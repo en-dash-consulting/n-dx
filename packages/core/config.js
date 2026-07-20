@@ -2033,3 +2033,61 @@ export async function runConfig(args) {
   // SHOW mode: all configs
   handleShowAll(configs, flags);
 }
+
+/**
+ * `ndx auth` — verify the active vendor's credentials on demand.
+ *
+ * Re-runs the same provider auth preflight used by `ndx init` /
+ * `ndx config llm.vendor` so users have a clear, repeatable way to confirm
+ * credentials after fixing them (the canonical auth-failure guidance ends
+ * with "Verify credentials: ndx auth" pointing here). Works without an
+ * initialized project — with no config the default vendor (claude) is
+ * checked.
+ *
+ * On success prints the active vendor, resolved model, and "credentials
+ * valid". On failure prints the same structured, JSON-free failure guidance
+ * as the config preflight path.
+ *
+ * @returns {Promise<number>} Exit code: 0 = credentials valid, 1 = failure.
+ */
+export async function runAuthCheck(args) {
+  const { positional } = parseArgs(args);
+
+  // The only meaningful positional is an optional project directory.
+  const dir =
+    positional[0] && (await fileExists(resolve(positional[0])))
+      ? resolve(positional[0])
+      : process.cwd();
+  const { configs } = await loadAllConfigs(dir);
+
+  const llmConfig =
+    configs.llm && typeof configs.llm === "object" ? configs.llm : {};
+  const legacyClaude =
+    configs.claude && typeof configs.claude === "object"
+      ? configs.claude
+      : undefined;
+  const vendor =
+    typeof llmConfig.vendor === "string" && llmConfig.vendor
+      ? llmConfig.vendor
+      : "claude";
+
+  const { resolveVendorModel } = await import("@n-dx/llm-client");
+  const { green, dim } = await import("./cli-brand.js");
+  let model;
+  try {
+    model = resolveVendorModel(vendor, llmConfig);
+  } catch {
+    model = "unknown";
+  }
+
+  console.log(dim(`Checking ${vendor} credentials…`));
+  const preflight = await runVendorAuthPreflight(vendor, llmConfig, legacyClaude);
+  if (preflight.ok) {
+    console.log(green(`✓ Credentials valid — vendor: ${vendor}, model: ${model}`));
+    return 0;
+  }
+
+  await printVendorPreflightFailure(vendor, preflight, llmConfig, legacyClaude);
+  console.error("Re-run 'ndx auth' after fixing the issue above to verify.");
+  return 1;
+}

@@ -40,7 +40,7 @@ import { createRequire } from "module";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, loadProjectConfig, repairProjectConfig } from "./config.js";
+import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig } from "./config.js";
 import {
   parseRecommendationsJson,
   formatQueuedTaskSummary,
@@ -333,7 +333,7 @@ let staleCheckResult = null;
  * Commands that skip the stale check — either they have no project context
  * (help, version) or they are about to fix staleness (init).
  */
-const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version"]);
+const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "auth"]);
 
 /**
  * On POSIX systems, spawn each child with `detached: true` so it becomes the
@@ -2102,6 +2102,17 @@ async function handleConfig(rest) {
   }
 }
 
+async function handleAuth(rest) {
+  try {
+    const code = await runAuthCheck(rest);
+    exitWithCleanup(code);
+  } catch (err) {
+    if (err instanceof ExitRequest) throw err;
+    console.error(formatError(err));
+    exitWithCleanup(1);
+  }
+}
+
 // ── Delegated rex commands ────────────────────────────────────────────────────
 
 async function handleValidate(rest) {
@@ -2490,6 +2501,7 @@ const COMMAND_DISPATCH = new Map([
   ["web",               (rest) => handleStart(rest, "web")],
   ["export",            handleExport],
   ["config",            handleConfig],
+  ["auth",              handleAuth],
   ["self-heal",         handleSelfHeal],
   // ── Delegated rex commands ──
   ["validate",          handleValidate],

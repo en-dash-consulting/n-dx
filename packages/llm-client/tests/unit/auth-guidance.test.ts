@@ -3,7 +3,11 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { authFailureGuidance, authFailureMessage } from "../../src/auth-guidance.js";
+import {
+  authFailureGuidance,
+  authFailureMessage,
+  VERIFY_CREDENTIALS_STEP,
+} from "../../src/auth-guidance.js";
 
 describe("authFailureGuidance", () => {
   it("names Claude and gives the logout/login remediation", () => {
@@ -45,6 +49,14 @@ describe("authFailureGuidance", () => {
       expect(all).not.toContain("}");
     }
   });
+
+  it("ends every vendor's remediation with the ndx auth verification step", () => {
+    for (const vendor of ["claude", "codex", "google"]) {
+      const g = authFailureGuidance(vendor);
+      expect(g.remediation.at(-1)).toBe(VERIFY_CREDENTIALS_STEP);
+    }
+    expect(VERIFY_CREDENTIALS_STEP).toBe("Verify credentials: ndx auth");
+  });
 });
 
 describe("authFailureMessage", () => {
@@ -55,5 +67,11 @@ describe("authFailureMessage", () => {
     expect(m).toContain("claude logout && claude login");
     expect(m).not.toContain("\n");
     expect(m).not.toContain("{");
+  });
+
+  it("ends with the ndx auth verification step for every vendor", () => {
+    for (const vendor of ["claude", "codex", "google"]) {
+      expect(authFailureMessage(vendor)).toMatch(/Verify credentials: ndx auth\.$/);
+    }
   });
 });

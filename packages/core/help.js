@@ -186,7 +186,14 @@ const COMMAND_REGISTRY = [
     category: "Orchestration",
     summary: "View and edit settings across all packages",
     keywords: ["settings", "configuration", "preferences", "edit", "view", "feature", "toggle"],
-    related: [],
+    related: ["auth"],
+  },
+  {
+    name: "auth",
+    category: "Orchestration",
+    summary: "Verify LLM provider credentials for the active vendor",
+    keywords: ["auth", "credentials", "login", "preflight", "verify", "authentication", "vendor"],
+    related: ["config", "init"],
   },
   {
     name: "export",
@@ -1002,6 +1009,17 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["start", "status"],
   },
+  auth: {
+    summary: "verify LLM provider credentials",
+    description:
+      "Re-runs the provider auth preflight for the active vendor (llm.vendor)\nand reports pass/fail. Use it to confirm credentials after re-authenticating\n(e.g. after 'claude logout && claude login' or updating an API key).\n\nExits 0 when credentials are valid, non-zero on auth failure. On failure\nthe same actionable guidance shown by the runtime error path is printed.\nWorks without an initialized project — the default vendor (claude) is\nchecked when no config exists.",
+    usage: "ndx auth [dir]",
+    examples: [
+      { command: "ndx auth", description: "Verify credentials for the active vendor" },
+      { command: "ndx auth ~/projects/app", description: "Verify using another project's vendor config" },
+    ],
+    related: ["config", "init"],
+  },
   validate: {
     summary: "check PRD integrity",
     description: "Validates the PRD structure: checks DAG integrity, schema conformance,\nparent-child references, and ID uniqueness. Delegates to 'rex validate'.",
@@ -1383,6 +1401,7 @@ export function formatMainHelp() {
   section("SETUP", [
     ["init [dir]", "Initialize project"],
     ["config [key] [value]", "View or edit settings"],
+    ["auth [dir]", "Verify LLM provider credentials"],
   ], pad);
 
   section("ANALYZE", [

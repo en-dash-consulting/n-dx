@@ -391,7 +391,7 @@ export type {
 } from "./llm-error-classifier.js";
 
 // Canonical re-authentication guidance (shared wording across all entry points)
-export { authFailureGuidance, authFailureMessage } from "./auth-guidance.js";
+export { authFailureGuidance, authFailureMessage, VERIFY_CREDENTIALS_STEP } from "./auth-guidance.js";
 export type { AuthFailureGuidance } from "./auth-guidance.js";
 
 // Rate-limit detection and retry utilities

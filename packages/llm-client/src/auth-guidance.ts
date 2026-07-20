@@ -34,8 +34,16 @@ export interface AuthFailureGuidance {
 const CANONICAL_CAUSE = "Invalid or expired credentials";
 
 /**
+ * Canonical verification step appended to every vendor's remediation:
+ * `ndx auth` re-runs the provider preflight, giving users a repeatable way
+ * to confirm credentials after fixing them.
+ */
+export const VERIFY_CREDENTIALS_STEP = "Verify credentials: ndx auth";
+
+/**
  * Return concise re-authentication guidance for a provider. Unknown vendors
- * fall back to Claude (the default vendor).
+ * fall back to Claude (the default vendor). The final remediation line is
+ * always {@link VERIFY_CREDENTIALS_STEP}.
  */
 export function authFailureGuidance(vendor: LLMVendor | string | undefined): AuthFailureGuidance {
   switch (vendor) {
@@ -46,6 +54,7 @@ export function authFailureGuidance(vendor: LLMVendor | string | undefined): Aut
         remediation: [
           "Re-authenticate: codex logout && codex login",
           "If needed, set the binary path: ndx config llm.codex.cli_path /path/to/codex",
+          VERIFY_CREDENTIALS_STEP,
         ],
       };
     case "google":
@@ -56,6 +65,7 @@ export function authFailureGuidance(vendor: LLMVendor | string | undefined): Aut
           "Update your API key: ndx config llm.google.api_key <KEY>",
           "Or set the env var: export GEMINI_API_KEY=<KEY>",
           "Get a key: https://aistudio.google.com/apikey",
+          VERIFY_CREDENTIALS_STEP,
         ],
       };
     case "claude":
@@ -63,16 +73,20 @@ export function authFailureGuidance(vendor: LLMVendor | string | undefined): Aut
       return {
         provider: "Claude",
         headline: `Authentication failed for Claude — ${CANONICAL_CAUSE}.`,
-        remediation: ["Re-authenticate: claude logout && claude login"],
+        remediation: [
+          "Re-authenticate: claude logout && claude login",
+          VERIFY_CREDENTIALS_STEP,
+        ],
       };
   }
 }
 
 /**
  * Flatten {@link authFailureGuidance} into a single JSON-free line suitable
- * for an error `.message` — the headline plus the primary remediation command.
+ * for an error `.message` — the headline plus the primary remediation
+ * command, ending with the {@link VERIFY_CREDENTIALS_STEP} verification step.
  */
 export function authFailureMessage(vendor: LLMVendor | string | undefined): string {
   const guidance = authFailureGuidance(vendor);
-  return `${guidance.headline} ${guidance.remediation[0]}`;
+  return `${guidance.headline} ${guidance.remediation[0]}. ${VERIFY_CREDENTIALS_STEP}.`;
 }
