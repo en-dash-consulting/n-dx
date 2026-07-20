@@ -12,7 +12,7 @@ description: "The Zones graph already lets a user expand a zone node to reveal i
 
 | Title | Status |
 |-------|--------|
-| [Add tests for cross-zone connection surfacing and file ordering](./add-tests-for-cross-zone-6042f1.md) | pending |
+| [Add tests for cross-zone connection surfacing and file ordering](./add-tests-for-cross-zone-6042f1.md) | completed |
 | [Color-code the cross-zone indicator bar by target zone](./color-code-the-cross-zone-d593c6.md) | pending |
 | [Highlight a file's cross-zone connections on hover or select](./highlight-a-file-s-cross-zone-06071f.md) | pending |
 | [Prioritize and optionally filter connecting files in an expanded zone](./prioritize-and-optionally-f9c648.md) | completed |

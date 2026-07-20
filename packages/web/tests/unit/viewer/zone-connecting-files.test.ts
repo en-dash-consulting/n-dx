@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import type { ZoneData, FileInfo, FileConnectionMap, FileZoneLink } from "../../../src/viewer/views/zone-types.js";
+import type { CallGraph, CallEdge, ExternalImport, Zone, Zones } from "../../../src/schema/v1.js";
 import {
   prioritizeConnectingFiles,
   applyConnectingFilesOrdering,
   buildConnectionsTooltip,
+  buildFileConnectionMap,
 } from "../../../src/viewer/views/zones.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -221,5 +223,167 @@ describe("buildConnectionsTooltip", () => {
     ];
     buildConnectionsTooltip(links, zoneNameById);
     expect(links.map((l) => l.targetZoneId)).toEqual(["z-shared", "z-server"]);
+  });
+});
+
+// ── buildFileConnectionMap ───────────────────────────────────────────────────
+
+function callEdge(callerFile: string, calleeFile: string | null): CallEdge {
+  return { callerFile, caller: "fn", calleeFile, callee: "gn", type: "direct", line: 1, column: 0 };
+}
+
+function makeCallGraph(edges: CallEdge[]): CallGraph {
+  return {
+    functions: [],
+    edges,
+    summary: {
+      totalFunctions: 0,
+      totalCalls: edges.length,
+      filesWithCalls: 0,
+      mostCalled: [],
+      mostCalling: [],
+      cycleCount: 0,
+    },
+  };
+}
+
+function makeZone(id: string, files: string[]): Zone {
+  return { id, name: id, description: "", files, entryPoints: [], cohesion: 0.8, coupling: 0.2 };
+}
+
+function makeZones(...zones: Zone[]): Zones {
+  return { zones, crossings: [], unzoned: [] };
+}
+
+function extImport(pkg: string, importedBy: string[]): ExternalImport {
+  return { package: pkg, importedBy, symbols: [] };
+}
+
+describe("buildFileConnectionMap", () => {
+  const zoneEntry = (id: string) => ({ id, name: id, color: "#00E5B9" });
+  const fileToZoneMap = new Map([
+    ["a/one.ts", zoneEntry("za")],
+    ["a/two.ts", zoneEntry("za")],
+    ["b/one.ts", zoneEntry("zb")],
+  ]);
+
+  it("records a bidirectional connection with weight 1 for a cross-zone call edge", () => {
+    const map = buildFileConnectionMap(
+      makeCallGraph([callEdge("a/one.ts", "b/one.ts")]),
+      [],
+      fileToZoneMap,
+      null,
+    );
+    expect(map.get("a/one.ts")).toEqual([{ targetZoneId: "zb", weight: 1 }]);
+    expect(map.get("b/one.ts")).toEqual([{ targetZoneId: "za", weight: 1 }]);
+    expect(map.size).toBe(2);
+  });
+
+  it("accumulates weight across repeated edges to the same target zone", () => {
+    const map = buildFileConnectionMap(
+      makeCallGraph([
+        callEdge("a/one.ts", "b/one.ts"),
+        callEdge("a/one.ts", "b/one.ts"),
+        callEdge("a/two.ts", "b/one.ts"),
+      ]),
+      [],
+      fileToZoneMap,
+      null,
+    );
+    expect(map.get("a/one.ts")).toEqual([{ targetZoneId: "zb", weight: 2 }]);
+    expect(map.get("a/two.ts")).toEqual([{ targetZoneId: "zb", weight: 1 }]);
+    // Callee side aggregates all three inbound calls from zone za
+    expect(map.get("b/one.ts")).toEqual([{ targetZoneId: "za", weight: 3 }]);
+  });
+
+  it("ignores same-zone edges, unresolved callees, and unzoned files", () => {
+    const map = buildFileConnectionMap(
+      makeCallGraph([
+        callEdge("a/one.ts", "a/two.ts"),   // same zone
+        callEdge("a/one.ts", null),          // external/unresolved callee
+        callEdge("a/one.ts", "orphan.ts"),  // callee not in any zone
+        callEdge("orphan.ts", "b/one.ts"),  // caller not in any zone
+      ]),
+      [],
+      fileToZoneMap,
+      null,
+    );
+    expect(map.size).toBe(0);
+  });
+
+  it("maps @n-dx/-scoped external imports to the zone owning the package directory", () => {
+    const zones = makeZones(
+      makeZone("z-core", ["packages/core/cli.js"]),
+      makeZone("z-llm", ["packages/llm-client/src/api.ts"]),
+    );
+    const map = buildFileConnectionMap(
+      makeCallGraph([]),
+      [extImport("@n-dx/llm-client", ["packages/core/cli.js"])],
+      new Map([["packages/core/cli.js", zoneEntry("z-core")]]),
+      zones,
+    );
+    // Import-derived connections are one-directional: importer → target zone
+    expect(map.get("packages/core/cli.js")).toEqual([{ targetZoneId: "z-llm", weight: 1 }]);
+    expect(map.size).toBe(1);
+  });
+
+  it("maps bare package names to the zone owning packages/<name>", () => {
+    const zones = makeZones(makeZone("z-rex", ["packages/rex/src/store.ts"]));
+    const map = buildFileConnectionMap(
+      makeCallGraph([]),
+      [extImport("rex", ["packages/hench/src/gateway.ts"])],
+      new Map([["packages/hench/src/gateway.ts", zoneEntry("z-hench")]]),
+      zones,
+    );
+    expect(map.get("packages/hench/src/gateway.ts")).toEqual([{ targetZoneId: "z-rex", weight: 1 }]);
+  });
+
+  it("prefers the zone owning src/ files when a package spans multiple zones", () => {
+    const zones = makeZones(
+      makeZone("z-tests", ["packages/llm-client/tests/api.test.ts"]),
+      makeZone("z-lib", ["packages/llm-client/src/api.ts"]),
+    );
+    const map = buildFileConnectionMap(
+      makeCallGraph([]),
+      [extImport("@n-dx/llm-client", ["packages/core/cli.js"])],
+      new Map([["packages/core/cli.js", zoneEntry("z-core")]]),
+      zones,
+    );
+    expect(map.get("packages/core/cli.js")).toEqual([{ targetZoneId: "z-lib", weight: 1 }]);
+  });
+
+  it("skips external imports whose importer is inside the target zone", () => {
+    const zones = makeZones(makeZone("z-lib", ["packages/llm-client/src/api.ts"]));
+    const map = buildFileConnectionMap(
+      makeCallGraph([]),
+      [extImport("@n-dx/llm-client", ["packages/llm-client/src/other.ts"])],
+      new Map([["packages/llm-client/src/other.ts", zoneEntry("z-lib")]]),
+      zones,
+    );
+    expect(map.size).toBe(0);
+  });
+
+  it("combines call-edge and external-import weights per target zone", () => {
+    const zones = makeZones(
+      makeZone("z-beta", ["packages/beta/src/b.ts"]),
+      makeZone("za", ["a/one.ts"]),
+    );
+    const ftz = new Map([
+      ["a/one.ts", zoneEntry("za")],
+      ["packages/beta/src/b.ts", zoneEntry("z-beta")],
+    ]);
+    const map = buildFileConnectionMap(
+      makeCallGraph([callEdge("a/one.ts", "packages/beta/src/b.ts")]),
+      [extImport("beta", ["a/one.ts"])],
+      ftz,
+      zones,
+    );
+    expect(map.get("a/one.ts")).toEqual([{ targetZoneId: "z-beta", weight: 2 }]);
+    expect(map.get("packages/beta/src/b.ts")).toEqual([{ targetZoneId: "za", weight: 1 }]);
+  });
+
+  it("returns an empty map when there are no edges or imports", () => {
+    const map = buildFileConnectionMap(makeCallGraph([]), [], fileToZoneMap, makeZones());
+    expect(map.size).toBe(0);
   });
 });

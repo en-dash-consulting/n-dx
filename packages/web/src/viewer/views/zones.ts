@@ -323,7 +323,7 @@ function buildExplorerData(
  * Build per-file cross-zone connection map.
  * For each file, tracks which other zones it connects to (and weight).
  */
-function buildFileConnectionMap(
+export function buildFileConnectionMap(
   callGraph: CallGraph,
   externalImports: import("../../schema/v1.js").ExternalImport[],
   fileToZoneMap: Map<string, { id: string; name: string; color: string }>,
