@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { GITATTRIBUTES_EOL_RULES } from "../../packages/core/gitattributes-pins.js";
 
 const REPO_ROOT = process.cwd();
 const PRD_ROOT = join(REPO_ROOT, ".rex", "prd_tree");
@@ -99,5 +100,42 @@ describe("other n-dx-serialized tracked files are pinned to LF", () => {
       cwd: REPO_ROOT,
     });
     expect(out.trim()).toMatch(/: lf$/);
+  });
+});
+
+// ── Sync guard: the injector list and the repo's own .gitattributes must not
+// drift apart. The pins originally shipped incomplete precisely because these
+// two sources diverged (one was updated, the other wasn't), so a per-pattern
+// check isn't enough — assert the FULL pattern sets are equal.
+describe("GITATTRIBUTES_EOL_RULES stays in sync with n-dx's own .gitattributes", () => {
+  /** First-token glob pattern of each `eol=lf` line in a .gitattributes body. */
+  function eolPatternsFromGitattributes(body) {
+    return body
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#") && line.includes("eol=lf"))
+      .map((line) => line.split(/\s+/)[0]);
+  }
+
+  it("the injected rule set equals the repo .gitattributes eol=lf pattern set", () => {
+    const injectorPatterns = GITATTRIBUTES_EOL_RULES.map((r) => r.trim().split(/\s+/)[0]);
+    const repoBody = readFileSync(join(REPO_ROOT, ".gitattributes"), "utf-8");
+    const repoPatterns = eolPatternsFromGitattributes(repoBody);
+
+    // Equality of sets — any pattern present in one source but not the other is
+    // the drift this guard exists to catch. Sorted arrays give a readable diff.
+    expect([...new Set(injectorPatterns)].sort()).toEqual(
+      [...new Set(repoPatterns)].sort(),
+    );
+  });
+
+  it("neither source has duplicate eol=lf patterns", () => {
+    const injectorPatterns = GITATTRIBUTES_EOL_RULES.map((r) => r.trim().split(/\s+/)[0]);
+    expect(injectorPatterns.length).toBe(new Set(injectorPatterns).size);
+
+    const repoPatterns = eolPatternsFromGitattributes(
+      readFileSync(join(REPO_ROOT, ".gitattributes"), "utf-8"),
+    );
+    expect(repoPatterns.length).toBe(new Set(repoPatterns).size);
   });
 });

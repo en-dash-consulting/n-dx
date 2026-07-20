@@ -80,6 +80,7 @@ import {
   formatOrchestratorCommandHelp,
 } from "./help.js";
 import { setupAssistantIntegrations, formatInitReport, checkSkillTracking, formatSkillTrackingHints } from "./assistant-integration.js";
+import { ensureGitattributesRules } from "./gitattributes-pins.js";
 import { generateTargetReadme } from "./readme-generator.js";
 import {
   runGitPreflight,
@@ -862,61 +863,6 @@ function ensureGitignoreEntry(dir, entry) {
   if (content.includes(entry)) return;
   const suffix = (content.length > 0 && !content.endsWith("\n") ? "\n" : "") + entry + "\n";
   writeFileSync(gitignorePath, content + suffix, "utf-8");
-}
-
-/**
- * Files that n-dx tools rewrite with LF line endings. Each needs an eol=lf
- * pin so a Windows checkout (core.autocrlf=true) doesn't show line-ending-only
- * churn after every tool write. Mirrors the n-dx repo's own .gitattributes.
- * See https://github.com/en-dash-consulting/n-dx/issues/283.
- */
-const GITATTRIBUTES_EOL_RULES = [
-  ".rex/**/*.md    text eol=lf",
-  ".rex/**/*.json  text eol=lf",
-  ".rex/**/*.jsonl text eol=lf",
-  ".hench/**/*.md   text eol=lf",
-  ".hench/**/*.json text eol=lf",
-  ".sourcevision/**/*.md   text eol=lf",
-  ".sourcevision/**/*.json text eol=lf",
-  ".sourcevision/**/*.txt  text eol=lf",
-  ".n-dx.json text eol=lf",
-  "AGENTS.md  text eol=lf",
-  "CLAUDE.md  text eol=lf",
-  ".agents/**/*.md text eol=lf",
-  ".claude/skills/**/*.md text eol=lf",
-  ".codex/config.toml text eol=lf",
-];
-
-const GITATTRIBUTES_EOL_HEADER =
-  "# n-dx tools write these files with LF. Pin them so Windows checkouts\n" +
-  "# (core.autocrlf=true) don't show line-ending-only churn on every tool write.\n";
-
-/**
- * Append missing eol=lf rules to the project's .gitattributes.
- * Creates the file if it doesn't exist. Idempotent: a rule is skipped when a
- * line for its pattern is already present (even with different attributes,
- * so user overrides win). Existing content is never modified.
- */
-function ensureGitattributesRules(dir) {
-  const attrPath = join(dir, ".gitattributes");
-  let content = "";
-  try {
-    content = readFileSync(attrPath, "utf-8");
-  } catch {
-    // No .gitattributes yet
-  }
-  const existingPatterns = new Set(
-    content.split("\n").map((line) => line.trim().split(/\s+/)[0]).filter(Boolean),
-  );
-  const missing = GITATTRIBUTES_EOL_RULES.filter(
-    (rule) => !existingPatterns.has(rule.split(/\s+/)[0]),
-  );
-  if (missing.length === 0) return;
-  const header = content.includes("n-dx tools write these files with LF")
-    ? ""
-    : GITATTRIBUTES_EOL_HEADER;
-  const prefix = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
-  writeFileSync(attrPath, content + prefix + header + missing.join("\n") + "\n", "utf-8");
 }
 
 // ── Command handlers ─────────────────────────────────────────────────────────
