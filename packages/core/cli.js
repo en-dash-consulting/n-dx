@@ -878,10 +878,13 @@ const GITATTRIBUTES_EOL_RULES = [
   ".hench/**/*.json text eol=lf",
   ".sourcevision/**/*.md   text eol=lf",
   ".sourcevision/**/*.json text eol=lf",
+  ".sourcevision/**/*.txt  text eol=lf",
   ".n-dx.json text eol=lf",
   "AGENTS.md  text eol=lf",
   "CLAUDE.md  text eol=lf",
   ".agents/**/*.md text eol=lf",
+  ".claude/skills/**/*.md text eol=lf",
+  ".codex/config.toml text eol=lf",
 ];
 
 const GITATTRIBUTES_EOL_HEADER =

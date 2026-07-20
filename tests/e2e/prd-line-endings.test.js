@@ -84,10 +84,13 @@ describe("other n-dx-serialized tracked files are pinned to LF", () => {
   const surfaces = [
     ".hench/config.json",
     ".sourcevision/hints.md",
+    ".sourcevision/llms.txt",
     ".n-dx.json",
     "AGENTS.md",
     "CLAUDE.md",
     ".agents/skills/ndx-work/SKILL.md",
+    ".claude/skills/ndx-work/SKILL.md",
+    ".codex/config.toml",
   ];
 
   it.each(surfaces)("git resolves eol=lf for %s", (path) => {
