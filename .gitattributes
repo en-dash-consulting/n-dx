@@ -18,3 +18,4 @@
 AGENTS.md               text eol=lf
 CLAUDE.md               text eol=lf
 .agents/**/*.md         text eol=lf
+.claude/skills/**/*.md  text eol=lf

@@ -26,7 +26,6 @@ tests/fixtures/sv-evals/**/.sourcevision/
 ndx-export/
 .ndx-deploy-tmp/
 .claude/settings.local.json
-.claude/skills/
 .claude/worktrees/
 docs/.vitepress/dist/
 docs/.vitepress/cache/

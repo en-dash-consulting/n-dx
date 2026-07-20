@@ -103,7 +103,7 @@ ndx start .
 
 If using stdio MCP transport, re-run init to regenerate configs:
 ```sh
-ndx init .   # re-registers Claude MCP servers, regenerates .codex/config.toml
+ndx init .   # re-registers Claude MCP servers and regenerates the Codex config (.codex/config.toml)
 ```
 
 For Claude Code specifically, you can also remove and re-add servers manually:

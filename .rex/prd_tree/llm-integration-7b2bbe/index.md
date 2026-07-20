@@ -45,4 +45,5 @@ description: "AI client infrastructure: vendor-neutral LLM foundation, token usa
 | [Token Usage Attribution per PRD Item](./token-usage-attribution-per-prd-item/index.md) | completed |
 | [Token usage tracking and analytics](./token-usage-tracking-and-analytics/index.md) | completed |
 | [Unified Server Architecture: HTTP MCP and ndx start](./unified-server-architecture-e96db7/index.md) | completed |
+| [Codex workflow parity — close-out (issue #122 remainder)](./codex-workflow-parity-close-out-8f00a8.md) | pending |
 | [`ndx add` ignores configured Google/Gemini vendor and falls back to Claude](./ndx-add-ignores-configured-46d8b9.md) | completed |

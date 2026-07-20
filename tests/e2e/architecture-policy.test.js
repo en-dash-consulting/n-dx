@@ -76,6 +76,9 @@ const ALLOWED = new Set([
   "packages/core/git-preflight.js",
   // Codex integration — writes .codex/config.toml, .agents/skills, AGENTS.md
   "packages/core/codex-integration.js",
+  // Assistant integration — runs `git check-ignore` to detect gitignored
+  // skill directories (the #284 skill-tracking hint)
+  "packages/core/assistant-integration.js",
   // CI preflight script — runs build/test/check steps via child processes
   "scripts/preflight.mjs",
   // Performance profiling script — measures PRD write latency via pnpm exec
