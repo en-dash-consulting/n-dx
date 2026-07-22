@@ -1278,8 +1278,13 @@ export async function updateCompletedTaskStatus(
 
     return true;
   } catch (err) {
-    // Best-effort: log failure but don't fail the run
-    detail(`Warning: early PRD status update failed: ${(err as Error).message}`);
+    const msg = (err as Error).message;
+    detail(`Warning: early PRD status update failed: ${msg}`);
+    // Record in run diagnostics so the failure is visible after the fact,
+    // not only in the console output.
+    if (run.diagnostics) {
+      run.diagnostics.notes.push(`cascade_failure: ${msg}`);
+    }
     return false;
   }
 }
@@ -1434,7 +1439,12 @@ export async function performCommitPromptIfNeeded(
     } catch (err) {
       // Best-effort: if PRD update fails, proceed with commit anyway
       // This prevents a failed PRD update from blocking the entire commit flow
-      detail(`Warning: PRD status update failed: ${(err as Error).message}`);
+      const msg = (err as Error).message;
+      detail(`Warning: PRD status update failed: ${msg}`);
+      // Record in run diagnostics so the failure is visible after the fact.
+      if (run.diagnostics) {
+        run.diagnostics.notes.push(`cascade_failure: ${msg}`);
+      }
     }
   }
 
