@@ -42,6 +42,7 @@ const EXPECTED_EXPORTS = [
   "computeTimestampUpdates",
   // Parent auto-completion
   "findAutoCompletions",
+  "reconcileAutoCompletions",
   // Requirements validation
   "collectRequirements",
   "validateAutomatedRequirements",

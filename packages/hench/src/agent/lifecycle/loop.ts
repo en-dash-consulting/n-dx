@@ -32,6 +32,7 @@ import {
   transitionToInProgress,
   initRunRecord,
   captureStartingHead,
+  captureBaselineUntracked,
   runReviewGate,
   finalizeRun,
   handleRunFailure,
@@ -522,6 +523,8 @@ interface GeminiToolLoopParams {
   maxTurns: number;
   tokenBudget: number | undefined;
   startingHead: string | undefined;
+  /** Untracked files present before the run, for scoped rollback (#303). */
+  baselineUntracked: string[];
   opts: AgentLoopOptions;
 }
 
@@ -546,7 +549,8 @@ interface GeminiToolLoopParams {
 async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoopResult> {
   const {
     provider, config, model, systemPrompt, briefText, taskTitle, testCommand,
-    taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead, opts,
+    taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead,
+    baselineUntracked, opts,
   } = params;
 
   const hasToolCalling =
@@ -672,7 +676,11 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   heartbeat.stop();
 
   if (opts.review && run.status === "completed") {
-    await runReviewGate(projectDir, store, taskId, run);
+    await runReviewGate(projectDir, store, taskId, run, {
+      rollbackOnFailure: opts.rollbackOnFailure,
+      yes: opts.yes,
+      baselineUntracked,
+    });
   }
 
   await finalizeRun({
@@ -690,6 +698,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     store,
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
+    baselineUntracked,
   });
 
   return { run };
@@ -733,6 +742,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   // API-specific: resolve provider, API key, build client and tool context
   const startingHead = captureStartingHead(projectDir);
+  // Snapshot untracked files before the agent runs, so a rollback removes only
+  // the files the agent creates — never the user's pre-existing work (#303).
+  const baselineUntracked = await captureBaselineUntracked(projectDir);
 
   // Resolve provider — registry or legacy path based on config flag
   const llmConfig = await loadLLMConfig(henchDir);
@@ -776,6 +788,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       maxTurns,
       tokenBudget,
       startingHead,
+      baselineUntracked,
       opts,
     });
   }
@@ -989,7 +1002,11 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   // Shared: review gate
   if (opts.review && run.status === "completed") {
-    await runReviewGate(projectDir, store, taskId, run);
+    await runReviewGate(projectDir, store, taskId, run, {
+      rollbackOnFailure: opts.rollbackOnFailure,
+      yes: opts.yes,
+      baselineUntracked,
+    });
   }
 
   // Shared: finalize run (build summary, memory stats, post-task tests, save)
@@ -1008,6 +1025,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     store,
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
+    baselineUntracked,
   });
 
   return { run };

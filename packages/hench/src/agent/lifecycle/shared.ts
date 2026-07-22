@@ -28,7 +28,7 @@ import { saveRun } from "../../store/runs.js";
 import { persistRunLog } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
-import { collectReviewDiff, promptReview, revertChanges } from "../analysis/review.js";
+import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { defaultRegistry, resolveVendorModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
@@ -423,6 +423,23 @@ export function captureStartingHead(projectDir: string): string | undefined {
   return getCurrentHead(projectDir);
 }
 
+/**
+ * Capture the set of untracked files present BEFORE the agent runs.
+ *
+ * On rollback, this baseline lets {@link revertChanges} remove only the
+ * untracked files the agent created during the run, while preserving the
+ * user's pre-existing untracked work (`.env`, local scratch, hidden files).
+ * This is the plumbing half of the #303 data-loss guard.
+ *
+ * Returns `[]` when the tree is clean or git is unavailable — a `[]` baseline
+ * (empty but defined) still means "the agent created everything untracked",
+ * which is correct when the tree started clean. The undefined-baseline
+ * fallback (delete nothing) only applies when this capture is skipped.
+ */
+export async function captureBaselineUntracked(projectDir: string): Promise<string[]> {
+  return listUntrackedPaths(projectDir);
+}
+
 // ---------------------------------------------------------------------------
 // Review gate (identical in both loops)
 // ---------------------------------------------------------------------------
@@ -430,6 +447,23 @@ export function captureStartingHead(projectDir: string): string | undefined {
 export interface ReviewGateResult {
   rejected: boolean;
   reason?: string;
+}
+
+/** Options controlling rollback behavior when the reviewer rejects changes. */
+export interface ReviewGateOptions {
+  /**
+   * Automatically revert on rejection. Default: true. When false (via
+   * --no-rollback), rejected changes are left in place. Previously the review
+   * path ignored this flag entirely (issue #303).
+   */
+  rollbackOnFailure?: boolean;
+  /** Skip the interactive rollback confirmation prompt (--yes / non-interactive). */
+  yes?: boolean;
+  /**
+   * Untracked paths present before the run, so rollback removes only
+   * agent-created files. See {@link captureBaselineUntracked}.
+   */
+  baselineUntracked?: string[];
 }
 
 /**
@@ -444,6 +478,7 @@ export async function runReviewGate(
   store: PRDStore,
   taskId: string,
   run: RunRecord,
+  options: ReviewGateOptions = {},
 ): Promise<ReviewGateResult> {
   const reviewDiff = await collectReviewDiff(projectDir);
   const reviewResult = await promptReview(reviewDiff);
@@ -452,8 +487,20 @@ export async function runReviewGate(
     run.status = "failed";
     run.error = reviewResult.reason;
 
-    info(`\nChanges rejected — reverting...`);
-    await revertChanges(projectDir);
+    // Honor --no-rollback here too: previously this path reverted
+    // unconditionally, ignoring the flag (issue #303). When rollback is
+    // suppressed, leave the rejected changes in place for the user to inspect.
+    if (options.rollbackOnFailure === false) {
+      info("\nChanges rejected — leaving changes in place (--no-rollback).");
+    } else {
+      // Reuse the shared rollback path: it prompts for confirmation in
+      // interactive sessions and scopes untracked removal to agent-created
+      // files via the baseline.
+      await performRollbackIfNeeded(projectDir, {
+        yes: options.yes,
+        baselineUntracked: options.baselineUntracked,
+      });
+    }
 
     await toolRexUpdateStatus(store, taskId, { status: "pending" });
     await toolRexAppendLog(store, taskId, {
@@ -738,6 +785,13 @@ export interface FinalizeRunOptions {
    * Default: false (gate is mandatory). Set via --skip-test-gate flag.
    */
   skipFullTestGate?: boolean;
+  /**
+   * Untracked paths captured before the run started (via
+   * {@link captureBaselineUntracked}). Threaded into rollback so only
+   * agent-created untracked files are removed on failure — never the user's
+   * pre-existing untracked work (issue #303).
+   */
+  baselineUntracked?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -898,14 +952,27 @@ async function promptRollbackConfirm(count: number): Promise<boolean> {
  *
  * Prints the number of reverted paths on completion.
  */
-async function performRollbackIfNeeded(projectDir: string, yes?: boolean): Promise<void> {
+interface PerformRollbackOptions {
+  /** Skip the interactive confirmation prompt (--yes / non-interactive). */
+  yes?: boolean;
+  /**
+   * Untracked paths present before the run; only untracked files absent from
+   * this set are removed. When omitted, no untracked files are deleted.
+   */
+  baselineUntracked?: string[];
+}
+
+async function performRollbackIfNeeded(
+  projectDir: string,
+  options: PerformRollbackOptions = {},
+): Promise<void> {
   const dirtyPaths = await listDirtyPaths(projectDir);
   if (dirtyPaths.length === 0) {
     return;
   }
 
   // Prompt only in interactive TTY sessions where --yes was not supplied.
-  const isInteractive = Boolean(process.stdin.isTTY) && !yes;
+  const isInteractive = Boolean(process.stdin.isTTY) && !options.yes;
   if (isInteractive) {
     const confirmed = await promptRollbackConfirm(dirtyPaths.length);
     if (!confirmed) {
@@ -915,8 +982,16 @@ async function performRollbackIfNeeded(projectDir: string, yes?: boolean): Promi
   }
 
   info(`\nRolling back ${dirtyPaths.length} uncommitted file(s) after failed run…`);
-  await revertChanges(projectDir);
-  info(`Rollback complete — ${dirtyPaths.length} file(s) reverted.`);
+  const result = await revertChanges(projectDir, {
+    baselineUntracked: options.baselineUntracked,
+  });
+  const removed = result.removedUntracked.length;
+  const kept = result.keptUntracked.length;
+  info(
+    `Rollback complete — reverted tracked changes` +
+      `; removed ${removed} agent-created file(s)` +
+      (kept > 0 ? `, preserved ${kept} pre-existing untracked file(s).` : "."),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1014,6 +1089,59 @@ async function commitPreRunChanges(projectDir: string, message: string): Promise
     cwd: projectDir,
     timeout: 30_000,
   });
+}
+
+/**
+ * Commit any uncommitted .rex/prd_tree changes produced by the task-completion
+ * status update. Called on the autoCommit path only, where
+ * performCommitPromptIfNeeded is a no-op and would otherwise leave the
+ * metadata dirty in the working tree.
+ *
+ * Skips silently when there are no staged changes or when not in a git repo.
+ */
+async function commitCompletionMetadata(
+  projectDir: string,
+  taskId: string,
+): Promise<void> {
+  const { join } = await import("node:path");
+  const { existsSync } = await import("node:fs");
+  const prdTreePath = join(".rex", PRD_TREE_DIRNAME);
+
+  if (!existsSync(join(projectDir, prdTreePath))) {
+    return;
+  }
+
+  try {
+    await execStdout("git", ["add", prdTreePath], { cwd: projectDir, timeout: 10_000 });
+  } catch {
+    return; // not in a git repo
+  }
+
+  let staged = 0;
+  try {
+    const out = await execStdout(
+      "git", ["diff", "--cached", "--name-only", "--", ".rex/"],
+      { cwd: projectDir, timeout: 10_000 },
+    );
+    staged = out.trim().split("\n").filter(Boolean).length;
+  } catch {
+    return;
+  }
+
+  if (staged === 0) {
+    return;
+  }
+
+  const message = `chore(prd): mark task ${taskId} completed`;
+  try {
+    await execStdout(
+      "git", ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine()],
+      { cwd: projectDir, timeout: 30_000 },
+    );
+    detail(`Committed completion metadata (${staged} PRD file(s))`);
+  } catch (err) {
+    detail(`Warning: could not commit completion metadata: ${(err as Error).message}`);
+  }
 }
 
 export interface PreRunCommitGateOptions {
@@ -1150,8 +1278,13 @@ export async function updateCompletedTaskStatus(
 
     return true;
   } catch (err) {
-    // Best-effort: log failure but don't fail the run
-    detail(`Warning: early PRD status update failed: ${(err as Error).message}`);
+    const msg = (err as Error).message;
+    detail(`Warning: early PRD status update failed: ${msg}`);
+    // Record in run diagnostics so the failure is visible after the fact,
+    // not only in the console output.
+    if (run.diagnostics) {
+      run.diagnostics.notes.push(`cascade_failure: ${msg}`);
+    }
     return false;
   }
 }
@@ -1306,7 +1439,12 @@ export async function performCommitPromptIfNeeded(
     } catch (err) {
       // Best-effort: if PRD update fails, proceed with commit anyway
       // This prevents a failed PRD update from blocking the entire commit flow
-      detail(`Warning: PRD status update failed: ${(err as Error).message}`);
+      const msg = (err as Error).message;
+      detail(`Warning: PRD status update failed: ${msg}`);
+      // Record in run diagnostics so the failure is visible after the fact.
+      if (run.diagnostics) {
+        run.diagnostics.notes.push(`cascade_failure: ${msg}`);
+      }
     }
   }
 
@@ -1749,11 +1887,21 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     opts.commitWatcher,
   );
 
+  // On the autoCommit path performCommitPromptIfNeeded is a no-op, so the
+  // completion metadata written by updateCompletedTaskStatus would otherwise
+  // be left uncommitted. Commit it now in a small dedicated second commit.
+  if (opts.autoCommit === true && run.status === "completed" && run.taskId) {
+    await commitCompletionMetadata(projectDir, run.taskId);
+  }
+
   // Rollback uncommitted changes when the run failed (unless suppressed).
   // Runs after test gates so the working tree reflects the agent's final state.
   // Skips silently when nothing is dirty (no-op for already-clean trees).
   if (opts.rollbackOnFailure !== false && FAILURE_STATUSES.has(run.status)) {
-    await performRollbackIfNeeded(projectDir, opts.yes);
+    await performRollbackIfNeeded(projectDir, {
+      yes: opts.yes,
+      baselineUntracked: opts.baselineUntracked,
+    });
   }
 
   // Reset task to pending when run failed and task is still in_progress.

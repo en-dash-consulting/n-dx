@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor } from "../prd/rex-gateway.js";
 import { PROJECT_DIRS } from "../prd/llm-gateway.js";
 import { execShellCmd } from "../process/exec.js";
-import { computeTimestampUpdates, findAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "../prd/rex-gateway.js";
+import { computeTimestampUpdates, reconcileAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "../prd/rex-gateway.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 import type {
   RexToolHandlers,
@@ -112,12 +112,18 @@ export async function toolRexUpdateStatus(
     applyAttribution: true,
     ...(options?.projectDir ? { projectDir: options.projectDir } : {}),
   });
-  await store.appendLog({
-    timestamp: new Date().toISOString(),
-    event: "status_updated",
-    itemId: taskId,
-    detail: `Status changed to ${params.status} by hench agent`,
-  });
+
+  // status_updated log is best-effort: a failure must not cancel the cascade.
+  try {
+    await store.appendLog({
+      timestamp: new Date().toISOString(),
+      event: "status_updated",
+      itemId: taskId,
+      detail: `Status changed to ${params.status} by hench agent`,
+    });
+  } catch {
+    // Non-fatal: proceed to cascade
+  }
 
   // Auto-acknowledge sourcevision findings when a task is deferred
   if (params.status === "deferred" && existing?.tags && options?.projectDir) {
@@ -137,11 +143,13 @@ export async function toolRexUpdateStatus(
     }
   }
 
-  // Auto-complete parent items when a child is completed or deferred
+  // Auto-complete parent items using a whole-tree reconciliation sweep.
+  // Using reconcileAutoCompletions (not findAutoCompletions) ensures that
+  // parents left stuck pending by a previously-missed cascade are also healed.
   const autoCompleted: string[] = [];
   if (params.status === "completed" || params.status === "deferred") {
     const doc = await store.loadDocument();
-    const { completedItems } = findAutoCompletions(doc.items, taskId);
+    const { completedItems } = reconcileAutoCompletions(doc.items);
 
     for (const item of completedItems) {
       const parentItem = await store.getItem(item.id);

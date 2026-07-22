@@ -56,6 +56,66 @@ function allChildrenTerminal(
  * @param itemId    - The ID of the item that just completed.
  * @returns Items to auto-complete, ordered bottom-up. Empty if no propagation needed.
  */
+/**
+ * Scan the whole PRD tree bottom-up and return every parent that is
+ * `pending` or `in_progress` but whose children are all terminal
+ * (`completed`/`deferred`). Operates independently of any single trigger
+ * item, so it self-heals parents whose event-driven cascade was previously
+ * lost (e.g. due to an `appendLog` failure after child completion).
+ *
+ * Items are returned bottom-up: a feature appears before its epic so that
+ * callers can apply updates in order without re-checking the tree.
+ *
+ * @param items - The full PRD item tree.
+ * @returns Items to auto-complete, ordered bottom-up. Empty when everything is consistent.
+ */
+export function reconcileAutoCompletions(items: PRDItem[]): AutoCompletionResult {
+  const result: AutoCompletionResult = {
+    completedIds: [],
+    completedItems: [],
+  };
+
+  // Collect all items in post-order (children before parents)
+  const postOrder: PRDItem[] = [];
+  function collectPostOrder(nodes: PRDItem[]): void {
+    for (const node of nodes) {
+      if (node.children && node.children.length > 0) {
+        collectPostOrder(node.children);
+      }
+      postOrder.push(node);
+    }
+  }
+  collectPostOrder(items);
+
+  // Track items that are already terminal or have been decided as auto-completable
+  const virtuallyCompleted = new Set<string>();
+
+  for (const item of postOrder) {
+    // Already terminal: treat as virtually completed for ancestor checks
+    if (TERMINAL_CHILD_STATUSES.has(item.status)) {
+      virtuallyCompleted.add(item.id);
+      continue;
+    }
+
+    // Only auto-complete pending / in_progress parents
+    if (!AUTO_COMPLETABLE_STATUSES.has(item.status)) continue;
+
+    // allChildrenTerminal returns false when there are no children — leaf items
+    // in a non-terminal status are never auto-completed.
+    if (!allChildrenTerminal(item, virtuallyCompleted)) continue;
+
+    result.completedIds.push(item.id);
+    result.completedItems.push({
+      id: item.id,
+      title: item.title,
+      level: item.level,
+    });
+    virtuallyCompleted.add(item.id);
+  }
+
+  return result;
+}
+
 export function findAutoCompletions(
   items: PRDItem[],
   itemId: string,

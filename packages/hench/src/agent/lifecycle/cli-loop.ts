@@ -53,6 +53,7 @@ import {
   transitionToInProgress,
   initRunRecord,
   captureStartingHead,
+  captureBaselineUntracked,
   runReviewGate,
   finalizeRun,
   handleRunFailure,
@@ -1014,6 +1015,12 @@ interface SuccessContext {
   tokenBudget?: number;
   review?: boolean;
   selfHeal?: boolean;
+  /** Automatically revert on review rejection. Default: true; false via --no-rollback. */
+  rollbackOnFailure?: boolean;
+  /** Skip the interactive rollback confirmation prompt (--yes / non-interactive). */
+  yes?: boolean;
+  /** Untracked files present before the run, for scoped rollback (#303). */
+  baselineUntracked?: string[];
   /** Per-attempt EventAccumulator (event pipeline path). */
   attemptAccumulator?: EventAccumulator;
   /** Cross-retry EventAccumulator (event pipeline path). */
@@ -1076,7 +1083,11 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
   if (validation.valid) {
     // Review gate
     if (ctx.review) {
-      const reviewGate = await runReviewGate(projectDir, store, taskId, run);
+      const reviewGate = await runReviewGate(projectDir, store, taskId, run, {
+        rollbackOnFailure: ctx.rollbackOnFailure,
+        yes: ctx.yes,
+        baselineUntracked: ctx.baselineUntracked,
+      });
       if (reviewGate.rejected) {
         run.summary = result.summary;
         return "break";
@@ -1247,6 +1258,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
 
   // Shared: capture HEAD before agent runs
   const startingHead = captureStartingHead(projectDir);
+  // Snapshot untracked files before the agent runs, so a rollback removes only
+  // the files the agent creates — never the user's pre-existing work (#303).
+  const baselineUntracked = await captureBaselineUntracked(projectDir);
 
   const retryConfig: RetryConfig = config.retry ?? {
     maxRetries: 3,
@@ -1413,6 +1427,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           tokenBudget: config.tokenBudget,
           review: opts.review,
           selfHeal: config.selfHeal,
+          rollbackOnFailure: opts.rollbackOnFailure,
+          yes: opts.yes,
+          baselineUntracked,
           attemptAccumulator,
           runAccumulator,
         });
@@ -1483,6 +1500,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
     commitWatcher,
+    baselineUntracked,
   });
 
   return { run };

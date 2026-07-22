@@ -89,10 +89,12 @@ describe("finalizeRun git rollback", () => {
     expect(fileContent).toBe(originalContent);
   });
 
-  it("removes untracked files when run fails", async () => {
+  it("removes agent-created untracked files when run fails (empty baseline)", async () => {
     const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
 
     await makeInitialCommit(projectDir, "original.ts", "export {};\n");
+    // Tree started clean (empty baseline) → the new file is agent-created and
+    // must be removed on rollback.
     await writeFile(join(projectDir, "new-file.ts"), "new file content\n", "utf-8");
 
     const run = buildMinimalRun("failed");
@@ -102,9 +104,10 @@ describe("finalizeRun git rollback", () => {
       henchDir,
       projectDir,
       rollbackOnFailure: true,
+      baselineUntracked: [],
     });
 
-    // Untracked file should be removed by git clean -fd
+    // Untracked file should be removed by the scoped git clean
     let fileExists = true;
     try {
       await readFile(join(projectDir, "new-file.ts"), "utf-8");
@@ -112,6 +115,80 @@ describe("finalizeRun git rollback", () => {
       fileExists = false;
     }
     expect(fileExists).toBe(false);
+  });
+
+  it("preserves pre-existing untracked files, removing only agent-created ones (#303)", async () => {
+    const { finalizeRun, captureBaselineUntracked } = await import(
+      "../../src/agent/lifecycle/shared.js"
+    );
+
+    const originalTracked = "export const v = 1;\n";
+    await makeInitialCommit(projectDir, "lib.ts", originalTracked);
+
+    // The user's pre-existing untracked work — must survive rollback.
+    // Includes a hidden dotfile, the exact class of file #303 was wiping.
+    await writeFile(join(projectDir, "user-scratch.txt"), "do not delete me\n", "utf-8");
+    await writeFile(join(projectDir, ".env"), "SECRET=keepme\n", "utf-8");
+
+    // Capture the baseline BEFORE the agent runs, exactly as the loops do.
+    const baselineUntracked = await captureBaselineUntracked(projectDir);
+
+    // Simulate the agent: modify a tracked file AND create a new untracked file.
+    await writeFile(join(projectDir, "lib.ts"), "export const v = 999;\n", "utf-8");
+    await writeFile(join(projectDir, "agent-output.log"), "scratch from agent\n", "utf-8");
+
+    const run = buildMinimalRun("failed");
+
+    await finalizeRun({
+      run,
+      henchDir,
+      projectDir,
+      rollbackOnFailure: true,
+      baselineUntracked,
+    });
+
+    // Pre-existing untracked files (incl. hidden) are preserved.
+    expect(await readFile(join(projectDir, "user-scratch.txt"), "utf-8")).toBe(
+      "do not delete me\n",
+    );
+    expect(await readFile(join(projectDir, ".env"), "utf-8")).toBe("SECRET=keepme\n");
+
+    // The agent-created untracked file is removed.
+    let agentFileExists = true;
+    try {
+      await readFile(join(projectDir, "agent-output.log"), "utf-8");
+    } catch {
+      agentFileExists = false;
+    }
+    expect(agentFileExists).toBe(false);
+
+    // The tracked modification is reverted. Normalize EOL: git may restore
+    // tracked files with CRLF under Windows autocrlf (unrelated to #303).
+    const revertedLib = (await readFile(join(projectDir, "lib.ts"), "utf-8")).replace(
+      /\r\n/g,
+      "\n",
+    );
+    expect(revertedLib).toBe(originalTracked);
+  });
+
+  it("preserves ALL untracked files when no baseline is supplied (safe fallback)", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+
+    await makeInitialCommit(projectDir, "original.ts", "export {};\n");
+    await writeFile(join(projectDir, "unknown-scratch.txt"), "keep me\n", "utf-8");
+
+    const run = buildMinimalRun("failed");
+
+    // No baselineUntracked → cannot distinguish agent files from user files,
+    // so nothing untracked is deleted. Tracked changes still revert.
+    await finalizeRun({
+      run,
+      henchDir,
+      projectDir,
+      rollbackOnFailure: true,
+    });
+
+    expect(await readFile(join(projectDir, "unknown-scratch.txt"), "utf-8")).toBe("keep me\n");
   });
 
   it("skips rollback silently when working tree is clean", async () => {
