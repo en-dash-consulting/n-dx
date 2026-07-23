@@ -1,5 +1,26 @@
 # @n-dx/sourcevision
 
+## 0.5.0
+
+### Patch Changes
+
+- [#298](https://github.com/en-dash-consulting/n-dx/pull/298) [`1031719`](https://github.com/en-dash-consulting/n-dx/commit/1031719e295722833e2982c720e93ff56a929fad) Thanks [@endash-shal](https://github.com/endash-shal)! - Classify `*.config.*` build/tooling artifacts as `config` instead of `source`. `classifyRole` derived the `config` role from a finite, hardcoded per-language `configFilenames` set, so any config file it did not enumerate — `drizzle.config.ts`, `playwright.config.ts`, `tsup.config.ts`, `cypress.config.js`, project-specific configs, and configs from newer tools — fell through to the `source` role and polluted source-logic analysis (archetype classification and enrichment both key off `role === "source"`). A universal convention heuristic now matches `<name>.config.<ext>` for JS/TS and data-config extensions (`ts/tsx/js/jsx/mjs/cjs/mts/cts/json/yaml/yml/toml`), so these artifacts are separated from source logic and rescans are less noisy. Matching requires the literal `.config.` segment, so genuine source files such as `config.ts`, `configuration.ts`, and `db-config.ts` are unaffected, and the pattern only fires for the listed extensions, leaving Python/Go/other source untouched.
+
+- [#298](https://github.com/en-dash-consulting/n-dx/pull/298) [`1031719`](https://github.com/en-dash-consulting/n-dx/commit/1031719e295722833e2982c720e93ff56a929fad) Thanks [@endash-shal](https://github.com/endash-shal)! - Exclude vendored third-party dependency directories from analysis in every project. Vendored deps are excluded via skip-directories (like `node_modules`), but only per-language configs skipped them (Go's `vendor/`, Python's virtualenvs) — the universal skip set held only `.git` and n-dx tooling dirs. A TS-primary repo with a committed `vendor/`, `third_party/`, `bower_components/`, `jspm_packages/`, etc. would therefore walk and classify those files as source, inflating language stats and distorting source-logic analysis. A new universal `VENDOR_SKIP_DIRS` set (`vendor`, `vendored`, `third_party`, `third-party`, `thirdparty`, `bower_components`, `jspm_packages`, `web_modules`, `Godeps`, `.yarn`) is now merged into the skip set for all projects. Directories are matched by exact name at any depth, so a plural `vendors/` directory or a `vendor-utils.ts` source file remains included.
+
+- [#299](https://github.com/en-dash-consulting/n-dx/pull/299) [`ab24172`](https://github.com/en-dash-consulting/n-dx/commit/ab241723f3822cca76e801d4628289b3c45b0b84) Thanks [@stevemikedan](https://github.com/stevemikedan)! - Harden CLI spawning on Windows so launching `.cmd` shims (claude, codex, rex) no longer fails. Node can't spawn a `.cmd` directly (post-CVE-2024-27980), and the previous `shell: process.platform === "win32"` workaround triggered the `[DEP0190]` deprecation and broke on paths containing spaces.
+
+  - **New `spawnCli` helper** (`@n-dx/llm-client`) routes CLI binaries through `cmd.exe /d /s /c` with `windowsVerbatimArguments` and never uses `shell:true`. Argument quoting follows the Microsoft ArgvQuote / cross-spawn rules (unconditional quoting, backslash-run doubling before quotes, embedded-quote doubling) so paths with spaces and tokens with cmd.exe metacharacters (`& | < > ^ ( )`) are handled. The orchestration tier (`@n-dx/core`) carries an equivalent `win-spawn.js` twin (it cannot import `@n-dx/llm-client`), kept in lockstep by a cross-package parity test.
+  - **All CLI-binary spawn sites** are routed through the helper: the claude and codex providers, the hench agent loop and its adapters, the `ndx config` CLI-path validator, `ndx pair-programming`'s reviewer, and sourcevision's `rex` invocations.
+  - **Prompts are delivered via stdin** for the codex hench adapter and the pair-programming reviewer (previously passed as an argv token), preventing multi-line prompt truncation and command injection through `cmd.exe`.
+  - **`diagnoseCliInvocation`** produces an actionable message when a CLI binary is missing or not invokable — distinguishing a not-found binary, a configured absolute path that doesn't exist, and a binary present on PATH but failing to run — and works from the close/non-zero-exit path on Windows (where a missing `.cmd` never raises `ENOENT`). Detection is anchored to the spawned binary so a legitimate run's own error output isn't misclassified.
+  - A **regression guard test** fails CI if any CLI spawn site reintroduces the `shell:true` + args (`DEP0190`) pattern.
+
+  No behavior change on macOS or Linux.
+
+- Updated dependencies [[`1031719`](https://github.com/en-dash-consulting/n-dx/commit/1031719e295722833e2982c720e93ff56a929fad), [`1031719`](https://github.com/en-dash-consulting/n-dx/commit/1031719e295722833e2982c720e93ff56a929fad), [`18b36f7`](https://github.com/en-dash-consulting/n-dx/commit/18b36f73c0b18bdf508b956e3fb42e5bbf5aeabd), [`21283a2`](https://github.com/en-dash-consulting/n-dx/commit/21283a22fcd2b68d5f016fe923e49908c141ebf0), [`ab24172`](https://github.com/en-dash-consulting/n-dx/commit/ab241723f3822cca76e801d4628289b3c45b0b84)]:
+  - @n-dx/llm-client@0.5.0
+
 ## 0.4.6
 
 ### Patch Changes
