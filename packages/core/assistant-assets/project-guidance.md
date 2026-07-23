@@ -238,6 +238,10 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 
 Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `ndx start stop .` to stop.
 
+## Changeset Versioning
+
+- **Always default changeset bumps to `patch`** across all affected packages unless explicitly instructed otherwise by a user.
+
 ## Key Files
 
 | Path | Purpose |

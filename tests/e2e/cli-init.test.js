@@ -489,10 +489,18 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
       const attrPath = join(projectDir, ".gitattributes");
       expect(existsSync(attrPath)).toBe(true);
       const first = await readFile(attrPath, "utf-8");
-      for (const pattern of [".rex/**/*.md", ".hench/**/*.json", ".n-dx.json", "AGENTS.md", "CLAUDE.md"]) {
+      for (const pattern of [
+        ".rex/**/*.md", ".hench/**/*.json", ".n-dx.json", "AGENTS.md", "CLAUDE.md",
+        // Assistant + config + text surfaces must be pinned too (parity with
+        // n-dx's own .gitattributes — GITATTRIBUTES_EOL_RULES sync invariant).
+        ".claude/skills/**/*.md", ".codex/config.toml", ".sourcevision/**/*.txt",
+      ]) {
         expect(first).toContain(`${pattern}`);
       }
       expect(first).toMatch(/\.rex\/\*\*\/\*\.md\s+text eol=lf/);
+      expect(first).toMatch(/\.claude\/skills\/\*\*\/\*\.md\s+text eol=lf/);
+      expect(first).toMatch(/\.codex\/config\.toml\s+text eol=lf/);
+      expect(first).toMatch(/\.sourcevision\/\*\*\/\*\.txt\s+text eol=lf/);
 
       // Re-init must not duplicate rules or the header.
       await initWithFakeCodex(projectDir, binDir);

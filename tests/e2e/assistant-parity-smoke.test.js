@@ -332,4 +332,17 @@ describe("Claude-only wording regression guard", () => {
     const initHelp = run(["help", "init"]);
     expect(initHelp).toContain("both Claude and Codex");
   });
+
+  it("web/README.md does not describe MCP endpoints as Claude-only", () => {
+    const src = readFileSync(join(ROOT, "packages/web/README.md"), "utf-8");
+    // The unified MCP server serves any MCP-compatible assistant, not just Claude.
+    expect(src).not.toContain("MCP endpoints for Claude Code integration");
+  });
+
+  it("troubleshooting guide does not imply only Claude MCP servers are re-registered", () => {
+    const src = readFileSync(join(ROOT, "docs/guide/troubleshooting.md"), "utf-8");
+    // `ndx init` re-registers Claude MCP servers AND regenerates the Codex
+    // config — the comment must not read as Claude-only.
+    expect(src).not.toContain("re-registers Claude MCP servers, regenerates");
+  });
 });
