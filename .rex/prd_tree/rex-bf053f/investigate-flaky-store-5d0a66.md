@@ -2,7 +2,7 @@
 id: "5d0a6670-7a22-47b5-ac9c-7309ca2032e2"
 level: "task"
 title: "Investigate flaky store-roundtrip concurrency test (0 items after serialized mutations)"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "rex"
@@ -10,6 +10,11 @@ tags:
   - "concurrency"
   - "store"
 source: "test-flake-triage"
+startedAt: "2026-07-24T15:09:49.978Z"
+completedAt: "2026-07-24T18:29:51.992Z"
+endedAt: "2026-07-24T18:29:51.992Z"
+resolutionType: "code-change"
+resolutionDetail: "In-process mutex + ownership-token compare-and-delete release in file-lock.ts; same-pid lock files treated as orphans; deterministic repro via injectable staleMs unit test. store-roundtrip test unchanged, 10/10 stress runs green."
 acceptanceCriteria:
   - "Root cause of the 0-item read is identified with a deterministic or high-probability reproduction"
   - "file-lock.ts release() cannot unlink a lock it no longer owns (ownership token or equivalent)"
