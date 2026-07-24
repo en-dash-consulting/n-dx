@@ -27,6 +27,8 @@ import { AggregationResultCache } from "./aggregation-cache.js";
 interface PackageTokenUsage {
   inputTokens: number;
   outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
   calls: number;
 }
 
@@ -38,6 +40,8 @@ interface AggregateTokenUsage {
   };
   totalInputTokens: number;
   totalOutputTokens: number;
+  totalCacheCreationTokens: number;
+  totalCacheReadTokens: number;
   totalCalls: number;
 }
 
@@ -47,6 +51,8 @@ interface TokenEvent {
   package: "rex" | "hench" | "sv";
   inputTokens: number;
   outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
   calls: number;
   vendor?: string;
   model?: string;
@@ -141,7 +147,7 @@ interface BudgetCheckResult {
 const TOKEN_PREFIX = "/api/token/";
 
 function emptyPackageUsage(): PackageTokenUsage {
-  return { inputTokens: 0, outputTokens: 0, calls: 0 };
+  return { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 };
 }
 
 function emptyToolBreakdown(): ToolBreakdown {
@@ -327,6 +333,8 @@ function extractRexEvents(logEntries: LogEntry[], since?: string, until?: string
         package: "rex",
         inputTokens: data.inputTokens ?? 0,
         outputTokens: data.outputTokens ?? 0,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
         calls: data.calls ?? 0,
         vendor: normalizeEventMetadata(data.vendor),
         model: normalizeEventMetadata(data.model),
@@ -339,10 +347,17 @@ function extractRexEvents(logEntries: LogEntry[], since?: string, until?: string
 interface HenchRunSummary {
   startedAt: string;
   model?: string;
-  tokenUsage: { input: number; output: number };
+  tokenUsage: {
+    input: number;
+    output: number;
+    cacheCreationInput?: number;
+    cacheReadInput?: number;
+  };
   turnTokenUsage?: Array<{
     input: number;
     output: number;
+    cacheCreationInput?: number;
+    cacheReadInput?: number;
     vendor?: string;
     model?: string;
   }>;
@@ -365,6 +380,11 @@ function extractHenchEvents(projectDir: string, since?: string, until?: string):
       if (!isInRange(run.startedAt, since, until)) continue;
 
       if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
+        // Per-turn input/output. Cache totals come from run-level to avoid
+        // double-counting per-turn re-reads of the same cache context.
+        const turnHasCacheFields = run.turnTokenUsage.some(
+          (t) => t.cacheCreationInput != null || t.cacheReadInput != null,
+        );
         for (const turn of run.turnTokenUsage) {
           events.push({
             timestamp: run.startedAt,
@@ -372,10 +392,30 @@ function extractHenchEvents(projectDir: string, since?: string, until?: string):
             package: "hench",
             inputTokens: turn.input ?? 0,
             outputTokens: turn.output ?? 0,
+            cacheCreationTokens: turnHasCacheFields ? (turn.cacheCreationInput ?? 0) : 0,
+            cacheReadTokens: turnHasCacheFields ? (turn.cacheReadInput ?? 0) : 0,
             calls: 1,
             vendor: normalizeEventMetadata(turn.vendor),
             model: normalizeEventMetadata(turn.model) ?? normalizeEventMetadata(run.model),
           });
+        }
+        // If per-turn cache was not available, attribute run-level cache once.
+        if (!turnHasCacheFields) {
+          const cc = run.tokenUsage.cacheCreationInput ?? 0;
+          const cr = run.tokenUsage.cacheReadInput ?? 0;
+          if (cc > 0 || cr > 0) {
+            events.push({
+              timestamp: run.startedAt,
+              command: "run",
+              package: "hench",
+              inputTokens: 0,
+              outputTokens: 0,
+              cacheCreationTokens: cc,
+              cacheReadTokens: cr,
+              calls: 0,
+              model: normalizeEventMetadata(run.model),
+            });
+          }
         }
         continue;
       }
@@ -386,6 +426,8 @@ function extractHenchEvents(projectDir: string, since?: string, until?: string):
         package: "hench",
         inputTokens: run.tokenUsage.input ?? 0,
         outputTokens: run.tokenUsage.output ?? 0,
+        cacheCreationTokens: run.tokenUsage.cacheCreationInput ?? 0,
+        cacheReadTokens: run.tokenUsage.cacheReadInput ?? 0,
         calls: 1,
         model: normalizeEventMetadata(run.model),
       });
@@ -419,6 +461,8 @@ function extractSvEvents(projectDir: string, since?: string, until?: string): To
       package: "sv",
       inputTokens: manifest.tokenUsage.inputTokens ?? 0,
       outputTokens: manifest.tokenUsage.outputTokens ?? 0,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 0,
       calls: manifest.tokenUsage.calls ?? 0,
       vendor: normalizeEventMetadata(manifest.tokenUsage.vendor) ?? "unknown",
       model: normalizeEventMetadata(manifest.tokenUsage.model) ?? "unknown",
@@ -461,6 +505,8 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
     const pkg = ev.package === "rex" ? rex : ev.package === "hench" ? hench : sv;
     pkg.inputTokens += ev.inputTokens;
     pkg.outputTokens += ev.outputTokens;
+    pkg.cacheCreationTokens += ev.cacheCreationTokens;
+    pkg.cacheReadTokens += ev.cacheReadTokens;
     pkg.calls += ev.calls;
   }
 
@@ -468,6 +514,8 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
     packages: { rex, hench, sv },
     totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
     totalOutputTokens: rex.outputTokens + hench.outputTokens + sv.outputTokens,
+    totalCacheCreationTokens: rex.cacheCreationTokens + hench.cacheCreationTokens + sv.cacheCreationTokens,
+    totalCacheReadTokens: rex.cacheReadTokens + hench.cacheReadTokens + sv.cacheReadTokens,
     totalCalls: rex.calls + hench.calls + sv.calls,
   };
 }
@@ -483,11 +531,13 @@ function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
     const key = `${ev.package}:${ev.command}`;
     let entry = map.get(key);
     if (!entry) {
-      entry = { command: ev.command, package: ev.package, inputTokens: 0, outputTokens: 0, calls: 0 };
+      entry = { command: ev.command, package: ev.package, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 };
       map.set(key, entry);
     }
     entry.inputTokens += ev.inputTokens;
     entry.outputTokens += ev.outputTokens;
+    entry.cacheCreationTokens += ev.cacheCreationTokens;
+    entry.cacheReadTokens += ev.cacheReadTokens;
     entry.calls += ev.calls;
   }
   return Array.from(map.values()).sort(
@@ -510,6 +560,8 @@ function aggregateByVendorModel(events: TokenEvent[]): VendorModelUsage[] {
         model,
         inputTokens: 0,
         outputTokens: 0,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
         calls: 0,
         toolBreakdown: emptyToolBreakdown(),
       };
@@ -519,9 +571,13 @@ function aggregateByVendorModel(events: TokenEvent[]): VendorModelUsage[] {
     const tool = ev.package === "rex" ? entry.toolBreakdown.rex : ev.package === "hench" ? entry.toolBreakdown.hench : entry.toolBreakdown.sv;
     tool.inputTokens += ev.inputTokens;
     tool.outputTokens += ev.outputTokens;
+    tool.cacheCreationTokens += ev.cacheCreationTokens;
+    tool.cacheReadTokens += ev.cacheReadTokens;
     tool.calls += ev.calls;
     entry.inputTokens += ev.inputTokens;
     entry.outputTokens += ev.outputTokens;
+    entry.cacheCreationTokens += ev.cacheCreationTokens;
+    entry.cacheReadTokens += ev.cacheReadTokens;
     entry.calls += ev.calls;
   }
 
@@ -603,7 +659,7 @@ function groupUtilizationTrend(
     const byVendorModel = aggregateByVendorModel(evts);
     result.push({
       period: key,
-      totalTokens: usage.totalInputTokens + usage.totalOutputTokens,
+      totalTokens: usage.totalInputTokens + usage.totalOutputTokens + usage.totalCacheCreationTokens + usage.totalCacheReadTokens,
       byVendorModel,
       toolBreakdown: usage.packages,
       estimatedCost: estimateCost(usage),
@@ -651,7 +707,7 @@ function checkBudget(usage: AggregateTokenUsage, budget: RexConfig["budget"]): B
   }
 
   if (budget.tokens && budget.tokens > 0) {
-    const used = usage.totalInputTokens + usage.totalOutputTokens;
+    const used = usage.totalInputTokens + usage.totalOutputTokens + usage.totalCacheCreationTokens + usage.totalCacheReadTokens;
     const { percent, severity } = dimCheck(used, budget.tokens);
     tokenStatus = { used, budget: budget.tokens, percent, severity };
     if (severity === "exceeded") {

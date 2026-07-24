@@ -42,7 +42,10 @@ import type { PRDItem } from "../schema/v1.js";
 export interface ItemTokenTuple {
   input: number;
   output: number;
-  cached: number;
+  /** Tokens consumed creating prompt-cache entries (distinct from cache-read). */
+  cacheCreation: number;
+  /** Tokens consumed re-reading prompt-cache entries across turns. */
+  cacheRead: number;
   total: number;
 }
 
@@ -87,13 +90,14 @@ export interface ItemTokenAggregation {
 // ---------------------------------------------------------------------------
 
 function zeroTuple(): ItemTokenTuple {
-  return { input: 0, output: 0, cached: 0, total: 0 };
+  return { input: 0, output: 0, cacheCreation: 0, cacheRead: 0, total: 0 };
 }
 
 function addInto(target: ItemTokenTuple, src: ItemTokenTuple): void {
   target.input += src.input;
   target.output += src.output;
-  target.cached += src.cached;
+  target.cacheCreation += src.cacheCreation;
+  target.cacheRead += src.cacheRead;
   target.total += src.total;
 }
 
@@ -170,7 +174,8 @@ export function aggregateItemTokenUsage(
     }
     t.total.input = t.self.input + t.descendants.input;
     t.total.output = t.self.output + t.descendants.output;
-    t.total.cached = t.self.cached + t.descendants.cached;
+    t.total.cacheCreation = t.self.cacheCreation + t.descendants.cacheCreation;
+    t.total.cacheRead = t.self.cacheRead + t.descendants.cacheRead;
     t.total.total = t.self.total + t.descendants.total;
     t.runCount = runCount;
     return t;
@@ -208,16 +213,18 @@ function tokensFromRecord(run: MinimalRunRecord): ItemTokenTuple {
   if (run.tokens) {
     const input = run.tokens.input ?? 0;
     const output = run.tokens.output ?? 0;
-    const cached = run.tokens.cached ?? 0;
-    const total = run.tokens.total ?? input + output + cached;
-    return { input, output, cached, total };
+    const cacheCreation = run.tokens.cacheCreation ?? 0;
+    const cacheRead = run.tokens.cacheRead ?? 0;
+    const total = run.tokens.total ?? input + output + cacheCreation + cacheRead;
+    return { input, output, cacheCreation, cacheRead, total };
   }
   const u = run.tokenUsage;
   if (!u) return zeroTuple();
   const input = u.input ?? 0;
   const output = u.output ?? 0;
-  const cached = (u.cacheCreationInput ?? 0) + (u.cacheReadInput ?? 0);
-  return { input, output, cached, total: input + output + cached };
+  const cacheCreation = u.cacheCreationInput ?? 0;
+  const cacheRead = u.cacheReadInput ?? 0;
+  return { input, output, cacheCreation, cacheRead, total: input + output + cacheCreation + cacheRead };
 }
 
 /**

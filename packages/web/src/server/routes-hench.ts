@@ -1052,7 +1052,7 @@ function projectRollup(
 
 function buildItemRollup(
   items: PRDDocument["items"],
-  contributions: Array<{ itemId: string; tokens: { input: number; output: number; cached: number; total: number } }>,
+  contributions: Array<{ itemId: string; tokens: { input: number; output: number; cacheCreation: number; cacheRead: number; total: number } }>,
 ): Record<string, ItemUsageRollupWire> {
   const aggregation = aggregateItemTokenUsage(items, contributions);
   const { durations } = aggregateItemDurations(items);

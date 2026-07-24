@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleTokenUsageRoute, resetAggregationCache } from "../../../src/server/routes-token-usage.js";
+import { readRunTokensFromHench } from "@n-dx/rex";
 
 /** Create a hench run record with token usage. */
 function makeRun(
@@ -12,13 +13,30 @@ function makeRun(
   startedAt: string,
   inputTokens: number,
   outputTokens: number,
-  opts?: { model?: string; turnTokenUsage?: Array<{ input: number; output: number; vendor?: string; model?: string }> },
+  opts?: {
+    model?: string;
+    cacheCreationInput?: number;
+    cacheReadInput?: number;
+    turnTokenUsage?: Array<{
+      input: number;
+      output: number;
+      cacheCreationInput?: number;
+      cacheReadInput?: number;
+      vendor?: string;
+      model?: string;
+    }>;
+  },
 ) {
   return {
     id,
     startedAt,
     status: "completed",
-    tokenUsage: { input: inputTokens, output: outputTokens },
+    tokenUsage: {
+      input: inputTokens,
+      output: outputTokens,
+      ...(opts?.cacheCreationInput != null ? { cacheCreationInput: opts.cacheCreationInput } : {}),
+      ...(opts?.cacheReadInput != null ? { cacheReadInput: opts.cacheReadInput } : {}),
+    },
     model: opts?.model,
     turnTokenUsage: opts?.turnTokenUsage,
   };
@@ -542,6 +560,146 @@ describe("Token Usage API routes", () => {
     expect(data.events).toHaveLength(1);
     expect(data.events[0].vendor).toBe("unknown");
     expect(data.events[0].model).toBe("unknown");
+  });
+
+  it("surfaces cache-creation and cache-read tokens from hench run-level fields", async () => {
+    // Run with run-level cache totals (no per-turn cache fields).
+    await writeFile(
+      join(henchRunsDir, "cache-run.json"),
+      JSON.stringify(makeRun("cache-run", "2026-02-05T10:00:00.000Z", 1000, 200, {
+        cacheCreationInput: 5000,
+        cacheReadInput: 750000,
+      })),
+    );
+
+    const res = await fetch(`http://localhost:${port}/api/token/summary`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+
+    // Hench should include cache from the new run.
+    expect(data.usage.packages.hench.cacheCreationTokens).toBe(5000);
+    expect(data.usage.packages.hench.cacheReadTokens).toBe(750000);
+    expect(data.usage.totalCacheCreationTokens).toBe(5000);
+    expect(data.usage.totalCacheReadTokens).toBe(750000);
+  });
+
+  it("attributes per-turn cache when turnTokenUsage carries cache fields", async () => {
+    await writeFile(
+      join(henchRunsDir, "per-turn-cache.json"),
+      JSON.stringify(makeRun("ptu", "2026-02-06T10:00:00.000Z", 300, 100, {
+        cacheCreationInput: 500,
+        cacheReadInput: 2000,
+        turnTokenUsage: [
+          { input: 200, output: 70, cacheCreationInput: 500, cacheReadInput: 1000, vendor: "claude", model: "claude-sonnet-4-6" },
+          { input: 100, output: 30, cacheCreationInput: 0, cacheReadInput: 1000, vendor: "claude", model: "claude-sonnet-4-6" },
+        ],
+      })),
+    );
+
+    const res = await fetch(`http://localhost:${port}/api/token/summary`);
+    const data = await res.json();
+
+    // Per-turn cache sums across turns: 500+0=500 creation, 1000+1000=2000 read.
+    expect(data.usage.packages.hench.cacheCreationTokens).toBeGreaterThanOrEqual(500);
+    expect(data.usage.packages.hench.cacheReadTokens).toBeGreaterThanOrEqual(2000);
+  });
+
+  it("attributes run-level cache once when turnTokenUsage lacks cache fields", async () => {
+    await writeFile(
+      join(henchRunsDir, "no-turn-cache.json"),
+      JSON.stringify(makeRun("ntc", "2026-02-07T10:00:00.000Z", 400, 100, {
+        cacheCreationInput: 3000,
+        cacheReadInput: 80000,
+        turnTokenUsage: [
+          { input: 200, output: 50, vendor: "claude", model: "claude-sonnet-4-6" },
+          { input: 200, output: 50, vendor: "claude", model: "claude-sonnet-4-6" },
+        ],
+      })),
+    );
+
+    const res = await fetch(`http://localhost:${port}/api/token/summary`);
+    const data = await res.json();
+
+    // Run-level cache should appear exactly once (not doubled across turns).
+    expect(data.usage.packages.hench.cacheCreationTokens).toBeGreaterThanOrEqual(3000);
+    expect(data.usage.packages.hench.cacheReadTokens).toBeGreaterThanOrEqual(80000);
+
+    // Verify no double-count: check events endpoint
+    const evRes = await fetch(`http://localhost:${port}/api/token/events?package=hench`);
+    const evData = await evRes.json();
+    const cacheCreationSum = evData.events.reduce(
+      (s: number, e: { cacheCreationTokens: number }) => s + e.cacheCreationTokens, 0,
+    );
+    expect(cacheCreationSum).toBe(3000);
+    const cacheReadSum = evData.events.reduce(
+      (s: number, e: { cacheReadTokens: number }) => s + e.cacheReadTokens, 0,
+    );
+    expect(cacheReadSum).toBe(80000);
+  });
+
+  it("rex rollup and usage-page hench aggregate match for runs with cache (anti-divergence)", async () => {
+    // Use an isolated directory so we control exactly which runs exist.
+    const isoDir = await mkdtemp(join(tmpdir(), "token-iso-"));
+    const isoRunsDir = join(isoDir, ".hench", "runs");
+    await mkdir(isoRunsDir, { recursive: true });
+
+    // Write two runs, both with taskId (so rex rollup includes them) and cache data.
+    const runA = {
+      id: "run-a",
+      taskId: "task-a",
+      startedAt: "2026-02-10T10:00:00.000Z",
+      status: "completed",
+      tokenUsage: { input: 1000, output: 500, cacheCreationInput: 2000, cacheReadInput: 50000 },
+    };
+    const runB = {
+      id: "run-b",
+      taskId: "task-b",
+      startedAt: "2026-02-11T10:00:00.000Z",
+      status: "completed",
+      tokenUsage: { input: 800, output: 300, cacheCreationInput: 500, cacheReadInput: 20000 },
+    };
+    await writeFile(join(isoRunsDir, "run-a.json"), JSON.stringify(runA));
+    await writeFile(join(isoRunsDir, "run-b.json"), JSON.stringify(runB));
+
+    // Rex rollup (only counts runs with taskId).
+    const runs = await readRunTokensFromHench(isoDir);
+    const rollupTotal = runs.reduce(
+      (acc, r) => ({
+        input: acc.input + r.tokens.input,
+        output: acc.output + r.tokens.output,
+        cacheCreation: acc.cacheCreation + r.tokens.cacheCreation,
+        cacheRead: acc.cacheRead + r.tokens.cacheRead,
+        total: acc.total + r.tokens.total,
+      }),
+      { input: 0, output: 0, cacheCreation: 0, cacheRead: 0, total: 0 },
+    );
+
+    // Usage page reads the same runs directory via a separate server context.
+    const isoCtx: ServerContext = {
+      projectDir: isoDir,
+      svDir: join(isoDir, ".sourcevision"),
+      rexDir: join(isoDir, ".rex"),
+      dev: false,
+    };
+    await mkdir(isoCtx.svDir, { recursive: true });
+    await mkdir(isoCtx.rexDir, { recursive: true });
+    const isoServer = await startTestServer(isoCtx);
+    try {
+      const res = await fetch(`http://localhost:${isoServer.port}/api/token/summary`);
+      const data = await res.json();
+      const hench = data.usage.packages.hench;
+
+      // Both surfaces must agree on all four components.
+      expect(hench.inputTokens).toBe(rollupTotal.input);
+      expect(hench.outputTokens).toBe(rollupTotal.output);
+      expect(hench.cacheCreationTokens).toBe(rollupTotal.cacheCreation);
+      expect(hench.cacheReadTokens).toBe(rollupTotal.cacheRead);
+      expect(hench.inputTokens + hench.outputTokens + hench.cacheCreationTokens + hench.cacheReadTokens)
+        .toBe(rollupTotal.total);
+    } finally {
+      isoServer.server.close();
+      await rm(isoDir, { recursive: true, force: true });
+    }
   });
 
   it("returns false for non-token routes", async () => {
