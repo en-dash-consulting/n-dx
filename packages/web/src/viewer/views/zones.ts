@@ -655,6 +655,107 @@ function computeEdgePath(
   return `M ${from.x} ${from.y} Q ${cpx} ${cpy} ${to.x} ${to.y}`;
 }
 
+// ── File highlight edges (hover/select) ──────────────────────────────
+
+/** Reference to the file row currently hovered or pin-selected in the diagram. */
+export interface ActiveFileRef {
+  path: string;
+  zoneId: string;
+}
+
+/** One highlight edge from an active file row to a target zone box. */
+export interface FileHighlightEdge {
+  key: string;
+  d: string;
+  color: string;
+  weight: number;
+}
+
+/**
+ * Compute the on-screen rect of a file row inside an expanded zone box, or
+ * null when the file is not currently visible (zone collapsed upstream, file
+ * beyond the row cap, or its subzone not expanded). Mirrors the layout math
+ * of renderFileContent / renderSubZoneContent in ZoneBox — keep in sync.
+ *
+ * @internal Exported for testing.
+ */
+export function computeFileRowRect(
+  zone: ZoneData,
+  box: BoxRect,
+  filePath: string,
+  expandedSubZoneIds?: Set<string>,
+): BoxRect | null {
+  const rowRect = (x: number, y: number, w: number): BoxRect => ({
+    x, y, w, h: FILE_ROW_H - 2, gridCol: box.gridCol, gridRow: box.gridRow,
+  });
+
+  // Zone with subzones — walk subzone rows accumulating y like renderSubZoneContent
+  if (zone.subZones && zone.subZones.length > 0) {
+    let curY = box.y + BOX_H_COLLAPSED - 4;
+    for (const sz of zone.subZones.slice(0, SUBZONE_ROWS_MAX)) {
+      curY += SUBZONE_ROW_H;
+      if (!expandedSubZoneIds?.has(sz.id)) continue;
+      const szFiles = sz.files.slice(0, FILE_ROWS_MAX);
+      for (const file of szFiles) {
+        if (file.path === filePath) {
+          return rowRect(box.x + SUBZONE_FILE_INDENT + 8, curY, box.w - SUBZONE_FILE_INDENT - 16);
+        }
+        curY += FILE_ROW_H;
+      }
+      if (sz.files.length > FILE_ROWS_MAX) curY += 20;
+    }
+    return null;
+  }
+
+  // Flat file list
+  const idx = zone.files.slice(0, FILE_ROWS_MAX).findIndex((f) => f.path === filePath);
+  if (idx === -1) return null;
+  return rowRect(box.x + 8, box.y + BOX_H_COLLAPSED - 4 + idx * FILE_ROW_H, box.w - 16);
+}
+
+/**
+ * Build highlight edges from the active (hovered/selected) file row to each
+ * cross-zone target's box, plus the set of target zone ids to highlight.
+ * Returns null when nothing should be drawn (source zone not expanded, file
+ * row not visible, or no on-screen targets). Target zones need not be
+ * expanded — edges anchor on the zone box rect either way.
+ *
+ * @internal Exported for testing.
+ */
+export function buildFileHighlightEdges(
+  active: ActiveFileRef,
+  zoneById: Map<string, ZoneData>,
+  boxes: Map<string, BoxRect>,
+  expandedZones: Set<string>,
+  expandedSubZones: ExpandedSubZones,
+  fileConnections: FileConnectionMap,
+): { targetZoneIds: Set<string>; edges: FileHighlightEdge[] } | null {
+  if (!expandedZones.has(active.zoneId)) return null;
+  const zone = zoneById.get(active.zoneId);
+  const box = boxes.get(active.zoneId);
+  if (!zone || !box) return null;
+
+  const rowRect = computeFileRowRect(zone, box, active.path, expandedSubZones.get(active.zoneId));
+  if (!rowRect) return null;
+
+  const targetZoneIds = new Set<string>();
+  const edges: FileHighlightEdge[] = [];
+  for (const link of fileConnections.get(active.path) ?? []) {
+    if (link.targetZoneId === active.zoneId) continue;
+    const targetBox = boxes.get(link.targetZoneId);
+    if (!targetBox) continue;
+    targetZoneIds.add(link.targetZoneId);
+    edges.push({
+      key: `hl-${active.path}-${link.targetZoneId}`,
+      d: computeEdgePath(rowRect, targetBox, 0, 1),
+      color: zoneById.get(link.targetZoneId)?.color ?? "var(--border-strong)",
+      weight: link.weight,
+    });
+  }
+
+  return edges.length > 0 ? { targetZoneIds, edges } : null;
+}
+
 // ── Sub-components ───────────────────────────────────────────────────
 
 function StatCard({ value, label, color }: { value: string; label: string; color?: string }) {
@@ -736,9 +837,11 @@ function FileRow({
   boxW,
   searchMatch,
   hasCrossZone,
+  active,
   tooltip,
   onClick,
   onDblClick,
+  onHover,
 }: {
   file: FileInfo;
   y: number;
@@ -746,9 +849,11 @@ function FileRow({
   boxW: number;
   searchMatch: boolean;
   hasCrossZone: boolean;
+  active?: boolean;
   tooltip?: string | null;
   onClick: () => void;
   onDblClick: () => void;
+  onHover?: (hovering: boolean) => void;
 }) {
   const totalIn = file.functions.reduce((s, fi) => s + fi.incoming.length, 0);
   const totalOut = file.functions.reduce((s, fi) => s + fi.outgoing.length, 0);
@@ -757,9 +862,11 @@ function FileRow({
   const arrows = `${totalIn > 0 ? "\u2190" + totalIn : ""}${totalOut > 0 ? "\u2192" + totalOut : ""}`;
 
   return h("g", {
-    class: `cg-file-row${searchMatch ? " search-match" : ""}${hasCrossZone ? " cross-zone" : ""}`,
+    class: `cg-file-row${searchMatch ? " search-match" : ""}${hasCrossZone ? " cross-zone" : ""}${active ? " active" : ""}`,
     onClick: (e: Event) => { e.stopPropagation(); onClick(); },
     onDblClick: (e: Event) => { e.stopPropagation(); onDblClick(); },
+    onMouseEnter: onHover ? () => onHover(true) : undefined,
+    onMouseLeave: onHover ? () => onHover(false) : undefined,
   },
     tooltip ? h("title", null, tooltip) : null,
     h("rect", {
@@ -942,6 +1049,8 @@ function ZoneBox({
   expanded,
   selected,
   dimmed,
+  connHighlighted,
+  activeFilePath,
   searchQ,
   matchingFiles,
   fileConnections,
@@ -952,6 +1061,7 @@ function ZoneBox({
   onSelectZone,
   onSelectFile,
   onDblClickFile,
+  onFileHover,
   onDrillDown,
   onToggleSubZone,
   onToggleConnectingOnly,
@@ -961,6 +1071,10 @@ function ZoneBox({
   expanded: boolean;
   selected: boolean;
   dimmed: boolean;
+  /** True while an active file in another zone connects to this zone. */
+  connHighlighted?: boolean;
+  /** Path of the hovered/selected file when it belongs to this zone. */
+  activeFilePath?: string | null;
   searchQ: string;
   matchingFiles: Set<string>;
   fileConnections: FileConnectionMap;
@@ -971,6 +1085,7 @@ function ZoneBox({
   onSelectZone: () => void;
   onSelectFile: (path: string) => void;
   onDblClickFile: (path: string) => void;
+  onFileHover?: (path: string | null) => void;
   onDrillDown?: () => void;
   onToggleSubZone?: (subZoneId: string) => void;
   onToggleConnectingOnly?: () => void;
@@ -999,9 +1114,11 @@ function ZoneBox({
           boxW: box.w,
           searchMatch: searchQ ? isMatch : false,
           hasCrossZone,
+          active: activeFilePath === file.path,
           tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
           onClick: () => onSelectFile(file.path),
           onDblClick: () => onDblClickFile(file.path),
+          onHover: onFileHover ? (hov: boolean) => onFileHover(hov ? file.path : null) : undefined,
         });
       }),
       overflow > 0
@@ -1055,9 +1172,11 @@ function ZoneBox({
               boxW: box.w - SUBZONE_FILE_INDENT,
               searchMatch: searchQ ? matchingFiles.has(file.path) : false,
               hasCrossZone,
+              active: activeFilePath === file.path,
               tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
               onClick: () => onSelectFile(file.path),
               onDblClick: () => onDblClickFile(file.path),
+              onHover: onFileHover ? (hov: boolean) => onFileHover(hov ? file.path : null) : undefined,
             }),
           );
           curY += FILE_ROW_H;
@@ -1091,7 +1210,7 @@ function ZoneBox({
   };
 
   return h("g", {
-    class: `cg-zone-box${expanded ? " expanded" : ""}${selected ? " selected" : ""}${dimmed ? " search-dim" : ""}`,
+    class: `cg-zone-box${expanded ? " expanded" : ""}${selected ? " selected" : ""}${dimmed ? " search-dim" : ""}${connHighlighted ? " conn-highlight" : ""}`,
     "data-zone-id": zone.id,
     style: "cursor: grab;",
   },
@@ -1310,6 +1429,10 @@ function ZoneDiagram({
   onToggleConnectingOnly: (zoneId: string) => void;
 }) {
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
+  // File highlight state: hover is transient, selection pins until re-click.
+  const [hoveredFile, setHoveredFile] = useState<ActiveFileRef | null>(null);
+  const [selectedFile, setSelectedFile] = useState<ActiveFileRef | null>(null);
+  const activeFile = hoveredFile ?? selectedFile;
 
   const zoneById = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
   const zoneNameById = useMemo(() => new Map(zones.map((z) => [z.id, z.name])), [zones]);
@@ -1358,6 +1481,23 @@ function ZoneDiagram({
     for (const k of szHiddenEdges) merged.add(k);
     return merged;
   }, [fileHiddenEdges, szHiddenEdges]);
+
+  // Active-file highlight: edges to target zone boxes + zones to highlight
+  const fileHighlight = useMemo(() => {
+    if (!activeFile) return null;
+    return buildFileHighlightEdges(
+      activeFile, zoneById, boxes, expandedZones, expandedSubZones, fileConnections,
+    );
+  }, [activeFile, zoneById, boxes, expandedZones, expandedSubZones, fileConnections]);
+
+  const handleFileHover = useCallback((zoneId: string, path: string | null) => {
+    setHoveredFile(path ? { path, zoneId } : null);
+  }, []);
+
+  const handleFileClick = useCallback((zoneId: string, path: string) => {
+    setSelectedFile((prev) => (prev?.path === path && prev.zoneId === zoneId ? null : { path, zoneId }));
+    onSelectFile(path);
+  }, [onSelectFile]);
 
   // Edge weight stats
   const maxWeight = useMemo(() => {
@@ -1590,6 +1730,8 @@ function ZoneDiagram({
             expanded: expandedZones.has(zone.id),
             selected: selectedZoneId === zone.id,
             dimmed: dimmedZones.has(zone.id),
+            connHighlighted: fileHighlight?.targetZoneIds.has(zone.id) ?? false,
+            activeFilePath: activeFile?.zoneId === zone.id ? activeFile.path : null,
             searchQ,
             matchingFiles: matchingFilesByZone.get(zone.id) ?? new Set(),
             fileConnections,
@@ -1598,8 +1740,9 @@ function ZoneDiagram({
             connectingOnly: connectingOnlyZones.has(zone.id),
             onToggle: () => onToggleZone(zone.id),
             onSelectZone: () => onSelectZone(zone),
-            onSelectFile,
+            onSelectFile: (path: string) => handleFileClick(zone.id, path),
             onDblClickFile,
+            onFileHover: (path: string | null) => handleFileHover(zone.id, path),
             onDrillDown: zone.hasDrillDown && onDrillDown
               ? () => onDrillDown(zone.id)
               : undefined,
@@ -1608,6 +1751,24 @@ function ZoneDiagram({
           });
         }),
       ),
+
+      // Active-file highlight edges (on top of zone boxes so collapsed
+      // targets stay clearly connected; non-interactive)
+      fileHighlight
+        ? h("g", { class: "cg-file-highlight-edges", style: "pointer-events: none;" },
+            fileHighlight.edges.map((e) =>
+              h("path", {
+                key: e.key,
+                class: "cg-file-highlight-edge",
+                d: e.d,
+                fill: "none",
+                stroke: e.color,
+                "stroke-width": Math.max(1.5, Math.min(3.5, e.weight * 0.4 + 1.2)),
+                "marker-end": "url(#cg-arrow)",
+              }),
+            ),
+          )
+        : null,
     ),
 
     h(ZoomControls, {
