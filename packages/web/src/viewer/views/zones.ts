@@ -178,6 +178,46 @@ export function buildConnectionsTooltip(
   return lines.length > 0 ? lines.join("\n") : null;
 }
 
+/** One vertical segment of a file row's cross-zone indicator bar. */
+export interface XZoneBarSegment {
+  /** Offset from the top of the bar. */
+  y: number;
+  h: number;
+  color: string;
+}
+
+/**
+ * Split the cross-zone indicator bar into stacked segments, one per target
+ * zone, with heights proportional to link weight. Sorted by weight descending
+ * to match the tooltip line order. Links whose target zone is not in the
+ * rendered zone list are omitted; returns empty when nothing resolves (the
+ * caller falls back to the single accent-colored bar).
+ *
+ * @internal Exported for testing.
+ */
+export function buildXZoneBarSegments(
+  links: FileZoneLink[] | undefined,
+  zoneColorById: Map<string, string>,
+  barHeight: number,
+): XZoneBarSegment[] {
+  if (!links || links.length === 0) return [];
+  const resolved = links
+    .filter((l) => zoneColorById.has(l.targetZoneId))
+    .sort((a, b) => b.weight - a.weight);
+  const total = resolved.reduce((sum, l) => sum + l.weight, 0);
+  if (total <= 0) return [];
+
+  const segments: XZoneBarSegment[] = [];
+  let cum = 0;
+  for (const link of resolved) {
+    const y = (cum / total) * barHeight;
+    cum += link.weight;
+    const yEnd = (cum / total) * barHeight;
+    segments.push({ y, h: yEnd - y, color: zoneColorById.get(link.targetZoneId)! });
+  }
+  return segments;
+}
+
 /**
  * Distribute a parent zone's enriched FileInfo[] to each subzone by matching
  * file paths from the raw Zone.files string array.
@@ -838,6 +878,7 @@ function FileRow({
   searchMatch,
   hasCrossZone,
   active,
+  xzoneSegments,
   tooltip,
   onClick,
   onDblClick,
@@ -850,6 +891,8 @@ function FileRow({
   searchMatch: boolean;
   hasCrossZone: boolean;
   active?: boolean;
+  /** Per-target-zone indicator bar segments; empty → single accent bar. */
+  xzoneSegments?: XZoneBarSegment[];
   tooltip?: string | null;
   onClick: () => void;
   onDblClick: () => void;
@@ -877,16 +920,31 @@ function FileRow({
       height: FILE_ROW_H - 2,
       rx: 3,
     }),
-    // Cross-zone indicator bar
+    // Cross-zone indicator bar — one segment per target zone, colored to
+    // match the target's zone box; single accent bar when none resolve
     hasCrossZone
-      ? h("rect", {
-          class: "cg-file-xzone-bar",
-          x: boxX + 8,
-          y,
-          width: 2,
-          height: FILE_ROW_H - 2,
-          rx: 1,
-        })
+      ? (xzoneSegments && xzoneSegments.length > 0
+          ? h("g", { class: "cg-file-xzone-segments" },
+              xzoneSegments.map((seg, si) =>
+                h("rect", {
+                  key: si,
+                  class: "cg-file-xzone-bar",
+                  x: boxX + 8,
+                  y: y + seg.y,
+                  width: 2,
+                  height: seg.h,
+                  style: `fill: ${seg.color};`,
+                }),
+              ),
+            )
+          : h("rect", {
+              class: "cg-file-xzone-bar",
+              x: boxX + 8,
+              y,
+              width: 2,
+              height: FILE_ROW_H - 2,
+              rx: 1,
+            }))
       : null,
     h("text", {
       class: "cg-file-name",
@@ -1055,6 +1113,7 @@ function ZoneBox({
   matchingFiles,
   fileConnections,
   zoneNameById,
+  zoneColorById,
   expandedSubZoneIds,
   connectingOnly,
   onToggle,
@@ -1079,6 +1138,7 @@ function ZoneBox({
   matchingFiles: Set<string>;
   fileConnections: FileConnectionMap;
   zoneNameById: Map<string, string>;
+  zoneColorById: Map<string, string>;
   expandedSubZoneIds?: Set<string>;
   connectingOnly: boolean;
   onToggle: () => void;
@@ -1115,6 +1175,7 @@ function ZoneBox({
           searchMatch: searchQ ? isMatch : false,
           hasCrossZone,
           active: activeFilePath === file.path,
+          xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2),
           tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
           onClick: () => onSelectFile(file.path),
           onDblClick: () => onDblClickFile(file.path),
@@ -1173,6 +1234,7 @@ function ZoneBox({
               searchMatch: searchQ ? matchingFiles.has(file.path) : false,
               hasCrossZone,
               active: activeFilePath === file.path,
+              xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2),
               tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
               onClick: () => onSelectFile(file.path),
               onDblClick: () => onDblClickFile(file.path),
@@ -1436,6 +1498,7 @@ function ZoneDiagram({
 
   const zoneById = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
   const zoneNameById = useMemo(() => new Map(zones.map((z) => [z.id, z.name])), [zones]);
+  const zoneColorById = useMemo(() => new Map(zones.map((z) => [z.id, z.color])), [zones]);
 
   // Layout computation
   const { boxes: baseBoxes, totalW, totalH } = useMemo(
@@ -1736,6 +1799,7 @@ function ZoneDiagram({
             matchingFiles: matchingFilesByZone.get(zone.id) ?? new Set(),
             fileConnections,
             zoneNameById,
+            zoneColorById,
             expandedSubZoneIds: expandedSubZones.get(zone.id),
             connectingOnly: connectingOnlyZones.has(zone.id),
             onToggle: () => onToggleZone(zone.id),

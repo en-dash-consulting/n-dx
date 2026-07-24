@@ -6,6 +6,7 @@ import {
   prioritizeConnectingFiles,
   applyConnectingFilesOrdering,
   buildConnectionsTooltip,
+  buildXZoneBarSegments,
   buildFileConnectionMap,
 } from "../../../src/viewer/views/zones.js";
 
@@ -385,5 +386,66 @@ describe("buildFileConnectionMap", () => {
   it("returns an empty map when there are no edges or imports", () => {
     const map = buildFileConnectionMap(makeCallGraph([]), [], fileToZoneMap, makeZones());
     expect(map.size).toBe(0);
+  });
+});
+
+// ── buildXZoneBarSegments ────────────────────────────────────────────────────
+
+describe("buildXZoneBarSegments", () => {
+  const zoneColorById = new Map([
+    ["z-red", "#ff0000"],
+    ["z-green", "#00ff00"],
+    ["z-blue", "#0000ff"],
+  ]);
+  const BAR_H = 20;
+
+  it("renders a single full-height segment in the target zone's color", () => {
+    const segments = buildXZoneBarSegments(
+      [{ targetZoneId: "z-red", weight: 3 }],
+      zoneColorById,
+      BAR_H,
+    );
+    expect(segments).toEqual([{ y: 0, h: BAR_H, color: "#ff0000" }]);
+  });
+
+  it("splits multi-target files into weight-proportional contiguous segments", () => {
+    const segments = buildXZoneBarSegments(
+      [
+        { targetZoneId: "z-green", weight: 1 },
+        { targetZoneId: "z-red", weight: 3 },
+      ],
+      zoneColorById,
+      BAR_H,
+    );
+    // Sorted by weight descending, like the tooltip
+    expect(segments).toEqual([
+      { y: 0, h: 15, color: "#ff0000" },
+      { y: 15, h: 5, color: "#00ff00" },
+    ]);
+    // Contiguous and full-height
+    const total = segments.reduce((s, seg) => s + seg.h, 0);
+    expect(total).toBe(BAR_H);
+  });
+
+  it("omits links whose target zone is not in the color map", () => {
+    const segments = buildXZoneBarSegments(
+      [
+        { targetZoneId: "z-unknown", weight: 5 },
+        { targetZoneId: "z-blue", weight: 1 },
+      ],
+      zoneColorById,
+      BAR_H,
+    );
+    expect(segments).toEqual([{ y: 0, h: BAR_H, color: "#0000ff" }]);
+  });
+
+  it("returns empty for undefined, empty, or fully-unresolvable links", () => {
+    expect(buildXZoneBarSegments(undefined, zoneColorById, BAR_H)).toEqual([]);
+    expect(buildXZoneBarSegments([], zoneColorById, BAR_H)).toEqual([]);
+    expect(buildXZoneBarSegments(
+      [{ targetZoneId: "z-unknown", weight: 2 }],
+      zoneColorById,
+      BAR_H,
+    )).toEqual([]);
   });
 });
