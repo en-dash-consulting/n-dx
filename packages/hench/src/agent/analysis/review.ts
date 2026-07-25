@@ -138,7 +138,17 @@ export async function listUntrackedPaths(
   return output
     .split("\n")
     .filter((line) => line.startsWith("?? "))
-    .map((line) => line.slice(3).trim())
+    .map((line) => {
+      // `git status --porcelain` wraps paths containing spaces or special
+      // characters in double quotes (e.g. `?? "my file.ts"`). Strip them so
+      // the same path matches between the baseline and the current set, and so
+      // the pathspec passed to `git clean -fd --` refers to the real file.
+      let path = line.slice(3).trim();
+      if (path.length >= 2 && path.startsWith('"') && path.endsWith('"')) {
+        path = path.slice(1, -1);
+      }
+      return path;
+    })
     .filter(Boolean);
 }
 

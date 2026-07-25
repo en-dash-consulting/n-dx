@@ -121,8 +121,12 @@ export async function toolRexUpdateStatus(
       itemId: taskId,
       detail: `Status changed to ${params.status} by hench agent`,
     });
-  } catch {
-    // Non-fatal: proceed to cascade
+  } catch (err) {
+    // Non-fatal: proceed to cascade. Surface a trace so a dropped status_updated
+    // entry isn't completely silent (the tool has no run handle for diagnostics).
+    console.warn(
+      `[rex] status_updated log append failed for ${taskId} (non-fatal): ${(err as Error).message}`,
+    );
   }
 
   // Auto-acknowledge sourcevision findings when a task is deferred
@@ -146,6 +150,11 @@ export async function toolRexUpdateStatus(
   // Auto-complete parent items using a whole-tree reconciliation sweep.
   // Using reconcileAutoCompletions (not findAutoCompletions) ensures that
   // parents left stuck pending by a previously-missed cascade are also healed.
+  // This scans the full tree on every completed/deferred update and may cascade
+  // parents unrelated to this task — that is the intended self-healing. It relies
+  // on the no-concurrent-PRD-writers contract (see CLAUDE.md "Concurrency
+  // contract"): a writer landing between updateItem and loadDocument here could
+  // otherwise cross-contaminate the sweep.
   const autoCompleted: string[] = [];
   if (params.status === "completed" || params.status === "deferred") {
     const doc = await store.loadDocument();

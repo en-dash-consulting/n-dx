@@ -45,18 +45,6 @@ function allChildrenTerminal(
 }
 
 /**
- * Given a recently-completed item, find all ancestors that should be
- * auto-completed because all their children are now done.
- *
- * Walks up the parent chain, simulating each completion so that
- * grandparents can see their child (which we just decided to complete)
- * as terminal.
- *
- * @param items     - The full PRD item tree.
- * @param itemId    - The ID of the item that just completed.
- * @returns Items to auto-complete, ordered bottom-up. Empty if no propagation needed.
- */
-/**
  * Scan the whole PRD tree bottom-up and return every parent that is
  * `pending` or `in_progress` but whose children are all terminal
  * (`completed`/`deferred`). Operates independently of any single trigger
@@ -116,6 +104,18 @@ export function reconcileAutoCompletions(items: PRDItem[]): AutoCompletionResult
   return result;
 }
 
+/**
+ * Given a recently-completed item, find all ancestors that should be
+ * auto-completed because all their children are now done.
+ *
+ * Walks up the parent chain, simulating each completion so that
+ * grandparents can see their child (which we just decided to complete)
+ * as terminal.
+ *
+ * @param items     - The full PRD item tree.
+ * @param itemId    - The ID of the item that just completed.
+ * @returns Items to auto-complete, ordered bottom-up. Empty if no propagation needed.
+ */
 export function findAutoCompletions(
   items: PRDItem[],
   itemId: string,

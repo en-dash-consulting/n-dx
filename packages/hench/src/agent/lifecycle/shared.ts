@@ -982,16 +982,23 @@ async function performRollbackIfNeeded(
   }
 
   info(`\nRolling back ${dirtyPaths.length} uncommitted file(s) after failed run…`);
-  const result = await revertChanges(projectDir, {
-    baselineUntracked: options.baselineUntracked,
-  });
-  const removed = result.removedUntracked.length;
-  const kept = result.keptUntracked.length;
-  info(
-    `Rollback complete — reverted tracked changes` +
-      `; removed ${removed} agent-created file(s)` +
-      (kept > 0 ? `, preserved ${kept} pre-existing untracked file(s).` : "."),
-  );
+  // Defensive: the git helpers (execStdout) already swallow errors, but guard
+  // the call site too so a corrupt git state can never throw here and prevent
+  // the caller (finalizeRun) from saving the run record.
+  try {
+    const result = await revertChanges(projectDir, {
+      baselineUntracked: options.baselineUntracked,
+    });
+    const removed = result.removedUntracked.length;
+    const kept = result.keptUntracked.length;
+    info(
+      `Rollback complete — reverted tracked changes` +
+        `; removed ${removed} agent-created file(s)` +
+        (kept > 0 ? `, preserved ${kept} pre-existing untracked file(s).` : "."),
+    );
+  } catch (err) {
+    info(`Rollback encountered an error (continuing): ${(err as Error).message}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1132,7 +1139,10 @@ async function commitCompletionMetadata(
     return;
   }
 
-  const message = `chore(prd): mark task ${taskId} completed`;
+  // Stages the whole `.rex/prd_tree/` (the completion write may touch the task
+  // plus cascaded ancestors). Under the no-concurrent-PRD-writers contract this
+  // is just this run's metadata; the message reflects it may span the tree.
+  const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
   try {
     await execStdout(
       "git", ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine()],
