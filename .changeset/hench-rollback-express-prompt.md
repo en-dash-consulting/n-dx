@@ -1,5 +1,5 @@
 ---
-"hench": patch
+"@n-dx/hench": patch
 ---
 
 Make the `rollbackOnFailure` revert **prompt-only** — a failed run never discards work without an express, per-run confirmation. On an interactive TTY, a failed run prompts `Revert N uncommitted file(s)? [y/N]` (defaults to **No**); only an explicit yes reverts (a full `git reset`/`checkout`/`clean -fd`). Declining preserves the working tree.

@@ -1,6 +1,6 @@
 ---
 "@n-dx/llm-client": patch
-"hench": patch
+"@n-dx/hench": patch
 ---
 
 Enforce the git-subcommand allowlist in CLI provider mode. Previously only the

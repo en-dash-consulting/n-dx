@@ -67,6 +67,9 @@ describe("checkSkillTracking()", () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "skill-tracking-"));
     execFileSync("git", ["init"], { cwd: dir });
+    // Isolate the fixture from the developer's global excludes file (e.g. a
+    // machine-wide `.claude/` ignore) so only the fixture's .gitignore applies.
+    execFileSync("git", ["config", "core.excludesFile", "/dev/null"], { cwd: dir });
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
