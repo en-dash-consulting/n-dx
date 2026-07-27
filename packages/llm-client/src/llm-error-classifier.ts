@@ -233,25 +233,6 @@ export function classifyLLMError(
 
   // ── Authentication (401, invalid key, expired token, lost session) ──
   if (isAuthError(authCheckMessage)) {
-    if (vendor === "codex") {
-      return {
-        message: `Authentication failed — Codex CLI credentials were rejected.${suffix}${detailSuffix}`,
-        suggestion:
-          "Run 'codex login', then retry. If needed, set the binary path with: n-dx config llm.codex.cli_path /path/to/codex",
-        category: "auth",
-        code: CLI_ERROR_CODES.AUTH_FAILED,
-      };
-    }
-    if (vendor === "google") {
-      return {
-        message: `Authentication failed — your Google API key was rejected.${suffix}${detailSuffix}`,
-        suggestion:
-          "Check your API key with: n-dx config llm.google.api_key <key>, or set the GEMINI_API_KEY environment variable.",
-        category: "auth",
-        code: CLI_ERROR_CODES.AUTH_FAILED,
-      };
-    }
-  if (isAuthError) {
     // Canonical, JSON-free wording shared with the preflight and providers.
     // The raw provider detail is intentionally omitted from the headline so
     // no internal error fields leak into the primary message.
