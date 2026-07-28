@@ -1017,8 +1017,10 @@ interface SuccessContext {
   selfHeal?: boolean;
   /** Automatically revert on review rejection. Default: true; false via --no-rollback. */
   rollbackOnFailure?: boolean;
-  /** Skip the interactive rollback confirmation prompt (--yes / non-interactive). */
+  /** True when --yes was passed — the rollback prompt is unavailable, so no revert. */
   yes?: boolean;
+  /** True in autonomous modes (--auto/--loop); rollback never runs unattended. */
+  autonomous?: boolean;
   /** Untracked files present before the run, for scoped rollback (#303). */
   baselineUntracked?: string[];
   /** Per-attempt EventAccumulator (event pipeline path). */
@@ -1086,6 +1088,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
       const reviewGate = await runReviewGate(projectDir, store, taskId, run, {
         rollbackOnFailure: ctx.rollbackOnFailure,
         yes: ctx.yes,
+        autonomous: ctx.autonomous,
         baselineUntracked: ctx.baselineUntracked,
       });
       if (reviewGate.rejected) {
@@ -1434,6 +1437,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           selfHeal: config.selfHeal,
           rollbackOnFailure: opts.rollbackOnFailure,
           yes: opts.yes,
+          autonomous: opts.autonomous,
           baselineUntracked,
           attemptAccumulator,
           runAccumulator,

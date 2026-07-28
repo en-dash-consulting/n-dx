@@ -463,8 +463,10 @@ export interface ReviewGateOptions {
    * path ignored this flag entirely (issue #303).
    */
   rollbackOnFailure?: boolean;
-  /** Skip the interactive rollback confirmation prompt (--yes / non-interactive). */
+  /** True when --yes was passed — the rollback prompt is unavailable, so no revert. */
   yes?: boolean;
+  /** True in autonomous modes (--auto/--loop). Same effect as `yes`. */
+  autonomous?: boolean;
   /**
    * Untracked paths present before the run, so rollback removes only
    * agent-created files. See {@link captureBaselineUntracked}.
@@ -504,6 +506,7 @@ export async function runReviewGate(
       // files via the baseline.
       await performRollbackIfNeeded(projectDir, {
         yes: options.yes,
+        autonomous: options.autonomous,
         baselineUntracked: options.baselineUntracked,
       });
     }
@@ -970,14 +973,18 @@ async function promptRollbackConfirm(count: number): Promise<boolean> {
  * The revert is prompt-only:
  * - Interactive TTY (stdin is a terminal, --yes not passed, not autonomous):
  *   prompts `Revert N uncommitted file(s)? [y/N]`, defaulting to No. Only an
- *   explicit yes reverts (a full revert, including untracked files).
+ *   explicit yes reverts — and even then the revert is scoped: tracked
+ *   changes are reverted, but untracked removal is limited to files absent
+ *   from the pre-run baseline (agent-created), never pre-existing work.
  * - Non-interactive (CI, pipe, --yes, or any autonomous mode): there is no
  *   channel for a per-run confirmation, so the working tree is left exactly
  *   as-is and the uncommitted files are reported. Nothing is discarded.
  */
 interface PerformRollbackOptions {
-  /** Skip the interactive confirmation prompt (--yes / non-interactive). */
+  /** True when --yes was passed. There is no prompt channel, so no revert. */
   yes?: boolean;
+  /** True in autonomous modes (--auto/--loop). Same effect as `yes`. */
+  autonomous?: boolean;
   /**
    * Untracked paths present before the run; only untracked files absent from
    * this set are removed. When omitted, no untracked files are deleted.
@@ -994,14 +1001,22 @@ async function performRollbackIfNeeded(
     return;
   }
 
-  // Prompt only in interactive TTY sessions where --yes was not supplied.
-  const isInteractive = Boolean(process.stdin.isTTY) && !options.yes;
-  if (isInteractive) {
-    const confirmed = await promptRollbackConfirm(dirtyPaths.length);
-    if (!confirmed) {
-      info(`Changes preserved — ${dirtyPaths.length} uncommitted file(s) left unchanged.`);
-      return;
-    }
+  // A revert requires an express per-run confirmation, which is only
+  // available on an interactive TTY where neither --yes nor an autonomous
+  // mode (--auto/--loop/--epic-by-epic) was supplied. Everything else leaves
+  // the working tree untouched.
+  const isInteractive = Boolean(process.stdin.isTTY) && !options.yes && !options.autonomous;
+  if (!isInteractive) {
+    info(
+      `${dirtyPaths.length} uncommitted file(s) left in place — a rollback only runs after an interactive confirmation.`,
+    );
+    return;
+  }
+
+  const confirmed = await promptRollbackConfirm(dirtyPaths.length);
+  if (!confirmed) {
+    info(`Changes preserved — ${dirtyPaths.length} uncommitted file(s) left unchanged.`);
+    return;
   }
 
   info(`\nRolling back ${dirtyPaths.length} uncommitted file(s) after failed run…`);
@@ -2013,6 +2028,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   if (opts.rollbackOnFailure !== false && FAILURE_STATUSES.has(run.status)) {
     await performRollbackIfNeeded(projectDir, {
       yes: opts.yes,
+      autonomous: opts.autonomous,
       baselineUntracked: opts.baselineUntracked,
     });
   }

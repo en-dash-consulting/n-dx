@@ -205,11 +205,14 @@ describe("rollbackOnFailure express-prompt gate", () => {
     }
   });
 
-  it("reverts tracked changes and removes untracked files when the prompt is accepted", async () => {
+  it("reverts tracked changes and removes agent-created untracked files when the prompt is accepted, preserving pre-existing untracked work", async () => {
     const { fakes } = installFakeReadline();
     vi.resetModules();
 
     await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
+    // Pre-existing untracked work (in the pre-run baseline — think `.env`).
+    await writeFile(join(projectDir, "pre-existing.ts"), "// mine\n", "utf-8");
+    // Changes made during the run: a tracked edit and an agent-created file.
     await writeFile(join(projectDir, "src.ts"), "export const x = 999;\n", "utf-8");
     await writeFile(join(projectDir, "scratch.ts"), "// untracked\n", "utf-8");
 
@@ -221,6 +224,7 @@ describe("rollbackOnFailure express-prompt gate", () => {
         henchDir,
         projectDir,
         rollbackOnFailure: true,
+        baselineUntracked: ["pre-existing.ts"],
       });
 
       await waitForFakePrompt(fakes);
@@ -233,8 +237,13 @@ describe("rollbackOnFailure express-prompt gate", () => {
       const content = await readFile(join(projectDir, "src.ts"), "utf-8");
       expect(content).toBe("export const x = 1;\n");
 
-      // Explicit confirmation authorizes untracked-file removal.
+      // Explicit confirmation authorizes removing agent-created files...
       await expect(readFile(join(projectDir, "scratch.ts"), "utf-8")).rejects.toThrow();
+
+      // ...but the confirmed revert stays scoped: pre-existing untracked
+      // work (the baseline) is never deleted (#303).
+      const preExisting = await readFile(join(projectDir, "pre-existing.ts"), "utf-8");
+      expect(preExisting).toBe("// mine\n");
     } finally {
       restoreSigintListeners(priorListeners);
     }

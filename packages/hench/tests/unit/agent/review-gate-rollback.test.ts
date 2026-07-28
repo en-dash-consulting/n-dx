@@ -1,14 +1,36 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 /**
  * Tests for runReviewGate's rollback gating (issue #303).
  *
  * When a reviewer rejects the agent's changes, the gate must honor
- * `rollbackOnFailure` / `--no-rollback`: previously it reverted
- * unconditionally, ignoring the flag. These tests lock the behavior:
- *   - rollbackOnFailure: false  → NO revert (changes left in place)
- *   - rollbackOnFailure default → revert runs (when the tree is dirty)
+ * `rollbackOnFailure` / `--no-rollback`, and the revert itself is
+ * prompt-only (never unattended). These tests lock the behavior:
+ *   - rollbackOnFailure: false      → NO revert (changes left in place)
+ *   - non-interactive (no TTY)      → NO revert, no prompt
+ *   - autonomous mode (even on TTY) → NO revert, no prompt
+ *   - interactive TTY + declined    → NO revert
+ *   - interactive TTY + confirmed   → revert runs, scoped by the pre-run
+ *     untracked baseline so pre-existing files are preserved
  */
+
+// Fake readline so the confirmation prompt can be driven deterministically.
+// `questions` doubles as the assertion that a prompt did (or did not) open.
+const readlineFake = vi.hoisted(() => ({
+  questions: [] as string[],
+  answers: [] as string[],
+}));
+vi.mock("node:readline", () => ({
+  createInterface: () => ({
+    question: (q: string, cb: (answer: string) => void) => {
+      readlineFake.questions.push(q);
+      cb(readlineFake.answers.shift() ?? "");
+    },
+    close: () => {},
+    on: () => {},
+    removeListener: () => {},
+  }),
+}));
 
 // Mock the review analysis module so promptReview rejects and revertChanges
 // is an observable spy (never touches real git).
@@ -61,8 +83,20 @@ function buildRun() {
   } as unknown as import("../../../src/schema/index.js").RunRecord;
 }
 
+const originalIsTTY = process.stdin.isTTY;
+
+function setStdinTTY(value: boolean | undefined): void {
+  Object.defineProperty(process.stdin, "isTTY", { value, configurable: true });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  readlineFake.questions.length = 0;
+  readlineFake.answers.length = 0;
+});
+
+afterEach(() => {
+  setStdinTTY(originalIsTTY);
 });
 
 describe("runReviewGate — rollback gating (#303)", () => {
@@ -79,25 +113,78 @@ describe("runReviewGate — rollback gating (#303)", () => {
     expect(run.status).toBe("failed");
     // The core assertion: --no-rollback leaves the rejected changes in place.
     expect(revertChanges).not.toHaveBeenCalled();
+    expect(readlineFake.questions).toHaveLength(0);
   });
 
-  it("reverts on rejection when rollbackOnFailure is not suppressed (dirty tree)", async () => {
+  it("does NOT revert when non-interactive (no TTY) — reports and leaves changes", async () => {
+    setStdinTTY(undefined);
     const { runReviewGate } = await import("../../../src/agent/lifecycle/shared.js");
     const { revertChanges } = await import("../../../src/agent/analysis/review.js");
 
     const run = buildRun();
     const result = await runReviewGate("/project", {} as never, "task-1", run, {
-      // rollbackOnFailure omitted → defaults to reverting
       baselineUntracked: [],
     });
 
     expect(result.rejected).toBe(true);
     expect(run.status).toBe("failed");
-    // The rollback path ran and scoped the revert with the provided baseline.
+    // Without a prompt channel there is no confirmation, so nothing reverts.
+    expect(revertChanges).not.toHaveBeenCalled();
+    expect(readlineFake.questions).toHaveLength(0);
+  });
+
+  it("does NOT revert in autonomous mode, even on a TTY (no prompt)", async () => {
+    setStdinTTY(true);
+    const { runReviewGate } = await import("../../../src/agent/lifecycle/shared.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
+
+    const run = buildRun();
+    const result = await runReviewGate("/project", {} as never, "task-1", run, {
+      autonomous: true,
+      baselineUntracked: [],
+    });
+
+    expect(result.rejected).toBe(true);
+    expect(revertChanges).not.toHaveBeenCalled();
+    expect(readlineFake.questions).toHaveLength(0);
+  });
+
+  it("does NOT revert when the interactive prompt is declined", async () => {
+    setStdinTTY(true);
+    readlineFake.answers.push("n");
+    const { runReviewGate } = await import("../../../src/agent/lifecycle/shared.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
+
+    const run = buildRun();
+    const result = await runReviewGate("/project", {} as never, "task-1", run, {
+      baselineUntracked: [],
+    });
+
+    expect(result.rejected).toBe(true);
+    expect(readlineFake.questions).toHaveLength(1);
+    expect(revertChanges).not.toHaveBeenCalled();
+  });
+
+  it("reverts on express confirmation, scoped by the pre-run untracked baseline", async () => {
+    setStdinTTY(true);
+    readlineFake.answers.push("y");
+    const { runReviewGate } = await import("../../../src/agent/lifecycle/shared.js");
+    const { revertChanges } = await import("../../../src/agent/analysis/review.js");
+
+    const run = buildRun();
+    const result = await runReviewGate("/project", {} as never, "task-1", run, {
+      baselineUntracked: ["pre-existing.txt"],
+    });
+
+    expect(result.rejected).toBe(true);
+    expect(run.status).toBe("failed");
+    expect(readlineFake.questions).toHaveLength(1);
+    // The rollback path ran and scoped the revert with the provided baseline,
+    // so pre-existing untracked work survives even a confirmed revert.
     expect(revertChanges).toHaveBeenCalledTimes(1);
     expect(revertChanges).toHaveBeenCalledWith(
       "/project",
-      expect.objectContaining({ baselineUntracked: [] }),
+      expect.objectContaining({ baselineUntracked: ["pre-existing.txt"] }),
     );
   });
 });

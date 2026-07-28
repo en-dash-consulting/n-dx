@@ -679,6 +679,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     await runReviewGate(projectDir, store, taskId, run, {
       rollbackOnFailure: opts.rollbackOnFailure,
       yes: opts.yes,
+      autonomous: opts.autonomous,
       baselineUntracked,
     });
   }
@@ -1005,6 +1006,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     await runReviewGate(projectDir, store, taskId, run, {
       rollbackOnFailure: opts.rollbackOnFailure,
       yes: opts.yes,
+      autonomous: opts.autonomous,
       baselineUntracked,
     });
   }

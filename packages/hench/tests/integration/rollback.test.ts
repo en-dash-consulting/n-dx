@@ -93,22 +93,21 @@ describe("finalizeRun git rollback (prompt-only, non-interactive path)", () => {
     expect(fileContent).toBe(modifiedContent);
   });
 
-  it("removes agent-created untracked files when run fails (empty baseline)", async () => {
-    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+  // The next three cases assert the SCOPING of a revert (#303). finalizeRun
+  // never reverts non-interactively, so they exercise revertChanges directly —
+  // the exact call the lifecycle makes after an express confirmation.
+
+  it("removes agent-created untracked files on a confirmed revert (empty baseline)", async () => {
+    const { revertChanges } = await import("../../src/agent/analysis/review.js");
 
     await makeInitialCommit(projectDir, "original.ts", "export {};\n");
     // Tree started clean (empty baseline) → the new file is agent-created and
-    // must be removed on rollback.
+    // must be removed on revert.
     await writeFile(join(projectDir, "new-file.ts"), "new file content\n", "utf-8");
 
-    await finalizeRun({
-      run: buildMinimalRun("failed"),
-      henchDir,
-      projectDir,
-      rollbackOnFailure: true,
-      baselineUntracked: [],
-    });
+    const result = await revertChanges(projectDir, { baselineUntracked: [] });
 
+    expect(result.removedUntracked).toEqual(["new-file.ts"]);
     // Untracked file should be removed by the scoped git clean
     let fileExists = true;
     try {
@@ -120,9 +119,8 @@ describe("finalizeRun git rollback (prompt-only, non-interactive path)", () => {
   });
 
   it("preserves pre-existing untracked files, removing only agent-created ones (#303)", async () => {
-    const { finalizeRun, captureBaselineUntracked } = await import(
-      "../../src/agent/lifecycle/shared.js"
-    );
+    const { captureBaselineUntracked } = await import("../../src/agent/lifecycle/shared.js");
+    const { revertChanges } = await import("../../src/agent/analysis/review.js");
 
     const originalTracked = "export const v = 1;\n";
     await makeInitialCommit(projectDir, "lib.ts", originalTracked);
@@ -139,23 +137,19 @@ describe("finalizeRun git rollback (prompt-only, non-interactive path)", () => {
     await writeFile(join(projectDir, "lib.ts"), "export const v = 999;\n", "utf-8");
     await writeFile(join(projectDir, "agent-output.log"), "scratch from agent\n", "utf-8");
 
-    const run = buildMinimalRun("failed");
-
-    await finalizeRun({
-      run,
-      henchDir,
-      projectDir,
-      rollbackOnFailure: true,
-      baselineUntracked,
-    });
+    const result = await revertChanges(projectDir, { baselineUntracked });
 
     // Pre-existing untracked files (incl. hidden) are preserved.
+    expect(result.keptUntracked).toEqual(
+      expect.arrayContaining([".env", "user-scratch.txt"]),
+    );
     expect(await readFile(join(projectDir, "user-scratch.txt"), "utf-8")).toBe(
       "do not delete me\n",
     );
     expect(await readFile(join(projectDir, ".env"), "utf-8")).toBe("SECRET=keepme\n");
 
     // The agent-created untracked file is removed.
+    expect(result.removedUntracked).toEqual(["agent-output.log"]);
     let agentFileExists = true;
     try {
       await readFile(join(projectDir, "agent-output.log"), "utf-8");
@@ -174,22 +168,16 @@ describe("finalizeRun git rollback (prompt-only, non-interactive path)", () => {
   });
 
   it("preserves ALL untracked files when no baseline is supplied (safe fallback)", async () => {
-    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const { revertChanges } = await import("../../src/agent/analysis/review.js");
 
     await makeInitialCommit(projectDir, "original.ts", "export {};\n");
     await writeFile(join(projectDir, "unknown-scratch.txt"), "keep me\n", "utf-8");
 
-    const run = buildMinimalRun("failed");
-
     // No baselineUntracked → cannot distinguish agent files from user files,
-    // so nothing untracked is deleted. Tracked changes still revert.
-    await finalizeRun({
-      run,
-      henchDir,
-      projectDir,
-      rollbackOnFailure: true,
-    });
+    // so nothing untracked is deleted.
+    const result = await revertChanges(projectDir);
 
+    expect(result.removedUntracked).toEqual([]);
     expect(await readFile(join(projectDir, "unknown-scratch.txt"), "utf-8")).toBe("keep me\n");
   });
 

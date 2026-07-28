@@ -165,6 +165,10 @@ export async function listUntrackedPaths(
  * #303). Instead we remove ONLY the untracked files the agent created during
  * the run, computed by diffing the current untracked set against
  * `options.baselineUntracked`. With no baseline we remove nothing.
+ *
+ * Invocation is also prompt-gated: the run lifecycle only calls this after an
+ * express per-run confirmation on an interactive TTY (never unattended) — see
+ * `performRollbackIfNeeded` in `lifecycle/shared.ts`.
  */
 export async function revertChanges(
   projectDir: string,
