@@ -1020,14 +1020,15 @@ describe("n-dx config", () => {
 
       run(["llm.codex.cli_path", fakeCodex, tmpDir]);
       const stderr = runFail(["llm.vendor", "codex", tmpDir]);
-      expect(stderr).toContain("Provider auth preflight failed for \"codex\"");
-      expect(stderr).toContain("Details:");
-      expect(stderr).toContain(`Next step: run '${fakeCodex} login'`);
+      expect(stderr).toContain("Authentication failed for Codex");
+      expect(stderr).toContain("Invalid or expired credentials");
+      expect(stderr).toContain("codex logout && codex login");
+      expect(stderr).not.toContain("Details:");
 
       await expect(readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8")).rejects.toThrow(/ENOENT/);
     });
 
-    it("prints claude login guidance on claude auth preflight failure", async () => {
+    it("prints claude re-auth guidance on claude auth preflight failure", async () => {
       const basePath = join(tmpDir, "fake-claude-preflight-fail");
       const fakeClaude = await writeFakeBinary(basePath, {
         stderrLine: "please login",
@@ -1037,8 +1038,9 @@ describe("n-dx config", () => {
 
       run(["llm.claude.cli_path", fakeClaude, tmpDir]);
       const stderr = runFail(["llm.vendor", "claude", tmpDir]);
-      expect(stderr).toContain("Provider auth preflight failed for \"claude\"");
-      expect(stderr).toContain(`Next step: run '${fakeClaude} login'`);
+      expect(stderr).toContain("Authentication failed for Claude");
+      expect(stderr).toContain("Invalid or expired credentials");
+      expect(stderr).toContain("claude logout && claude login");
 
       await expect(readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8")).rejects.toThrow(/ENOENT/);
     });
@@ -1074,8 +1076,8 @@ describe("n-dx config", () => {
 
       // Soft mode does not abort.
       expect(status).toBe(0);
-      // The failure detail + remediation are still surfaced (never swallowed)...
-      expect(stderr).toContain('Provider auth preflight failed for "google"');
+      // The failure + remediation are still surfaced (never swallowed)...
+      expect(stderr).toContain("No API key configured for Google");
       expect(stderr).toContain("GEMINI_API_KEY");
       // ...followed by a clear "proceeding anyway" notice.
       expect(stderr).toContain("Proceeding anyway");
@@ -1093,7 +1095,7 @@ describe("n-dx config", () => {
       );
 
       expect(status).toBe(1);
-      expect(stderr).toContain('Provider auth preflight failed for "google"');
+      expect(stderr).toContain("No API key configured for Google");
       await expect(readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8")).rejects.toThrow(/ENOENT/);
     });
 
@@ -1348,6 +1350,107 @@ describe("n-dx config", () => {
       } finally {
         await rm(emptyDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  // ── Auth-failure re-authentication guidance ─────────────────────────────────
+
+  describe("auth-failure preflight guidance", () => {
+    /** Run `config llm.vendor <v>` expecting a non-zero exit; return stderr. */
+    function runVendorFail(vendor, dir, env = {}) {
+      try {
+        execFileSync("node", [CLI_PATH, "config", "llm.vendor", vendor, dir], {
+          encoding: "utf-8",
+          timeout: 15000,
+          stdio: "pipe",
+          env: { ...process.env, ...env },
+        });
+        throw new Error("Expected command to fail");
+      } catch (err) {
+        if (err.message === "Expected command to fail") throw err;
+        return err.stderr ?? "";
+      }
+    }
+
+    // A JSON auth blob the way the claude/codex CLI emits it on rejected creds.
+    const AUTH_JSON = '{"type":"result","is_error":true,"result":"invalid api key - 401 Unauthorized"}';
+
+    async function pointVendorAtFakeBinary(dir, vendor, binPath) {
+      await writeFile(
+        SHARED_CONFIG_PATH(dir),
+        JSON.stringify({ llm: { [vendor]: { cli_path: binPath } } }, null, 2) + "\n",
+      );
+    }
+
+    it("claude: replaces the raw JSON dump with concise re-auth guidance", async () => {
+      const bin = await writeFakeBinary(join(tmpDir, "fake-claude"), {
+        stderrLine: AUTH_JSON,
+        exitCode: 1,
+      });
+      await pointVendorAtFakeBinary(tmpDir, "claude", bin);
+
+      const stderr = runVendorFail("claude", tmpDir);
+
+      // Names provider + canonical cause + concrete remediation command.
+      expect(stderr).toContain("Authentication failed for Claude");
+      expect(stderr).toContain("Invalid or expired credentials");
+      expect(stderr).toContain("claude logout && claude login");
+      // No raw JSON payload / internal fields in the output.
+      expect(stderr).not.toContain("{");
+      expect(stderr).not.toContain("is_error");
+      expect(stderr).not.toContain("invalid api key - 401");
+      // NDX code is a secondary line, not the headline.
+      expect(stderr).toContain("[NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED]");
+      const headlineIdx = stderr.indexOf("Authentication failed for Claude");
+      const codeIdx = stderr.indexOf("[NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED]");
+      expect(headlineIdx).toBeGreaterThanOrEqual(0);
+      expect(codeIdx).toBeGreaterThan(headlineIdx);
+    });
+
+    it("codex: replaces the raw JSON dump with concise re-auth guidance", async () => {
+      const bin = await writeFakeBinary(join(tmpDir, "fake-codex"), {
+        stderrLine: AUTH_JSON,
+        exitCode: 1,
+      });
+      await pointVendorAtFakeBinary(tmpDir, "codex", bin);
+
+      const stderr = runVendorFail("codex", tmpDir);
+
+      expect(stderr).toContain("Authentication failed for Codex");
+      expect(stderr).toContain("Invalid or expired credentials");
+      expect(stderr).toContain("codex logout && codex login");
+      expect(stderr).not.toContain("{");
+      expect(stderr).not.toContain("is_error");
+      expect(stderr).toContain("[NDX_CODEX_PREFLIGHT_AUTH_FAILED]");
+    });
+
+    it("google: concise missing-key guidance when no key is configured", async () => {
+      // No cli_path needed; clear any ambient API key so preflight hits NO_KEY.
+      const stderr = runVendorFail("google", tmpDir, {
+        GEMINI_API_KEY: "",
+        GOOGLE_API_KEY: "",
+        GOOGLE_GENAI_API_KEY: "",
+      });
+
+      expect(stderr).toContain("No API key configured for Google");
+      expect(stderr).toContain("ndx config llm.google.api_key <KEY>");
+      expect(stderr).toContain("GEMINI_API_KEY");
+      expect(stderr).not.toContain("{");
+      expect(stderr).toContain("[NDX_GOOGLE_PREFLIGHT_NO_KEY]");
+    });
+
+    it("applies red ANSI error color when color is forced", async () => {
+      const bin = await writeFakeBinary(join(tmpDir, "fake-claude"), {
+        stderrLine: AUTH_JSON,
+        exitCode: 1,
+      });
+      await pointVendorAtFakeBinary(tmpDir, "claude", bin);
+
+      const stderr = runVendorFail("claude", tmpDir, { FORCE_COLOR: "1" });
+
+      // Red headline (\x1b[31m) and dim (\x1b[2m) code line.
+      expect(stderr).toContain("\x1b[31m");
+      expect(stderr).toContain("\x1b[2m");
     });
   });
 });

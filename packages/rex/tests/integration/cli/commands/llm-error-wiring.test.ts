@@ -119,9 +119,9 @@ describe("auth error classification", () => {
     expect(r.suggestion).toContain("codex login");
   });
 
-  it("provides API key guidance for claude", () => {
+  it("provides re-authentication guidance for claude", () => {
     const r = classifyLLMError(new Error("401 Unauthorized"), "claude");
-    expect(r.suggestion).toContain("n-dx config");
+    expect(r.suggestion).toContain("claude logout && claude login");
   });
 });
 

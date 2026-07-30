@@ -54,9 +54,26 @@ const MAX_SUMMARY_LENGTH = 500;
  * Maps the policy's `allowedCommands` (e.g. `["npm", "git"]`) to Claude CLI's
  * tool pattern format (e.g. `["Bash(npm:*)", "Bash(git:*)"]`), and includes
  * file tools that are inherently scoped to `cwd` by Claude CLI.
+ *
+ * When `allowedGitSubcommands` is provided and non-empty, `git` is granted at
+ * subcommand granularity (`Bash(git commit:*)`, `Bash(git status:*)`, …) rather
+ * than the blanket `Bash(git:*)`. This mirrors the API-provider guard's
+ * `checkGitSubcommand` allowlist, so destructive subcommands not on the list
+ * (`reset`, `clean`, `revert`, `push`) are not auto-approved in CLI mode — they
+ * fall through to a permission prompt (denied under a non-interactive
+ * `acceptEdits` spawn). When the list is omitted/empty, `git` keeps its legacy
+ * blanket grant for backward compatibility.
  */
-export function buildAllowedTools(allowedCommands: ReadonlyArray<string>): string[] {
-  const bashTools = allowedCommands.map((cmd) => `Bash(${cmd}:*)`);
+export function buildAllowedTools(
+  allowedCommands: ReadonlyArray<string>,
+  allowedGitSubcommands?: ReadonlyArray<string>,
+): string[] {
+  const scopeGit = !!allowedGitSubcommands && allowedGitSubcommands.length > 0;
+  const bashTools = allowedCommands.flatMap((cmd) =>
+    cmd === "git" && scopeGit
+      ? allowedGitSubcommands!.map((sub) => `Bash(git ${sub}:*)`)
+      : [`Bash(${cmd}:*)`],
+  );
   return [...bashTools, ...CLI_FILE_TOOLS];
 }
 
@@ -335,7 +352,7 @@ export const claudeCliAdapter: VendorAdapter = {
     opts: VendorSpawnOptions,
   ): SpawnConfig {
     const { systemPrompt, taskPrompt } = assemblePrompt(envelope);
-    const allowedTools = buildAllowedTools(policy.allowedCommands);
+    const allowedTools = buildAllowedTools(policy.allowedCommands, policy.allowedGitSubcommands);
 
     const { args, stdinContent } = buildClaudeCliArgs({
       systemPrompt,

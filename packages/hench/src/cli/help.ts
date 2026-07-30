@@ -55,7 +55,18 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },
       { flag: "--model=<model>", description: "Override the Claude model" },
       { flag: "--permission-mode=<mode>", description: "Claude permission posture: default | acceptEdits | bypassPermissions | plan (autonomous runs default to acceptEdits)" },
-      { flag: "--allow-dirty", description: "Let autonomous runs (--auto/--loop/--epic-by-epic) start with an uncommitted working tree (they abort by default)" },
+      { flag: "--allow-dirty", description: "Start with an uncommitted working tree: autonomous runs (--auto/--loop/--epic-by-epic) abort by default, and this flag also overrides hench.git.requireCleanTree and hench.git.checkpointThreshold escalation" },
+    ],
+    sections: [
+      {
+        title: "Pre-run commit gate",
+        content:
+          "The gate is size-aware: when uncommitted changes reach\n" +
+          "hench.git.checkpointThreshold lines changed (default: 200, 0 disables),\n" +
+          "the interactive prompt defaults to committing a checkpoint first. With\n" +
+          "hench.git.requireCleanTree=true, dirty runs must commit or stop.\n" +
+          "Precedence: --allow-dirty flag > hench.git.* config > defaults.",
+      },
     ],
     examples: [
       { command: "hench run", description: "Run next task (interactive selection)" },

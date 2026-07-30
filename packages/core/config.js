@@ -907,11 +907,14 @@ function hasClaudeAuthenticatedEvidence(detailLower) {
   ].some((phrase) => detailLower.includes(phrase));
 }
 
-function hasClaudeAuthRequiredEvidence(detailLower) {
-  return (
-    detailLower.includes("please login") ||
-    detailLower.includes("not logged in") ||
-    detailLower.includes("login required")
+/**
+ * Detect whether a CLI preflight failure detail indicates rejected/expired
+ * credentials (as opposed to a missing binary or a launch/PATH problem).
+ */
+function isAuthFailureDetail(detail) {
+  if (!detail) return false;
+  return /\b40[13]\b|unauthorized|invalid[\s_-]*api[\s_-]*key|authentication[\s_-]*(error|failed|fail|invalid|expired)|token[\s_-]*expired|expired|oauth|credential|please\s*login|not\s*logged\s*in|login\s*required/i.test(
+    detail,
   );
 }
 
@@ -958,15 +961,6 @@ function formatClaudePreflightFailure(preflight) {
     };
   }
 
-  if (hasClaudeAuthRequiredEvidence(detailLower)) {
-    return {
-      code: "NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED",
-      lines: [
-        `Next step: run '${getVendorLoginCommand("claude", { claude: { cli_path: binary } })}', then retry '${retryCommand}'.`,
-      ],
-    };
-  }
-
   return {
     code: "NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED",
     lines: [
@@ -979,59 +973,111 @@ function formatClaudePreflightFailure(preflight) {
   };
 }
 
-function printVendorPreflightFailure(
+/**
+ * Print concise re-authentication guidance for a preflight auth failure.
+ * Uses the canonical, JSON-free wording shared with the runtime providers so
+ * every entry point (ndx init/work/plan/analyze) reads identically. The NDX
+ * error code is emitted only as a dim, secondary diagnostic line.
+ */
+async function printAuthFailureGuidance(vendor, code) {
+  const { authFailureGuidance } = await import("@n-dx/llm-client");
+  const { red, yellow, dim } = await import("./cli-brand.js");
+  const guidance = authFailureGuidance(vendor);
+  console.error(red(`✗ ${guidance.headline}`));
+  for (const line of guidance.remediation) {
+    console.error(yellow(`  ${line}`));
+  }
+  console.error(`  Then retry: ndx config llm.vendor ${vendor}`);
+  if (code) {
+    console.error(dim(`  [${code}]`));
+  }
+}
+
+async function printVendorPreflightFailure(
   vendor,
   preflight,
   llmConfig,
   legacyClaudeConfig,
 ) {
+  const { red, yellow, dim } = await import("./cli-brand.js");
   // Google uses API-key auth — no binary / CLI args to display.
   if (vendor === "google") {
     const errorCode = preflight.errorCode || "NDX_GOOGLE_PREFLIGHT_FAILED";
     const apiKeyEnvVar = llmConfig?.google?.apiKeyEnv || "GEMINI_API_KEY";
-    console.error(`Provider auth preflight failed for "google".`);
-    if (preflight.detail) {
-      console.error(`Details: ${preflight.detail}`);
-    }
-    console.error(`[${errorCode}]`);
+    // A rejected or malformed key is an invalid-credentials problem →
+    // canonical re-auth guidance.
     if (
-      preflight.errorCode === "NDX_GOOGLE_PREFLIGHT_NO_KEY" ||
-      preflight.errorCode === "NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT"
+      errorCode === "NDX_GOOGLE_PREFLIGHT_AUTH_FAILED" ||
+      errorCode === "NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT"
     ) {
-      console.error("Get a free API key at: https://aistudio.google.com/apikey");
-      console.error(`Set it with: export ${apiKeyEnvVar}=<your-key>`);
-      console.error("Or store in config: n-dx config llm.google.api_key <your-key>");
-    } else if (preflight.errorCode === "NDX_GOOGLE_PREFLIGHT_AUTH_FAILED") {
-      console.error("Get a valid API key at: https://aistudio.google.com/apikey");
+      await printAuthFailureGuidance("google", errorCode);
+      return;
     }
-    console.error(`Retry after updating your key: ndx config llm.vendor google`);
+    // No key configured yet → distinct "missing API key" root cause.
+    if (errorCode === "NDX_GOOGLE_PREFLIGHT_NO_KEY") {
+      console.error(red("✗ No API key configured for Google."));
+      console.error(yellow("  Set your API key: ndx config llm.google.api_key <KEY>"));
+      console.error(yellow(`  Or set the env var: export ${apiKeyEnvVar}=<KEY>`));
+      console.error("  Get a key: https://aistudio.google.com/apikey");
+      console.error(dim(`  [${errorCode}]`));
+      return;
+    }
+    // Network / HTTP failure — concise, no raw payload.
+    console.error(red("✗ Provider auth preflight failed for Google."));
+    if (preflight.detail && !looksLikeJson(preflight.detail)) {
+      console.error(`  ${preflight.detail}`);
+    }
+    console.error(yellow("  Retry after resolving the issue: ndx config llm.vendor google"));
+    console.error(dim(`  [${errorCode}]`));
     return;
   }
 
-  console.error(
-    `Provider auth preflight failed for "${vendor}" via: ${preflight.binary} ${preflight.args.join(" ")}`,
-  );
-  if (preflight.detail) {
-    console.error(`Details: ${preflight.detail}`);
+  // CLI-based vendors (claude, codex): a rejected/expired credential is an
+  // auth failure → canonical re-auth guidance, never a raw payload dump.
+  if (isAuthFailureDetail(preflight.detail)) {
+    const code =
+      vendor === "codex"
+        ? "NDX_CODEX_PREFLIGHT_AUTH_FAILED"
+        : "NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED";
+    await printAuthFailureGuidance(vendor, code);
+    return;
   }
 
   if (vendor !== "claude") {
+    // codex (or other CLI vendor) non-auth launch failure.
     const loginCommand = getVendorLoginCommand(
       vendor,
       llmConfig,
       legacyClaudeConfig,
     );
+    console.error(red(`✗ Provider auth preflight failed for "${vendor}".`));
+    if (preflight.detail && !looksLikeJson(preflight.detail)) {
+      console.error(`  ${preflight.detail}`);
+    }
     console.error(
-      `Next step: run '${loginCommand}', then retry 'ndx config llm.vendor ${vendor}'.`,
+      yellow(`  Next step: run '${loginCommand}', then retry 'ndx config llm.vendor ${vendor}'.`),
     );
     return;
   }
 
+  // claude non-auth failure (not installed / not on PATH / could not launch).
   const classified = formatClaudePreflightFailure(preflight);
-  console.error(`[${classified.code}]`);
-  for (const line of classified.lines) {
-    console.error(line);
+  console.error(red(`✗ ${classified.lines[0]}`));
+  for (const line of classified.lines.slice(1)) {
+    console.error(yellow(`  ${line}`));
   }
+  console.error(dim(`  [${classified.code}]`));
+}
+
+/** Detect a JSON-looking payload so raw blobs never reach user output. */
+function looksLikeJson(detail) {
+  if (!detail) return false;
+  const trimmed = detail.trim();
+  return (
+    trimmed.startsWith("{") ||
+    trimmed.startsWith("[") ||
+    /"[\w.-]+"\s*:/.test(trimmed)
+  );
 }
 
 // ── Display ──────────────────────────────────────────────────────────────────
@@ -1118,6 +1164,18 @@ Hench settings (.hench/config.json):
                                      Set to true for unattended 'ndx work --loop' runs — the agent
                                      runs 'git commit' directly so no approval prompt interrupts
                                      the loop.
+
+Hench git-safety settings (pre-run commit gate):
+  hench.git.checkpointThreshold  number    Lines-changed threshold at/above which the pre-run
+                                           commit gate escalates: the interactive prompt warns
+                                           about the change size and defaults to committing a
+                                           checkpoint instead of proceeding (default: 200,
+                                           0 disables escalation)
+  hench.git.requireCleanTree     boolean   Refuse to start runs against a dirty working tree:
+                                           interactive prompts drop the "proceed" option and
+                                           non-interactive runs abort (default: false)
+                                           The --allow-dirty flag overrides both settings for
+                                           one run (flag > config > defaults).
 
 Hench guard settings (security boundaries):
   hench.guard.blockedPaths       string[]  Glob patterns for blocked file paths
@@ -1573,7 +1631,7 @@ async function runLLMVendorPreflight(coerced, configs, soft = false) {
     legacyClaude,
   );
   if (!preflight.ok) {
-    printVendorPreflightFailure(
+    await printVendorPreflightFailure(
       coerced,
       preflight,
       llmForPreflight,
@@ -1974,4 +2032,62 @@ export async function runConfig(args) {
 
   // SHOW mode: all configs
   handleShowAll(configs, flags);
+}
+
+/**
+ * `ndx auth` — verify the active vendor's credentials on demand.
+ *
+ * Re-runs the same provider auth preflight used by `ndx init` /
+ * `ndx config llm.vendor` so users have a clear, repeatable way to confirm
+ * credentials after fixing them (the canonical auth-failure guidance ends
+ * with "Verify credentials: ndx auth" pointing here). Works without an
+ * initialized project — with no config the default vendor (claude) is
+ * checked.
+ *
+ * On success prints the active vendor, resolved model, and "credentials
+ * valid". On failure prints the same structured, JSON-free failure guidance
+ * as the config preflight path.
+ *
+ * @returns {Promise<number>} Exit code: 0 = credentials valid, 1 = failure.
+ */
+export async function runAuthCheck(args) {
+  const { positional } = parseArgs(args);
+
+  // The only meaningful positional is an optional project directory.
+  const dir =
+    positional[0] && (await fileExists(resolve(positional[0])))
+      ? resolve(positional[0])
+      : process.cwd();
+  const { configs } = await loadAllConfigs(dir);
+
+  const llmConfig =
+    configs.llm && typeof configs.llm === "object" ? configs.llm : {};
+  const legacyClaude =
+    configs.claude && typeof configs.claude === "object"
+      ? configs.claude
+      : undefined;
+  const vendor =
+    typeof llmConfig.vendor === "string" && llmConfig.vendor
+      ? llmConfig.vendor
+      : "claude";
+
+  const { resolveVendorModel } = await import("@n-dx/llm-client");
+  const { green, dim } = await import("./cli-brand.js");
+  let model;
+  try {
+    model = resolveVendorModel(vendor, llmConfig);
+  } catch {
+    model = "unknown";
+  }
+
+  console.log(dim(`Checking ${vendor} credentials…`));
+  const preflight = await runVendorAuthPreflight(vendor, llmConfig, legacyClaude);
+  if (preflight.ok) {
+    console.log(green(`✓ Credentials valid — vendor: ${vendor}, model: ${model}`));
+    return 0;
+  }
+
+  await printVendorPreflightFailure(vendor, preflight, llmConfig, legacyClaude);
+  console.error("Re-run 'ndx auth' after fixing the issue above to verify.");
+  return 1;
 }

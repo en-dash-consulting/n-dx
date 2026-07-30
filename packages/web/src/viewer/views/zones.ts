@@ -31,6 +31,7 @@ import type {
   FileConnectionMap,
   FileToFileMap,
   FileInfo,
+  FileZoneLink,
   ZoneBreadcrumb,
   ExpandedSubZones,
 } from "./zone-types.js";
@@ -112,6 +113,109 @@ export function convertCrossings(crossings?: ZoneCrossing[]): FlowEdge[] {
     const [from, to] = key.split("->");
     return { from, to, weight };
   });
+}
+
+/**
+ * Stable-partition a zone's files so cross-zone-connecting files (present in
+ * fileConnections with at least one link) render before internal-only files.
+ * When connectingOnly is true, internal-only files are dropped entirely.
+ *
+ * @internal Exported for testing.
+ */
+export function prioritizeConnectingFiles(
+  files: FileInfo[],
+  fileConnections: FileConnectionMap,
+  connectingOnly: boolean,
+): FileInfo[] {
+  const connecting: FileInfo[] = [];
+  const internal: FileInfo[] = [];
+  for (const f of files) {
+    const links = fileConnections.get(f.path);
+    (links && links.length > 0 ? connecting : internal).push(f);
+  }
+  return connectingOnly ? connecting : [...connecting, ...internal];
+}
+
+/**
+ * Apply connecting-file ordering (and per-zone connecting-only filtering) to
+ * zone data before layout and rendering. Downstream consumers (boxHeight,
+ * useFileEdges, useSubZoneEdges, ZoneBox) all index into zone.files, so the
+ * transform must happen once, upstream, to keep row positions, overflow
+ * counts, and edge anchors in sync.
+ *
+ * @internal Exported for testing.
+ */
+export function applyConnectingFilesOrdering(
+  zones: ZoneData[],
+  fileConnections: FileConnectionMap,
+  connectingOnlyZones: Set<string>,
+): ZoneData[] {
+  const transform = (zone: ZoneData, connectingOnly: boolean): ZoneData => ({
+    ...zone,
+    files: prioritizeConnectingFiles(zone.files, fileConnections, connectingOnly),
+    subZones: zone.subZones?.map((sz) => transform(sz, connectingOnly)),
+  });
+  return zones.map((z) => transform(z, connectingOnlyZones.has(z.id)));
+}
+
+/**
+ * Build the tooltip text for a connecting file row: one line per target zone
+ * ("→ <name> · <weight> call(s)"), sorted by weight descending. Links whose
+ * target zone is not in the rendered zone list are omitted so the tooltip
+ * never shows unknown-zone labels. Returns null when nothing resolves.
+ *
+ * @internal Exported for testing.
+ */
+export function buildConnectionsTooltip(
+  links: FileZoneLink[] | undefined,
+  zoneNameById: Map<string, string>,
+): string | null {
+  if (!links || links.length === 0) return null;
+  const lines = links
+    .filter((l) => zoneNameById.has(l.targetZoneId))
+    .sort((a, b) => b.weight - a.weight)
+    .map((l) => `→ ${zoneNameById.get(l.targetZoneId)} · ${l.weight} call${l.weight === 1 ? "" : "s"}`);
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
+/** One vertical segment of a file row's cross-zone indicator bar. */
+export interface XZoneBarSegment {
+  /** Offset from the top of the bar. */
+  y: number;
+  h: number;
+  color: string;
+}
+
+/**
+ * Split the cross-zone indicator bar into stacked segments, one per target
+ * zone, with heights proportional to link weight. Sorted by weight descending
+ * to match the tooltip line order. Links whose target zone is not in the
+ * rendered zone list are omitted; returns empty when nothing resolves (the
+ * caller falls back to the single accent-colored bar).
+ *
+ * @internal Exported for testing.
+ */
+export function buildXZoneBarSegments(
+  links: FileZoneLink[] | undefined,
+  zoneColorById: Map<string, string>,
+  barHeight: number,
+): XZoneBarSegment[] {
+  if (!links || links.length === 0) return [];
+  const resolved = links
+    .filter((l) => zoneColorById.has(l.targetZoneId))
+    .sort((a, b) => b.weight - a.weight);
+  const total = resolved.reduce((sum, l) => sum + l.weight, 0);
+  if (total <= 0) return [];
+
+  const segments: XZoneBarSegment[] = [];
+  let cum = 0;
+  for (const link of resolved) {
+    const y = (cum / total) * barHeight;
+    cum += link.weight;
+    const yEnd = (cum / total) * barHeight;
+    segments.push({ y, h: yEnd - y, color: zoneColorById.get(link.targetZoneId)! });
+  }
+  return segments;
 }
 
 /**
@@ -259,7 +363,7 @@ function buildExplorerData(
  * Build per-file cross-zone connection map.
  * For each file, tracks which other zones it connects to (and weight).
  */
-function buildFileConnectionMap(
+export function buildFileConnectionMap(
   callGraph: CallGraph,
   externalImports: import("../../schema/v1.js").ExternalImport[],
   fileToZoneMap: Map<string, { id: string; name: string; color: string }>,
@@ -591,6 +695,107 @@ function computeEdgePath(
   return `M ${from.x} ${from.y} Q ${cpx} ${cpy} ${to.x} ${to.y}`;
 }
 
+// ── File highlight edges (hover/select) ──────────────────────────────
+
+/** Reference to the file row currently hovered or pin-selected in the diagram. */
+export interface ActiveFileRef {
+  path: string;
+  zoneId: string;
+}
+
+/** One highlight edge from an active file row to a target zone box. */
+export interface FileHighlightEdge {
+  key: string;
+  d: string;
+  color: string;
+  weight: number;
+}
+
+/**
+ * Compute the on-screen rect of a file row inside an expanded zone box, or
+ * null when the file is not currently visible (zone collapsed upstream, file
+ * beyond the row cap, or its subzone not expanded). Mirrors the layout math
+ * of renderFileContent / renderSubZoneContent in ZoneBox — keep in sync.
+ *
+ * @internal Exported for testing.
+ */
+export function computeFileRowRect(
+  zone: ZoneData,
+  box: BoxRect,
+  filePath: string,
+  expandedSubZoneIds?: Set<string>,
+): BoxRect | null {
+  const rowRect = (x: number, y: number, w: number): BoxRect => ({
+    x, y, w, h: FILE_ROW_H - 2, gridCol: box.gridCol, gridRow: box.gridRow,
+  });
+
+  // Zone with subzones — walk subzone rows accumulating y like renderSubZoneContent
+  if (zone.subZones && zone.subZones.length > 0) {
+    let curY = box.y + BOX_H_COLLAPSED - 4;
+    for (const sz of zone.subZones.slice(0, SUBZONE_ROWS_MAX)) {
+      curY += SUBZONE_ROW_H;
+      if (!expandedSubZoneIds?.has(sz.id)) continue;
+      const szFiles = sz.files.slice(0, FILE_ROWS_MAX);
+      for (const file of szFiles) {
+        if (file.path === filePath) {
+          return rowRect(box.x + SUBZONE_FILE_INDENT + 8, curY, box.w - SUBZONE_FILE_INDENT - 16);
+        }
+        curY += FILE_ROW_H;
+      }
+      if (sz.files.length > FILE_ROWS_MAX) curY += 20;
+    }
+    return null;
+  }
+
+  // Flat file list
+  const idx = zone.files.slice(0, FILE_ROWS_MAX).findIndex((f) => f.path === filePath);
+  if (idx === -1) return null;
+  return rowRect(box.x + 8, box.y + BOX_H_COLLAPSED - 4 + idx * FILE_ROW_H, box.w - 16);
+}
+
+/**
+ * Build highlight edges from the active (hovered/selected) file row to each
+ * cross-zone target's box, plus the set of target zone ids to highlight.
+ * Returns null when nothing should be drawn (source zone not expanded, file
+ * row not visible, or no on-screen targets). Target zones need not be
+ * expanded — edges anchor on the zone box rect either way.
+ *
+ * @internal Exported for testing.
+ */
+export function buildFileHighlightEdges(
+  active: ActiveFileRef,
+  zoneById: Map<string, ZoneData>,
+  boxes: Map<string, BoxRect>,
+  expandedZones: Set<string>,
+  expandedSubZones: ExpandedSubZones,
+  fileConnections: FileConnectionMap,
+): { targetZoneIds: Set<string>; edges: FileHighlightEdge[] } | null {
+  if (!expandedZones.has(active.zoneId)) return null;
+  const zone = zoneById.get(active.zoneId);
+  const box = boxes.get(active.zoneId);
+  if (!zone || !box) return null;
+
+  const rowRect = computeFileRowRect(zone, box, active.path, expandedSubZones.get(active.zoneId));
+  if (!rowRect) return null;
+
+  const targetZoneIds = new Set<string>();
+  const edges: FileHighlightEdge[] = [];
+  for (const link of fileConnections.get(active.path) ?? []) {
+    if (link.targetZoneId === active.zoneId) continue;
+    const targetBox = boxes.get(link.targetZoneId);
+    if (!targetBox) continue;
+    targetZoneIds.add(link.targetZoneId);
+    edges.push({
+      key: `hl-${active.path}-${link.targetZoneId}`,
+      d: computeEdgePath(rowRect, targetBox, 0, 1),
+      color: zoneById.get(link.targetZoneId)?.color ?? "var(--border-strong)",
+      weight: link.weight,
+    });
+  }
+
+  return edges.length > 0 ? { targetZoneIds, edges } : null;
+}
+
 // ── Sub-components ───────────────────────────────────────────────────
 
 function StatCard({ value, label, color }: { value: string; label: string; color?: string }) {
@@ -672,8 +877,12 @@ function FileRow({
   boxW,
   searchMatch,
   hasCrossZone,
+  active,
+  xzoneSegments,
+  tooltip,
   onClick,
   onDblClick,
+  onHover,
 }: {
   file: FileInfo;
   y: number;
@@ -681,8 +890,13 @@ function FileRow({
   boxW: number;
   searchMatch: boolean;
   hasCrossZone: boolean;
+  active?: boolean;
+  /** Per-target-zone indicator bar segments; empty → single accent bar. */
+  xzoneSegments?: XZoneBarSegment[];
+  tooltip?: string | null;
   onClick: () => void;
   onDblClick: () => void;
+  onHover?: (hovering: boolean) => void;
 }) {
   const totalIn = file.functions.reduce((s, fi) => s + fi.incoming.length, 0);
   const totalOut = file.functions.reduce((s, fi) => s + fi.outgoing.length, 0);
@@ -691,10 +905,13 @@ function FileRow({
   const arrows = `${totalIn > 0 ? "\u2190" + totalIn : ""}${totalOut > 0 ? "\u2192" + totalOut : ""}`;
 
   return h("g", {
-    class: `cg-file-row${searchMatch ? " search-match" : ""}${hasCrossZone ? " cross-zone" : ""}`,
+    class: `cg-file-row${searchMatch ? " search-match" : ""}${hasCrossZone ? " cross-zone" : ""}${active ? " active" : ""}`,
     onClick: (e: Event) => { e.stopPropagation(); onClick(); },
     onDblClick: (e: Event) => { e.stopPropagation(); onDblClick(); },
+    onMouseEnter: onHover ? () => onHover(true) : undefined,
+    onMouseLeave: onHover ? () => onHover(false) : undefined,
   },
+    tooltip ? h("title", null, tooltip) : null,
     h("rect", {
       class: "cg-file-bg",
       x: boxX + 8,
@@ -703,16 +920,31 @@ function FileRow({
       height: FILE_ROW_H - 2,
       rx: 3,
     }),
-    // Cross-zone indicator bar
+    // Cross-zone indicator bar — one segment per target zone, colored to
+    // match the target's zone box; single accent bar when none resolve
     hasCrossZone
-      ? h("rect", {
-          class: "cg-file-xzone-bar",
-          x: boxX + 8,
-          y,
-          width: 2,
-          height: FILE_ROW_H - 2,
-          rx: 1,
-        })
+      ? (xzoneSegments && xzoneSegments.length > 0
+          ? h("g", { class: "cg-file-xzone-segments" },
+              xzoneSegments.map((seg, si) =>
+                h("rect", {
+                  key: si,
+                  class: "cg-file-xzone-bar",
+                  x: boxX + 8,
+                  y: y + seg.y,
+                  width: 2,
+                  height: seg.h,
+                  style: `fill: ${seg.color};`,
+                }),
+              ),
+            )
+          : h("rect", {
+              class: "cg-file-xzone-bar",
+              x: boxX + 8,
+              y,
+              width: 2,
+              height: FILE_ROW_H - 2,
+              rx: 1,
+            }))
       : null,
     h("text", {
       class: "cg-file-name",
@@ -875,35 +1107,55 @@ function ZoneBox({
   expanded,
   selected,
   dimmed,
+  connHighlighted,
+  activeFilePath,
   searchQ,
   matchingFiles,
   fileConnections,
+  zoneNameById,
+  zoneColorById,
   expandedSubZoneIds,
+  connectingOnly,
   onToggle,
   onSelectZone,
   onSelectFile,
   onDblClickFile,
+  onFileHover,
   onDrillDown,
   onToggleSubZone,
+  onToggleConnectingOnly,
 }: {
   zone: ZoneData;
   box: BoxRect;
   expanded: boolean;
   selected: boolean;
   dimmed: boolean;
+  /** True while an active file in another zone connects to this zone. */
+  connHighlighted?: boolean;
+  /** Path of the hovered/selected file when it belongs to this zone. */
+  activeFilePath?: string | null;
   searchQ: string;
   matchingFiles: Set<string>;
   fileConnections: FileConnectionMap;
+  zoneNameById: Map<string, string>;
+  zoneColorById: Map<string, string>;
   expandedSubZoneIds?: Set<string>;
+  connectingOnly: boolean;
   onToggle: () => void;
   onSelectZone: () => void;
   onSelectFile: (path: string) => void;
   onDblClickFile: (path: string) => void;
+  onFileHover?: (path: string | null) => void;
   onDrillDown?: () => void;
   onToggleSubZone?: (subZoneId: string) => void;
+  onToggleConnectingOnly?: () => void;
 }) {
   const fileCount = zone.totalFiles;
   const hasSubZones = !!(zone.subZones && zone.subZones.length > 0);
+  const hasConnecting = (files: FileInfo[]) =>
+    files.some((f) => (fileConnections.get(f.path)?.length ?? 0) > 0);
+  const showConnectingToggle = !!onToggleConnectingOnly &&
+    (connectingOnly || hasConnecting(zone.files) || !!zone.subZones?.some((sz) => hasConnecting(sz.files)));
 
   // Build expanded content elements
   const renderFileContent = () => {
@@ -922,8 +1174,12 @@ function ZoneBox({
           boxW: box.w,
           searchMatch: searchQ ? isMatch : false,
           hasCrossZone,
+          active: activeFilePath === file.path,
+          xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2),
+          tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
           onClick: () => onSelectFile(file.path),
           onDblClick: () => onDblClickFile(file.path),
+          onHover: onFileHover ? (hov: boolean) => onFileHover(hov ? file.path : null) : undefined,
         });
       }),
       overflow > 0
@@ -977,8 +1233,12 @@ function ZoneBox({
               boxW: box.w - SUBZONE_FILE_INDENT,
               searchMatch: searchQ ? matchingFiles.has(file.path) : false,
               hasCrossZone,
+              active: activeFilePath === file.path,
+              xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2),
+              tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
               onClick: () => onSelectFile(file.path),
               onDblClick: () => onDblClickFile(file.path),
+              onHover: onFileHover ? (hov: boolean) => onFileHover(hov ? file.path : null) : undefined,
             }),
           );
           curY += FILE_ROW_H;
@@ -1012,7 +1272,7 @@ function ZoneBox({
   };
 
   return h("g", {
-    class: `cg-zone-box${expanded ? " expanded" : ""}${selected ? " selected" : ""}${dimmed ? " search-dim" : ""}`,
+    class: `cg-zone-box${expanded ? " expanded" : ""}${selected ? " selected" : ""}${dimmed ? " search-dim" : ""}${connHighlighted ? " conn-highlight" : ""}`,
     "data-zone-id": zone.id,
     style: "cursor: grab;",
   },
@@ -1102,6 +1362,30 @@ function ZoneBox({
 
     expanded
       ? h("g", null,
+          // Connecting-only filter toggle
+          showConnectingToggle
+            ? h("g", {
+                class: `cg-zone-connfilter-btn${connectingOnly ? " active" : ""}`,
+                onMouseDown: (e: Event) => e.stopPropagation(),
+                onClick: (e: Event) => { e.stopPropagation(); onToggleConnectingOnly?.(); },
+              },
+                h("title", null, connectingOnly ? "Show all files" : "Show only cross-zone connecting files"),
+                h("rect", {
+                  x: box.x + box.w - 58,
+                  y: box.y + 6,
+                  width: 22,
+                  height: 22,
+                  rx: 11,
+                  class: "cg-connfilter-btn-bg",
+                }),
+                h("text", {
+                  x: box.x + box.w - 47,
+                  y: box.y + 21,
+                  "text-anchor": "middle",
+                  class: "cg-connfilter-btn-text",
+                }, "⇄"),
+              )
+            : null,
           // Detail button — opens sidebar
           h("g", {
             class: "cg-zone-detail-btn",
@@ -1178,6 +1462,7 @@ function ZoneDiagram({
   searchQ,
   fileConnections,
   fileToFileMap,
+  connectingOnlyZones,
   onToggleZone,
   onSelectZone,
   onSelectFile,
@@ -1185,6 +1470,7 @@ function ZoneDiagram({
   onDblClickZone,
   onDrillDown,
   onToggleSubZone,
+  onToggleConnectingOnly,
 }: {
   zones: ZoneData[];
   edges: FlowEdge[];
@@ -1194,6 +1480,7 @@ function ZoneDiagram({
   searchQ: string;
   fileConnections: FileConnectionMap;
   fileToFileMap: FileToFileMap;
+  connectingOnlyZones: Set<string>;
   onToggleZone: (id: string) => void;
   onSelectZone: (zd: ZoneData) => void;
   onSelectFile: (path: string) => void;
@@ -1201,10 +1488,17 @@ function ZoneDiagram({
   onDblClickZone: (id: string) => void;
   onDrillDown?: (zoneId: string) => void;
   onToggleSubZone: (parentId: string, subZoneId: string) => void;
+  onToggleConnectingOnly: (zoneId: string) => void;
 }) {
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
+  // File highlight state: hover is transient, selection pins until re-click.
+  const [hoveredFile, setHoveredFile] = useState<ActiveFileRef | null>(null);
+  const [selectedFile, setSelectedFile] = useState<ActiveFileRef | null>(null);
+  const activeFile = hoveredFile ?? selectedFile;
 
   const zoneById = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
+  const zoneNameById = useMemo(() => new Map(zones.map((z) => [z.id, z.name])), [zones]);
+  const zoneColorById = useMemo(() => new Map(zones.map((z) => [z.id, z.color])), [zones]);
 
   // Layout computation
   const { boxes: baseBoxes, totalW, totalH } = useMemo(
@@ -1250,6 +1544,23 @@ function ZoneDiagram({
     for (const k of szHiddenEdges) merged.add(k);
     return merged;
   }, [fileHiddenEdges, szHiddenEdges]);
+
+  // Active-file highlight: edges to target zone boxes + zones to highlight
+  const fileHighlight = useMemo(() => {
+    if (!activeFile) return null;
+    return buildFileHighlightEdges(
+      activeFile, zoneById, boxes, expandedZones, expandedSubZones, fileConnections,
+    );
+  }, [activeFile, zoneById, boxes, expandedZones, expandedSubZones, fileConnections]);
+
+  const handleFileHover = useCallback((zoneId: string, path: string | null) => {
+    setHoveredFile(path ? { path, zoneId } : null);
+  }, []);
+
+  const handleFileClick = useCallback((zoneId: string, path: string) => {
+    setSelectedFile((prev) => (prev?.path === path && prev.zoneId === zoneId ? null : { path, zoneId }));
+    onSelectFile(path);
+  }, [onSelectFile]);
 
   // Edge weight stats
   const maxWeight = useMemo(() => {
@@ -1482,21 +1793,46 @@ function ZoneDiagram({
             expanded: expandedZones.has(zone.id),
             selected: selectedZoneId === zone.id,
             dimmed: dimmedZones.has(zone.id),
+            connHighlighted: fileHighlight?.targetZoneIds.has(zone.id) ?? false,
+            activeFilePath: activeFile?.zoneId === zone.id ? activeFile.path : null,
             searchQ,
             matchingFiles: matchingFilesByZone.get(zone.id) ?? new Set(),
             fileConnections,
+            zoneNameById,
+            zoneColorById,
             expandedSubZoneIds: expandedSubZones.get(zone.id),
+            connectingOnly: connectingOnlyZones.has(zone.id),
             onToggle: () => onToggleZone(zone.id),
             onSelectZone: () => onSelectZone(zone),
-            onSelectFile,
+            onSelectFile: (path: string) => handleFileClick(zone.id, path),
             onDblClickFile,
+            onFileHover: (path: string | null) => handleFileHover(zone.id, path),
             onDrillDown: zone.hasDrillDown && onDrillDown
               ? () => onDrillDown(zone.id)
               : undefined,
             onToggleSubZone: (szId: string) => onToggleSubZone(zone.id, szId),
+            onToggleConnectingOnly: () => onToggleConnectingOnly(zone.id),
           });
         }),
       ),
+
+      // Active-file highlight edges (on top of zone boxes so collapsed
+      // targets stay clearly connected; non-interactive)
+      fileHighlight
+        ? h("g", { class: "cg-file-highlight-edges", style: "pointer-events: none;" },
+            fileHighlight.edges.map((e) =>
+              h("path", {
+                key: e.key,
+                class: "cg-file-highlight-edge",
+                d: e.d,
+                fill: "none",
+                stroke: e.color,
+                "stroke-width": Math.max(1.5, Math.min(3.5, e.weight * 0.4 + 1.2)),
+                "marker-end": "url(#cg-arrow)",
+              }),
+            ),
+          )
+        : null,
     ),
 
     h(ZoomControls, {
@@ -1582,6 +1918,7 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
   const [search, setSearch] = useState("");
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
   const [expandedSubZones, setExpandedSubZones] = useState<ExpandedSubZones>(new Map());
+  const [connectingOnlyZones, setConnectingOnlyZones] = useState<Set<string>>(new Set());
   const [slideoutZone, setSlideoutZone] = useState<Zone | null>(null);
 
   // Zone pins from .n-dx.json (augmented by server onto zones response)
@@ -1695,6 +2032,13 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
     return buildFileToFileMap(callGraph, fileToZoneMap);
   }, [callGraph, fileToZoneMap]);
 
+  // Connecting files first (and per-zone connecting-only filter), applied
+  // upstream of layout/edge hooks so row indices stay consistent everywhere.
+  const displayZones = useMemo(
+    () => applyConnectingFilesOrdering(visibleZones, fileConnections, connectingOnlyZones),
+    [visibleZones, fileConnections, connectingOnlyZones],
+  );
+
   const crossZoneTotal = useMemo(() => {
     return flowEdges.reduce((sum, e) => sum + e.weight, 0);
   }, [flowEdges]);
@@ -1733,12 +2077,18 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-        // Clean up subzone expansion state when collapsing
+        // Clean up subzone expansion and filter state when collapsing
         setExpandedSubZones((prevSz) => {
           if (!prevSz.has(id)) return prevSz;
           const nextSz = new Map(prevSz);
           nextSz.delete(id);
           return nextSz;
+        });
+        setConnectingOnlyZones((prevCo) => {
+          if (!prevCo.has(id)) return prevCo;
+          const nextCo = new Set(prevCo);
+          nextCo.delete(id);
+          return nextCo;
         });
       } else {
         next.add(id);
@@ -1753,6 +2103,14 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
       const set = new Set(prev.get(parentId) ?? []);
       if (set.has(subZoneId)) set.delete(subZoneId); else set.add(subZoneId);
       if (set.size === 0) next.delete(parentId); else next.set(parentId, set);
+      return next;
+    });
+  }, []);
+
+  const toggleConnectingOnly = useCallback((zoneId: string) => {
+    setConnectingOnlyZones((prev) => {
+      const next = new Set(prev);
+      if (next.has(zoneId)) next.delete(zoneId); else next.add(zoneId);
       return next;
     });
   }, []);
@@ -1841,7 +2199,7 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
     // Zone Diagram
     visibleZones.length > 0
       ? h(ZoneDiagram, {
-          zones: visibleZones,
+          zones: displayZones,
           edges: visibleCrossings,
           expandedZones: effectiveExpandedZones,
           expandedSubZones,
@@ -1849,6 +2207,7 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
           searchQ,
           fileConnections,
           fileToFileMap,
+          connectingOnlyZones,
           onToggleZone: toggleZone,
           onSelectZone: handleDiagramZoneSelect,
           onSelectFile: handleFileSelect,
@@ -1856,6 +2215,7 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
           onDblClickZone: handleZoneDblClick,
           onDrillDown: handleDrillDown,
           onToggleSubZone: toggleSubZone,
+          onToggleConnectingOnly: toggleConnectingOnly,
         })
       : null,
 

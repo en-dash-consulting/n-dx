@@ -54,6 +54,14 @@
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--zone-color, var(--accent)) 40%, transparent));
 }
 
+/* Target zone of an active (hovered/selected) connecting file */
+.cg-zone-box.conn-highlight .cg-zone-rect {
+  stroke: var(--zone-color, var(--accent));
+  stroke-width: 2.5;
+  fill: color-mix(in srgb, var(--zone-color, var(--accent)) 8%, var(--bg-surface));
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--zone-color, var(--accent)) 40%, transparent));
+}
+
 .cg-zone-name {
   font-family: var(--font-mono, monospace);
   font-size: 13px;
@@ -102,6 +110,41 @@
 
 .cg-zone-detail-btn:hover .cg-detail-btn-text {
   fill: var(--accent-strong, #2b7de9);
+}
+
+/* ── Connecting-only filter toggle (on expanded zones) ────────────── */
+
+.cg-zone-connfilter-btn {
+  cursor: pointer;
+}
+
+.cg-connfilter-btn-bg {
+  fill: var(--bg-hover, rgba(128, 128, 128, 0.1));
+  stroke: var(--border-strong, #888);
+  stroke-width: 1.5;
+  transition: fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease;
+}
+
+.cg-zone-connfilter-btn:hover .cg-connfilter-btn-bg {
+  stroke: var(--accent, #4a9eff);
+  stroke-width: 2;
+}
+
+.cg-zone-connfilter-btn.active .cg-connfilter-btn-bg {
+  fill: var(--accent-bg, rgba(74, 158, 255, 0.15));
+  stroke: var(--accent, #4a9eff);
+}
+
+.cg-connfilter-btn-text {
+  font-size: 13px;
+  fill: var(--text-dim, #888);
+  pointer-events: none;
+  transition: fill 0.15s ease;
+}
+
+.cg-zone-connfilter-btn:hover .cg-connfilter-btn-text,
+.cg-zone-connfilter-btn.active .cg-connfilter-btn-text {
+  fill: var(--accent, #4a9eff);
 }
 
 /* ── Drill-down button (on zones with sub-zones) ──────────────────── */
@@ -208,6 +251,11 @@
   font-weight: 500;
 }
 
+/* Active (hovered/selected) connecting file row */
+.cg-file-row.active .cg-file-bg {
+  fill: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
 /* ── Subzone rows inside expanded zones ───────────────────────────── */
 
 .cg-subzone-bg { fill: transparent; cursor: pointer; transition: fill 0.1s ease; }
@@ -235,6 +283,12 @@
   stroke-linecap: round;
   pointer-events: none;
   transition: opacity 0.15s ease;
+}
+
+/* Highlight edges from an active file row to its target zone boxes */
+.cg-file-highlight-edge {
+  stroke-linecap: round;
+  opacity: 0.9;
 }
 
 /* ── Edges (connection lines) ────────────────────────────────────── */

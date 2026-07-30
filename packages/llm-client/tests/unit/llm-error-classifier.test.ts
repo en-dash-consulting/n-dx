@@ -21,10 +21,12 @@ import { AuthFailureError, ClaudeClientError } from "../../src/types.js";
 describe("classifyLLMError", () => {
   // ── auth category ─────────────────────────────────────────────────
 
-  it("classifies 401 as auth", () => {
+  it("classifies 401 as auth with canonical re-auth guidance", () => {
     const r = classifyLLMError(new Error("401 Unauthorized"));
     expect(r.category).toBe("auth");
-    expect(r.message).toContain("Authentication failed");
+    expect(r.message).toContain("Authentication failed for Claude");
+    expect(r.message).toContain("Invalid or expired credentials");
+    expect(r.suggestion).toContain("claude logout && claude login");
   });
 
   it("classifies invalid API key as auth", () => {
@@ -49,14 +51,14 @@ describe("classifyLLMError", () => {
   it("uses codex-specific messaging for codex vendor", () => {
     const r = classifyLLMError(new Error("401 Unauthorized"), "codex");
     expect(r.category).toBe("auth");
-    expect(r.message).toContain("Codex CLI");
-    expect(r.suggestion).toContain("codex login");
+    expect(r.message).toContain("Authentication failed for Codex");
+    expect(r.suggestion).toContain("codex logout && codex login");
   });
 
   it("uses google-specific messaging for google vendor auth error", () => {
     const r = classifyLLMError(new Error("401 Unauthorized"), "google");
     expect(r.category).toBe("auth");
-    expect(r.message).toContain("Google API key");
+    expect(r.message).toContain("Authentication failed for Google");
     expect(r.suggestion).toContain("llm.google.api_key");
     expect(r.suggestion).toContain("GEMINI_API_KEY");
   });
@@ -338,7 +340,7 @@ describe("classifyLLMError", () => {
     expect(r.message).toContain("Quota exceeded");
   });
 
-  it("surfaces OpenAI's parsed error message on auth failure", () => {
+  it("does NOT surface the raw provider payload on auth failure (canonical message only)", () => {
     const body = JSON.stringify({
       error: { message: "Incorrect API key provided", code: "invalid_api_key" },
     });
@@ -347,7 +349,11 @@ describe("classifyLLMError", () => {
       "codex",
     );
     expect(r.category).toBe("auth");
-    expect(r.message).toContain("Incorrect API key provided");
+    // Primary message is canonical and JSON-free — no raw provider fields.
+    expect(r.message).toContain("Authentication failed for Codex");
+    expect(r.message).not.toContain("Incorrect API key provided");
+    expect(r.message).not.toContain("invalid_api_key");
+    expect(r.message).not.toContain("{");
   });
 
   it("passes a plain (non-JSON) provider message through as detail", () => {
@@ -606,7 +612,8 @@ describe("classifyAuthError", () => {
     const body = JSON.stringify({ error: { code: 401, message: "API key not valid.", status: "UNAUTHENTICATED" } });
     const r = classifyAuthError(new Error(`Gemini API error 401: ${body}`), "google");
     expect(r).toBeInstanceOf(AuthFailureError);
-    expect(r?.message).toContain("Google API key");
+    expect(r?.message).toContain("Authentication failed for Google");
+    expect(r?.message).toContain("Invalid or expired credentials");
     expect(r?.message).not.toContain("{");  // no raw JSON blob
   });
 

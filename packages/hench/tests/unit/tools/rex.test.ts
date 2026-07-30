@@ -47,7 +47,7 @@ describe("toolRexUpdateStatus", () => {
 
   it("auto-completes parent when all children done", async () => {
     const store = mockStore();
-    const taskItem = {
+    const taskItemInitial = {
       id: "task-2",
       title: "Last task",
       status: "in_progress",
@@ -60,18 +60,26 @@ describe("toolRexUpdateStatus", () => {
       level: "feature",
       children: [
         { id: "task-1", title: "First task", status: "completed", level: "task" },
-        taskItem,
+        taskItemInitial,
       ],
     };
     store.getItem.mockImplementation(async (id: string) => {
-      if (id === "task-2") return taskItem;
+      if (id === "task-2") return taskItemInitial;
       if (id === "feature-1") return parentItem;
       return null;
     });
+    // loadDocument reflects disk state AFTER updateItem persisted task-2 as completed.
+    // reconcileAutoCompletions works on this post-write tree (not the pre-write in-memory state).
     store.loadDocument.mockResolvedValue({
       schema: "rex/v1",
       title: "Test",
-      items: [parentItem],
+      items: [{
+        ...parentItem,
+        children: [
+          { id: "task-1", title: "First task", status: "completed", level: "task" },
+          { ...taskItemInitial, status: "completed" },
+        ],
+      }],
     });
     const result = await toolRexUpdateStatus(store, "task-2", { status: "completed" });
     expect(result).toContain("Auto-completed");
@@ -199,6 +207,100 @@ describe("toolRexUpdateStatus — requirements validation", () => {
     const result = await toolRexUpdateStatus(store, "task-1", { status: "completed" });
     expect(result).toContain("completed");
     expect(store.updateItem).toHaveBeenCalled();
+  });
+});
+
+describe("toolRexUpdateStatus — cascade independence", () => {
+  it("parent cascade runs even when status_updated appendLog throws", async () => {
+    const store = mockStore();
+    const task2Initial = { id: "task-2", title: "Last task", status: "in_progress", level: "task" };
+    const parentItem = {
+      id: "feature-1",
+      title: "Feature",
+      status: "in_progress",
+      level: "feature",
+      children: [
+        { id: "task-1", title: "First task", status: "completed", level: "task" },
+        task2Initial,
+      ],
+    };
+    store.getItem.mockImplementation(async (id: string) => {
+      if (id === "task-2") return task2Initial;
+      if (id === "feature-1") return parentItem;
+      return null;
+    });
+    // loadDocument reflects the disk state AFTER updateItem persisted task-2 as completed
+    store.loadDocument.mockResolvedValue({
+      schema: "rex/v1",
+      title: "Test",
+      items: [{
+        ...parentItem,
+        children: [
+          { id: "task-1", title: "First task", status: "completed", level: "task" },
+          { ...task2Initial, status: "completed" },
+        ],
+      }],
+    });
+
+    // appendLog throws on the first call (status_updated) but succeeds later (auto_completed)
+    let appendLogCallCount = 0;
+    store.appendLog.mockImplementation(async () => {
+      appendLogCallCount++;
+      if (appendLogCallCount === 1) throw new Error("log failure");
+    });
+
+    const result = await toolRexUpdateStatus(store, "task-2", { status: "completed" });
+
+    // Parent cascade must have run despite appendLog failure on first call
+    expect(store.updateItem).toHaveBeenCalledWith(
+      "feature-1",
+      expect.objectContaining({ status: "completed" }),
+      expect.any(Object),
+    );
+    expect(result).toContain("Auto-completed");
+  });
+
+  it("uses whole-tree reconciliation — heals a stuck parent from a prior missed cascade", async () => {
+    const store = mockStore();
+    const task2Initial = { id: "task-2", title: "Task 2", status: "in_progress", level: "task" };
+    const feature1 = {
+      id: "feature-1",
+      title: "Feature 1",
+      status: "pending", // stuck — cascade was missed when task-1 completed earlier
+      level: "feature",
+      children: [
+        { id: "task-1", title: "Task 1", status: "completed", level: "task" },
+        task2Initial,
+      ],
+    };
+    store.getItem.mockImplementation(async (id: string) => {
+      if (id === "task-2") return task2Initial;
+      if (id === "feature-1") return feature1;
+      return null;
+    });
+    // loadDocument reflects disk state AFTER task-2 was written as completed;
+    // feature-1 is still stuck pending (the old cascade never ran).
+    store.loadDocument.mockResolvedValue({
+      schema: "rex/v1",
+      title: "Test",
+      items: [{
+        ...feature1,
+        children: [
+          { id: "task-1", title: "Task 1", status: "completed", level: "task" },
+          { ...task2Initial, status: "completed" },
+        ],
+      }],
+    });
+
+    const result = await toolRexUpdateStatus(store, "task-2", { status: "completed" });
+
+    // feature-1 gets healed by whole-tree reconciliation (all children now terminal)
+    expect(store.updateItem).toHaveBeenCalledWith(
+      "feature-1",
+      expect.objectContaining({ status: "completed" }),
+      expect.any(Object),
+    );
+    expect(result).toContain("Auto-completed");
   });
 });
 

@@ -106,7 +106,7 @@ export { SELF_HEAL_TAG } from "@n-dx/rex";
 export { computeTimestampUpdates } from "@n-dx/rex";
 
 // ---- Parent auto-completion -------------------------------------------------
-export { findAutoCompletions } from "@n-dx/rex";
+export { findAutoCompletions, reconcileAutoCompletions } from "@n-dx/rex";
 
 // ---- Requirements validation ------------------------------------------------
 export {

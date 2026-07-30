@@ -227,8 +227,8 @@ describe("n-dx init provider selection", () => {
         // init no longer aborts: the chosen vendor is persisted and applies to
         // all later commands; the auth problem is surfaced as a visible warning.
         expect(result.status).toBe(0);
-        expect(result.stderr).toContain("Provider auth preflight failed for \"codex\"");
-        expect(result.stderr).toContain("Next step: run 'codex login'");
+        expect(result.stderr).toContain("Authentication failed for Codex");
+        expect(result.stderr).toContain("codex logout && codex login");
         expect(result.stderr).toContain("Proceeding anyway");
 
         const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
@@ -267,8 +267,8 @@ describe("n-dx init provider selection", () => {
         );
 
         expect(result.status).toBe(0);
-        expect(result.stderr).toContain("Provider auth preflight failed for \"claude\"");
-        expect(result.stderr).toContain("Next step: run 'claude login'");
+        expect(result.stderr).toContain("Authentication failed for Claude");
+        expect(result.stderr).toContain("claude logout && claude login");
         expect(result.stderr).toContain("Proceeding anyway");
 
         const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
@@ -344,7 +344,7 @@ describe("n-dx init provider selection", () => {
       // auth error surfaces clearly at use time) and emits a visible warning
       // instead of silently aborting and reverting to the Claude default.
       expect(result.status).toBe(0);
-      expect(result.stderr).toContain("Provider auth preflight failed for \"google\"");
+      expect(result.stderr).toContain("No API key configured for Google");
       expect(result.stderr).toContain("NDX_GOOGLE_PREFLIGHT_NO_KEY");
       expect(result.stderr).toContain("aistudio.google.com/apikey");
       expect(result.stderr).toContain("Proceeding anyway");
@@ -489,10 +489,18 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
       const attrPath = join(projectDir, ".gitattributes");
       expect(existsSync(attrPath)).toBe(true);
       const first = await readFile(attrPath, "utf-8");
-      for (const pattern of [".rex/**/*.md", ".hench/**/*.json", ".n-dx.json", "AGENTS.md", "CLAUDE.md"]) {
+      for (const pattern of [
+        ".rex/**/*.md", ".hench/**/*.json", ".n-dx.json", "AGENTS.md", "CLAUDE.md",
+        // Assistant + config + text surfaces must be pinned too (parity with
+        // n-dx's own .gitattributes — GITATTRIBUTES_EOL_RULES sync invariant).
+        ".claude/skills/**/*.md", ".codex/config.toml", ".sourcevision/**/*.txt",
+      ]) {
         expect(first).toContain(`${pattern}`);
       }
       expect(first).toMatch(/\.rex\/\*\*\/\*\.md\s+text eol=lf/);
+      expect(first).toMatch(/\.claude\/skills\/\*\*\/\*\.md\s+text eol=lf/);
+      expect(first).toMatch(/\.codex\/config\.toml\s+text eol=lf/);
+      expect(first).toMatch(/\.sourcevision\/\*\*\/\*\.txt\s+text eol=lf/);
 
       // Re-init must not duplicate rules or the header.
       await initWithFakeCodex(projectDir, binDir);

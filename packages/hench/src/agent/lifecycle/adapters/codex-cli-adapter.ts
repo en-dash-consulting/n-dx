@@ -656,6 +656,11 @@ export const codexCliAdapter: VendorAdapter = {
 
     // Compile explicit sandbox and approval flags from the n-dx policy.
     // Replaces --full-auto so preset aliases cannot override intent.
+    //
+    // policy.allowedGitSubcommands is intentionally not consulted — Codex has no
+    // per-command allowlist surface (its safety model is the sandbox/approval
+    // flags above), so git-subcommand scoping is a Claude-CLI-only control. Under
+    // workspace-write, git mutations stay confined to the sandboxed workspace.
     const policyFlags = compileCodexPolicyFlags(policy);
 
     // opts.permissionMode is intentionally ignored — it is a Claude-CLI

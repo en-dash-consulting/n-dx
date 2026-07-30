@@ -2,9 +2,10 @@
 id: "7b2bbeff-44de-4b1b-b164-54fb5ddcb5f3"
 level: "epic"
 title: "LLM Integration"
-status: "pending"
+status: "completed"
 startedAt: "2026-04-13T18:35:49.604Z"
-endedAt: "2026-06-09T14:02:46.085Z"
+completedAt: "2026-07-20T16:48:11.425Z"
+endedAt: "2026-07-20T16:48:11.425Z"
 description: "AI client infrastructure: vendor-neutral LLM foundation, token usage tracking and analytics, budget management, vendor support (Claude, Codex), onboarding and authentication.\n\n---\n\nAutomated recommendations from SourceVision analysis. 21 zone+category groups covering 25 total findings."
 ---
 
@@ -12,7 +13,7 @@ description: "AI client infrastructure: vendor-neutral LLM foundation, token usa
 
 | Title | Status |
 |-------|--------|
-| [Auth Failure Detection and Re-Authentication Guidance](./auth-failure-detection-and-re-07e456/index.md) | pending |
+| [Auth Failure Detection and Re-Authentication Guidance](./auth-failure-detection-and-re-07e456/index.md) | completed |
 | [Between-Run API Quota Status Logging](./between-run-api-quota-status-642df7/index.md) | completed |
 | [Between-Run API Quota Status Logging](./between-run-api-quota-status-adf5e5/index.md) | completed |
 | [Centralized Model Resolution and Vendor Visibility Across All LLM Commands](./centralized-model-resolution-e34e66/index.md) | completed |
@@ -45,4 +46,5 @@ description: "AI client infrastructure: vendor-neutral LLM foundation, token usa
 | [Token Usage Attribution per PRD Item](./token-usage-attribution-per-prd-item/index.md) | completed |
 | [Token usage tracking and analytics](./token-usage-tracking-and-analytics/index.md) | completed |
 | [Unified Server Architecture: HTTP MCP and ndx start](./unified-server-architecture-e96db7/index.md) | completed |
+| [Codex workflow parity — close-out (issue #122 remainder)](./codex-workflow-parity-close-out-8f00a8.md) | pending |
 | [`ndx add` ignores configured Google/Gemini vendor and falls back to Claude](./ndx-add-ignores-configured-46d8b9.md) | completed |

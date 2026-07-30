@@ -55,6 +55,7 @@ describe("rex public API contract", () => {
     // Timestamps & auto-completion
     { name: "computeTimestampUpdates", type: "function" },
     { name: "findAutoCompletions", type: "function" },
+    { name: "reconcileAutoCompletions", type: "function" },
     // Merge
     { name: "validateMerge", type: "function" },
     { name: "previewMerge", type: "function" },
@@ -570,7 +571,7 @@ describe("gateway export auto-detection", () => {
       ...["resolveStore", "isCompatibleSchema", "assertSchemaVersion",
         "findItem", "walkTree", "findNextTask", "findActionableTasks",
         "collectCompletedIds", "explainSelection", "computeTimestampUpdates",
-        "findAutoCompletions", "collectRequirements", "validateAutomatedRequirements",
+        "findAutoCompletions", "reconcileAutoCompletions", "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "SELF_HEAL_TAG"],

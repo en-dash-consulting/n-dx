@@ -4,8 +4,8 @@ level: "epic"
 title: "Hench"
 status: "completed"
 startedAt: "2026-03-26T15:22:13.999Z"
-completedAt: "2026-07-02T18:43:22.327Z"
-endedAt: "2026-07-02T18:43:22.327Z"
+completedAt: "2026-07-22T14:48:00.299Z"
+endedAt: "2026-07-22T14:48:00.299Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
 ---
 
@@ -24,6 +24,7 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Feature 3: Rex Scanner Go Support](./feature-3-rex-scanner-go-support/index.md) | completed |
 | [Feature 4: Hench Go Project Support](./feature-4-hench-go-project-support/index.md) | completed |
 | [Fix Inaccurate File-Change Reporting in Run Summary and Dashboard](./fix-inaccurate-file-change-a10628/index.md) | completed |
+| [Git-Safety Hardening: express-prompt destructive actions and size-aware commit checkpoints](./git-safety-hardening-express-9ffe3e/index.md) | completed |
 | [Graceful Cancellation with Rollback Prompt on Ctrl+C](./graceful-cancellation-with-626d40/index.md) | completed |
 | [Hench Process Concurrency Management](./hench-process-concurrency-management/index.md) | completed |
 | [Hench Resource Monitoring and User Feedback](./hench-resource-monitoring-and-a5f844/index.md) | completed |
@@ -36,4 +37,6 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Run Loop Cancellation and Iteration Visibility Refinements](./run-loop-cancellation-and-3e4e10/index.md) | completed |
 | [Sequential Epic Execution](./sequential-epic-execution/index.md) | completed |
 | [Web UI: Reorganize around SourceVision / Rex / Hench sections](./web-ui-reorganize-around-d5ad6f/index.md) | completed |
+| [Fix hench parent auto-completion cascade silently skipped + add reconciliation sweep (#293)](./fix-hench-parent-auto-e8f441.md) | completed |
+| [Fix hench task-completion commit gap + fullTestCommand schema drop (#302)](./fix-hench-task-completion-5c8cb3.md) | completed |
 | [Pre-run commit gate: verify uncommitted changes before starting a work loop](./pre-run-commit-gate-verify-9af68a.md) | completed |

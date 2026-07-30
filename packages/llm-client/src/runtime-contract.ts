@@ -133,6 +133,16 @@ export interface ExecutionPolicy {
   readonly writableRoots: ReadonlyArray<string>;
   /** Shell commands the agent may execute (e.g. `["npm", "git", "node"]`). */
   readonly allowedCommands: ReadonlyArray<string>;
+  /**
+   * Git subcommands the agent may run when `git` is in {@link allowedCommands}
+   * (e.g. `["status", "add", "commit"]`). When present, vendors that support
+   * per-command scoping (Claude CLI) grant `git` at subcommand granularity
+   * (`Bash(git commit:*)`) instead of a blanket `Bash(git:*)`, keeping
+   * destructive subcommands (`reset`, `clean`, `revert`, `push`) off the
+   * auto-approve list. When omitted, `git` is granted unscoped for backward
+   * compatibility. Sandbox-based vendors (Codex) ignore this field.
+   */
+  readonly allowedGitSubcommands?: ReadonlyArray<string>;
   /** File operation tools the agent may use (e.g. `["Read", "Edit", "Write"]`). */
   readonly allowedFileTools: ReadonlyArray<string>;
 }

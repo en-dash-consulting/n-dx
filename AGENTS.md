@@ -151,6 +151,10 @@ sv <command> [args]               # alias for sourcevision
 
 `init`, `run`, `status`, `show`
 
+## Changeset Versioning
+
+- **Always default changeset bumps to `patch`** across all affected packages unless explicitly instructed otherwise by a user.
+
 ## Key Files
 
 | Path | Purpose |

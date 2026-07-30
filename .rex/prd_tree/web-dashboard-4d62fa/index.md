@@ -4,7 +4,8 @@ level: "epic"
 title: "Web Dashboard"
 status: "completed"
 startedAt: "2026-03-24T05:27:03.754Z"
-completedAt: "2026-03-24T20:36:04.012Z"
+completedAt: "2026-07-24T19:40:06.608Z"
+endedAt: "2026-07-24T19:40:06.608Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
 ---
 
@@ -24,5 +25,6 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [Process Lifecycle Management and Graceful Shutdown](./process-lifecycle-management-f95ede/index.md) | completed |
 | [Runtime Process and Thread Lifecycle Enforcement](./runtime-process-and-thread-8abe3c/index.md) | completed |
 | [Settings Page Completeness and Command-Based Reorganization](./settings-page-completeness-and-dc5e66/index.md) | completed |
+| [Surface per-file cross-zone connections in the expandable Zones graph](./surface-per-file-cross-zone-7da574/index.md) | completed |
 | [Transparent task selection and completion reasoning](./transparent-task-selection-and-cb54ce/index.md) | completed |
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-5dd63e.md) | completed |

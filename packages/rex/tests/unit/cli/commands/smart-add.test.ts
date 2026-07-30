@@ -609,7 +609,7 @@ describe("classifySmartAddError", () => {
   it("classifies 401/unauthorized errors as authentication failures", () => {
     const result = classifySmartAddError(new Error("401 Unauthorized"), "description");
     expect(result.message).toContain("Authentication failed");
-    expect(result.suggestion).toContain("API key");
+    expect(result.suggestion).toContain("claude logout && claude login");
   });
 
   it("classifies rate limit errors", () => {

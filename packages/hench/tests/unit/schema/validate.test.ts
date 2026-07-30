@@ -311,6 +311,32 @@ describe("validateConfig", () => {
       expect(result.ok).toBe(false);
     });
   });
+
+  describe("fullTestCommand field", () => {
+    it("survives validateConfig — not stripped as unknown key", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestCommand: "pnpm test" };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.fullTestCommand).toBe("pnpm test");
+      }
+    });
+
+    it("is optional — config without fullTestCommand validates normally", () => {
+      const config = DEFAULT_HENCH_CONFIG();
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.fullTestCommand).toBeUndefined();
+      }
+    });
+
+    it("rejects non-string fullTestCommand", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestCommand: 42 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(false);
+    });
+  });
 });
 
 describe("validateRunRecord", () => {

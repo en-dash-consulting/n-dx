@@ -663,6 +663,58 @@ describe("ClaudeCliAdapter: buildAllowedTools", () => {
     const tools = buildAllowedTools(["npm", "git", "node", "tsc", "pnpm"]);
     expect(tools).toHaveLength(10); // 5 bash + 5 file tools
   });
+
+  it("falls back to blanket Bash(git:*) when no subcommand allowlist is given", () => {
+    // Backward-compatible: absent/empty list preserves the legacy blanket grant.
+    expect(buildAllowedTools(["git"])).toContain("Bash(git:*)");
+    expect(buildAllowedTools(["git"], [])).toContain("Bash(git:*)");
+  });
+});
+
+// ── 8. Git-subcommand scoping in CLI mode ────────────────────────────────
+
+describe("ClaudeCliAdapter: git-subcommand allowlist scoping", () => {
+  const SUBS = ["status", "add", "commit", "diff", "log", "branch", "checkout", "stash", "show", "rev-parse"];
+
+  it("expands git into scoped Bash(git <sub>:*) patterns when a subcommand allowlist is provided", () => {
+    const tools = buildAllowedTools(["npm", "git"], SUBS);
+    for (const sub of SUBS) {
+      expect(tools).toContain(`Bash(git ${sub}:*)`);
+    }
+    // Non-git commands are unaffected.
+    expect(tools).toContain("Bash(npm:*)");
+    // File tools still present.
+    expect(tools).toContain("Read");
+  });
+
+  it("does NOT grant the blanket Bash(git:*) when scoping is active", () => {
+    const tools = buildAllowedTools(["git"], SUBS);
+    expect(tools).not.toContain("Bash(git:*)");
+  });
+
+  it("excludes destructive subcommands not on the allowlist", () => {
+    const tools = buildAllowedTools(["git"], SUBS);
+    for (const destructive of ["reset", "clean", "revert", "push"]) {
+      expect(tools).not.toContain(`Bash(git ${destructive}:*)`);
+    }
+    // And crucially no blanket grant that would re-admit them.
+    expect(tools).not.toContain("Bash(git:*)");
+  });
+
+  it("buildSpawnConfig scopes git from policy.allowedGitSubcommands", () => {
+    const policy: ExecutionPolicy = {
+      ...DEFAULT_EXECUTION_POLICY,
+      allowedCommands: ["git", "npm"],
+      allowedGitSubcommands: SUBS,
+    };
+    const config = claudeCliAdapter.buildSpawnConfig(createMinimalEnvelope(), policy, {});
+
+    expect(config.args).toContain("Bash(git commit:*)");
+    expect(config.args).toContain("Bash(git status:*)");
+    expect(config.args).not.toContain("Bash(git:*)");
+    expect(config.args).not.toContain("Bash(git reset:*)");
+    expect(config.args).not.toContain("Bash(git clean:*)");
+  });
 });
 
 // ── 7. Windows --allowed-tools quoting (GH #37 regression) ──────────────

@@ -12,8 +12,11 @@
  * @module n-dx/assistant-integration
  */
 
+import { execFileSync } from "child_process";
+import { join } from "path";
 import { setupClaudeIntegration } from "./claude-integration.js";
 import { setupCodexIntegration } from "./codex-integration.js";
+import { getVendorTarget } from "./assistant-assets.js";
 
 // ── Vendor registry ──────────────────────────────────────────────────────────
 
@@ -206,5 +209,95 @@ function formatVendorArtifacts(vendor, detail) {
     }
   }
 
+  return lines;
+}
+
+// ── Skill git-tracking check ──────────────────────────────────────────────────
+
+/**
+ * Test whether a path is matched by the project's `.gitignore` rules.
+ *
+ * Uses `git check-ignore`, which matches patterns against the pathname
+ * regardless of whether the file exists.  Exit code 0 means the path is
+ * ignored; exit 1 means it is not; any other exit (e.g. 128 outside a git
+ * repository) is treated as "not ignored" so the check is a silent no-op in
+ * non-git projects.
+ *
+ * @param {string} dir      Project root
+ * @param {string} relPath  Repo-relative path to probe
+ * @returns {boolean}
+ */
+function isPathGitIgnored(dir, relPath) {
+  try {
+    execFileSync("git", ["check-ignore", "-q", "--", relPath], {
+      cwd: dir,
+      stdio: "ignore",
+      timeout: 5_000,
+    });
+    return true; // exit 0 → ignored
+  } catch {
+    return false; // exit 1 (not ignored) or 128 (no git repo) → no hint
+  }
+}
+
+/**
+ * Detect the skill-tracking asymmetry that caused GitHub #284: a generated
+ * assistant's skill directory being gitignored means its `ndx-*` skills are
+ * never committed, so cloned checkouts silently lack them until `ndx init`
+ * is re-run.  Generated skills are meant to be committed (symmetric with
+ * `.agents/skills/`), so a gitignored skill directory is almost always a
+ * mistake.
+ *
+ * Returns a hint line for each enabled vendor whose skill directory is
+ * gitignored.  An empty array means every enabled vendor's skills will be
+ * committed (the healthy state).
+ *
+ * @param {string} dir  Project root
+ * @param {Record<string, boolean>} [enabled]
+ *   Map of vendor names to enabled flags (same shape as
+ *   `setupAssistantIntegrations`).  Vendors set to `false` are skipped.
+ * @returns {string[]}
+ */
+export function checkSkillTracking(dir, enabled = {}) {
+  const hints = [];
+
+  for (const vendor of getSupportedAssistants()) {
+    if (enabled[vendor] === false) continue;
+
+    let target;
+    try {
+      target = getVendorTarget(vendor);
+    } catch {
+      continue; // vendor without a manifest target — nothing to check
+    }
+
+    // Probe a representative generated skill path under the vendor's dir.
+    const probe = join(target.skillDir, "ndx-work", target.skillFile);
+    if (isPathGitIgnored(dir, probe)) {
+      hints.push(
+        `${target.skillDir}/ is gitignored — generated ${VENDOR_REGISTRY[vendor]?.label ?? vendor} ` +
+          `skills won't be committed, so cloned checkouts will lack the /ndx-* skills until ` +
+          `'ndx init' is re-run. Remove the rule from .gitignore to share them with your team.`,
+      );
+    }
+  }
+
+  return hints;
+}
+
+/**
+ * Format skill-tracking hints for the init summary.  Returns an empty array
+ * when there are no hints (the healthy state), so callers can concatenate
+ * unconditionally.
+ *
+ * @param {string[]} hints  The return value of `checkSkillTracking()`.
+ * @returns {string[]}
+ */
+export function formatSkillTrackingHints(hints) {
+  if (!hints || hints.length === 0) return [];
+  const lines = ["  Skill tracking:"];
+  for (const hint of hints) {
+    lines.push(`    ⚠ ${hint}`);
+  }
   return lines;
 }
