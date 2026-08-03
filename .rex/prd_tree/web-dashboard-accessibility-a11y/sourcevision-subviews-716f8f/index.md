@@ -14,4 +14,4 @@ description: "Beyond the zones graph, SourceVision has five additional sub-views
 |-------|--------|
 | [Ensure SourceVision PR markdown tab, file search, and route tree view are fully accessible](./ensure-sourcevision-pr-markdown-c9a53f.md) | pending |
 | [Make SourceVision findings list, filter controls, and finding detail panels keyboard and screen-reader accessible](./make-sourcevision-findings-list-21d0a1.md) | completed |
-| [Make SourceVision import graph and context graph visualizations accessible with keyboard navigation and text alternatives](./make-sourcevision-import-graph-582769.md) | in_progress |
+| [Make SourceVision import graph and context graph visualizations accessible with keyboard navigation and text alternatives](./make-sourcevision-import-graph-582769.md) | completed |
