@@ -1,5 +1,5 @@
 import { h, Fragment } from "preact";
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem, FileDetail, ZoneDetail } from "../types.js";
 import { meterClass, getZoneColorByIndex } from "../visualization/index.js";
 import { basename } from "../utils.js";
@@ -25,6 +25,19 @@ export function DetailPanel({ detail, data, navigateTo, onClose, prdDetailConten
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [detail, onClose]);
+
+  // Focus management: save trigger element when panel opens, restore it when panel closes.
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (detail) {
+      previousFocusRef.current = document.activeElement as HTMLElement;
+    } else {
+      requestAnimationFrame(() => {
+        previousFocusRef.current?.focus();
+        previousFocusRef.current = null;
+      });
+    }
+  }, [detail]);
 
   if (!detail) return null;
 

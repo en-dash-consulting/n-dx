@@ -2,7 +2,7 @@
 id: "ddc95a90-9119-4374-ac0a-7b8ce8477fa8"
 level: "task"
 title: "Establish semantic HTML structure, ARIA landmark roles, skip-navigation, and keyboard focus management across all dashboard routes"
-status: "pending"
+status: "completed"
 priority: "critical"
 tags:
   - "a11y"
@@ -11,6 +11,9 @@ tags:
   - "keyboard-nav"
   - "focus-management"
 source: "smart-add"
+startedAt: "2026-08-03T13:26:20.173Z"
+completedAt: "2026-08-03T13:40:10.574Z"
+endedAt: "2026-08-03T13:40:10.574Z"
 acceptanceCriteria:
   - "Every page has exactly one <main> landmark and a meaningful <title> element update on route change"
   - "Heading levels are strictly hierarchical (h1 → h2 → h3) with no skipped levels on any view"

@@ -1,5 +1,5 @@
 import { h, Fragment } from "preact";
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import type { Zone, ZoneCrossing } from "../external.js";
 import { getZoneColorByIndex } from "../visualization/colors.js";
 import { meterClass } from "../visualization/metrics.js";
@@ -51,7 +51,25 @@ export function ZoneSlideout({
     return () => document.removeEventListener("keydown", handleKey);
   }, [zone, onClose]);
 
-  // Trap focus inside the panel when open
+  // Focus management: save the previously focused element on open, restore it on close.
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const prevZoneIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const prevId = prevZoneIdRef.current;
+    const currId = zone?.id ?? null;
+    prevZoneIdRef.current = currId;
+
+    if (currId && !prevId) {
+      // Panel just opened: save the triggering element's focus.
+      previousFocusRef.current = document.activeElement as HTMLElement;
+    } else if (!currId && prevId) {
+      // Panel just closed: restore focus to the trigger.
+      requestAnimationFrame(() => previousFocusRef.current?.focus());
+    }
+  }, [zone]);
+
+  // Focus the panel itself when it opens so keyboard users can interact immediately.
   const panelRef = useCallback((el: HTMLElement | null) => {
     if (el) el.focus();
   }, []);

@@ -225,16 +225,12 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
     sidebarCollapsed
       ? h("div", { class: "sidebar-rail", "aria-label": "Collapsed navigation" },
           // Logo — scoped: product logo, unscoped: n-dx logo
-          h("div", {
+          h("button", {
             class: "sidebar-rail-logo",
+            type: "button",
             onClick: () => handleNav(visibleSections[0]?.items[0]?.id ?? "overview"),
-            role: "button",
-            tabIndex: 0,
             title: scope ? `${scope} \u2014 Home` : "n-dx \u2014 Overview",
             "aria-label": scope ? `Go to ${scope} home` : "Go to Overview",
-            onKeyDown: (e: KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleNav(visibleSections[0]?.items[0]?.id ?? "overview"); }
-            },
           }, scope
             ? h(ProductLogoPng, { product: scope as "sourcevision" | "rex" | "hench", size: 48 })
             : h(NdxLogoPng, { size: 48 }),
@@ -320,19 +316,12 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
         const isExpanded = expandedSection === section.label;
         return h("div", { key: section.label, class: "nav-section" },
           // Section header (clickable)
-          h("div", {
+          h("button", {
             class: `nav-section-header${section.product ? ` nav-section-${section.product}` : ""}`,
-            role: "button",
-            tabIndex: 0,
+            type: "button",
             "aria-expanded": String(isExpanded),
             "aria-controls": `nav-section-${section.label}`,
             onClick: () => toggleSection(section.label),
-            onKeyDown: (e: KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                toggleSection(section.label);
-              }
-            },
           },
             section.product
               ? h(ProductLogoPng, { product: section.product, size: 40, class: "nav-section-logo" })
@@ -359,20 +348,14 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
           },
             section.items.map((entry) => {
               const locked = entry.minPass > 0 && enrichmentPass < entry.minPass;
-              return h("div", {
+              return h("button", {
                 key: entry.id,
+                type: "button",
                 class: `nav-item ${view === entry.id ? "active" : ""} ${locked ? "locked" : ""}`,
                 onClick: locked ? undefined : () => handleNav(entry.id),
-                role: "button",
-                tabIndex: locked || !isExpanded ? -1 : 0,
+                disabled: locked ? true : undefined,
+                tabIndex: !locked && !isExpanded ? -1 : undefined,
                 "aria-current": view === entry.id ? "page" : undefined,
-                "aria-disabled": locked ? "true" : undefined,
-                onKeyDown: (e: KeyboardEvent) => {
-                  if (!locked && (e.key === "Enter" || e.key === " ")) {
-                    e.preventDefault();
-                    handleNav(entry.id);
-                  }
-                },
               },
                 h("span", { class: "nav-icon", "aria-hidden": "true" }, entry.icon),
                 entry.label,
@@ -383,18 +366,12 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
             }),
             // Analysis progress indicator (inside SourceVision section)
             section.product === "sourcevision" && manifest
-              ? h("div", {
+              ? h("button", {
                   class: "sidebar-progress",
-                  role: "button",
-                  tabIndex: isExpanded ? 0 : -1,
+                  type: "button",
+                  tabIndex: isExpanded ? undefined : -1,
                   "aria-label": `Analysis progress: ${completedCount} of ${moduleNames.length} complete — click to view`,
                   onClick: () => handleNav("overview"),
-                  onKeyDown: (e: KeyboardEvent) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleNav("overview");
-                    }
-                  },
                 },
                   h("div", { class: "progress-label" }, `Analysis: ${completedCount}/${moduleNames.length}`),
                   h("div", { class: "progress-bar", role: "progressbar", "aria-valuenow": String(completedCount), "aria-valuemin": "0", "aria-valuemax": String(moduleNames.length) },

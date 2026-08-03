@@ -52,15 +52,11 @@ export function CollapsibleSection({
   const hiddenCount = items.length - threshold;
 
   return h("div", { class: "mb-16" },
-    h("div", {
+    h("button", {
       class: "collapsible-header",
+      type: "button",
       onClick: () => setOpen(!open),
-      role: "button",
-      tabIndex: 0,
       "aria-expanded": String(open),
-      onKeyDown: (e: KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(!open); }
-      },
     },
       h("span", { class: `collapsible-chevron ${open ? "open" : ""}`, "aria-hidden": "true" }, "\u25B6"),
       h("span", { class: "collapsible-title" }, title),

@@ -62,18 +62,12 @@ export function SvFreshnessIndicator({ status, onNavigate, tabIndex }: SvIndicat
   const isStale = status.freshness === "stale";
   const timeLabel = status.minutesAgo != null ? formatTimeAgo(status.minutesAgo) : "";
 
-  return h("div", {
+  return h("button", {
     class: `sidebar-indicator${isStale ? " sidebar-indicator-warning" : " sidebar-indicator-ok"}`,
-    role: "button",
+    type: "button",
     tabIndex,
     "aria-label": `Analysis ${isStale ? "stale" : "fresh"}${timeLabel ? ` — last run ${timeLabel}` : ""} — click to view`,
     onClick: () => onNavigate("overview"),
-    onKeyDown: (e: KeyboardEvent) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        onNavigate("overview");
-      }
-    },
   },
     h("span", {
       class: `indicator-dot ${isStale ? "indicator-dot-stale" : "indicator-dot-fresh"}`,
@@ -124,18 +118,12 @@ export function RexCompletionIndicator({ status, onNavigate, tabIndex }: RexIndi
     nextTaskTitle ? `Next: ${nextTaskTitle}` : null,
   ].filter(Boolean).join(", ");
 
-  return h("div", {
+  return h("button", {
     class: "sidebar-indicator sidebar-indicator-prd",
-    role: "button",
+    type: "button",
     tabIndex,
     "aria-label": `${ariaLabel} — click to view`,
     onClick: () => onNavigate("rex-dashboard"),
-    onKeyDown: (e: KeyboardEvent) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        onNavigate("rex-dashboard");
-      }
-    },
   },
     // Top row: percentage + task counts
     h("div", { class: "indicator-row" },
@@ -193,18 +181,12 @@ export function HenchActivityIndicator({ status, onNavigate, tabIndex }: HenchIn
 
   const hasStaleRuns = status.staleRuns > 0;
 
-  return h("div", {
+  return h("button", {
     class: `sidebar-indicator ${hasStaleRuns ? "sidebar-indicator-warning" : "sidebar-indicator-ok"}`,
-    role: "button",
+    type: "button",
     tabIndex,
     "aria-label": `Hench: ${status.totalRuns} runs${hasStaleRuns ? `, ${status.staleRuns} stuck` : ""} — click to view`,
     onClick: () => onNavigate("hench-runs"),
-    onKeyDown: (e: KeyboardEvent) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        onNavigate("hench-runs");
-      }
-    },
   },
     h("span", {
       class: `indicator-dot ${hasStaleRuns ? "indicator-dot-stale" : "indicator-dot-fresh"}`,
