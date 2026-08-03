@@ -1,0 +1,20 @@
+---
+id: "0842c3e1-f5fc-4cb7-b3e2-be50161d1633"
+level: "epic"
+title: "Web Dashboard Accessibility (a11y)"
+status: "pending"
+source: "smart-add"
+startedAt: "2026-05-08T16:36:15.092Z"
+endedAt: "2026-05-08T16:36:15.092Z"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Color, Contrast, and Motion Accessibility](./color-contrast-and-motion-4f67f1/index.md) | pending |
+| [Dynamic Content ARIA, Icon Labeling, and A11y Regression Coverage](./dynamic-content-aria-icon-01d36c/index.md) | pending |
+| [Global A11y Foundation and Semantic HTML](./global-a11y-foundation-and-semantic-html/index.md) | pending |
+| [SourceVision Subviews Accessibility (Findings, Import Graph, PR Tab, File Search, Route Tree)](./sourcevision-subviews-716f8f/index.md) | pending |
+| [SourceVision Zones Graph and Visualization Accessibility](./sourcevision-zones-graph-and-edeab3/index.md) | pending |
+| [Top-Down PRD Merge Graph with Click-to-Expand and Merge Detail Panel](./top-down-prd-merge-graph-with-b2b3f1/index.md) | completed |
