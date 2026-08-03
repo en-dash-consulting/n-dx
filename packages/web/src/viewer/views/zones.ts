@@ -9,7 +9,7 @@
  */
 
 import { h } from "preact";
-import { useState, useMemo, useCallback, useEffect } from "preact/hooks";
+import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
 import type { CallGraph, Zone, ZoneCrossing } from "../external.js";
 import {
@@ -1138,6 +1138,9 @@ function ZoneBox({
   onDrillDown,
   onToggleSubZone,
   onToggleConnectingOnly,
+  nodeRef,
+  onNodeKeyDown,
+  connectedZonesLabel,
 }: {
   zone: ZoneData;
   box: BoxRect;
@@ -1163,6 +1166,12 @@ function ZoneBox({
   onDrillDown?: () => void;
   onToggleSubZone?: (subZoneId: string) => void;
   onToggleConnectingOnly?: () => void;
+  /** Callback ref attached to the root SVG <g> for programmatic focus. */
+  nodeRef?: (el: Element | null) => void;
+  /** Arrow-key navigation handler delegated from ZoneDiagram. */
+  onNodeKeyDown?: (e: KeyboardEvent) => void;
+  /** Screen-reader description of connected zones for aria-describedby. */
+  connectedZonesLabel?: string;
 }) {
   const fileCount = zone.totalFiles;
   const hasSubZones = !!(zone.subZones && zone.subZones.length > 0);
@@ -1285,11 +1294,30 @@ function ZoneBox({
     return elements;
   };
 
+  const ariaLabel = `${zone.name} zone, cohesion ${zone.cohesion.toFixed(2)}, coupling ${zone.coupling.toFixed(2)}, ${zone.totalFiles} file${zone.totalFiles !== 1 ? "s" : ""}`;
+
   return h("g", {
     class: `cg-zone-box${expanded ? " expanded" : ""}${selected ? " selected" : ""}${dimmed ? " search-dim" : ""}${connHighlighted ? " conn-highlight" : ""}`,
     "data-zone-id": zone.id,
+    // Use lowercase "tabindex" for SVG — browsers and jsdom treat SVG attrs case-sensitively
+    "tabindex": 0,
+    role: "button",
+    "aria-label": ariaLabel,
+    "aria-describedby": `zone-desc-${zone.id}`,
     style: "cursor: grab;",
+    ref: nodeRef,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        e.stopPropagation();
+        onSelectZone();
+      } else {
+        onNodeKeyDown?.(e);
+      }
+    },
   },
+    // SVG description element for aria-describedby (connected zones)
+    h("desc", { id: `zone-desc-${zone.id}` }, connectedZonesLabel ?? "No direct connections"),
     h("rect", {
       class: "cg-zone-rect",
       x: box.x,
@@ -1434,6 +1462,17 @@ function ZoneBox({
           ...(hasSubZones ? renderSubZoneContent() : renderFileContent()),
         )
       : null,
+    // Focus ring: invisible by default, appears on :focus-visible via CSS
+    h("rect", {
+      class: "cg-zone-focus-ring",
+      x: box.x - 3,
+      y: box.y - 3,
+      width: box.w + 6,
+      height: box.h + 6,
+      rx: 10,
+      fill: "none",
+      style: "pointer-events: none;",
+    }),
   );
 }
 
@@ -1513,9 +1552,53 @@ function ZoneDiagram({
   const [selectedFile, setSelectedFile] = useState<ActiveFileRef | null>(null);
   const activeFile = hoveredFile ?? selectedFile;
 
+  // Keyboard navigation: refs to zone <g> elements for programmatic focus
+  const zoneRefs = useRef(new Map<string, Element>());
+
   const zoneById = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
   const zoneNameById = useMemo(() => new Map(zones.map((z) => [z.id, z.name])), [zones]);
   const zoneColorById = useMemo(() => new Map(zones.map((z) => [z.id, z.color])), [zones]);
+
+  // Undirected adjacency list built from visible edges (deduped per pair)
+  const adjacency = useMemo(() => {
+    const adj = new Map<string, string[]>();
+    for (const z of zones) adj.set(z.id, []);
+    for (const e of edges) {
+      if (!adj.has(e.from) || !adj.has(e.to)) continue;
+      const fromList = adj.get(e.from)!;
+      if (!fromList.includes(e.to)) fromList.push(e.to);
+      const toList = adj.get(e.to)!;
+      if (!toList.includes(e.from)) toList.push(e.from);
+    }
+    return adj;
+  }, [zones, edges]);
+
+  // Screen-reader description for each zone: lists connected zone names
+  const connectionLabels = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const z of zones) {
+      const connIds = adjacency.get(z.id) ?? [];
+      labels.set(
+        z.id,
+        connIds.length === 0
+          ? "No direct connections"
+          : `Connected to: ${connIds.map((id) => zoneById.get(id)?.name ?? id).join(", ")}`,
+      );
+    }
+    return labels;
+  }, [zones, adjacency, zoneById]);
+
+  // Arrow-key navigation: cycles through the focused zone's edge-connected neighbours
+  const handleNodeKeyDown = useCallback((zoneId: string, e: KeyboardEvent) => {
+    const { key } = e;
+    if (key !== "ArrowRight" && key !== "ArrowLeft" && key !== "ArrowDown" && key !== "ArrowUp") return;
+    e.preventDefault();
+    const connIds = adjacency.get(zoneId) ?? [];
+    if (connIds.length === 0) return;
+    const forward = key === "ArrowRight" || key === "ArrowDown";
+    const targetId = forward ? connIds[0] : connIds[connIds.length - 1];
+    (zoneRefs.current.get(targetId) as HTMLElement | null)?.focus();
+  }, [adjacency]);
 
   // Layout computation
   const { boxes: baseBoxes, totalW, totalH } = useMemo(
@@ -1829,6 +1912,12 @@ function ZoneDiagram({
               : undefined,
             onToggleSubZone: (szId: string) => onToggleSubZone(zone.id, szId),
             onToggleConnectingOnly: () => onToggleConnectingOnly(zone.id),
+            nodeRef: (el: Element | null) => {
+              if (el) zoneRefs.current.set(zone.id, el);
+              else zoneRefs.current.delete(zone.id);
+            },
+            onNodeKeyDown: (e: KeyboardEvent) => handleNodeKeyDown(zone.id, e),
+            connectedZonesLabel: connectionLabels.get(zone.id),
           });
         }),
       ),

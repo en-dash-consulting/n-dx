@@ -361,3 +361,24 @@
 .cg-zoom-btn:active {
   background: var(--bg-active);
 }
+
+/* ── Keyboard focus ring for zone nodes ──────────────────────────── */
+
+/* Suppress browser outline on SVG <g> elements; use explicit ring rect. */
+.cg-zone-box:focus {
+  outline: none;
+}
+
+.cg-zone-box .cg-zone-focus-ring {
+  fill: none;
+  stroke: none;
+  pointer-events: none;
+  transition: stroke 0.1s ease;
+}
+
+/* Visible focus ring in light and dark themes (relies on --accent token) */
+.cg-zone-box:focus-visible .cg-zone-focus-ring {
+  stroke: var(--accent, #4a9eff);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent, #4a9eff) 60%, transparent));
+}

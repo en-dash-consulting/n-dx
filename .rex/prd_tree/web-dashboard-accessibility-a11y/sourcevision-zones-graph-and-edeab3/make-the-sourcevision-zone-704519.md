@@ -2,7 +2,7 @@
 id: "704519ae-55ab-4f76-bfae-2487ce2a8223"
 level: "task"
 title: "Make the SourceVision zone graph keyboard-navigable with ARIA roles and node/edge descriptions"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "a11y"
@@ -11,6 +11,9 @@ tags:
   - "graph"
   - "keyboard-nav"
 source: "smart-add"
+startedAt: "2026-08-03T14:36:44.061Z"
+completedAt: "2026-08-03T14:49:08.453Z"
+endedAt: "2026-08-03T14:49:08.453Z"
 acceptanceCriteria:
   - "Every zone node in the SVG graph is reachable by Tab/Shift-Tab and activatable by Enter or Space"
   - "Arrow keys navigate between nodes connected by edges from the currently focused node"
