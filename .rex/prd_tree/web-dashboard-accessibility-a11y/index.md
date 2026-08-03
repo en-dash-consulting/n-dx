@@ -12,7 +12,7 @@ endedAt: "2026-05-08T16:36:15.092Z"
 
 | Title | Status |
 |-------|--------|
-| [Color, Contrast, and Motion Accessibility](./color-contrast-and-motion-4f67f1/index.md) | pending |
+| [Color, Contrast, and Motion Accessibility](./color-contrast-and-motion-4f67f1/index.md) | in_progress |
 | [Dynamic Content ARIA, Icon Labeling, and A11y Regression Coverage](./dynamic-content-aria-icon-01d36c/index.md) | pending |
 | [Global A11y Foundation and Semantic HTML](./global-a11y-foundation-and-semantic-html/index.md) | completed |
 | [SourceVision Subviews Accessibility (Findings, Import Graph, PR Tab, File Search, Route Tree)](./sourcevision-subviews-716f8f/index.md) | completed |
