@@ -2,7 +2,7 @@
 id: "53b8ddbc-6382-44a1-bb95-44192e912055"
 level: "task"
 title: "Audit and fix WCAG AA color contrast ratios, add prefers-reduced-motion support, and add non-color redundant indicators for status and severity"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "a11y"
@@ -13,6 +13,7 @@ tags:
   - "color-independence"
   - "web-viewer"
 source: "smart-add"
+startedAt: "2026-08-03T13:56:28.806Z"
 acceptanceCriteria:
   - "All body and label text in both light and dark themes passes 4.5:1 contrast ratio against its background"
   - "All large text (≥18px regular or ≥14px bold) passes 3:1 contrast ratio"

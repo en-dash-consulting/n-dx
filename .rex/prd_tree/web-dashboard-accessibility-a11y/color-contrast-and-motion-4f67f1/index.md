@@ -12,4 +12,4 @@ description: "Ensure the dashboard meets WCAG 2.1 AA color contrast requirements
 
 | Title | Status |
 |-------|--------|
-| [Audit and fix WCAG AA color contrast ratios, add prefers-reduced-motion support, and add non-color redundant indicators for status and severity](./audit-and-fix-wcag-aa-color-53b8dd.md) | pending |
+| [Audit and fix WCAG AA color contrast ratios, add prefers-reduced-motion support, and add non-color redundant indicators for status and severity](./audit-and-fix-wcag-aa-color-53b8dd.md) | in_progress |
