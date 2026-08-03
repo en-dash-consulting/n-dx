@@ -1494,6 +1494,8 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                   type: "button",
                   class: `ig-mini-zone${zoneFilter === zone.id ? " ig-mini-zone-active" : ""}`,
                   title: `${zone.name}: ${zone.n} files, ${stats.in} in / ${stats.out} out`,
+                  "aria-pressed": zoneFilter === zone.id,
+                  "aria-label": `${zone.name} zone: ${zone.n} files, ${stats.in} incoming, ${stats.out} outgoing`,
                   onClick: () => openZoneInGraph(zone.id),
                 }, zone.name);
               }),
@@ -1512,10 +1514,11 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
             ),
           ),
           h("div", { class: "ig-zone-selector-grid" },
-            h("div", { class: "ig-zone-map", "aria-label": "Zone boundary map" },
+            h("div", { class: "ig-zone-map" },
               h("svg", {
                 viewBox: `0 0 ${zoneMapW} ${zoneMapH}`,
-                role: "img",
+                role: "group",
+                "aria-label": "Zone boundary map",
                 onPointerDown: (event: PointerEvent) => beginPan("codebase", event),
                 onPointerMove: handlePointerMove,
                 onPointerUp: endDrag,
@@ -1560,6 +1563,16 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                           key: zone.id,
                           class: `ig-zone-map-node${zoneFilter === zone.id ? " ig-zone-map-node-active" : ""}`,
                           transform: `translate(${zone.x}, ${zone.y})`,
+                          role: "button",
+                          tabIndex: 0,
+                          "aria-label": `${zone.name} zone: ${zone.n} file${zone.n === 1 ? "" : "s"}. Open zone map.`,
+                          "aria-pressed": zoneFilter === zone.id,
+                          onKeyDown: (event: KeyboardEvent) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              openZoneInGraph(zone.id);
+                            }
+                          },
                           onPointerDown: (event: PointerEvent) => {
                             event.stopPropagation();
                             suppressNodeClickRef.current = false;
@@ -1609,7 +1622,8 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                       h("div", { class: "ig-boundary-row", key: `${flow.fromZone}->${flow.toZone}` },
                         h("span", { class: "ig-boundary-route" },
                           zones ? zoneDisplayName(zones, flow.fromZone) : flow.fromZone,
-                          " -> ",
+                          h("span", { "aria-hidden": "true" }, " -> "),
+                          h("span", { class: "sr-only" }, " imports into "),
                           zones ? zoneDisplayName(zones, flow.toZone) : flow.toZone,
                         ),
                         h("span", { class: "ig-boundary-count" }, flow.count.toLocaleString()),
@@ -1972,7 +1986,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
               `${graphNodeCount} nodes · ${graphEdgeCount} imports shown · ${graphCrossEdgeCount} cross-boundary · ${graphScopeLabel}`,
             ),
           ),
-          h("div", { class: "ig-preview-history", "aria-label": "Dependency preview history" },
+          h("div", { class: "ig-preview-history", role: "group", "aria-label": "Dependency preview history" },
             h("button", {
               type: "button",
               class: "ig-preview-history-btn",

@@ -181,7 +181,7 @@ function renderFileDetail(
       ? h("button", {
           class: "detail-nav-btn",
           onClick: () => navigateTo("graph", { file: path }),
-        }, "\u2B95 View in Graph")
+        }, h("span", { "aria-hidden": "true" }, "\u2B95 "), "View in Graph")
       : null,
   );
 }
@@ -230,7 +230,15 @@ function renderZoneDetail(
         h("span", { class: "label" }, "Cohesion"),
         h("span", null, cohesion.toFixed(2))
       ),
-      h("div", { class: "meter" },
+      h("div", {
+        class: "meter",
+        role: "meter",
+        "aria-label": "Cohesion",
+        "aria-valuemin": 0,
+        "aria-valuemax": 1,
+        "aria-valuenow": cohesion,
+        "aria-valuetext": cohesion.toFixed(2),
+      },
         h("div", {
           class: `meter-fill ${meterClass(cohesion)}`,
           style: `width: ${cohesion * 100}%`,
@@ -244,7 +252,15 @@ function renderZoneDetail(
         h("span", { class: "label" }, "Coupling"),
         h("span", null, coupling.toFixed(2))
       ),
-      h("div", { class: "meter" },
+      h("div", {
+        class: "meter",
+        role: "meter",
+        "aria-label": "Coupling",
+        "aria-valuemin": 0,
+        "aria-valuemax": 1,
+        "aria-valuenow": coupling,
+        "aria-valuetext": coupling.toFixed(2),
+      },
         h("div", {
           class: `meter-fill ${meterClass(coupling, true)}`,
           style: `width: ${coupling * 100}%`,
@@ -275,15 +291,15 @@ function renderZoneDetail(
           h("button", {
             class: "detail-nav-btn",
             onClick: () => navigateTo("files", { zone: zoneId }),
-          }, "\u2630 View in Files"),
+          }, h("span", { "aria-hidden": "true" }, "\u2630 "), "View in Files"),
           h("button", {
             class: "detail-nav-btn",
             onClick: () => navigateTo("problems"),
-          }, "\u26A0 View Problems"),
+          }, h("span", { "aria-hidden": "true" }, "\u26A0 "), "View Problems"),
           h("button", {
             class: "detail-nav-btn",
             onClick: () => navigateTo("suggestions"),
-          }, "\u2728 View Suggestions"),
+          }, h("span", { "aria-hidden": "true" }, "\u2728 "), "View Suggestions"),
         )
       : null,
   );

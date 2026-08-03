@@ -24,11 +24,14 @@ export function BarChart({ data, width = 500, height }: BarChartProps) {
   const chartHeight = height ?? data.length * (barHeight + gap);
   const barArea = width - labelWidth - valueWidth - 16;
   const maxVal = Math.max(...data.map((d) => d.value), 1);
+  const summary = data.map((d) => `${d.label}: ${d.value}`).join(", ");
 
   return h("svg", {
     viewBox: `0 0 ${width} ${chartHeight}`,
     class: "chart-block",
     preserveAspectRatio: "xMinYMin meet",
+    role: "img",
+    "aria-label": `Bar chart. ${summary}`,
   },
     data.map((d, i) => {
       const y = i * (barHeight + gap);
@@ -127,6 +130,8 @@ export function FlowDiagram({
       preserveAspectRatio: "xMidYMid meet",
       class: "chart-block",
       style: "max-width: 800px; margin: 0 auto 16px;",
+      role: "group",
+      "aria-label": `Flow diagram with ${nodes.length} node${nodes.length === 1 ? "" : "s"} and ${edges.length} connection${edges.length === 1 ? "" : "s"}`,
     },
       // Edges
       edges.map((e, i) => {
@@ -154,6 +159,7 @@ export function FlowDiagram({
           stroke: isHigh ? "var(--orange)" : "var(--border)",
           "stroke-width": sw,
           opacity,
+          "aria-hidden": "true",
         });
       }),
       // Nodes
@@ -164,6 +170,19 @@ export function FlowDiagram({
           class: "flow-node",
           transform: `translate(${pos.x},${pos.y})`,
           onClick: onNodeClick ? () => onNodeClick(n.id) : undefined,
+          ...(onNodeClick
+            ? {
+                role: "button",
+                tabIndex: 0,
+                "aria-label": n.label,
+                onKeyDown: (e: KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onNodeClick(n.id);
+                  }
+                },
+              }
+            : { role: "img", "aria-label": n.label }),
         },
           h("circle", {
             r: nodeRadius,

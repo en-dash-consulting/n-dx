@@ -26,6 +26,9 @@ import { ZonesView } from "../../../src/viewer/views/zones.js";
 import { Graph } from "../../../src/viewer/views/graph.js";
 import { Overview } from "../../../src/viewer/views/overview.js";
 import { ProblemsView } from "../../../src/viewer/views/problems.js";
+import { ArchitectureView } from "../../../src/viewer/views/architecture.js";
+import { SuggestionsView } from "../../../src/viewer/views/suggestions.js";
+import { RoutesView } from "../../../src/viewer/views/routes.js";
 
 // ── Axe-core loader ───────────────────────────────────────────────────────────
 
@@ -366,6 +369,155 @@ describe.skipIf(!axeRun)("[a11y] ZonesView — axe audit", () => {
     );
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     clearInterval(rafId);
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+});
+
+// ── [a11y] ArchitectureView ──────────────────────────────────────────────────
+
+describe.skipIf(!axeRun)("[a11y] ArchitectureView — axe audit", () => {
+  let root: HTMLElement;
+  let cleanup: () => void;
+
+  afterEach(() => {
+    render(null, root);
+    root.remove();
+    cleanup?.();
+  });
+
+  it("has zero critical/serious violations (light theme)", async () => {
+    cleanup = setTheme("light");
+    root = renderToDiv(h(ArchitectureView, { data: makeLoadedData(), onSelect: () => {} }));
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+
+  it("has zero critical/serious violations (dark theme)", async () => {
+    cleanup = setTheme("dark");
+    root = renderToDiv(h(ArchitectureView, { data: makeLoadedData(), onSelect: () => {} }));
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+
+  it("has zero violations in locked/insufficient-data state", async () => {
+    cleanup = setTheme("light");
+    const data = makeLoadedData({ zones: { zones: [], crossings: [], unzoned: [], enrichmentPass: 0 } });
+    root = renderToDiv(h(ArchitectureView, { data, onSelect: () => {} }));
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+});
+
+// ── [a11y] SuggestionsView ───────────────────────────────────────────────────
+
+describe.skipIf(!axeRun)("[a11y] SuggestionsView — axe audit", () => {
+  let root: HTMLElement;
+  let cleanup: () => void;
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    // Prevent the refresh-recommendations fetch from firing during render
+    globalThis.fetch = vi.fn().mockReturnValue(new Promise(() => { /* never resolves */ }));
+  });
+
+  afterEach(() => {
+    render(null, root);
+    root.remove();
+    cleanup?.();
+    globalThis.fetch = originalFetch;
+  });
+
+  const unlockedData = () =>
+    makeLoadedData({
+      zones: {
+        zones: SAMPLE_ZONES,
+        crossings: [],
+        unzoned: [],
+        enrichmentPass: 4,
+        findings: [
+          { type: "suggestion", scope: "global", text: "Consider extracting shared helpers", severity: "info", pass: 4 },
+          { type: "suggestion", scope: "z-a", text: "Split large module", severity: "warning", pass: 4 },
+        ],
+      },
+    });
+
+  it("has zero critical/serious violations (light theme)", async () => {
+    cleanup = setTheme("light");
+    root = renderToDiv(h(SuggestionsView, { data: unlockedData() }));
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+
+  it("has zero critical/serious violations (dark theme)", async () => {
+    cleanup = setTheme("dark");
+    root = renderToDiv(h(SuggestionsView, { data: unlockedData() }));
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+
+  it("has zero violations in locked/insufficient-data state", async () => {
+    cleanup = setTheme("light");
+    const data = makeLoadedData({ zones: { zones: [], crossings: [], unzoned: [], enrichmentPass: 0 } });
+    root = renderToDiv(h(SuggestionsView, { data }));
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+});
+
+// ── [a11y] RoutesView ────────────────────────────────────────────────────────
+
+describe.skipIf(!axeRun)("[a11y] RoutesView — axe audit", () => {
+  let root: HTMLElement;
+  let cleanup: () => void;
+
+  afterEach(() => {
+    render(null, root);
+    root.remove();
+    cleanup?.();
+  });
+
+  const SAMPLE_COMPONENTS: NonNullable<LoadedData["components"]> = {
+    components: [
+      { file: "src/button.tsx", name: "Button", kind: "function", line: 1, isDefaultExport: true, conventionExports: [] },
+    ],
+    usageEdges: [
+      { from: "src/routes/home.tsx", to: "src/button.tsx", componentName: "Button", usageCount: 2 },
+    ],
+    routeModules: [
+      { file: "src/routes/home.tsx", routePattern: "/", exports: ["default", "loader"], parentLayout: null, isLayout: false, isIndex: true },
+    ],
+    routeTree: [
+      { file: "src/routes/home.tsx", routePattern: "/", children: [] },
+    ],
+    summary: {
+      totalComponents: 1,
+      totalRouteModules: 1,
+      totalUsageEdges: 1,
+      routeConventions: { default: 1, loader: 1 },
+      mostUsedComponents: [{ name: "Button", file: "src/button.tsx", usageCount: 2 }],
+      layoutDepth: 1,
+    },
+  };
+
+  it("has zero critical/serious violations (light theme)", async () => {
+    cleanup = setTheme("light");
+    root = renderToDiv(h(RoutesView, { data: makeLoadedData({ components: SAMPLE_COMPONENTS }) }));
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+
+  it("has zero critical/serious violations (dark theme)", async () => {
+    cleanup = setTheme("dark");
+    root = renderToDiv(h(RoutesView, { data: makeLoadedData({ components: SAMPLE_COMPONENTS }) }));
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+
+  it("has zero violations in no-component-data state", async () => {
+    cleanup = setTheme("light");
+    root = renderToDiv(h(RoutesView, { data: makeLoadedData({ components: null }) }));
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });

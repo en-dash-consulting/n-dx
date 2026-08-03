@@ -94,15 +94,15 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
       h("h4", null, "Architecture Map"),
       h("div", { class: "zone-map-legend" },
         h("span", { class: "legend-item" },
-          h("span", { class: "legend-dot", style: "background: var(--green)" }),
+          h("span", { class: "legend-dot", style: "background: var(--green)", "aria-hidden": "true" }),
           "High cohesion"
         ),
         h("span", { class: "legend-item" },
-          h("span", { class: "legend-dot", style: "background: var(--orange)" }),
+          h("span", { class: "legend-dot", style: "background: var(--orange)", "aria-hidden": "true" }),
           "Bidirectional"
         ),
         h("span", { class: "legend-item" },
-          h("span", { class: "legend-line" }),
+          h("span", { class: "legend-line", "aria-hidden": "true" }),
           "Dependency"
         )
       )
@@ -140,9 +140,25 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
           onClick: () => onZoneClick?.(zone.id),
           onMouseEnter: () => setHoveredZone(zone.id),
           onMouseLeave: () => setHoveredZone(null),
+          ...(onZoneClick
+            ? {
+                role: "button",
+                tabIndex: 0,
+                "aria-pressed": isSelected,
+                "aria-label": `Zone ${zone.name}: ${zone.files.length} files, cohesion ${zone.cohesion.toFixed(2)}, coupling ${zone.coupling.toFixed(2)}`,
+                onKeyDown: (e: KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onZoneClick(zone.id);
+                  }
+                },
+                onFocus: () => setHoveredZone(zone.id),
+                onBlur: () => setHoveredZone(null),
+              }
+            : {}),
         },
           h("div", { class: "zone-map-node-header" },
-            h("span", { class: "zone-map-node-dot", style: `background: ${color}` }),
+            h("span", { class: "zone-map-node-dot", style: `background: ${color}`, "aria-hidden": "true" }),
             h("span", { class: "zone-map-node-name" }, zone.name)
           ),
           h("div", { class: "zone-map-node-body" },
@@ -150,7 +166,7 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
               h("span", { class: "stat-value" }, zone.files.length),
               h("span", { class: "stat-label" }, "files")
             ),
-            h("div", { class: "zone-map-node-health" },
+            h("div", { class: "zone-map-node-health", "aria-hidden": "true" },
               h("span", {
                 class: "health-dot",
                 style: `background: ${healthColor}`,
@@ -169,11 +185,19 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
             : null,
           metrics && (metrics.incoming > 0 || metrics.outgoing > 0)
             ? h("div", { class: "zone-map-node-io" },
-                h("span", { class: "io-in", title: "Incoming deps" },
-                  "\u2190", metrics.incoming
+                h("span", {
+                  class: "io-in",
+                  title: "Incoming deps",
+                  "aria-label": `${metrics.incoming} incoming dependencies`,
+                },
+                  h("span", { "aria-hidden": "true" }, "\u2190"), metrics.incoming
                 ),
-                h("span", { class: "io-out", title: "Outgoing deps" },
-                  metrics.outgoing, "\u2192"
+                h("span", {
+                  class: "io-out",
+                  title: "Outgoing deps",
+                  "aria-label": `${metrics.outgoing} outgoing dependencies`,
+                },
+                  metrics.outgoing, h("span", { "aria-hidden": "true" }, "\u2192")
                 )
               )
             : null
@@ -204,7 +228,11 @@ export function ZoneMap({ zones, crossings, selectedZone, onZoneClick }: ZoneMap
                 },
                   fromZone.name
                 ),
-                h("span", { class: "connection-arrow" },
+                h("span", {
+                  class: "connection-arrow",
+                  role: "img",
+                  "aria-label": conn.bidirectional ? "depends on and is used by" : "depends on",
+                },
                   conn.bidirectional ? "\u21C4" : "\u2192"
                 ),
                 h("span", {
@@ -252,8 +280,19 @@ export function ZoneDetail({ zone, crossings, allZones, onClose, onFileClick }: 
   const zoneIdx = allZones.indexOf(zone);
   const color = getZoneColorByIndex(zoneIdx);
 
-  return h("div", { class: "zone-detail-overlay" },
-    h("div", { class: "zone-detail-panel", style: `--zone-color: ${color}` },
+  return h("div", {
+    class: "zone-detail-overlay",
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    },
+  },
+    h("div", {
+      class: "zone-detail-panel",
+      style: `--zone-color: ${color}`,
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-label": `Zone detail: ${zone.name}`,
+    },
       h("div", { class: "zone-detail-header" },
         h("h3", null, zone.name),
         h("button", { class: "close-btn", onClick: onClose, "aria-label": "Close zone detail", title: "Close" }, "\u2715")
@@ -351,6 +390,7 @@ export function ZoneDetail({ zone, crossings, allZones, onClose, onFileClick }: 
         h("button", {
           class: "toggle-files-btn",
           onClick: () => setShowFiles(!showFiles),
+          "aria-expanded": showFiles,
         },
           showFiles ? "Hide files" : `Show ${zone.files.length} files`
         ),
@@ -361,6 +401,18 @@ export function ZoneDetail({ zone, crossings, allZones, onClose, onFileClick }: 
                   key: f,
                   class: "file-item mono-sm",
                   onClick: onFileClick ? () => onFileClick(f) : undefined,
+                  ...(onFileClick
+                    ? {
+                        role: "button",
+                        tabIndex: 0,
+                        onKeyDown: (e: KeyboardEvent) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onFileClick(f);
+                          }
+                        },
+                      }
+                    : {}),
                 },
                   f,
                   zone.entryPoints.includes(f)

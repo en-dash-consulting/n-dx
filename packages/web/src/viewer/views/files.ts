@@ -319,6 +319,7 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
         ? h("select", {
             class: "filter-select",
             value: zoneFilter,
+            "aria-label": "Filter by zone",
             onChange: (e: Event) => setZoneFilter((e.target as HTMLSelectElement).value),
           },
             h("option", { value: "all" }, "All Zones"),

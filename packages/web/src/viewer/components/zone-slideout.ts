@@ -105,7 +105,7 @@ export function ZoneSlideout({
       // Header
       h("div", { class: "zone-slideout-header" },
         h("div", { class: "zone-slideout-title" },
-          h("span", { class: "zone-slideout-dot", style: `background: ${color}` }),
+          h("span", { class: "zone-slideout-dot", style: `background: ${color}`, "aria-hidden": "true" }),
           h("h3", { id: titleId }, zone.name),
         ),
         h("button", {
@@ -146,7 +146,15 @@ export function ZoneSlideout({
       // Cohesion meter
       h("div", { class: "zone-slideout-meter-row" },
         h("span", { class: "zone-slideout-meter-label" }, "Cohesion"),
-        h("div", { class: "meter" },
+        h("div", {
+          class: "meter",
+          role: "meter",
+          "aria-label": "Cohesion",
+          "aria-valuemin": 0,
+          "aria-valuemax": 1,
+          "aria-valuenow": zone.cohesion,
+          "aria-valuetext": zone.cohesion.toFixed(2),
+        },
           h("div", {
             class: `meter-fill ${meterClass(zone.cohesion)}`,
             style: `width: ${zone.cohesion * 100}%`,
@@ -157,7 +165,15 @@ export function ZoneSlideout({
       // Coupling meter
       h("div", { class: "zone-slideout-meter-row" },
         h("span", { class: "zone-slideout-meter-label" }, "Coupling"),
-        h("div", { class: "meter" },
+        h("div", {
+          class: "meter",
+          role: "meter",
+          "aria-label": "Coupling",
+          "aria-valuemin": 0,
+          "aria-valuemax": 1,
+          "aria-valuenow": zone.coupling,
+          "aria-valuetext": zone.coupling.toFixed(2),
+        },
           h("div", {
             class: `meter-fill ${meterClass(zone.coupling, true)}`,
             style: `width: ${zone.coupling * 100}%`,
@@ -176,6 +192,19 @@ export function ZoneSlideout({
                   class: `zone-slideout-list-item mono-sm ${onFileClick ? "clickable" : ""}`,
                   title: ep,
                   onClick: onFileClick ? () => onFileClick(ep) : undefined,
+                  ...(onFileClick
+                    ? {
+                        role: "button",
+                        tabIndex: 0,
+                        "aria-label": `Open file ${ep}`,
+                        onKeyDown: (e: KeyboardEvent) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onFileClick(ep);
+                          }
+                        },
+                      }
+                    : {}),
                 }, basename(ep)),
               ),
               zone.entryPoints.length > 8
@@ -262,6 +291,7 @@ export function ZoneSlideout({
         h("button", {
           class: "zone-slideout-files-toggle",
           onClick: () => setShowFiles(!showFiles),
+          "aria-expanded": showFiles,
         },
           showFiles ? "Hide files" : `Show ${zone.files.length} files`,
         ),
@@ -272,6 +302,19 @@ export function ZoneSlideout({
                   key: f,
                   class: `zone-slideout-file-item mono-sm ${onFileClick ? "clickable" : ""}`,
                   onClick: onFileClick ? () => onFileClick(f) : undefined,
+                  ...(onFileClick
+                    ? {
+                        role: "button",
+                        tabIndex: 0,
+                        "aria-label": `Open file ${f}`,
+                        onKeyDown: (e: KeyboardEvent) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onFileClick(f);
+                          }
+                        },
+                      }
+                    : {}),
                 },
                   h("span", { class: "zone-slideout-file-path" }, f),
                   pinnedFiles?.has(f)
@@ -292,15 +335,15 @@ export function ZoneSlideout({
             h("button", {
               class: "zone-slideout-nav-btn",
               onClick: () => navigateTo("files", { zone: zone.id }),
-            }, "\u2630 View in Files"),
+            }, h("span", { "aria-hidden": "true" }, "\u2630 "), "View in Files"),
             h("button", {
               class: "zone-slideout-nav-btn",
               onClick: () => navigateTo("problems"),
-            }, "\u26A0 View Problems"),
+            }, h("span", { "aria-hidden": "true" }, "\u26A0 "), "View Problems"),
             h("button", {
               class: "zone-slideout-nav-btn",
               onClick: () => navigateTo("suggestions"),
-            }, "\u2728 View Suggestions"),
+            }, h("span", { "aria-hidden": "true" }, "\u2728 "), "View Suggestions"),
           )
         : null,
     ),

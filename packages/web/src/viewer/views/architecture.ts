@@ -18,7 +18,7 @@ export function ArchitectureView({ data, onSelect, navigateTo }: ArchitecturePro
 
   if (enrichmentPass < ENRICHMENT_THRESHOLDS.architecture) {
     return h("div", { class: "locked-view" },
-      h("div", { class: "locked-icon" }, "\u{1F512}"),
+      h("div", { class: "locked-icon", "aria-hidden": "true" }, "\u{1F512}"),
       h("h2", null, "Architecture"),
       h("p", null, "Requires enrichment pass 2 (current: ", enrichmentPass, ")"),
       h("p", { class: "locked-hint" },

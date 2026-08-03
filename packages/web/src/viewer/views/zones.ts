@@ -913,6 +913,8 @@ function FileRow({
 
   return h("g", {
     class: `cg-file-row${searchMatch ? " search-match" : ""}${hasCrossZone ? " cross-zone" : ""}${active ? " active" : ""}`,
+    role: "button",
+    "aria-label": `Select file ${file.path}${hasCrossZone ? " (cross-zone connections)" : ""}`,
     onClick: (e: Event) => { e.stopPropagation(); onClick(); },
     onDblClick: (e: Event) => { e.stopPropagation(); onDblClick(); },
     onMouseEnter: onHover ? () => onHover(true) : undefined,
@@ -1385,6 +1387,8 @@ function ZoneBox({
     zone.hasDrillDown && zone.subZones && onDrillDown
       ? h("g", {
           class: "cg-zone-drill-btn",
+          role: "button",
+          "aria-label": `Drill into ${zone.subZones.length} sub-zones of ${zone.name}`,
           onClick: (e: Event) => { e.stopPropagation(); onDrillDown(); },
         },
           h("rect", {
@@ -1411,6 +1415,9 @@ function ZoneBox({
           showConnectingToggle
             ? h("g", {
                 class: `cg-zone-connfilter-btn${connectingOnly ? " active" : ""}`,
+                role: "button",
+                "aria-pressed": connectingOnly,
+                "aria-label": connectingOnly ? "Show all files" : "Show only cross-zone connecting files",
                 onMouseDown: (e: Event) => e.stopPropagation(),
                 onClick: (e: Event) => { e.stopPropagation(); onToggleConnectingOnly?.(); },
               },
@@ -1434,6 +1441,8 @@ function ZoneBox({
           // Detail button — opens sidebar
           h("g", {
             class: "cg-zone-detail-btn",
+            role: "button",
+            "aria-label": `View ${zone.name} zone details`,
             onClick: (e: Event) => { e.stopPropagation(); onSelectZone(); },
           },
             h("title", null, "View zone details"),

@@ -84,7 +84,12 @@ describe("Graph (Import Graph view)", () => {
     expect(root.querySelector(".ig-type-toggles")).toBeNull();
     expect(root.querySelector("#ig-graph-panel")).not.toBeNull();
     expect(root.textContent).toContain("Codebase map");
-    expect(root.querySelector(".ig-boundary-strip")?.textContent).toContain("Zone A -> Zone B");
+    // The visual "->" arrow is aria-hidden with an sr-only "imports into"
+    // alternative, so match the route parts rather than the raw glyph.
+    const boundaryRoute = root.querySelector(".ig-boundary-route")?.textContent ?? "";
+    expect(boundaryRoute).toContain("Zone A");
+    expect(boundaryRoute).toContain("Zone B");
+    expect(boundaryRoute).toContain("imports into");
     expect(root.textContent).toContain("Zone A");
   });
 
