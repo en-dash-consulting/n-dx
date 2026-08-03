@@ -164,8 +164,12 @@ describe("PRMarkdownView", () => {
     const rawToggle = root.querySelector('button[aria-controls="pr-markdown-panel-raw"]') as HTMLButtonElement | null;
     expect(previewToggle).toBeTruthy();
     expect(rawToggle).toBeTruthy();
-    expect(previewToggle?.getAttribute("aria-pressed")).toBe("true");
-    expect(rawToggle?.getAttribute("aria-pressed")).toBe("false");
+    expect(previewToggle?.getAttribute("aria-selected")).toBe("true");
+    expect(rawToggle?.getAttribute("aria-selected")).toBe("false");
+    expect(previewToggle?.getAttribute("role")).toBe("tab");
+    expect(rawToggle?.getAttribute("role")).toBe("tab");
+    expect(root.querySelector("[role='tablist']")).toBeTruthy();
+    expect(root.querySelector("#pr-markdown-panel-preview")?.getAttribute("role")).toBe("tabpanel");
     expect(root.querySelector(".pr-markdown-preview h2")?.textContent).toBe("Summary");
     expect(root.querySelector(".pr-markdown-preview ul li")?.textContent).toBe("Added tab");
     expect(root.querySelector(".pr-markdown-preview code")?.textContent).toContain("console.log('ok');");
@@ -175,8 +179,9 @@ describe("PRMarkdownView", () => {
     });
     await flushUi();
 
-    expect(previewToggle?.getAttribute("aria-pressed")).toBe("false");
-    expect(rawToggle?.getAttribute("aria-pressed")).toBe("true");
+    expect(previewToggle?.getAttribute("aria-selected")).toBe("false");
+    expect(rawToggle?.getAttribute("aria-selected")).toBe("true");
+    expect(root.querySelector("#pr-markdown-panel-raw")?.getAttribute("role")).toBe("tabpanel");
     expect(root.querySelector(".pr-markdown-preview")).toBeNull();
     expect(root.querySelector(".pr-markdown-raw")?.textContent).toContain("## Summary");
     expect(root.querySelector(".pr-markdown-raw")?.textContent).toContain("```ts");
@@ -204,12 +209,12 @@ describe("PRMarkdownView", () => {
     });
     await flushUi();
 
-    expect(root.querySelector('button[aria-controls="pr-markdown-panel-preview"]')?.getAttribute("aria-pressed")).toBe("false");
-    expect(root.querySelector('button[aria-controls="pr-markdown-panel-raw"]')?.getAttribute("aria-pressed")).toBe("true");
+    expect(root.querySelector('button[aria-controls="pr-markdown-panel-preview"]')?.getAttribute("aria-selected")).toBe("false");
+    expect(root.querySelector('button[aria-controls="pr-markdown-panel-raw"]')?.getAttribute("aria-selected")).toBe("true");
     expect(root.querySelector(".pr-markdown-raw")?.textContent).toContain("## Snapshot");
   });
 
-  it("exposes keyboard-focusable toggle controls with ARIA pressed states", async () => {
+  it("exposes keyboard-focusable tab controls with ARIA selected states", async () => {
     const fetchMock = createFetchMock({ signature: "sig-a11y", availability: "ready" }, "## Accessibility");
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
@@ -219,16 +224,18 @@ describe("PRMarkdownView", () => {
 
     rawToggle.focus();
     expect(document.activeElement).toBe(rawToggle);
-    expect(previewToggle.getAttribute("aria-pressed")).toBe("true");
-    expect(rawToggle.getAttribute("aria-pressed")).toBe("false");
+    expect(previewToggle.getAttribute("aria-selected")).toBe("true");
+    expect(rawToggle.getAttribute("aria-selected")).toBe("false");
+    expect(previewToggle.getAttribute("role")).toBe("tab");
+    expect(rawToggle.getAttribute("role")).toBe("tab");
 
     await act(async () => {
       rawToggle.click();
     });
     await flushUi();
 
-    expect(previewToggle.getAttribute("aria-pressed")).toBe("false");
-    expect(rawToggle.getAttribute("aria-pressed")).toBe("true");
+    expect(previewToggle.getAttribute("aria-selected")).toBe("false");
+    expect(rawToggle.getAttribute("aria-selected")).toBe("true");
   });
 
   it("shows error state when request fails", async () => {

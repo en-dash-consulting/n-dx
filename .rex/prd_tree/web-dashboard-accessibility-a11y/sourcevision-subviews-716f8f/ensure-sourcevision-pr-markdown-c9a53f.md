@@ -2,7 +2,7 @@
 id: "c9a53f95-ecd2-4c20-8bcf-a917668ea7c6"
 level: "task"
 title: "Ensure SourceVision PR markdown tab, file search, and route tree view are fully accessible"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "a11y"
@@ -11,6 +11,9 @@ tags:
   - "file-search"
   - "route-tree"
 source: "smart-add"
+startedAt: "2026-08-03T15:26:37.149Z"
+completedAt: "2026-08-03T15:34:04.826Z"
+endedAt: "2026-08-03T15:34:04.826Z"
 acceptanceCriteria:
   - "PR markdown rendered output preserves the heading hierarchy from the source markdown without injecting new h1s"
   - "Raw/preview toggle uses role='tablist' and role='tab' with aria-selected state"
