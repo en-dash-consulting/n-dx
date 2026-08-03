@@ -5,6 +5,7 @@ interface FilterOption {
   label: string;
   value: string;
   options: Array<{ label: string; value: string }>;
+  onChange?: (value: string) => void;
 }
 
 interface SearchFilterProps {
@@ -45,14 +46,8 @@ export function SearchFilter({
             class: "filter-select",
             value: f.value,
             onChange: (e: Event) => {
-              const opt = f.options.find(
-                (o) => o.value === (e.target as HTMLSelectElement).value
-              );
-              if (opt) {
-                (e.target as HTMLSelectElement).dispatchEvent(
-                  new CustomEvent("filter-change", { detail: opt.value })
-                );
-              }
+              const newValue = (e.target as HTMLSelectElement).value;
+              f.onChange?.(newValue);
             },
           },
             f.options.map((o) =>

@@ -2,7 +2,7 @@
 id: "21d0a1c3-10c5-486b-a712-7a9cc9ab30b3"
 level: "task"
 title: "Make SourceVision findings list, filter controls, and finding detail panels keyboard and screen-reader accessible"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "a11y"
@@ -10,6 +10,9 @@ tags:
   - "findings"
   - "aria"
 source: "smart-add"
+startedAt: "2026-08-03T14:59:13.040Z"
+completedAt: "2026-08-03T15:09:33.366Z"
+endedAt: "2026-08-03T15:09:33.366Z"
 acceptanceCriteria:
   - "Findings are rendered as <li> inside a <ul role='list'> or equivalent semantic list structure"
   - "Filter controls (type, zone, severity) use native <select> elements or ARIA combobox pattern with keyboard support"
