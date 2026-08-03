@@ -1,5 +1,5 @@
 import { h, Fragment } from "preact";
-import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { useState, useEffect, useRef } from "preact/hooks";
 import type { Zone, ZoneCrossing } from "../external.js";
 import { getZoneColorByIndex } from "../visualization/colors.js";
 import { meterClass } from "../visualization/metrics.js";
@@ -51,9 +51,12 @@ export function ZoneSlideout({
     return () => document.removeEventListener("keydown", handleKey);
   }, [zone, onClose]);
 
-  // Focus management: save the previously focused element on open, restore it on close.
+  // Focus management: save trigger on open, restore on close.
+  // Note: previousFocus must be captured before the panel focuses itself, so
+  // we save it in the same effect that focuses the panel (not via ref callback).
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const prevZoneIdRef = useRef<string | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const prevId = prevZoneIdRef.current;
@@ -61,23 +64,20 @@ export function ZoneSlideout({
     prevZoneIdRef.current = currId;
 
     if (currId && !prevId) {
-      // Panel just opened: save the triggering element's focus.
+      // Panel just opened: save the trigger's focus first, then focus the panel.
       previousFocusRef.current = document.activeElement as HTMLElement;
+      panelRef.current?.focus();
     } else if (!currId && prevId) {
       // Panel just closed: restore focus to the trigger.
       requestAnimationFrame(() => previousFocusRef.current?.focus());
     }
   }, [zone]);
 
-  // Focus the panel itself when it opens so keyboard users can interact immediately.
-  const panelRef = useCallback((el: HTMLElement | null) => {
-    if (el) el.focus();
-  }, []);
-
   if (!zone) return null;
 
   const zoneIdx = allZones.indexOf(zone);
   const color = getZoneColorByIndex(zoneIdx >= 0 ? zoneIdx : 0);
+  const titleId = `zone-slideout-title-${zone.id}`;
 
   // Dependencies
   const incoming = crossings.filter((c) => c.toZone === zone.id);
@@ -96,8 +96,9 @@ export function ZoneSlideout({
     h("aside", {
       ref: panelRef,
       class: "zone-slideout open",
-      role: "complementary",
-      "aria-label": `Zone details: ${zone.name}`,
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": titleId,
       tabIndex: -1,
       style: `--zone-accent: ${color}`,
     },
@@ -105,7 +106,7 @@ export function ZoneSlideout({
       h("div", { class: "zone-slideout-header" },
         h("div", { class: "zone-slideout-title" },
           h("span", { class: "zone-slideout-dot", style: `background: ${color}` }),
-          h("h3", null, zone.name),
+          h("h3", { id: titleId }, zone.name),
         ),
         h("button", {
           class: "zone-slideout-close",

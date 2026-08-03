@@ -2,7 +2,7 @@
 id: "9955ef75-9f1b-46cc-bcd0-8fe2cbaef3dc"
 level: "task"
 title: "Make cross-zone connection indicators, zone filters, and the zone detail slideout panel screen-reader accessible"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "a11y"
@@ -11,6 +11,9 @@ tags:
   - "aria"
   - "slideout"
 source: "smart-add"
+startedAt: "2026-08-03T14:24:02.678Z"
+completedAt: "2026-08-03T14:35:30.431Z"
+endedAt: "2026-08-03T14:35:30.431Z"
 acceptanceCriteria:
   - "Cross-zone connection indicator bars have aria-label describing the target zone and connection count for each bar segment"
   - "Zone search/filter input announces result count changes via an aria-live='polite' region (e.g. '12 zones match')"

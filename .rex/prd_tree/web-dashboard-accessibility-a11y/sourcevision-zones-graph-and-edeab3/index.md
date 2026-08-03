@@ -12,6 +12,6 @@ description: "The SourceVision zones view is the most visually complex part of t
 
 | Title | Status |
 |-------|--------|
-| [Make cross-zone connection indicators, zone filters, and the zone detail slideout panel screen-reader accessible](./make-cross-zone-connection-9955ef.md) | pending |
+| [Make cross-zone connection indicators, zone filters, and the zone detail slideout panel screen-reader accessible](./make-cross-zone-connection-9955ef.md) | completed |
 | [Make the SourceVision zone graph keyboard-navigable with ARIA roles and node/edge descriptions](./make-the-sourcevision-zone-704519.md) | pending |
 | [Provide an accessible table/list alternative representation for zone graph data](./provide-an-accessible-table-97c7ba.md) | pending |

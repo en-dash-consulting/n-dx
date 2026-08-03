@@ -184,6 +184,8 @@ export interface XZoneBarSegment {
   y: number;
   h: number;
   color: string;
+  /** Accessible label: "Cross-zone: <zone name>, N call(s)". Undefined when no name map supplied. */
+  label?: string;
 }
 
 /**
@@ -199,6 +201,7 @@ export function buildXZoneBarSegments(
   links: FileZoneLink[] | undefined,
   zoneColorById: Map<string, string>,
   barHeight: number,
+  zoneNameById?: Map<string, string>,
 ): XZoneBarSegment[] {
   if (!links || links.length === 0) return [];
   const resolved = links
@@ -213,7 +216,11 @@ export function buildXZoneBarSegments(
     const y = (cum / total) * barHeight;
     cum += link.weight;
     const yEnd = (cum / total) * barHeight;
-    segments.push({ y, h: yEnd - y, color: zoneColorById.get(link.targetZoneId)! });
+    const zoneName = zoneNameById?.get(link.targetZoneId);
+    const label = zoneName
+      ? `Cross-zone: ${zoneName}, ${link.weight} call${link.weight === 1 ? "" : "s"}`
+      : undefined;
+    segments.push({ y, h: yEnd - y, color: zoneColorById.get(link.targetZoneId)!, label });
   }
   return segments;
 }
@@ -934,6 +941,8 @@ function FileRow({
                   width: 2,
                   height: seg.h,
                   style: `fill: ${seg.color};`,
+                  role: "img",
+                  "aria-label": seg.label ?? "Cross-zone connection",
                 }),
               ),
             )
@@ -944,6 +953,8 @@ function FileRow({
               width: 2,
               height: FILE_ROW_H - 2,
               rx: 1,
+              "aria-label": "Cross-zone file",
+              role: "img",
             }))
       : null,
     h("text", {
@@ -1057,6 +1068,9 @@ function SubZoneRow({
 
   return h("g", {
     class: `cg-subzone-row${expanded ? " expanded" : ""}`,
+    role: "button",
+    "aria-expanded": expanded,
+    "aria-label": `${expanded ? "Collapse" : "Expand"} sub-zone: ${subZone.name}`,
     style: `--zone-color: ${subZone.color}`,
     onClick: (e: Event) => { e.stopPropagation(); onToggle(); },
   },
@@ -1175,7 +1189,7 @@ function ZoneBox({
           searchMatch: searchQ ? isMatch : false,
           hasCrossZone,
           active: activeFilePath === file.path,
-          xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2),
+          xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2, zoneNameById),
           tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
           onClick: () => onSelectFile(file.path),
           onDblClick: () => onDblClickFile(file.path),
@@ -1234,7 +1248,7 @@ function ZoneBox({
               searchMatch: searchQ ? matchingFiles.has(file.path) : false,
               hasCrossZone,
               active: activeFilePath === file.path,
-              xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2),
+              xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2, zoneNameById),
               tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
               onClick: () => onSelectFile(file.path),
               onDblClick: () => onDblClickFile(file.path),
@@ -1314,6 +1328,9 @@ function ZoneBox({
     ),
     h("g", {
       class: "cg-zone-toggle-btn",
+      role: "button",
+      "aria-expanded": expanded,
+      "aria-label": expanded ? "Collapse zone" : "Expand zone",
       onMouseDown: (e: Event) => e.stopPropagation(),
       onClick: (e: Event) => { e.stopPropagation(); onToggle(); },
       style: "cursor: pointer;",
