@@ -2,7 +2,7 @@
 id: "582769c3-90f7-4524-afe5-8fe3c7e4dc67"
 level: "task"
 title: "Make SourceVision import graph and context graph visualizations accessible with keyboard navigation and text alternatives"
-status: "pending"
+status: "in_progress"
 priority: "high"
 tags:
   - "a11y"
@@ -11,6 +11,7 @@ tags:
   - "context-graph"
   - "keyboard-nav"
 source: "smart-add"
+startedAt: "2026-08-03T15:10:30.060Z"
 acceptanceCriteria:
   - "Import graph SVG nodes are Tab-reachable and have aria-label describing file path, zone, and import count"
   - "Arrow keys traverse connected nodes in the import graph from a focused node"

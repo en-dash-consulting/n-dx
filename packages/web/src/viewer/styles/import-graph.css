@@ -2133,3 +2133,94 @@
     max-height: 210px;
   }
 }
+
+/* ── Keyboard accessibility — SVG node focus ring ──────────────────────── */
+
+.ig-node:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ── Import edge table view (accessible alternative to dep SVG) ─────────── */
+
+.ig-table-section {
+  margin: 8px 0 12px;
+}
+
+.ig-table-wrapper {
+  margin: 0;
+}
+
+.ig-table-caption {
+  caption-side: top;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding-bottom: 4px;
+}
+
+.ig-table-empty {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 20px 0;
+  font-style: italic;
+}
+
+.ig-table-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  background: none;
+  padding: 0;
+  color: inherit;
+  max-width: min(44vw, 480px);
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.ig-table-type-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--text-dim) 15%, transparent);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.ig-table-type-static {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+.ig-table-type-dynamic {
+  background: color-mix(in srgb, var(--orange) 18%, transparent);
+  color: var(--orange);
+}
+
+.ig-table-type-re-export {
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+  color: var(--green);
+}
+
+.ig-table-type-type-only {
+  background: color-mix(in srgb, var(--text-dim) 12%, transparent);
+  color: var(--text-dim);
+}
+
+/* ── Visually-hidden live region (announces visible node/edge count) ─────── */
+
+.ig-a11y-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

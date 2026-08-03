@@ -327,6 +327,96 @@ function layoutZoneMapNodes<T extends { id: string; n: number; group?: string }>
   return { nodes, width, height };
 }
 
+// ── Import edge table view ────────────────────────────────────────────────────
+//
+// Accessible alternative to the SVG focused dep graph. Shows the same data
+// (source file → imported file, import type) in a sortable <table> so
+// keyboard and screen-reader users can explore the graph without SVG interactions.
+
+function ImportEdgeTableView({
+  edges,
+  mode,
+  focusFile,
+  focusPackage,
+  packageFiles,
+}: {
+  edges: Array<{ from: string; to: string; type: string }>;
+  mode: "file" | "package";
+  focusFile: string | null;
+  focusPackage: string | null;
+  packageFiles: string[];
+}) {
+  const [sortCol, setSortCol] = useState<"source" | "imported" | "type">("source");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const toggleSort = (col: typeof sortCol) => {
+    if (sortCol === col) setSortAsc((v) => !v);
+    else { setSortCol(col); setSortAsc(true); }
+  };
+
+  const thKeyDown = (col: typeof sortCol) => (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(col); }
+  };
+
+  // In package mode, synthesise rows from the importer list
+  const rows = useMemo(() => {
+    const rawRows: Array<{ source: string; imported: string; type: string }> =
+      mode === "package" && focusPackage
+        ? packageFiles.map((f) => ({ source: f, imported: focusPackage, type: "static" }))
+        : edges.map((e) => ({ source: e.from, imported: e.to, type: e.type }));
+
+    return [...rawRows].sort((a, b) => {
+      let cmp = 0;
+      if (sortCol === "source") cmp = a.source.localeCompare(b.source);
+      else if (sortCol === "imported") cmp = a.imported.localeCompare(b.imported);
+      else cmp = a.type.localeCompare(b.type);
+      return sortAsc ? cmp : -cmp;
+    });
+  }, [edges, mode, focusPackage, packageFiles, sortCol, sortAsc]);
+
+  const ariaSort = (col: typeof sortCol): "ascending" | "descending" | "none" =>
+    sortCol !== col ? "none" : sortAsc ? "ascending" : "descending";
+
+  const sortArrow = (col: typeof sortCol) =>
+    sortCol !== col ? "" : (sortAsc ? " ▲" : " ▼");
+
+  const captionId = "ig-table-caption";
+  const scopeLabel = mode === "package" && focusPackage
+    ? `Importers of ${focusPackage}`
+    : focusFile
+      ? `Imports for ${focusFile}`
+      : "Import edges";
+
+  return h("div", { class: "data-table-wrapper ig-table-wrapper" },
+    h("table", {
+      class: "data-table ig-table",
+      "aria-labelledby": captionId,
+    },
+      h("caption", { id: captionId, class: "ig-table-caption" },
+        `${scopeLabel} — ${rows.length} edge${rows.length !== 1 ? "s" : ""}`,
+      ),
+      h("thead", null,
+        h("tr", null,
+          h("th", { scope: "col", "aria-sort": ariaSort("source"), onClick: () => toggleSort("source"), tabIndex: 0, onKeyDown: thKeyDown("source") }, `Source File${sortArrow("source")}`),
+          h("th", { scope: "col", "aria-sort": ariaSort("imported"), onClick: () => toggleSort("imported"), tabIndex: 0, onKeyDown: thKeyDown("imported") }, `Imported File${sortArrow("imported")}`),
+          h("th", { scope: "col", "aria-sort": ariaSort("type"), onClick: () => toggleSort("type"), tabIndex: 0, onKeyDown: thKeyDown("type") }, `Import Type${sortArrow("type")}`),
+        ),
+      ),
+      h("tbody", null,
+        rows.length === 0
+          ? h("tr", null, h("td", { colSpan: 3, class: "ig-table-empty" }, "No import edges in the current view."))
+          : rows.map((row, i) =>
+              h("tr", { key: `${row.source}->${row.imported}:${row.type}:${i}` },
+                h("td", null, h("code", { class: "ig-table-path", title: row.source }, row.source)),
+                h("td", null, h("code", { class: "ig-table-path", title: row.imported }, row.imported)),
+                h("td", null, h("span", { class: `ig-table-type-badge ig-table-type-${row.type}` }, row.type)),
+              ),
+            ),
+      ),
+    ),
+  );
+}
+
 export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphProps) {
   const { imports, zones, inventory } = data;
   const pageRef = useRef<HTMLDivElement | null>(null);
@@ -336,7 +426,11 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
   const suppressNodeClickRef = useRef(false);
 
   const [mode, setMode] = useState<"file" | "package">("file");
+  /** Graph vs table toggle for the accessible alternative dep view. */
+  const [depViewMode, setDepViewMode] = useState<"graph" | "table">("graph");
   const [focusFile, setFocusFile] = useState<string | null>(null);
+  // Keyboard navigation refs for the focused dep SVG nodes
+  const depNodeRefs = useRef(new Map<string, Element>());
   const [focusPackage, setFocusPackage] = useState<string | null>(null);
   const [focusSource, setFocusSource] = useState<FocusSource>({ kind: "default" });
   const [zoneFilter, setZoneFilter] = useState<string>("");
@@ -1292,6 +1386,33 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
   const graphEdgeCount = edgePaths.length;
   const graphCrossEdgeCount = edgePaths.filter((edge) => edge.cross).length;
 
+  // ── Keyboard navigation adjacency for dep SVG nodes ────────────────────────
+  // Undirected neighbour list so arrow keys traverse connected nodes. Built
+  // from edgePaths (which already contains only the visible edges).
+  const depAdjacency = useMemo(() => {
+    const adj = new Map<string, string[]>();
+    if (!layoutNodes) return adj;
+    for (const n of layoutNodes) adj.set(n.id, []);
+    for (const ep of edgePaths) {
+      if (!ep.fromId || !ep.toId) continue;
+      const fromList = adj.get(ep.fromId);
+      const toList = adj.get(ep.toId);
+      if (fromList && !fromList.includes(ep.toId)) fromList.push(ep.toId);
+      if (toList && !toList.includes(ep.fromId)) toList.push(ep.fromId);
+    }
+    return adj;
+  }, [layoutNodes, edgePaths]);
+
+  const handleDepNodeArrow = useCallback((nodeId: string, e: KeyboardEvent) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const connIds = depAdjacency.get(nodeId) ?? [];
+    if (connIds.length === 0) return;
+    const forward = e.key === "ArrowRight" || e.key === "ArrowDown";
+    const targetId = forward ? connIds[0] : connIds[connIds.length - 1];
+    (depNodeRefs.current.get(targetId) as HTMLElement | null)?.focus();
+  }, [depAdjacency]);
+
   // ── Hover spotlight: derive which edges/nodes to highlight or dim based on
   // the current hoverEdgeKey / hoverGraphNode. Hovering an edge spotlights
   // that single edge + its two endpoints; hovering a node spotlights every
@@ -1865,6 +1986,33 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
               onClick: () => moveFocusHistory(1),
             }, "Forward"),
           ),
+          // Graph/Table toggle for keyboard-accessible alternative view
+          h("div", {
+            class: "zone-view-toggle ig-dep-view-toggle",
+            role: "group",
+            "aria-label": "Import graph display mode",
+          },
+            h("button", {
+              type: "button",
+              class: `zone-view-btn${depViewMode === "graph" ? " active" : ""}`,
+              onClick: () => setDepViewMode("graph"),
+              "aria-pressed": depViewMode === "graph",
+              "aria-label": "Switch to graph view",
+            }, "Graph"),
+            h("button", {
+              type: "button",
+              class: `zone-view-btn${depViewMode === "table" ? " active" : ""}`,
+              onClick: () => setDepViewMode("table"),
+              "aria-pressed": depViewMode === "table",
+              "aria-label": "Switch to table view",
+            }, "Table"),
+          ),
+          // Visually hidden live region: announces node/edge count when filtered
+          h("div", {
+            class: "ig-a11y-live",
+            "aria-live": "polite",
+            "aria-atomic": "true",
+          }, `${graphNodeCount} node${graphNodeCount !== 1 ? "s" : ""}, ${graphEdgeCount} import${graphEdgeCount !== 1 ? "s" : ""} visible`),
           streetViewMode === "dialog"
             ? h("button", {
                 type: "button",
@@ -1878,7 +2026,19 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
               ? h("span", { class: "ig-focus-chip ig-focus-chip-pkg", title: focusPackage }, focusPackage)
               : null,
         ),
-        h("div", { class: "ig-svg-wrap", key: "svg" },
+        depViewMode === "table"
+          ? h("div", { class: "ig-table-section", key: "table" },
+              h(ImportEdgeTableView, {
+                edges: mode === "file" ? (subgraph?.edges ?? []) : [],
+                mode,
+                focusFile,
+                focusPackage,
+                packageFiles: packageSubgraph?.files ?? [],
+              }),
+            )
+          : null,
+        depViewMode === "graph"
+          ? h("div", { class: "ig-svg-wrap", key: "svg" },
           h("svg", {
             viewBox: `0 0 ${svgW} ${svgH}`,
             preserveAspectRatio: "xMidYMid meet",
@@ -1992,8 +2152,25 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                       (isDimmed ? " ig-node-dim" : ""),
                     transform: `translate(${pos.x - w / 2},${pos.y - hgt / 2})`,
                     title: tip,
+                    "tabindex": 0,
+                    role: "button",
+                    "aria-label": n.kind === "file"
+                      ? `${n.id}, zone: ${zones?.zones.find((z) => z.id === fileToZoneId(n.id, zones))?.name ?? "unzoned"}, ${inDegree.get(n.id) ?? 0} importing, ${outDegree.get(n.id) ?? 0} outgoing`
+                      : `${n.label} package`,
+                    ref: (el: Element | null) => {
+                      if (el) depNodeRefs.current.set(n.id, el);
+                      else depNodeRefs.current.delete(n.id);
+                    },
                     onMouseEnter: () => setHoverGraphNode(n.id),
                     onMouseLeave: () => setHoverGraphNode((cur) => (cur === n.id ? null : cur)),
+                    onKeyDown: (ev: KeyboardEvent) => {
+                      if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        if (n.kind === "file") handleFileClick(n.id);
+                      } else {
+                        handleDepNodeArrow(n.id, ev);
+                      }
+                    },
                     onPointerDown: (ev: PointerEvent) => {
                       ev.stopPropagation();
                       (ev.currentTarget as Element).setPointerCapture?.(ev.pointerId);
@@ -2035,7 +2212,7 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
                 `Showing 48 of ${packageSubgraph.files.length} importers. Narrow the file list or choose another package.`,
               )
             : null,
-        ),
+        ) : null,
         streetViewMode === "dialog" && mode === "file" && focusFile
           ? h("div", { class: "ig-street-detail", key: "detail" },
               h("span", null, focusZoneName ?? "Unzoned"),
