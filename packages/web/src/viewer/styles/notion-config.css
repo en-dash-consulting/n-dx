@@ -183,6 +183,16 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .notion-status-dot-testing {
+    animation: none;
+  }
+
+  .notion-config-toast {
+    animation: none;
+  }
+}
+
 /* ── Form fields ───────────────────────────────────────────────────── */
 
 .notion-config-field {

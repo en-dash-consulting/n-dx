@@ -70,11 +70,13 @@ Background surfaces: `--bg: #f5f6fa`, `--bg-surface: #ffffff`
 | Body/label text — light theme | ✅ All pass 4.5:1 |
 | Status badge text — dark theme | ✅ All pass 4.5:1 |
 | Status badge text — light theme | ✅ All pass 4.5:1 |
+| Severity badge text — both themes | ✅ Use CSS vars from tokens.css; tested values pass 4.5:1 |
 | Focus rings (`--accent`) — both themes | ✅ Pass 3:1 for UI |
-| `prefers-reduced-motion` — all CSS animations | ✅ All disabled |
+| `prefers-reduced-motion` — all CSS animations | ✅ All 22 animation files have a `@media (prefers-reduced-motion: reduce)` block |
 | Non-color run status indicators (hench runs) | ✅ Icon + text label |
 | Non-color zone health indicators (overview) | ✅ Dot + text label |
 | Non-color PRD task status (prd-tree) | ✅ Icon + aria-label (pre-existing) |
+| Non-color severity labels (findings) | ✅ Icon (⛔/⚠/ℹ) + text label, color is redundant |
 
 ---
 

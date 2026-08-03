@@ -359,6 +359,12 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .rex-dash-start-error {
+    animation: none;
+  }
+}
+
 /* ── Smart Add (dashboard) ────────────────────────────────────────── */
 
 .rex-dash-smart-add {
@@ -758,6 +764,16 @@
 @keyframes reorg-slide-in {
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reorg-overlay {
+    animation: none;
+  }
+
+  .reorg-panel {
+    animation: none;
+  }
 }
 
 .reorg-panel {

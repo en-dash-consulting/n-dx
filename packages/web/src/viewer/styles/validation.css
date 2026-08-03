@@ -67,6 +67,13 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .val-panel,
+  .dep-panel {
+    animation: none;
+  }
+}
+
 .val-actions {
   display: flex;
   align-items: center;

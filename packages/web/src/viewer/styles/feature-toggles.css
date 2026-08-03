@@ -355,6 +355,12 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .ft-toast {
+    animation: none;
+  }
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────── */
 
 @media (max-width: 700px) {

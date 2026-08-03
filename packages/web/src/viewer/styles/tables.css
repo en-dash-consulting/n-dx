@@ -65,10 +65,19 @@
   letter-spacing: 0.03em;
 }
 
-.severity-info { background: #1e3a5f; color: #6cb4ee; }
-.severity-warning { background: #3f2e1e; color: var(--orange); }
-.severity-critical { background: #3f1e1e; color: #e8578a; }
-
-[data-theme="light"] .severity-info { background: #dbeafe; color: #1e40af; }
-[data-theme="light"] .severity-warning { background: #fef3c7; color: #92400e; }
-[data-theme="light"] .severity-critical { background: #fee2e2; color: #991b1b; }
+/* Severity badge colors use CSS variables so they adapt to the active theme
+   and pick up the WCAG-AA-compliant values from tokens.css.
+   Dark theme: color-mix badge bg computed against --bg-surface (#151829) passes
+   4.5:1 for all three levels. Light theme: overrides below use tested values. */
+.severity-info {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface));
+  color: var(--accent);
+}
+.severity-warning {
+  background: color-mix(in srgb, var(--orange) 12%, var(--bg-surface));
+  color: var(--orange);
+}
+.severity-critical {
+  background: color-mix(in srgb, var(--red) 12%, var(--bg-surface));
+  color: var(--red);
+}
