@@ -2,7 +2,7 @@
 id: "b0d38827-f7b8-4b35-8662-d36bcb6109d8"
 level: "task"
 title: "Integrate automated a11y regression tests into CI and document screen-reader compatibility"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "a11y"
@@ -10,6 +10,9 @@ tags:
   - "ci"
   - "documentation"
 source: "smart-add"
+startedAt: "2026-08-03T15:49:57.012Z"
+completedAt: "2026-08-03T16:02:34.291Z"
+endedAt: "2026-08-03T16:02:34.291Z"
 acceptanceCriteria:
   - "Axe-core integration tests run against every major dashboard route in CI (zones, findings, import graph, PR tab, Rex PRD tree, hench monitor, settings)"
   - "CI fails if any axe violation of severity 'critical' or 'serious' is introduced"
