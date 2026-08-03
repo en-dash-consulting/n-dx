@@ -2,7 +2,7 @@
 id: "97c7baaf-7e49-4f31-aa3b-39c70dc984ac"
 level: "task"
 title: "Provide an accessible table/list alternative representation for zone graph data"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "a11y"
@@ -10,6 +10,9 @@ tags:
   - "zones"
   - "screen-reader"
 source: "smart-add"
+startedAt: "2026-08-03T14:50:21.880Z"
+completedAt: "2026-08-03T14:57:35.909Z"
+endedAt: "2026-08-03T14:57:35.909Z"
 acceptanceCriteria:
   - "A visible 'Switch to table view' / 'Switch to graph view' toggle button is accessible from the zones page without reaching the graph first"
   - "The table view lists all visible zones with columns: Zone Name, Files, Cohesion, Coupling, Top Connections, Findings"
