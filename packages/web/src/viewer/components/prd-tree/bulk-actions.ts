@@ -131,6 +131,7 @@ export function BulkActions({ selectedIds, onClearSelection, onActionComplete, o
       class: "rex-bulk-clear",
       onClick: onClearSelection,
       title: "Clear selection",
+      "aria-label": "Clear selection",
     }, "\u00d7"),
   );
 }

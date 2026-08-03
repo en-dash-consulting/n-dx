@@ -256,7 +256,7 @@ export function ZoneDetail({ zone, crossings, allZones, onClose, onFileClick }: 
     h("div", { class: "zone-detail-panel", style: `--zone-color: ${color}` },
       h("div", { class: "zone-detail-header" },
         h("h3", null, zone.name),
-        h("button", { class: "close-btn", onClick: onClose }, "\u2715")
+        h("button", { class: "close-btn", onClick: onClose, "aria-label": "Close zone detail", title: "Close" }, "\u2715")
       ),
 
       h("p", { class: "zone-detail-desc" }, zone.description),
