@@ -2,7 +2,7 @@
 id: "029054d3-c481-489b-9ef2-c59f79dce26c"
 level: "task"
 title: "Add ARIA live regions for real-time UI updates and label all icon-only interactive elements across the dashboard"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "a11y"
@@ -14,6 +14,9 @@ tags:
   - "aria"
   - "web-viewer"
 source: "smart-add"
+startedAt: "2026-08-03T13:41:27.260Z"
+completedAt: "2026-08-03T13:55:52.207Z"
+endedAt: "2026-08-03T13:55:52.207Z"
 acceptanceCriteria:
   - "A visually hidden aria-live='polite' region in the hench monitor announces task start, completion, and transition events"
   - "Hench run failure and auth error states are announced via aria-live='assertive' within one polling cycle"

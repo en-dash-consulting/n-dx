@@ -12,5 +12,5 @@ description: "The dashboard uses SSE/polling to push real-time updates to the UI
 
 | Title | Status |
 |-------|--------|
-| [Add ARIA live regions for real-time UI updates and label all icon-only interactive elements across the dashboard](./add-aria-live-regions-for-real-029054.md) | pending |
+| [Add ARIA live regions for real-time UI updates and label all icon-only interactive elements across the dashboard](./add-aria-live-regions-for-real-029054.md) | completed |
 | [Integrate automated a11y regression tests into CI and document screen-reader compatibility](./integrate-automated-a11y-b0d388.md) | pending |
