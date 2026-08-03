@@ -191,3 +191,10 @@
   fill: none;
   stroke-linecap: round;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .collapsible-chevron,
+  .tree-chevron {
+    transition: none;
+  }
+}

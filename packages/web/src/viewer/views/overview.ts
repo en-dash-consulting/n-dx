@@ -304,6 +304,9 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
                 const healthColor = zone.cohesion >= 0.7 ? "var(--green)"
                   : zone.cohesion >= 0.4 ? "var(--orange)"
                   : "var(--red)";
+                const healthLabel = zone.cohesion >= 0.7 ? "Good"
+                  : zone.cohesion >= 0.4 ? "Fair"
+                  : "Poor";
 
                 return h("div", {
                   key: zone.id,
@@ -314,10 +317,13 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
                   h("span", { class: "zone-name" }, zone.name),
                   h("span", { class: "zone-files" }, `${zone.files.length} files`),
                   h("span", {
-                    class: "health-dot",
-                    style: `background: ${healthColor}`,
+                    class: "top-zone-health",
                     title: `Cohesion: ${zone.cohesion.toFixed(2)} / Coupling: ${zone.coupling.toFixed(2)}`,
-                  })
+                    style: `color: ${healthColor}`,
+                  },
+                    h("span", { class: "health-dot", style: `background: ${healthColor}`, "aria-hidden": "true" }),
+                    h("span", { class: "health-label" }, healthLabel),
+                  )
                 );
               })
             ),

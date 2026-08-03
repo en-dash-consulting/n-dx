@@ -134,6 +134,18 @@ function getStatusConfig(status: string) {
   return STATUS_CONFIG[status] ?? { icon: "○", label: status, color: "var(--text-dim)" };
 }
 
+/** Maps a run status to the corresponding .status-badge--* CSS class. */
+function getStatusBadgeClass(status: string): string {
+  const map: Record<string, string> = {
+    completed: "completed",
+    failed: "failed",
+    error: "failed",
+    running: "running",
+    in_progress: "running",
+  };
+  return map[status] ?? "pending";
+}
+
 const TOKEN_DIAG_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
   complete: { icon: "●", label: "Complete", color: "var(--green)" },
   partial: { icon: "◐", label: "Partial", color: "var(--orange)" },
@@ -335,10 +347,13 @@ function RunCard({ run, isSelected, isHighlighted, onClick, navigateTo, cardRef 
     // Top row: status + task link + timestamp
     h("div", { class: "hench-run-header" },
       h("span", {
-        class: "hench-run-status",
-        style: `color: ${status.color}`,
-        title: status.label,
-      }, status.icon),
+        class: `status-badge status-badge--${getStatusBadgeClass(run.status)}`,
+        "aria-label": status.label,
+      },
+        h("span", { "aria-hidden": "true" }, status.icon),
+        " ",
+        status.label,
+      ),
       navigateTo && run.taskId
         ? h(RexTaskLink, {
             task: {
@@ -444,9 +459,13 @@ function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: ()
       ),
       h("div", { class: "hench-detail-title-row" },
         h("span", {
-          class: "hench-run-status",
-          style: `color: ${status.color}; font-size: 18px`,
-        }, status.icon),
+          class: `status-badge status-badge--${getStatusBadgeClass(run.status)} hench-detail-status-badge`,
+          "aria-label": status.label,
+        },
+          h("span", { "aria-hidden": "true" }, status.icon),
+          " ",
+          status.label,
+        ),
         h("h2", null, run.taskTitle),
       ),
     ),

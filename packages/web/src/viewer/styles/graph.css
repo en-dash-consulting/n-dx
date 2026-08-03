@@ -354,3 +354,38 @@
 @media (pointer: coarse) {
   .graph-node circle { stroke-width: 2px; }
 }
+
+/* ── Prefers-reduced-motion ──────────────────────────────────────────
+   Disable animations and transitions for users who prefer reduced motion.
+   ─────────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .graph-node,
+  .graph-link {
+    transition: none;
+  }
+
+  .zone-hull {
+    transition: none;
+  }
+
+  .graph-label-toggle,
+  .graph-zone-toggle,
+  .graph-zoom-btn {
+    transition: none;
+  }
+
+  .graph-legend-item {
+    transition: none;
+  }
+
+  .graph-search-ring {
+    animation: none;
+  }
+
+  .refresh-toast {
+    animation: none;
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}

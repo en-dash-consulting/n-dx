@@ -484,6 +484,14 @@
   margin: 0;
 }
 
+/* Status badge shown in the detail view title row — slightly larger than the
+   list badge to match the h2 context, but still uses the shared badge styles */
+.hench-detail-status-badge {
+  font-size: var(--font-sm);
+  padding: 3px 10px;
+  flex-shrink: 0;
+}
+
 /* Info grid */
 .hench-detail-info {
   background: var(--bg-surface);
@@ -2259,4 +2267,28 @@
   background: color-mix(in srgb, var(--red) 8%, transparent);
   color: var(--red);
   font-size: var(--font-xs);
+}
+
+/* ── Prefers-reduced-motion ─────────────────────────────────────────────
+   Disable all pulse/spin/highlight animations for users who have
+   opted into reduced motion at the OS level.
+   ────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .active-tasks-icon,
+  .active-task-pulse,
+  .active-task-pulse-stale,
+  .active-task-pulse-starting,
+  .hench-run-highlighted,
+  .concurrency-icon-moderate,
+  .concurrency-icon-high,
+  .concurrency-icon-at_limit,
+  .concurrency-bar-at_limit,
+  .throttle-icon-paused,
+  .memory-icon-warning,
+  .memory-icon-critical,
+  .memory-bar-critical,
+  .ws-health-icon-unhealthy {
+    animation: none;
+  }
 }
