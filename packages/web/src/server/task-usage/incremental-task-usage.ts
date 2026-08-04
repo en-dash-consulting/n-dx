@@ -103,12 +103,12 @@ export class IncrementalTaskUsageAggregator {
    * The caller MUST `await getTaskUsage()` first (or call `refresh()`
    * indirectly) to ensure the cache reflects the current filesystem.
    */
-  getFileContributions(): Array<{ itemId: string; tokens: { input: number; output: number; cached: number; total: number } }> {
-    const out: Array<{ itemId: string; tokens: { input: number; output: number; cached: number; total: number } }> = [];
+  getFileContributions(): Array<{ itemId: string; tokens: { input: number; output: number; cacheCreation: number; cacheRead: number; total: number } }> {
+    const out: Array<{ itemId: string; tokens: { input: number; output: number; cacheCreation: number; cacheRead: number; total: number } }> = [];
     for (const c of this.fileContributions.values()) {
       out.push({
         itemId: c.taskId,
-        tokens: { input: 0, output: 0, cached: 0, total: c.totalTokens },
+        tokens: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0, total: c.totalTokens },
       });
     }
     return out;

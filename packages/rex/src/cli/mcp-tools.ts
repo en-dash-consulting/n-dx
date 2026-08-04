@@ -801,10 +801,11 @@ export async function handleGetTokenUsage(
       (acc, o) => ({
         input: acc.input + o.tokens.input,
         output: acc.output + o.tokens.output,
-        cached: acc.cached + o.tokens.cached,
+        cacheCreation: acc.cacheCreation + o.tokens.cacheCreation,
+        cacheRead: acc.cacheRead + o.tokens.cacheRead,
         total: acc.total + o.tokens.total,
       }),
-      { input: 0, output: 0, cached: 0, total: 0 },
+      { input: 0, output: 0, cacheCreation: 0, cacheRead: 0, total: 0 },
     );
 
     return textResult(
