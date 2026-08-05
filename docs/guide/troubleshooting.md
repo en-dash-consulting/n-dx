@@ -2,6 +2,55 @@
 
 Common issues and how to fix them. If your issue isn't listed here, use the `/ndx-feedback` skill in your assistant (Claude Code or Codex) to report it — it'll file a GitHub issue with your environment details automatically.
 
+## `ERR_MODULE_NOT_FOUND` on every `ndx` command
+
+**Problem**: Any `ndx` command crashes immediately with a stack trace like:
+
+```
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module
+'.../node_modules/assistant-assets/index.js' imported from
+'.../node_modules/@n-dx/core/claude-integration.js'
+```
+
+**Cause**: You are on `@n-dx/core` 0.3.x, which shipped with an import path that
+escaped the published tarball. The referenced file was never included, so Node
+fails while linking the module graph — before any `ndx` code runs. Fixed in
+0.4.0.
+
+Reinstalling alone often does **not** help. pnpm records a caret range in its
+global manifest, and for 0.x versions `^0.3.1` means `>=0.3.1 <0.4.0` — so
+`pnpm add -g @n-dx/core` and `pnpm update -g` both re-resolve inside the broken
+0.3 line and can never reach the fix.
+
+**Fix**: reinstall with an explicit `@latest` tag, which pins past the recorded
+range:
+
+```sh
+# pnpm — remove first so the stale caret range is dropped from the manifest
+pnpm remove -g @n-dx/core
+pnpm add -g @n-dx/core@latest
+
+# npm
+npm i -g @n-dx/core@latest
+```
+
+Then confirm the version actually changed:
+
+```sh
+ndx --version    # expect 0.4.0 or newer
+```
+
+Two things to watch for:
+
+- **Run these from outside an n-dx checkout.** The repo's `.npmrc` sets
+  `minimum-release-age`, and pnpm reads a local `.npmrc` even for `-g`
+  operations — from inside the repo it will refuse recent releases.
+- **Don't switch package managers to upgrade.** Installing with npm when your
+  existing global install came from pnpm leaves *two* `ndx` shims on `PATH`.
+  Whichever resolves first wins, so `ndx --version` can keep reporting the old
+  version even though the upgrade succeeded. Upgrade with the same manager you
+  installed with, or remove the other install first.
+
 ## "Unknown command" when running rex/sourcevision/hench commands
 
 **Problem**: Running `rex plan` or `sourcevision init` fails with "unknown command."
