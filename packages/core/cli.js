@@ -65,6 +65,7 @@ import {
   validateRefreshCompletion,
   rollbackRefreshState,
 } from "./refresh-validate.js";
+import { handleInstallSample, handleDestroySample } from "./sample-app.js";
 
 const CLI_ERROR_CODES = Object.freeze({
   NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
@@ -2515,6 +2516,8 @@ const COMMAND_DISPATCH = new Map([
   ["start",             (rest) => handleStart(rest, "start")],
   ["web",               (rest) => handleStart(rest, "web")],
   ["export",            handleExport],
+  ["install-sample",    handleInstallSample],
+  ["destroy-sample",    handleDestroySample],
   ["config",            handleConfig],
   ["auth",              handleAuth],
   ["self-heal",         handleSelfHeal],

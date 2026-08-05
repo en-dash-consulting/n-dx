@@ -14,6 +14,144 @@ import { useCliName } from "../hooks/index.js";
 
 type OpState = "idle" | "running" | "done" | "error";
 
+// ── Sample App Panel ───────────────────────────────────────────────────
+
+function InstallSamplePanel() {
+  const [state, setState] = useState<OpState>("idle");
+  const [output, setOutput] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [stepMessage, setStepMessage] = useState<string>("");
+  const [activeAction, setActiveAction] = useState<"install" | "destroy" | null>(null);
+  const [isInstalled, setIsInstalled] = useState<boolean | null>(null);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/commands/sample-status");
+      const data = await res.json() as { isInstalled: boolean };
+      if (res.ok) {
+        setIsInstalled(data.isInstalled);
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
+  const handleAction = useCallback(async (action: "install" | "destroy") => {
+    setState("running");
+    setActiveAction(action);
+    setError(null);
+    setOutput(null);
+
+    // Progressive UI feedback steps
+    const steps = action === "install"
+      ? ["Initializing sandbox...", "Creating webapp files...", "Generating sample PRD trees...", "Finalizing setup..."]
+      : ["Cleaning up source files...", "Pruning PRD trees...", "Removing sandbox environment..."];
+
+    let stepIndex = 0;
+    setStepMessage(steps[0]);
+
+    const stepInterval = setInterval(() => {
+      stepIndex++;
+      if (stepIndex < steps.length) {
+        setStepMessage(steps[stepIndex]);
+      }
+    }, 600); // 600ms per step to make the loading indicator noticeable
+
+    try {
+      // Intentionally slowing down the fetch slightly to let the animation play out
+      const [res] = await Promise.all([
+        fetch(`/api/commands/${action}-sample`, { method: "POST" }),
+        new Promise(resolve => setTimeout(resolve, steps.length * 600))
+      ]);
+
+      clearInterval(stepInterval);
+      const data = await res.json() as Record<string, unknown>;
+
+      if (!res.ok) {
+        throw new Error((data.error as string) || `HTTP ${res.status}`);
+      }
+
+      setOutput((data.output as string) || `${action === "install" ? "Install" : "Destroy"} complete.`);
+      setState("done");
+      fetchStatus();
+    } catch (err) {
+      clearInterval(stepInterval);
+      setError(String(err));
+      setState("error");
+    } finally {
+      setActiveAction(null);
+    }
+  }, [fetchStatus]);
+
+  return h("div", { class: "cmd-panel" },
+    h("div", { class: "cmd-panel-header" },
+      h("h3", { class: "cmd-panel-title" }, "✨ Sample App"),
+      h("p", { class: "cmd-panel-desc" },
+        "Install a safe, easily destroyable sample web application to quickly explore and understand how n-dx manages PRDs and codebase analysis."
+      ),
+      isInstalled !== null
+        ? h("div", { 
+            style: `display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; font-size: 0.85em; font-weight: 500; margin-top: 12px; background: ${isInstalled ? "var(--color-bg-success)" : "var(--color-bg-subtle)"}; color: ${isInstalled ? "var(--color-text-success)" : "var(--color-text-muted)"}; border: 1px solid ${isInstalled ? "var(--color-border-success)" : "var(--color-border)"}` 
+          },
+            h("span", { style: "font-size: 1.2em;" }, isInstalled ? "✓" : "○"),
+            isInstalled ? "Sample App is installed" : "Sample App is not installed"
+          )
+        : null
+    ),
+
+    h("div", { class: "cmd-panel-actions" },
+      h("button", {
+        class: "cmd-btn cmd-btn-primary",
+        onClick: () => handleAction("install"),
+        disabled: state === "running" || isInstalled === true,
+      }, state === "running" && activeAction === "install" ? "Installing..." : "Install Sample App"),
+      h("button", {
+        class: "cmd-btn cmd-btn-danger",
+        onClick: () => handleAction("destroy"),
+        disabled: state === "running" || isInstalled === false,
+        style: "margin-left: 12px",
+      }, state === "running" && activeAction === "destroy" ? "Destroying..." : "Destroy Sample App"),
+    ),
+
+    isInstalled === true && h("div", { 
+      style: "margin-top: 16px; padding: 14px; background: var(--color-bg-subtle); border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.9em;"
+    },
+      h("h4", { style: "margin: 0 0 8px 0; color: var(--color-text); font-size: 1.05em; display: flex; align-items: center; gap: 6px;" }, "🚀 Next Steps"),
+      h("p", { style: "margin: 0 0 12px 0; color: var(--color-text-muted);" }, "The sample app has been generated in a new `sample-app/` directory along with a dummy PRD! Open your terminal and run the following commands to see n-dx in action:"),
+      h("pre", { style: "margin: 0; padding: 10px; background: var(--color-bg-code); border-radius: 6px; color: var(--color-text-code); font-family: monospace; white-space: pre-wrap; font-size: 0.95em;" },
+        "cd sample-app\n" +
+        "ndx status\n" +
+        "ndx work --auto"
+      )
+    ),
+
+    state === "running"
+      ? h("div", { class: "cmd-progress", role: "status", "aria-live": "polite" },
+          h("div", { class: "cmd-spinner", "aria-hidden": "true" }),
+          h("div", { style: "display: flex; flex-direction: column; gap: 4px;" },
+            h("span", { style: "font-weight: 500;" }, stepMessage),
+            h("span", { style: "font-size: 0.85em; opacity: 0.7;" }, "Please wait, this will only take a moment...")
+          )
+        )
+      : null,
+
+    state === "done" && output
+      ? h("div", { class: "cmd-result-success", role: "status", style: "animation: fadeIn 0.3s ease-in;" },
+          h("span", { class: "cmd-result-icon" }, "✓"),
+          h("pre", { class: "cmd-result-output" }, output),
+        )
+      : null,
+
+    error
+      ? h("div", { class: "cmd-result-error", role: "alert", style: "animation: fadeIn 0.3s ease-in;" }, error)
+      : null,
+  );
+}
+
 // ── Export Panel ─────────────────────────────────────────────────────
 
 function ExportPanel() {
@@ -530,6 +668,7 @@ export function CommandsView() {
 
     h("div", { class: "cmd-panels" },
       h(RefreshPanel, null),
+      h(InstallSamplePanel, null),
       h(ExportPanel, null),
       h(SelfHealPanel, null),
     ),

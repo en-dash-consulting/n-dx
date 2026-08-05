@@ -59,6 +59,7 @@
     "assistant-assets.js",
     "assistant-integration.js",
     "claude-integration.js",
+    "sample-app.js",
     "codex-integration.js",
     "refresh-validate.js",
     "init-llm.js",

@@ -46,6 +46,9 @@ export const CROSS_CUTTING_VIEWS: readonly ViewId[] = [
   "feature-toggles",
   "cli-timeouts",
   "command-reference",
+  "commands",
+  "llm-provider",
+  "project-settings",
 ];
 
 export const VIEWS_BY_SCOPE: Readonly<Record<ViewerScope, readonly ViewId[]>> = {
