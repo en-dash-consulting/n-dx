@@ -126,11 +126,13 @@ describe("backup-snapshots", () => {
     // Get list of backups
     const backups = await getAvailableBackups(rexDir);
 
-    // Verify all backups are listed and sorted (newest first)
+    // Verify all backups are listed and sorted (newest first). getAvailableBackups
+    // returns the on-disk snapshot id, which is the colon-free encoding of the
+    // ISO timestamp — not the raw timestamp.
     expect(backups.length).toBe(3);
-    expect(backups[0]).toBe(snapshots[2].timestamp);
-    expect(backups[1]).toBe(snapshots[1].timestamp);
-    expect(backups[2]).toBe(snapshots[0].timestamp);
+    expect(backups[0]).toBe(snapshots[2].id);
+    expect(backups[1]).toBe(snapshots[1].id);
+    expect(backups[2]).toBe(snapshots[0].id);
   });
 
   it("should prune old backups keeping only the retention cap", async () => {
@@ -226,5 +228,73 @@ describe("backup-snapshots", () => {
     const backupTaskFile = join(snapshot!.backupPath, "epic_nested", "feature_sub", "task_item", "index.md");
     const content = await readFile(backupTaskFile, "utf-8");
     expect(content).toBe("Nested task");
+  });
+
+  // ── Windows filename-safety regression ───────────────────────────────────────
+  //
+  // The snapshot directory name used to embed a raw ISO-8601 timestamp. `:` is
+  // illegal in Windows filenames, so every snapshot failed with EINVAL — and
+  // because callers downgraded the failure to a warning and continued, Windows
+  // users ran destructive tree rewrites with no rollback at all.
+
+  it("names the snapshot directory without characters Windows forbids", async () => {
+    await mkdir(join(treeRoot, "epic_test"), { recursive: true });
+    await writeFile(join(treeRoot, "epic_test", "index.md"), "Test");
+
+    const snapshot = await snapshotPRDTree(rexDir);
+    expect(snapshot).not.toBeNull();
+
+    const dirName = snapshot!.backupPath.split(/[\\/]/).pop()!;
+    // <>:"/\|?* are all reserved on Windows.
+    expect(dirName).not.toMatch(/[<>:"/\\|?*]/);
+    // The directory really exists — proves the mkdir/cp actually succeeded.
+    expect((await stat(snapshot!.backupPath)).isDirectory()).toBe(true);
+  });
+
+  it("keeps snapshot ids chronologically sortable after colon encoding", async () => {
+    await mkdir(join(treeRoot, "epic_test"), { recursive: true });
+    await writeFile(join(treeRoot, "epic_test", "index.md"), "Test");
+
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const snap = await snapshotPRDTree(rexDir);
+      ids.push(snap!.id);
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    // getAvailableBackups relies on lexicographic sort meaning chronological
+    // order. Encoding must not break that.
+    expect([...ids].sort()).toEqual(ids);
+  });
+
+  it("restores from a raw ISO timestamp as well as an encoded id", async () => {
+    await mkdir(join(treeRoot, "epic_test"), { recursive: true });
+    await writeFile(join(treeRoot, "epic_test", "index.md"), "original");
+
+    const snapshot = await snapshotPRDTree(rexDir);
+    await writeFile(join(treeRoot, "epic_test", "index.md"), "mutated");
+
+    // Callers holding the ISO timestamp (the pre-fix identifier) still work.
+    await restoreFromBackup(rexDir, snapshot!.timestamp);
+    expect(await readFile(join(treeRoot, "epic_test", "index.md"), "utf-8")).toBe("original");
+  });
+
+  it("replaces the tree on restore rather than overlaying it", async () => {
+    await mkdir(join(treeRoot, "epic_test"), { recursive: true });
+    await writeFile(join(treeRoot, "epic_test", "index.md"), "original");
+
+    const snapshot = await snapshotPRDTree(rexDir);
+
+    // Simulate a command that ADDS an item after the snapshot was taken.
+    await mkdir(join(treeRoot, "epic_added"), { recursive: true });
+    await writeFile(join(treeRoot, "epic_added", "index.md"), "added later");
+
+    await restoreFromBackup(rexDir, snapshot!.id);
+
+    // A plain recursive copy would leave epic_added behind, producing a tree
+    // that is the union of both states instead of the snapshot's point in time.
+    const entries = await readdir(treeRoot);
+    expect(entries).toContain("epic_test");
+    expect(entries).not.toContain("epic_added");
   });
 });

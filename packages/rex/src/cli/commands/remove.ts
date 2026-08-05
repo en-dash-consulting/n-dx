@@ -15,6 +15,7 @@ import { CLIError } from "../errors.js";
 import { info, warn, result } from "../output.js";
 import type { ItemStatus } from "../../schema/index.js";
 import { isRootLevel, getLevelLabel } from "../../schema/index.js";
+import { ensureSnapshot } from "../snapshot-guard.js";
 
 /**
  * Supported levels for the remove command.
@@ -63,6 +64,9 @@ export async function cmdRemove(
 
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+
+  // Snapshot the tree before any mutation so `rex restore` can undo this remove.
+  await ensureSnapshot(rexDir, "remove", flags);
   const doc = await store.loadDocument();
 
   // Resolve the item and validate (accepts UUID or exact title)

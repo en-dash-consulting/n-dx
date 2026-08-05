@@ -390,6 +390,11 @@ async function dispatchCommand(
       await cmdPrune(resolveDir(positional), flags);
       break;
     }
+    case "restore": {
+      const { cmdRestore } = await import("./commands/restore.js");
+      await cmdRestore(resolveDir(positional), flags);
+      break;
+    }
     case "validate": {
       const { cmdValidate } = await import("./commands/validate.js");
       await cmdValidate(resolveDir(positional), flags);
@@ -500,7 +505,7 @@ async function dispatchCommand(
 
       const REX_COMMANDS = [
         "init", "status", "tree", "next", "add", "update", "move", "remove", "reshape",
-        "prune", "validate", "fix", "sync", "usage", "report", "verify",
+        "prune", "restore", "validate", "fix", "sync", "usage", "report", "verify",
         "recommend", "analyze", "import", "adapter", "reorganize", "health", "mcp",
         "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "parse-md",
         "backfill-commit-attribution",

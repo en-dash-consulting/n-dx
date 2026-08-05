@@ -10,7 +10,7 @@ import { reasonForReshape, formatReshapeProposal, reasonForBodyMerge } from "../
 import { setLLMConfig, setClaudeConfig, resolveConfiguredModel } from "../../analyze/reason.js";
 import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
 import { migrateToFolderPerTask } from "../../core/folder-per-task-migration.js";
-import { snapshotPRDTree, pruneBackups } from "../../core/backup-snapshots.js";
+import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
 import { printVendorModelHeader } from "@n-dx/llm-client";
 import { REX_DIR } from "./constants.js";
@@ -59,13 +59,7 @@ async function _cmdReshapeCore(
 
   // Snapshot PRD tree before structural migrations (backup for recovery on failure)
   const treeRoot = join(rexDir, "prd_tree");
-  let backupSnapshot = null;
-  try {
-    backupSnapshot = await snapshotPRDTree(rexDir);
-  } catch (err) {
-    // Best-effort: don't fail the command if backup creation fails
-    warn(`Warning: Failed to create backup snapshot: ${String(err)}`);
-  }
+  const backupSnapshot = await ensureSnapshot(rexDir, "reshape", flags);
 
   // Run folder-per-task structural migration pass
   info("Migrating non-conforming task structures to folder-per-task form...");
@@ -73,13 +67,10 @@ async function _cmdReshapeCore(
   try {
     migrationResult = await migrateToFolderPerTask(treeRoot);
   } catch (err) {
-    // Surface backup path in error message for recovery
-    const backupMsg = backupSnapshot
-      ? `\n\nBackup saved to: ${backupSnapshot.backupPath}\nRestore with: cp -r ${backupSnapshot.backupPath} ${treeRoot}`
-      : "";
+    // Surface the rollback command for recovery
     throw new CLIError(
-      `Migration failed: ${String(err)}${backupMsg}`,
-      "Check the backup path above to restore the PRD tree.",
+      `Migration failed: ${String(err)}${formatRecoveryHint(backupSnapshot, dir)}`,
+      "Roll the PRD tree back with 'rex restore' as shown above.",
     );
   }
 
@@ -100,15 +91,6 @@ async function _cmdReshapeCore(
   // when no proposals end up being applied.
   const canonicalDoc = await store.loadDocument();
   await store.saveDocument(canonicalDoc);
-
-  // Prune old backups if migrations were applied
-  if (migrationResult.migratedCount > 0) {
-    try {
-      await pruneBackups(rexDir, 10);
-    } catch {
-      // Best-effort: don't fail the command if pruning fails
-    }
-  }
 
   const docAfterCompaction = canonicalDoc;
 
