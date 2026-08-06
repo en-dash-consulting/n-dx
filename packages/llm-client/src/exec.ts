@@ -884,13 +884,46 @@ export function quoteWindowsToken(token: string): string {
 }
 
 /**
+ * A binary token that is a plain bare command name — letters, digits, and the
+ * safe punctuation that appears in real CLI names (`.`, `-`, `_`, `+`). No
+ * spaces, quotes, path separators, or cmd.exe metacharacters, so it needs no
+ * quoting to survive tokenization.
+ *
+ * TWIN: mirrored in `packages/core/win-spawn.js`.
+ */
+const WINDOWS_BARE_BINARY_RE = /^[A-Za-z0-9_.+-]+$/;
+
+/**
  * Build a Windows cmd.exe verbatim command line from a binary path and args.
  *
  * Pure function — safe to call on any platform; its tests run on every CI.
- * Each token is quoted unconditionally by {@link quoteWindowsToken}.
+ * Every ARGUMENT is quoted unconditionally by {@link quoteWindowsToken}.
+ *
+ * The BINARY is quoted only when it needs it (spaces, quotes, path separators,
+ * metacharacters). A bare command name is emitted UNQUOTED, because quoting the
+ * command name suppresses cmd.exe's PATHEXT resolution: cmd then looks for an
+ * exact filename match on PATH instead of trying `.CMD`/`.EXE`/… in turn. When
+ * a PATH directory holds an extensionless file beside its shim — exactly what
+ * pnpm/npm global installs produce (`pnpm` + `pnpm.CMD`, `claude` + `claude.CMD`)
+ * — the quoted form finds the extensionless POSIX script, fails CreateProcess,
+ * and exits 1 with `The system cannot find the path specified.`
+ *
+ *   `cmd /d /s /c ""pnpm" "--version""`  →  exit 1, path-not-found
+ *   `cmd /d /s /c "pnpm "--version""`    →  exit 0, resolves pnpm.CMD
+ *
+ * Quoted paths keep their quotes and still resolve (verified for both
+ * `C:\...\pnpm` and `C:\...\pnpm.CMD`), so spaced-path handling (#68) is
+ * unaffected.
+ *
+ * LIMITATION: an unquoted bare name that collides with a cmd.exe INTERNAL
+ * command (`echo`, `dir`, `set`, `start`, …) resolves to the builtin rather than
+ * to a file on PATH. No vendor CLI this helper spawns (`claude`, `codex`,
+ * `pnpm`, `node`, `git`, `gemini`) collides; pass an absolute path if one ever
+ * does.
  */
 export function buildWindowsCliCommandLine(binary: string, args: string[]): string {
-  return [binary, ...args].map(quoteWindowsToken).join(" ");
+  const head = WINDOWS_BARE_BINARY_RE.test(binary) ? binary : quoteWindowsToken(binary);
+  return [head, ...args.map(quoteWindowsToken)].join(" ");
 }
 
 /**

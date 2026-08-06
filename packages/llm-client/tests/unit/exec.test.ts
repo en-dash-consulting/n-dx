@@ -818,10 +818,20 @@ describe("quoteWindowsToken", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildWindowsCliCommandLine", () => {
-  it("quotes every token in a simple command line", () => {
+  it("quotes every arg and leaves a bare binary name unquoted", () => {
     expect(buildWindowsCliCommandLine("claude", ["--print", "hello"])).toBe(
-      '"claude" "--print" "hello"',
+      'claude "--print" "hello"',
     );
+  });
+
+  // Quoting the command name suppresses cmd.exe PATHEXT resolution, so cmd
+  // matches an exact filename on PATH and finds the extensionless POSIX script
+  // that pnpm/npm global installs place beside the .CMD shim — CreateProcess
+  // then fails with "The system cannot find the path specified."
+  it("leaves bare names unquoted so cmd.exe PATHEXT resolution still applies", () => {
+    for (const bare of ["pnpm", "claude", "codex", "node", "some-cli", "cli_v2.1"]) {
+      expect(buildWindowsCliCommandLine(bare, ["--version"])).toBe(`${bare} "--version"`);
+    }
   });
 
   it("quotes a binary path that contains spaces", () => {
@@ -830,19 +840,28 @@ describe("buildWindowsCliCommandLine", () => {
     ).toBe('"C:\\Program Files\\claude\\claude.cmd" "--print"');
   });
 
+  it("quotes a binary that contains a path separator or metacharacter", () => {
+    expect(buildWindowsCliCommandLine("C:\\tools\\claude.cmd", [])).toBe(
+      '"C:\\tools\\claude.cmd"',
+    );
+    expect(buildWindowsCliCommandLine("./local-cli", [])).toBe('"./local-cli"');
+    expect(buildWindowsCliCommandLine("weird&name", [])).toBe('"weird&name"');
+    expect(buildWindowsCliCommandLine("", ["--print"])).toBe('"" "--print"');
+  });
+
   it("quotes an arg that contains spaces", () => {
     expect(buildWindowsCliCommandLine("claude", ["--print", "hello world"])).toBe(
-      '"claude" "--print" "hello world"',
+      'claude "--print" "hello world"',
     );
   });
 
   it("handles empty args list", () => {
-    expect(buildWindowsCliCommandLine("claude", [])).toBe('"claude"');
+    expect(buildWindowsCliCommandLine("claude", [])).toBe("claude");
   });
 
   it("keeps an empty positional arg as a quoted empty string", () => {
     expect(buildWindowsCliCommandLine("claude", ["", "--print"])).toBe(
-      '"claude" "" "--print"',
+      'claude "" "--print"',
     );
   });
 
@@ -882,7 +901,7 @@ describe("spawnCli", () => {
 
     expect(mockSpawn).toHaveBeenCalledWith(
       "cmd.exe",
-      ["/d", "/s", "/c", '""claude.cmd" "--print" "hi""'],
+      ["/d", "/s", "/c", '"claude.cmd "--print" "hi""'],
       expect.objectContaining({ windowsVerbatimArguments: true }),
     );
     const spawnOpts = mockSpawn.mock.calls[0][2] as Record<string, unknown>;

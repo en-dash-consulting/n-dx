@@ -54,12 +54,32 @@ export function quoteWindowsToken(token) {
 }
 
 /**
+ * A binary token that is a plain bare command name — no spaces, quotes, path
+ * separators, or cmd.exe metacharacters, so it needs no quoting.
+ *
+ * TWIN: exact copy of WINDOWS_BARE_BINARY_RE in packages/llm-client/src/exec.ts.
+ */
+const WINDOWS_BARE_BINARY_RE = /^[A-Za-z0-9_.+-]+$/;
+
+/**
  * Build a Windows cmd.exe verbatim command line from a binary path and args.
  * TWIN: exact copy of buildWindowsCliCommandLine in packages/llm-client/src/exec.ts.
  * Exported for the cross-package parity test.
+ *
+ * Args are always quoted; a bare command name is left UNQUOTED so cmd.exe still
+ * applies PATHEXT resolution. Quoting the command name makes cmd match an exact
+ * filename on PATH, which picks the extensionless POSIX script that pnpm/npm
+ * global installs place beside the `.CMD` shim and fails with
+ * `The system cannot find the path specified.` See the canonical copy in
+ * exec.ts for the full rationale.
+ *
+ * LIMITATION: an unquoted bare name that collides with a cmd.exe internal
+ * command (`echo`, `dir`, `set`, …) resolves to the builtin, not a file on PATH.
+ * No CLI spawned here collides; pass an absolute path if one ever does.
  */
 export function buildWindowsCliCommandLine(binary, args) {
-  return [binary, ...args].map(quoteWindowsToken).join(" ");
+  const head = WINDOWS_BARE_BINARY_RE.test(binary) ? binary : quoteWindowsToken(binary);
+  return [head, ...args.map(quoteWindowsToken)].join(" ");
 }
 
 /**
