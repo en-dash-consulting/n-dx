@@ -130,6 +130,9 @@ function resolveRexBin(ctx: ServerContext): { bin: string; args: string[] } {
  *     the n-dx repo itself.
  */
 function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
+  if (process.env.NDX_CLI_PATH) {
+    return { bin: "node", args: [process.env.NDX_CLI_PATH] };
+  }
   const bin = join(ctx.projectDir, "node_modules", ".bin", "ndx");
   if (existsSync(bin)) return { bin, args: [] };
 
