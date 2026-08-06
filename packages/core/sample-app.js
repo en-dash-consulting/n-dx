@@ -212,7 +212,6 @@ export async function handleInstallSample(rest) {
 
   console.log(`${green("✔")} Sample app installed successfully!`);
   console.log(`\n${cyan("Next Steps:")}`);
-  console.log(`  cd sample-app`);
   console.log(`  ndx status`);
   console.log(`  ndx work --auto\n`);
 }

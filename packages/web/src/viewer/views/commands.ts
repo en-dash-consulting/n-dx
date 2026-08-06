@@ -123,7 +123,6 @@ function InstallSamplePanel() {
       h("h4", { style: "margin: 0 0 8px 0; color: var(--color-text); font-size: 1.05em; display: flex; align-items: center; gap: 6px;" }, "🚀 Next Steps"),
       h("p", { style: "margin: 0 0 12px 0; color: var(--color-text-muted);" }, "The sample app has been generated in a new `sample-app/` directory along with a dummy PRD! Open your terminal and run the following commands to see n-dx in action:"),
       h("pre", { style: "margin: 0; padding: 10px; background: var(--color-bg-code); border-radius: 6px; color: var(--color-text-code); font-family: monospace; white-space: pre-wrap; font-size: 0.95em;" },
-        "cd sample-app\n" +
         "ndx status\n" +
         "ndx work --auto"
       )
