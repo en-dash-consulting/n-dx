@@ -82,7 +82,13 @@ async function runAxe(element: Element): Promise<AxeViolation[]> {
 function renderToDiv(vnode: ReturnType<typeof h>): HTMLElement {
   const root = document.createElement("div");
   document.body.appendChild(root);
-  render(vnode, root);
+  // act() flushes effects synchronously via options.requestAnimationFrame, so
+  // Preact never schedules its rAF + setTimeout(100) fallback pair — the
+  // fallback otherwise fires after jsdom teardown and calls a
+  // cancelAnimationFrame that no longer exists (unhandled ReferenceError).
+  act(() => {
+    render(vnode, root);
+  });
   return root;
 }
 
@@ -163,7 +169,9 @@ describe.skipIf(!axeRun)("[a11y] PRDTree — axe audit", () => {
   let cleanup: () => void;
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
   });
@@ -190,7 +198,9 @@ describe.skipIf(!axeRun)("[a11y] FindingsList — axe audit", () => {
   let cleanup: () => void;
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
   });
@@ -224,7 +234,9 @@ describe.skipIf(!axeRun)("[a11y] ProblemsView — axe audit", () => {
   let cleanup: () => void;
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
   });
@@ -257,19 +269,19 @@ describe.skipIf(!axeRun)("[a11y] ProblemsView — axe audit", () => {
 describe.skipIf(!axeRun)("[a11y] Graph (import graph) — axe audit", () => {
   let root: HTMLElement;
   let cleanup: () => void;
-  let rafId: ReturnType<typeof setInterval>;
 
   beforeEach(() => {
-    // Graph uses requestAnimationFrame for force layout; stub it
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      rafId = setInterval(cb, 16) as unknown as number;
-      return 0;
-    });
-    vi.stubGlobal("cancelAnimationFrame", () => clearInterval(rafId));
+    // One-shot rAF stub with real timer ids so cancelAnimationFrame clears the
+    // right handle (the interval-based stub leaked timers past unstub/teardown).
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
+      setTimeout(() => cb(performance.now()), 16) as unknown as number);
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id));
   });
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
     vi.unstubAllGlobals();
@@ -279,7 +291,6 @@ describe.skipIf(!axeRun)("[a11y] Graph (import graph) — axe audit", () => {
     cleanup = setTheme("light");
     root = renderToDiv(h(Graph, { data: makeLoadedData(), onSelect: () => {} }));
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    clearInterval(rafId);
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });
@@ -288,7 +299,6 @@ describe.skipIf(!axeRun)("[a11y] Graph (import graph) — axe audit", () => {
     cleanup = setTheme("dark");
     root = renderToDiv(h(Graph, { data: makeLoadedData(), onSelect: () => {} }));
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    clearInterval(rafId);
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });
@@ -308,7 +318,9 @@ describe.skipIf(!axeRun)("[a11y] OverviewView — axe audit", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
     globalThis.fetch = originalFetch;
@@ -334,18 +346,19 @@ describe.skipIf(!axeRun)("[a11y] OverviewView — axe audit", () => {
 describe.skipIf(!axeRun)("[a11y] ZonesView — axe audit", () => {
   let root: HTMLElement;
   let cleanup: () => void;
-  let rafId: ReturnType<typeof setInterval>;
 
   beforeEach(() => {
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      rafId = setInterval(cb, 16) as unknown as number;
-      return 0;
-    });
-    vi.stubGlobal("cancelAnimationFrame", () => clearInterval(rafId));
+    // One-shot rAF stub with real timer ids so cancelAnimationFrame clears the
+    // right handle (the interval-based stub leaked timers past unstub/teardown).
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
+      setTimeout(() => cb(performance.now()), 16) as unknown as number);
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id));
   });
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
     vi.unstubAllGlobals();
@@ -357,7 +370,6 @@ describe.skipIf(!axeRun)("[a11y] ZonesView — axe audit", () => {
       h(ZonesView, { data: makeLoadedData(), onSelect: () => {}, navigateTo: () => {} }),
     );
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    clearInterval(rafId);
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });
@@ -368,7 +380,6 @@ describe.skipIf(!axeRun)("[a11y] ZonesView — axe audit", () => {
       h(ZonesView, { data: makeLoadedData(), onSelect: () => {}, navigateTo: () => {} }),
     );
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    clearInterval(rafId);
     const violations = await runAxe(root);
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });
@@ -381,7 +392,9 @@ describe.skipIf(!axeRun)("[a11y] ArchitectureView — axe audit", () => {
   let cleanup: () => void;
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
   });
@@ -423,7 +436,9 @@ describe.skipIf(!axeRun)("[a11y] SuggestionsView — axe audit", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
     globalThis.fetch = originalFetch;
@@ -473,7 +488,9 @@ describe.skipIf(!axeRun)("[a11y] RoutesView — axe audit", () => {
   let cleanup: () => void;
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
   });
@@ -536,7 +553,9 @@ describe.skipIf(!axeRun)("[a11y] HenchRunsView — axe audit", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
     globalThis.fetch = originalFetch;
@@ -574,7 +593,9 @@ describe.skipIf(!axeRun)("[a11y] HenchConfigView — axe audit", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
     globalThis.fetch = originalFetch;
@@ -612,7 +633,9 @@ describe.skipIf(!axeRun)("[a11y] PRMarkdownView — axe audit", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
     globalThis.fetch = originalFetch;
@@ -650,7 +673,9 @@ describe.skipIf(!axeRun)("[a11y] ProjectSettings — axe audit", () => {
   });
 
   afterEach(() => {
-    render(null, root);
+    act(() => {
+      render(null, root);
+    });
     root.remove();
     cleanup?.();
     globalThis.fetch = originalFetch;
