@@ -89,6 +89,13 @@ Alternatives: `pnpm add -g @n-dx/core` (equivalent), or `yarn global add @n-dx/c
 `npx -p @n-dx/core ndx <command>` — bare `npx @n-dx/core` does not work.
 See [Install Path Validation](docs/process/install-path-validation.md) for the tested-behavior rationale.
 
+**Upgrading:** always pass an explicit `@latest` tag — `npm i -g @n-dx/core@latest`
+or `pnpm add -g @n-dx/core@latest`. While the project is on 0.x, a bare upgrade
+re-resolves inside the caret range recorded at install time (`^0.3.1` means
+`>=0.3.1 <0.4.0`), so it cannot cross a minor boundary. Upgrade with the same
+package manager you installed with; see
+[Troubleshooting](docs/guide/troubleshooting.md) if `ndx --version` does not change.
+
 Then run:
 
 ```sh

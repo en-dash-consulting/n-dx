@@ -293,7 +293,8 @@ describe("parseFolderTree: folder-tree fixtures", () => {
     expect(result.items.map(item => item.title)).toEqual(["Good Epic"]);
     expect(result.warnings).toEqual([
       expect.objectContaining({
-        path: expect.stringContaining("broken-epic-bbbbbbbb/index.md"),
+        // join() builds the warning path, so the separator is "\" on Windows.
+        path: expect.stringContaining(join("broken-epic-bbbbbbbb", "index.md")),
         message: "Unclosed frontmatter block (missing closing ---)",
       }),
     ]);

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
+import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -42,15 +43,15 @@ describe("rex --quiet", () => {
     const quiet = run(["init", "--quiet", tmpDir2]);
     expect(quiet).toBe("");
 
-    // Clean up
-    execFileSync("rm", ["-rf", tmpDir2]);
+    // Clean up — rmSync, not `rm`: there is no rm binary on Windows.
+    rmSync(tmpDir2, { recursive: true, force: true });
   });
 
   it("suppresses init output with -q shorthand", () => {
     const tmpDir2 = tmpDir + "-q2";
     const quiet = run(["init", "-q", tmpDir2]);
     expect(quiet).toBe("");
-    execFileSync("rm", ["-rf", tmpDir2]);
+    rmSync(tmpDir2, { recursive: true, force: true });
   });
 
   it("shows minimal status output with --quiet", () => {

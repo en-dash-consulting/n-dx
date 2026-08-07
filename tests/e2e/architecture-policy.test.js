@@ -1229,12 +1229,13 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/commands/remove.ts", "Lazy-loads LLM client for smart remove analysis"],
   ["packages/rex/src/cli/commands/reorganize.ts", "Lazy-loads LLM client for reorganization proposals"],
   ["packages/rex/src/cli/commands/reshape.ts", "Lazy-loads LLM client for reshape analysis"],
+  ["packages/rex/src/cli/commands/restore.ts", "Lazy-loads node:readline only for the interactive restore confirmation prompt — skipped entirely with --yes"],
   ["packages/rex/src/cli/commands/smart-add.ts", "Lazy-loads LLM client for smart add proposals"],
   ["packages/rex/src/cli/commands/validate-interactive.ts", "Lazy-loads LLM client for interactive validation"],
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
   // Core — lazy-loads utilities
   ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers when the vendor changes, plus the shared auth-failure guidance and the cli-brand color palette on the preflight-failure error path"],
-  ["packages/core/cli.js", "Lazy-loads cli-ink.js (Ink + React TTY renderer) only during `ndx init` in interactive TTY mode — avoids React/Ink bundle cost for every CLI invocation"],
+  ["packages/core/cli.js", "Lazy-loads cli-ink.js (Ink + React TUI renderer) only during `ndx init` when stdout is a TTY and --quiet is unset — avoids React/Ink import cost on every CLI invocation and in non-interactive environments"],
   ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
   ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
   // Sourcevision — lazy-loads analyzers and heavy dependencies
@@ -1250,8 +1251,6 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/web/src/server/routes-rex/health.ts", "Lazy-loads health check analysis on demand"],
   // Core orchestrator — dynamic import of rex public API for export pre-rendering
   ["packages/core/export.js", "Lazy-loads rex functions for static export pre-rendering"],
-  // Core CLI — lazy-loads Ink TUI renderer only when running in an interactive TTY
-  ["packages/core/cli.js", "Lazy-loads cli-ink.js Ink TUI renderer on demand — only activated when stdout is a TTY, avoiding React/Ink import cost in non-interactive environments"],
   // Hench agent — deferred node: builtins for lock file and cleanup operations
   ["packages/hench/src/agent/lifecycle/shared.ts", "Lazy-loads node:fs and node:path for lock file cleanup — deferred to avoid import overhead on code paths that never touch the filesystem"],
   ["packages/hench/src/tools/cleanup-transformations.ts", "Lazy-loads node:fs/promises for file deletion — async filesystem access isolated to the tool cleanup path"],

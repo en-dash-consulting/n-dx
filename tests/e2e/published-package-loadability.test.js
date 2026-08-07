@@ -12,6 +12,10 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync, spawnSync } from "child_process";
+// execFileSyncCli is used for `pnpm` only: on Windows pnpm is a `.CMD` shim that
+// a raw execFileSync cannot launch (`spawnSync pnpm ENOENT`). `tar` and `node`
+// are real executables, so they keep using execFileSync/spawnSync directly.
+import { execFileSyncCli } from "../../packages/core/win-spawn.js";
 import {
   mkdtempSync,
   rmSync,
@@ -24,6 +28,17 @@ import {
 } from "fs";
 import { join, resolve, dirname } from "path";
 import { tmpdir } from "os";
+import { pathToFileURL } from "url";
+
+/**
+ * Render a path as a `file://` URL literal for embedding in generated `import()`
+ * code. Windows rejects a bare absolute path there with
+ * ERR_UNSUPPORTED_ESM_URL_SCHEME ("Received protocol 'c:'"); posix accepts the
+ * file:// form too, so this is unconditional.
+ */
+function importSpecifier(path) {
+  return JSON.stringify(pathToFileURL(path).href);
+}
 
 const REPO_ROOT = resolve(import.meta.dirname, "../..");
 const PACKAGES_DIR = join(REPO_ROOT, "packages");
@@ -65,7 +80,7 @@ function packAndExtract(pkgDir) {
   // CLIs (e.g. a concurrent `rex prune` loading a half-written module). pnpm
   // honors ignore-scripts=true, so it packs the pre-built dist/ (what publish
   // ships) without rebuilding.
-  const out = execFileSync(
+  const out = execFileSyncCli(
     "pnpm",
     ["pack", "--json", "--pack-destination", tmpRoot],
     { cwd: pkgDir, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
@@ -86,7 +101,14 @@ function packAndExtract(pkgDir) {
   // to test transitive workspace deps — those come from the source tree.
   const srcNodeModules = join(pkgDir, "node_modules");
   if (existsSync(srcNodeModules)) {
-    symlinkSync(srcNodeModules, join(extractDir, "node_modules"));
+    // "junction" on Windows: a directory symlink requires elevation or Developer
+    // Mode there and otherwise fails with EPERM. Junctions need no privileges and
+    // behave the same for module resolution. The type arg is ignored off-Windows.
+    symlinkSync(
+      srcNodeModules,
+      join(extractDir, "node_modules"),
+      process.platform === "win32" ? "junction" : undefined,
+    );
   }
 
   return { tmpRoot, extractDir, shippedFiles: report.files.map((f) => f.path) };
@@ -141,7 +163,7 @@ describe("published-package loadability (pack + extract + import)", () => {
           const result = runNode([
             "--input-type=module",
             "-e",
-            `await import(${JSON.stringify(entryPath)});`,
+            `await import(${importSpecifier(entryPath)});`,
           ]);
 
           if (result.status !== 0) {
@@ -227,7 +249,7 @@ describe("published-package loadability (pack + extract + import)", () => {
         "--input-type=module",
         "-e",
         `
-          const m = await import(${JSON.stringify(join(extractDir, "assistant-assets.js"))});
+          const m = await import(${importSpecifier(join(extractDir, "assistant-assets.js"))});
           const manifest = m.getManifest();
           if (!manifest.skills || Object.keys(manifest.skills).length === 0) {
             throw new Error("manifest.skills is empty");
@@ -254,7 +276,7 @@ describe("published-package loadability (pack + extract + import)", () => {
       const result = runNode([
         "--input-type=module",
         "-e",
-        `await import(${JSON.stringify(join(extractDir, "claude-integration.js"))});`,
+        `await import(${importSpecifier(join(extractDir, "claude-integration.js"))});`,
       ]);
       if (result.status !== 0) {
         throw new Error(
@@ -267,7 +289,7 @@ describe("published-package loadability (pack + extract + import)", () => {
       const result = runNode([
         "--input-type=module",
         "-e",
-        `await import(${JSON.stringify(join(extractDir, "codex-integration.js"))});`,
+        `await import(${importSpecifier(join(extractDir, "codex-integration.js"))});`,
       ]);
       if (result.status !== 0) {
         throw new Error(

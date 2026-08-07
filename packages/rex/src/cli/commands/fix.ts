@@ -4,6 +4,7 @@ import { detectIssues, applyFixes } from "../../fix/index.js";
 import type { FixAction, FixKind } from "../../fix/index.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
+import { ensureSnapshot } from "../snapshot-guard.js";
 
 /**
  * Auto-fix common PRD validation issues.
@@ -18,6 +19,9 @@ export async function cmdFix(
 ): Promise<void> {
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+
+  // Snapshot the tree before any mutation so `rex restore` can undo this fix.
+  await ensureSnapshot(rexDir, "fix", flags);
   const doc = await store.loadDocument();
 
   const dryRun = flags["dry-run"] === "true";

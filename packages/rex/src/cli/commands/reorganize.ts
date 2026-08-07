@@ -22,6 +22,7 @@ import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
 import { printVendorModelHeader } from "@n-dx/llm-client";
 import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
+import { ensureSnapshot } from "../snapshot-guard.js";
 
 // ── LLM analysis ──────────────────────────────────────────────────────
 
@@ -279,6 +280,9 @@ export async function cmdReorganize(
 ): Promise<void> {
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+
+  // Snapshot the tree before any mutation so `rex restore` can undo this reorganize.
+  await ensureSnapshot(rexDir, "reorganize", flags);
   const doc = await store.loadDocument();
 
   if (doc.items.length === 0) {

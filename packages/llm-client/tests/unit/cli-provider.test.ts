@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeFakeCli } from "../helpers/fake-cli.js";
 import { createCliClient } from "../../src/cli-provider.js";
 import { ClaudeClientError } from "../../src/types.js";
 import type { LLMProvider } from "../../src/provider-interface.js";
@@ -72,12 +73,21 @@ describe("createCliClient", () => {
 });
 
 describe("createCliClient — stdout error envelope", () => {
-  function writeFakeCli(body: string): { dir: string; path: string } {
+  /**
+   * Fake `claude` in a fresh temp dir. Drains stdin because the provider writes
+   * the prompt there, then emits `stdout` and exits `exitCode`. The fake is a
+   * Node script behind a platform shim — a shebang script is unrunnable on
+   * Windows (see tests/helpers/fake-cli.ts).
+   */
+  function makeFakeCli(
+    stdout: string,
+    exitCode: number,
+  ): { dir: string; path: string } {
     const dir = mkdtempSync(join(tmpdir(), "claude-fake-"));
-    const path = join(dir, "claude");
-    writeFileSync(path, body, { mode: 0o755 });
-    chmodSync(path, 0o755);
-    return { dir, path };
+    return {
+      dir,
+      path: writeFakeCli(dir, { name: "claude", stdout, exitCode, drainStdin: true }),
+    };
   }
 
   it("surfaces JSON stdout error envelope when stderr is empty and exit is non-zero", async () => {
@@ -87,9 +97,7 @@ describe("createCliClient — stdout error envelope", () => {
       api_error_status: 429,
       result: "You've hit your limit · resets Apr 23 at 12pm (America/Los_Angeles)",
     });
-    const { dir, path } = writeFakeCli(
-      `#!/bin/sh\ncat > /dev/null\nprintf '%s' '${envelope.replace(/'/g, "'\\''")}'\nexit 1\n`,
-    );
+    const { dir, path } = makeFakeCli(envelope, 1);
 
     try {
       const client = createCliClient({
@@ -110,7 +118,7 @@ describe("createCliClient — stdout error envelope", () => {
   });
 
   it("falls back to the exit-code string when stdout has no error envelope", async () => {
-    const { dir, path } = writeFakeCli("#!/bin/sh\ncat > /dev/null\nexit 1\n");
+    const { dir, path } = makeFakeCli("", 1);
 
     try {
       const client = createCliClient({
@@ -144,9 +152,7 @@ describe("createCliClient — stdout error envelope", () => {
         usage: { input_tokens: 12, output_tokens: 7 },
       },
     ]);
-    const { dir, path } = writeFakeCli(
-      `#!/bin/sh\ncat > /dev/null\nprintf '%s' '${arrayBody.replace(/'/g, "'\\''")}'\nexit 0\n`,
-    );
+    const { dir, path } = makeFakeCli(arrayBody, 0);
 
     try {
       const client = createCliClient({
@@ -167,9 +173,7 @@ describe("createCliClient — stdout error envelope", () => {
       input_tokens: 5,
       output_tokens: 9,
     });
-    const { dir, path } = writeFakeCli(
-      `#!/bin/sh\ncat > /dev/null\nprintf '%s' '${envelope.replace(/'/g, "'\\''")}'\nexit 0\n`,
-    );
+    const { dir, path } = makeFakeCli(envelope, 0);
 
     try {
       const client = createCliClient({

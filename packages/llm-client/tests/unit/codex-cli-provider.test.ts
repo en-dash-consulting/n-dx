@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { writeFile, chmod, mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { writeFakeCli } from "../helpers/fake-cli.js";
 import {
   mapSandboxToCodexFlag,
   mapApprovalToCodexFlag,
@@ -111,24 +112,18 @@ describe("Codex policy flag compilation", () => {
 // ── Rate limit retry behavior ────────────────────────────────────────────────
 
 /**
- * Create a temporary executable Node.js script that writes `stderr` to stderr
- * and exits with `exitCode`. The binary ignores all arguments so it can act as
- * a stand-in for any `codex exec ...` invocation.
+ * Create a temporary fake `codex` that writes `stderr` to stderr and exits with
+ * `exitCode`. The binary ignores all arguments so it can act as a stand-in for
+ * any `codex exec ...` invocation.
+ *
+ * Delegates to the shared helper so the fake is launchable on Windows too — a
+ * bare `#!/usr/bin/env node` script is not (see tests/helpers/fake-cli.ts).
  */
 async function makeMockBinary(
   tmpDir: string,
   { stderr, exitCode }: { stderr: string; exitCode: number },
 ): Promise<string> {
-  const scriptPath = join(tmpDir, "mock-codex");
-  const content = [
-    "#!/usr/bin/env node",
-    `process.stderr.write(${JSON.stringify(stderr)});`,
-    `process.exit(${exitCode});`,
-    "",
-  ].join("\n");
-  await writeFile(scriptPath, content, "utf-8");
-  await chmod(scriptPath, 0o755);
-  return scriptPath;
+  return writeFakeCli(tmpDir, { name: "mock-codex", stderr, exitCode });
 }
 
 describe("createCodexCliClient — rate limit retry", () => {

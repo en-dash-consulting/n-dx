@@ -14,6 +14,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const REGISTRY_URL = "https://registry.npmjs.org/@n-dx/core/latest";
 
@@ -99,6 +100,55 @@ function isNewer(current, latest) {
   return lPat > cPat;
 }
 
+// ── Install-manager detection ─────────────────────────────────────────────────
+
+/**
+ * Infer which package manager installed the running copy of @n-dx/core by
+ * inspecting its own path on disk.
+ *
+ * Why this matters: telling a pnpm-global user to run `npm i -g` creates a
+ * SECOND global install under the npm prefix. Both ship an `ndx` shim, and
+ * whichever lands earlier on PATH wins — so the user can "successfully
+ * upgrade" and still be running the old copy, with no error to explain it.
+ *
+ * Signals (checked in order):
+ *  - pnpm always materializes packages inside a `.pnpm` virtual store, and its
+ *    global root lives under a `pnpm/` directory. Either segment is conclusive.
+ *  - yarn classic installs globals under a `yarn/` data directory.
+ *  - anything else (including npm's prefix and a local dev checkout) → npm.
+ *
+ * @param {string} [modulePath] Absolute path to a file inside the install.
+ *   Defaults to this module. Injectable for tests.
+ * @returns {"pnpm"|"yarn"|"npm"}
+ */
+export function detectInstallManager(modulePath = fileURLToPath(import.meta.url)) {
+  // Normalize Windows separators so one set of segment checks covers both
+  // platforms; lowercase because Windows paths are case-insensitive.
+  const path = modulePath.replace(/\\/g, "/").toLowerCase();
+  if (path.includes("/.pnpm/") || path.includes("/pnpm/")) return "pnpm";
+  if (path.includes("/yarn/")) return "yarn";
+  return "npm";
+}
+
+/**
+ * Build the upgrade command for a given package manager.
+ *
+ * The explicit `@latest` tag is load-bearing, not decorative. pnpm records a
+ * caret range in its global manifest (e.g. `"@n-dx/core": "^0.3.1"`), and for
+ * 0.x versions `^0.3.1` means `>=0.3.1 <0.4.0`. A bare `pnpm add -g @n-dx/core`
+ * or `pnpm update -g` re-resolves inside that range and can never cross a minor
+ * boundary, so the user stays stranded on the old line no matter how many times
+ * they "upgrade". `@latest` pins past it.
+ *
+ * @param {"pnpm"|"yarn"|"npm"} [manager]
+ * @returns {string}
+ */
+export function formatUpgradeCommand(manager = detectInstallManager()) {
+  if (manager === "pnpm") return "pnpm add -g @n-dx/core@latest";
+  if (manager === "yarn") return "yarn global add @n-dx/core@latest";
+  return "npm i -g @n-dx/core@latest";
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -138,18 +188,24 @@ export async function startUpdateCheck({ currentVersion } = {}) {
 /**
  * Format a one-line update notice for display after command output.
  *
- * @param {{ current: string, latest: string }} info
+ * The suggested command is matched to the package manager that actually
+ * installed this copy — see `detectInstallManager` for why a hardcoded
+ * `npm i -g` silently breaks pnpm and yarn users.
+ *
+ * @param {{ current: string, latest: string, manager?: "pnpm"|"yarn"|"npm" }} info
  * @returns {string}
  */
-export function formatUpdateNotice({ current, latest }) {
+export function formatUpdateNotice({ current, latest, manager }) {
   // Use plain ANSI without importing cli-brand so this module stays
   // self-contained and testable without side-effects.
   const dim = (t) => `\x1b[2m${t}\x1b[22m`;
   const bold = (t) => `\x1b[1m${t}\x1b[22m`;
   const cyan = (t) => `\x1b[36m${t}\x1b[39m`;
 
+  const command = formatUpgradeCommand(manager ?? detectInstallManager());
+
   return (
     `\n  ${dim("Update available:")} ${dim(current)} → ${cyan(bold(latest))}` +
-    `  ${dim("Run")} ${bold("npm i -g @n-dx/core")} ${dim("to update.")}`
+    `  ${dim("Run")} ${bold(command)} ${dim("to update.")}`
   );
 }

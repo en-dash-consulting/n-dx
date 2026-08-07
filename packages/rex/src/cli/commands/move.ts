@@ -5,6 +5,7 @@ import { REX_DIR } from "./constants.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
+import { ensureSnapshot } from "../snapshot-guard.js";
 
 export async function cmdMove(
   dir: string,
@@ -16,6 +17,9 @@ export async function cmdMove(
 
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+
+  // Snapshot the tree before any mutation so `rex restore` can undo this move.
+  await ensureSnapshot(rexDir, "move", flags);
   const doc = await store.loadDocument();
 
   const newParentId = flags.parent || undefined;
