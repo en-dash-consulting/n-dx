@@ -604,7 +604,15 @@ async function parseItemFileFromFrontmatter(
 
 async function readIndexFile(filePath: string, warnings: ParseWarning[]): Promise<string | null> {
   try {
-    return await readFile(filePath, "utf8");
+    // Normalize CRLF → LF before any parsing. rex serializes with LF, but a
+    // Windows checkout without eol=lf pins (core.autocrlf=true) hands us CRLF.
+    // The line-based parsers below (frontmatter, body offsets, `## Subtask:`
+    // sections) split and match on "\n"; without this a trailing "\r" turns a
+    // block-style key like `tags:` into `tags:\r`, which silently aborts the
+    // frontmatter mapping and DROPS every remaining field — a data-loss bug on
+    // the next parse→save round trip, not just a cosmetic one.
+    const raw = await readFile(filePath, "utf8");
+    return raw.replace(/\r\n/g, "\n");
   } catch {
     warnings.push({ path: filePath, message: "index.md not found or unreadable" });
     return null;
@@ -884,7 +892,10 @@ export function parseFrontmatter(
   filePath: string,
   warnings: ParseWarning[],
 ): Record<string, unknown> | null {
-  const lines = text.split("\n");
+  // CRLF-tolerant split: external callers (folder-per-task-migration) pass raw
+  // file text that readIndexFile's normalization never saw. A retained "\r"
+  // breaks block-style key detection in splitMappingLine (see readIndexFile).
+  const lines = text.split(/\r?\n/);
 
   // Find opening ---
   let i = 0;
