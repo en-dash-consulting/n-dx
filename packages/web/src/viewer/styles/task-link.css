@@ -183,13 +183,3 @@
     transform: scale(1);
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .rex-context-menu {
-    animation: none;
-  }
-
-  .rex-context-menu-feedback {
-    animation: none;
-  }
-}

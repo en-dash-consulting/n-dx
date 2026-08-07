@@ -97,8 +97,3 @@
 }
 
 /* Respect reduced motion preferences */
-@media (prefers-reduced-motion: reduce) {
-  .polling-suspension-indicator {
-    animation: none;
-  }
-}

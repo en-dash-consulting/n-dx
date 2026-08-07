@@ -26,17 +26,23 @@ export function DetailPanel({ detail, data, navigateTo, onClose, prdDetailConten
     return () => document.removeEventListener("keydown", handleKey);
   }, [detail, onClose]);
 
-  // Focus management: save trigger element when panel opens, restore it when panel closes.
+  // Focus management: save trigger element when panel opens, restore it when
+  // panel closes. Capture only on the closed→open transition — switching
+  // between two details while the panel stays open must not overwrite the
+  // original trigger, or closing would drop focus to <body>.
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (detail) {
+    const isOpen = detail !== null;
+    if (isOpen && !wasOpenRef.current) {
       previousFocusRef.current = document.activeElement as HTMLElement;
-    } else {
+    } else if (!isOpen && wasOpenRef.current) {
       requestAnimationFrame(() => {
         previousFocusRef.current?.focus();
         previousFocusRef.current = null;
       });
     }
+    wasOpenRef.current = isOpen;
   }, [detail]);
 
   if (!detail) return null;

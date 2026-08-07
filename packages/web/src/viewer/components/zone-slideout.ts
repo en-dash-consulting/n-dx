@@ -1,5 +1,6 @@
 import { h, Fragment } from "preact";
 import { useState, useEffect, useRef } from "preact/hooks";
+import { useFocusTrap } from "../hooks/index.js";
 import type { Zone, ZoneCrossing } from "../external.js";
 import { getZoneColorByIndex } from "../visualization/colors.js";
 import { meterClass } from "../visualization/metrics.js";
@@ -72,6 +73,10 @@ export function ZoneSlideout({
       requestAnimationFrame(() => previousFocusRef.current?.focus());
     }
   }, [zone]);
+
+  // aria-modal="true" promises assistive tech the background is inert, so
+  // Tab must not be able to move focus behind the open panel.
+  useFocusTrap(panelRef, !!zone);
 
   if (!zone) return null;
 

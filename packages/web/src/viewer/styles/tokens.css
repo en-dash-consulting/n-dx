@@ -77,9 +77,9 @@
   --accent: var(--brand-teal);
   --accent-dim: #008f75;
   --accent-subtle: color-mix(in srgb, var(--brand-teal) 8%, transparent);
-  --green: var(--brand-green);
-  --orange: var(--brand-orange);
-  --red: #f55574; /* was var(--brand-rose) #d52e66 (3.4:1 fail on dark badge bg) → 4.9:1 pass */
+  --green: var(--brand-green); /* 5.2:1+ on all badge surfaces incl. --bg-active */
+  --orange: #ff8060; /* was var(--brand-orange) #ff5926 (3.8:1 fail on badge bg over --bg-active) → 4.6:1 pass */
+  --red: #ff7f9c; /* was #f55574 (3.7:1 fail on badge bg over --bg-active) → 4.7:1 pass */
   --purple: var(--brand-purple);
 
   /* Logo background — purple in dark mode */

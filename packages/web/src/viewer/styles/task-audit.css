@@ -616,18 +616,6 @@
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .audit-task-pulse,
-  .audit-task-pulse-stale,
-  .audit-task-unresponsive-badge {
-    animation: none;
-  }
-
-  .audit-copy-toast {
-    animation: none;
-  }
-}
-
 /* ── Responsive ──────────────────────────────────────────────────── */
 
 @media (max-width: 700px) {

@@ -35,7 +35,7 @@ import type {
   ZoneBreadcrumb,
   ExpandedSubZones,
 } from "./zone-types.js";
-import { usePanZoom, useZoneDrag, useFileEdges, useSubZoneEdges } from "../hooks/index.js";
+import { usePanZoom, useZoneDrag, useFileEdges, useSubZoneEdges, useGraphArrowNav } from "../hooks/index.js";
 
 // ── Re-export types for downstream consumers ─────────────────────────
 export type { ZoneData, BoxRect, FlowEdge, FileConnectionMap, FileToFileMap, ZoneBreadcrumb } from "./zone-types.js";
@@ -1598,16 +1598,12 @@ function ZoneDiagram({
   }, [zones, adjacency, zoneById]);
 
   // Arrow-key navigation: cycles through the focused zone's edge-connected neighbours
-  const handleNodeKeyDown = useCallback((zoneId: string, e: KeyboardEvent) => {
-    const { key } = e;
-    if (key !== "ArrowRight" && key !== "ArrowLeft" && key !== "ArrowDown" && key !== "ArrowUp") return;
-    e.preventDefault();
-    const connIds = adjacency.get(zoneId) ?? [];
-    if (connIds.length === 0) return;
-    const forward = key === "ArrowRight" || key === "ArrowDown";
-    const targetId = forward ? connIds[0] : connIds[connIds.length - 1];
-    (zoneRefs.current.get(targetId) as HTMLElement | null)?.focus();
-  }, [adjacency]);
+  const handleNodeKeyDown = useGraphArrowNav(
+    useCallback((zoneId: string) => adjacency.get(zoneId) ?? [], [adjacency]),
+    useCallback((targetId: string) => {
+      (zoneRefs.current.get(targetId) as HTMLElement | null)?.focus();
+    }, []),
+  );
 
   // Layout computation
   const { boxes: baseBoxes, totalW, totalH } = useMemo(

@@ -6,6 +6,7 @@ import { h } from "preact";
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/index.js";
+import { useGraphArrowNav } from "../hooks/index.js";
 import { basename } from "../utils.js";
 import {
   aggregateDirectedZoneFlows,
@@ -1403,15 +1404,12 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
     return adj;
   }, [layoutNodes, edgePaths]);
 
-  const handleDepNodeArrow = useCallback((nodeId: string, e: KeyboardEvent) => {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-    e.preventDefault();
-    const connIds = depAdjacency.get(nodeId) ?? [];
-    if (connIds.length === 0) return;
-    const forward = e.key === "ArrowRight" || e.key === "ArrowDown";
-    const targetId = forward ? connIds[0] : connIds[connIds.length - 1];
-    (depNodeRefs.current.get(targetId) as HTMLElement | null)?.focus();
-  }, [depAdjacency]);
+  const handleDepNodeArrow = useGraphArrowNav(
+    useCallback((nodeId: string) => depAdjacency.get(nodeId) ?? [], [depAdjacency]),
+    useCallback((targetId: string) => {
+      (depNodeRefs.current.get(targetId) as HTMLElement | null)?.focus();
+    }, []),
+  );
 
   // ── Hover spotlight: derive which edges/nodes to highlight or dim based on
   // the current hoverEdgeKey / hoverGraphNode. Hovering an edge spotlights

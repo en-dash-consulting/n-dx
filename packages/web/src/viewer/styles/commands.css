@@ -217,13 +217,6 @@
   to { transform: rotate(360deg); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .cmd-spinner,
-  .cmd-inline-spinner {
-    animation: none;
-  }
-}
-
 .cmd-inline-result {
   display: inline-flex;
   align-items: center;

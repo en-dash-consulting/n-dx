@@ -438,12 +438,6 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .intg-toast {
-    animation: none;
-  }
-}
-
 /* ── Environment variable hints ───────────────────────────────────── */
 
 .intg-env-hint {

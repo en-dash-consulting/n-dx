@@ -35,6 +35,26 @@ textarea:focus-visible,
   outline-offset: 2px;
 }
 
+/* ── Reduced motion (global) ──────────────────────────────────────── */
+/*
+ * Single global kill-switch for animation and transitions, replacing
+ * per-file @media blocks. Near-zero duration + single iteration ends
+ * every animation instantly at its base styles, which is visually
+ * equivalent to `animation: none` for pulse/spin/slide effects.
+ * Rules that need a distinct static end-state (e.g. .section-reveal,
+ * .refresh-toast, progress fills) keep their own local overrides.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Screen reader only */
 .sr-only {
   position: absolute;

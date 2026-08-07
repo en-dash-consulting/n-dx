@@ -98,8 +98,3 @@
 }
 
 /* Respect reduced motion preferences */
-@media (prefers-reduced-motion: reduce) {
-  .refresh-queue-status {
-    animation: none;
-  }
-}

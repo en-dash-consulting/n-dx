@@ -86,12 +86,6 @@
   50% { opacity: 0.6; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .status-badge--running {
-    animation: none;
-  }
-}
-
 /* ── Tag Chip ──────────────────────────────────────────────────────
    Unified tag appearance shared by tree nodes, task detail,
    dashboard cards, and any other tag display.

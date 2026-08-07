@@ -79,6 +79,44 @@ describe("TreeView", () => {
     expect(negCount).toBe(treeitems.length - 1);
   });
 
+  it("keeps a tab target when a filter hides the first root node", () => {
+    const twoRoots: TreeNode[] = [
+      { id: "alpha", children: [] },
+      { id: "beta", children: [] },
+    ];
+    // Filter matches only the second root — "alpha" is not rendered.
+    const root = renderToDiv(
+      h(TreeView, { nodes: twoRoots, renderNode, filterMatch: new Set(["beta"]) }),
+    );
+    const treeitems = Array.from(root.querySelectorAll<HTMLElement>("[role='treeitem']"));
+    expect(treeitems.length).toBe(1);
+    // The remaining visible node must own tabIndex=0 or the tree is
+    // unreachable by keyboard.
+    expect(treeitems[0].tabIndex).toBe(0);
+    expect(treeitems[0].dataset.treeId).toBe("beta");
+  });
+
+  it("exposes aria-level, aria-setsize, and aria-posinset on treeitems", () => {
+    const root = renderToDiv(h(TreeView, { nodes, renderNode, defaultExpandDepth: 3 }));
+    const items = Array.from(root.querySelectorAll<HTMLElement>("[role='treeitem']"));
+    const byId = new Map(items.map((el) => [el.dataset.treeId, el]));
+    expect(byId.get("root")?.getAttribute("aria-level")).toBe("1");
+    expect(byId.get("child-a")?.getAttribute("aria-level")).toBe("2");
+    expect(byId.get("grandchild")?.getAttribute("aria-level")).toBe("3");
+    expect(byId.get("child-a")?.getAttribute("aria-setsize")).toBe("2");
+    expect(byId.get("child-a")?.getAttribute("aria-posinset")).toBe("1");
+    expect(byId.get("child-b")?.getAttribute("aria-posinset")).toBe("2");
+  });
+
+  it("does not expose the role-less wrapper between tree and treeitem", () => {
+    const root = renderToDiv(h(TreeView, { nodes, renderNode }));
+    const wrappers = Array.from(root.querySelectorAll<HTMLElement>(".tree-node"));
+    expect(wrappers.length).toBeGreaterThan(0);
+    for (const w of wrappers) {
+      expect(w.getAttribute("role")).toBe("none");
+    }
+  });
+
   it("exposes data-tree-id on each treeitem", () => {
     const root = renderToDiv(h(TreeView, { nodes, renderNode, defaultExpandDepth: 3 }));
     const treeitems = Array.from(root.querySelectorAll<HTMLElement>("[role='treeitem']"));

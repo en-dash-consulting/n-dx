@@ -182,4 +182,36 @@ describe("zone graph keyboard navigation", () => {
     // Focus should have moved to the Core zone (connected via crossing)
     expect(document.activeElement).toBe(coreNode);
   });
+
+  it("arrow keys are inverses and cycle through all neighbours of a hub", async () => {
+    // Hub zone connected to two neighbours: arrows must reach both, and
+    // ArrowLeft must undo the previous ArrowRight instead of always jumping
+    // to the last adjacency entry.
+    const zones = [makeZone("hub", "Hub"), makeZone("z2", "Beta"), makeZone("z3", "Gamma")];
+    const crossings = [makeCrossing("hub", "z2"), makeCrossing("hub", "z3")];
+    root = renderToDiv(
+      h(ZonesView, { data: makeData(zones, crossings), onSelect: vi.fn() }),
+    );
+    const byName = (name: string) =>
+      queryZoneNodes(root).find((n) => n.getAttribute("aria-label")?.includes(name)) as HTMLElement;
+    const hub = byName("Hub");
+    const beta = byName("Beta");
+    const gamma = byName("Gamma");
+
+    const press = async (el: HTMLElement, key: string) => {
+      await act(async () => {
+        el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+      });
+    };
+
+    await act(async () => { hub.focus(); });
+    await press(hub, "ArrowRight");
+    expect(document.activeElement).toBe(beta); // first neighbour
+
+    await press(beta, "ArrowLeft");
+    expect(document.activeElement).toBe(hub); // inverse of the last move
+
+    await press(hub, "ArrowRight");
+    expect(document.activeElement).toBe(gamma); // cycles past the neighbour we came from
+  });
 });

@@ -261,7 +261,9 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
           role: "combobox",
           "aria-autocomplete": "list",
           "aria-expanded": comboOpen && comboOptions.length > 0,
-          "aria-controls": FILE_SEARCH_LISTBOX_ID,
+          // Only reference the listbox while it is mounted — a permanent
+          // aria-controls pointing at an absent id is a dangling IDREF.
+          "aria-controls": comboOpen && comboOptions.length > 0 ? FILE_SEARCH_LISTBOX_ID : undefined,
           "aria-activedescendant": activeOptionId,
           "aria-label": "Search files",
           onInput: (e: Event) => {

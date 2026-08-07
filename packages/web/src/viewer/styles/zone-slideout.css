@@ -359,9 +359,3 @@
     grid-template-columns: 1fr;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .zone-slideout {
-    transition: none;
-  }
-}

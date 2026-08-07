@@ -431,12 +431,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ct-toast {
-    animation: none;
-  }
-}
-
 /* ── Responsive ───────────────────────────────────────────────────────── */
 
 @media (max-width: 700px) {

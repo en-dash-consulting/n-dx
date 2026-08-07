@@ -22,12 +22,6 @@
   animation: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .neolithic-overlay {
-    animation: none;
-  }
-}
-
 .neolithic-overlay-content {
   display: flex;
   flex-direction: column;

@@ -401,12 +401,6 @@
   animation: mg-node-enter 220ms ease-out;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .mg-prd-node, .mg-merge-node {
-    animation: none;
-  }
-}
-
 .mg-node.selected .mg-circle,
 .mg-node.selected .mg-diamond,
 .mg-node.selected .mg-square,

@@ -26,7 +26,7 @@
 
 import { h, Fragment } from "preact";
 import { useState, useEffect, useMemo, useCallback, useRef } from "preact/hooks";
-import { usePanZoom } from "../hooks/index.js";
+import { usePanZoom, useGraphArrowNav } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import type { PRDItemData } from "../components/prd-tree/types.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
@@ -1291,16 +1291,13 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
     return adj;
   }, [graph, layout]);
 
-  const handleNodeArrow = useCallback((nodeId: string, e: KeyboardEvent) => {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-    e.preventDefault();
-    const connIds = nodeAdjacency.get(nodeId) ?? [];
-    if (connIds.length === 0) return;
-    const forward = e.key === "ArrowRight" || e.key === "ArrowDown";
-    const targetId = forward ? connIds[0] : connIds[connIds.length - 1];
-    const el = prdNodeRefs.current.get(targetId) ?? mergeNodeRefs.current.get(targetId);
-    (el as HTMLElement | null)?.focus();
-  }, [nodeAdjacency]);
+  const handleNodeArrow = useGraphArrowNav(
+    useCallback((nodeId: string) => nodeAdjacency.get(nodeId) ?? [], [nodeAdjacency]),
+    useCallback((targetId: string) => {
+      const el = prdNodeRefs.current.get(targetId) ?? mergeNodeRefs.current.get(targetId);
+      (el as HTMLElement | null)?.focus();
+    }, []),
+  );
 
   // ── Origin lookup ──────────────────────────────────────────────────────────
   // Per-item lazy fetch of `/api/prd-origin?path=<treePath>`. The request is

@@ -2273,22 +2273,3 @@
    Disable all pulse/spin/highlight animations for users who have
    opted into reduced motion at the OS level.
    ────────────────────────────────────────────────────────────────────── */
-
-@media (prefers-reduced-motion: reduce) {
-  .active-tasks-icon,
-  .active-task-pulse,
-  .active-task-pulse-stale,
-  .active-task-pulse-starting,
-  .hench-run-highlighted,
-  .concurrency-icon-moderate,
-  .concurrency-icon-high,
-  .concurrency-icon-at_limit,
-  .concurrency-bar-at_limit,
-  .throttle-icon-paused,
-  .memory-icon-warning,
-  .memory-icon-critical,
-  .memory-bar-critical,
-  .ws-health-icon-unhealthy {
-    animation: none;
-  }
-}

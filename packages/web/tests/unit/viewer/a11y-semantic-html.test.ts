@@ -232,6 +232,38 @@ describe("ZoneSlideout a11y", () => {
     expect(document.activeElement).toBe(trigger);
     document.body.innerHTML = "";
   });
+
+  it("traps Tab inside the open dialog (aria-modal contract)", async () => {
+    document.body.innerHTML = "<button id='outside'>Outside</button><div id='app'></div>";
+    const appRoot = document.getElementById("app")!;
+    const zone = makeZone();
+    await act(async () => {
+      render(h(ZoneSlideout, { zone, crossings: [], allZones: [zone], onClose: () => {} }), appRoot);
+    });
+
+    const panel = appRoot.querySelector("[role='dialog']") as HTMLElement;
+    const focusables = Array.from(panel.querySelectorAll<HTMLElement>("button"));
+    expect(focusables.length).toBeGreaterThan(1);
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+
+    // Tab from the last focusable wraps back to the first instead of
+    // escaping behind the modal.
+    last.focus();
+    await act(async () => {
+      last.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    });
+    expect(document.activeElement).toBe(first);
+
+    // Shift+Tab from the first wraps to the last.
+    await act(async () => {
+      first.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
+    });
+    expect(document.activeElement).toBe(last);
+
+    render(null, appRoot);
+    document.body.innerHTML = "";
+  });
 });
 
 // ── Landmark and skip-link structure ─────────────────────────────────────────

@@ -370,12 +370,6 @@
   font-size: 16px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .hench-template-toast {
-    animation: none;
-  }
-}
-
 /* Responsive */
 @media (max-width: 700px) {
   .hench-templates-grid {

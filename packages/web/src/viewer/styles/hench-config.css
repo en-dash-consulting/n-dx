@@ -566,12 +566,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .hench-config-toast {
-    animation: none;
-  }
-}
-
 /* ── Responsive ────────────────────────────────────────────────────── */
 
 @media (max-width: 700px) {

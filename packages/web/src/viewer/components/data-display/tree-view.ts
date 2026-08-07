@@ -58,6 +58,23 @@ export function TreeView({
     setExpanded(next);
   };
 
+  // Visible node IDs in render order, mirroring renderNodes' filter/expand
+  // logic. Used to pick the roving-tabindex target: when the focused node is
+  // hidden by a filter change, the tab target falls back to the first visible
+  // node so the tree always stays keyboard-reachable.
+  const visibleIds: string[] = [];
+  (function collectVisible(ns: TreeNode[]) {
+    for (const n of ns) {
+      if (filterMatch && !nodeMatchesFilter(n, filterMatch)) continue;
+      visibleIds.push(n.id);
+      if (n.children.length > 0 && effectiveExpanded.has(n.id)) collectVisible(n.children);
+    }
+  })(nodes);
+  const tabTargetId =
+    focusedId !== null && visibleIds.includes(focusedId)
+      ? focusedId
+      : visibleIds[0] ?? null;
+
   // After each render, flush any pending focus request
   useEffect(() => {
     if (!pendingFocusId.current || !treeRef.current) return;
@@ -152,30 +169,35 @@ export function TreeView({
     depth: number,
     parentId: string | null = null,
   ): VNode<any>[] {
-    return ns.map((node, idx) => {
+    const visibleNs = filterMatch
+      ? ns.filter((n) => nodeMatchesFilter(n, filterMatch))
+      : ns;
+    return visibleNs.map((node, idx) => {
       const hasChildren = node.children.length > 0;
       const isOpen = effectiveExpanded.has(node.id);
-      const isLast = idx === ns.length - 1;
+      const isLast = idx === visibleNs.length - 1;
       const firstChildId = hasChildren ? node.children[0].id : null;
 
-      if (filterMatch && !nodeMatchesFilter(node, filterMatch)) return null!;
-
       const indent = depth * 24;
-      const isTabTarget =
-        focusedId === node.id ||
-        (focusedId === null && idx === 0 && depth === 0);
 
       return h("div", {
         key: node.id,
         class: "tree-node",
+        // The wrapper sits between tree/group and treeitem in the DOM;
+        // remove it from the accessibility tree so treeitems stay direct
+        // children of their tree/group context.
+        role: "none",
       },
         h("div", {
           class: `tree-node-row${hasChildren ? " tree-node-expandable" : ""}`,
           style: `padding-left: ${indent + 8}px`,
           role: "treeitem",
           "aria-expanded": hasChildren ? isOpen : undefined,
+          "aria-level": depth + 1,
+          "aria-setsize": visibleNs.length,
+          "aria-posinset": idx + 1,
           "data-tree-id": node.id,
-          tabIndex: isTabTarget ? 0 : -1,
+          tabIndex: node.id === tabTargetId ? 0 : -1,
           onClick: hasChildren ? () => toggle(node.id) : undefined,
           onKeyDown: (e: KeyboardEvent) =>
             handleKeyDown(e, node.id, hasChildren, firstChildId, parentId),
@@ -210,7 +232,7 @@ export function TreeView({
             )
           : null,
       );
-    }).filter(Boolean);
+    });
   }
 
   return h("div", {
