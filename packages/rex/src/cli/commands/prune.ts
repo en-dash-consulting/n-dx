@@ -19,6 +19,7 @@ import { classifyLLMError } from "../llm-error-classifier.js";
 import { printVendorModelHeader } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
+import { ensureSnapshot } from "../snapshot-guard.js";
 
 // ── Parsed flag helpers ──────────────────────────────────────────────
 
@@ -112,6 +113,9 @@ export async function cmdPrune(
 
   const rexDir = join(dir, REX_DIR);
   const store = await resolveStore(rexDir);
+
+  // Snapshot the tree before any mutation so `rex restore` can undo this prune.
+  await ensureSnapshot(rexDir, "prune", flags);
   const doc = await store.loadDocument();
 
   const dryRun = flags["dry-run"] === "true";

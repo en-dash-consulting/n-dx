@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { ensureLegacyPrdMigrated, LegacyPrdMigrationError } from "../../../src/store/ensure-legacy-prd-migrated.js";
@@ -153,8 +153,9 @@ describe("ensureLegacyPrdMigrated", () => {
     expect(result.migrated).toBe(true);
     expect(result.backupPath).toBeDefined();
 
-    // Extract timestamp from filename and verify format
-    const backupName = result.backupPath!.split("/").pop()!;
+    // Extract timestamp from filename and verify format. basename, not
+    // split("/"): backupPath uses "\" separators on Windows.
+    const backupName = basename(result.backupPath!);
     expect(backupName).toMatch(/^prd\.json\.backup-\d{8}-\d{6}$/);
 
     // Verify backup contains original content

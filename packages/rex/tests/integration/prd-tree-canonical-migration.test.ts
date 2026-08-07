@@ -123,7 +123,8 @@ describe("PRD tree canonical migration", () => {
     // ── Snapshot before mutating ─────────────────────────────────────────────
     const snapshot = await snapshotPRDTree(rexDir);
     expect(snapshot).not.toBeNull();
-    expect(snapshot!.backupPath).toMatch(/\.rex\/\.backups\/prd_tree_/);
+    // [\\/]: backupPath is built with join(), so it uses "\" on Windows.
+    expect(snapshot!.backupPath).toMatch(/\.rex[\\/]\.backups[\\/]prd_tree_/);
     const backupExists = await stat(snapshot!.backupPath).then(() => true).catch(() => false);
     expect(backupExists).toBe(true);
 

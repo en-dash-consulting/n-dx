@@ -21,3 +21,23 @@ CLAUDE.md               text eol=lf
 .agents/**/*.md         text eol=lf
 .claude/skills/**/*.md  text eol=lf
 .codex/config.toml      text eol=lf
+
+# repo-only eol pins (not injected by ndx init)
+# Everything below is specific to this repository's own layout, so it is NOT
+# part of GITATTRIBUTES_EOL_RULES (which `ndx init` writes into consumer
+# projects). The sync guard in tests/e2e/prd-line-endings.test.js compares the
+# injector list against the section ABOVE this marker only.
+#
+# A shebang line must end with LF. `#!/usr/bin/env node\r\n` breaks direct
+# execution on Unix ("bad interpreter: ...^M") and breaks vitest's transform of
+# any script a test imports, which fails collection with the locationless
+# `SyntaxError: Invalid or unexpected token`. Every hashbang-bearing tracked
+# file is already LF in the index, so these pins add no content change — they
+# only stop Windows checkouts (core.autocrlf=true) from rewriting them to CRLF.
+*.sh                        text eol=lf
+*.mjs                       text eol=lf
+*.py                        text eol=lf
+packages/*/bin/*.js         text eol=lf
+packages/*/src/cli/index.ts text eol=lf
+packages/core/cli.js        text eol=lf
+packages/core/export.js     text eol=lf

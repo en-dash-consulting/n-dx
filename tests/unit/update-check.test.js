@@ -25,6 +25,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import {
   startUpdateCheck,
   formatUpdateNotice,
+  detectInstallManager,
+  formatUpgradeCommand,
   CACHE_TTL_MS,
 } from "../../packages/core/update-check.js";
 
@@ -190,6 +192,74 @@ describe("update-check", () => {
     it("includes the install command in the output", () => {
       const notice = formatUpdateNotice({ current: "1.0.0", latest: "2.0.0" });
       expect(notice).toMatch(/npm|pnpm|install|update/i);
+    });
+
+    it("suggests the command for the detected package manager", () => {
+      const notice = formatUpdateNotice({
+        current: "1.0.0",
+        latest: "2.0.0",
+        manager: "pnpm",
+      });
+      expect(notice).toContain("pnpm add -g @n-dx/core@latest");
+      expect(notice).not.toContain("npm i -g");
+    });
+
+    // Regression: a bare `@n-dx/core` re-resolves inside pnpm's recorded caret
+    // range, which for 0.x versions cannot cross a minor boundary. Users stayed
+    // stranded on 0.3.x while believing they had upgraded.
+    it("always pins @latest so a caret range cannot strand the upgrade", () => {
+      for (const manager of ["npm", "pnpm", "yarn"]) {
+        const notice = formatUpdateNotice({ current: "0.3.1", latest: "0.4.6", manager });
+        expect(notice).toContain("@n-dx/core@latest");
+      }
+    });
+  });
+
+  describe("detectInstallManager", () => {
+    it("detects a pnpm global install from its virtual store path", () => {
+      expect(
+        detectInstallManager(
+          "C:\\Users\\x\\AppData\\Local\\pnpm\\global\\5\\.pnpm\\@n-dx+core@0.3.1\\node_modules\\@n-dx\\core\\update-check.js",
+        ),
+      ).toBe("pnpm");
+    });
+
+    it("detects pnpm on POSIX paths", () => {
+      expect(
+        detectInstallManager("/home/x/.local/share/pnpm/global/5/.pnpm/@n-dx+core@0.4.6/node_modules/@n-dx/core/update-check.js"),
+      ).toBe("pnpm");
+    });
+
+    it("detects a yarn classic global install", () => {
+      expect(
+        detectInstallManager(
+          "C:\\Users\\x\\AppData\\Local\\Yarn\\Data\\global\\node_modules\\@n-dx\\core\\update-check.js",
+        ),
+      ).toBe("yarn");
+    });
+
+    it("falls back to npm for an npm prefix install", () => {
+      expect(
+        detectInstallManager(
+          "C:\\Users\\x\\AppData\\Roaming\\npm\\node_modules\\@n-dx\\core\\update-check.js",
+        ),
+      ).toBe("npm");
+    });
+
+    it("falls back to npm for a local dev checkout", () => {
+      expect(detectInstallManager("/home/x/code/n-dx/packages/core/update-check.js")).toBe("npm");
+    });
+  });
+
+  describe("formatUpgradeCommand", () => {
+    it("maps each manager to its own global-install syntax", () => {
+      expect(formatUpgradeCommand("npm")).toBe("npm i -g @n-dx/core@latest");
+      expect(formatUpgradeCommand("pnpm")).toBe("pnpm add -g @n-dx/core@latest");
+      expect(formatUpgradeCommand("yarn")).toBe("yarn global add @n-dx/core@latest");
+    });
+
+    it("treats an unknown manager as npm", () => {
+      expect(formatUpgradeCommand("bun")).toBe("npm i -g @n-dx/core@latest");
     });
   });
 

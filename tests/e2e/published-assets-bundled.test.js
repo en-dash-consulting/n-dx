@@ -8,9 +8,12 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { execFileSync } from "child_process";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+// execFileSyncCli, not execFileSync: `pnpm` on Windows is a `.CMD` shim, which a
+// raw execFileSync cannot launch (`spawnSync pnpm ENOENT`). The helper routes
+// through cmd.exe on win32 and calls execFileSync directly elsewhere.
+import { execFileSyncCli } from "../../packages/core/win-spawn.js";
 
 const CORE_DIR = join(import.meta.dirname, "../../packages/core");
 const ASSET_DIR = join(CORE_DIR, "assistant-assets");
@@ -37,7 +40,7 @@ describe("@n-dx/core publishes assistant-assets/", () => {
     // pnpm (not npm): npm rebuilds shared dist via the `prepare` lifecycle on
     // pack even with ignore-scripts, racing other root tests. pnpm honors
     // .npmrc ignore-scripts=true. `pnpm pack --json` prints a single object.
-    const out = execFileSync(
+    const out = execFileSyncCli(
       "pnpm",
       ["pack", "--dry-run", "--json"],
       { cwd: CORE_DIR, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },

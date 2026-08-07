@@ -57,10 +57,16 @@ describe("quoteWindowsToken", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildWindowsCliCommandLine", () => {
-  it("joins binary and args as quoted tokens", () => {
+  it("quotes args and leaves a bare binary name unquoted", () => {
     expect(buildWindowsCliCommandLine("node", ["--version"])).toBe(
-      '"node" "--version"',
+      'node "--version"',
     );
+  });
+
+  // A quoted command name defeats cmd.exe PATHEXT resolution — see the
+  // rationale on buildWindowsCliCommandLine in packages/llm-client/src/exec.ts.
+  it("leaves bare names unquoted so cmd.exe PATHEXT resolution still applies", () => {
+    expect(buildWindowsCliCommandLine("pnpm", ["build"])).toBe('pnpm "build"');
   });
 
   it("handles a spaced binary path", () => {
@@ -69,7 +75,7 @@ describe("buildWindowsCliCommandLine", () => {
   });
 
   it("handles zero args", () => {
-    expect(buildWindowsCliCommandLine("claude", [])).toBe('"claude"');
+    expect(buildWindowsCliCommandLine("claude", [])).toBe("claude");
   });
 });
 
