@@ -1,5 +1,5 @@
 import { h, Fragment } from "preact";
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem, FileDetail, ZoneDetail } from "../types.js";
 import { meterClass, getZoneColorByIndex } from "../visualization/index.js";
 import { basename } from "../utils.js";
@@ -25,6 +25,25 @@ export function DetailPanel({ detail, data, navigateTo, onClose, prdDetailConten
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [detail, onClose]);
+
+  // Focus management: save trigger element when panel opens, restore it when
+  // panel closes. Capture only on the closed→open transition — switching
+  // between two details while the panel stays open must not overwrite the
+  // original trigger, or closing would drop focus to <body>.
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    const isOpen = detail !== null;
+    if (isOpen && !wasOpenRef.current) {
+      previousFocusRef.current = document.activeElement as HTMLElement;
+    } else if (!isOpen && wasOpenRef.current) {
+      requestAnimationFrame(() => {
+        previousFocusRef.current?.focus();
+        previousFocusRef.current = null;
+      });
+    }
+    wasOpenRef.current = isOpen;
+  }, [detail]);
 
   if (!detail) return null;
 
@@ -168,7 +187,7 @@ function renderFileDetail(
       ? h("button", {
           class: "detail-nav-btn",
           onClick: () => navigateTo("graph", { file: path }),
-        }, "\u2B95 View in Graph")
+        }, h("span", { "aria-hidden": "true" }, "\u2B95 "), "View in Graph")
       : null,
   );
 }
@@ -217,7 +236,15 @@ function renderZoneDetail(
         h("span", { class: "label" }, "Cohesion"),
         h("span", null, cohesion.toFixed(2))
       ),
-      h("div", { class: "meter" },
+      h("div", {
+        class: "meter",
+        role: "meter",
+        "aria-label": "Cohesion",
+        "aria-valuemin": 0,
+        "aria-valuemax": 1,
+        "aria-valuenow": cohesion,
+        "aria-valuetext": cohesion.toFixed(2),
+      },
         h("div", {
           class: `meter-fill ${meterClass(cohesion)}`,
           style: `width: ${cohesion * 100}%`,
@@ -231,7 +258,15 @@ function renderZoneDetail(
         h("span", { class: "label" }, "Coupling"),
         h("span", null, coupling.toFixed(2))
       ),
-      h("div", { class: "meter" },
+      h("div", {
+        class: "meter",
+        role: "meter",
+        "aria-label": "Coupling",
+        "aria-valuemin": 0,
+        "aria-valuemax": 1,
+        "aria-valuenow": coupling,
+        "aria-valuetext": coupling.toFixed(2),
+      },
         h("div", {
           class: `meter-fill ${meterClass(coupling, true)}`,
           style: `width: ${coupling * 100}%`,
@@ -262,15 +297,15 @@ function renderZoneDetail(
           h("button", {
             class: "detail-nav-btn",
             onClick: () => navigateTo("files", { zone: zoneId }),
-          }, "\u2630 View in Files"),
+          }, h("span", { "aria-hidden": "true" }, "\u2630 "), "View in Files"),
           h("button", {
             class: "detail-nav-btn",
             onClick: () => navigateTo("problems"),
-          }, "\u26A0 View Problems"),
+          }, h("span", { "aria-hidden": "true" }, "\u26A0 "), "View Problems"),
           h("button", {
             class: "detail-nav-btn",
             onClick: () => navigateTo("suggestions"),
-          }, "\u2728 View Suggestions"),
+          }, h("span", { "aria-hidden": "true" }, "\u2728 "), "View Suggestions"),
         )
       : null,
   );

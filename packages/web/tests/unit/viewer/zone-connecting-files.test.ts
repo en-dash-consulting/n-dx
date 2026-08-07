@@ -448,4 +448,32 @@ describe("buildXZoneBarSegments", () => {
       BAR_H,
     )).toEqual([]);
   });
+
+  it("sets label on each segment when zoneNameById is provided", () => {
+    const zoneNameById = new Map([
+      ["z-red", "Red Zone"],
+      ["z-green", "Green Zone"],
+    ]);
+    const segments = buildXZoneBarSegments(
+      [
+        { targetZoneId: "z-red", weight: 2 },
+        { targetZoneId: "z-green", weight: 1 },
+      ],
+      zoneColorById,
+      BAR_H,
+      zoneNameById,
+    );
+    // Sorted by weight descending: red (2), green (1)
+    expect(segments[0].label).toBe("Cross-zone: Red Zone, 2 calls");
+    expect(segments[1].label).toBe("Cross-zone: Green Zone, 1 call");
+  });
+
+  it("omits label when zoneNameById is not provided (backward compat)", () => {
+    const segments = buildXZoneBarSegments(
+      [{ targetZoneId: "z-red", weight: 1 }],
+      zoneColorById,
+      BAR_H,
+    );
+    expect(segments[0].label).toBeUndefined();
+  });
 });

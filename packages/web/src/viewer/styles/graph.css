@@ -354,3 +354,17 @@
 @media (pointer: coarse) {
   .graph-node circle { stroke-width: 2px; }
 }
+
+/* ── Prefers-reduced-motion ──────────────────────────────────────────
+   Disable animations and transitions for users who prefer reduced motion.
+   ─────────────────────────────────────────────────────────────────── */
+
+/* Animation disabling is handled globally in a11y.css; only rules that
+   need a distinct static end-state live here. */
+@media (prefers-reduced-motion: reduce) {
+  .refresh-toast {
+    animation: none;
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}

@@ -286,19 +286,23 @@ describe("Sidebar", () => {
   });
 
   describe("section header accessibility", () => {
-    it("section headers have role=button", () => {
+    it("section headers are native <button> elements", () => {
       renderSidebar();
       const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
       headers.forEach((header) => {
-        expect(header.getAttribute("role")).toBe("button");
+        // Native buttons are intrinsically interactive; no role attribute needed.
+        expect(header.tagName.toLowerCase()).toBe("button");
+        expect(header.getAttribute("role")).toBeNull();
       });
     });
 
-    it("section headers are focusable", () => {
+    it("section headers are natively focusable (button element)", () => {
       renderSidebar();
       const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
       headers.forEach((header) => {
-        expect(header.getAttribute("tabindex")).toBe("0");
+        // Native buttons are keyboard-focusable without explicit tabindex.
+        expect(header.tagName.toLowerCase()).toBe("button");
+        expect(header.getAttribute("tabindex")).toBeNull();
       });
     });
 
@@ -511,10 +515,12 @@ describe("Sidebar", () => {
       expect(onNavigate).toHaveBeenCalledWith("overview");
     });
 
-    it("progress indicator has accessible role and label", () => {
+    it("progress indicator is a native <button> with accessible label", () => {
       renderSidebar({ manifest: mockManifest, view: "overview" as const });
       const progress = root.querySelector(".sidebar-progress");
-      expect(progress?.getAttribute("role")).toBe("button");
+      // Native button — no role attribute needed.
+      expect(progress?.tagName.toLowerCase()).toBe("button");
+      expect(progress?.getAttribute("role")).toBeNull();
       expect(progress?.getAttribute("aria-label")).toContain("Analysis progress");
       expect(progress?.getAttribute("aria-label")).toContain("click to view");
     });

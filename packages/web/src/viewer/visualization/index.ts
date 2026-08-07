@@ -54,4 +54,4 @@ export { TreeView } from "../components/data-display/tree-view.js";
 export type { TreeNode } from "../components/data-display/tree-view.js";
 
 // ── Composition components: zone visualization ──────────────────────
-export { ZoneMap, ZoneDetail } from "../components/data-display/zone-map.js";
+export { ZoneMap } from "../components/data-display/zone-map.js";

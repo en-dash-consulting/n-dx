@@ -29,11 +29,23 @@ export function HealthGauge({ value, label, size = 80, inverted = false }: Healt
   const cx = size / 2;
   const cy = size / 2;
 
-  return h("div", { class: "health-gauge", style: `width: ${size}px` },
+  const health = displayValue >= 0.7 ? "good" : displayValue >= 0.4 ? "fair" : "poor";
+
+  return h("div", {
+    class: "health-gauge",
+    style: `width: ${size}px`,
+    role: "meter",
+    "aria-valuemin": 0,
+    "aria-valuemax": 1,
+    "aria-valuenow": normalized,
+    "aria-valuetext": `${normalized.toFixed(2)} (${health})`,
+    "aria-label": label,
+  },
     h("svg", {
       viewBox: `0 0 ${size} ${size}`,
       width: size,
       height: size,
+      "aria-hidden": "true",
     },
       // Background circle
       h("circle", {
@@ -82,8 +94,10 @@ interface PatternBadgeProps {
 
 export function PatternBadge({ type, label }: PatternBadgeProps) {
   const icon = type === "pattern" ? "\u2713" : "\u26A0";
+  const typeName = type === "pattern" ? "Pattern" : "Anti-pattern";
   return h("span", { class: `pattern-badge ${type}` },
-    h("span", { class: "pattern-icon" }, icon),
+    h("span", { class: "pattern-icon", "aria-hidden": "true" }, icon),
+    h("span", { class: "sr-only" }, `${typeName}: `),
     label
   );
 }
@@ -100,12 +114,13 @@ interface MetricCardProps {
 
 export function MetricCard({ value, label, trend, color }: MetricCardProps) {
   const trendIcon = trend === "up" ? "\u2191" : trend === "down" ? "\u2193" : "";
+  const trendText = trend === "up" ? "trending up" : trend === "down" ? "trending down" : "";
 
-  return h("div", { class: "metric-card" },
-    h("div", { class: "metric-value", style: color ? `color: ${color}` : "" },
+  return h("div", { class: "metric-card", role: "group", "aria-label": `${label}: ${value}${trendText ? `, ${trendText}` : ""}` },
+    h("div", { class: "metric-value", style: color ? `color: ${color}` : "", "aria-hidden": "true" },
       value,
       trend ? h("span", { class: `metric-trend metric-trend-${trend}` }, trendIcon) : null
     ),
-    h("div", { class: "metric-label" }, label)
+    h("div", { class: "metric-label", "aria-hidden": "true" }, label)
   );
 }

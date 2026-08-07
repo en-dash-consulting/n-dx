@@ -59,19 +59,22 @@ function RefreshRecommendationsButton() {
       class: "cmd-inline-trigger",
       onClick: handleClick,
       disabled: state === "running",
+      "aria-busy": state === "running",
       title: "Re-run rex recommend to refresh suggestions",
     },
       state === "running"
         ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" })
-        : "\u{1F504}",
+        : h("span", { "aria-hidden": "true" }, "\u{1F504}"),
       state === "running" ? "Refreshing..." : "Refresh Recommendations",
     ),
-    state === "done"
-      ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, doneLabel)
-      : null,
-    state === "error"
-      ? h("span", { class: "cmd-inline-result cmd-inline-result-err" }, error || "Failed")
-      : null,
+    h("span", { role: "status", "aria-live": "polite" },
+      state === "done"
+        ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, doneLabel)
+        : null,
+      state === "error"
+        ? h("span", { class: "cmd-inline-result cmd-inline-result-err" }, error || "Failed")
+        : null,
+    ),
   );
 }
 
@@ -81,7 +84,7 @@ export function SuggestionsView({ data }: SuggestionsProps) {
 
   if (enrichmentPass < ENRICHMENT_THRESHOLDS.suggestions) {
     return h("div", { class: "locked-view" },
-      h("div", { class: "locked-icon" }, "\u{1F512}"),
+      h("div", { class: "locked-icon", "aria-hidden": "true" }, "\u{1F512}"),
       h("h2", null, "Suggestions"),
       h("p", null, "Requires enrichment pass 4 (current: ", enrichmentPass, ")"),
       h("p", { class: "locked-hint" },

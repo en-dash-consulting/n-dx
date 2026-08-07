@@ -177,18 +177,11 @@ function FAQModal({ onClose, initialSection }: { onClose: () => void; initialSec
         FAQ_SECTIONS.map((section) => {
           const isExpanded = expandedSection === section.title;
           return h("div", { key: section.title, class: "faq-section" },
-            h("div", {
+            h("button", {
               class: "faq-section-header",
-              role: "button",
-              tabIndex: 0,
+              type: "button",
               "aria-expanded": String(isExpanded),
               onClick: () => toggleSection(section.title),
-              onKeyDown: (e: KeyboardEvent) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  toggleSection(section.title);
-                }
-              },
             },
               h("span", {
                 class: `faq-section-chevron${isExpanded ? " faq-section-chevron-open" : ""}`,

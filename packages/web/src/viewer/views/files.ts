@@ -1,10 +1,13 @@
 import { h } from "preact";
-import { useState, useMemo, useEffect } from "preact/hooks";
+import { useState, useMemo, useEffect, useRef, useCallback } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { FileEntry } from "../external.js";
 import { buildFileToZoneMap, getZoneColorByIndex } from "../visualization/index.js";
 import { basename } from "../utils.js";
 import { BrandedHeader } from "../components/index.js";
+
+const FILE_SEARCH_LISTBOX_ID = "file-search-listbox";
+const FILE_SEARCH_MAX_OPTIONS = 10;
 
 interface FilesViewProps {
   data: LoadedData;
@@ -42,6 +45,11 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [showCount, setShowCount] = useState(100);
   const [showAllFiles, setShowAllFiles] = useState(false);
+  // Combobox state for the search input
+  const [comboActiveIndex, setComboActiveIndex] = useState(-1);
+  const [comboOpen, setComboOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const liveRegionRef = useRef<HTMLSpanElement>(null);
 
   // Auto-set zone filter when selectedZone prop is provided
   useEffect(() => {
@@ -156,6 +164,70 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
     });
   };
 
+  // Combobox options — first N files from the filtered set
+  const comboOptions = useMemo(
+    () => filtered.slice(0, FILE_SEARCH_MAX_OPTIONS),
+    [filtered],
+  );
+
+  const handleComboSelect = useCallback((file: FileEntry) => {
+    setSearch(file.path);
+    setComboOpen(false);
+    setComboActiveIndex(-1);
+    handleRowClick(file);
+    // Announce to screen readers
+    if (liveRegionRef.current) {
+      liveRegionRef.current.textContent = `Selected ${file.path}`;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleRowClick]);
+
+  const handleSearchKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!comboOpen && search.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setComboOpen(true);
+        setComboActiveIndex(0);
+        return;
+      }
+    }
+    if (!comboOpen) return;
+
+    switch (e.key) {
+      case "ArrowDown": {
+        e.preventDefault();
+        setComboActiveIndex((i) => Math.min(i + 1, comboOptions.length - 1));
+        break;
+      }
+      case "ArrowUp": {
+        e.preventDefault();
+        setComboActiveIndex((i) => {
+          const next = i - 1;
+          if (next < 0) { setComboOpen(false); return -1; }
+          return next;
+        });
+        break;
+      }
+      case "Enter": {
+        if (comboActiveIndex >= 0 && comboActiveIndex < comboOptions.length) {
+          e.preventDefault();
+          handleComboSelect(comboOptions[comboActiveIndex]);
+        }
+        break;
+      }
+      case "Escape": {
+        e.preventDefault();
+        setComboOpen(false);
+        setComboActiveIndex(-1);
+        break;
+      }
+    }
+  }, [comboOpen, search, comboOptions, comboActiveIndex, handleComboSelect]);
+
+  const activeOptionId = comboOpen && comboActiveIndex >= 0
+    ? `file-option-${comboActiveIndex}`
+    : undefined;
+
   const visible = filtered.slice(0, showCount);
   const remaining = filtered.length - showCount;
 
@@ -168,15 +240,66 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
       `${inventory.summary.totalFiles} files, ${inventory.summary.totalLines.toLocaleString()} lines`
     ),
 
+    // Screen-reader live region for combobox announcements
+    h("span", {
+      ref: liveRegionRef,
+      role: "status",
+      "aria-live": "polite",
+      class: "sr-only",
+    }),
+
     // Filter bar
     h("div", { class: "filter-bar" },
-      h("input", {
-        class: "filter-input",
-        type: "text",
-        placeholder: "Search files or categories...",
-        value: search,
-        onInput: (e: Event) => setSearch((e.target as HTMLInputElement).value),
-      }),
+      // Combobox wrapper
+      h("div", { class: "file-search-combobox", style: "position:relative" },
+        h("input", {
+          ref: searchInputRef,
+          class: "filter-input",
+          type: "text",
+          placeholder: "Search files or categories...",
+          value: search,
+          role: "combobox",
+          "aria-autocomplete": "list",
+          "aria-expanded": comboOpen && comboOptions.length > 0,
+          // Only reference the listbox while it is mounted — a permanent
+          // aria-controls pointing at an absent id is a dangling IDREF.
+          "aria-controls": comboOpen && comboOptions.length > 0 ? FILE_SEARCH_LISTBOX_ID : undefined,
+          "aria-activedescendant": activeOptionId,
+          "aria-label": "Search files",
+          onInput: (e: Event) => {
+            const val = (e.target as HTMLInputElement).value;
+            setSearch(val);
+            setComboOpen(val.length > 0);
+            setComboActiveIndex(-1);
+          },
+          onKeyDown: handleSearchKeyDown,
+          onFocus: () => { if (search.length > 0) setComboOpen(true); },
+          onBlur: () => {
+            // Small delay to allow click on option to fire before closing
+            setTimeout(() => { setComboOpen(false); setComboActiveIndex(-1); }, 150);
+          },
+        }),
+        // Listbox dropdown
+        comboOpen && comboOptions.length > 0
+          ? h("ul", {
+              id: FILE_SEARCH_LISTBOX_ID,
+              role: "listbox",
+              "aria-label": "File suggestions",
+              class: "file-search-listbox",
+            },
+              comboOptions.map((file, i) =>
+                h("li", {
+                  key: file.path,
+                  id: `file-option-${i}`,
+                  role: "option",
+                  "aria-selected": i === comboActiveIndex,
+                  class: `file-search-option${i === comboActiveIndex ? " active" : ""}`,
+                  onMouseDown: (e: MouseEvent) => { e.preventDefault(); handleComboSelect(file); },
+                }, file.path),
+              ),
+            )
+          : null,
+      ),
       h("select", {
         class: "filter-select",
         value: roleFilter,
@@ -198,6 +321,7 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
         ? h("select", {
             class: "filter-select",
             value: zoneFilter,
+            "aria-label": "Filter by zone",
             onChange: (e: Event) => setZoneFilter((e.target as HTMLSelectElement).value),
           },
             h("option", { value: "all" }, "All Zones"),

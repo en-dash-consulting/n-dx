@@ -755,3 +755,93 @@
 .mg-file-added { color: var(--green); }
 .mg-file-deleted { color: var(--brand-rose); }
 .mg-file-renamed { color: var(--brand-orange); }
+
+/* ── Focus ring on keyboard-navigable SVG nodes ──────────────────────────── */
+
+.mg-node:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ── Accessible table view ───────────────────────────────────────────────── */
+
+.mg-table-section {
+  padding: var(--space-4);
+  overflow-x: auto;
+}
+
+.mg-table-wrapper {
+  margin: 0;
+}
+
+.mg-table-caption {
+  caption-side: top;
+  text-align: right;
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  padding: var(--space-1) 0 var(--space-2);
+}
+
+.mg-table-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: var(--space-6) var(--space-4);
+}
+
+.mg-table-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.mg-table-row.selected td {
+  background: var(--bg-active);
+}
+
+.mg-level-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  text-transform: capitalize;
+}
+
+.mg-level-epic { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.mg-level-feature { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green); }
+.mg-level-task { background: color-mix(in srgb, var(--brand-orange) 12%, transparent); color: var(--brand-orange); }
+.mg-level-subtask { background: var(--bg-hover); color: var(--text-muted); }
+
+.mg-status-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  text-transform: capitalize;
+  background: var(--bg-hover);
+  color: var(--text-dim);
+}
+
+.mg-status-pending { background: var(--bg-hover); color: var(--text-muted); }
+.mg-status-in-progress { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.mg-status-completed { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green); }
+.mg-status-failing { background: color-mix(in srgb, var(--brand-rose) 12%, transparent); color: var(--brand-rose); }
+.mg-status-blocked { background: color-mix(in srgb, var(--brand-orange) 12%, transparent); color: var(--brand-orange); }
+.mg-status-deferred { background: color-mix(in srgb, var(--brand-purple) 12%, transparent); color: var(--brand-purple); }
+
+/* ── Visually-hidden live region for filter change announcements ─────────── */
+
+.mg-a11y-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

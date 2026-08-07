@@ -123,11 +123,6 @@
 }
 
 /* Respect reduced motion preferences */
-@media (prefers-reduced-motion: reduce) {
-  .degradation-banner {
-    animation: none;
-  }
-}
 
 /* When degradation disables animations globally, suppress all transitions */
 .degradation-no-animations,

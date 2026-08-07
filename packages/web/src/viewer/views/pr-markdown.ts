@@ -425,28 +425,52 @@ export function PRMarkdownView() {
                 cacheStatus === "fresh" ? " — fresh" : "",
               )
             : null,
-          h("div", { class: "pr-markdown-mode-toggle", role: "group", "aria-label": "PR markdown view mode" },
+          h("div", {
+            class: "pr-markdown-mode-toggle",
+            role: "tablist",
+            "aria-label": "PR markdown view mode",
+            onKeyDown: (e: KeyboardEvent) => {
+              if (e.key === "ArrowLeft") { e.preventDefault(); handleModeChange("preview"); }
+              else if (e.key === "ArrowRight") { e.preventDefault(); handleModeChange("raw"); }
+            },
+          },
             h("button", {
               type: "button",
+              id: "pr-markdown-tab-preview",
+              role: "tab",
               class: `toggle-btn${viewMode === "preview" ? " active" : ""}`,
-              "aria-pressed": String(viewMode === "preview"),
+              "aria-selected": String(viewMode === "preview"),
               "aria-controls": "pr-markdown-panel-preview",
+              tabIndex: viewMode === "preview" ? 0 : -1,
               onClick: () => handleModeChange("preview"),
             }, "Preview"),
             h("button", {
               type: "button",
+              id: "pr-markdown-tab-raw",
+              role: "tab",
               class: `toggle-btn${viewMode === "raw" ? " active" : ""}`,
-              "aria-pressed": String(viewMode === "raw"),
+              "aria-selected": String(viewMode === "raw"),
               "aria-controls": "pr-markdown-panel-raw",
+              tabIndex: viewMode === "raw" ? 0 : -1,
               onClick: () => handleModeChange("raw"),
             }, "Raw"),
           ),
           viewMode === "preview"
-            ? h("section", { class: "pr-markdown-panel", id: "pr-markdown-panel-preview" },
+            ? h("section", {
+                class: "pr-markdown-panel",
+                id: "pr-markdown-panel-preview",
+                role: "tabpanel",
+                "aria-labelledby": "pr-markdown-tab-preview",
+              },
                 h("h4", { class: "section-header-sm" }, "Preview"),
                 h("div", { class: "pr-markdown-preview" }, renderMarkdownPreview(markdown)),
               )
-            : h("section", { class: "pr-markdown-panel", id: "pr-markdown-panel-raw" },
+            : h("section", {
+                class: "pr-markdown-panel",
+                id: "pr-markdown-panel-raw",
+                role: "tabpanel",
+                "aria-labelledby": "pr-markdown-tab-raw",
+              },
                 h("div", { class: "pr-markdown-raw-header" },
                   h("h4", { class: "section-header-sm" }, "Raw Markdown"),
                   h("button", {

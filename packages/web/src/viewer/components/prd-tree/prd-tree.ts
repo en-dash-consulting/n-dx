@@ -965,6 +965,8 @@ export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget
     item: PRDItemData;
     anchorRect: { left: number; top: number; bottom: number };
   } | null>(null);
+  /** ARIA live region message for status transitions. */
+  const [statusLiveMsg, setStatusLiveMsg] = useState("");
 
   const handleStatusClick = useCallback((item: PRDItemData, anchorRect: { left: number; top: number; bottom: number }) => {
     setStatusPicker((prev) => (prev?.item.id === item.id ? null : { item, anchorRect }));
@@ -977,7 +979,10 @@ export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget
   const handleStatusChange = useCallback(
     (status: ItemStatus) => {
       if (!statusPicker || !onUpdateItem) return;
-      onUpdateItem(statusPicker.item.id, { status });
+      const { item } = statusPicker;
+      const label = STATUS_CONFIG[status].label;
+      onUpdateItem(item.id, { status });
+      setStatusLiveMsg(`${item.title} status changed to ${label}`);
     },
     [statusPicker, onUpdateItem],
   );
@@ -1025,6 +1030,8 @@ export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget
   return h(
     "div",
     { class: "prd-tree-container" },
+    // Visually-hidden live region for status transition announcements.
+    h("div", { class: "sr-only", "aria-live": "polite", "aria-atomic": "true" }, statusLiveMsg),
     // Header
     h(
       "div",

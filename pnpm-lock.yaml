@@ -200,6 +200,9 @@ importers:
       '@types/node':
         specifier: ^25.1.0
         version: 25.2.0
+      axe-core:
+        specifier: ^4.10.0
+        version: 4.12.1
       esbuild:
         specifier: ^0.27.0
         version: 0.27.2
@@ -1265,6 +1268,10 @@ packages:
   auto-bind@5.0.1:
     resolution: {integrity: sha512-ooviqdwwgfIfNmDwo94wlshcdzfO64XV0Cg6oDsDYBJfITDz1EngD2z7DkbvCWn+XIMsIqW27sEVF6qcpJrRcg==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
+
+  axe-core@4.12.1:
+    resolution: {integrity: sha512-s7iGf5GaVMxEG0ENN9x+xTr7GFZCb1ZP/1uATUpCEK2X78nDB3RwbtFCo9pGAf9ru+VwoQ464DkaLEeRM08wJA==}
+    engines: {node: '>=4'}
 
   base64-js@0.0.8:
     resolution: {integrity: sha512-3XSA2cR/h/73EzlXXdU6YNycmYI7+kicTxks4eJg2g39biHR84slg2+des+p7iHYhbRg/udIS4TD53WabcOUkw==}
@@ -3494,14 +3501,6 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.0.18(vite@7.3.2(@types/node@22.19.8))':
-    dependencies:
-      '@vitest/spy': 4.0.18
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      vite: 7.3.2(@types/node@22.19.8)
-
   '@vitest/mocker@4.0.18(vite@7.3.2(@types/node@25.2.0))':
     dependencies:
       '@vitest/spy': 4.0.18
@@ -3721,6 +3720,8 @@ snapshots:
   assertion-error@2.0.1: {}
 
   auto-bind@5.0.1: {}
+
+  axe-core@4.12.1: {}
 
   base64-js@0.0.8: {}
 
@@ -5049,7 +5050,7 @@ snapshots:
   vitest@4.0.18(@types/node@22.19.8)(jsdom@27.4.0(@noble/hashes@1.8.0)):
     dependencies:
       '@vitest/expect': 4.0.18
-      '@vitest/mocker': 4.0.18(vite@7.3.2(@types/node@22.19.8))
+      '@vitest/mocker': 4.0.18(vite@7.3.2(@types/node@25.2.0))
       '@vitest/pretty-format': 4.0.18
       '@vitest/runner': 4.0.18
       '@vitest/snapshot': 4.0.18

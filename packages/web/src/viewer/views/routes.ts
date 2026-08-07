@@ -84,7 +84,7 @@ export function RoutesView({ data }: RoutesViewProps) {
 
   if (!components) {
     return h("div", { class: "locked-view" },
-      h("div", { class: "locked-icon" }, "\u25C7"),
+      h("div", { class: "locked-icon", "aria-hidden": "true" }, "\u25C7"),
       h("h2", null, "No Component Data"),
       h("p", null, "Run the component analyzer to see routes and component usage."),
       h("div", { class: "locked-hint" },
@@ -269,10 +269,10 @@ export function RoutesView({ data }: RoutesViewProps) {
             h("table", { class: "data-table" },
               h("thead", null,
                 h("tr", null,
-                  h("th", null, "File"),
-                  h("th", null, "Pattern"),
-                  h("th", null, "Exports"),
-                  h("th", null, "Layout"),
+                  h("th", { scope: "col" }, "File"),
+                  h("th", { scope: "col" }, "Pattern"),
+                  h("th", { scope: "col" }, "Exports"),
+                  h("th", { scope: "col" }, "Layout"),
                 )
               ),
               h("tbody", null,
@@ -312,9 +312,9 @@ export function RoutesView({ data }: RoutesViewProps) {
             h("table", { class: "data-table component-usage-table" },
               h("thead", null,
                 h("tr", null,
-                  h("th", null, "Component"),
-                  h("th", null, "File"),
-                  h("th", null, "Usage Count"),
+                  h("th", { scope: "col" }, "Component"),
+                  h("th", { scope: "col" }, "File"),
+                  h("th", { scope: "col" }, "Usage Count"),
                 )
               ),
               h("tbody", null,

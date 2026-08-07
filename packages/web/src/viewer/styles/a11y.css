@@ -10,21 +10,49 @@
   font-size: 13px;
   border-radius: 0 0 6px 0;
   transition: top 0.15s;
+  text-decoration: none;
 }
 
 .skip-link:focus {
   top: 0;
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
 }
 
-/* Focus visible for keyboard nav */
+/* Focus visible for keyboard nav — 3:1 contrast per WCAG 2.1 §1.4.11 */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-button:focus-visible, .nav-item:focus-visible, .zone-card:focus-visible {
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ── Reduced motion (global) ──────────────────────────────────────── */
+/*
+ * Single global kill-switch for animation and transitions, replacing
+ * per-file @media blocks. Near-zero duration + single iteration ends
+ * every animation instantly at its base styles, which is visually
+ * equivalent to `animation: none` for pulse/spin/slide effects.
+ * Rules that need a distinct static end-state (e.g. .section-reveal,
+ * .refresh-toast, progress fills) keep their own local overrides.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Screen reader only */
@@ -43,4 +71,35 @@ button:focus-visible, .nav-item:focus-visible, .zone-card:focus-visible {
 /* Mobile menu button: hidden on desktop */
 .mobile-menu-btn {
   display: none;
+}
+
+/* ── Button resets for elements converted from div[role="button"] ── */
+/*
+ * These classes historically used div[role="button"] for clickable regions.
+ * They have been converted to native <button> elements for proper semantics
+ * and keyboard accessibility. The resets below strip UA button defaults
+ * while preserving the visual styles applied by the class itself.
+ */
+button.nav-item,
+button.nav-section-header,
+button.collapsible-header,
+button.sidebar-indicator,
+button.faq-section-header,
+button.sidebar-progress {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  background: none;
+  font: inherit;
+  width: 100%;
+  text-align: left;
+}
+
+button.sidebar-rail-logo {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  background: none;
+  font: inherit;
+  padding: 0;
 }

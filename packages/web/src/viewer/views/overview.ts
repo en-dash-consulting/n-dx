@@ -42,19 +42,22 @@ function ReanalyzeButton() {
       class: "cmd-inline-trigger",
       onClick: handleClick,
       disabled: state === "running",
+      "aria-busy": state === "running",
       title: "Re-run sourcevision analyze to refresh all data",
     },
       state === "running"
         ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" })
-        : "\u{1F504}",
+        : h("span", { "aria-hidden": "true" }, "\u{1F504}"),
       state === "running" ? "Analyzing..." : "Re-analyze",
     ),
-    state === "done"
-      ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, "\u2713 Done")
-      : null,
-    state === "error"
-      ? h("span", { class: "cmd-inline-result cmd-inline-result-err" }, error || "Failed")
-      : null,
+    h("span", { role: "status", "aria-live": "polite" },
+      state === "done"
+        ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, "\u2713 Done")
+        : null,
+      state === "error"
+        ? h("span", { class: "cmd-inline-result cmd-inline-result-err" }, error || "Failed")
+        : null,
+    ),
   );
 }
 
@@ -304,20 +307,41 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
                 const healthColor = zone.cohesion >= 0.7 ? "var(--green)"
                   : zone.cohesion >= 0.4 ? "var(--orange)"
                   : "var(--red)";
+                const healthLabel = zone.cohesion >= 0.7 ? "Good"
+                  : zone.cohesion >= 0.4 ? "Fair"
+                  : "Poor";
+
+                const openZone = navigateTo ? () => navigateTo("graph", { zone: zone.id }) : undefined;
 
                 return h("div", {
                   key: zone.id,
                   class: "top-zone-item",
-                  onClick: navigateTo ? () => navigateTo("graph", { zone: zone.id }) : undefined,
+                  onClick: openZone,
+                  ...(openZone
+                    ? {
+                        role: "button",
+                        tabIndex: 0,
+                        "aria-label": `${zone.name}: ${zone.files.length} files, health ${healthLabel}. Open in map.`,
+                        onKeyDown: (e: KeyboardEvent) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openZone();
+                          }
+                        },
+                      }
+                    : {}),
                 },
-                  h("span", { class: "zone-dot", style: `background: ${color}` }),
+                  h("span", { class: "zone-dot", style: `background: ${color}`, "aria-hidden": "true" }),
                   h("span", { class: "zone-name" }, zone.name),
                   h("span", { class: "zone-files" }, `${zone.files.length} files`),
                   h("span", {
-                    class: "health-dot",
-                    style: `background: ${healthColor}`,
+                    class: "top-zone-health",
                     title: `Cohesion: ${zone.cohesion.toFixed(2)} / Coupling: ${zone.coupling.toFixed(2)}`,
-                  })
+                    style: `color: ${healthColor}`,
+                  },
+                    h("span", { class: "health-dot", style: `background: ${healthColor}`, "aria-hidden": "true" }),
+                    h("span", { class: "health-label" }, healthLabel),
+                  )
                 );
               })
             ),

@@ -61,6 +61,35 @@ async function fetchScope(): Promise<string | null> {
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
+/** Human-readable page titles for each view, used to update document.title on navigation. */
+const VIEW_TITLE_MAP: Partial<Record<import("./types.js").ViewId, string>> = {
+  overview: "Overview",
+  graph: "Import Graph",
+  files: "Files",
+  routes: "Routes",
+  architecture: "Architecture",
+  problems: "Problems",
+  suggestions: "Suggestions",
+  "pr-markdown": "PR Report",
+  "rex-dashboard": "Rex Dashboard",
+  prd: "Tasks",
+  "token-usage": "Token Usage",
+  validation: "Validation",
+  "notion-config": "Notion Sync",
+  integrations: "Integrations",
+  "hench-runs": "Runs",
+  "hench-audit": "Audit",
+  "hench-config": "ndx work",
+  "hench-templates": "Templates",
+  "hench-optimization": "Optimization",
+  "feature-toggles": "Feature Flags",
+  "cli-timeouts": "CLI Timeouts",
+  commands: "ndx export",
+  "llm-provider": "General",
+  "project-settings": "ndx analyze / plan",
+  "merge-graph": "Context Graph",
+};
+
 function getInitialSidebarCollapsed(): boolean {
   try {
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
@@ -160,6 +189,12 @@ function App({ scope }: { scope: string | null }) {
     document.getElementById("main-content")?.scrollTo(0, 0);
   }, [view]);
 
+  // Update browser <title> on route change so screen readers announce the new page
+  useEffect(() => {
+    const label = VIEW_TITLE_MAP[view] ?? view;
+    document.title = `${label} | n-dx`;
+  }, [view]);
+
   // Update browser favicon to match the active product section
   useEffect(() => {
     updateFavicon(view);
@@ -171,10 +206,11 @@ function App({ scope }: { scope: string | null }) {
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
   return h(Fragment, null,
+    // Skip link must be the first focusable element so keyboard users can bypass navigation.
+    h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
-    h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar, scope }),
     h("main", {
       id: "main-content",

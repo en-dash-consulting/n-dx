@@ -1,5 +1,6 @@
 import { h, Fragment } from "preact";
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useRef } from "preact/hooks";
+import { useFocusTrap } from "../hooks/index.js";
 import type { Zone, ZoneCrossing } from "../external.js";
 import { getZoneColorByIndex } from "../visualization/colors.js";
 import { meterClass } from "../visualization/metrics.js";
@@ -51,15 +52,37 @@ export function ZoneSlideout({
     return () => document.removeEventListener("keydown", handleKey);
   }, [zone, onClose]);
 
-  // Trap focus inside the panel when open
-  const panelRef = useCallback((el: HTMLElement | null) => {
-    if (el) el.focus();
-  }, []);
+  // Focus management: save trigger on open, restore on close.
+  // Note: previousFocus must be captured before the panel focuses itself, so
+  // we save it in the same effect that focuses the panel (not via ref callback).
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const prevZoneIdRef = useRef<string | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const prevId = prevZoneIdRef.current;
+    const currId = zone?.id ?? null;
+    prevZoneIdRef.current = currId;
+
+    if (currId && !prevId) {
+      // Panel just opened: save the trigger's focus first, then focus the panel.
+      previousFocusRef.current = document.activeElement as HTMLElement;
+      panelRef.current?.focus();
+    } else if (!currId && prevId) {
+      // Panel just closed: restore focus to the trigger.
+      requestAnimationFrame(() => previousFocusRef.current?.focus());
+    }
+  }, [zone]);
+
+  // aria-modal="true" promises assistive tech the background is inert, so
+  // Tab must not be able to move focus behind the open panel.
+  useFocusTrap(panelRef, !!zone);
 
   if (!zone) return null;
 
   const zoneIdx = allZones.indexOf(zone);
   const color = getZoneColorByIndex(zoneIdx >= 0 ? zoneIdx : 0);
+  const titleId = `zone-slideout-title-${zone.id}`;
 
   // Dependencies
   const incoming = crossings.filter((c) => c.toZone === zone.id);
@@ -78,16 +101,17 @@ export function ZoneSlideout({
     h("aside", {
       ref: panelRef,
       class: "zone-slideout open",
-      role: "complementary",
-      "aria-label": `Zone details: ${zone.name}`,
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": titleId,
       tabIndex: -1,
       style: `--zone-accent: ${color}`,
     },
       // Header
       h("div", { class: "zone-slideout-header" },
         h("div", { class: "zone-slideout-title" },
-          h("span", { class: "zone-slideout-dot", style: `background: ${color}` }),
-          h("h3", null, zone.name),
+          h("span", { class: "zone-slideout-dot", style: `background: ${color}`, "aria-hidden": "true" }),
+          h("h3", { id: titleId }, zone.name),
         ),
         h("button", {
           class: "zone-slideout-close",
@@ -127,7 +151,15 @@ export function ZoneSlideout({
       // Cohesion meter
       h("div", { class: "zone-slideout-meter-row" },
         h("span", { class: "zone-slideout-meter-label" }, "Cohesion"),
-        h("div", { class: "meter" },
+        h("div", {
+          class: "meter",
+          role: "meter",
+          "aria-label": "Cohesion",
+          "aria-valuemin": 0,
+          "aria-valuemax": 1,
+          "aria-valuenow": zone.cohesion,
+          "aria-valuetext": zone.cohesion.toFixed(2),
+        },
           h("div", {
             class: `meter-fill ${meterClass(zone.cohesion)}`,
             style: `width: ${zone.cohesion * 100}%`,
@@ -138,7 +170,15 @@ export function ZoneSlideout({
       // Coupling meter
       h("div", { class: "zone-slideout-meter-row" },
         h("span", { class: "zone-slideout-meter-label" }, "Coupling"),
-        h("div", { class: "meter" },
+        h("div", {
+          class: "meter",
+          role: "meter",
+          "aria-label": "Coupling",
+          "aria-valuemin": 0,
+          "aria-valuemax": 1,
+          "aria-valuenow": zone.coupling,
+          "aria-valuetext": zone.coupling.toFixed(2),
+        },
           h("div", {
             class: `meter-fill ${meterClass(zone.coupling, true)}`,
             style: `width: ${zone.coupling * 100}%`,
@@ -157,6 +197,19 @@ export function ZoneSlideout({
                   class: `zone-slideout-list-item mono-sm ${onFileClick ? "clickable" : ""}`,
                   title: ep,
                   onClick: onFileClick ? () => onFileClick(ep) : undefined,
+                  ...(onFileClick
+                    ? {
+                        role: "button",
+                        tabIndex: 0,
+                        "aria-label": `Open file ${ep}`,
+                        onKeyDown: (e: KeyboardEvent) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onFileClick(ep);
+                          }
+                        },
+                      }
+                    : {}),
                 }, basename(ep)),
               ),
               zone.entryPoints.length > 8
@@ -243,6 +296,7 @@ export function ZoneSlideout({
         h("button", {
           class: "zone-slideout-files-toggle",
           onClick: () => setShowFiles(!showFiles),
+          "aria-expanded": showFiles,
         },
           showFiles ? "Hide files" : `Show ${zone.files.length} files`,
         ),
@@ -253,6 +307,19 @@ export function ZoneSlideout({
                   key: f,
                   class: `zone-slideout-file-item mono-sm ${onFileClick ? "clickable" : ""}`,
                   onClick: onFileClick ? () => onFileClick(f) : undefined,
+                  ...(onFileClick
+                    ? {
+                        role: "button",
+                        tabIndex: 0,
+                        "aria-label": `Open file ${f}`,
+                        onKeyDown: (e: KeyboardEvent) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onFileClick(f);
+                          }
+                        },
+                      }
+                    : {}),
                 },
                   h("span", { class: "zone-slideout-file-path" }, f),
                   pinnedFiles?.has(f)
@@ -273,15 +340,15 @@ export function ZoneSlideout({
             h("button", {
               class: "zone-slideout-nav-btn",
               onClick: () => navigateTo("files", { zone: zone.id }),
-            }, "\u2630 View in Files"),
+            }, h("span", { "aria-hidden": "true" }, "\u2630 "), "View in Files"),
             h("button", {
               class: "zone-slideout-nav-btn",
               onClick: () => navigateTo("problems"),
-            }, "\u26A0 View Problems"),
+            }, h("span", { "aria-hidden": "true" }, "\u26A0 "), "View Problems"),
             h("button", {
               class: "zone-slideout-nav-btn",
               onClick: () => navigateTo("suggestions"),
-            }, "\u2728 View Suggestions"),
+            }, h("span", { "aria-hidden": "true" }, "\u2728 "), "View Suggestions"),
           )
         : null,
     ),

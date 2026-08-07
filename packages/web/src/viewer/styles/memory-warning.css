@@ -108,8 +108,3 @@
 }
 
 /* Respect reduced motion preferences */
-@media (prefers-reduced-motion: reduce) {
-  .memory-warning-banner {
-    animation: none;
-  }
-}

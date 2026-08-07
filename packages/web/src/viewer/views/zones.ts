@@ -9,9 +9,9 @@
  */
 
 import { h } from "preact";
-import { useState, useMemo, useCallback, useEffect } from "preact/hooks";
+import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
-import type { CallGraph, Zone, ZoneCrossing } from "../external.js";
+import type { CallGraph, Finding, Zone, ZoneCrossing } from "../external.js";
 import {
   CollapsibleSection,
   buildFileToZoneMap,
@@ -35,7 +35,7 @@ import type {
   ZoneBreadcrumb,
   ExpandedSubZones,
 } from "./zone-types.js";
-import { usePanZoom, useZoneDrag, useFileEdges, useSubZoneEdges } from "../hooks/index.js";
+import { usePanZoom, useZoneDrag, useFileEdges, useSubZoneEdges, useGraphArrowNav } from "../hooks/index.js";
 
 // ── Re-export types for downstream consumers ─────────────────────────
 export type { ZoneData, BoxRect, FlowEdge, FileConnectionMap, FileToFileMap, ZoneBreadcrumb } from "./zone-types.js";
@@ -184,6 +184,8 @@ export interface XZoneBarSegment {
   y: number;
   h: number;
   color: string;
+  /** Accessible label: "Cross-zone: <zone name>, N call(s)". Undefined when no name map supplied. */
+  label?: string;
 }
 
 /**
@@ -199,6 +201,7 @@ export function buildXZoneBarSegments(
   links: FileZoneLink[] | undefined,
   zoneColorById: Map<string, string>,
   barHeight: number,
+  zoneNameById?: Map<string, string>,
 ): XZoneBarSegment[] {
   if (!links || links.length === 0) return [];
   const resolved = links
@@ -213,7 +216,11 @@ export function buildXZoneBarSegments(
     const y = (cum / total) * barHeight;
     cum += link.weight;
     const yEnd = (cum / total) * barHeight;
-    segments.push({ y, h: yEnd - y, color: zoneColorById.get(link.targetZoneId)! });
+    const zoneName = zoneNameById?.get(link.targetZoneId);
+    const label = zoneName
+      ? `Cross-zone: ${zoneName}, ${link.weight} call${link.weight === 1 ? "" : "s"}`
+      : undefined;
+    segments.push({ y, h: yEnd - y, color: zoneColorById.get(link.targetZoneId)!, label });
   }
   return segments;
 }
@@ -906,6 +913,8 @@ function FileRow({
 
   return h("g", {
     class: `cg-file-row${searchMatch ? " search-match" : ""}${hasCrossZone ? " cross-zone" : ""}${active ? " active" : ""}`,
+    role: "button",
+    "aria-label": `Select file ${file.path}${hasCrossZone ? " (cross-zone connections)" : ""}`,
     onClick: (e: Event) => { e.stopPropagation(); onClick(); },
     onDblClick: (e: Event) => { e.stopPropagation(); onDblClick(); },
     onMouseEnter: onHover ? () => onHover(true) : undefined,
@@ -934,6 +943,8 @@ function FileRow({
                   width: 2,
                   height: seg.h,
                   style: `fill: ${seg.color};`,
+                  role: "img",
+                  "aria-label": seg.label ?? "Cross-zone connection",
                 }),
               ),
             )
@@ -944,6 +955,8 @@ function FileRow({
               width: 2,
               height: FILE_ROW_H - 2,
               rx: 1,
+              "aria-label": "Cross-zone file",
+              role: "img",
             }))
       : null,
     h("text", {
@@ -1057,6 +1070,9 @@ function SubZoneRow({
 
   return h("g", {
     class: `cg-subzone-row${expanded ? " expanded" : ""}`,
+    role: "button",
+    "aria-expanded": expanded,
+    "aria-label": `${expanded ? "Collapse" : "Expand"} sub-zone: ${subZone.name}`,
     style: `--zone-color: ${subZone.color}`,
     onClick: (e: Event) => { e.stopPropagation(); onToggle(); },
   },
@@ -1124,6 +1140,9 @@ function ZoneBox({
   onDrillDown,
   onToggleSubZone,
   onToggleConnectingOnly,
+  nodeRef,
+  onNodeKeyDown,
+  connectedZonesLabel,
 }: {
   zone: ZoneData;
   box: BoxRect;
@@ -1149,6 +1168,12 @@ function ZoneBox({
   onDrillDown?: () => void;
   onToggleSubZone?: (subZoneId: string) => void;
   onToggleConnectingOnly?: () => void;
+  /** Callback ref attached to the root SVG <g> for programmatic focus. */
+  nodeRef?: (el: Element | null) => void;
+  /** Arrow-key navigation handler delegated from ZoneDiagram. */
+  onNodeKeyDown?: (e: KeyboardEvent) => void;
+  /** Screen-reader description of connected zones for aria-describedby. */
+  connectedZonesLabel?: string;
 }) {
   const fileCount = zone.totalFiles;
   const hasSubZones = !!(zone.subZones && zone.subZones.length > 0);
@@ -1175,7 +1200,7 @@ function ZoneBox({
           searchMatch: searchQ ? isMatch : false,
           hasCrossZone,
           active: activeFilePath === file.path,
-          xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2),
+          xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2, zoneNameById),
           tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
           onClick: () => onSelectFile(file.path),
           onDblClick: () => onDblClickFile(file.path),
@@ -1234,7 +1259,7 @@ function ZoneBox({
               searchMatch: searchQ ? matchingFiles.has(file.path) : false,
               hasCrossZone,
               active: activeFilePath === file.path,
-              xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2),
+              xzoneSegments: buildXZoneBarSegments(fileConnections.get(file.path), zoneColorById, FILE_ROW_H - 2, zoneNameById),
               tooltip: buildConnectionsTooltip(fileConnections.get(file.path), zoneNameById),
               onClick: () => onSelectFile(file.path),
               onDblClick: () => onDblClickFile(file.path),
@@ -1271,11 +1296,30 @@ function ZoneBox({
     return elements;
   };
 
+  const ariaLabel = `${zone.name} zone, cohesion ${zone.cohesion.toFixed(2)}, coupling ${zone.coupling.toFixed(2)}, ${zone.totalFiles} file${zone.totalFiles !== 1 ? "s" : ""}`;
+
   return h("g", {
     class: `cg-zone-box${expanded ? " expanded" : ""}${selected ? " selected" : ""}${dimmed ? " search-dim" : ""}${connHighlighted ? " conn-highlight" : ""}`,
     "data-zone-id": zone.id,
+    // Use lowercase "tabindex" for SVG — browsers and jsdom treat SVG attrs case-sensitively
+    "tabindex": 0,
+    role: "button",
+    "aria-label": ariaLabel,
+    "aria-describedby": `zone-desc-${zone.id}`,
     style: "cursor: grab;",
+    ref: nodeRef,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        e.stopPropagation();
+        onSelectZone();
+      } else {
+        onNodeKeyDown?.(e);
+      }
+    },
   },
+    // SVG description element for aria-describedby (connected zones)
+    h("desc", { id: `zone-desc-${zone.id}` }, connectedZonesLabel ?? "No direct connections"),
     h("rect", {
       class: "cg-zone-rect",
       x: box.x,
@@ -1314,6 +1358,9 @@ function ZoneBox({
     ),
     h("g", {
       class: "cg-zone-toggle-btn",
+      role: "button",
+      "aria-expanded": expanded,
+      "aria-label": expanded ? "Collapse zone" : "Expand zone",
       onMouseDown: (e: Event) => e.stopPropagation(),
       onClick: (e: Event) => { e.stopPropagation(); onToggle(); },
       style: "cursor: pointer;",
@@ -1340,6 +1387,8 @@ function ZoneBox({
     zone.hasDrillDown && zone.subZones && onDrillDown
       ? h("g", {
           class: "cg-zone-drill-btn",
+          role: "button",
+          "aria-label": `Drill into ${zone.subZones.length} sub-zones of ${zone.name}`,
           onClick: (e: Event) => { e.stopPropagation(); onDrillDown(); },
         },
           h("rect", {
@@ -1366,6 +1415,9 @@ function ZoneBox({
           showConnectingToggle
             ? h("g", {
                 class: `cg-zone-connfilter-btn${connectingOnly ? " active" : ""}`,
+                role: "button",
+                "aria-pressed": connectingOnly,
+                "aria-label": connectingOnly ? "Show all files" : "Show only cross-zone connecting files",
                 onMouseDown: (e: Event) => e.stopPropagation(),
                 onClick: (e: Event) => { e.stopPropagation(); onToggleConnectingOnly?.(); },
               },
@@ -1389,6 +1441,8 @@ function ZoneBox({
           // Detail button — opens sidebar
           h("g", {
             class: "cg-zone-detail-btn",
+            role: "button",
+            "aria-label": `View ${zone.name} zone details`,
             onClick: (e: Event) => { e.stopPropagation(); onSelectZone(); },
           },
             h("title", null, "View zone details"),
@@ -1417,6 +1471,17 @@ function ZoneBox({
           ...(hasSubZones ? renderSubZoneContent() : renderFileContent()),
         )
       : null,
+    // Focus ring: invisible by default, appears on :focus-visible via CSS
+    h("rect", {
+      class: "cg-zone-focus-ring",
+      x: box.x - 3,
+      y: box.y - 3,
+      width: box.w + 6,
+      height: box.h + 6,
+      rx: 10,
+      fill: "none",
+      style: "pointer-events: none;",
+    }),
   );
 }
 
@@ -1496,9 +1561,49 @@ function ZoneDiagram({
   const [selectedFile, setSelectedFile] = useState<ActiveFileRef | null>(null);
   const activeFile = hoveredFile ?? selectedFile;
 
+  // Keyboard navigation: refs to zone <g> elements for programmatic focus
+  const zoneRefs = useRef(new Map<string, Element>());
+
   const zoneById = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
   const zoneNameById = useMemo(() => new Map(zones.map((z) => [z.id, z.name])), [zones]);
   const zoneColorById = useMemo(() => new Map(zones.map((z) => [z.id, z.color])), [zones]);
+
+  // Undirected adjacency list built from visible edges (deduped per pair)
+  const adjacency = useMemo(() => {
+    const adj = new Map<string, string[]>();
+    for (const z of zones) adj.set(z.id, []);
+    for (const e of edges) {
+      if (!adj.has(e.from) || !adj.has(e.to)) continue;
+      const fromList = adj.get(e.from)!;
+      if (!fromList.includes(e.to)) fromList.push(e.to);
+      const toList = adj.get(e.to)!;
+      if (!toList.includes(e.from)) toList.push(e.from);
+    }
+    return adj;
+  }, [zones, edges]);
+
+  // Screen-reader description for each zone: lists connected zone names
+  const connectionLabels = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const z of zones) {
+      const connIds = adjacency.get(z.id) ?? [];
+      labels.set(
+        z.id,
+        connIds.length === 0
+          ? "No direct connections"
+          : `Connected to: ${connIds.map((id) => zoneById.get(id)?.name ?? id).join(", ")}`,
+      );
+    }
+    return labels;
+  }, [zones, adjacency, zoneById]);
+
+  // Arrow-key navigation: cycles through the focused zone's edge-connected neighbours
+  const handleNodeKeyDown = useGraphArrowNav(
+    useCallback((zoneId: string) => adjacency.get(zoneId) ?? [], [adjacency]),
+    useCallback((targetId: string) => {
+      (zoneRefs.current.get(targetId) as HTMLElement | null)?.focus();
+    }, []),
+  );
 
   // Layout computation
   const { boxes: baseBoxes, totalW, totalH } = useMemo(
@@ -1812,6 +1917,12 @@ function ZoneDiagram({
               : undefined,
             onToggleSubZone: (szId: string) => onToggleSubZone(zone.id, szId),
             onToggleConnectingOnly: () => onToggleConnectingOnly(zone.id),
+            nodeRef: (el: Element | null) => {
+              if (el) zoneRefs.current.set(zone.id, el);
+              else zoneRefs.current.delete(zone.id);
+            },
+            onNodeKeyDown: (e: KeyboardEvent) => handleNodeKeyDown(zone.id, e),
+            connectedZonesLabel: connectionLabels.get(zone.id),
           });
         }),
       ),
@@ -1911,6 +2022,195 @@ function TopFunctionsTables({ summary }: TopFunctionsTablesProps) {
   );
 }
 
+// ── Persistence helper ───────────────────────────────────────────────
+
+function useLocalStorageState<T>(key: string, defaultValue: T): [T, (v: T) => void] {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored !== null ? (JSON.parse(stored) as T) : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  });
+
+  const setAndPersist = useCallback((v: T) => {
+    setValue(v);
+    try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* storage unavailable */ }
+  }, [key]);
+
+  return [value, setAndPersist];
+}
+
+// ── View toggle ──────────────────────────────────────────────────────
+
+function ViewToggle({
+  mode,
+  onChange,
+}: {
+  mode: "graph" | "table";
+  onChange: (m: "graph" | "table") => void;
+}) {
+  return h("div", { class: "zone-view-toggle" },
+    h("button", {
+      type: "button",
+      class: `zone-view-btn${mode === "graph" ? " active" : ""}`,
+      onClick: () => onChange("graph"),
+      "aria-pressed": mode === "graph",
+      "aria-label": "Switch to graph view",
+    }, "Graph"),
+    h("button", {
+      type: "button",
+      class: `zone-view-btn${mode === "table" ? " active" : ""}`,
+      onClick: () => onChange("table"),
+      "aria-pressed": mode === "table",
+      "aria-label": "Switch to table view",
+    }, "Table"),
+  );
+}
+
+// ── Zone table view ──────────────────────────────────────────────────
+
+function ZoneTableView({
+  zones,
+  findings,
+  edges,
+  searchQ,
+  selectedZoneId,
+  onSelectZone,
+}: {
+  zones: ZoneData[];
+  findings: Finding[];
+  edges: FlowEdge[];
+  searchQ: string;
+  selectedZoneId: string | null;
+  onSelectZone: (zd: ZoneData) => void;
+}) {
+  const zoneById = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
+
+  // Count per-zone findings (scope !== "global")
+  const findingsCount = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const f of findings) {
+      if (f.scope !== "global") {
+        counts.set(f.scope, (counts.get(f.scope) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [findings]);
+
+  // Build undirected adjacency (zone name list) from flow edges
+  const connectionsByZone = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const z of zones) map.set(z.id, []);
+    for (const e of edges) {
+      const toZone = zoneById.get(e.to);
+      const fromZone = zoneById.get(e.from);
+      if (map.has(e.from) && toZone && !map.get(e.from)!.includes(toZone.name)) {
+        map.get(e.from)!.push(toZone.name);
+      }
+      if (map.has(e.to) && fromZone && !map.get(e.to)!.includes(fromZone.name)) {
+        map.get(e.to)!.push(fromZone.name);
+      }
+    }
+    return map;
+  }, [zones, edges, zoneById]);
+
+  const visibleZones = useMemo(() => {
+    if (!searchQ) return zones;
+    return zones.filter((z) =>
+      z.name.toLowerCase().includes(searchQ) ||
+      z.description.toLowerCase().includes(searchQ) ||
+      z.files.some((f) => f.path.toLowerCase().includes(searchQ)),
+    );
+  }, [zones, searchQ]);
+
+  const captionId = "zone-table-caption";
+
+  return h("div", { class: "data-table-wrapper zone-table-wrapper" },
+    h("table", {
+      class: "data-table zone-table",
+      "aria-labelledby": captionId,
+    },
+      h("caption", { id: captionId, class: "zone-table-caption" },
+        `${visibleZones.length} zone${visibleZones.length !== 1 ? "s" : ""}`,
+      ),
+      h("thead", null,
+        h("tr", null,
+          h("th", { scope: "col" }, "Zone Name"),
+          h("th", { scope: "col" }, "Files"),
+          h("th", { scope: "col" }, "Cohesion"),
+          h("th", { scope: "col" }, "Coupling"),
+          h("th", { scope: "col" }, "Top Connections"),
+          h("th", { scope: "col" }, "Findings"),
+        ),
+      ),
+      h("tbody", null,
+        visibleZones.length === 0
+          ? h("tr", null,
+              h("td", { colSpan: 6, class: "zone-table-empty" }, "No zones match the current filter."),
+            )
+          : visibleZones.map((zone) => {
+              const conns = connectionsByZone.get(zone.id) ?? [];
+              const fCount = findingsCount.get(zone.id) ?? 0;
+              const isSelected = selectedZoneId === zone.id;
+
+              return h("tr", {
+                key: zone.id,
+                class: `zone-table-row${isSelected ? " selected" : ""}`,
+                tabIndex: 0,
+                "aria-selected": isSelected,
+                onClick: () => onSelectZone(zone),
+                onKeyDown: (e: KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectZone(zone);
+                  }
+                },
+              },
+                h("td", null,
+                  h("span", { class: "zone-table-name" },
+                    h("span", {
+                      class: "zone-table-dot",
+                      style: `background: ${zone.color}`,
+                      "aria-hidden": "true",
+                    }),
+                    zone.name,
+                  ),
+                ),
+                h("td", null, String(zone.totalFiles)),
+                h("td", null,
+                  h("span", { class: `zone-metric-val${zone.cohesion < 0.5 ? " zone-metric-warn" : ""}` },
+                    zone.cohesion.toFixed(2),
+                  ),
+                ),
+                h("td", null,
+                  h("span", { class: `zone-metric-val${zone.coupling > 0.5 ? " zone-metric-warn" : ""}` },
+                    zone.coupling.toFixed(2),
+                  ),
+                ),
+                h("td", null,
+                  conns.length === 0
+                    ? h("span", { class: "text-dim" }, "—")
+                    : h("span", { title: conns.join(", ") },
+                        conns.slice(0, 3).join(", "),
+                        conns.length > 3
+                          ? h("span", { class: "text-dim" }, ` +${conns.length - 3} more`)
+                          : null,
+                      ),
+                ),
+                h("td", null,
+                  fCount > 0
+                    ? h("span", { class: "zone-findings-count" }, String(fCount))
+                    : h("span", { class: "text-dim" }, "—"),
+                ),
+              );
+            }),
+      ),
+    ),
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────
 
 export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
@@ -1920,6 +2220,7 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
   const [expandedSubZones, setExpandedSubZones] = useState<ExpandedSubZones>(new Map());
   const [connectingOnlyZones, setConnectingOnlyZones] = useState<Set<string>>(new Set());
   const [slideoutZone, setSlideoutZone] = useState<Zone | null>(null);
+  const [viewMode, setViewMode] = useLocalStorageState<"graph" | "table">("ndx-zones-view-mode", "graph");
 
   // Zone pins from .n-dx.json (augmented by server onto zones response)
   const pinnedFiles = useMemo(() => {
@@ -2193,30 +2494,44 @@ export function ZonesView({ data, onSelect, navigateTo }: ZonesViewProps) {
         )
       : null,
 
-    // Drill-down breadcrumb (hidden at root level)
-    h(ZoneBreadcrumbNav, { drillPath, onNavigate: handleBreadcrumbNavigate }),
+    // View toggle (graph ↔ table)
+    h("div", { class: "zone-view-controls" },
+      h(ViewToggle, { mode: viewMode, onChange: setViewMode }),
+      // Drill-down breadcrumb (hidden at root level, only relevant in graph mode)
+      viewMode === "graph" ? h(ZoneBreadcrumbNav, { drillPath, onNavigate: handleBreadcrumbNavigate }) : null,
+    ),
 
-    // Zone Diagram
+    // Zone Diagram or Table View
     visibleZones.length > 0
-      ? h(ZoneDiagram, {
-          zones: displayZones,
-          edges: visibleCrossings,
-          expandedZones: effectiveExpandedZones,
-          expandedSubZones,
-          selectedZoneId: slideoutZone?.id ?? null,
-          searchQ,
-          fileConnections,
-          fileToFileMap,
-          connectingOnlyZones,
-          onToggleZone: toggleZone,
-          onSelectZone: handleDiagramZoneSelect,
-          onSelectFile: handleFileSelect,
-          onDblClickFile: handleFileDblClick,
-          onDblClickZone: handleZoneDblClick,
-          onDrillDown: handleDrillDown,
-          onToggleSubZone: toggleSubZone,
-          onToggleConnectingOnly: toggleConnectingOnly,
-        })
+      ? (viewMode === "table"
+          ? h(ZoneTableView, {
+              zones: displayZones,
+              findings: zones.findings ?? [],
+              edges: visibleCrossings,
+              searchQ,
+              selectedZoneId: slideoutZone?.id ?? null,
+              onSelectZone: handleDiagramZoneSelect,
+            })
+          : h(ZoneDiagram, {
+              zones: displayZones,
+              edges: visibleCrossings,
+              expandedZones: effectiveExpandedZones,
+              expandedSubZones,
+              selectedZoneId: slideoutZone?.id ?? null,
+              searchQ,
+              fileConnections,
+              fileToFileMap,
+              connectingOnlyZones,
+              onToggleZone: toggleZone,
+              onSelectZone: handleDiagramZoneSelect,
+              onSelectFile: handleFileSelect,
+              onDblClickFile: handleFileDblClick,
+              onDblClickZone: handleZoneDblClick,
+              onDrillDown: handleDrillDown,
+              onToggleSubZone: toggleSubZone,
+              onToggleConnectingOnly: toggleConnectingOnly,
+            })
+        )
       : null,
 
     // Unzoned files

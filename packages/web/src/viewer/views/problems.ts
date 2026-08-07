@@ -16,7 +16,7 @@ export function ProblemsView({ data }: ProblemsProps) {
 
   if (enrichmentPass < ENRICHMENT_THRESHOLDS.problems) {
     return h("div", { class: "locked-view" },
-      h("div", { class: "locked-icon" }, "\u{1F512}"),
+      h("div", { class: "locked-icon", "aria-hidden": "true" }, "\u{1F512}"),
       h("h2", null, "Problems"),
       h("p", null, "Requires enrichment pass 3 (current: ", enrichmentPass, ")"),
       h("p", { class: "locked-hint" },

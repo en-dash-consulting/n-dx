@@ -73,13 +73,13 @@
   --border-strong: #3d4470;
   --text: #e8eaf0;
   --text-dim: #9ea3bc;
-  --text-muted: #6b7094;
+  --text-muted: #868aaa; /* was #6b7094 (3.7:1 fail) → 5.3:1 pass */
   --accent: var(--brand-teal);
   --accent-dim: #008f75;
   --accent-subtle: color-mix(in srgb, var(--brand-teal) 8%, transparent);
-  --green: var(--brand-green);
-  --orange: var(--brand-orange);
-  --red: var(--brand-rose);
+  --green: var(--brand-green); /* 5.2:1+ on all badge surfaces incl. --bg-active */
+  --orange: #ff8060; /* was var(--brand-orange) #ff5926 (3.8:1 fail on badge bg over --bg-active) → 4.6:1 pass */
+  --red: #ff7f9c; /* was #f55574 (3.7:1 fail on badge bg over --bg-active) → 4.7:1 pass */
   --purple: var(--brand-purple);
 
   /* Logo background — purple in dark mode */
@@ -97,13 +97,13 @@
   --border-strong: #bcc2d4;
   --text: #1a1d2e;
   --text-dim: #5c6078;
-  --text-muted: #8b90a8;
-  --accent: #008f60;
-  --accent-dim: #007a52;
-  --accent-subtle: color-mix(in srgb, #008f60 6%, transparent);
-  --green: var(--brand-green);
-  --orange: var(--brand-orange);
-  --red: var(--brand-rose);
+  --text-muted: #6b6e88; /* was #8b90a8 (2.9:1 fail) → 4.6:1 pass */
+  --accent: #006E4E; /* was #008f60 (3.7:1 fail on badge bg) → 5.6:1 pass */
+  --accent-dim: #005a40;
+  --accent-subtle: color-mix(in srgb, #006E4E 6%, transparent);
+  --green: #006E4A; /* was var(--brand-green) #00bd81 (2.2:1 fail on badge bg) → 5.6:1 pass */
+  --orange: #B03800; /* was var(--brand-orange) #ff5926 (2.7:1 fail on badge bg) → 5.4:1 pass */
+  --red: #B01A54; /* was var(--brand-rose) #d52e66 (fail on badge bg) → 5.9:1 pass */
   --purple: var(--brand-purple);
 
   /* Logo background — navy in light mode */

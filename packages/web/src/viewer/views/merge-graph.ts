@@ -26,7 +26,7 @@
 
 import { h, Fragment } from "preact";
 import { useState, useEffect, useMemo, useCallback, useRef } from "preact/hooks";
-import { usePanZoom } from "../hooks/index.js";
+import { usePanZoom, useGraphArrowNav } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import type { PRDItemData } from "../components/prd-tree/types.js";
 import { findItemById } from "../components/prd-tree/tree-utils.js";
@@ -943,6 +943,113 @@ function MergeMetaPanel({ graph, selection }: {
   );
 }
 
+// ── Context table view ────────────────────────────────────────────────────────
+
+function ContextTableView({
+  graph,
+  visiblePrdIds,
+  onSelectPrd,
+  selected,
+}: {
+  graph: MergeGraph;
+  visiblePrdIds: Set<string>;
+  onSelectPrd: (node: PrdNode) => void;
+  selected: SelectedNode | null;
+}) {
+  const [sortCol, setSortCol] = useState<"title" | "type" | "parent" | "status">("type");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const parentTitleById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const n of graph.nodes) {
+      if (n.kind === "prd") m.set(n.id, n.title);
+    }
+    return m;
+  }, [graph]);
+
+  const toggleSort = (col: typeof sortCol) => {
+    if (sortCol === col) setSortAsc((v) => !v);
+    else { setSortCol(col); setSortAsc(true); }
+  };
+
+  const thKeyDown = (col: typeof sortCol) => (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(col); }
+  };
+
+  const rows = useMemo(() => {
+    const LEVEL_ORDER = ["epic", "feature", "task", "subtask"];
+    const prdNodes = graph.nodes.filter((n): n is PrdNode => n.kind === "prd" && visiblePrdIds.has(n.id));
+    return [...prdNodes].sort((a, b) => {
+      let cmp = 0;
+      if (sortCol === "title") {
+        cmp = a.title.localeCompare(b.title);
+      } else if (sortCol === "type") {
+        cmp = (LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level)) || a.title.localeCompare(b.title);
+      } else if (sortCol === "parent") {
+        const ap = a.parentId ? (parentTitleById.get(a.parentId) ?? "") : "";
+        const bp = b.parentId ? (parentTitleById.get(b.parentId) ?? "") : "";
+        cmp = ap.localeCompare(bp) || a.title.localeCompare(b.title);
+      } else {
+        cmp = a.status.localeCompare(b.status) || a.title.localeCompare(b.title);
+      }
+      return sortAsc ? cmp : -cmp;
+    });
+  }, [graph, visiblePrdIds, sortCol, sortAsc, parentTitleById]);
+
+  const ariaSort = (col: typeof sortCol): "ascending" | "descending" | "none" =>
+    sortCol !== col ? "none" : sortAsc ? "ascending" : "descending";
+
+  const sortArrow = (col: typeof sortCol) =>
+    sortCol !== col ? "" : (sortAsc ? " ▲" : " ▼");
+
+  const captionId = "mg-table-caption";
+  return h("div", { class: "data-table-wrapper mg-table-wrapper" },
+    h("table", {
+      class: "data-table mg-table",
+      "aria-labelledby": captionId,
+    },
+      h("caption", { id: captionId, class: "mg-table-caption" },
+        `${rows.length} item${rows.length !== 1 ? "s" : ""}`,
+      ),
+      h("thead", null,
+        h("tr", null,
+          h("th", { scope: "col", "aria-sort": ariaSort("title"), onClick: () => toggleSort("title"), tabIndex: 0, onKeyDown: thKeyDown("title") }, `Item Title${sortArrow("title")}`),
+          h("th", { scope: "col", "aria-sort": ariaSort("type"), onClick: () => toggleSort("type"), tabIndex: 0, onKeyDown: thKeyDown("type") }, `Type${sortArrow("type")}`),
+          h("th", { scope: "col", "aria-sort": ariaSort("parent"), onClick: () => toggleSort("parent"), tabIndex: 0, onKeyDown: thKeyDown("parent") }, `Parent${sortArrow("parent")}`),
+          h("th", { scope: "col", "aria-sort": ariaSort("status"), onClick: () => toggleSort("status"), tabIndex: 0, onKeyDown: thKeyDown("status") }, `Status${sortArrow("status")}`),
+        ),
+      ),
+      h("tbody", null,
+        rows.length === 0
+          ? h("tr", null, h("td", { colSpan: 4, class: "mg-table-empty" }, "No items match the current filters."))
+          : rows.map((n) => {
+              const isSelected = selected?.kind === "prd" && selected.node.id === n.id;
+              const parentTitle = n.parentId ? (parentTitleById.get(n.parentId) ?? "—") : "—";
+              return h("tr", {
+                key: n.id,
+                class: `mg-table-row${isSelected ? " selected" : ""}`,
+                tabIndex: 0,
+                "aria-selected": isSelected,
+                onClick: () => onSelectPrd(n),
+                onKeyDown: (e: KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelectPrd(n); }
+                },
+              },
+                h("td", null, n.title),
+                h("td", null, h("span", { class: `mg-level-badge mg-level-${n.level}` }, n.level)),
+                h("td", null, parentTitle),
+                h("td", null,
+                  h("span", { class: `mg-status-chip mg-status-${n.status.replace(/_/g, "-")}` },
+                    n.status.replace(/_/g, " "),
+                  ),
+                ),
+              );
+            }),
+      ),
+    ),
+  );
+}
+
 // ── Filters ───────────────────────────────────────────────────────────────────
 
 const ALL_PRD_STATUSES = ["pending", "in_progress", "completed", "failing", "blocked", "deferred"];
@@ -985,6 +1092,8 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
   // the default so the graph mirrors the on-disk layout. "epics-only" trims
   // to the top-level epic rows for a higher-level overview.
   const [viewMode, setViewMode] = useState<"full-tree" | "epics-only">("full-tree");
+  /** Graph vs table toggle for the accessible alternative view. */
+  const [tableViewMode, setTableViewMode] = useState<"graph" | "table">("graph");
   // Per-item PRD origin lookup cache. Populated lazily on PRD click via
   // `/api/prd-origin`; keyed by PRD item id.
   const [originByItemId, setOriginByItemId] = useState<Map<string, OriginEntry>>(
@@ -992,6 +1101,9 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
   );
   const abortRef = useRef<AbortController | null>(null);
   const originAbortRef = useRef<AbortController | null>(null);
+  // Keyboard navigation: refs to PRD and merge <g> elements for programmatic focus
+  const prdNodeRefs = useRef(new Map<string, Element>());
+  const mergeNodeRefs = useRef(new Map<string, Element>());
 
   // ── Fetch graph ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1150,6 +1262,43 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
     return map;
   }, [layout]);
 
+  // ── Keyboard navigation adjacency ─────────────────────────────────────────
+  // Builds an undirected neighbour list from both tree edges (parent↔child)
+  // and merge-link edges (merge↔prd) so arrow keys can traverse any connected
+  // pair. Keyed by node id; only includes currently-visible nodes.
+  const nodeAdjacency = useMemo(() => {
+    if (!graph || !layout) return new Map<string, string[]>();
+    const visibleIds = new Set(layout.nodes.map((n) => n.id));
+    const adj = new Map<string, string[]>();
+    for (const n of layout.nodes) adj.set(n.id, []);
+    // Tree edges: parent ↔ child
+    for (const n of graph.nodes) {
+      if (n.kind !== "prd" || !n.parentId) continue;
+      if (!visibleIds.has(n.id) || !visibleIds.has(n.parentId)) continue;
+      const fromList = adj.get(n.parentId);
+      const toList = adj.get(n.id);
+      if (fromList && !fromList.includes(n.id)) fromList.push(n.id);
+      if (toList && !toList.includes(n.parentId)) toList.push(n.parentId);
+    }
+    // Merge-link edges: merge ↔ prd
+    for (const e of graph.edges) {
+      if (!visibleIds.has(e.from) || !visibleIds.has(e.to)) continue;
+      const fromList = adj.get(e.from);
+      const toList = adj.get(e.to);
+      if (fromList && !fromList.includes(e.to)) fromList.push(e.to);
+      if (toList && !toList.includes(e.from)) toList.push(e.from);
+    }
+    return adj;
+  }, [graph, layout]);
+
+  const handleNodeArrow = useGraphArrowNav(
+    useCallback((nodeId: string) => nodeAdjacency.get(nodeId) ?? [], [nodeAdjacency]),
+    useCallback((targetId: string) => {
+      const el = prdNodeRefs.current.get(targetId) ?? mergeNodeRefs.current.get(targetId);
+      (el as HTMLElement | null)?.focus();
+    }, []),
+  );
+
   // ── Origin lookup ──────────────────────────────────────────────────────────
   // Per-item lazy fetch of `/api/prd-origin?path=<treePath>`. The request is
   // skipped when we already hold a non-loading entry for that id; the result
@@ -1283,6 +1432,27 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
               title: "Back to Tasks",
             }, "☑ Tasks")
           : null,
+        // Graph/Table toggle for keyboard-accessible alternative view
+        h("div", {
+          class: "zone-view-toggle",
+          role: "group",
+          "aria-label": "Context graph display mode",
+        },
+          h("button", {
+            type: "button",
+            class: `zone-view-btn${tableViewMode === "graph" ? " active" : ""}`,
+            onClick: () => setTableViewMode("graph"),
+            "aria-pressed": tableViewMode === "graph",
+            "aria-label": "Switch to graph view",
+          }, "Graph"),
+          h("button", {
+            type: "button",
+            class: `zone-view-btn${tableViewMode === "table" ? " active" : ""}`,
+            onClick: () => setTableViewMode("table"),
+            "aria-pressed": tableViewMode === "table",
+            "aria-label": "Switch to table view",
+          }, "Table"),
+        ),
         // View-mode toggle: full PRD tree (default) vs epic-only summary.
         // Two segmented buttons styled with the existing filter chip pattern
         // so the visual language stays consistent with the filter bar below.
@@ -1401,11 +1571,39 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
         ? h("div", { class: "mg-notice" }, "No merge commits could be linked to PRD items yet. Merges are shown separately on the right.")
         : null,
 
+    // ── Aria-live region: announces visible item count when filters change ────
+    h("div", {
+      class: "mg-a11y-live",
+      "aria-live": "polite",
+      "aria-atomic": "true",
+    }, `${visiblePrdIds.size} item${visiblePrdIds.size !== 1 ? "s" : ""}, ${visibleMergeIds.size} merge${visibleMergeIds.size !== 1 ? "s" : ""} visible`),
+
+    // ── Table view alternative ────────────────────────────────────────────────
+    tableViewMode === "table"
+      ? h("div", { class: "mg-table-section" },
+          h(ContextTableView, {
+            graph,
+            visiblePrdIds,
+            onSelectPrd: handlePrdClick,
+            selected,
+          }),
+          // Show detail panel below the table when a node is selected
+          selected
+            ? h(DetailPanelContent, {
+                selection: selected,
+                prdData,
+                origin: selected.kind === "prd" ? originByItemId.get(selected.node.id) : undefined,
+                onClose: clearSelection,
+              })
+            : null,
+        )
+      : null,
+
     // ── Merge metadata panel (above the graph) ───────────────────────────────
-    h(MergeMetaPanel, { graph, selection: selected }),
+    tableViewMode === "graph" ? h(MergeMetaPanel, { graph, selection: selected }) : null,
 
     // ── Main canvas ──────────────────────────────────────────────────────────
-    h("div", { class: "mg-canvas" },
+    tableViewMode === "graph" ? h("div", { class: "mg-canvas" },
       // Zoom controls
       h("div", { class: "mg-zoom-controls", "aria-label": "Zoom controls" },
         h("button", { onClick: handleZoomIn, title: "Zoom in", "aria-label": "Zoom in" }, "+"),
@@ -1540,9 +1738,14 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
                 onClick: (e: MouseEvent) => { e.stopPropagation(); handlePrdClick(n); },
                 role: "button",
                 tabIndex: 0,
-                "aria-label": `PRD ${n.level}: ${n.title} (${n.status}) - ${n.shape || "circle"}`,
+                "aria-label": `PRD ${n.level}: ${n.title} (${n.status})`,
+                ref: (el: Element | null) => {
+                  if (el) prdNodeRefs.current.set(n.id, el);
+                  else prdNodeRefs.current.delete(n.id);
+                },
                 onKeyDown: (e: KeyboardEvent) => {
                   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handlePrdClick(n); }
+                  handleNodeArrow(n.id, e);
                 },
                 style: { opacity: isHighlighted ? 1 : 0.2 },
               },
@@ -1581,9 +1784,14 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
                 onClick: (e: MouseEvent) => { e.stopPropagation(); handleMergeClick(n); },
                 role: "button",
                 tabIndex: 0,
-                "aria-label": `Merge: ${n.subject}`,
+                "aria-label": `Merge commit ${n.shortSha}: ${n.subject}`,
+                ref: (el: Element | null) => {
+                  if (el) mergeNodeRefs.current.set(n.id, el);
+                  else mergeNodeRefs.current.delete(n.id);
+                },
                 onKeyDown: (e: KeyboardEvent) => {
                   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleMergeClick(n); }
+                  handleNodeArrow(n.id, e);
                 },
                 style: { opacity: isHighlighted ? 1 : 0.2 },
               },
@@ -1642,7 +1850,7 @@ export function MergeGraphView({ navigateTo }: MergeGraphViewProps) {
             onClose: clearSelection,
           })
         : null,
-    ),
+    ) : null,
   );
 }
 

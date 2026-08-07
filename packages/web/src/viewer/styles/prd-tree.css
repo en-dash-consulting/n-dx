@@ -6232,3 +6232,18 @@
   color: var(--text-muted);
   font-size: var(--font-xs);
 }
+
+/* ── Prefers-reduced-motion ─────────────────────────────────────────────
+   Disable animations and make transitions instant for users who prefer
+   reduced motion at the OS/browser level.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Animation disabling is handled globally in a11y.css; only rules that
+   need a distinct static end-state live here. */
+@media (prefers-reduced-motion: reduce) {
+  /* Smart-add skeleton loading bar */
+  .smart-add-loading-bar-fill {
+    animation: none;
+    transform: scaleX(0.5); /* static partial fill so the element is still visible */
+  }
+}

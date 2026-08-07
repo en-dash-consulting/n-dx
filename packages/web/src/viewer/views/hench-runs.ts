@@ -134,6 +134,18 @@ function getStatusConfig(status: string) {
   return STATUS_CONFIG[status] ?? { icon: "○", label: status, color: "var(--text-dim)" };
 }
 
+/** Maps a run status to the corresponding .status-badge--* CSS class. */
+function getStatusBadgeClass(status: string): string {
+  const map: Record<string, string> = {
+    completed: "completed",
+    failed: "failed",
+    error: "failed",
+    running: "running",
+    in_progress: "running",
+  };
+  return map[status] ?? "pending";
+}
+
 const TOKEN_DIAG_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
   complete: { icon: "●", label: "Complete", color: "var(--green)" },
   partial: { icon: "◐", label: "Partial", color: "var(--orange)" },
@@ -335,10 +347,13 @@ function RunCard({ run, isSelected, isHighlighted, onClick, navigateTo, cardRef 
     // Top row: status + task link + timestamp
     h("div", { class: "hench-run-header" },
       h("span", {
-        class: "hench-run-status",
-        style: `color: ${status.color}`,
-        title: status.label,
-      }, status.icon),
+        class: `status-badge status-badge--${getStatusBadgeClass(run.status)}`,
+        "aria-label": status.label,
+      },
+        h("span", { "aria-hidden": "true" }, status.icon),
+        " ",
+        status.label,
+      ),
       navigateTo && run.taskId
         ? h(RexTaskLink, {
             task: {
@@ -444,9 +459,13 @@ function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: ()
       ),
       h("div", { class: "hench-detail-title-row" },
         h("span", {
-          class: "hench-run-status",
-          style: `color: ${status.color}; font-size: 18px`,
-        }, status.icon),
+          class: `status-badge status-badge--${getStatusBadgeClass(run.status)} hench-detail-status-badge`,
+          "aria-label": status.label,
+        },
+          h("span", { "aria-hidden": "true" }, status.icon),
+          " ",
+          status.label,
+        ),
         h("h2", null, run.taskTitle),
       ),
     ),
@@ -724,6 +743,19 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
   /** Whether the initial deep-link has been consumed. */
   const deepLinkConsumedRef = useRef(false);
 
+  // ── ARIA live region state ────────────────────────────────────────────
+  /** Polite announcements: task start / completion. Throttled to ≤1 per 3s. */
+  const [politeMsg, setPoliteMsg] = useState("");
+  /** Assertive announcements: run failures and connection errors. */
+  const [assertiveMsg, setAssertiveMsg] = useState("");
+  /** Tracks previous status per run ID to detect transitions. */
+  const prevRunStatusesRef = useRef<Map<string, string>>(new Map());
+  /** Tracks the last polite announcement timestamp for throttling. */
+  const lastPoliteTimeRef = useRef(0);
+  /** Set to true after the first runs array is received; skips initial-load churn. */
+  const seenFirstRunsRef = useRef(false);
+  const POLITE_THROTTLE_MS = 3000;
+
   // Fetch the runs list
   const fetchRuns = useCallback(async () => {
     try {
@@ -746,6 +778,54 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
 
   // Visibility-aware polling via polling manager
   usePolling("hench-runs", fetchRuns, 10_000);
+
+  // Detect run state transitions for ARIA live region announcements
+  useEffect(() => {
+    const prev = prevRunStatusesRef.current;
+
+    if (!seenFirstRunsRef.current) {
+      // First run data: populate the baseline without announcing.
+      seenFirstRunsRef.current = true;
+      const next = new Map<string, string>();
+      for (const r of runs) next.set(r.id, r.status);
+      prevRunStatusesRef.current = next;
+      return;
+    }
+
+    const politeItems: string[] = [];
+    const assertiveItems: string[] = [];
+    const next = new Map<string, string>();
+
+    for (const run of runs) {
+      next.set(run.id, run.status);
+      const prevStatus = prev.get(run.id);
+
+      if (prevStatus === run.status) continue;
+
+      if (!prevStatus && (run.status === "running" || run.status === "in_progress")) {
+        // Newly appeared running task
+        politeItems.push(`Task "${run.taskTitle}" started`);
+      } else if (prevStatus && run.status === "completed") {
+        politeItems.push(`Task "${run.taskTitle}" completed`);
+      } else if (prevStatus && (run.status === "failed" || run.status === "error")) {
+        assertiveItems.push(`Task "${run.taskTitle}" failed`);
+      }
+    }
+
+    prevRunStatusesRef.current = next;
+
+    if (assertiveItems.length > 0) {
+      setAssertiveMsg(assertiveItems.join(". "));
+    }
+
+    if (politeItems.length > 0) {
+      const now = Date.now();
+      if (now - lastPoliteTimeRef.current >= POLITE_THROTTLE_MS) {
+        lastPoliteTimeRef.current = now;
+        setPoliteMsg(politeItems.join(". "));
+      }
+    }
+  }, [runs]);
 
   // Deep-link: auto-select the target run once runs are loaded
   useEffect(() => {
@@ -908,12 +988,12 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
 
   // ── Loading state ──
   if (loading) {
-    return h("div", { class: "loading" }, "Loading execution history...");
+    return h("div", { class: "loading", role: "status", "aria-live": "polite" }, "Loading execution history...");
   }
 
   // ── Error state ──
   if (error) {
-    return h("div", { class: "prd-empty" },
+    return h("div", { role: "alert", class: "prd-empty" },
       h("p", null, error),
       h("button", { class: "btn", onClick: fetchRuns }, "Retry"),
     );
@@ -959,6 +1039,10 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
 
   // ── List view ──
   return h("div", { class: "hench-runs-container" },
+    // Visually-hidden ARIA live regions for run state transitions.
+    // Polite: task start / completion (throttled). Assertive: failures.
+    h("div", { class: "sr-only", "aria-live": "polite", "aria-atomic": "true" }, politeMsg),
+    h("div", { class: "sr-only", "aria-live": "assertive", "aria-atomic": "true" }, assertiveMsg),
     h("div", { class: "hench-runs-header" },
       h(BrandedHeader, { product: "hench", title: "Hench", class: "branded-header-hench" }),
       h("div", { class: "hench-runs-title-row" },

@@ -147,6 +147,15 @@
   color: var(--text-dim);
 }
 
+.top-zone-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+}
+
 .top-zone-item .health-dot {
   width: 8px;
   height: 8px;

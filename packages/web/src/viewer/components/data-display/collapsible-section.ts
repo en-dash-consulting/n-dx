@@ -23,6 +23,8 @@ interface CollapsibleSectionProps {
   threshold?: number;
   /** When set, open/closed state is persisted to localStorage across navigation. */
   storageKey?: string;
+  /** When set, wraps items in a <ul role="list"> instead of a Fragment. */
+  listTag?: "ul";
   children?: ComponentChildren;
 }
 
@@ -32,6 +34,7 @@ export function CollapsibleSection({
   defaultOpen = true,
   threshold = 8,
   storageKey,
+  listTag,
   children,
 }: CollapsibleSectionProps) {
   const raw = Array.isArray(children) ? children : children ? [children] : [];
@@ -52,15 +55,11 @@ export function CollapsibleSection({
   const hiddenCount = items.length - threshold;
 
   return h("div", { class: "mb-16" },
-    h("div", {
+    h("button", {
       class: "collapsible-header",
+      type: "button",
       onClick: () => setOpen(!open),
-      role: "button",
-      tabIndex: 0,
       "aria-expanded": String(open),
-      onKeyDown: (e: KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(!open); }
-      },
     },
       h("span", { class: `collapsible-chevron ${open ? "open" : ""}`, "aria-hidden": "true" }, "\u25B6"),
       h("span", { class: "collapsible-title" }, title),
@@ -72,7 +71,9 @@ export function CollapsibleSection({
       ? h(Fragment, null,
           needsCollapse && expanded
             ? h("div", { class: "collapsible-scroll-container" },
-                items,
+                listTag === "ul"
+                  ? h("ul", { role: "list" }, ...items)
+                  : items,
                 h("div", { class: "collapsible-sticky-footer" },
                   h("button", {
                     class: "collapsible-toggle",
@@ -81,7 +82,9 @@ export function CollapsibleSection({
                 )
               )
             : h(Fragment, null,
-                visibleItems,
+                listTag === "ul"
+                  ? h("ul", { role: "list" }, ...visibleItems)
+                  : visibleItems,
                 needsCollapse
                   ? h("button", {
                       class: "collapsible-toggle",

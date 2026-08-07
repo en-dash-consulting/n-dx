@@ -145,8 +145,3 @@
 }
 
 /* Respect reduced motion preferences */
-@media (prefers-reduced-motion: reduce) {
-  .crash-recovery-banner {
-    animation: none;
-  }
-}
