@@ -81,6 +81,7 @@ import {
 } from "./help.js";
 import { setupAssistantIntegrations, formatInitReport, checkSkillTracking, formatSkillTrackingHints } from "./assistant-integration.js";
 import { ensureGitattributesRules } from "./gitattributes-pins.js";
+import { recordCliName } from "./cli-identity.js";
 import { generateTargetReadme } from "./readme-generator.js";
 import {
   runGitPreflight,
@@ -1298,6 +1299,7 @@ async function handleInit(rest) {
         const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
         recordInitVersion(dir, version);
       } catch { /* non-fatal */ }
+      recordCliName(dir);
       exitWithCleanup(0);
     }
   }
@@ -1329,6 +1331,7 @@ async function handleInit(rest) {
     const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
     recordInitVersion(dir, version);
   } catch { /* non-fatal */ }
+  recordCliName(dir);
 
   // Generate a target-repo README before assistant artifacts so the user's
   // project documentation reflects only their own manifest/structure — not

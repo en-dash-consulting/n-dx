@@ -2,13 +2,16 @@
 id: "2238b4b2-49a4-483d-885a-34da3e9b5389"
 level: "task"
 title: "Detect project CLI name from package.json bin field and expose in .n-dx.json schema"
-status: "pending"
+status: "completed"
 priority: "critical"
 tags:
   - "cli"
   - "config"
   - "identity"
 source: "smart-add"
+startedAt: "2026-08-12T13:52:05.159Z"
+completedAt: "2026-08-12T17:02:44.976Z"
+endedAt: "2026-08-12T17:02:44.976Z"
 acceptanceCriteria:
   - "Resolver reads the first binary name from package.json bin field at the project root"
   - "Resolved name is written as cli.name in .n-dx.json when ndx init runs"
