@@ -1,167 +1,216 @@
 # CLI ↔ Dashboard Coverage Gap Inventory
 
-_Last updated: 2026-04-18_
+_Last updated: 2026-08-12_
 
 ## Methodology
 
-Every ndx CLI command (core + delegated rex / sourcevision / hench sub-commands) is rated:
+Every user-facing capability — ndx orchestration commands, rex / sourcevision / hench package CLI commands, and rex / sourcevision MCP tools — is rated:
 
-- **full** — dashboard has a trigger, status view, and configuration panel for this command  
-- **partial** — dashboard exposes some but not all meaningful facets (read-only view exists but no trigger, or trigger exists but without config surface)  
+- **full** — dashboard has a trigger, status view, and configuration surface for this capability
+- **partial** — dashboard exposes some but not all meaningful facets (read-only view without trigger, trigger without config, or a subset of the CLI's options)
 - **none** — no dashboard representation at all
+- **n/a** — intentionally terminal-only or not meaningful inside the dashboard (rationale given)
 
-"User impact" is rated **high / medium / low** based on how frequently the command appears in a normal daily workflow.
+"User impact" is rated **high / medium / low** based on how frequently the capability appears in a normal daily workflow.
+
+Coverage was verified against the current viewer (`packages/web/src/viewer/views/view-registry.ts`, `components/sidebar.ts`) and server routes (`packages/web/src/server/routes-*.ts`), including the trigger controls shipped in `feat(web): add dashboard trigger controls for CLI commands` (`/api/commands/*`).
 
 ---
 
-## Summary Table
+## Changes since the 2026-04-18 audit
+
+The Dashboard Trigger Controls feature closed five of the previous Tier 1–3 gaps:
+
+| Command | Was | Now | Shipped surface |
+|---------|-----|-----|-----------------|
+| `ndx analyze` | none | **full** | "Run Analysis" button on Overview → POST `/api/commands/sv-analyze` (lite/full) |
+| `ndx sync` | none | **full** | Push / Pull / Sync buttons in ndx sync settings → POST `/api/commands/sync` |
+| `ndx recommend` | partial | **full** | "Refresh Recommendations" on Suggestions → POST `/api/commands/recommend` |
+| `ndx export` | none | **partial** | Export panel in Commands view → POST `/api/commands/export` (no `--deploy=github` flow) |
+| `ndx self-heal` | none | **partial** | Self-Heal panel in Commands view → POST `/api/commands/self-heal` + status poll (no live phase/iteration view, no stop control) |
+
+One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` proposal review) are no longer reachable — see [Orphaned UI surface](#orphaned-ui-surface).
+
+---
+
+## ndx orchestration commands
 
 | Command | Coverage | Impact | Notes |
 |---------|----------|--------|-------|
-| `ndx work` | partial | **high** | Epic-by-epic execution panel exists; direct `hench run` trigger missing |
-| `ndx analyze` (sourcevision) | none | **high** | No dashboard trigger to re-run sourcevision analysis after code changes |
-| `ndx sync` | none | **high** | Notion config view exists; no trigger to push/pull sync |
-| `ndx refresh` | none | **high** | No trigger to refresh sourcevision data + rebuild dashboard artifacts |
-| `ndx recommend` | partial | **high** | Suggestions view shows results; no trigger to re-run recommend pass |
-| `ndx plan` / `ndx plan --accept` | full | **high** | Analyze-panel + proposal-editor + accept flow fully implemented |
-| `ndx add` | full | **high** | Add-item form, inline-add, batch import, smart-add preview all present |
-| `ndx status` | full | **high** | Rex dashboard + PRD tree fully implemented |
-| `ndx usage` | full | **high** | Token usage view + `/api/usage/*` routes fully implemented |
-| `ndx self-heal` | none | medium | No dashboard representation of the iterative improvement loop |
-| `ndx ci` | none | medium | CI validation pipeline has no dashboard trigger or results view |
-| `ndx export` | none | medium | No trigger to export a static deployable dashboard |
-| `rex validate` | partial | medium | Validation results view exists (`/api/validation/*`); no trigger to re-run |
-| `rex reshape` | none | medium | LLM-powered PRD restructuring has no dashboard trigger |
-| `rex fix` | none | medium | Auto-fix for common PRD issues has no dashboard entry point |
-| `rex health` | full | medium | Health gauge + `/api/rex/health` fully implemented |
-| `rex reorganize` | full | medium | Reorganize panel + apply route fully implemented |
-| `rex prune` | full | medium | Prune confirmation + preview + execute fully implemented |
-| `rex verify` | partial | medium | Requirements coverage endpoint exists; no UI panel |
-| `rex next` | full | medium | Active-tasks panel + `/api/rex/next` |
-| `rex update` | full | medium | Inline status picker + bulk actions |
-| `rex remove` | full | medium | PRD tree delete actions |
-| `rex move` | full | medium | PRD tree reparent (drag-and-drop / move) |
-| `ndx config` | partial | medium | Config view, cli-timeouts, feature-toggles present; cross-package config write not exposed |
-| `ndx pair-programming` / `bicker` | none | low | No dashboard representation |
-| `rex report` | none | low | JSON health report; health view covers most of this |
-| `sourcevision reset` | none | low | Dangerous destructive command; low frequency |
-| `hench show` | full | low | Hench-runs view + run details |
-| `ndx init` | none | low | One-time setup wizard; not needed post-init |
-| `ndx dev` | none | low | Dev-server command; not relevant in dashboard context |
-| `ndx start` / `ndx web` | n/a | — | This command IS the dashboard |
-| `ndx version` | none | low | CLI diagnostic; not meaningful in dashboard |
-| `ndx help` | none | low | Guide + FAQ views provide equivalent UX |
+| `ndx work` | **full** | high | Per-task Execute button (task detail), "Start" on next-task card, epic-by-epic panel with pause/resume, terminate + throttle/emergency-stop controls |
+| `ndx analyze` | **full** | high | "Run Analysis" on Overview (lite/full); `--deep` not exposed |
+| `ndx sync` | **full** | high | Push/pull/sync triggers + Notion config, connection test, schema wizard |
+| `ndx recommend` | **full** | high | Suggestions view + refresh trigger |
+| `ndx plan` / `--accept` | **partial** | high | **Regression:** smart-add preview + accept-edited work (SmartAddInput), but the proposal-review panel (`AnalyzePanel` → `/api/rex/analyze`, `/api/rex/proposals*`) is only mounted by the orphaned `views/analysis.ts` |
+| `ndx add` | full | high | Smart-add input with debounced preview, accept-edited flow |
+| `ndx status` | full | high | Rex dashboard + PRD tree |
+| `ndx usage` | **partial** | high | Token Usage view consumes only `/api/token/utilization`; `by-period` (day/week/month grouping), `by-command`, `budget`, `events` endpoints exist but have no UI |
+| `ndx refresh` | **none** | high | Still no trigger to refresh sourcevision data + rebuild dashboard artifacts (POST `/api/reload` only reloads the viewer) |
+| `ndx self-heal` | partial | medium | Trigger + status poll exist; no live phase display or stop control |
+| `ndx export` | partial | medium | Export trigger exists; deploy flow not exposed |
+| `ndx ci` | **none** | medium | No trigger or results view |
+| `ndx config` | full | medium | Settings section: General (LLM provider), project settings, hench config, Notion, feature flags, CLI timeouts — grouped by CLI command |
+| `ndx auth` | none | low | Credential check is terminal-adjacent; a status chip in LLM settings would suffice |
+| `ndx pair-programming` / `bicker` | none | low | Experimental; not yet a dashboard workflow |
+| `ndx init` | n/a | — | One-time setup; dashboard requires init to exist |
+| `ndx start` / `ndx dev` | n/a | — | These commands launch the dashboard |
+| `ndx version` / `ndx help` | n/a | — | Footer version + Guide/FAQ views cover this |
+
+## rex package CLI
+
+| Command | Coverage | Impact | Notes |
+|---------|----------|--------|-------|
+| `rex status` / `tree` | full | high | PRD tree view |
+| `rex next` | full | high | Next-task card on Rex dashboard |
+| `rex add` (manual + smart) | full | high | Inline add + smart-add |
+| `rex update` / `remove` / `move` | full | medium | Inline status picker, bulk actions, delete, reparent |
+| `rex validate` | full | medium | Validation view re-fetches `/api/rex/validate` + dependency graph with cycle detection |
+| `rex health` | full | medium | Health gauge on dashboard |
+| `rex reorganize` | full | medium | Reorganize panel with preview + apply |
+| `rex prune` | full | medium | Prune preview + confirmation + execute |
+| `rex reshape` | **none** | medium | LLM restructuring has no dashboard entry point (high-risk op that would benefit from a diff-preview flow) |
+| `rex fix` | **none** | medium | Validation view shows issues but offers no fix action |
+| `rex verify` | **partial** | medium | Requirements CRUD/coverage/traceability API exists (`routes-rex/requirements.ts`, 575 lines) with **no page** consuming it |
+| `rex analyze` / `import` | partial | medium | Same orphaned-panel regression as `ndx plan` |
+| `rex usage` | partial | medium | Same gaps as `ndx usage` |
+| `rex sync` | full | medium | Via sync triggers |
+| `rex adapter` | partial | low | Integrations view provides schema-driven config for registered adapters; no add/remove |
+| `rex report` | none | low | JSON for CI; health view covers interactive use |
+| `rex facets` (MCP `facets`) | partial | low | Facet filters in PRD tree; no facet-distribution view |
+| `rex migrate-to-md` / `migrate-folder-tree-filenames` / `backfill-commit-attribution` | n/a | — | One-time migrations; terminal-only by design |
+| `rex mcp` | n/a | — | Server plumbing; MCP HTTP endpoints served by the dashboard itself |
+
+## sourcevision package CLI
+
+| Command | Coverage | Impact | Notes |
+|---------|----------|--------|-------|
+| `sourcevision analyze` | full | high | Run Analysis trigger + eight data views |
+| `sourcevision pr-markdown` | full | medium | PR Markdown tab with per-section copy + freshness state |
+| `sourcevision validate` | none | low | No UI to validate `.sourcevision/` outputs; freshness indicator partially covers intent |
+| `sourcevision export-pdf` | **none** | medium | No export-as-PDF control; natural fit next to the existing Export panel |
+| `sourcevision workspace` | none | low | Multi-repo aggregation has no dashboard concept yet (project switcher `/api/projects` is single-repo) |
+| `sourcevision serve` | n/a | — | Legacy standalone viewer; superseded by `ndx start` |
+| `sourcevision reset` | n/a | — | Destructive; intentionally terminal-only |
+| `sourcevision git-credential-helper` | n/a | — | Interactive terminal flow |
+| `sourcevision mcp` | n/a | — | Server plumbing |
+
+## hench package CLI
+
+| Command | Coverage | Impact | Notes |
+|---------|----------|--------|-------|
+| `hench run` | full | high | Execute buttons + epic-by-epic panel (see `ndx work`) |
+| `hench status` / `show` | full | medium | Runs view: history, transcript, token breakdown, files changed |
+| `hench config` | full | medium | ndx work settings view (GET/PUT `/api/hench/config`) |
+| `hench template` | full | medium | Templates view: gallery, apply, save, delete |
+| `hench validate-tokens` | none | low | Vendor token-accuracy check; diagnostics already shown per-run — trigger could live in Runs view |
+| `hench record` | n/a | — | Plumbing for the /ndx-work assisted-run skill |
+| `hench init` | n/a | — | Covered by `ndx init` |
+
+## Rex MCP tools (17)
+
+MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Coverage below records whether an equivalent human surface exists, since a capability reachable by agents but invisible to humans is an observability gap.
+
+| Tool | Equivalent UI | Coverage |
+|------|---------------|----------|
+| `get_prd_status` | Rex dashboard stats + PRD tree | full |
+| `get_next_task` | Next-task card | full |
+| `update_task_status` | Inline status picker / bulk actions | full |
+| `add_item` | Add-item + smart-add | full |
+| `edit_item` | Detail panel editing | full |
+| `get_item` | Detail panel | full |
+| `move_item` | Tree reparent | full |
+| `merge_items` | Merge preview | full |
+| `get_recommendations` | Suggestions view | full |
+| `verify_criteria` | — | **none** (same gap as `rex verify`: no requirements/traceability page) |
+| `reorganize` | Reorganize panel | full |
+| `health` | Health gauge | full |
+| `facets` | Facet filters (no distribution view) | partial |
+| `append_log` | — | n/a (agent write path; execution log has no viewer, see gap list) |
+| `sync_with_remote` | Sync triggers | full |
+| `get_token_usage` | Token Usage view (utilization only) | partial |
+| `get_capabilities` | — | n/a (protocol handshake) |
+
+## Sourcevision MCP tools (10)
+
+| Tool | Equivalent UI | Coverage |
+|------|---------------|----------|
+| `get_overview` | Overview tab | full |
+| `get_next_steps` | Suggestions tab | full |
+| `get_zone` | — | **none** — the zone-detail view (`views/zones.ts`, 2569 lines) exists but is unreachable (see orphaned surface) |
+| `get_findings` | Architecture / Problems / Suggestions tabs | full |
+| `get_file_info` | Files tab | full |
+| `search_files` | Files tab filters + global search overlay | full |
+| `get_imports` | Map tab | full |
+| `get_classifications` | Files tab role column | partial (no archetype-classification breakdown) |
+| `set_file_archetype` | — | **none** (the only sourcevision *write* tool; no UI to override a file's archetype) |
+| `get_route_tree` | Routes tab | full |
 
 ---
 
-## Priority-Ordered Gap List
+## Orphaned UI surface
 
-Gaps ranked by user-facing impact. Items with **none** coverage and **high** impact are the first implementation targets.
+Roughly 2,900 lines of built view code are currently unreachable — restoring them is cheaper than building the equivalent pages from scratch and directly serves the "Surface all new functions as dashboard pages/sections" feature:
 
-### Tier 1 — High impact, no dashboard coverage
+1. **`views/analysis.ts` (`AnalysisView`)** — not in `view-registry.ts`, no `ViewId`, no sidebar entry. It is the only consumer of `AnalyzePanel` and `BatchImportPanel`, which means POST `/api/rex/analyze`, `/api/rex/proposals*`, and `/api/rex/batch-import` have no reachable UI. This is the `ndx plan` regression.
+2. **`views/zones.ts` (`ZonesView`, 2569 lines)** — exported from `domain-sourcevision.ts` but absent from the registry and from `SourcevisionScopeViewId`. The interactive zone diagram (the UI equivalent of `get_zone`) is not navigable; its only live reference is a unit test.
 
-#### 1. `ndx analyze` (sourcevision re-run trigger)
-After modifying source files, users must drop to the terminal to refresh the analysis. A simple "Re-analyze" button with a progress indicator (streaming stdout) would eliminate the most common terminal escape.
+## Server APIs with no UI consumer
 
-**Suggested UI:** Toolbar button in the Overview / Zones views → POST `/api/sv/analyze` (new route) → stream progress via WebSocket → auto-refresh data views on completion.
+| API surface | Size | Note |
+|-------------|------|------|
+| `/api/hench/adaptive/*` (`routes-adaptive.ts`) | 873 lines, 10 endpoints | Zero occurrences of "adaptive" in `src/viewer/` — an entire feature with no page |
+| `/api/rex/requirements/*` | 575 lines | Requirements CRUD/coverage/traceability; feeds `rex verify` / `verify_criteria` gap |
+| `/api/sv/*` (all except `pr-markdown`) | 8 endpoints | Viewer reads `/data/*.json` directly; these serve external/MCP consumers — **document as external API, not a UI gap** |
+| `/api/token/{summary,events,by-command,by-period,budget}` | 5 endpoints | Token Usage view uses only `utilization` |
+| `/api/hench/{metrics,metrics/snapshots,memory/history,memory/leaks,runs/health}` | 5 endpoints | Panels exist for live memory/concurrency; historical metrics unexposed |
+| `/api/rex/{next,stats}` | 2 endpoints | Dashboard consumes `/api/rex/dashboard` instead; candidates for removal or documentation |
 
-#### 2. `ndx sync` (Notion push / pull trigger)
-The Notion config view exists but there is no way to trigger a sync from the dashboard. Users with Notion integration must run `ndx sync --push` / `ndx sync --pull` manually.
+## SourceVision full-flow note
 
-**Suggested UI:** "Sync" split-button (push / pull / bidirectional) in the Notion config view → POST `/api/notion/sync` → show last-sync timestamp and conflict summary.
-
-#### 3. `ndx refresh` (data + artifact rebuild trigger)
-After running `ndx plan --accept` or editing config, the dashboard caches go stale. Restart is needed. A dashboard-initiated refresh avoids the terminal entirely.
-
-**Suggested UI:** "Refresh data" button in settings or top-nav → POST `/api/refresh` → stream phase progress (analyze → build → reload) → auto-reload viewer on completion.
-
-### Tier 2 — High impact, partial dashboard coverage
-
-#### 4. `ndx work` (hench run trigger)
-The epic-by-epic execution panel exists and covers a planned execution mode, but there is no equivalent to `ndx work --task=ID` (run a specific task) or `ndx work --auto` (pick next and execute). The hench runs view shows history but provides no start-new-run control.
-
-**Suggested UI:** "Run next task" button in the PRD tree next-task panel + "Run this task" context action on individual task nodes → POST `/api/hench/execute` (route exists) → live log streaming in hench-runs view.
-
-#### 5. `ndx recommend` (re-run trigger)
-The suggestions view reads sourcevision recommendations but they are static until `rex recommend` is re-run. Users cannot trigger a fresh recommendation pass from the dashboard.
-
-**Suggested UI:** "Refresh recommendations" button in the Suggestions view → POST `/api/rex/recommend` (new route) → reload suggestions list.
-
-### Tier 3 — Medium impact, no dashboard coverage
-
-#### 6. `ndx self-heal` (iterative improvement loop)
-Self-heal chains analyze → recommend → work in a loop with regression detection. It is the primary autonomous improvement workflow. Having no dashboard entry point means users cannot monitor or control it.
-
-**Suggested UI:** Dedicated "Self-Heal" view showing current loop iteration, phase (analyze / recommend / execute), iteration count, and stop control → POST `/api/self-heal/start` / `/api/self-heal/stop`.
-
-#### 7. `ndx ci` (CI validation pipeline)
-`ndx ci` runs the full analysis + PRD health validation and is used in automated pipelines. A dashboard "Run CI check" button would let developers validate locally before pushing.
-
-**Suggested UI:** "Run CI check" button in the Validation view → POST `/api/ci/run` → show structured results (findings count, health score, pass/fail).
-
-#### 8. `ndx export` (static dashboard export)
-Exporting a read-only snapshot for sharing with stakeholders requires the terminal. 
-
-**Suggested UI:** "Export dashboard" button in settings → POST `/api/export` → download ZIP or open deploy dialog.
-
-#### 9. `rex reshape` (LLM PRD restructuring)
-Reshape uses an LLM to reorganize the PRD hierarchy. This is a high-risk operation that benefits from a confirmation flow the dashboard could provide better than the CLI.
-
-**Suggested UI:** "Reshape PRD" action in the PRD view → POST `/api/rex/reshape` → preview diff → confirm apply.
-
-#### 10. `rex fix` (auto-fix PRD issues)
-After validation surfaces issues, `rex fix` resolves them automatically. The validation view shows problems but offers no fix action.
-
-**Suggested UI:** "Fix issues" button in the Validation view → POST `/api/rex/fix` → re-load validation results.
-
-### Tier 4 — Medium impact, partial coverage gaps
-
-#### 11. `rex validate` (trigger)
-The validation view shows results but they are read-only snapshots. Users cannot trigger a fresh validation run from the dashboard.
-
-**Suggested UI:** "Re-validate" button in the Validation view → POST `/api/validation/run` (new route).
-
-#### 12. `rex verify` (acceptance criteria → test mapping)
-The `/api/rex/requirements/coverage` endpoint exists but there is no UI panel exposing the traceability matrix or verify results.
-
-**Suggested UI:** "Requirements" tab in the PRD view or a dedicated view showing the coverage matrix with pass/fail status per acceptance criterion.
-
-#### 13. `ndx config` (cross-package write)
-The config view lets users see and change most settings, but writing cross-package config (e.g., switching LLM vendor across all packages atomically) is not exposed.
-
-**Suggested UI:** Extend the existing config view with a structured form for `.n-dx.json` top-level keys (llm.vendor, llm.claude.model, web.port).
+The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, Problems ≥ 3, Suggestions ≥ 4). The "Run Analysis" trigger offers only lite/full; unless a run reaches enrichment pass 4, the Suggestions tab (and below it, recommendations) stays locked. This is the root cause tracked by the "SourceVision section runs the full analysis flow with all tabs and recommendations visible" feature: the UI trigger must be able to drive the full enrichment pipeline (equivalent of `ndx analyze --deep/--full`) and surface per-pass progress, or the tabs remain invisible regardless of server capability.
 
 ---
 
-## Commands with N/A or Intentional No-Dashboard Status
+## Priority-ordered gap list
 
-| Command | Rationale |
-|---------|-----------|
-| `ndx start` / `ndx web` | This command launches the dashboard; not representable within it |
-| `ndx dev` | Dev-server tooling; not relevant to production dashboard users |
-| `ndx init` | One-time setup; a post-init onboarding checklist could replace it |
-| `ndx version` | CLI diagnostic; package version in footer is sufficient |
-| `ndx help` | Guide + FAQ views cover this |
-| `sourcevision reset` | Destructive; low frequency; intentionally terminal-only |
-| `ndx pair-programming` / `bicker` | Experimental; cross-vendor review not yet a dashboard workflow |
-| `rex report` | JSON output for CI pipelines; health view covers the interactive use case |
+### Tier 1 — high impact
 
----
+1. **Restore the orphaned `AnalysisView`** (register `ViewId`, sidebar entry under REX) — fixes the `ndx plan` proposal-review regression; the panels and routes already exist.
+2. **Restore the orphaned `ZonesView`** — unlocks zone drill-down (`get_zone` equivalent) with no new backend work; pairs with the SourceVision full-flow feature.
+3. **`ndx refresh` trigger** — "Refresh data" control → new POST `/api/refresh` with phase progress; removes the most common terminal escape after `plan --accept`.
+4. **Full-flow analysis trigger** — extend `/api/commands/sv-analyze` to drive deep/enrichment passes with per-pass progress so all SourceVision tabs unlock from the UI (feeds feature `a83b1a2f`).
 
-## Implementation Order Summary
+### Tier 2 — medium impact
 
-| Priority | Command(s) | Effort est. |
-|----------|-----------|------------|
-| P1 | `ndx analyze` trigger | S — one new route + button + WS progress |
-| P1 | `ndx sync` trigger | S — reuse existing Notion gateway, add route |
-| P1 | `ndx refresh` trigger | M — multi-phase progress streaming |
-| P2 | `ndx work` run-task trigger | M — reuse `/api/hench/execute`, add PRD context actions |
-| P2 | `ndx recommend` trigger | S — one new route + button in suggestions view |
-| P3 | `ndx self-heal` view | L — new view + start/stop control + live phase display |
-| P3 | `ndx ci` trigger | M — new route + structured results panel |
-| P3 | `ndx export` trigger | M — new route + download/deploy flow |
-| P3 | `rex reshape` action | M — new route + diff preview + confirmation |
-| P3 | `rex fix` action | S — one new route + button in validation view |
-| P4 | `rex validate` trigger | S — one new route + button |
-| P4 | `rex verify` panel | M — new requirements traceability view |
-| P4 | `ndx config` cross-package write | S — extend existing config form |
+5. **Requirements / traceability page** — consume the existing 575-line requirements API; closes `rex verify` + `verify_criteria`.
+6. **Adaptive-optimization page** — consume `routes-adaptive.ts`; an entire shipped feature is currently invisible.
+7. **`rex fix` action** — "Fix issues" button in the Validation view → new POST `/api/rex/fix`.
+8. **`rex reshape` flow** — reshape trigger with diff preview + confirm.
+9. **`ndx ci` trigger** — "Run CI check" → structured results panel.
+10. **Token usage depth** — wire `by-period` / `by-command` / `budget` endpoints into the Token Usage view (restores `ndx usage --group=…` parity).
+11. **Self-heal live view** — phase/iteration display + stop control on top of the existing status endpoint.
+
+### Tier 3 — low impact
+
+12. **`sourcevision export-pdf` control** next to the Export panel.
+13. **`set_file_archetype` override UI** in the Files tab (only sourcevision write tool without UI).
+14. **Facet distribution view** (MCP `facets` parity).
+15. **`ndx auth` status chip** in LLM settings.
+16. **`hench validate-tokens` trigger** in the Runs view.
+17. **Execution-log viewer** (`.rex/execution-log.jsonl`; `append_log` observability).
+
+## Intentionally terminal-only (excluded)
+
+| Capability | Rationale |
+|-----------|-----------|
+| `ndx start` / `ndx dev` | These launch the dashboard |
+| `ndx init` / `hench init` / `rex init` / `sourcevision init` | One-time setup; dashboard presupposes init |
+| `ndx version` / `ndx help` | Footer version, Guide + FAQ views |
+| `sourcevision reset` | Destructive, low frequency |
+| `sourcevision serve` | Superseded by `ndx start` |
+| `sourcevision git-credential-helper` | Interactive terminal flow |
+| `rex migrate-*` / `backfill-commit-attribution` | One-time migrations |
+| `rex mcp` / `sourcevision mcp` | Transport plumbing; HTTP MCP is served by the dashboard |
+| `hench record` | Skill-integration plumbing |
+| MCP `append_log` (write path), `get_capabilities` | Agent/protocol-facing |
+| `/api/sv/*` read endpoints | External/MCP-facing API by design; viewer reads `/data/*.json` |
