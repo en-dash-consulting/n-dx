@@ -11,6 +11,7 @@
  */
 
 export { PRDView } from "./prd.js";
+export { AnalysisView } from "./analysis.js";
 export { RexDashboard } from "./rex-dashboard.js";
 export { TokenUsageView } from "./token-usage.js";
 export { ValidationView } from "./validation.js";

@@ -46,6 +46,7 @@ const PRODUCT_DEFAULT_VIEW: Record<string, ViewId> = {
 const VIEW_META: Record<ViewId, ViewMeta> = {
   overview:              { product: "sourcevision", label: "Overview",        productLabel: "SourceVision" },
   graph:                 { product: "sourcevision", label: "Map",             productLabel: "SourceVision" },
+  zones:                 { product: "sourcevision", label: "Zones",           productLabel: "SourceVision" },
   files:                 { product: "sourcevision", label: "Files",           productLabel: "SourceVision" },
   routes:                { product: "sourcevision", label: "Routes",          productLabel: "SourceVision" },
   architecture:          { product: "sourcevision", label: "Architecture",    productLabel: "SourceVision" },
@@ -54,6 +55,7 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   "pr-markdown":         { product: "sourcevision", label: "PR Markdown",     productLabel: "SourceVision" },
   "rex-dashboard":       { product: "rex",          label: "Dashboard",       productLabel: "Rex" },
   prd:                   { product: "rex",          label: "Tasks",           productLabel: "Rex" },
+  analysis:              { product: "rex",          label: "Analyze & Import", productLabel: "Rex" },
   "token-usage":         { product: "global",       label: "Token Usage",     productLabel: "Global" },
   validation:            { product: "rex",          label: "Validation",      productLabel: "Rex" },
   "notion-config":       { product: "global",       label: "ndx sync",           productLabel: "Settings" },

@@ -22,6 +22,7 @@ import type { DegradableFeature } from "../performance/index.js";
 import {
   Overview,
   Graph,
+  ZonesView,
   FilesView,
   ArchitectureView,
   ProblemsView,
@@ -32,6 +33,7 @@ import {
 
 import {
   PRDView,
+  AnalysisView,
   RexDashboard,
   TokenUsageView,
   ValidationView,
@@ -84,6 +86,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "graph": ({ data, setDetail, selectedFile, selectedZone, navigateTo }) =>
     h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo }),
 
+  "zones": ({ data, setDetail, navigateTo }) =>
+    h(ZonesView, { data, onSelect: setDetail, navigateTo }),
+
   "files": ({ data, setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo }) =>
     h(FilesView, { data, onSelect: setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo }),
 
@@ -107,6 +112,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "prd": ({ setDetail, setPrdDetailContent, selectedTaskId, navigateTo }) =>
     h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent, initialTaskId: selectedTaskId, navigateTo }),
+
+  "analysis": () =>
+    h(AnalysisView, null),
 
   "merge-graph": ({ navigateTo }) =>
     h(MergeGraphView, { navigateTo }),

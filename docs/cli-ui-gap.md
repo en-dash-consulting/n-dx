@@ -147,12 +147,12 @@ MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Cover
 
 ---
 
-## Orphaned UI surface
+## Orphaned UI surface — resolved 2026-08-12
 
-Roughly 2,900 lines of built view code are currently unreachable — restoring them is cheaper than building the equivalent pages from scratch and directly serves the "Surface all new functions as dashboard pages/sections" feature:
+Roughly 2,900 lines of built view code were unreachable; both views are now registered (guarded by `tests/unit/viewer/restored-views.test.ts`):
 
-1. **`views/analysis.ts` (`AnalysisView`)** — not in `view-registry.ts`, no `ViewId`, no sidebar entry. It is the only consumer of `AnalyzePanel` and `BatchImportPanel`, which means POST `/api/rex/analyze`, `/api/rex/proposals*`, and `/api/rex/batch-import` have no reachable UI. This is the `ndx plan` regression.
-2. **`views/zones.ts` (`ZonesView`, 2569 lines)** — exported from `domain-sourcevision.ts` but absent from the registry and from `SourcevisionScopeViewId`. The interactive zone diagram (the UI equivalent of `get_zone`) is not navigable; its only live reference is a unit test.
+1. **`views/analysis.ts` (`AnalysisView`)** — was never registered after the web-package extraction, leaving POST `/api/rex/analyze`, `/api/rex/proposals*`, and `/api/rex/batch-import` without reachable UI. Now `analysis` (REX → "Analyze & Import").
+2. **`views/zones.ts` (`ZonesView`, 2569 lines)** — removed from navigation in PR #189 ("obsolete Zones navigation") before PRs #317/#321 invested in expandable zones and a11y, leaving that feature work invisible. Now `zones` (SourceVision → "Zones" tab).
 
 ## Server APIs with no UI consumer
 
@@ -175,8 +175,8 @@ The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, P
 
 ### Tier 1 — high impact
 
-1. **Restore the orphaned `AnalysisView`** (register `ViewId`, sidebar entry under REX) — fixes the `ndx plan` proposal-review regression; the panels and routes already exist.
-2. **Restore the orphaned `ZonesView`** — unlocks zone drill-down (`get_zone` equivalent) with no new backend work; pairs with the SourceVision full-flow feature.
+1. ~~**Restore the orphaned `AnalysisView`**~~ — **done 2026-08-12**: registered as `analysis` (REX → "Analyze & Import"); `ndx plan` proposal review is reachable again.
+2. ~~**Restore the orphaned `ZonesView`**~~ — **done 2026-08-12**: registered as `zones` (SourceVision → "Zones" tab); zone drill-down (`get_zone` equivalent) is navigable.
 3. **`ndx refresh` trigger** — "Refresh data" control → new POST `/api/refresh` with phase progress; removes the most common terminal escape after `plan --accept`.
 4. **Full-flow analysis trigger** — extend `/api/commands/sv-analyze` to drive deep/enrichment passes with per-pass progress so all SourceVision tabs unlock from the UI (feeds feature `a83b1a2f`).
 

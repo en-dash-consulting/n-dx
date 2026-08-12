@@ -21,5 +21,5 @@ description: "The dashboard UI lags behind the toolkit's actual capabilities: fu
 
 | Title | Status |
 |-------|--------|
+| [Implement new dashboard pages/sections for uncovered functions](./implement-new-dashboard-pages-974800/index.md) | in_progress |
 | [Audit functions lacking dashboard UI coverage](./audit-functions-lacking-15afda.md) | completed |
-| [Implement new dashboard pages/sections for uncovered functions](./implement-new-dashboard-pages-974800.md) | pending |

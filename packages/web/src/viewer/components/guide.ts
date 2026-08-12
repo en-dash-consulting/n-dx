@@ -19,6 +19,12 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     lookFor: "Hub files, unexpected cross-zone imports, and external zones that cluster around many files.",
     actions: "Select a zone, hover files to preview routes, and click files to open the dependency street view.",
   },
+  zones: {
+    title: "Zones",
+    description: "Interactive diagram of architectural zones with expandable file lists, cross-zone connection bars, and flow edges between zones.",
+    lookFor: "Zones with many outbound connections (high coupling). Files whose connection bars span several target zones. Unexpected flow edges between zones that should be independent.",
+    actions: "Expand a zone to see its files ordered by cross-zone traffic. Hover or select a file row to highlight its connections. Click through to the file detail for import specifics.",
+  },
   files: {
     title: "Files",
     description: "Sortable, filterable table of all project files with language, role, size, and category information.",
@@ -67,6 +73,12 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     description: "Interactive PRD tree showing the full hierarchy: epics → features → tasks → subtasks. Each item shows its status, priority, and tags. Supports multi-select for bulk operations.",
     lookFor: "Tasks stuck in 'in_progress' for too long. Blocked items with unresolved dependencies. Orphaned subtasks without clear parent context. Items missing acceptance criteria.",
     actions: "Click items to view details in the side panel. Use bulk actions to update multiple items at once. Merge duplicate tasks. Add new items at any level of the hierarchy.",
+  },
+  analysis: {
+    title: "Analyze & Import",
+    description: "Rex analysis workspace: run project analysis, add items from natural language, batch-import ideas from files or text, and review pending proposals before accepting them into the PRD.",
+    lookFor: "Pending proposals awaiting review. Analysis history events showing what recent runs produced. Duplicate proposals that should be rejected rather than accepted.",
+    actions: "Use Smart Add to draft items from a description. Run a project scan to generate proposals, then accept or reject each one. Batch-import a spec file to seed the PRD.",
   },
   "token-usage": {
     title: "Token Usage",
