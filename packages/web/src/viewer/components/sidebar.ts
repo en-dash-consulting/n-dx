@@ -62,7 +62,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "item", id: "project-settings", icon: "\u25A3", label: "ndx analyze / plan", minPass: 0 },
   { type: "item", id: "hench-config", icon: "\u25B6", label: "ndx work", minPass: 0 },
   { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "ndx sync", minPass: 0, featureGate: "rex.notionSync" },
-  { type: "item", id: "commands", icon: "\u{1F4E4}", label: "ndx export", minPass: 0 },
+  { type: "item", id: "commands", icon: "\u{1F4E4}", label: "ndx export / refresh", minPass: 0 },
   // Cross-cutting settings (affect multiple commands)
   { type: "item", id: "feature-toggles", icon: "\u{1F4CC}", label: "Feature Flags", minPass: 0 },
   { type: "item", id: "cli-timeouts", icon: "\u23F1", label: "CLI Timeouts", minPass: 0 },

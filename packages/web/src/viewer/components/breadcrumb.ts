@@ -67,7 +67,7 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   "hench-optimization":  { product: "hench",        label: "Optimization",       productLabel: "Hench" },
   "feature-toggles":     { product: "global",       label: "Feature Flags",      productLabel: "Settings" },
   "cli-timeouts":        { product: "global",       label: "CLI Timeouts",       productLabel: "Settings" },
-  "commands":            { product: "global",       label: "ndx export",         productLabel: "Settings" },
+  "commands":            { product: "global",       label: "ndx export / refresh", productLabel: "Settings" },
   "llm-provider":        { product: "global",       label: "General",            productLabel: "Settings" },
   "project-settings":    { product: "global",       label: "ndx analyze / plan", productLabel: "Settings" },
   "merge-graph":         { product: "rex",          label: "Context Graph",       productLabel: "Rex" },

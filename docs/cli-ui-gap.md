@@ -44,8 +44,8 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `ndx plan` / `--accept` | **partial** | high | **Regression:** smart-add preview + accept-edited work (SmartAddInput), but the proposal-review panel (`AnalyzePanel` → `/api/rex/analyze`, `/api/rex/proposals*`) is only mounted by the orphaned `views/analysis.ts` |
 | `ndx add` | full | high | Smart-add input with debounced preview, accept-edited flow |
 | `ndx status` | full | high | Rex dashboard + PRD tree |
-| `ndx usage` | **partial** | high | Token Usage view consumes only `/api/token/utilization`; `by-period` (day/week/month grouping), `by-command`, `budget`, `events` endpoints exist but have no UI |
-| `ndx refresh` | **none** | high | Still no trigger to refresh sourcevision data + rebuild dashboard artifacts (POST `/api/reload` only reloads the viewer) |
+|  `ndx usage` | **partial** | high | Token Usage view consumes only `/api/token/utilization`; `by-period` (day/week/month grouping), `by-command`, `budget`, `events` endpoints exist but have no UI |
+| `ndx refresh` | **partial** | high | "Refresh Data" panel triggers the data phases live (`--data-only --live-server`); full UI rebuild still requires the terminal (server must stop) |
 | `ndx self-heal` | partial | medium | Trigger + status poll exist; no live phase display or stop control |
 | `ndx export` | partial | medium | Export trigger exists; deploy flow not exposed |
 | `ndx ci` | **none** | medium | No trigger or results view |
@@ -72,7 +72,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `rex fix` | **none** | medium | Validation view shows issues but offers no fix action |
 | `rex verify` | **partial** | medium | Requirements CRUD/coverage/traceability API exists (`routes-rex/requirements.ts`, 575 lines) with **no page** consuming it |
 | `rex analyze` / `import` | partial | medium | Same orphaned-panel regression as `ndx plan` |
-| `rex usage` | partial | medium | Same gaps as `ndx usage` |
+| `rex usage` | partial | medium | Same gaps as  `ndx usage` |
 | `rex sync` | full | medium | Via sync triggers |
 | `rex adapter` | partial | low | Integrations view provides schema-driven config for registered adapters; no add/remove |
 | `rex report` | none | low | JSON for CI; health view covers interactive use |
@@ -177,7 +177,7 @@ The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, P
 
 1. ~~**Restore the orphaned `AnalysisView`**~~ — **done 2026-08-12**: registered as `analysis` (REX → "Analyze & Import"); `ndx plan` proposal review is reachable again.
 2. ~~**Restore the orphaned `ZonesView`**~~ — **done 2026-08-12**: registered as `zones` (SourceVision → "Zones" tab); zone drill-down (`get_zone` equivalent) is navigable.
-3. **`ndx refresh` trigger** — "Refresh data" control → new POST `/api/refresh` with phase progress; removes the most common terminal escape after `plan --accept`.
+3. ~~**`ndx refresh` trigger**~~ — **done 2026-08-12**: "Refresh Data" panel in the Commands view → POST `/api/commands/refresh` (spawns `ndx refresh --data-only --live-server`, a new CLI mode that keeps the running server alive) with phase progress from the `[refresh]` output and a status poll endpoint.
 4. **Full-flow analysis trigger** — extend `/api/commands/sv-analyze` to drive deep/enrichment passes with per-pass progress so all SourceVision tabs unlock from the UI (feeds feature `a83b1a2f`).
 
 ### Tier 2 — medium impact

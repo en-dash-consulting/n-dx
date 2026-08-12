@@ -65,6 +65,8 @@ const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 const VIEW_TITLE_MAP: Partial<Record<import("./types.js").ViewId, string>> = {
   overview: "Overview",
   graph: "Import Graph",
+  zones: "Zones",
+  analysis: "Analyze & Import",
   files: "Files",
   routes: "Routes",
   architecture: "Architecture",
@@ -84,7 +86,7 @@ const VIEW_TITLE_MAP: Partial<Record<import("./types.js").ViewId, string>> = {
   "hench-optimization": "Optimization",
   "feature-toggles": "Feature Flags",
   "cli-timeouts": "CLI Timeouts",
-  commands: "ndx export",
+  commands: "ndx export / refresh",
   "llm-provider": "General",
   "project-settings": "ndx analyze / plan",
   "merge-graph": "Context Graph",

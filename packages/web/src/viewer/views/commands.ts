@@ -1,7 +1,8 @@
 /**
  * Commands view — trigger CLI operations from the dashboard.
  *
- * Provides action panels for: export static dashboard, self-heal loop.
+ * Provides action panels for: refresh data (live server), export static
+ * dashboard, self-heal loop.
  */
 
 import { h, Fragment } from "preact";
@@ -291,6 +292,136 @@ function SelfHealPanel() {
   );
 }
 
+// ── Refresh Panel ────────────────────────────────────────────────────
+
+interface RefreshStatusData {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  fast: boolean;
+  phases: string[];
+  output: string;
+  error: string | null;
+}
+
+export function RefreshPanel() {
+  const [state, setState] = useState<OpState>("idle");
+  const [fast, setFast] = useState(false);
+  const [statusData, setStatusData] = useState<RefreshStatusData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Poll refresh status while running
+  useEffect(() => {
+    if (state !== "running") return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/commands/refresh/status");
+        if (!res.ok) return;
+        const data = await res.json() as RefreshStatusData;
+        setStatusData(data);
+        if (!data.running && data.finishedAt) {
+          clearInterval(interval);
+          if (data.error) {
+            setError(data.error);
+            setState("error");
+          } else {
+            setState("done");
+          }
+        }
+      } catch {
+        // Ignore transient fetch errors
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [state]);
+
+  const handleStart = useCallback(async () => {
+    setState("running");
+    setError(null);
+    setStatusData(null);
+
+    try {
+      const res = await fetch("/api/commands/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fast }),
+      });
+
+      const data = await res.json() as Record<string, unknown>;
+
+      if (res.status === 409) {
+        // Already running — the polling loop will pick up its status
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error((data.error as string) || `HTTP ${res.status}`);
+      }
+
+      // 202 accepted — polling loop handles the rest
+    } catch (err) {
+      setError(String(err));
+      setState("error");
+    }
+  }, [fast]);
+
+  return h("div", { class: "cmd-panel" },
+    h("div", { class: "cmd-panel-header" },
+      h("h3", { class: "cmd-panel-title" }, "\u{1F504} Refresh Data"),
+      h("p", { class: "cmd-panel-desc" },
+        "Re-run SourceVision analysis and regenerate dashboard data without restarting the server. Equivalent to ",
+        h("code", null, "ndx refresh --data-only"), ".",
+      ),
+    ),
+
+    h("div", { class: "cmd-panel-form" },
+      h("label", { class: "cmd-panel-label cmd-panel-label-inline" },
+        h("input", {
+          type: "checkbox",
+          checked: fast,
+          onInput: (e: Event) => setFast((e.target as HTMLInputElement).checked),
+          disabled: state === "running",
+        }),
+        " Fast mode (structural only — skip LLM enrichment)",
+      ),
+    ),
+
+    h("div", { class: "cmd-panel-actions" },
+      h("button", {
+        class: "cmd-btn cmd-btn-primary",
+        onClick: handleStart,
+        disabled: state === "running",
+      }, state === "running" ? "Refreshing..." : "Refresh Data"),
+    ),
+
+    state === "running"
+      ? h("div", { class: "cmd-progress", role: "status", "aria-live": "polite" },
+          h("div", { class: "cmd-spinner", "aria-hidden": "true" }),
+          h("span", null, "Refreshing SourceVision data..."),
+        )
+      : null,
+
+    statusData && statusData.phases.length > 0
+      ? h("ul", { class: "cmd-phase-list" },
+          statusData.phases.map((phase, i) =>
+            h("li", { key: i, class: "cmd-phase-item" }, phase)),
+        )
+      : null,
+
+    state === "done"
+      ? h("div", { class: "cmd-result cmd-result-ok", role: "status" },
+          "Refresh complete — data views will update automatically.",
+        )
+      : null,
+
+    state === "error" && error
+      ? h("div", { class: "cmd-result cmd-result-error", role: "alert" }, error)
+      : null,
+  );
+}
+
 // ── Main view ────────────────────────────────────────────────────────
 
 export function CommandsView() {
@@ -304,6 +435,7 @@ export function CommandsView() {
     ),
 
     h("div", { class: "cmd-panels" },
+      h(RefreshPanel, null),
       h(ExportPanel, null),
       h(SelfHealPanel, null),
     ),

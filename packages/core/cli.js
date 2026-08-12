@@ -1463,21 +1463,7 @@ async function handleRefresh(rest) {
   const absDir = resolve(dir);
   const flags = extractFlags(rest);
 
-  // Pre-refresh: detect and stop any conflicting dashboard process so the
-  // refresh does not race against a running server rebuilding its own assets.
-  const conflict = await detectAndCleanConflictingDashboard(absDir);
-  if (conflict.status === "stopped") {
-    console.log(
-      `Pre-refresh: detected running dashboard (PID ${conflict.pid}, port ${conflict.port}); stopped.`,
-    );
-  } else if (conflict.status === "stop-failed") {
-    console.error(
-      `Error: Dashboard server (PID ${conflict.pid}) is running and could not be stopped automatically.`,
-    );
-    console.error(`Stop it manually: ndx start stop "${absDir}"`);
-    exitWithCleanup(1);
-  }
-
+  // Plan first so flag errors surface before any process is touched.
   let plan;
   try {
     plan = buildRefreshPlan(flags);
@@ -1488,6 +1474,25 @@ async function handleRefresh(rest) {
       exitWithCleanup(1);
     }
     throw err;
+  }
+
+  // Pre-refresh: detect and stop any conflicting dashboard process so the
+  // refresh does not race against a running server rebuilding its own assets.
+  // Skipped for --live-server: the refresh was triggered BY the running
+  // dashboard, and the plan is guaranteed not to contain a web-build step.
+  if (!plan.liveServer) {
+    const conflict = await detectAndCleanConflictingDashboard(absDir);
+    if (conflict.status === "stopped") {
+      console.log(
+        `Pre-refresh: detected running dashboard (PID ${conflict.pid}, port ${conflict.port}); stopped.`,
+      );
+    } else if (conflict.status === "stop-failed") {
+      console.error(
+        `Error: Dashboard server (PID ${conflict.pid}) is running and could not be stopped automatically.`,
+      );
+      console.error(`Stop it manually: ndx start stop "${absDir}"`);
+      exitWithCleanup(1);
+    }
   }
 
   if (plan.needsSourcevisionDir) {

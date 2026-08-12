@@ -24,7 +24,7 @@ description: "For each gap identified in the audit, add a dashboard page or sect
 | Title | Status |
 |-------|--------|
 | [Adaptive optimization page](./adaptive-optimization-page.md) | pending |
-| [Add ndx refresh trigger to dashboard](./add-ndx-refresh-trigger-to-dashboard.md) | pending |
+| [Add ndx refresh trigger to dashboard](./add-ndx-refresh-trigger-to-dashboard.md) | completed |
 | [Requirements and traceability page](./requirements-and-traceability-page.md) | pending |
 | [Restore orphaned ZonesView and AnalysisView into navigation](./restore-orphaned-zonesview-and-02333a.md) | completed |
 | [Tier 3 small coverage items](./tier-3-small-coverage-items.md) | pending |

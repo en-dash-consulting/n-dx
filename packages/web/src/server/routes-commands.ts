@@ -9,6 +9,8 @@
  * POST /api/commands/export          — ndx export static dashboard
  * POST /api/commands/self-heal       — ndx self-heal iterative loop (body: { iterations?: number })
  * GET  /api/commands/self-heal/status — check running self-heal status
+ * POST /api/commands/refresh         — refresh SourceVision data (live server; --data-only --live-server)
+ * GET  /api/commands/refresh/status  — check running refresh status
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -379,6 +381,133 @@ function handleSelfHealStatus(
   return true;
 }
 
+// ── Refresh (live-server data refresh) ────────────────────────────────
+
+interface RefreshStatus {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  fast: boolean;
+  /** Phase lines emitted by the CLI's `[refresh]` progress tags. */
+  phases: string[];
+  output: string;
+  error: string | null;
+}
+
+// Module-level singleton — one refresh at a time per server process.
+const refreshStatus: RefreshStatus = {
+  running: false,
+  startedAt: null,
+  finishedAt: null,
+  fast: false,
+  phases: [],
+  output: "",
+  error: null,
+};
+
+/** Extract the `[refresh] …` phase lines from CLI output (ANSI stripped). */
+function parseRefreshPhases(stdout: string): string[] {
+  // eslint-disable-next-line no-control-regex
+  const plain = stdout.replace(/\[[0-9;]*m/g, "");
+  return plain
+    .split("\n")
+    .filter((line) => line.startsWith("[refresh]"))
+    .map((line) => line.slice("[refresh]".length).trim())
+    .filter(Boolean);
+}
+
+/**
+ * POST /api/commands/refresh — refresh SourceVision data while the dashboard
+ * keeps running. Spawns `ndx refresh --data-only --live-server`; the
+ * --live-server plan is validated CLI-side to never rebuild the UI assets
+ * this server is serving, and skips the pre-refresh server termination.
+ */
+async function handleRefresh(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  if (refreshStatus.running) {
+    jsonResponse(res, 409, {
+      error: "A refresh is already running",
+      startedAt: refreshStatus.startedAt,
+    });
+    return true;
+  }
+
+  let fast = false;
+  try {
+    const body = await readBody(req);
+    if (body) {
+      const input = JSON.parse(body) as { fast?: boolean };
+      fast = !!input.fast;
+    }
+  } catch {
+    // Use defaults
+  }
+
+  const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  const cmdArgs = [...prefixArgs, "refresh", "--data-only", "--live-server"];
+  if (fast) cmdArgs.push("--fast");
+  cmdArgs.push(ctx.projectDir);
+
+  refreshStatus.running = true;
+  refreshStatus.startedAt = new Date().toISOString();
+  refreshStatus.finishedAt = null;
+  refreshStatus.fast = fast;
+  refreshStatus.phases = [];
+  refreshStatus.output = "";
+  refreshStatus.error = null;
+
+  if (broadcast) {
+    broadcast({ type: "commands:refresh-started", timestamp: refreshStatus.startedAt });
+  }
+
+  // Return 202 immediately, run in background
+  jsonResponse(res, 202, {
+    ok: true,
+    startedAt: refreshStatus.startedAt,
+    message: "Refresh started. Poll /api/commands/refresh/status for progress.",
+  });
+
+  foundationExec(bin, cmdArgs, {
+    cwd: ctx.projectDir,
+    timeout: 300_000, // 5 minutes — data analysis, no UI build
+    maxBuffer: 20 * 1024 * 1024,
+  }).then((result) => {
+    refreshStatus.running = false;
+    refreshStatus.finishedAt = new Date().toISOString();
+    refreshStatus.output = (result.stdout || "").trim().slice(-5000);
+    refreshStatus.phases = parseRefreshPhases(result.stdout || "");
+    refreshStatus.error = result.error ? (result.stderr || result.error.message).slice(-1000) : null;
+
+    if (broadcast) {
+      broadcast({
+        type: "sv:data-changed",
+        source: "refresh",
+        ok: !result.error,
+        timestamp: refreshStatus.finishedAt,
+      });
+    }
+  }).catch((err: unknown) => {
+    refreshStatus.running = false;
+    refreshStatus.finishedAt = new Date().toISOString();
+    refreshStatus.error = String(err);
+  });
+
+  return true;
+}
+
+/** GET /api/commands/refresh/status */
+function handleRefreshStatus(
+  _req: IncomingMessage,
+  res: ServerResponse,
+): boolean {
+  jsonResponse(res, 200, { ...refreshStatus });
+  return true;
+}
+
 // ── Dispatcher ────────────────────────────────────────────────────────
 
 /** Handle command trigger API requests. Returns true if the request was handled. */
@@ -412,6 +541,12 @@ export function handleCommandsRoute(
   }
   if (path === "self-heal/status" && method === "GET") {
     return handleSelfHealStatus(req, res);
+  }
+  if (path === "refresh" && method === "POST") {
+    return handleRefresh(req, res, ctx, broadcast);
+  }
+  if (path === "refresh/status" && method === "GET") {
+    return handleRefreshStatus(req, res);
   }
 
   return false;

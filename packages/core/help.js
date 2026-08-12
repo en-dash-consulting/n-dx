@@ -842,6 +842,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--pr-markdown", description: "Regenerate .sourcevision/pr-markdown.md only (skip analyze/build)" },
       { flag: "--no-build", description: "Skip UI build step after data refresh" },
       { flag: "--fast", description: "Structural-only analysis — skip LLM archetype/zone enrichment (much faster)" },
+      { flag: "--live-server", description: "Dashboard-triggered mode: keep the running server alive (requires --data-only, --no-build, or --pr-markdown)" },
       { flag: "--quiet, -q", description: "Suppress informational output from delegated tools" },
     ],
     examples: [
