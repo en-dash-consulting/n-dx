@@ -3,7 +3,8 @@
  *
  * All endpoints are under /api/commands/.
  *
- * POST /api/commands/sv-analyze      — re-run sourcevision analyze
+ * POST /api/commands/sv-analyze      — re-run sourcevision analyze (full: true → async, see status)
+ * GET  /api/commands/sv-analyze/status — check running full-analysis status
  * POST /api/commands/sync            — rex sync (body: { direction: "push"|"pull"|"sync" })
  * POST /api/commands/recommend       — rex recommend (refresh sourcevision-based recommendations)
  * POST /api/commands/export          — ndx export static dashboard
@@ -97,7 +98,36 @@ function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
 
 // ── Handlers ──────────────────────────────────────────────────────────
 
-/** POST /api/commands/sv-analyze — re-run sourcevision analyze */
+// ── Full-analysis state tracking ─────────────────────────────────────
+
+interface SvAnalyzeStatus {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /** Tail of the analyzer's output — phase and enrichment-pass lines. */
+  recentOutput: string;
+  error: string | null;
+}
+
+// Module-level singleton — one full analysis at a time per server process.
+const svAnalyzeStatus: SvAnalyzeStatus = {
+  running: false,
+  startedAt: null,
+  finishedAt: null,
+  recentOutput: "",
+  error: null,
+};
+
+/**
+ * POST /api/commands/sv-analyze — re-run sourcevision analyze.
+ *
+ * Quick runs (default / `lite: true`) execute synchronously and return 200
+ * with the output. Full runs (`full: true` — all four enrichment passes,
+ * which unlock the Architecture/Problems/Suggestions tabs) can take many
+ * minutes of LLM work, so they run as an async singleton: 202 immediately,
+ * progress via GET /api/commands/sv-analyze/status. Either way the viewer's
+ * data polling repopulates the tabs when the new files land.
+ */
 async function handleSvAnalyze(
   req: IncomingMessage,
   res: ServerResponse,
@@ -123,6 +153,60 @@ async function handleSvAnalyze(
   if (full) cmdArgs.push("--full");
   cmdArgs.push(ctx.projectDir);
 
+  if (full) {
+    if (svAnalyzeStatus.running) {
+      jsonResponse(res, 409, {
+        error: "A full analysis is already running",
+        startedAt: svAnalyzeStatus.startedAt,
+      });
+      return true;
+    }
+
+    svAnalyzeStatus.running = true;
+    svAnalyzeStatus.startedAt = new Date().toISOString();
+    svAnalyzeStatus.finishedAt = null;
+    svAnalyzeStatus.recentOutput = "";
+    svAnalyzeStatus.error = null;
+
+    if (broadcast) {
+      broadcast({ type: "commands:sv-analyze-started", timestamp: svAnalyzeStatus.startedAt });
+    }
+
+    jsonResponse(res, 202, {
+      ok: true,
+      startedAt: svAnalyzeStatus.startedAt,
+      message: "Full analysis started. Poll /api/commands/sv-analyze/status for progress.",
+    });
+
+    foundationExec(bin, cmdArgs, {
+      cwd: ctx.projectDir,
+      timeout: 1_800_000, // 30 minutes — four LLM enrichment passes
+      maxBuffer: 20 * 1024 * 1024,
+    }).then((result) => {
+      svAnalyzeStatus.running = false;
+      svAnalyzeStatus.finishedAt = new Date().toISOString();
+      svAnalyzeStatus.recentOutput = (result.stdout || "").trim().slice(-3000);
+      svAnalyzeStatus.error = result.error
+        ? (result.stderr || result.error.message).slice(-1000)
+        : null;
+
+      if (broadcast) {
+        broadcast({
+          type: "sv:data-changed",
+          source: "sv-analyze-full",
+          ok: !result.error,
+          timestamp: svAnalyzeStatus.finishedAt,
+        });
+      }
+    }).catch((err: unknown) => {
+      svAnalyzeStatus.running = false;
+      svAnalyzeStatus.finishedAt = new Date().toISOString();
+      svAnalyzeStatus.error = String(err);
+    });
+
+    return true;
+  }
+
   try {
     const result = await foundationExec(bin, cmdArgs, {
       cwd: ctx.projectDir,
@@ -146,6 +230,15 @@ async function handleSvAnalyze(
   } catch (err) {
     errorResponse(res, 500, String(err));
   }
+  return true;
+}
+
+/** GET /api/commands/sv-analyze/status */
+function handleSvAnalyzeStatus(
+  _req: IncomingMessage,
+  res: ServerResponse,
+): boolean {
+  jsonResponse(res, 200, { ...svAnalyzeStatus });
   return true;
 }
 
@@ -526,6 +619,9 @@ export function handleCommandsRoute(
 
   if (path === "sv-analyze" && method === "POST") {
     return handleSvAnalyze(req, res, ctx, broadcast);
+  }
+  if (path === "sv-analyze/status" && method === "GET") {
+    return handleSvAnalyzeStatus(req, res);
   }
   if (path === "sync" && method === "POST") {
     return handleSync(req, res, ctx, broadcast);

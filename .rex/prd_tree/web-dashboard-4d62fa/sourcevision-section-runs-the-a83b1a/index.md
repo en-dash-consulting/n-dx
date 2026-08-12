@@ -22,4 +22,4 @@ description: "The SourceVision section of the dashboard must be able to run the 
 | Title | Status |
 |-------|--------|
 | [Surface all sourcevision recommendations and functions in the section UI](./surface-all-sourcevision-33dafe.md) | pending |
-| [Wire full sourcevision flow trigger and tab population from the dashboard](./wire-full-sourcevision-flow-3ccf11.md) | pending |
+| [Wire full sourcevision flow trigger and tab population from the dashboard](./wire-full-sourcevision-flow-3ccf11.md) | completed |

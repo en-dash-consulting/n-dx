@@ -165,9 +165,9 @@ Roughly 2,900 lines of built view code were unreachable; both views are now regi
 | `/api/hench/{metrics,metrics/snapshots,memory/history,memory/leaks,runs/health}` | 5 endpoints | Panels exist for live memory/concurrency; historical metrics unexposed |
 | `/api/rex/{next,stats}` | 2 endpoints | Dashboard consumes `/api/rex/dashboard` instead; candidates for removal or documentation |
 
-## SourceVision full-flow note
+## SourceVision full-flow note — trigger shipped 2026-08-12
 
-The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, Problems ≥ 3, Suggestions ≥ 4). The "Run Analysis" trigger offers only lite/full; unless a run reaches enrichment pass 4, the Suggestions tab (and below it, recommendations) stays locked. This is the root cause tracked by the "SourceVision section runs the full analysis flow with all tabs and recommendations visible" feature: the UI trigger must be able to drive the full enrichment pipeline (equivalent of `ndx analyze --deep/--full`) and surface per-pass progress, or the tabs remain invisible regardless of server capability.
+The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, Problems ≥ 3, Suggestions ≥ 4). The Overview now has a **"Full analysis"** control that runs `sourcevision analyze --full` (all four enrichment passes) as a background job — POST `/api/commands/sv-analyze` with `full: true` returns 202 and progress streams via `GET /api/commands/sv-analyze/status` (30-minute budget for the LLM passes; the old synchronous path capped out at 3 minutes). Locked tabs unlock automatically as the viewer's data polling picks up the refreshed `zones.json`. Remaining scope for the feature lives in its second task: surfacing every recommendation/function per tab once data exists.
 
 ---
 

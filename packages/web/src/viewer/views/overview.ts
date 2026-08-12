@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { useState, useCallback, useMemo } from "preact/hooks";
+import { useState, useCallback, useEffect, useMemo } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import {
   BarChart,
@@ -11,11 +11,60 @@ import {
 import { basename } from "../utils.js";
 import { BrandedHeader } from "../components/index.js";
 
-function ReanalyzeButton() {
-  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
-  const [error, setError] = useState<string | null>(null);
+interface SvAnalyzeStatusData {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  recentOutput: string;
+  error: string | null;
+}
 
-  const handleClick = useCallback(async () => {
+/**
+ * Quick and full analysis triggers for the SourceVision section.
+ *
+ * Quick re-analyze is a synchronous structural refresh. Full analysis runs
+ * all four enrichment passes (unlocking the Architecture, Problems, and
+ * Suggestions tabs) as a background job \u2014 202 + status polling \u2014 because the
+ * LLM passes can take many minutes. Tab data repopulates automatically via
+ * the viewer's data polling once new files land.
+ */
+export function AnalyzeControls() {
+  const [state, setState] = useState<"idle" | "running" | "running-full" | "done" | "done-full" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
+
+  // Poll full-analysis status while running
+  useEffect(() => {
+    if (state !== "running-full") return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/commands/sv-analyze/status");
+        if (!res.ok) return;
+        const data = await res.json() as SvAnalyzeStatusData;
+        const lastLine = data.recentOutput.split("\n").filter(Boolean).pop();
+        if (lastLine) setProgress(lastLine.slice(0, 120));
+        if (!data.running && data.finishedAt) {
+          clearInterval(interval);
+          if (data.error) {
+            setError(data.error);
+            setState("error");
+            setTimeout(() => setState("idle"), 10000);
+          } else {
+            setProgress(null);
+            setState("done-full");
+            setTimeout(() => setState("idle"), 8000);
+          }
+        }
+      } catch {
+        // Ignore transient fetch errors
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [state]);
+
+  const handleQuick = useCallback(async () => {
     setState("running");
     setError(null);
     try {
@@ -37,11 +86,39 @@ function ReanalyzeButton() {
     }
   }, []);
 
+  const handleFull = useCallback(async () => {
+    setState("running-full");
+    setError(null);
+    setProgress(null);
+    try {
+      const res = await fetch("/api/commands/sv-analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ full: true }),
+      });
+      if (res.status === 409) {
+        // Already running \u2014 the polling loop will track it
+        return;
+      }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: "Full analysis failed to start" })) as { error?: string };
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      // 202 accepted \u2014 polling loop handles the rest
+    } catch (err) {
+      setError(String(err));
+      setState("error");
+      setTimeout(() => setState("idle"), 10000);
+    }
+  }, []);
+
+  const busy = state === "running" || state === "running-full";
+
   return h("div", { class: "overview-reanalyze" },
     h("button", {
       class: "cmd-inline-trigger",
-      onClick: handleClick,
-      disabled: state === "running",
+      onClick: handleQuick,
+      disabled: busy,
       "aria-busy": state === "running",
       title: "Re-run sourcevision analyze to refresh all data",
     },
@@ -50,14 +127,33 @@ function ReanalyzeButton() {
         : h("span", { "aria-hidden": "true" }, "\u{1F504}"),
       state === "running" ? "Analyzing..." : "Re-analyze",
     ),
+    h("button", {
+      class: "cmd-inline-trigger",
+      onClick: handleFull,
+      disabled: busy,
+      "aria-busy": state === "running-full",
+      title: "Run all four enrichment passes \u2014 unlocks the Architecture, Problems, and Suggestions tabs. Takes several minutes.",
+    },
+      state === "running-full"
+        ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" })
+        : h("span", { "aria-hidden": "true" }, "\u2728"),
+      state === "running-full" ? "Running full analysis..." : "Full analysis",
+    ),
     h("span", { role: "status", "aria-live": "polite" },
+      state === "running-full" && progress
+        ? h("span", { class: "cmd-inline-progress" }, progress)
+        : null,
       state === "done"
         ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, "\u2713 Done")
         : null,
-      state === "error"
-        ? h("span", { class: "cmd-inline-result cmd-inline-result-err" }, error || "Failed")
+      state === "done-full"
+        ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" },
+            "\u2713 Full analysis complete \u2014 tabs unlock as data refreshes")
         : null,
     ),
+    state === "error" && error
+      ? h("span", { class: "cmd-inline-result cmd-inline-result-err", role: "alert" }, error)
+      : null,
   );
 }
 
@@ -205,7 +301,7 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
       : null,
 
     // Re-analyze trigger
-    h(ReanalyzeButton, null),
+    h(AnalyzeControls, null),
 
     // Main metrics row
     h("div", { class: "overview-metrics" },

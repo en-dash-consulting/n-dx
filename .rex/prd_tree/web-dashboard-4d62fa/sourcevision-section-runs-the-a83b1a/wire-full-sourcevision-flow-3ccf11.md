@@ -2,12 +2,15 @@
 id: "3ccf116a-5601-4e0e-9a47-9d4775450da3"
 level: "task"
 title: "Wire full sourcevision flow trigger and tab population from the dashboard"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "web"
   - "sourcevision"
 source: "ndx-capture"
+startedAt: "2026-08-12T22:59:21.880Z"
+completedAt: "2026-08-12T23:05:14.638Z"
+endedAt: "2026-08-12T23:05:14.638Z"
 acceptanceCriteria:
   - "A control in the SourceVision section starts the full analysis flow with visible progress state"
   - "On completion, all tabs re-load and display populated data without a manual server restart"

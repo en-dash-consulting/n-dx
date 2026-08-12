@@ -268,3 +268,133 @@ describe("commands route — refresh (live-server data refresh)", () => {
     expect(String(status.error)).toContain("refresh exploded");
   });
 });
+
+describe("commands route — sv-analyze full flow (async)", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    execMock.mockReset();
+    tmpDir = await mkdtemp(join(tmpdir(), "commands-svfull-"));
+    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    const started = await startRouteTestServer((req, res) =>
+      handleCommandsRoute(req, res, ctx),
+    );
+    server = started.server;
+    port = started.port;
+  });
+
+  afterEach(async () => {
+    server.close();
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  async function waitForFinish(): Promise<Record<string, unknown>> {
+    for (let i = 0; i < 50; i++) {
+      const res = await fetch(`http://localhost:${port}/api/commands/sv-analyze/status`);
+      const body = (await res.json()) as Record<string, unknown>;
+      if (!body.running) return body;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error("full analysis did not finish");
+  }
+
+  it("full mode returns 202 and spawns analyze --full in the background", async () => {
+    execMock.mockResolvedValue({ stdout: "Phase 1 done\nPass 4 complete", stderr: "", error: null });
+
+    const res = await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ full: true }),
+    });
+    expect(res.status).toBe(202);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+
+    const status = await waitForFinish();
+    expect(status.error).toBeNull();
+    expect(status.finishedAt).toBeTruthy();
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).toContain("analyze");
+    expect(args).toContain("--full");
+  });
+
+  it("quick mode stays synchronous and returns 200 with output", async () => {
+    execMock.mockResolvedValue({ stdout: "quick analysis ok", stderr: "", error: null });
+
+    const res = await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lite: true }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.output).toContain("quick analysis ok");
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).toContain("--lite");
+    expect(args).not.toContain("--full");
+  });
+
+  it("rejects a concurrent full run with 409", async () => {
+    let release: (() => void) | undefined;
+    execMock.mockImplementation(
+      () => new Promise((resolve) => {
+        release = () => resolve({ stdout: "done", stderr: "", error: null });
+      }),
+    );
+
+    const first = await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ full: true }),
+    });
+    expect(first.status).toBe(202);
+
+    const second = await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ full: true }),
+    });
+    expect(second.status).toBe(409);
+
+    release?.();
+    await waitForFinish();
+  });
+
+  it("status exposes recent output lines while and after running", async () => {
+    execMock.mockResolvedValue({
+      stdout: ["Phase 1: inventory", "Phase 3: zones", "Enrichment pass 4 complete"].join("\n"),
+      stderr: "",
+      error: null,
+    });
+
+    await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ full: true }),
+    });
+    const status = await waitForFinish();
+    expect(status.recentOutput).toContain("Enrichment pass 4 complete");
+  });
+
+  it("captures a failed full run into status.error", async () => {
+    execMock.mockResolvedValue({ stdout: "", stderr: "no LLM credentials", error: new Error("exit 1") });
+
+    await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ full: true }),
+    });
+    const status = await waitForFinish();
+    expect(String(status.error)).toContain("no LLM credentials");
+  });
+});
