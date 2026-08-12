@@ -157,6 +157,53 @@ export function AnalyzeControls() {
   );
 }
 
+interface NextStep {
+  priority: string;
+  title: string;
+  description: string;
+  category: string;
+}
+
+/**
+ * Prioritized next-step recommendations — the UI twin of the sourcevision
+ * MCP `get_next_steps` tool. Rendered on the Overview so recommendations are
+ * visible at any enrichment pass (the Suggestions tab requires pass ≥ 4).
+ * Renders nothing when no steps are available yet.
+ */
+export function NextStepsPanel() {
+  const [steps, setSteps] = useState<NextStep[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/sv/next-steps?limit=5");
+        if (!res.ok) return;
+        const body = await res.json() as { steps?: NextStep[] };
+        if (!cancelled && body.steps && body.steps.length > 0) setSteps(body.steps);
+      } catch {
+        // Panel is best-effort — stay hidden on failure
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!steps) return null;
+
+  return h("div", { class: "overview-next-steps" },
+    h("h3", { class: "section-header" }, "Next Steps"),
+    h("ol", { class: "next-steps-list" },
+      steps.map((s, i) =>
+        h("li", { key: i, class: "next-step-item" },
+          h("span", { class: `tag next-step-priority-${s.priority}` }, s.priority),
+          h("strong", null, ` ${s.title}`),
+          h("div", { class: "next-step-desc" }, s.description),
+        ),
+      ),
+    ),
+  );
+}
+
 interface OverviewProps {
   data: LoadedData;
   navigateTo?: NavigateTo;
@@ -302,6 +349,9 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
 
     // Re-analyze trigger
     h(AnalyzeControls, null),
+
+    // Prioritized recommendations (hidden until analysis data exists)
+    h(NextStepsPanel, null),
 
     // Main metrics row
     h("div", { class: "overview-metrics" },

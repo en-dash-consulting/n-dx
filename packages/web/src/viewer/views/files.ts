@@ -35,8 +35,106 @@ const ROLE_TAG_CLASS: Record<string, string> = {
   other: "tag-other",
 };
 
+interface ArchetypeCellProps {
+  path: string;
+  archetype: string | null;
+  validArchetypes: string[];
+}
+
+/**
+ * Archetype display + override control — the UI twin of the sourcevision MCP
+ * `set_file_archetype` tool. Click to edit; the override persists to
+ * `.n-dx.json` and takes effect on the next analyze run.
+ */
+export function ArchetypeCell({ path, archetype, validArchetypes }: ArchetypeCellProps) {
+  const [editing, setEditing] = useState(false);
+  const [current, setCurrent] = useState(archetype);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleChange = useCallback(async (e: Event) => {
+    const next = (e.target as HTMLSelectElement).value;
+    setEditing(false);
+    setError(null);
+    if (!next || next === current) return;
+    try {
+      const res = await fetch("/api/sv/archetype", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, archetype: next }),
+      });
+      const body = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok || !body.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setCurrent(next);
+      setNote("saved — re-analyze to apply");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [path, current]);
+
+  if (editing) {
+    return h("select", {
+      class: "filter-select archetype-select",
+      "aria-label": `Archetype for ${path}`,
+      value: current ?? "",
+      onClick: (e: Event) => e.stopPropagation(),
+      onChange: handleChange,
+      onBlur: () => setEditing(false),
+    },
+      h("option", { value: "" }, "—"),
+      validArchetypes.map((a) => h("option", { key: a, value: a }, a)),
+    );
+  }
+
+  return h("span", { class: "archetype-cell" },
+    h("button", {
+      class: "archetype-edit-btn",
+      title: "Override archetype classification",
+      onClick: (e: Event) => { e.stopPropagation(); setEditing(true); },
+    }, current ?? "—"),
+    note ? h("span", { class: "archetype-note" }, ` ${note}`) : null,
+    error ? h("span", { class: "archetype-error", role: "alert" }, ` ${error}`) : null,
+  );
+}
+
+interface ClassificationsData {
+  archetypes?: Array<{ id: string }>;
+  files?: Array<{ path: string; archetype?: string }>;
+}
+
 export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selectedZone, navigateTo }: FilesViewProps) {
   const { inventory, zones } = data;
+
+  // Archetype classifications — fetched lazily (server-side data file, not
+  // part of the polled LoadedData set). Empty when analysis hasn't produced
+  // classifications.json yet.
+  const [classifications, setClassifications] = useState<ClassificationsData | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/sv/classifications");
+        if (!res.ok) return;
+        const body = await res.json() as ClassificationsData;
+        if (!cancelled) setClassifications(body);
+      } catch {
+        // Column stays hidden without classification data
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const archetypeByPath = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const f of classifications?.files ?? []) {
+      if (f.archetype) map.set(f.path, f.archetype);
+    }
+    return map;
+  }, [classifications]);
+  const validArchetypes = useMemo(
+    () => (classifications?.archetypes ?? []).map((a) => a.id),
+    [classifications],
+  );
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [langFilter, setLangFilter] = useState<string>("all");
@@ -351,7 +449,8 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
           h("th", { onClick: () => toggleSort("lineCount") }, `Lines${sortIndicator("lineCount")}`),
           h("th", { onClick: () => toggleSort("size") }, `Size${sortIndicator("size")}`),
           h("th", { onClick: () => toggleSort("role") }, `Role${sortIndicator("role")}`),
-          h("th", { onClick: () => toggleSort("category") }, `Category${sortIndicator("category")}`)
+          h("th", { onClick: () => toggleSort("category") }, `Category${sortIndicator("category")}`),
+          classifications ? h("th", null, "Archetype") : null
         )
       ),
       h("tbody", null,
@@ -378,7 +477,17 @@ export function FilesView({ data, onSelect, selectedFile, setSelectedFile, selec
             h("td", null,
               h("span", { class: `tag ${ROLE_TAG_CLASS[file.role] || "tag-other"}` }, file.role)
             ),
-            h("td", null, file.category)
+            h("td", null, file.category),
+            classifications
+              ? h("td", null,
+                  h(ArchetypeCell, {
+                    key: file.path,
+                    path: file.path,
+                    archetype: archetypeByPath.get(file.path) ?? null,
+                    validArchetypes,
+                  })
+                )
+              : null
           );
         })
       )

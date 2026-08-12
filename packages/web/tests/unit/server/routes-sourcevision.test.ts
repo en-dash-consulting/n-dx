@@ -356,3 +356,127 @@ describe("Sourcevision API routes", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("Sourcevision capability routes (next-steps, classifications, archetype)", () => {
+  let tmpDir: string;
+  let svDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  const zonesWithFindings = {
+    schema: "sourcevision/v1",
+    zones: [{ id: "zone-1", name: "Core", files: ["src/index.ts"] }],
+    findings: [
+      { type: "anti-pattern", severity: "critical", scope: "zone-1", text: "God file detected: src/index.ts does everything" },
+      { type: "suggestion", severity: "info", scope: "zone-1", text: "Split helpers: extract utils" },
+    ],
+  };
+
+  const classificationsData = {
+    schema: "sourcevision/v1",
+    archetypes: [
+      { id: "utility", name: "Utility" },
+      { id: "entrypoint", name: "Entrypoint" },
+    ],
+    files: [
+      { path: "src/index.ts", archetype: "entrypoint", confidence: 0.9 },
+      { path: "src/utils.ts", archetype: "utility", confidence: 0.8 },
+    ],
+  };
+
+  const inventoryFixture = {
+    schema: "sourcevision/v1",
+    files: [
+      { path: "src/index.ts", extension: ".ts", sizeBytes: 10, lines: 5 },
+      { path: "src/utils.ts", extension: ".ts", sizeBytes: 10, lines: 5 },
+    ],
+    summary: { totalFiles: 2, totalLines: 10, totalSizeBytes: 20 },
+  };
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-capability-"));
+    svDir = join(tmpDir, ".sourcevision");
+    await mkdir(svDir, { recursive: true });
+    await writeFile(join(svDir, "zones.json"), JSON.stringify(zonesWithFindings));
+    await writeFile(join(svDir, "classifications.json"), JSON.stringify(classificationsData));
+    await writeFile(join(svDir, "inventory.json"), JSON.stringify(inventoryFixture));
+    ctx = {
+      projectDir: tmpDir,
+      svDir,
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    ({ server, port } = await startTestServer(ctx));
+  });
+
+  afterEach(async () => {
+    server.close();
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("GET /api/sv/next-steps derives prioritized steps from zones findings", async () => {
+    const res = await fetch(`http://localhost:${port}/api/sv/next-steps`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.steps)).toBe(true);
+    expect(body.steps.length).toBeGreaterThan(0);
+    expect(body.steps[0].priority).toBeTruthy();
+  });
+
+  it("GET /api/sv/next-steps supports priority and limit params", async () => {
+    const res = await fetch(`http://localhost:${port}/api/sv/next-steps?priority=high&limit=1`);
+    const body = await res.json();
+    expect(body.steps.length).toBeLessThanOrEqual(1);
+    for (const s of body.steps) expect(s.priority).toBe("high");
+  });
+
+  it("GET /api/sv/next-steps 404s without zones data", async () => {
+    await rm(join(svDir, "zones.json"));
+    const res = await fetch(`http://localhost:${port}/api/sv/next-steps`);
+    expect(res.status).toBe(404);
+  });
+
+  it("GET /api/sv/classifications serves the classifications file", async () => {
+    const res = await fetch(`http://localhost:${port}/api/sv/classifications`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.archetypes).toHaveLength(2);
+    expect(body.files).toHaveLength(2);
+  });
+
+  it("POST /api/sv/archetype persists an override to .n-dx.json", async () => {
+    const res = await fetch(`http://localhost:${port}/api/sv/archetype`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "src/utils.ts", archetype: "entrypoint" }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(String(body.message)).toContain("analyze");
+
+    const config = JSON.parse(await (await import("node:fs/promises")).readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+    expect(config.sourcevision.archetypes.overrides["src/utils.ts"]).toBe("entrypoint");
+  });
+
+  it("POST /api/sv/archetype rejects an unknown archetype with the valid list", async () => {
+    const res = await fetch(`http://localhost:${port}/api/sv/archetype`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "src/utils.ts", archetype: "nonsense" }),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(String(body.error)).toContain("utility");
+  });
+
+  it("POST /api/sv/archetype rejects a file not in the inventory", async () => {
+    const res = await fetch(`http://localhost:${port}/api/sv/archetype`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "src/ghost.ts", archetype: "utility" }),
+    });
+    expect(res.status).toBe(404);
+  });
+});

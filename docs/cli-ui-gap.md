@@ -135,14 +135,14 @@ MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Cover
 | Tool | Equivalent UI | Coverage |
 |------|---------------|----------|
 | `get_overview` | Overview tab | full |
-| `get_next_steps` | Suggestions tab | full |
+| `get_next_steps` | Next Steps panel on Overview (derived steps, any pass) + Suggestions tab | full |
 | `get_zone` | — | **none** — the zone-detail view (`views/zones.ts`, 2569 lines) exists but is unreachable (see orphaned surface) |
 | `get_findings` | Architecture / Problems / Suggestions tabs | full |
 | `get_file_info` | Files tab | full |
 | `search_files` | Files tab filters + global search overlay | full |
 | `get_imports` | Map tab | full |
-| `get_classifications` | Files tab role column | partial (no archetype-classification breakdown) |
-| `set_file_archetype` | — | **none** (the only sourcevision *write* tool; no UI to override a file's archetype) |
+| `get_classifications` | Files tab Archetype column (via `/api/sv/classifications`) | full |
+| `set_file_archetype` | Archetype override control in the Files tab (POST `/api/sv/archetype`) | full |
 | `get_route_tree` | Routes tab | full |
 
 ---
@@ -193,7 +193,7 @@ The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, P
 ### Tier 3 — low impact
 
 12. **`sourcevision export-pdf` control** next to the Export panel.
-13. **`set_file_archetype` override UI** in the Files tab (only sourcevision write tool without UI).
+13. ~~**`set_file_archetype` override UI**~~ — **done 2026-08-12** (Files tab Archetype column with override control).
 14. **Facet distribution view** (MCP `facets` parity).
 15. **`ndx auth` status chip** in LLM settings.
 16. **`hench validate-tokens` trigger** in the Runs view.

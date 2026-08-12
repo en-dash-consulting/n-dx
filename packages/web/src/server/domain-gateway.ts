@@ -16,4 +16,5 @@
  * @see packages/hench/src/prd/rex-gateway.ts — hench's equivalent gateway
  */
 
-export { createSourcevisionMcpServer } from "@n-dx/sourcevision";
+export { createSourcevisionMcpServer, deriveNextSteps, setArchetypeOverride } from "@n-dx/sourcevision";
+export type { NextStep } from "@n-dx/sourcevision";

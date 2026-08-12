@@ -2,7 +2,7 @@
 id: "33dafeba-d798-44b2-96c5-15dc3c42908d"
 level: "task"
 title: "Surface all sourcevision recommendations and functions in the section UI"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "web"
@@ -11,6 +11,9 @@ tags:
 blockedBy:
   - "3ccf116a-5601-4e0e-9a47-9d4775450da3"
 source: "ndx-capture"
+startedAt: "2026-08-12T23:12:21.550Z"
+completedAt: "2026-08-12T23:25:55.922Z"
+endedAt: "2026-08-12T23:25:55.922Z"
 acceptanceCriteria:
   - "All recommendations from get_next_steps and get_findings render in the UI"
   - "Each sourcevision MCP capability has a corresponding visible UI affordance or documented exclusion"
