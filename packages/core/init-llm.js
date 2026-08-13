@@ -137,11 +137,11 @@ export function resolveInitLLMSelection({ flags, existingConfig, isTTY }) {
     result.needsModelPrompt = isTTY;
   }
 
-  // Local vendor: always offer a model prompt on TTY even when a model is
-  // already set — the active model changes frequently in LM Studio/Ollama,
-  // and blank input keeps the existing value. Suppressed when --model= was
-  // given (the flag value is used directly without re-prompting).
-  if (result.provider === "local" && isTTY && !flags.model) {
+  // Always offer a model prompt on TTY, even when a model is already in config.
+  // The user can confirm the existing choice (press Enter) or switch to a
+  // different model. Suppressed only when --model= was given — the flag value
+  // is used directly without re-prompting.
+  if (result.provider && isTTY && !flags.model) {
     result.needsModelPrompt = true;
   }
 
@@ -207,10 +207,11 @@ async function defaultPromptProvider() {
  * recommended model without prompting. Explicit model selection in scripted
  * flows requires the --model= flag.
  *
- * @param {string} provider  The resolved provider (e.g. "codex", "claude").
+ * @param {string} provider      The resolved provider (e.g. "codex", "claude").
+ * @param {string} [existingModel]  Current model from config — pre-selected as default.
  * @returns {Promise<string|undefined>}  Selected model ID or undefined on cancel.
  */
-async function defaultPromptModel(provider) {
+async function defaultPromptModel(provider, existingModel) {
   const models = getModelsForVendor(provider);
   if (!models || models.length === 0) return undefined;
 
@@ -218,7 +219,7 @@ async function defaultPromptModel(provider) {
   if (models.length === 1) return models[0].id;
 
   if (isInteractiveTerminal()) {
-    return promptModelEnquirer(provider, models);
+    return promptModelEnquirer(provider, models, existingModel);
   }
 
   // Non-interactive environment (piped input, CI, test harnesses):
@@ -233,19 +234,33 @@ async function defaultPromptModel(provider) {
 /**
  * Enquirer-based model selector — keyboard-driven, TTY-only.
  *
+ * When `existingModel` is provided (re-prompt on reinit), it is pre-selected
+ * so the user can confirm with Enter or arrow to a different model.
+ * Falls back to the recommended model, then the first entry.
+ *
  * @param {string} provider
  * @param {import("./llm-model-catalog.js").ModelEntry[]} models
+ * @param {string} [existingModel]  Currently configured model (pre-selected default).
  * @returns {Promise<string|undefined>}
  */
-async function promptModelEnquirer(provider, models) {
+async function promptModelEnquirer(provider, models, existingModel) {
   try {
     const { default: Enquirer } = await import("enquirer");
     const enquirer = new Enquirer();
 
     const recommended = getRecommendedModel(provider);
-    const initialIndex = recommended
-      ? models.findIndex((m) => m.id === recommended.id)
-      : 0;
+    // Pre-select the existing model when re-prompting; fall back to recommended.
+    const initialIndex = (() => {
+      if (existingModel) {
+        const idx = models.findIndex((m) => m.id === existingModel);
+        if (idx >= 0) return idx;
+      }
+      if (recommended) {
+        const idx = models.findIndex((m) => m.id === recommended.id);
+        if (idx >= 0) return idx;
+      }
+      return 0;
+    })();
 
     const choices = models.map((m) => ({
       name: m.id,
@@ -351,15 +366,21 @@ export async function promptLLMSelection(resolution, options = {}) {
   }
 
   // Non-local vendors: catalog-driven select prompt.
+  // Pass the existing model so it is pre-selected (confirm with Enter or change).
+  // Cancellation (Ctrl+C/Esc) keeps the existing config model and does NOT mark
+  // the selection as cancelled — Esc means "keep what I had", not "abort init".
+  // Only mark cancelled when there was no existing model to fall back to.
   if (needsModelPrompt && provider && provider !== "local") {
     const promptFn = options.promptModel ?? defaultPromptModel;
-    const selected = await promptFn(provider);
+    const selected = await promptFn(provider, model);
     if (selected) {
       model = selected;
       modelSource = "prompt";
-    } else {
+    } else if (modelSource !== "config") {
+      // No prior model in config — treat cancellation as an abort.
       cancelled = true;
     }
+    // else: model stays as the existing config value; cancelled stays false.
   }
 
   return { provider, model, providerSource, modelSource, cancelled };
