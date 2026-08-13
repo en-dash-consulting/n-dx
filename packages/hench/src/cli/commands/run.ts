@@ -912,7 +912,7 @@ export async function cmdRun(
   // consistent with how --quiet suppresses info() output.
   if (flags.format === "json") setQuiet(true);
 
-  const provider = (flags.provider as "cli" | "api") ?? config.provider;
+  let provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
   const review = flags.review === "true";
   // --no-rollback always wins; otherwise read config (defaults to true).
@@ -967,18 +967,13 @@ export async function cmdRun(
   }
 
   // Google and local only support API mode (no CLI binary exists).
-  if (llmVendor === "google" && provider === "cli" && !dryRun) {
-    throw new CLIError(
-      "Google vendor does not support CLI mode — it uses the Gemini REST API directly.",
-      "Set 'n-dx config hench.provider api' or switch vendor: 'n-dx config llm.vendor claude'.",
-    );
-  }
-
-  if (llmVendor === "local" && provider === "cli" && !dryRun) {
-    throw new CLIError(
-      "Local vendor does not support CLI mode — it connects to a local REST server.",
-      "Set 'n-dx config hench.provider api' or switch vendor: 'n-dx config llm.vendor claude'.",
-    );
+  // Auto-switch to API mode rather than failing — hench.provider defaults to
+  // "cli" but local/google have no binary. Emit a hint so the user knows
+  // what happened and can persist the setting if desired.
+  if ((llmVendor === "google" || llmVendor === "local") && provider === "cli" && !dryRun) {
+    info(`vendor=${llmVendor} requires API mode — auto-switching from cli to api`);
+    info(`To persist: ndx config hench.provider api`);
+    provider = "api";
   }
 
   // Fail fast if CLI provider selected but vendor CLI binary not available.

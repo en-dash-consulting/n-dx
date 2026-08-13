@@ -915,7 +915,7 @@ function parseInitFlagSet(rest) {
   const googleLightModelFromFlag = extractInitGoogleLightModel(rest);
 
   if (providerFromFlag !== undefined && !SUPPORTED_PROVIDERS.includes(providerFromFlag)) {
-    console.error(`Error: Invalid provider "${providerFromFlag}". Expected one of: codex, claude, google.`);
+    console.error(`Error: Invalid provider "${providerFromFlag}". Expected one of: codex, claude, google, local.`);
     exitWithCleanup(1);
   }
 
@@ -1161,6 +1161,12 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
       if (googleLightModelFromFlag) {
         await runConfig(["llm.google.lightModel", googleLightModelFromFlag, dir]);
       }
+      // Local and Google vendors use the REST API loop — there is no CLI binary.
+      // Auto-set hench.provider=api so hench doesn't fail at runtime with a
+      // confusing "CLI mode not supported" error.
+      if (selectedProvider === "local" || selectedProvider === "google") {
+        await runConfig(["hench.provider", "api", dir]);
+      }
     } finally {
       console.log = origLog;
     }
@@ -1251,7 +1257,7 @@ async function handleInit(rest) {
   // When no provider is available and it wasn't a user cancellation (e.g.
   // non-TTY with no flags or config), exit with a clear message.
   if (!selectedProvider && !llmSkipped) {
-    console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex', 'claude', or 'google'.");
+    console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex', 'claude', 'google', or 'local'.");
     exitWithCleanup(1);
   }
 
@@ -1683,7 +1689,7 @@ async function handleWork(rest) {
     const vendor = readLLMVendor(dir);
     if (!vendor) {
       console.error("Error: No LLM vendor configured for this project.");
-      console.error("Hint: Run 'ndx config llm.vendor claude', 'ndx config llm.vendor codex', or 'ndx config llm.vendor google' to configure a vendor.");
+      console.error("Hint: Run 'ndx config llm.vendor claude', 'ndx config llm.vendor codex', 'ndx config llm.vendor google', or 'ndx config llm.vendor local' to configure a vendor.");
       exitWithCleanup(1);
     }
   }
@@ -1885,7 +1891,7 @@ async function handleSelfHeal(rest) {
   const vendor = readLLMVendor(dir);
   if (!vendor && !captureOnly) {
     console.error("Error: No LLM vendor configured for this project.");
-    console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
+    console.error("Hint: Run 'ndx config llm.vendor claude', 'ndx config llm.vendor codex', or 'ndx config llm.vendor local' to configure a vendor.");
     exitWithCleanup(1);
   }
 
@@ -2265,7 +2271,7 @@ async function handlePairProgramming(rest) {
   const primaryVendor = readLLMVendor(dir);
   if (!isDryRun && !primaryVendor) {
     console.error("Error: No LLM vendor configured for this project.");
-    console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
+    console.error("Hint: Run 'ndx config llm.vendor claude', 'ndx config llm.vendor codex', or 'ndx config llm.vendor local' to configure a vendor.");
     exitWithCleanup(1);
   }
 

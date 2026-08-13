@@ -1094,6 +1094,21 @@ async function printVendorPreflightFailure(
     return;
   }
 
+  // Local vendor: server connectivity failure — guide user to start their
+  // local server rather than suggesting a login command.
+  if (vendor === "local") {
+    const host = llmConfig?.local?.host || "localhost";
+    const port = llmConfig?.local?.port || 1234;
+    console.error(red(`✗ Cannot reach local LLM server at http://${host}:${port}.`));
+    if (preflight.detail && !looksLikeJson(preflight.detail)) {
+      console.error(`  ${preflight.detail}`);
+    }
+    console.error(yellow("  Start LM Studio (or Ollama) and enable its local server, then retry."));
+    console.error(yellow(`  LM Studio: Developer tab → "Start Server". Ollama: 'ollama serve'.`));
+    console.error(yellow(`  Configure host/port: ndx config llm.local.host <host> / ndx config llm.local.port <port>`));
+    return;
+  }
+
   if (vendor !== "claude") {
     // codex (or other CLI vendor) non-auth launch failure.
     const loginCommand = getVendorLoginCommand(
@@ -1689,6 +1704,19 @@ async function runLLMVendorPreflight(coerced, configs, soft = false) {
     configs.claude && typeof configs.claude === "object"
       ? configs.claude
       : undefined;
+
+  // Local vendor requires a running HTTP server. During soft-preflight (used
+  // by `ndx init` and `ndx config llm.vendor local`), skip the connectivity
+  // check — the server doesn't need to be running at config time, only at
+  // execution time. Print an info line reminding the user to start it before
+  // `ndx work`.
+  if (coerced === "local" && soft) {
+    const { dim } = await import("./cli-brand.js");
+    const host = llmForPreflight?.local?.host || "localhost";
+    const port = llmForPreflight?.local?.port || 1234;
+    console.error(dim(`  Local vendor configured. Start your local server at http://${host}:${port} before running 'ndx work'.`));
+    return;
+  }
 
   const preflight = await runVendorAuthPreflight(
     coerced,
