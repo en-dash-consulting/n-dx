@@ -697,14 +697,16 @@ describe("LLM_MODEL_CATALOG", () => {
     expect(LLM_MODEL_CATALOG).toHaveProperty("claude");
   });
 
-  it("each vendor has at least one model", () => {
+  it("each vendor has at least one model (local is exempt — uses free-text prompt)", () => {
     for (const [vendor, models] of Object.entries(LLM_MODEL_CATALOG)) {
+      if (vendor === "local") continue; // local has no catalog; model set via free-text input
       expect(models.length, `${vendor} should have at least one model`).toBeGreaterThanOrEqual(1);
     }
   });
 
-  it("each vendor has exactly one recommended model", () => {
+  it("each vendor has exactly one recommended model (local is exempt)", () => {
     for (const [vendor, models] of Object.entries(LLM_MODEL_CATALOG)) {
+      if (vendor === "local") continue;
       const recommended = models.filter((m) => m.recommended);
       expect(
         recommended.length,
@@ -1148,5 +1150,127 @@ describe("google provider", () => {
     const result = await promptLLMSelection(resolution);
     expect(result.model).toBe("gemini-2.5-pro");
     expect(result.modelSource).toBe("prompt");
+  });
+});
+
+// ─── local provider model prompt ─────────────────────────────────────────────
+
+describe("local provider model prompt", () => {
+  describe("resolveInitLLMSelection: local always prompts on TTY", () => {
+    it("sets needsModelPrompt=true even when model is already in config", () => {
+      const result = resolveInitLLMSelection({
+        flags: {},
+        existingConfig: { vendor: "local", model: "qwen2.5-coder-32b" },
+        isTTY: true,
+      });
+      expect(result.provider).toBe("local");
+      expect(result.model).toBe("qwen2.5-coder-32b");
+      expect(result.modelSource).toBe("config");
+      expect(result.needsModelPrompt).toBe(true);
+    });
+
+    it("sets needsModelPrompt=true when model is not set", () => {
+      const result = resolveInitLLMSelection({
+        flags: {},
+        existingConfig: { vendor: "local" },
+        isTTY: true,
+      });
+      expect(result.provider).toBe("local");
+      expect(result.needsModelPrompt).toBe(true);
+    });
+
+    it("suppresses model prompt when --model flag is given", () => {
+      const result = resolveInitLLMSelection({
+        flags: { model: "llama-3.1-8b-instruct" },
+        existingConfig: { vendor: "local", model: "qwen2.5-coder-32b" },
+        isTTY: true,
+      });
+      expect(result.model).toBe("llama-3.1-8b-instruct");
+      expect(result.modelSource).toBe("flag");
+      expect(result.needsModelPrompt).toBe(false);
+    });
+
+    it("does not set needsModelPrompt for local in non-TTY", () => {
+      const result = resolveInitLLMSelection({
+        flags: {},
+        existingConfig: { vendor: "local", model: "qwen2.5-coder-32b" },
+        isTTY: false,
+      });
+      expect(result.needsModelPrompt).toBe(false);
+    });
+  });
+
+  describe("promptLLMSelection: local uses promptLocalModel, not promptModel", () => {
+    it("calls promptLocalModel instead of promptModel for local provider", async () => {
+      const resolution = {
+        provider: "local",
+        model: undefined,
+        providerSource: "flag",
+        modelSource: undefined,
+        needsProviderPrompt: false,
+        needsModelPrompt: true,
+      };
+      const modelPrompt = vi.fn();
+      const localModelPrompt = vi.fn().mockResolvedValue("qwen2.5-coder-32b");
+      await promptLLMSelection(resolution, {
+        promptModel: modelPrompt,
+        promptLocalModel: localModelPrompt,
+      });
+      expect(modelPrompt).not.toHaveBeenCalled();
+      expect(localModelPrompt).toHaveBeenCalledWith(undefined);
+    });
+
+    it("passes existing model as default to promptLocalModel", async () => {
+      const resolution = {
+        provider: "local",
+        model: "qwen2.5-coder-32b",
+        providerSource: "config",
+        modelSource: "config",
+        needsProviderPrompt: false,
+        needsModelPrompt: true,
+      };
+      let receivedExisting;
+      await promptLLMSelection(resolution, {
+        promptLocalModel: async (existing) => {
+          receivedExisting = existing;
+          return existing;
+        },
+      });
+      expect(receivedExisting).toBe("qwen2.5-coder-32b");
+    });
+
+    it("sets model and modelSource when local prompt returns a name", async () => {
+      const resolution = {
+        provider: "local",
+        model: undefined,
+        providerSource: "prompt",
+        modelSource: undefined,
+        needsProviderPrompt: false,
+        needsModelPrompt: true,
+      };
+      const result = await promptLLMSelection(resolution, {
+        promptLocalModel: async () => "llama-3.1-8b-instruct",
+      });
+      expect(result.model).toBe("llama-3.1-8b-instruct");
+      expect(result.modelSource).toBe("prompt");
+      expect(result.cancelled).toBe(false);
+    });
+
+    it("does NOT set cancelled when local prompt returns undefined (blank = optional)", async () => {
+      const resolution = {
+        provider: "local",
+        model: "qwen2.5-coder-32b",
+        providerSource: "config",
+        modelSource: "config",
+        needsProviderPrompt: false,
+        needsModelPrompt: true,
+      };
+      const result = await promptLLMSelection(resolution, {
+        promptLocalModel: async () => undefined,
+      });
+      expect(result.cancelled).toBe(false);
+      expect(result.model).toBeUndefined();
+      expect(result.modelSource).toBeUndefined();
+    });
   });
 });

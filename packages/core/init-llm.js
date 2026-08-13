@@ -137,6 +137,14 @@ export function resolveInitLLMSelection({ flags, existingConfig, isTTY }) {
     result.needsModelPrompt = isTTY;
   }
 
+  // Local vendor: always offer a model prompt on TTY even when a model is
+  // already set — the active model changes frequently in LM Studio/Ollama,
+  // and blank input keeps the existing value. Suppressed when --model= was
+  // given (the flag value is used directly without re-prompting).
+  if (result.provider === "local" && isTTY && !flags.model) {
+    result.needsModelPrompt = true;
+  }
+
   return result;
 }
 
@@ -260,6 +268,37 @@ async function promptModelEnquirer(provider, models) {
   }
 }
 
+/**
+ * Local-vendor model prompt using enquirer's Input prompt — TTY only.
+ *
+ * Accepts a free-text model name (e.g. "qwen2.5-coder-32b").
+ * Model is optional — blank input returns undefined, which means
+ * "use whatever is currently loaded in LM Studio / Ollama".
+ * Existing model is shown as the pre-filled default so the user can
+ * confirm it with Enter or overwrite it.
+ *
+ * @param {string|undefined} existingModel  Current model from config (shown as default).
+ * @returns {Promise<string|undefined>}  Entered model name, or undefined if left blank.
+ */
+async function promptLocalModel(existingModel) {
+  if (!isInteractiveTerminal()) return existingModel ?? undefined;
+  try {
+    const { default: Enquirer } = await import("enquirer");
+    const enquirer = new Enquirer();
+    const response = await enquirer.prompt({
+      type: "input",
+      name: "model",
+      message: "Local model name (leave blank to use whatever is loaded)",
+      initial: existingModel || "",
+    });
+    return response.model?.trim() || undefined;
+  } catch (err) {
+    // Ctrl+C or Esc — treat as skip (local model is optional)
+    if (err === "" || (err && err.message === "")) return undefined;
+    throw err;
+  }
+}
+
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -295,8 +334,23 @@ export async function promptLLMSelection(resolution, options = {}) {
     }
   }
 
-  // Local vendor: model is optional — LM Studio uses whatever is loaded.
-  // Skip prompting and leave model unset (no llm.local.model written to config).
+  // Local vendor: free-text input so the user can confirm or change the active
+  // model name. Blank input leaves the model unset — LM Studio/Ollama then uses
+  // whatever model is currently loaded. No cancellation on blank: it is valid.
+  if (needsModelPrompt && provider === "local") {
+    const promptFn = options.promptLocalModel ?? promptLocalModel;
+    const selected = await promptFn(model);
+    if (selected) {
+      model = selected;
+      modelSource = "prompt";
+    } else {
+      // Blank or skipped: clear any previously set model so config stays clean.
+      model = undefined;
+      modelSource = undefined;
+    }
+  }
+
+  // Non-local vendors: catalog-driven select prompt.
   if (needsModelPrompt && provider && provider !== "local") {
     const promptFn = options.promptModel ?? defaultPromptModel;
     const selected = await promptFn(provider);
