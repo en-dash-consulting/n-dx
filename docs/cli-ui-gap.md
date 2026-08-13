@@ -70,7 +70,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `rex prune` | full | medium | Prune preview + confirmation + execute |
 | `rex reshape` | **none** | medium | LLM restructuring has no dashboard entry point (high-risk op that would benefit from a diff-preview flow) |
 | `rex fix` | **none** | medium | Validation view shows issues but offers no fix action |
-| `rex verify` | **partial** | medium | Requirements CRUD/coverage/traceability API exists (`routes-rex/requirements.ts`, 575 lines) with **no page** consuming it |
+| `rex verify` | **full** | medium | Requirements page renders coverage + traceability matrix (per-item CRUD deferred to the task detail panel) |
 | `rex analyze` / `import` | partial | medium | Same orphaned-panel regression as `ndx plan` |
 | `rex usage` | partial | medium | Same gaps as  `ndx usage` |
 | `rex sync` | full | medium | Via sync triggers |
@@ -121,7 +121,7 @@ MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Cover
 | `move_item` | Tree reparent | full |
 | `merge_items` | Merge preview | full |
 | `get_recommendations` | Suggestions view | full |
-| `verify_criteria` | — | **none** (same gap as `rex verify`: no requirements/traceability page) |
+| `verify_criteria` | Requirements page (coverage + traceability matrix) | full |
 | `reorganize` | Reorganize panel | full |
 | `health` | Health gauge | full |
 | `facets` | Facet filters (no distribution view) | partial |
@@ -159,7 +159,7 @@ Roughly 2,900 lines of built view code were unreachable; both views are now regi
 | API surface | Size | Note |
 |-------------|------|------|
 | ~~`/api/hench/adaptive/*`~~ | 873 lines, 10 endpoints | **Done 2026-08-13**: Adaptive Optimization view (HENCH → Adaptive) consumes all 10 endpoints |
-| `/api/rex/requirements/*` | 575 lines | Requirements CRUD/coverage/traceability; feeds `rex verify` / `verify_criteria` gap |
+| ~~`/api/rex/requirements/*`~~ | 575 lines | **Done 2026-08-13**: Requirements page (REX → Requirements) renders coverage + traceability; per-item CRUD deferred to the task detail panel |
 | `/api/sv/*` (all except `pr-markdown`) | 8 endpoints | Viewer reads `/data/*.json` directly; these serve external/MCP consumers — **document as external API, not a UI gap** |
 | `/api/token/{summary,events,by-command,by-period,budget}` | 5 endpoints | Token Usage view uses only `utilization` |
 | `/api/hench/{metrics,metrics/snapshots,memory/history,memory/leaks,runs/health}` | 5 endpoints | Panels exist for live memory/concurrency; historical metrics unexposed |
@@ -182,7 +182,7 @@ The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, P
 
 ### Tier 2 — medium impact
 
-5. **Requirements / traceability page** — consume the existing 575-line requirements API; closes `rex verify` + `verify_criteria`.
+5. ~~**Requirements / traceability page**~~ — **done 2026-08-13** (REX → Requirements: coverage stats + expandable traceability matrix).
 6. ~~**Adaptive-optimization page**~~ — **done 2026-08-13** (HENCH → Adaptive view: metrics, apply/dismiss/lock, settings, overrides, history).
 7. **`rex fix` action** — "Fix issues" button in the Validation view → new POST `/api/rex/fix`.
 8. **`rex reshape` flow** — reshape trigger with diff preview + confirm.

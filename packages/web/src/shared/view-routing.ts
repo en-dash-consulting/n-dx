@@ -26,6 +26,7 @@ export const REX_SCOPE_VIEWS: readonly ViewId[] = [
   "analysis",
   "merge-graph",
   "validation",
+  "requirements",
   "notion-config",
   "integrations",
 ];

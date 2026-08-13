@@ -15,6 +15,7 @@ export { AnalysisView } from "./analysis.js";
 export { RexDashboard } from "./rex-dashboard.js";
 export { TokenUsageView } from "./token-usage.js";
 export { ValidationView } from "./validation.js";
+export { RequirementsView } from "./requirements.js";
 export { TaskAuditView } from "./task-audit.js";
 export { WorkflowOptimizationView } from "./workflow-optimization.js";
 export { MergeGraphView } from "./merge-graph.js";

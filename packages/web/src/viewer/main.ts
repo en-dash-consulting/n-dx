@@ -77,6 +77,7 @@ const VIEW_TITLE_MAP: Partial<Record<import("./types.js").ViewId, string>> = {
   prd: "Tasks",
   "token-usage": "Token Usage",
   validation: "Validation",
+  requirements: "Requirements",
   "notion-config": "Notion Sync",
   integrations: "Integrations",
   "hench-runs": "Runs",

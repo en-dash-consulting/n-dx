@@ -80,6 +80,12 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     lookFor: "Pending proposals awaiting review. Analysis history events showing what recent runs produced. Duplicate proposals that should be rejected rather than accepted.",
     actions: "Use Smart Add to draft items from a description. Run a project scan to generate proposals, then accept or reject each one. Batch-import a spec file to seed the PRD.",
   },
+  requirements: {
+    title: "Requirements",
+    description: "Requirement coverage and the traceability matrix: every requirement, the item it is defined on, the descendants it applies to, and how it is validated.",
+    lookFor: "Low coverage percentages. Items without any applicable requirements. Requirements with manual validation that could be automated.",
+    actions: "Expand a requirement to see its acceptance criteria and the status of every item it applies to. Add or edit requirements from the item detail panel in the Tasks view.",
+  },
   "hench-adaptive": {
     title: "Adaptive Optimization",
     description: "Monitors run history and proposes workflow-parameter adjustments (turn limits, token budgets, retry settings) as the project evolves. Adjustments can be applied, dismissed, or auto-applied when adaptive mode is on.",

@@ -37,6 +37,7 @@ import {
   RexDashboard,
   TokenUsageView,
   ValidationView,
+  RequirementsView,
   TaskAuditView,
   WorkflowOptimizationView,
   MergeGraphView,
@@ -126,6 +127,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "validation": ({ navigateTo }) =>
     h(ValidationView, { navigateTo }),
+
+  "requirements": () =>
+    h(RequirementsView, null),
 
   "notion-config": () =>
     h(NotionConfigView, null),

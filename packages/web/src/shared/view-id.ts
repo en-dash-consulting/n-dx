@@ -21,6 +21,7 @@ export type ViewId =
   | "prd"
   | "token-usage"
   | "validation"
+  | "requirements"
   | "notion-config"
   | "integrations"
   | "hench-runs"

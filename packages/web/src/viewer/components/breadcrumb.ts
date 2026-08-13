@@ -58,6 +58,7 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   analysis:              { product: "rex",          label: "Analyze & Import", productLabel: "Rex" },
   "token-usage":         { product: "global",       label: "Token Usage",     productLabel: "Global" },
   validation:            { product: "rex",          label: "Validation",      productLabel: "Rex" },
+  requirements:          { product: "rex",          label: "Requirements",    productLabel: "Rex" },
   "notion-config":       { product: "global",       label: "ndx sync",           productLabel: "Settings" },
   integrations:          { product: "rex",          label: "Integrations",       productLabel: "Rex" },
   "hench-runs":          { product: "hench",        label: "Runs",               productLabel: "Hench" },
