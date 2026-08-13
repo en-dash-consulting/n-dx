@@ -619,6 +619,24 @@ function readLLMModel(dir, vendor) {
 }
 
 /**
+ * Read local LLM server host and port from .n-dx.json.
+ * Returns defaults (localhost:1234) when unset or config file is missing/invalid.
+ */
+function readLocalConfig(dir) {
+  const configPath = join(dir, ".n-dx.json");
+  if (!existsSync(configPath)) return { host: "localhost", port: 1234 };
+  try {
+    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    return {
+      host: data?.llm?.local?.host || "localhost",
+      port: data?.llm?.local?.port || 1234,
+    };
+  } catch {
+    return { host: "localhost", port: 1234 };
+  }
+}
+
+/**
  * Record the current @n-dx/core version in .n-dx.json as `_initVersion`.
  * Called at the end of `ndx init` so subsequent stale-check runs can
  * report which version the project was initialized with.
@@ -1060,7 +1078,12 @@ async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, qui
 
   if (!process.stdout.isTTY || quiet) showInitBanner();
 
-  const selection = await promptLLMSelection(resolution);
+  // Read local server host/port so the live model fetch uses the right address.
+  const localConfig = readLocalConfig(dir);
+  const selection = await promptLLMSelection(resolution, {
+    localHost: localConfig.host,
+    localPort: localConfig.port,
+  });
   const selectedProvider = selection.provider;
   const llmSkipped = selection.cancelled;
 

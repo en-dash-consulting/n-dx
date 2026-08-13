@@ -816,9 +816,9 @@ describe("LLM_MODEL_CATALOG", () => {
     expect(LLM_MODEL_CATALOG).toHaveProperty("claude");
   });
 
-  it("each vendor has at least one model (local is exempt — uses free-text prompt)", () => {
+  it("each vendor has at least one model (local is exempt — model list is fetched live from server)", () => {
     for (const [vendor, models] of Object.entries(LLM_MODEL_CATALOG)) {
-      if (vendor === "local") continue; // local has no catalog; model set via free-text input
+      if (vendor === "local") continue; // local: no static catalog; list fetched from /v1/models at init time
       expect(models.length, `${vendor} should have at least one model`).toBeGreaterThanOrEqual(1);
     }
   });
@@ -1319,8 +1319,8 @@ describe("local provider model prompt", () => {
     });
   });
 
-  describe("promptLLMSelection: local uses promptLocalModel, not promptModel", () => {
-    it("calls promptLocalModel instead of promptModel for local provider", async () => {
+  describe("promptLLMSelection: local uses promptLocalModel injection (live fetch in production)", () => {
+    it("calls injected promptLocalModel instead of promptModel for local provider", async () => {
       const resolution = {
         provider: "local",
         model: undefined,
