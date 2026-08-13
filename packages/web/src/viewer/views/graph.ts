@@ -3,7 +3,7 @@
  */
 
 import { h } from "preact";
-import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/index.js";
 import { useGraphArrowNav } from "../hooks/index.js";
@@ -603,27 +603,37 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
     [mode, packageSubgraph, subgraph],
   );
 
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) so the reset completes synchronously
+  // within the render cycle — before vi.waitFor can poll the DOM in tests,
+  // and before any microtask queued by an event handler can read a stale view.
+  useLayoutEffect(() => {
     setDepView({ x: 0, y: 0, k: 1 });
     setDepNodeOffsets({});
   }, [focusFile, focusPackage, mode, streetViewMode]);
 
-  useEffect(() => {
+  // useLayoutEffect so focusHistory is initialised before the first DOM
+  // polling opportunity: prevents a race where a test clicks a node before
+  // the async effect fires, recording the wrong history start.
+  useLayoutEffect(() => {
     if (!focusFile || focusHistory.length) return;
     setFocusHistory([focusFile]);
     setFocusHistoryIndex(0);
   }, [focusFile, focusHistory.length]);
 
   const rememberFocusFile = useCallback((path: string) => {
-    setFocusHistory((prev) => {
-      const current = focusHistoryIndex >= 0 ? prev[focusHistoryIndex] : null;
-      if (current === path) return prev;
-      const base = focusHistoryIndex >= 0 ? prev.slice(0, focusHistoryIndex + 1) : [];
-      const next = [...base, path].slice(-24);
-      setFocusHistoryIndex(next.length - 1);
-      return next;
-    });
-  }, [focusHistoryIndex]);
+    // Read state directly from the closure rather than using a setFocusHistory
+    // functional updater.  Calling setFocusHistoryIndex() inside a setFocusHistory
+    // updater has undefined batching behaviour in Preact 10 — the inner call may
+    // not take effect in the same render.  All three setters here are plain state
+    // mutations that Preact batches together when triggered from an event handler,
+    // which is always the case for this callback (via handleFileClick).
+    const current = focusHistoryIndex >= 0 ? focusHistory[focusHistoryIndex] : null;
+    if (current === path) return;
+    const base = focusHistoryIndex >= 0 ? focusHistory.slice(0, focusHistoryIndex + 1) : [];
+    const next = [...base, path].slice(-24);
+    setFocusHistory(next);
+    setFocusHistoryIndex(next.length - 1);
+  }, [focusHistory, focusHistoryIndex]);
 
   const handleFileClick = useCallback(
     (path: string, source: FocusSource = { kind: "file", path }) => {
@@ -692,19 +702,23 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
   );
 
   const moveFocusHistory = useCallback((direction: -1 | 1) => {
-    setFocusHistoryIndex((current) => {
-      const next = current + direction;
-      if (next < 0 || next >= focusHistory.length) return current;
-      const path = focusHistory[next];
-      setMode("file");
-      setFocusFile(path);
-      setFocusSource({ kind: "file", path });
-      setHoverPreviewFile(null);
-      setStreetViewMode("dialog");
-      if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
-      return next;
-    });
-  }, [focusHistory]);
+    // Use the closure values directly rather than the functional-update form of
+    // setFocusHistoryIndex. Calling multiple setState setters inside one
+    // setter's updater produces undefined batching behaviour in Preact 10 — the
+    // inner calls may not take effect in the same render.  All six setters here
+    // are plain state mutations that Preact batches together when triggered from
+    // an event handler, which is always the case for this callback.
+    const next = focusHistoryIndex + direction;
+    if (next < 0 || next >= focusHistory.length) return;
+    const path = focusHistory[next];
+    setMode("file");
+    setFocusFile(path);
+    setFocusSource({ kind: "file", path });
+    setHoverPreviewFile(null);
+    setStreetViewMode("dialog");
+    if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+    setFocusHistoryIndex(next);
+  }, [focusHistory, focusHistoryIndex]);
 
   const updateSurfaceView = useCallback((surface: SurfaceKind, updater: (view: Viewport) => Viewport) => {
     if (surface === "codebase") setCodebaseView(updater);
@@ -775,9 +789,18 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
       const factor = event.deltaY < 0 ? 1.03 : 1 / 1.03;
       updateSurfaceView(surface, (view) => zoomMapToFocal(view, view.k * factor, cx, cy, svg));
     } else {
-      const vb = svg.viewBox.baseVal;
+      // Read viewBox dimensions from the attribute string rather than
+      // svg.viewBox.baseVal: in some environments (e.g. jsdom) the animated
+      // rect property returns zero dimensions even when the attribute is set.
+      // Also try lowercase "viewbox": jsdom (used in unit tests) lowercases SVG
+      // attribute names on retrieval even though getAttribute is case-sensitive
+      // per spec for non-HTML-namespace elements.
+      const vbAttr = svg.getAttribute("viewBox") ?? svg.getAttribute("viewbox") ?? "";
+      const vbParts = vbAttr.split(/\s+/).map(Number);
+      const vbW = Number.isFinite(vbParts[2]) ? vbParts[2] : 0;
+      const vbH = Number.isFinite(vbParts[3]) ? vbParts[3] : 0;
       updateSurfaceView(surface, (view) =>
-        clampMapView(panViewport(view, -event.deltaX, -event.deltaY), vb.width, vb.height),
+        clampMapView(panViewport(view, -event.deltaX, -event.deltaY), vbW, vbH),
       );
     }
   }, [updateSurfaceView]);
