@@ -351,3 +351,57 @@
   color: var(--red);
   margin-top: var(--space-3);
 }
+
+/* ── Command reference (All Commands view) ─────────────────────────── */
+
+.cmdref-container {
+  max-width: 960px;
+}
+
+.cmdref-group {
+  margin-top: var(--space-4);
+}
+
+.cmdref-table td {
+  vertical-align: top;
+}
+
+.cmdref-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-sm);
+  white-space: nowrap;
+}
+
+.cmdref-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.cmdref-status-available .cmdref-status-dot { background: var(--green); }
+.cmdref-status-needs-init .cmdref-status-dot { background: var(--yellow); }
+.cmdref-status-needs-llm .cmdref-status-dot { background: var(--purple); }
+
+/* ── Inline progress + phase list (Refresh / full-analysis panels) ── */
+
+.cmd-inline-progress {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+.cmd-phase-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+
+.cmd-phase-item {
+  padding: 2px 0;
+  font-family: var(--mono);
+}

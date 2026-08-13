@@ -54,6 +54,8 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "item", id: "hench-audit", icon: "\u2638", label: "Audit", minPass: 0 },
   { type: "item", id: "hench-templates", icon: "\u25A6", label: "Templates", minPass: 0 },
   { type: "item", id: "hench-optimization", icon: "\u26A1", label: "Optimization", minPass: 0 },
+  { type: "section", label: "COMMANDS" },
+  { type: "item", id: "command-reference", icon: "\u2318", label: "All Commands", minPass: 0 },
   { type: "section", label: "TOKEN USAGE" },
   { type: "item", id: "token-usage", icon: "\u229A", label: "Token Usage", minPass: 0 },
   { type: "section", label: "SETTINGS" },

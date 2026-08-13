@@ -2,13 +2,16 @@
 id: "79a057dc-3c25-4c2c-a411-3f3daddba51e"
 level: "task"
 title: "Design and implement Commands section UI with grouped command listing"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "web"
   - "ui"
   - "commands"
 source: "smart-add"
+startedAt: "2026-08-13T02:53:40.927Z"
+completedAt: "2026-08-13T03:10:05.439Z"
+endedAt: "2026-08-13T03:10:05.439Z"
 acceptanceCriteria:
   - "Commands section appears as a sidebar navigation entry in the dashboard"
   - "All ndx CLI commands are listed and grouped by category (setup, analysis, planning, execution, config)"

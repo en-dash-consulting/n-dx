@@ -398,3 +398,103 @@ describe("commands route — sv-analyze full flow (async)", () => {
     expect(String(status.error)).toContain("no LLM credentials");
   });
 });
+
+describe("commands route — manifest (command reference)", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    execMock.mockReset();
+    tmpDir = await mkdtemp(join(tmpdir(), "commands-manifest-"));
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    const started = await startRouteTestServer((req, res) =>
+      handleCommandsRoute(req, res, ctx),
+    );
+    server = started.server;
+    port = started.port;
+  });
+
+  afterEach(async () => {
+    server.close();
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  async function getManifest(): Promise<Record<string, any>> {
+    const res = await fetch(`http://localhost:${port}/api/commands/manifest`);
+    expect(res.status).toBe(200);
+    return res.json() as Promise<Record<string, any>>;
+  }
+
+  it("returns groups covering the five categories with described commands", async () => {
+    const body = await getManifest();
+    const ids = (body.groups as Array<{ id: string }>).map((g) => g.id);
+    expect(ids).toEqual(["setup", "analysis", "planning", "execution", "config"]);
+    for (const group of body.groups) {
+      expect(group.label).toBeTruthy();
+      expect(group.commands.length).toBeGreaterThan(0);
+      for (const cmd of group.commands) {
+        expect(cmd.name).toBeTruthy();
+        expect(cmd.description).toBeTruthy();
+        expect(["available", "needs-init", "needs-llm"]).toContain(cmd.status);
+      }
+    }
+    const allNames = body.groups.flatMap((g: { commands: Array<{ name: string }> }) => g.commands.map((c) => c.name));
+    for (const expected of ["init", "analyze", "plan", "work", "config"]) {
+      expect(allNames).toContain(expected);
+    }
+  });
+
+  it("resolves invocations with cli.name from .n-dx.json", async () => {
+    const { writeFile: wf } = await import("node:fs/promises");
+    await wf(join(tmpDir, ".n-dx.json"), JSON.stringify({ cli: { name: "myapp" } }));
+    const body = await getManifest();
+    expect(body.cliName).toBe("myapp");
+    const anyCmd = body.groups[0].commands[0];
+    expect(anyCmd.invocation.startsWith("myapp ")).toBe(true);
+  });
+
+  it("defaults invocations to ndx without cli.name", async () => {
+    const body = await getManifest();
+    expect(body.cliName).toBe("ndx");
+    expect(body.groups[0].commands[0].invocation.startsWith("ndx ")).toBe(true);
+  });
+
+  it("marks init-requiring commands needs-init in an uninitialized project", async () => {
+    const body = await getManifest();
+    const all = body.groups.flatMap((g: { commands: Array<Record<string, unknown>> }) => g.commands);
+    const work = all.find((c: Record<string, unknown>) => c.name === "work");
+    const init = all.find((c: Record<string, unknown>) => c.name === "init");
+    expect(work.status).not.toBe("available");
+    expect(init.status).toBe("available");
+  });
+
+  it("marks LLM-requiring commands available once init dirs and vendor exist", async () => {
+    const { writeFile: wf, mkdir: md } = await import("node:fs/promises");
+    for (const d of [".rex", ".sourcevision", ".hench"]) {
+      await md(join(tmpDir, d), { recursive: true });
+    }
+    await wf(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }));
+    const body = await getManifest();
+    const all = body.groups.flatMap((g: { commands: Array<Record<string, unknown>> }) => g.commands);
+    expect(all.find((c: Record<string, unknown>) => c.name === "work").status).toBe("available");
+    expect(all.find((c: Record<string, unknown>) => c.name === "status").status).toBe("available");
+  });
+
+  it("marks LLM-requiring commands needs-llm when initialized without a vendor", async () => {
+    const { mkdir: md } = await import("node:fs/promises");
+    for (const d of [".rex", ".sourcevision", ".hench"]) {
+      await md(join(tmpDir, d), { recursive: true });
+    }
+    const body = await getManifest();
+    const all = body.groups.flatMap((g: { commands: Array<Record<string, unknown>> }) => g.commands);
+    expect(all.find((c: Record<string, unknown>) => c.name === "work").status).toBe("needs-llm");
+    expect(all.find((c: Record<string, unknown>) => c.name === "status").status).toBe("available");
+  });
+});

@@ -12,10 +12,11 @@
  * GET  /api/commands/self-heal/status — check running self-heal status
  * POST /api/commands/refresh         — refresh SourceVision data (live server; --data-only --live-server)
  * GET  /api/commands/refresh/status  — check running refresh status
+ * GET  /api/commands/manifest        — grouped command reference with resolved CLI name and availability
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { exec as foundationExec } from "@n-dx/llm-client";
@@ -601,6 +602,136 @@ function handleRefreshStatus(
   return true;
 }
 
+// ── Command reference manifest ────────────────────────────────────────
+
+type CommandStatus = "available" | "needs-init" | "needs-llm";
+
+interface ManifestCommand {
+  /** Subcommand name, e.g. "plan". */
+  name: string;
+  /** One-line description shown in the reference row. */
+  description: string;
+  /** What the command needs before it can run. */
+  requires?: "init" | "llm";
+}
+
+interface ManifestGroup {
+  id: string;
+  label: string;
+  commands: ManifestCommand[];
+}
+
+/**
+ * Server-driven command manifest — the single place to add or edit commands
+ * shown in the dashboard's Commands reference section. The viewer renders
+ * whatever this returns, so new commands appear without UI code changes.
+ *
+ * `requires: "init"` — needs the tool directories (.rex/.sourcevision/.hench).
+ * `requires: "llm"` — additionally needs a configured LLM vendor.
+ */
+const COMMAND_MANIFEST: ManifestGroup[] = [
+  {
+    id: "setup", label: "Setup", commands: [
+      { name: "init", description: "Initialize project — sourcevision, rex, and hench directories plus LLM model selection" },
+      { name: "auth", description: "Verify LLM provider credentials" },
+    ],
+  },
+  {
+    id: "analysis", label: "Analysis", commands: [
+      { name: "analyze", description: "Run codebase analysis (--deep, --full, --lite)", requires: "init" },
+      { name: "recommend", description: "Show or accept sourcevision-based recommendations", requires: "llm" },
+      { name: "refresh", description: "Refresh dashboard data and UI artifacts", requires: "init" },
+      { name: "ci", description: "Run the analysis pipeline and validate PRD health", requires: "init" },
+    ],
+  },
+  {
+    id: "planning", label: "Planning", commands: [
+      { name: "plan", description: "Analyze the codebase and generate PRD proposals (--accept to apply)", requires: "llm" },
+      { name: "add", description: "Add PRD items from freeform descriptions, files, or stdin", requires: "llm" },
+      { name: "status", description: "Show the PRD status tree with completion stats", requires: "init" },
+      { name: "next", description: "Print the next actionable task", requires: "init" },
+      { name: "sync", description: "Sync the local PRD with a remote adapter (--push, --pull)", requires: "init" },
+    ],
+  },
+  {
+    id: "execution", label: "Execution", commands: [
+      { name: "work", description: "Execute the next task autonomously with the hench agent", requires: "llm" },
+      { name: "self-heal", description: "Iterative improvement loop: analyze → recommend → execute", requires: "llm" },
+      { name: "pair-programming", description: "Agent + cross-vendor review (alias: bicker)", requires: "llm" },
+      { name: "start", description: "Start the server: dashboard + MCP endpoints", requires: "init" },
+      { name: "dev", description: "Start the web dev server with live reload", requires: "init" },
+      { name: "export", description: "Export a static deployable dashboard", requires: "init" },
+    ],
+  },
+  {
+    id: "config", label: "Configuration", commands: [
+      { name: "config", description: "View or edit settings across all packages" },
+      { name: "usage", description: "Token usage analytics (--group=day|week|month)", requires: "init" },
+    ],
+  },
+];
+
+/** Read the resolved CLI command name (cli.name in .n-dx.json, default ndx). */
+function readCliName(projectDir: string): string {
+  try {
+    const raw = readFileSync(join(projectDir, ".n-dx.json"), "utf-8");
+    const config = JSON.parse(raw) as { cli?: { name?: unknown } };
+    const name = config.cli?.name;
+    return typeof name === "string" && name.length > 0 ? name : "ndx";
+  } catch {
+    return "ndx";
+  }
+}
+
+/** Check whether the project has an LLM vendor configured. */
+function hasLlmVendor(projectDir: string): boolean {
+  try {
+    const raw = readFileSync(join(projectDir, ".n-dx.json"), "utf-8");
+    const config = JSON.parse(raw) as { llm?: { vendor?: unknown } };
+    return typeof config.llm?.vendor === "string" && config.llm.vendor.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** GET /api/commands/manifest — grouped command reference with availability. */
+function handleManifest(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): boolean {
+  const cliName = readCliName(ctx.projectDir);
+  const initialized = [".rex", ".sourcevision", ".hench"]
+    .every((d) => existsSync(join(ctx.projectDir, d)));
+  const llmConfigured = hasLlmVendor(ctx.projectDir);
+
+  const statusFor = (cmd: ManifestCommand): CommandStatus => {
+    if (cmd.requires === "llm") {
+      if (!initialized) return "needs-init";
+      return llmConfigured ? "available" : "needs-llm";
+    }
+    if (cmd.requires === "init") {
+      return initialized ? "available" : "needs-init";
+    }
+    return "available";
+  };
+
+  jsonResponse(res, 200, {
+    cliName,
+    groups: COMMAND_MANIFEST.map((group) => ({
+      id: group.id,
+      label: group.label,
+      commands: group.commands.map((cmd) => ({
+        name: cmd.name,
+        invocation: `${cliName} ${cmd.name}`,
+        description: cmd.description,
+        status: statusFor(cmd),
+      })),
+    })),
+  });
+  return true;
+}
+
 // ── Dispatcher ────────────────────────────────────────────────────────
 
 /** Handle command trigger API requests. Returns true if the request was handled. */
@@ -643,6 +774,9 @@ export function handleCommandsRoute(
   }
   if (path === "refresh/status" && method === "GET") {
     return handleRefreshStatus(req, res);
+  }
+  if (path === "manifest" && method === "GET") {
+    return handleManifest(req, res, ctx);
   }
 
   return false;

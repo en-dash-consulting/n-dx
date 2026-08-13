@@ -30,3 +30,4 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [Surface per-file cross-zone connections in the expandable Zones graph](./surface-per-file-cross-zone-7da574/index.md) | completed |
 | [Transparent task selection and completion reasoning](./transparent-task-selection-and-cb54ce/index.md) | completed |
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-5dd63e.md) | completed |
+| [Stabilize web server route tests under parallel suite load](./stabilize-web-server-route-8230a9.md) | pending |

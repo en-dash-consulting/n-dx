@@ -80,6 +80,12 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     lookFor: "Pending proposals awaiting review. Analysis history events showing what recent runs produced. Duplicate proposals that should be rejected rather than accepted.",
     actions: "Use Smart Add to draft items from a description. Run a project scan to generate proposals, then accept or reject each one. Batch-import a spec file to seed the PRD.",
   },
+  "command-reference": {
+    title: "All Commands",
+    description: "Server-driven reference of every CLI command for this project, grouped by workflow stage, with the project's resolved CLI name and per-command availability.",
+    lookFor: "Commands marked 'needs init' or 'needs LLM' — they indicate setup steps still required before that part of the workflow is usable.",
+    actions: "Copy an invocation to run it in your terminal. Configure an LLM provider in Settings → General to unlock agent commands.",
+  },
   "token-usage": {
     title: "Token Usage",
     description: "Analytics dashboard showing token consumption across autonomous agent runs. Tracks input/output tokens, costs, and usage trends over time.",

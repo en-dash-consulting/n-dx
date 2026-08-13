@@ -87,6 +87,7 @@ const VIEW_TITLE_MAP: Partial<Record<import("./types.js").ViewId, string>> = {
   "feature-toggles": "Feature Flags",
   "cli-timeouts": "CLI Timeouts",
   commands: "ndx export / refresh",
+  "command-reference": "All Commands",
   "llm-provider": "General",
   "project-settings": "ndx analyze / plan",
   "merge-graph": "Context Graph",

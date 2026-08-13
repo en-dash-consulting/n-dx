@@ -12,5 +12,5 @@ description: "Add a unified Commands section to the web dashboard that surfaces 
 
 | Title | Status |
 |-------|--------|
-| [Design and implement Commands section UI with grouped command listing](./design-and-implement-commands-79a057.md) | pending |
+| [Design and implement Commands section UI with grouped command listing](./design-and-implement-commands-79a057.md) | completed |
 | [Wire trigger controls and live status into Commands section rows](./wire-trigger-controls-and-live-2c8294.md) | pending |

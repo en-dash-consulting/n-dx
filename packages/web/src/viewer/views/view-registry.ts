@@ -54,6 +54,7 @@ import {
   FeatureTogglesView,
   CliTimeoutsView,
   CommandsView,
+  CommandReferenceView,
   LlmProviderView,
   ProjectSettingsView,
 } from "./domain-settings.js";
@@ -154,6 +155,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "commands": () =>
     h(CommandsView, null),
+
+  "command-reference": () =>
+    h(CommandReferenceView, null),
 
   "llm-provider": () =>
     h(LlmProviderView, null),
