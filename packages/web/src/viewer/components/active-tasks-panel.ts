@@ -41,6 +41,8 @@ interface ExecutionState {
   startedAt: string;
   finishedAt?: string;
   lastOutput?: string;
+  /** Live tokens/sec from the most recent LLM turn (API-mode vendors: local, google). */
+  tokensPerSecond?: number;
   error?: string;
 }
 
@@ -142,6 +144,12 @@ function ActiveTaskCard({ run, navigateTo }: { run: ActiveRun; navigateTo?: Navi
 
 function ExecutionCard({ exec }: { exec: ExecutionState }) {
   const isStarting = exec.status === "starting";
+  // Show last non-blank line from stdout as a live status hint
+  const lastLine = exec.lastOutput
+    ?.split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .at(-1);
 
   return h("div", {
     class: `active-task-card${isStarting ? " active-task-card-starting" : ""}`,
@@ -165,9 +173,43 @@ function ExecutionCard({ exec }: { exec: ExecutionState }) {
           h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "▶"),
           formatStartTime(exec.startedAt),
         ),
+        exec.tokensPerSecond !== undefined
+          ? h("span", {
+              class: "active-task-toks",
+              title: "Tokens per second (most recent LLM turn)",
+            },
+              h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "⚡"),
+              `${exec.tokensPerSecond} tok/s`,
+            )
+          : null,
       ),
+      // Live output hint — last line of stdout, updated via WebSocket
+      lastLine
+        ? h("div", { class: "active-task-last-output", title: "Last output from hench" },
+            h("span", { class: "active-task-meta-icon", "aria-hidden": "true" }, "›"),
+            h("span", { class: "active-task-last-output-text" }, lastLine),
+          )
+        : null,
     ),
   );
+}
+
+// ── Browser notification helper ───────────────────────────────────
+
+/** Request notification permission once, silently. */
+function requestNotificationPermission() {
+  if (typeof Notification !== "undefined" && Notification.permission === "default") {
+    Notification.requestPermission().catch(() => { /* ignore */ });
+  }
+}
+
+function fireNotification(title: string, body: string) {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  try {
+    new Notification(title, { body, icon: "/favicon.png", silent: false });
+  } catch {
+    // Notifications blocked or unavailable in this context
+  }
 }
 
 // ── Main panel ───────────────────────────────────────────────────────
@@ -175,6 +217,24 @@ function ExecutionCard({ exec }: { exec: ExecutionState }) {
 export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
   const [executions, setExecutions] = useState<ExecutionState[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
+  // Tracks task IDs that have ever been seen as active (running/starting), so that
+  // a "completed" WS event can fire a notification even if it races ahead of the
+  // initial fetchExecutions response.
+  const knownActiveTaskIds = useRef<Set<string>>(new Set());
+
+  // Track whether notification permission has been asked this session.
+  // We do NOT call requestPermission() on mount — Chrome 80+ auto-denies without
+  // a user gesture, which locks out notifications permanently for the session.
+  const [notifState, setNotifState] = useState<"default" | "granted" | "denied">(() =>
+    typeof Notification !== "undefined" ? Notification.permission : "denied",
+  );
+
+  const handleEnableNotifications = useCallback(() => {
+    if (typeof Notification === "undefined") return;
+    Notification.requestPermission().then((result) => {
+      setNotifState(result);
+    }).catch(() => {});
+  }, []);
 
   // Fetch active dashboard-triggered executions
   const fetchExecutions = useCallback(async () => {
@@ -185,6 +245,9 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
         const active = (data.executions ?? []).filter(
           (e: ExecutionState) => e.status === "running" || e.status === "starting",
         );
+        // Seed knownActiveTaskIds so WS "completed" events that race ahead of this
+        // fetch can still fire a notification.
+        for (const e of active) knownActiveTaskIds.current.add(e.taskId);
         setExecutions(active);
       }
     } catch {
@@ -192,58 +255,99 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
     }
   }, []);
 
-  // WebSocket + polling
+  // WebSocket + polling with exponential-backoff reconnect
   useEffect(() => {
     let mounted = true;
     fetchExecutions();
 
-    // Connect to WebSocket for real-time updates
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}`;
-    let ws: WebSocket | null = null;
 
-    try {
-      ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+    let reconnectDelay = 1000; // ms; doubles on each failure, capped at 30 s
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-      ws.onmessage = (event) => {
-        if (!mounted) return;
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === "hench:task-execution-progress" && msg.state) {
-            const state = msg.state as ExecutionState;
-            setExecutions((prev) => {
-              // If completed/failed, remove from the list
-              if (state.status === "completed" || state.status === "failed") {
-                return prev.filter((e) => e.taskId !== state.taskId);
-              }
-              // Update or add
-              const idx = prev.findIndex((e) => e.taskId === state.taskId);
-              if (idx >= 0) {
-                const updated = [...prev];
-                updated[idx] = state;
-                return updated;
-              }
-              return [...prev, state];
-            });
+    function handleMessage(event: MessageEvent) {
+      if (!mounted) return;
+      try {
+        const msg = JSON.parse(event.data as string);
+        if (msg.type === "hench:task-execution-progress" && msg.state) {
+          const state = msg.state as ExecutionState;
+          // Track any active task so that fast-completing tasks are still
+          // recognized even if the initial fetchExecutions hasn't resolved yet.
+          if (state.status === "running" || state.status === "starting") {
+            knownActiveTaskIds.current.add(state.taskId);
           }
-        } catch {
-          // Ignore malformed messages
+          setExecutions((prev) => {
+            // If completed/failed, remove from the list and notify
+            if (state.status === "completed" || state.status === "failed") {
+              const wasActive =
+                prev.some((e) => e.taskId === state.taskId) ||
+                knownActiveTaskIds.current.has(state.taskId);
+              if (wasActive) {
+                knownActiveTaskIds.current.delete(state.taskId);
+                if (state.status === "completed") {
+                  fireNotification("Task complete", state.taskTitle);
+                } else {
+                  fireNotification("Task failed", `${state.taskTitle}${state.error ? ` — ${state.error}` : ""}`);
+                }
+              }
+              return prev.filter((e) => e.taskId !== state.taskId);
+            }
+            // Update or add
+            const idx = prev.findIndex((e) => e.taskId === state.taskId);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = state;
+              return updated;
+            }
+            return [...prev, state];
+          });
         }
-      };
-
-      ws.onclose = () => { wsRef.current = null; };
-    } catch {
-      // WebSocket not available
+      } catch {
+        // Ignore malformed messages
+      }
     }
 
-    // Poll as fallback every 5 seconds
+    function connect() {
+      if (!mounted) return;
+      try {
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onmessage = handleMessage;
+
+        ws.onopen = () => {
+          reconnectDelay = 1000; // reset backoff on successful connect
+        };
+
+        ws.onclose = () => {
+          wsRef.current = null;
+          if (!mounted) return;
+          // Schedule reconnect with exponential backoff (max 30 s)
+          reconnectTimer = setTimeout(() => {
+            reconnectDelay = Math.min(reconnectDelay * 2, 30_000);
+            connect();
+          }, reconnectDelay);
+        };
+
+        ws.onerror = () => {
+          // onclose fires after onerror — reconnect is handled there
+        };
+      } catch {
+        // WebSocket not supported; fall back to polling only
+      }
+    }
+
+    connect();
+
+    // Poll as fallback every 5 seconds (covers WS gaps during reconnect)
     const interval = setInterval(fetchExecutions, 5000);
 
     return () => {
       mounted = false;
       clearInterval(interval);
-      // Close WS using local reference (wsRef.current may already be null from onclose)
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      const ws = wsRef.current;
       if (ws) {
         try { ws.close(); } catch { /* ignore */ }
       }
@@ -274,6 +378,13 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
         ),
         h("span", { class: "active-tasks-count" }, String(totalActive)),
       ),
+      notifState === "default"
+        ? h("button", {
+            class: "active-tasks-notif-btn",
+            title: "Enable browser notifications for task completion",
+            onClick: handleEnableNotifications,
+          }, "🔔 Notify me")
+        : null,
     ),
 
     h("div", { class: "active-tasks-list" },

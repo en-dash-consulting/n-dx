@@ -40,6 +40,7 @@ export const CROSS_CUTTING_VIEWS: readonly ViewId[] = [
   "token-usage",
   "feature-toggles",
   "cli-timeouts",
+  "llm-provider",
 ];
 
 export const VIEWS_BY_SCOPE: Readonly<Record<ViewerScope, readonly ViewId[]>> = {
