@@ -4,6 +4,16 @@
   max-width: 800px;
 }
 
+.cmdref-run-note {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.cmdref-run-error {
+  color: var(--red);
+}
+
 /* ── Panels ─────────────────────────────────────────────────────────── */
 
 .cmd-panels {

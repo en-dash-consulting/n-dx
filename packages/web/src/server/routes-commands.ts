@@ -607,6 +607,18 @@ function handleRefreshStatus(
 
 type CommandStatus = "available" | "needs-init" | "needs-llm";
 
+/**
+ * Dashboard trigger for a command. When present, the Commands reference
+ * renders an inline Run button that POSTs `endpoint` — the same endpoint the
+ * command's primary view uses, so results are identical. `statusEndpoint`
+ * marks async singletons (202 + poll) like refresh and full analysis.
+ */
+interface CommandTrigger {
+  endpoint: string;
+  method: "POST";
+  statusEndpoint?: string;
+}
+
 interface ManifestCommand {
   /** Subcommand name, e.g. "plan". */
   name: string;
@@ -614,6 +626,13 @@ interface ManifestCommand {
   description: string;
   /** What the command needs before it can run. */
   requires?: "init" | "llm";
+  /**
+   * Dashboard trigger, when the command supports one. Deliberately absent
+   * for: `work` (requires task selection — use the next-task card),
+   * `self-heal` (destructive; confirmation-gated panel), and terminal-side
+   * commands (init, auth, config, start, dev).
+   */
+  trigger?: CommandTrigger;
 }
 
 interface ManifestGroup {
@@ -639,19 +658,19 @@ const COMMAND_MANIFEST: ManifestGroup[] = [
   },
   {
     id: "analysis", label: "Analysis", commands: [
-      { name: "analyze", description: "Run codebase analysis (--deep, --full, --lite)", requires: "init" },
-      { name: "recommend", description: "Show or accept sourcevision-based recommendations", requires: "llm" },
-      { name: "refresh", description: "Refresh dashboard data and UI artifacts", requires: "init" },
+      { name: "analyze", description: "Run codebase analysis (--deep, --full, --lite)", requires: "init", trigger: { endpoint: "/api/commands/sv-analyze", method: "POST", statusEndpoint: "/api/commands/sv-analyze/status" } },
+      { name: "recommend", description: "Show or accept sourcevision-based recommendations", requires: "llm", trigger: { endpoint: "/api/commands/recommend", method: "POST" } },
+      { name: "refresh", description: "Refresh dashboard data and UI artifacts", requires: "init", trigger: { endpoint: "/api/commands/refresh", method: "POST", statusEndpoint: "/api/commands/refresh/status" } },
       { name: "ci", description: "Run the analysis pipeline and validate PRD health", requires: "init" },
     ],
   },
   {
     id: "planning", label: "Planning", commands: [
-      { name: "plan", description: "Analyze the codebase and generate PRD proposals (--accept to apply)", requires: "llm" },
+      { name: "plan", description: "Analyze the codebase and generate PRD proposals (--accept to apply)", requires: "llm", trigger: { endpoint: "/api/rex/analyze", method: "POST" } },
       { name: "add", description: "Add PRD items from freeform descriptions, files, or stdin", requires: "llm" },
       { name: "status", description: "Show the PRD status tree with completion stats", requires: "init" },
       { name: "next", description: "Print the next actionable task", requires: "init" },
-      { name: "sync", description: "Sync the local PRD with a remote adapter (--push, --pull)", requires: "init" },
+      { name: "sync", description: "Sync the local PRD with a remote adapter (--push, --pull)", requires: "init", trigger: { endpoint: "/api/commands/sync", method: "POST" } },
     ],
   },
   {
@@ -661,7 +680,7 @@ const COMMAND_MANIFEST: ManifestGroup[] = [
       { name: "pair-programming", description: "Agent + cross-vendor review (alias: bicker)", requires: "llm" },
       { name: "start", description: "Start the server: dashboard + MCP endpoints", requires: "init" },
       { name: "dev", description: "Start the web dev server with live reload", requires: "init" },
-      { name: "export", description: "Export a static deployable dashboard", requires: "init" },
+      { name: "export", description: "Export a static deployable dashboard", requires: "init", trigger: { endpoint: "/api/commands/export", method: "POST" } },
     ],
   },
   {
@@ -715,6 +734,7 @@ function handleManifest(
         invocation: `${cliName} ${cmd.name}`,
         description: cmd.description,
         status: statusFor(cmd),
+        ...(cmd.trigger ? { trigger: cmd.trigger } : {}),
       })),
     })),
   });

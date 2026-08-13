@@ -432,6 +432,31 @@ describe("commands route — manifest (command reference)", () => {
     return res.json() as Promise<Record<string, any>>;
   }
 
+  it("carries trigger metadata only for dashboard-triggerable commands", async () => {
+    const body = await getManifest();
+    const all = body.groups.flatMap((g: { commands: Array<Record<string, any>> }) => g.commands);
+
+    const analyze = all.find((c: Record<string, any>) => c.name === "analyze");
+    expect(analyze.trigger).toMatchObject({ endpoint: "/api/commands/sv-analyze", method: "POST" });
+
+    const refresh = all.find((c: Record<string, any>) => c.name === "refresh");
+    expect(refresh.trigger).toMatchObject({
+      endpoint: "/api/commands/refresh",
+      method: "POST",
+      statusEndpoint: "/api/commands/refresh/status",
+    });
+
+    const plan = all.find((c: Record<string, any>) => c.name === "plan");
+    expect(plan.trigger).toMatchObject({ endpoint: "/api/rex/analyze", method: "POST" });
+
+    // Excluded by design: work needs task selection; self-heal is
+    // confirmation-gated; init/config are terminal-side.
+    for (const name of ["work", "self-heal", "init", "config"]) {
+      const cmd = all.find((c: Record<string, any>) => c.name === name);
+      expect(cmd.trigger).toBeUndefined();
+    }
+  });
+
   it("returns groups covering the five categories with described commands", async () => {
     const body = await getManifest();
     const ids = (body.groups as Array<{ id: string }>).map((g) => g.id);
