@@ -247,3 +247,46 @@ describe("Project API routes", () => {
     expect(data2.name).toBe("cached-project");
   });
 });
+
+describe("Project API — resolved CLI name", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    clearProjectMetadataCache();
+    tmpDir = await mkdtemp(join(tmpdir(), "project-cliname-"));
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    ({ server, port } = await startTestServer(ctx));
+  });
+
+  afterEach(async () => {
+    server.close();
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns cliName 'n-dx' when cli.name is absent from config", async () => {
+    const res = await fetch(`http://localhost:${port}/api/project`);
+    const body = await res.json();
+    expect(body.cliName).toBe("n-dx");
+  });
+
+  it("returns the configured cli.name when present", async () => {
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ cli: { name: "myapp" } }));
+    const res = await fetch(`http://localhost:${port}/api/project`);
+    const body = await res.json();
+    expect(body.cliName).toBe("myapp");
+  });
+
+  it("includes cliName in the extractProjectMetadata result", async () => {
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ cli: { name: "customcli" } }));
+    const metadata = await extractProjectMetadata(tmpDir);
+    expect(metadata.cliName).toBe("customcli");
+  });
+});

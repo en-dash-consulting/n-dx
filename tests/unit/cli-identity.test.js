@@ -22,17 +22,17 @@ describe("resolveCliName", () => {
     expect(resolveCliName({ name: "@acme/myapp", bin: "./cli.js" })).toBe("myapp");
   });
 
-  it("defaults to 'ndx' when package.json has no bin field", () => {
-    expect(resolveCliName({ name: "myapp" })).toBe("ndx");
-    expect(DEFAULT_CLI_NAME).toBe("ndx");
+  it("defaults to 'n-dx' when package.json has no bin field", () => {
+    expect(resolveCliName({ name: "myapp" })).toBe("n-dx");
+    expect(DEFAULT_CLI_NAME).toBe("n-dx");
   });
 
-  it("defaults to 'ndx' for empty or invalid bin values", () => {
-    expect(resolveCliName({ name: "myapp", bin: {} })).toBe("ndx");
-    expect(resolveCliName({ name: "myapp", bin: 42 })).toBe("ndx");
-    expect(resolveCliName({ bin: "./cli.js" })).toBe("ndx"); // bin string but no name
-    expect(resolveCliName(null)).toBe("ndx");
-    expect(resolveCliName(undefined)).toBe("ndx");
+  it("defaults to 'n-dx' for empty or invalid bin values", () => {
+    expect(resolveCliName({ name: "myapp", bin: {} })).toBe("n-dx");
+    expect(resolveCliName({ name: "myapp", bin: 42 })).toBe("n-dx");
+    expect(resolveCliName({ bin: "./cli.js" })).toBe("n-dx"); // bin string but no name
+    expect(resolveCliName(null)).toBe("n-dx");
+    expect(resolveCliName(undefined)).toBe("n-dx");
   });
 });
 
@@ -52,13 +52,13 @@ describe("detectCliName / recordCliName", () => {
     expect(detectCliName(dir)).toBe("myapp");
   });
 
-  it("detectCliName defaults to 'ndx' when package.json is missing", () => {
-    expect(detectCliName(dir)).toBe("ndx");
+  it("detectCliName defaults to 'n-dx' when package.json is missing", () => {
+    expect(detectCliName(dir)).toBe("n-dx");
   });
 
-  it("detectCliName defaults to 'ndx' when package.json is malformed", () => {
+  it("detectCliName defaults to 'n-dx' when package.json is malformed", () => {
     writeFileSync(join(dir, "package.json"), "{not json");
-    expect(detectCliName(dir)).toBe("ndx");
+    expect(detectCliName(dir)).toBe("n-dx");
   });
 
   it("recordCliName writes the detected name as cli.name in .n-dx.json", () => {
@@ -86,11 +86,11 @@ describe("detectCliName / recordCliName", () => {
     expect(config.cli.name).toBe("customcli");
   });
 
-  it("recordCliName writes the default 'ndx' when no bin field exists", () => {
+  it("recordCliName writes the default 'n-dx' when no bin field exists", () => {
     writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "x" }));
     recordCliName(dir);
     const config = JSON.parse(readFileSync(join(dir, ".n-dx.json"), "utf-8"));
-    expect(config.cli.name).toBe("ndx");
+    expect(config.cli.name).toBe("n-dx");
   });
 
   it("recordCliName is best-effort and does not throw on an unwritable dir", () => {

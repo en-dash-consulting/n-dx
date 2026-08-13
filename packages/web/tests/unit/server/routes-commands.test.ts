@@ -460,10 +460,10 @@ describe("commands route — manifest (command reference)", () => {
     expect(anyCmd.invocation.startsWith("myapp ")).toBe(true);
   });
 
-  it("defaults invocations to ndx without cli.name", async () => {
+  it("defaults invocations to n-dx without cli.name", async () => {
     const body = await getManifest();
-    expect(body.cliName).toBe("ndx");
-    expect(body.groups[0].commands[0].invocation.startsWith("ndx ")).toBe(true);
+    expect(body.cliName).toBe("n-dx");
+    expect(body.groups[0].commands[0].invocation.startsWith("n-dx ")).toBe(true);
   });
 
   it("marks init-requiring commands needs-init in an uninitialized project", async () => {

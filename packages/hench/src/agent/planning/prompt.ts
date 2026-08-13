@@ -55,7 +55,7 @@ export function buildSystemPrompt(
   const lines: string[] = [];
   const isCli = config.provider === "cli";
   const autoCommit = config.autoCommit === true;
-  const cliName = project.cliName ?? "ndx";
+  const cliName = project.cliName ?? "n-dx";
 
   lines.push("You are Hench, an autonomous AI agent that implements software tasks.");
   lines.push("You receive a task brief and use tools to implement it.\n");

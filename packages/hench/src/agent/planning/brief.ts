@@ -31,7 +31,7 @@ export interface AssembleBriefOptions {
   /**
    * Project root directory — used to resolve the project's CLI command name
    * (`cli.name` in `.n-dx.json`) for prompt/brief injection. Defaults to
-   * "ndx" when omitted.
+   * "n-dx" when omitted.
    */
   projectDir?: string;
 }

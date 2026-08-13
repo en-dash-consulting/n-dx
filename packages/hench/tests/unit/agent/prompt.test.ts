@@ -124,14 +124,14 @@ describe("buildSystemPrompt — resolved CLI name", () => {
     const namedProject: TaskBriefProject = { name: "test-project", cliName: "myapp" };
     const prompt = buildSystemPrompt(namedProject, config);
     expect(prompt).toContain("CLI command: `myapp`");
-    expect(prompt).not.toContain("CLI command: `ndx`");
+    expect(prompt).not.toContain("CLI command: `n-dx`");
   });
 
-  it("falls back to ndx when cliName is absent", () => {
+  it("falls back to n-dx when cliName is absent", () => {
     const config = DEFAULT_HENCH_CONFIG();
     const bare: TaskBriefProject = { name: "test-project" };
     const prompt = buildSystemPrompt(bare, config);
-    expect(prompt).toContain("CLI command: `ndx`");
+    expect(prompt).toContain("CLI command: `n-dx`");
   });
 
   it("uses the resolved name in the commit-confirmation rule", () => {

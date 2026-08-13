@@ -38,19 +38,19 @@ describe("cli.name propagation into prompt context", () => {
     const system = buildSystemPrompt(brief.project, DEFAULT_HENCH_CONFIG());
     const briefText = formatTaskBrief(brief);
     expect(system).toContain("myapp");
-    expect(system).not.toContain("CLI command: `ndx`");
+    expect(system).not.toContain("CLI command: `n-dx`");
     expect(briefText).toContain("CLI: `myapp`");
   });
 
-  it("defaults to ndx when the project has no cli.name", async () => {
+  it("defaults to n-dx when the project has no cli.name", async () => {
     const store = mockStoreWithDefaults([
       { id: "t1", title: "Do the thing", status: "pending", level: "task" },
     ]);
 
     const { brief } = await assembleTaskBrief(store, undefined, { projectDir });
-    expect(brief.project.cliName).toBe("ndx");
+    expect(brief.project.cliName).toBe("n-dx");
 
     const system = buildSystemPrompt(brief.project, DEFAULT_HENCH_CONFIG());
-    expect(system).toContain("CLI command: `ndx`");
+    expect(system).toContain("CLI command: `n-dx`");
   });
 });

@@ -5,7 +5,7 @@
  * detected command as `cli.name` in `.n-dx.json` (see
  * packages/core/cli-identity.js). Hench reads that persisted value so agent
  * prompts and task briefs reference the project's actual CLI command instead
- * of a hardcoded "ndx" — hench cannot import the core resolver across the
+ * of a hardcoded name — hench cannot import the core resolver across the
  * orchestration/execution tier boundary, so this is a read of the recorded
  * config value only (no bin-field detection).
  */
@@ -14,7 +14,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** Fallback command name when no cli.name is configured. */
-export const DEFAULT_CLI_NAME = "ndx";
+export const DEFAULT_CLI_NAME = "n-dx";
 
 /**
  * Read the resolved CLI command name for a project from `.n-dx.json`.

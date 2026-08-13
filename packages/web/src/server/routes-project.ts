@@ -13,6 +13,7 @@ import { join, basename } from "node:path";
 import { exec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
+import { readCliName, DEFAULT_CLI_NAME } from "./cli-name.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +41,8 @@ export interface ProjectMetadata {
   git: GitInfo | null;
   /** Source of the project name: "package.json" or "directory". */
   nameSource: "package.json" | "directory";
+  /** Resolved project CLI command name (cli.name in .n-dx.json, default "n-dx"). */
+  cliName: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +137,7 @@ export async function extractProjectMetadata(projectDir: string): Promise<Projec
     version: pkg?.version ?? null,
     git,
     nameSource: hasPackageName ? "package.json" : "directory",
+    cliName: readCliName(projectDir),
   };
 }
 
@@ -185,6 +189,7 @@ export async function handleProjectRoute(
       version: null,
       git: null,
       nameSource: "directory" as const,
+      cliName: DEFAULT_CLI_NAME,
     });
   }
 

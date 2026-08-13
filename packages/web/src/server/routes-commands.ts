@@ -22,6 +22,7 @@ import { createRequire } from "node:module";
 import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { readCliName } from "./cli-name.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 
 const CMD_PREFIX = "/api/commands/";
@@ -670,18 +671,6 @@ const COMMAND_MANIFEST: ManifestGroup[] = [
     ],
   },
 ];
-
-/** Read the resolved CLI command name (cli.name in .n-dx.json, default ndx). */
-function readCliName(projectDir: string): string {
-  try {
-    const raw = readFileSync(join(projectDir, ".n-dx.json"), "utf-8");
-    const config = JSON.parse(raw) as { cli?: { name?: unknown } };
-    const name = config.cli?.name;
-    return typeof name === "string" && name.length > 0 ? name : "ndx";
-  } catch {
-    return "ndx";
-  }
-}
 
 /** Check whether the project has an LLM vendor configured. */
 function hasLlmVendor(projectDir: string): boolean {

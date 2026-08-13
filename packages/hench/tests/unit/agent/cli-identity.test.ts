@@ -20,19 +20,19 @@ describe("resolveProjectCliName", () => {
     expect(resolveProjectCliName(dir)).toBe("myapp");
   });
 
-  it("defaults to 'ndx' when .n-dx.json is missing", () => {
-    expect(resolveProjectCliName(dir)).toBe("ndx");
+  it("defaults to 'n-dx' when .n-dx.json is missing", () => {
+    expect(resolveProjectCliName(dir)).toBe("n-dx");
   });
 
-  it("defaults to 'ndx' when cli.name is absent or not a string", () => {
+  it("defaults to 'n-dx' when cli.name is absent or not a string", () => {
     writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ cli: { timeoutMs: 5 } }));
-    expect(resolveProjectCliName(dir)).toBe("ndx");
+    expect(resolveProjectCliName(dir)).toBe("n-dx");
     writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ cli: { name: 42 } }));
-    expect(resolveProjectCliName(dir)).toBe("ndx");
+    expect(resolveProjectCliName(dir)).toBe("n-dx");
   });
 
-  it("defaults to 'ndx' when .n-dx.json is malformed", () => {
+  it("defaults to 'n-dx' when .n-dx.json is malformed", () => {
     writeFileSync(join(dir, ".n-dx.json"), "{not json");
-    expect(resolveProjectCliName(dir)).toBe("ndx");
+    expect(resolveProjectCliName(dir)).toBe("n-dx");
   });
 });

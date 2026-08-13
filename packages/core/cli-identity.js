@@ -13,7 +13,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** Fallback command name when no bin field (or no package.json) exists. */
-export const DEFAULT_CLI_NAME = "ndx";
+export const DEFAULT_CLI_NAME = "n-dx";
 
 /**
  * Resolve the installed CLI command name from a parsed package.json object.

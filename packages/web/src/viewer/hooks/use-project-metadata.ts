@@ -24,7 +24,12 @@ export interface ProjectMetadata {
   version: string | null;
   git: GitInfo | null;
   nameSource: "package.json" | "directory";
+  /** Resolved project CLI command name (cli.name in .n-dx.json, default "n-dx"). */
+  cliName?: string;
 }
+
+/** Fallback CLI command name while metadata is loading or unavailable. */
+export const DEFAULT_CLI_NAME = "n-dx";
 
 // ---------------------------------------------------------------------------
 // Singleton fetch + cache
@@ -61,6 +66,12 @@ export function getCachedProjectMetadata(): ProjectMetadata | null {
   return cachedMeta;
 }
 
+/** Clear the metadata cache (exposed for testing). */
+export function clearProjectMetadataCache(): void {
+  cachedMeta = null;
+  fetchPromise = null;
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -76,4 +87,17 @@ export function useProjectMetadata(): ProjectMetadata | null {
   }, []);
 
   return project;
+}
+
+/**
+ * Preact hook — the project's resolved CLI command name from shared state.
+ *
+ * The single sanctioned read path for the CLI name in dashboard components:
+ * always sourced from `/api/project` shared state (never localStorage,
+ * environment, or hardcoded strings). Returns "n-dx" while loading or when
+ * the server has no `cli.name` configured.
+ */
+export function useCliName(): string {
+  const project = useProjectMetadata();
+  return project?.cliName ?? DEFAULT_CLI_NAME;
 }

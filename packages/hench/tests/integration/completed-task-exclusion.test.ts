@@ -141,7 +141,7 @@ describe("assembleTaskBrief — explicit --task targeting completed task", () =>
       throw new Error("Should have thrown TaskNotActionableError");
     } catch (err) {
       const e = err as TaskNotActionableError;
-      expect(e.suggestion).toContain("ndx status");
+      expect(e.suggestion).toContain("n-dx status");
     }
   });
 

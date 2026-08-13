@@ -1290,7 +1290,7 @@ CLI settings (.n-dx.json):
   cli.name                 string    The project's installed CLI command name.
                                      Auto-detected from the package.json bin field
                                      by ndx init (first bin key, or the package name
-                                     for a string bin). Defaults to "ndx" when no
+                                     for a string bin). Defaults to "n-dx" when no
                                      bin field exists. Set manually to override
                                      detection — a set value is never overwritten
                                      by ndx init.

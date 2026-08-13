@@ -12,5 +12,5 @@ description: "The web dashboard currently displays hardcoded 'ndx' command strin
 
 | Title | Status |
 |-------|--------|
-| [Expose resolved CLI name via server API and inject into dashboard shared state](./expose-resolved-cli-name-via-396910.md) | pending |
+| [Expose resolved CLI name via server API and inject into dashboard shared state](./expose-resolved-cli-name-via-396910.md) | completed |
 | [Replace hardcoded 'ndx' command references in dashboard UI with project-resolved CLI name](./replace-hardcoded-ndx-command-46ebab.md) | pending |
