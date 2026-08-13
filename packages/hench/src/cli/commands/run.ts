@@ -865,7 +865,9 @@ export async function cmdRun(
       ? llmConfig?.claude?.model
       : llmVendor === "codex"
         ? llmConfig?.codex?.model
-        : llmConfig?.google?.model);
+        : llmVendor === "google"
+          ? llmConfig?.google?.model
+          : llmConfig?.local?.model);
   if (!cliModelOverride && activeConfiguredModel) {
     if (
       llmVendor === "claude" &&
@@ -964,7 +966,7 @@ export async function cmdRun(
     );
   }
 
-  // Google only supports API mode (no CLI binary exists).
+  // Google and local only support API mode (no CLI binary exists).
   if (llmVendor === "google" && provider === "cli" && !dryRun) {
     throw new CLIError(
       "Google vendor does not support CLI mode — it uses the Gemini REST API directly.",
@@ -972,9 +974,16 @@ export async function cmdRun(
     );
   }
 
+  if (llmVendor === "local" && provider === "cli" && !dryRun) {
+    throw new CLIError(
+      "Local vendor does not support CLI mode — it connects to a local REST server.",
+      "Set 'n-dx config hench.provider api' or switch vendor: 'n-dx config llm.vendor claude'.",
+    );
+  }
+
   // Fail fast if CLI provider selected but vendor CLI binary not available.
-  // Google is excluded — it has no CLI binary and is already guarded above.
-  if (provider === "cli" && !dryRun && llmVendor !== "google") {
+  // Google and local are excluded — they have no CLI binary and are already guarded above.
+  if (provider === "cli" && !dryRun && llmVendor !== "google" && llmVendor !== "local") {
     const customPath = resolveVendorCliPath(llmConfig);
     requireLLMCLI(llmVendor as "claude" | "codex", customPath);
   }
