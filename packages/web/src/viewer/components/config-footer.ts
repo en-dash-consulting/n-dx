@@ -13,6 +13,7 @@ import { useState, useEffect, useRef } from "preact/hooks";
 // ---------------------------------------------------------------------------
 
 interface NdxConfigSummary {
+  vendor: string | null;
   model: string | null;
   provider: string | null;
   authMethod: "api-key" | "cli" | "none";
@@ -62,17 +63,27 @@ function useNdxConfig(): NdxConfigSummary | null {
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
-function formatModel(model: string | null): string {
+function formatModel(model: string | null, vendor: string | null): string {
   if (!model) return "default";
-  // Shorten full model IDs for display
+  // Shorten official claude model IDs: "claude-sonnet-4-6" → "sonnet 4"
   if (model.startsWith("claude-")) {
     const parts = model.split("-");
-    // "claude-sonnet-4-6" -> "sonnet 4"
-    if (parts.length >= 3) {
-      return `${parts[1]} ${parts[2]}`;
-    }
+    if (parts.length >= 3) return `${parts[1]} ${parts[2]}`;
+  }
+  // Truncate long local model IDs (path-style names from LM Studio / Ollama)
+  if (model.length > 22) {
+    // Keep the tail — it usually has the most distinctive part (e.g. model variant)
+    return "…" + model.slice(-20);
   }
   return model;
+}
+
+/** Short vendor label for the badge (blank for claude — already implied by model name). */
+function vendorPrefix(vendor: string | null): string {
+  if (!vendor || vendor === "claude") return "";
+  if (vendor === "codex") return "codex · ";
+  if (vendor === "local") return "local · ";
+  return `${vendor} · `;
 }
 
 function formatTokenBudget(budget: number | null): string {
@@ -121,8 +132,8 @@ export function ConfigFooter() {
         // Model badge
         h("span", {
           class: "config-badge config-badge-model",
-          title: `Model: ${config.model ?? "default"}`,
-        }, formatModel(config.model)),
+          title: `Vendor: ${config.vendor ?? "default"}  Model: ${config.model ?? "default"}`,
+        }, vendorPrefix(config.vendor) + formatModel(config.model, config.vendor)),
         // Auth indicator
         h("span", {
           class: `config-badge config-badge-auth config-badge-auth-${config.authMethod}`,
@@ -151,9 +162,15 @@ export function ConfigFooter() {
           "aria-label": "Configuration details",
         },
           // Config rows
+          config.vendor
+            ? h("div", { class: "config-row" },
+                h("span", { class: "config-label" }, "Vendor"),
+                h("span", { class: "config-value" }, config.vendor),
+              )
+            : null,
           h("div", { class: "config-row" },
             h("span", { class: "config-label" }, "Model"),
-            h("span", { class: "config-value" }, formatModel(config.model)),
+            h("span", { class: "config-value" }, config.model ?? "default"),
           ),
           h("div", { class: "config-row" },
             h("span", { class: "config-label" }, "Auth"),

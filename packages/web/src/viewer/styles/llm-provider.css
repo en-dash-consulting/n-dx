@@ -64,9 +64,15 @@
 }
 
 .llm-vendor-tab-active {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-text-primary);
+  font-weight: 600;
 }
+
+/* Per-vendor active tint — overrides the generic accent tint */
+.llm-vendor-tab-active.llm-vendor-tab-claude { background: color-mix(in srgb, #d97706 14%, transparent); }
+.llm-vendor-tab-active.llm-vendor-tab-codex  { background: color-mix(in srgb, #2563eb 14%, transparent); }
+.llm-vendor-tab-active.llm-vendor-tab-local  { background: color-mix(in srgb, #16a34a 14%, transparent); }
 
 .llm-tab-name { /* no extra style needed */ }
 
@@ -360,7 +366,7 @@
   margin: 0;
 }
 
-/* "Saved profiles" sub-label */
+/* Section sub-labels (e.g. "Model", "Connection", "Saved profiles") */
 .llm-section-sub {
   font-size: 0.75rem;
   font-weight: 600;
@@ -368,6 +374,11 @@
   letter-spacing: 0.06em;
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+/* Highlight the model sub-label when live models are available */
+.llm-section-sub:first-of-type {
+  color: var(--color-text-primary);
 }
 
 /* ── Smoke test ──────────────────────────────────────────────────── */

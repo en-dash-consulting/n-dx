@@ -97,8 +97,8 @@ function VendorSelector({
             : null;
         return h("button", {
           key: v.id,
-          class: `llm-vendor-tab${active ? " llm-vendor-tab-active" : ""}`,
-          onClick: () => onChange(active ? null : v.id),
+          class: `llm-vendor-tab${active ? " llm-vendor-tab-active" : ""} llm-vendor-tab-${v.id}`,
+          onClick: () => onChange(v.id),
           "aria-pressed": String(active),
         },
           h("span", { class: `llm-vendor-dot llm-vendor-dot-${v.id}` }),
@@ -573,10 +573,24 @@ function LocalSection({
 
   return h("div", { class: "llm-vendor-section" },
 
-    // ── Status + connection
+    // ── Status pill (always first)
     h("div", { class: "llm-local-top" },
       h(StatusPill, { status: localStatus, onRefresh: onRefreshStatus }),
     ),
+
+    // ── Model selection (right after status — most important action when connected)
+    h("p", { class: "llm-section-sub" },
+      liveModels.length > 0
+        ? `Model — select from ${liveModels.length} available`
+        : "Model",
+    ),
+    primaryField,
+    lightField,
+
+    h("hr", { class: "llm-rule" }),
+
+    // ── Connection settings
+    h("p", { class: "llm-section-sub" }, "Connection"),
     h("div", { class: "llm-conn-row" },
       h("div", { class: `llm-field${dirtyKeys.has("local.host") ? " llm-field-dirty" : ""}` },
         h("label", { class: "llm-field-label", htmlFor: "local.host" },
@@ -622,12 +636,6 @@ function LocalSection({
       host, port, model,
       hasDirtyFields: connDirty || dirtyKeys.has("local.model"),
     }),
-
-    h("hr", { class: "llm-rule" }),
-
-    // ── Model selection
-    primaryField,
-    lightField,
 
     h("hr", { class: "llm-rule" }),
 

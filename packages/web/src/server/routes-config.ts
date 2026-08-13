@@ -19,7 +19,9 @@ import {jsonResponse} from "./response-utils.js";// ----------------------------
 // ---------------------------------------------------------------------------
 
 export interface NdxConfigSummary {
-  /** Active Claude model (from hench config or .n-dx.json). */
+  /** Active LLM vendor: "claude", "codex", "local", or null if unset. */
+  vendor: string | null;
+  /** Active model for the current vendor (from llm.<vendor>.model or legacy claude.model). */
   model: string | null;
   /** Provider type: "cli" or "api". */
   provider: string | null;
@@ -105,13 +107,31 @@ function extractConfig(ctx: ServerContext): NdxConfigSummary {
   const ndxConfig = readJSON(ndxConfigPath);
   const pkgJson = readJSON(pkgPath);
 
-  // Model: prefer .n-dx.json claude.model, fallback to hench config
-  const claudeModel = ndxConfig?.claude &&
-    typeof ndxConfig.claude === "object" &&
-    (ndxConfig.claude as Record<string, unknown>).model;
-  const henchModel = henchConfig?.model;
-  const model = (typeof claudeModel === "string" ? claudeModel : null) ??
-    (typeof henchModel === "string" ? henchModel : null);
+  // Vendor and model from modern llm.* namespace
+  const llmConfig = ndxConfig?.llm && typeof ndxConfig.llm === "object"
+    ? ndxConfig.llm as Record<string, unknown>
+    : null;
+  const vendor = llmConfig && typeof llmConfig.vendor === "string" ? llmConfig.vendor : null;
+
+  // Model: read from active vendor's llm.<vendor>.model field
+  let model: string | null = null;
+  if (vendor && llmConfig) {
+    const vendorCfg = llmConfig[vendor];
+    if (vendorCfg && typeof vendorCfg === "object") {
+      const vm = (vendorCfg as Record<string, unknown>).model;
+      if (typeof vm === "string" && vm.length > 0) model = vm;
+    }
+  }
+  // Legacy fallback: claude.model or hench.model (used before llm.* namespace existed)
+  if (!model) {
+    const legacyModel = ndxConfig?.claude &&
+      typeof ndxConfig.claude === "object"
+      ? (ndxConfig.claude as Record<string, unknown>).model
+      : undefined;
+    const henchModel = henchConfig?.model;
+    model = (typeof legacyModel === "string" && legacyModel.length > 0 ? legacyModel : null) ??
+            (typeof henchModel === "string" && henchModel.length > 0 ? henchModel : null);
+  }
 
   // Provider
   const provider = typeof henchConfig?.provider === "string"
@@ -150,6 +170,7 @@ function extractConfig(ctx: ServerContext): NdxConfigSummary {
   const projectName = pkgName ?? basename(ctx.projectDir);
 
   return {
+    vendor,
     model,
     provider,
     authMethod,
