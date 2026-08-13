@@ -10,5 +10,5 @@ source: "smart-add"
 
 | Title | Status |
 |-------|--------|
-| [CLI Identity Detection and Configuration](./cli-identity-detection-and-configuration/index.md) | pending |
+| [CLI Identity Detection and Configuration](./cli-identity-detection-and-configuration/index.md) | completed |
 | [CLI Identity Propagation Across Dashboard](./cli-identity-propagation-across-24f931/index.md) | pending |

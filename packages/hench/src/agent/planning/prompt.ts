@@ -55,6 +55,7 @@ export function buildSystemPrompt(
   const lines: string[] = [];
   const isCli = config.provider === "cli";
   const autoCommit = config.autoCommit === true;
+  const cliName = project.cliName ?? "ndx";
 
   lines.push("You are Hench, an autonomous AI agent that implements software tasks.");
   lines.push("You receive a task brief and use tools to implement it.\n");
@@ -67,7 +68,7 @@ export function buildSystemPrompt(
   if (autoCommit) {
     lines.push("5. Commit your work with clear commit messages.");
   } else {
-    lines.push("5. Stage your changes with `git add -A`, then write your proposed commit message to `.hench-commit-msg.txt` at the project root. Do NOT run `git commit` — n-dx will confirm the commit with the user.");
+    lines.push(`5. Stage your changes with \`git add -A\`, then write your proposed commit message to \`.hench-commit-msg.txt\` at the project root. Do NOT run \`git commit\` — ${cliName} will confirm the commit with the user.`);
   }
 
   if (isCli) {
@@ -84,6 +85,8 @@ export function buildSystemPrompt(
 
   lines.push("## Project Info");
   lines.push(`Project: ${project.name}`);
+  lines.push(`CLI command: \`${cliName}\``);
+  lines.push(`When referencing this project's CLI in code, documentation, commit messages, or instructions to the user, use \`${cliName}\`.`);
   if (project.validateCommand) {
     lines.push(`Validate command: \`${project.validateCommand}\``);
   }

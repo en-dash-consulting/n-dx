@@ -267,7 +267,7 @@ describe("assembleTaskBrief — invalid task selection", () => {
       await assembleTaskBrief(store, "done-2");
     } catch (err) {
       const e = err as TaskNotActionableError;
-      expect(e.suggestion).toContain("n-dx status");
+      expect(e.suggestion).toContain("ndx status");
     }
   });
 
@@ -1069,6 +1069,7 @@ describe("assembleTaskBrief — context assembly", () => {
       name: "test-project",
       validateCommand: "npm run typecheck",
       testCommand: "npm test",
+      cliName: "ndx",
     });
   });
 

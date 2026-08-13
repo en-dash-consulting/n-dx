@@ -2,7 +2,7 @@
 id: "7828dbab-faa4-4eb8-b356-70e0c736d4f7"
 level: "task"
 title: "Propagate resolved CLI name into hench agent prompts and task briefs"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "hench"
@@ -10,6 +10,9 @@ tags:
   - "identity"
   - "prompts"
 source: "smart-add"
+startedAt: "2026-08-13T00:31:47.851Z"
+completedAt: "2026-08-13T00:39:21.861Z"
+endedAt: "2026-08-13T00:39:21.861Z"
 acceptanceCriteria:
   - "Hench brief builder reads cli.name from project config and injects it as a named template variable in system prompts and task briefs"
   - "All hardcoded 'ndx' CLI-invocation references in agent system prompt templates are replaced with the resolved variable"

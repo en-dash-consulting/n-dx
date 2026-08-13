@@ -117,3 +117,28 @@ describe("buildSystemPrompt", () => {
     });
   });
 });
+
+describe("buildSystemPrompt — resolved CLI name", () => {
+  it("names the project CLI command when cliName is set", () => {
+    const config = DEFAULT_HENCH_CONFIG();
+    const namedProject: TaskBriefProject = { name: "test-project", cliName: "myapp" };
+    const prompt = buildSystemPrompt(namedProject, config);
+    expect(prompt).toContain("CLI command: `myapp`");
+    expect(prompt).not.toContain("CLI command: `ndx`");
+  });
+
+  it("falls back to ndx when cliName is absent", () => {
+    const config = DEFAULT_HENCH_CONFIG();
+    const bare: TaskBriefProject = { name: "test-project" };
+    const prompt = buildSystemPrompt(bare, config);
+    expect(prompt).toContain("CLI command: `ndx`");
+  });
+
+  it("uses the resolved name in the commit-confirmation rule", () => {
+    const config = { ...DEFAULT_HENCH_CONFIG(), autoCommit: false };
+    const namedProject: TaskBriefProject = { name: "test-project", cliName: "myapp" };
+    const prompt = buildSystemPrompt(namedProject, config);
+    expect(prompt).toContain("myapp will confirm the commit");
+    expect(prompt).not.toContain("n-dx will confirm the commit");
+  });
+});
