@@ -31,7 +31,7 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 
 const WEB_SRC = join(import.meta.dirname!, "..", "..", "src");
 
@@ -116,13 +116,13 @@ describe("server/client boundary", () => {
         // to avoid creating a zone-level dependency inversion through external.ts.
         // The shared/ directory is neutral (neither server nor viewer), so
         // messaging utilities can access it without violating the server/client boundary.
-        const isMessaging = rel.startsWith(join("viewer", "messaging") + "/") ||
+        const isMessaging = rel.startsWith(join("viewer", "messaging") + sep) ||
           rel === join("viewer", "messaging");
 
         // Crash detection is a standalone module with zero framework dependencies.
         // It imports ViewId directly from shared/ to avoid a bidirectional cycle
         // (crash → external.ts → crash via performance/index.ts re-exports).
-        const isCrash = rel.startsWith(join("viewer", "crash") + "/") ||
+        const isCrash = rel.startsWith(join("viewer", "crash") + sep) ||
           rel === join("viewer", "crash");
 
         for (const imp of extractImportPaths(file)) {
@@ -173,7 +173,7 @@ describe("server/client boundary", () => {
         const rel = relative(WEB_SRC, file);
 
         for (const zone of BARREL_ZONES) {
-          const zonePrefix = join("viewer", zone) + "/";
+          const zonePrefix = join("viewer", zone) + sep;
 
           // Files inside the sub-zone can import freely from siblings
           if (rel.startsWith(zonePrefix)) continue;
@@ -291,7 +291,7 @@ describe("server/client boundary", () => {
         const rel = relative(WEB_SRC, file);
 
         // Files inside components/ can import freely from siblings
-        if (rel.startsWith(join("viewer", "components") + "/")) continue;
+        if (rel.startsWith(join("viewer", "components") + sep)) continue;
 
         for (const imp of extractImportPaths(file)) {
           for (const component of componentFiles) {
@@ -366,10 +366,10 @@ describe("server/client boundary", () => {
           const rel = relative(WEB_SRC, file);
 
           // Crash zone exemption (documented cycle avoidance)
-          if (rel.startsWith(join("viewer", "crash") + "/")) continue;
+          if (rel.startsWith(join("viewer", "crash") + sep)) continue;
 
           // Messaging exemption (documented shared/ direct access)
-          if (rel.startsWith(join("viewer", "messaging") + "/")) continue;
+          if (rel.startsWith(join("viewer", "messaging") + sep)) continue;
 
           for (const imp of extractImportPaths(file)) {
             for (const leaf of SHARED_LEAF_FILES) {
@@ -630,7 +630,7 @@ describe("server/client boundary", () => {
       try {
         for (const file of collectTsFiles(viewerDir)) {
           const rel = relative(WEB_SRC, file);
-          if (rel.startsWith(join("viewer", "hooks") + "/")) continue;
+          if (rel.startsWith(join("viewer", "hooks") + sep)) continue;
 
           for (const imp of extractImportPaths(file)) {
             if (
@@ -686,7 +686,7 @@ describe("server/client boundary", () => {
         const rel = relative(WEB_SRC, file);
 
         // Files inside hooks/ can import from siblings freely
-        if (rel.startsWith(join("viewer", "hooks") + "/")) continue;
+        if (rel.startsWith(join("viewer", "hooks") + sep)) continue;
 
         for (const imp of extractImportPaths(file)) {
           for (const hook of hookLeafFiles) {
@@ -797,7 +797,7 @@ describe("server/client boundary", () => {
         const rel = relative(WEB_SRC, file);
 
         // Files inside the components/ directory can import siblings freely
-        if (rel.startsWith(join("viewer", "components") + "/")) continue;
+        if (rel.startsWith(join("viewer", "components") + sep)) continue;
 
         for (const imp of extractImportPaths(file)) {
           for (const leaf of UI_HUB_LEAVES) {

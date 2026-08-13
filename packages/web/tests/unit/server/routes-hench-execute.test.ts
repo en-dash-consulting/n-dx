@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { handleHenchRoute, shutdownActiveExecutions } from "../../../src/server/routes-hench.js";
 import { startRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal PRD document for testing. */
@@ -54,6 +54,9 @@ describe("POST /api/hench/execute", () => {
 
   afterEach(async () => {
     server.close();
+    // Terminate any spawned hench processes before removing tmpDir.
+    // On Windows, an active child process holds a CWD lock causing EBUSY.
+    await shutdownActiveExecutions(500).catch(() => {});
     await rm(tmpDir, { recursive: true, force: true });
   });
 

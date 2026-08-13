@@ -7,48 +7,48 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { EventEmitter } from "node:events";
+import type { ChildProcess } from "node:child_process";
 
-// ── Mock @n-dx/llm-client ─────────────────────────────────────────────────
-// Replace spawnManaged with a controlled factory so tests can inspect kill()
-// calls without spawning real processes.
+// ── Fake child-process factory ────────────────────────────────────────────
+// Returns a minimal ChildProcess-compatible object without spawning any real
+// OS process. The kill() implementation emits "close" on the next tick so
+// that the donePromise in handleExecute resolves immediately.
 
-interface MockHandle {
-  pid: number;
-  kill: ReturnType<typeof vi.fn>;
-  done: Promise<{ exitCode: number | null; stdout: string; stderr: string }>;
-  /** Manually resolve the done promise (simulate natural process exit). */
-  exit(): void;
-}
-
-function createMockHandle(pid = 99999): MockHandle {
-  let resolveDone!: (v: { exitCode: number | null; stdout: string; stderr: string }) => void;
-  const done = new Promise<{ exitCode: number | null; stdout: string; stderr: string }>((r) => {
-    resolveDone = r;
+function createFakeChildProcess(pid = 99999) {
+  const emitter = new EventEmitter();
+  const kill = vi.fn((_signal?: string): boolean => {
+    // Simulate graceful exit in response to any signal
+    setImmediate(() => emitter.emit("close", null));
+    return true;
   });
-  const handle: MockHandle = {
-    pid,
-    done,
-    kill: vi.fn().mockImplementation(() => {
-      // Simulate graceful exit in response to a signal
-      resolveDone({ exitCode: null, stdout: "", stderr: "" });
-      return true;
-    }),
-    exit() {
-      resolveDone({ exitCode: 0, stdout: "", stderr: "" });
-    },
+  (emitter as any).pid = pid;
+  (emitter as any).stdout = new EventEmitter();
+  (emitter as any).stderr = new EventEmitter();
+  (emitter as any).kill = kill;
+  return emitter as typeof emitter & {
+    pid: number;
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+    kill: typeof kill;
   };
-  return handle;
 }
 
-let _latestHandle: MockHandle | null = null;
+type FakeChildProcess = ReturnType<typeof createFakeChildProcess>;
 
-vi.mock("@n-dx/llm-client", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@n-dx/llm-client")>();
+// ── Module-level spawn mock ───────────────────────────────────────────────
+// handleExecute uses node:child_process spawn (not spawnManaged) so we mock
+// it here. The factory captures _latestProc for inspection in tests.
+
+let _latestProc: FakeChildProcess | null = null;
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const original = await importOriginal<typeof import("node:child_process")>();
   return {
     ...original,
-    spawnManaged: vi.fn(() => {
-      _latestHandle = createMockHandle(99999);
-      return _latestHandle;
+    spawn: vi.fn((): ChildProcess => {
+      _latestProc = createFakeChildProcess(99999);
+      return _latestProc as unknown as ChildProcess;
     }),
   };
 });
@@ -118,7 +118,7 @@ describe("shutdownActiveExecutions — with active executions", () => {
   let port: number;
 
   beforeEach(async () => {
-    _latestHandle = null;
+    _latestProc = null;
     vi.clearAllMocks();
 
     tmpDir = await mkdtemp(join(tmpdir(), "hench-shutdown-"));
@@ -154,7 +154,7 @@ describe("shutdownActiveExecutions — with active executions", () => {
   });
 
   it("sends SIGTERM to a running child process", async () => {
-    // Trigger execution (uses mocked spawnManaged)
+    // Trigger execution (uses mocked spawn)
     const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -162,16 +162,16 @@ describe("shutdownActiveExecutions — with active executions", () => {
     });
     expect(res.status).toBe(202);
 
-    const handle = _latestHandle!;
-    expect(handle).not.toBeNull();
+    const proc = _latestProc;
+    expect(proc).not.toBeNull();
 
     // Call shutdown — the mock kill() resolves done, so it exits gracefully
     await shutdownActiveExecutions(2_000);
 
     // kill() must have been called at least once
-    expect(handle.kill).toHaveBeenCalled();
+    expect(proc!.kill).toHaveBeenCalled();
     // First signal should be SIGTERM (graceful)
-    const firstSignal = handle.kill.mock.calls[0][0];
+    const firstSignal = proc!.kill.mock.calls[0][0];
     expect(firstSignal).toBe("SIGTERM");
   });
 
@@ -182,7 +182,7 @@ describe("shutdownActiveExecutions — with active executions", () => {
       body: JSON.stringify({ taskId: "task-1" }),
     });
     expect(res.status).toBe(202);
-    expect(_latestHandle).not.toBeNull();
+    expect(_latestProc).not.toBeNull();
 
     const result = await shutdownActiveExecutions(2_000);
     expect(result).toEqual({ terminated: 1, failed: 0 });
@@ -195,7 +195,7 @@ describe("shutdownActiveExecutions — with active executions", () => {
       body: JSON.stringify({ taskId: "task-1" }),
     });
     expect(res.status).toBe(202);
-    expect(_latestHandle).not.toBeNull();
+    expect(_latestProc).not.toBeNull();
 
     await shutdownActiveExecutions(2_000);
 
@@ -216,14 +216,14 @@ describe("shutdownActiveExecutions — with active executions", () => {
       ]), null, 2),
     );
 
-    const handles: MockHandle[] = [];
+    const procs: FakeChildProcess[] = [];
 
-    // Track all handles created during the test
-    const { spawnManaged: mockSpawn } = await import("@n-dx/llm-client");
-    vi.mocked(mockSpawn).mockImplementation(() => {
-      const h = createMockHandle(99990 + handles.length);
-      handles.push(h);
-      return h;
+    // Track all fake processes created during the test
+    const { spawn: mockSpawn } = await import("node:child_process");
+    vi.mocked(mockSpawn).mockImplementation((): ChildProcess => {
+      const p = createFakeChildProcess(99990 + procs.length);
+      procs.push(p);
+      return p as unknown as ChildProcess;
     });
 
     // Trigger two executions
@@ -238,14 +238,14 @@ describe("shutdownActiveExecutions — with active executions", () => {
       body: JSON.stringify({ taskId: "task-b" }),
     });
 
-    expect(handles.length).toBe(2);
+    expect(procs.length).toBe(2);
 
     await shutdownActiveExecutions(2_000);
 
-    // Both handles should have received SIGTERM
-    for (const h of handles) {
-      expect(h.kill).toHaveBeenCalled();
-      expect(h.kill.mock.calls[0][0]).toBe("SIGTERM");
+    // Both fake processes should have received SIGTERM
+    for (const p of procs) {
+      expect(p.kill).toHaveBeenCalled();
+      expect(p.kill.mock.calls[0][0]).toBe("SIGTERM");
     }
 
     // Map is cleared
@@ -264,7 +264,7 @@ describe("shutdownActiveExecutions — logging", () => {
   let port: number;
 
   beforeEach(async () => {
-    _latestHandle = null;
+    _latestProc = null;
     vi.clearAllMocks();
 
     tmpDir = await mkdtemp(join(tmpdir(), "hench-shutdown-log-"));
@@ -335,12 +335,12 @@ describe("shutdownActiveExecutions — logging", () => {
       ]), null, 2),
     );
 
-    const handles: MockHandle[] = [];
-    const { spawnManaged: mockSpawn } = await import("@n-dx/llm-client");
-    vi.mocked(mockSpawn).mockImplementation(() => {
-      const h = createMockHandle(99980 + handles.length);
-      handles.push(h);
-      return h;
+    const procs: FakeChildProcess[] = [];
+    const { spawn: mockSpawn } = await import("node:child_process");
+    vi.mocked(mockSpawn).mockImplementation((): ChildProcess => {
+      const p = createFakeChildProcess(99980 + procs.length);
+      procs.push(p);
+      return p as unknown as ChildProcess;
     });
 
     const logs: string[] = [];
@@ -360,7 +360,7 @@ describe("shutdownActiveExecutions — logging", () => {
         body: JSON.stringify({ taskId: "task-log-b" }),
       });
 
-      expect(handles.length).toBe(2);
+      expect(procs.length).toBe(2);
 
       await shutdownActiveExecutions(2_000);
 
@@ -375,12 +375,9 @@ describe("shutdownActiveExecutions — logging", () => {
   });
 
   it("includes the pid in the per-execution termination log", async () => {
-    const handles: MockHandle[] = [];
-    const { spawnManaged: mockSpawn } = await import("@n-dx/llm-client");
-    vi.mocked(mockSpawn).mockImplementation(() => {
-      const h = createMockHandle(12345);
-      handles.push(h);
-      return h;
+    const { spawn: mockSpawn } = await import("node:child_process");
+    vi.mocked(mockSpawn).mockImplementation((): ChildProcess => {
+      return createFakeChildProcess(12345) as unknown as ChildProcess;
     });
 
     const logs: string[] = [];
