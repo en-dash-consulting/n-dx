@@ -137,10 +137,11 @@ export function resolveInitLLMSelection({ flags, existingConfig, isTTY }) {
     result.needsModelPrompt = isTTY;
   }
 
-  // Always offer a model prompt on TTY, even when a model is already in config.
-  // The user can confirm the existing choice (press Enter) or switch to a
-  // different model. Suppressed only when --model= was given — the flag value
-  // is used directly without re-prompting.
+  // Always offer provider + model prompts on TTY so the user can confirm or
+  // switch. Suppressed by the respective flag (--provider= / --model=).
+  if (result.provider && isTTY && !flags.provider) {
+    result.needsProviderPrompt = true;
+  }
   if (result.provider && isTTY && !flags.model) {
     result.needsModelPrompt = true;
   }
@@ -162,13 +163,14 @@ export function resolveInitLLMSelection({ flags, existingConfig, isTTY }) {
  * a provider prompt is needed (i.e. isTTY is true). The non-TTY safety
  * fallback returns undefined, which the caller treats as cancellation.
  *
+ * @param {string} [existingProvider]  Currently configured provider — pre-selected as default.
  * @returns {Promise<string|undefined>}  Selected provider or undefined on cancel.
  */
-async function defaultPromptProvider() {
+async function defaultPromptProvider(existingProvider) {
   if (!isInteractiveTerminal()) {
     // Non-TTY environments should not reach here (resolveInitLLMSelection
     // sets needsProviderPrompt=false when isTTY is false). Safety fallback.
-    return undefined;
+    return existingProvider ?? undefined;
   }
 
   try {
@@ -180,11 +182,16 @@ async function defaultPromptProvider() {
       message: PROVIDER_LABELS[p] || p,
     }));
 
+    const initialIndex = existingProvider
+      ? SUPPORTED_PROVIDERS.indexOf(existingProvider)
+      : 0;
+
     const response = await enquirer.prompt({
       type: "select",
       name: "provider",
       message: "Select LLM provider",
       choices,
+      initial: initialIndex >= 0 ? initialIndex : 0,
     });
 
     return response.provider || undefined;
@@ -340,11 +347,19 @@ export async function promptLLMSelection(resolution, options = {}) {
 
   if (needsProviderPrompt) {
     const promptFn = options.promptProvider ?? defaultPromptProvider;
-    const selected = await promptFn();
+    const selected = await promptFn(provider);  // pass existing for pre-selection
     if (selected) {
+      if (selected !== provider) {
+        // Vendor changed — old model belongs to the old vendor, reset it so
+        // the model prompt starts fresh for the new vendor.
+        model = undefined;
+        modelSource = undefined;
+      }
       provider = selected;
       providerSource = "prompt";
-    } else {
+    } else if (providerSource !== "config") {
+      // Esc/Ctrl+C with no prior provider → abort.
+      // If provider was already in config, Esc means "keep existing".
       cancelled = true;
     }
   }

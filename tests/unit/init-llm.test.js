@@ -52,8 +52,8 @@ describe("resolveInitLLMSelection", () => {
 
   // ── Existing config skips prompting ──────────────────────────────────────
 
-  describe("existing config: skips provider prompt but re-prompts for model on TTY", () => {
-    it("skips provider prompt but shows model prompt so user can confirm/change", () => {
+  describe("existing config: re-prompts for both provider and model on TTY", () => {
+    it("shows both provider and model prompts so user can confirm/change", () => {
       const result = resolveInitLLMSelection({
         flags: {},
         existingConfig: { vendor: "claude", model: "claude-sonnet-4-6" },
@@ -63,11 +63,11 @@ describe("resolveInitLLMSelection", () => {
       expect(result.providerSource).toBe("config");
       expect(result.model).toBe("claude-sonnet-4-6");
       expect(result.modelSource).toBe("config");
-      expect(result.needsProviderPrompt).toBe(false);
-      expect(result.needsModelPrompt).toBe(true);  // always re-prompt on TTY
+      expect(result.needsProviderPrompt).toBe(true);   // re-prompt on TTY
+      expect(result.needsModelPrompt).toBe(true);      // re-prompt on TTY
     });
 
-    it("skips provider prompt but shows model prompt for codex", () => {
+    it("shows both prompts for codex", () => {
       const result = resolveInitLLMSelection({
         flags: {},
         existingConfig: { vendor: "codex", model: "gpt-5.5" },
@@ -77,8 +77,18 @@ describe("resolveInitLLMSelection", () => {
       expect(result.providerSource).toBe("config");
       expect(result.model).toBe("gpt-5.5");
       expect(result.modelSource).toBe("config");
+      expect(result.needsProviderPrompt).toBe(true);
+      expect(result.needsModelPrompt).toBe(true);
+    });
+
+    it("suppresses provider re-prompt when --provider flag is given", () => {
+      const result = resolveInitLLMSelection({
+        flags: { provider: "codex" },
+        existingConfig: { vendor: "codex", model: "gpt-5.5" },
+        isTTY: true,
+      });
       expect(result.needsProviderPrompt).toBe(false);
-      expect(result.needsModelPrompt).toBe(true);  // always re-prompt on TTY
+      expect(result.needsModelPrompt).toBe(true);   // model still re-prompted
     });
 
     it("suppresses model re-prompt when --model flag is given", () => {
@@ -87,12 +97,21 @@ describe("resolveInitLLMSelection", () => {
         existingConfig: { vendor: "claude", model: "claude-sonnet-4-6" },
         isTTY: true,
       });
-      expect(result.model).toBe("claude-opus-4-20250514");
-      expect(result.modelSource).toBe("flag");
+      expect(result.needsProviderPrompt).toBe(true);   // provider still re-prompted
       expect(result.needsModelPrompt).toBe(false);
     });
 
-    it("skips model re-prompt in non-TTY (existing model used as-is)", () => {
+    it("suppresses both prompts when both flags are given", () => {
+      const result = resolveInitLLMSelection({
+        flags: { provider: "codex", model: "gpt-5.5" },
+        existingConfig: { vendor: "codex", model: "gpt-5.5" },
+        isTTY: true,
+      });
+      expect(result.needsProviderPrompt).toBe(false);
+      expect(result.needsModelPrompt).toBe(false);
+    });
+
+    it("skips all re-prompts in non-TTY (existing values used as-is)", () => {
       const result = resolveInitLLMSelection({
         flags: {},
         existingConfig: { vendor: "codex", model: "gpt-5.5" },
@@ -105,8 +124,8 @@ describe("resolveInitLLMSelection", () => {
 
   // ── Missing model triggers model-only prompt ─────────────────────────────
 
-  describe("missing model triggers model-only prompt when vendor is already set", () => {
-    it("needs model prompt when vendor exists but model is absent", () => {
+  describe("missing model: both provider and model prompts shown on TTY", () => {
+    it("shows both prompts when vendor exists but model is absent", () => {
       const result = resolveInitLLMSelection({
         flags: {},
         existingConfig: { vendor: "claude" },
@@ -115,11 +134,11 @@ describe("resolveInitLLMSelection", () => {
       expect(result.provider).toBe("claude");
       expect(result.providerSource).toBe("config");
       expect(result.model).toBeUndefined();
-      expect(result.needsProviderPrompt).toBe(false);
+      expect(result.needsProviderPrompt).toBe(true);
       expect(result.needsModelPrompt).toBe(true);
     });
 
-    it("needs model prompt when vendor exists but model is undefined", () => {
+    it("shows both prompts when vendor exists but model is undefined", () => {
       const result = resolveInitLLMSelection({
         flags: {},
         existingConfig: { vendor: "codex", model: undefined },
@@ -127,11 +146,11 @@ describe("resolveInitLLMSelection", () => {
       });
       expect(result.provider).toBe("codex");
       expect(result.providerSource).toBe("config");
-      expect(result.needsProviderPrompt).toBe(false);
+      expect(result.needsProviderPrompt).toBe(true);
       expect(result.needsModelPrompt).toBe(true);
     });
 
-    it("does not need model prompt when flag provides model for existing vendor", () => {
+    it("skips model prompt but still shows provider prompt when --model flag is given", () => {
       const result = resolveInitLLMSelection({
         flags: { model: "claude-opus-4-20250514" },
         existingConfig: { vendor: "claude" },
@@ -141,7 +160,7 @@ describe("resolveInitLLMSelection", () => {
       expect(result.providerSource).toBe("config");
       expect(result.model).toBe("claude-opus-4-20250514");
       expect(result.modelSource).toBe("flag");
-      expect(result.needsProviderPrompt).toBe(false);
+      expect(result.needsProviderPrompt).toBe(true);   // --model flag doesn't suppress provider
       expect(result.needsModelPrompt).toBe(false);
     });
   });
@@ -482,6 +501,48 @@ describe("promptLLMSelection", () => {
       expect(result.model).toBeUndefined();
       expect(result.modelSource).toBeUndefined();
       expect(result.cancelled).toBe(true);
+    });
+
+    it("keeps existing provider and does NOT cancel when Esc pressed on provider re-prompt", async () => {
+      const resolution = {
+        provider: "codex",
+        model: "gpt-5.5",
+        providerSource: "config",
+        modelSource: "config",
+        needsProviderPrompt: true,
+        needsModelPrompt: true,
+      };
+      const modelPrompt = vi.fn();
+      const result = await promptLLMSelection(resolution, {
+        promptProvider: async () => undefined,  // simulate Esc
+        promptModel: modelPrompt,
+      });
+      expect(result.cancelled).toBe(false);
+      expect(result.provider).toBe("codex");
+      expect(result.providerSource).toBe("config");
+      // model prompt should still run after provider is kept
+      expect(modelPrompt).toHaveBeenCalled();
+    });
+
+    it("resets model when user switches to a different vendor", async () => {
+      const resolution = {
+        provider: "codex",
+        model: "gpt-5.5",
+        providerSource: "config",
+        modelSource: "config",
+        needsProviderPrompt: true,
+        needsModelPrompt: true,
+      };
+      let receivedModelDefault;
+      await promptLLMSelection(resolution, {
+        promptProvider: async () => "claude",   // switch vendor
+        promptModel: async (provider, existing) => {
+          receivedModelDefault = existing;
+          return "claude-sonnet-5";
+        },
+      });
+      // After switching from codex to claude, old gpt-5.5 model should be cleared
+      expect(receivedModelDefault).toBeUndefined();
     });
 
     it("keeps existing config model and does NOT cancel when Esc pressed on re-prompt", async () => {
@@ -1163,7 +1224,7 @@ describe("google provider", () => {
     expect(recommended.id).toBe("gemini-2.5-pro");
   });
 
-  it("resolveInitLLMSelection carries over existing google config and re-prompts for model on TTY", () => {
+  it("resolveInitLLMSelection re-prompts both provider and model for existing google config on TTY", () => {
     const result = resolveInitLLMSelection({
       flags: {},
       existingConfig: { vendor: "google", model: "gemini-2.5-pro" },
@@ -1172,8 +1233,8 @@ describe("google provider", () => {
     expect(result.provider).toBe("google");
     expect(result.providerSource).toBe("config");
     expect(result.model).toBe("gemini-2.5-pro");
-    expect(result.needsProviderPrompt).toBe(false);
-    expect(result.needsModelPrompt).toBe(true);  // always re-prompt on TTY
+    expect(result.needsProviderPrompt).toBe(true);
+    expect(result.needsModelPrompt).toBe(true);
   });
 
   it("promptLLMSelection works end-to-end for google", async () => {
