@@ -78,6 +78,60 @@ function resolveBaseUrl(localConfig?: LocalConfig): string {
   return `http://${host}:${port}/v1`;
 }
 
+/**
+ * Parse an LM Studio / OpenAI-compat error response body into a readable message.
+ *
+ * LM Studio wraps its errors in `{ error: { message, code, type } }`.
+ * This function extracts the inner message and rewrites known patterns into
+ * actionable guidance (e.g. context-window overflow → "increase Context Length").
+ */
+function parseLmStudioError(status: number, rawBody: string): string {
+  let innerMessage: string | null = null;
+  try {
+    const parsed = JSON.parse(rawBody) as Record<string, unknown>;
+    // LM Studio / OpenAI: { error: { message: "..." } }
+    const errObj = parsed.error;
+    if (errObj && typeof errObj === "object") {
+      const m = (errObj as Record<string, unknown>).message;
+      if (typeof m === "string") innerMessage = m;
+    } else if (typeof parsed.message === "string") {
+      innerMessage = parsed.message;
+    }
+  } catch {
+    // Not JSON — fall through to raw body
+  }
+
+  const msg = innerMessage ?? rawBody;
+
+  // ── Known patterns → actionable messages ────────────────────────────────
+
+  // Context-window overflow: "request (N tokens) exceeds the available context size (M tokens)"
+  const ctxMatch = msg.match(
+    /request \(([\d,]+) tokens?\) exceeds the available context size \(([\d,]+) tokens?\)/i,
+  );
+  if (ctxMatch) {
+    const requested = parseInt(ctxMatch[1].replace(/,/g, ""), 10).toLocaleString();
+    const available  = parseInt(ctxMatch[2].replace(/,/g, ""), 10).toLocaleString();
+    return (
+      `Context window too small — the brief was ${requested} tokens but LM Studio ` +
+      `is configured to ${available} tokens.\n` +
+      `Fix: open LM Studio → select the model → increase "Context Length" to 32 768 or higher.`
+    );
+  }
+
+  // No model loaded
+  if (/no model (is )?loaded|model not found|model.*not.*available/i.test(msg)) {
+    return `No model loaded in LM Studio — open LM Studio and load a model before running ndx work.`;
+  }
+
+  // Generic: prefer the extracted message over the raw JSON blob
+  if (innerMessage) return `Local API error ${status}: ${innerMessage}`;
+
+  // Last resort: truncate raw body so it stays readable
+  const truncated = rawBody.length > 300 ? rawBody.slice(0, 300) + "…" : rawBody;
+  return `Local API error ${status}: ${truncated}`;
+}
+
 /** Classify an HTTP status code into an ErrorReason and throw. */
 function classifyAndThrow(status: number, message: string): never {
   if (status === 401 || status === 403) {
@@ -169,8 +223,8 @@ export function createLocalApiProvider(
           }
 
           if (!response.ok) {
-            const responseBody = await response.text();
-            const message = `Local API error ${response.status}: ${responseBody}`;
+            const rawBody = await response.text();
+            const message = parseLmStudioError(response.status, rawBody);
 
             if (response.status === 401 || response.status === 403) {
               throw new ClaudeClientError(message, "auth", false);
@@ -272,11 +326,8 @@ export function createLocalApiProvider(
       clearTimeout(streamTimer);
 
       if (!response.ok) {
-        const responseBody = await response.text();
-        classifyAndThrow(
-          response.status,
-          `Local API stream error ${response.status}: ${responseBody}`,
-        );
+        const rawBody = await response.text();
+        classifyAndThrow(response.status, parseLmStudioError(response.status, rawBody));
       }
 
       if (!response.body) {

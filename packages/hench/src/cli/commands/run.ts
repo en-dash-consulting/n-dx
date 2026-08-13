@@ -282,10 +282,10 @@ export async function getEpicScopeInfo(
       totalTasks++;
       if (item.status === "completed") {
         completedTasks++;
-      } else if (item.status === "pending" || item.status === "in_progress") {
+      } else if (item.status === "pending" || item.status === "in_progress" || item.status === "failing") {
         actionableTasks++;
       }
-      // deferred and blocked are neither completed nor actionable
+      // deferred and blocked are neither completed nor actionable; failing IS actionable (retry)
     }
   }
 
