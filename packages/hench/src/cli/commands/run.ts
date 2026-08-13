@@ -967,12 +967,10 @@ export async function cmdRun(
   }
 
   // Google and local only support API mode (no CLI binary exists).
-  // Auto-switch to API mode rather than failing — hench.provider defaults to
-  // "cli" but local/google have no binary. Emit a hint so the user knows
-  // what happened and can persist the setting if desired.
+  // Auto-switch silently — ndx config / ndx init persist hench.provider=api
+  // automatically when local or google is selected as the vendor, so this
+  // branch is a safety net for projects configured outside of those flows.
   if ((llmVendor === "google" || llmVendor === "local") && provider === "cli" && !dryRun) {
-    info(`vendor=${llmVendor} requires API mode — auto-switching from cli to api`);
-    info(`To persist: ndx config hench.provider api`);
     provider = "api";
   }
 

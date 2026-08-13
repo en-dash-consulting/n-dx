@@ -1840,6 +1840,25 @@ async function handleSetProjectSection(
   for (const warning of warningMessages) {
     console.log(`  ⚠ ${warning.split("\n").join("\n  ")}`);
   }
+
+  // Cascade: local and google vendors require API mode — no CLI binary exists.
+  // Automatically persist hench.provider=api so `ndx work` never emits the
+  // "vendor=local requires API mode — To persist: ndx config hench.provider api" hint.
+  if (pkg === "llm" && settingPath === "vendor" && (coerced === "local" || coerced === "google")) {
+    const henchConfigPath = join(dir, ".hench", "config.json");
+    try {
+      if (await fileExists(henchConfigPath)) {
+        const henchConfig = await loadJSON(henchConfigPath);
+        if (henchConfig.provider !== "api") {
+          henchConfig.provider = "api";
+          await saveJSON(henchConfigPath, henchConfig);
+          console.log(`  → hench.provider = "api"  (${coerced} vendor requires API mode)`);
+        }
+      }
+    } catch {
+      // Best-effort — don't block the vendor write if hench config is missing or invalid.
+    }
+  }
 }
 
 /** Handle SET mode for a package config (rex, hench). */
