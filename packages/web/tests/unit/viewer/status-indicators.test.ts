@@ -313,7 +313,7 @@ describe("HenchActivityIndicator", () => {
   it("shows 'Not configured' when hench is not configured", () => {
     render(
       h(HenchActivityIndicator, {
-        status: { configured: false, totalRuns: 0 },
+        status: { configured: false, totalRuns: 0, activeRuns: 0, staleRuns: 0 },
         onNavigate,
         tabIndex: 0,
       }),
@@ -326,7 +326,7 @@ describe("HenchActivityIndicator", () => {
   it("shows run count when configured", () => {
     render(
       h(HenchActivityIndicator, {
-        status: { configured: true, totalRuns: 5 },
+        status: { configured: true, totalRuns: 5, activeRuns: 0, staleRuns: 0 },
         onNavigate,
         tabIndex: 0,
       }),
@@ -339,7 +339,7 @@ describe("HenchActivityIndicator", () => {
   it("uses singular 'run' for 1 run", () => {
     render(
       h(HenchActivityIndicator, {
-        status: { configured: true, totalRuns: 1 },
+        status: { configured: true, totalRuns: 1, activeRuns: 0, staleRuns: 0 },
         onNavigate,
         tabIndex: 0,
       }),
@@ -352,7 +352,7 @@ describe("HenchActivityIndicator", () => {
   it("navigates to hench-runs on click", () => {
     render(
       h(HenchActivityIndicator, {
-        status: { configured: true, totalRuns: 3 },
+        status: { configured: true, totalRuns: 3, activeRuns: 0, staleRuns: 0 },
         onNavigate,
         tabIndex: 0,
       }),
@@ -366,7 +366,7 @@ describe("HenchActivityIndicator", () => {
   it("has appropriate aria-label", () => {
     render(
       h(HenchActivityIndicator, {
-        status: { configured: true, totalRuns: 3 },
+        status: { configured: true, totalRuns: 3, activeRuns: 0, staleRuns: 0 },
         onNavigate,
         tabIndex: 0,
       }),

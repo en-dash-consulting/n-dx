@@ -136,15 +136,15 @@ describe("computeBranchStats", () => {
 
 describe("completionRatio", () => {
   it("returns 0 for empty stats", () => {
-    expect(completionRatio({ total: 0, completed: 0, inProgress: 0, pending: 0, deferred: 0, blocked: 0, deleted: 0 })).toBe(0);
+    expect(completionRatio({ total: 0, completed: 0, inProgress: 0, pending: 0, failing: 0, deferred: 0, blocked: 0, deleted: 0 })).toBe(0);
   });
 
   it("returns correct ratio", () => {
-    expect(completionRatio({ total: 10, completed: 3, inProgress: 2, pending: 5, deferred: 0, blocked: 0, deleted: 0 })).toBeCloseTo(0.3);
+    expect(completionRatio({ total: 10, completed: 3, inProgress: 2, pending: 5, failing: 0, deferred: 0, blocked: 0, deleted: 0 })).toBeCloseTo(0.3);
   });
 
   it("returns 1 when all completed", () => {
-    expect(completionRatio({ total: 5, completed: 5, inProgress: 0, pending: 0, deferred: 0, blocked: 0, deleted: 0 })).toBe(1);
+    expect(completionRatio({ total: 5, completed: 5, inProgress: 0, pending: 0, failing: 0, deferred: 0, blocked: 0, deleted: 0 })).toBe(1);
   });
 });
 
