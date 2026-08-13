@@ -65,6 +65,7 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   "hench-config":        { product: "global",       label: "ndx work",           productLabel: "Settings" },
   "hench-templates":     { product: "hench",        label: "Templates",          productLabel: "Hench" },
   "hench-optimization":  { product: "hench",        label: "Optimization",       productLabel: "Hench" },
+  "hench-adaptive":      { product: "hench",        label: "Adaptive",           productLabel: "Hench" },
   "feature-toggles":     { product: "global",       label: "Feature Flags",      productLabel: "Settings" },
   "cli-timeouts":        { product: "global",       label: "CLI Timeouts",       productLabel: "Settings" },
   "commands":            { product: "global",       label: "ndx export / refresh", productLabel: "Settings" },

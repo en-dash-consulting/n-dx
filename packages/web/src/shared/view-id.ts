@@ -28,6 +28,7 @@ export type ViewId =
   | "hench-config"
   | "hench-templates"
   | "hench-optimization"
+  | "hench-adaptive"
   | "feature-toggles"
   | "cli-timeouts"
   | "commands"

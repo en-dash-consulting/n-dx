@@ -36,6 +36,7 @@ export const HENCH_SCOPE_VIEWS: readonly ViewId[] = [
   "hench-config",
   "hench-templates",
   "hench-optimization",
+  "hench-adaptive",
 ];
 
 export const CROSS_CUTTING_VIEWS: readonly ViewId[] = [

@@ -84,6 +84,7 @@ const VIEW_TITLE_MAP: Partial<Record<import("./types.js").ViewId, string>> = {
   "hench-config": "ndx work",
   "hench-templates": "Templates",
   "hench-optimization": "Optimization",
+  "hench-adaptive": "Adaptive",
   "feature-toggles": "Feature Flags",
   "cli-timeouts": "CLI Timeouts",
   commands: "ndx export / refresh",

@@ -405,3 +405,45 @@
   padding: 2px 0;
   font-family: var(--mono);
 }
+
+/* ── Adaptive optimization view ────────────────────────────────────── */
+
+.adaptive-container section {
+  margin-top: var(--space-4);
+}
+
+.adaptive-rationale {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  margin: var(--space-2) 0;
+}
+
+.adaptive-change code {
+  padding: 1px 4px;
+}
+
+.adaptive-key-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+
+.adaptive-key-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px 0;
+}
+
+.adaptive-priority-high { color: var(--red); }
+.adaptive-priority-medium { color: var(--yellow); }
+.adaptive-priority-low { color: var(--text-muted); }
+
+.adaptive-decision-applied { color: var(--green); }
+.adaptive-decision-dismissed { color: var(--text-muted); }
+.adaptive-decision-overridden { color: var(--purple); }
+
+.cmd-btn-small {
+  font-size: var(--font-sm);
+  padding: 2px 8px;
+}

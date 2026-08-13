@@ -80,6 +80,12 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     lookFor: "Pending proposals awaiting review. Analysis history events showing what recent runs produced. Duplicate proposals that should be rejected rather than accepted.",
     actions: "Use Smart Add to draft items from a description. Run a project scan to generate proposals, then accept or reject each one. Batch-import a spec file to seed the PRD.",
   },
+  "hench-adaptive": {
+    title: "Adaptive Optimization",
+    description: "Monitors run history and proposes workflow-parameter adjustments (turn limits, token budgets, retry settings) as the project evolves. Adjustments can be applied, dismissed, or auto-applied when adaptive mode is on.",
+    lookFor: "High-priority adjustments with strong rationale. Trends moving the wrong way (falling success rate, rising token usage). Config keys you never want auto-tuned.",
+    actions: "Apply or dismiss each recommendation. Lock keys you manage manually. Enable adaptive mode to auto-apply safe adjustments; review the history to audit past changes.",
+  },
   "command-reference": {
     title: "All Commands",
     description: "Server-driven reference of every CLI command for this project, grouped by workflow stage, with the project's resolved CLI name and per-command availability.",

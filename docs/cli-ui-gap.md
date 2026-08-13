@@ -158,7 +158,7 @@ Roughly 2,900 lines of built view code were unreachable; both views are now regi
 
 | API surface | Size | Note |
 |-------------|------|------|
-| `/api/hench/adaptive/*` (`routes-adaptive.ts`) | 873 lines, 10 endpoints | Zero occurrences of "adaptive" in `src/viewer/` — an entire feature with no page |
+| ~~`/api/hench/adaptive/*`~~ | 873 lines, 10 endpoints | **Done 2026-08-13**: Adaptive Optimization view (HENCH → Adaptive) consumes all 10 endpoints |
 | `/api/rex/requirements/*` | 575 lines | Requirements CRUD/coverage/traceability; feeds `rex verify` / `verify_criteria` gap |
 | `/api/sv/*` (all except `pr-markdown`) | 8 endpoints | Viewer reads `/data/*.json` directly; these serve external/MCP consumers — **document as external API, not a UI gap** |
 | `/api/token/{summary,events,by-command,by-period,budget}` | 5 endpoints | Token Usage view uses only `utilization` |
@@ -183,7 +183,7 @@ The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, P
 ### Tier 2 — medium impact
 
 5. **Requirements / traceability page** — consume the existing 575-line requirements API; closes `rex verify` + `verify_criteria`.
-6. **Adaptive-optimization page** — consume `routes-adaptive.ts`; an entire shipped feature is currently invisible.
+6. ~~**Adaptive-optimization page**~~ — **done 2026-08-13** (HENCH → Adaptive view: metrics, apply/dismiss/lock, settings, overrides, history).
 7. **`rex fix` action** — "Fix issues" button in the Validation view → new POST `/api/rex/fix`.
 8. **`rex reshape` flow** — reshape trigger with diff preview + confirm.
 9. **`ndx ci` trigger** — "Run CI check" → structured results panel.

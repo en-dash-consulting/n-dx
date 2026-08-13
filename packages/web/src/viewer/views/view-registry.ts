@@ -46,6 +46,7 @@ import {
   HenchRunsView,
   HenchConfigView,
   HenchTemplatesView,
+  AdaptiveOptimizationView,
 } from "./domain-hench.js";
 
 import {
@@ -146,6 +147,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "hench-optimization": () =>
     h(WorkflowOptimizationView, null),
+
+  "hench-adaptive": () =>
+    h(AdaptiveOptimizationView, null),
 
   "feature-toggles": () =>
     h(FeatureTogglesView, null),
