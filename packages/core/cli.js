@@ -1085,7 +1085,9 @@ async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, qui
   const providerSource = PROVIDER_SOURCE_LABELS[selection.providerSource] ?? "selected";
   const modelSource = MODEL_SOURCE_LABELS[selection.modelSource] ?? "";
 
-  return { selectedProvider, selection, llmSkipped, providerSource, modelSource };
+  // providerSourceKey is the raw resolver value ("flag" | "config" | "prompt").
+  // providerSource is the display label ("from existing config", etc.) for the summary.
+  return { selectedProvider, selection, llmSkipped, providerSource, modelSource, providerSourceKey: selection.providerSource };
 }
 
 /**
@@ -1133,12 +1135,18 @@ async function runSubInitPhase(name, work, detail, quiet) {
  *   selectedModel: string|undefined, claudeModelFromFlag: string|undefined,
  *   codexModelFromFlag: string|undefined, googleModelFromFlag: string|undefined }} opts
  */
-async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag }) {
+async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerSource }) {
   if (!llmSkipped && selectedProvider) {
     const origLog = console.log;
     console.log = () => {};
     try {
-      await runConfig(["llm.vendor", selectedProvider, dir, "--soft-preflight"]);
+      // Skip the vendor write (and its auth preflight) when the provider
+      // comes from existing config — it's already persisted and re-running
+      // the preflight on every `ndx init` produces noisy auth warnings for
+      // vendors the user hasn't configured yet (e.g. codex without login).
+      if (providerSource !== "config") {
+        await runConfig(["llm.vendor", selectedProvider, dir, "--soft-preflight"]);
+      }
       if (selectedModel) {
         await runConfig([`llm.${selectedProvider}.model`, selectedModel, dir]);
       }
@@ -1252,7 +1260,7 @@ async function handleInit(rest) {
   const llmResult = await selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, {
     providerFromFlag, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag,
   });
-  const { selectedProvider, selection, llmSkipped, providerSource, modelSource } = llmResult;
+  const { selectedProvider, selection, llmSkipped, providerSource, modelSource, providerSourceKey } = llmResult;
 
   // When no provider is available and it wasn't a user cancellation (e.g.
   // non-TTY with no flags or config), exit with a clear message.
@@ -1282,6 +1290,7 @@ async function handleInit(rest) {
         flags,
         provider: selectedProvider,
         providerSource,
+        providerSourceKey,
         model: selection.model,
         modelSource,
         assistantEnabled,
@@ -1329,6 +1338,7 @@ async function handleInit(rest) {
   await persistInitLLMConfig(dir, {
     llmSkipped, selectedProvider, selectedModel: selection.model,
     claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag,
+    providerSource: providerSourceKey,  // raw key ("flag"|"config"|"prompt"), not display label
   });
 
   try {
