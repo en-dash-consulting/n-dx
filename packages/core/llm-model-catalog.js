@@ -48,6 +48,11 @@ export const LLM_MODEL_CATALOG = {
     { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", recommended: false },
     { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", recommended: false },
   ],
+  // Local models use whatever is loaded in LM Studio — no static catalog.
+  // The empty string is a sentinel meaning "use whichever model is active".
+  local: [
+    { id: "", label: "Use currently loaded model (LM Studio default)", recommended: true },
+  ],
 };
 
 /**

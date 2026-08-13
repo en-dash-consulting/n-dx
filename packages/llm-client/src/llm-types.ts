@@ -52,6 +52,21 @@ export interface CodexConfig {
   lightModel?: string;
 }
 
+/** Optional local model config section in `.n-dx.json` (e.g. LM Studio). */
+export interface LocalConfig {
+  /** Host for the local server. Defaults to `"localhost"`. */
+  host?: string;
+  /** Port for the local server. Defaults to `1234` (LM Studio default). */
+  port?: number;
+  /** Default model for local requests. When unset, the server uses whichever model is currently loaded. */
+  model?: string;
+  /**
+   * Model override for the 'light' task weight tier.
+   * When set, resolveVendorModel uses this model for light-weight tasks.
+   */
+  lightModel?: string;
+}
+
 /** Optional Google Gemini-specific config section in `.n-dx.json`. */
 export interface GoogleConfig {
   /** Google API key (from Google AI Studio or GCP). */
@@ -91,6 +106,8 @@ export interface LLMConfig {
   codex?: CodexConfig;
   /** Google Gemini-specific config. */
   google?: GoogleConfig;
+  /** Local model config (LM Studio or other OpenAI-compatible local servers). */
+  local?: LocalConfig;
   /**
    * Enable automatic failover on model/vendor errors.
    * When true, hench retries failed runs on fallback models before surfacing errors.

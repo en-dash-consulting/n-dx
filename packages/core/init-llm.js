@@ -20,7 +20,7 @@
 
 import { getModelsForVendor, getRecommendedModel } from "./llm-model-catalog.js";
 
-const SUPPORTED_PROVIDERS = ["codex", "claude", "google"];
+const SUPPORTED_PROVIDERS = ["codex", "claude", "google", "local"];
 
 /**
  * Legacy model IDs treated as "known" during init so `validateInitFlags` does
@@ -35,6 +35,7 @@ const LEGACY_CATALOG_MODEL_ALIASES = {
   codex: ["gpt-5-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"],
   claude: ["claude-sonnet-4-6"],
   google: [],
+  local: [],
 };
 
 /**
@@ -47,6 +48,7 @@ const PROVIDER_LABELS = {
   codex: "Codex (OpenAI)",
   claude: "Claude (Anthropic)",
   google: "Gemini (Google)",
+  local: "Local (LM Studio)",
 };
 
 /**
@@ -293,7 +295,9 @@ export async function promptLLMSelection(resolution, options = {}) {
     }
   }
 
-  if (needsModelPrompt && provider) {
+  // Local vendor: model is optional — LM Studio uses whatever is loaded.
+  // Skip prompting and leave model unset (no llm.local.model written to config).
+  if (needsModelPrompt && provider && provider !== "local") {
     const promptFn = options.promptModel ?? defaultPromptModel;
     const selected = await promptFn(provider);
     if (selected) {

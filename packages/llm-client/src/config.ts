@@ -36,6 +36,8 @@ export const NEWEST_MODELS: Record<LLMVendor, string> = {
   claude: "claude-sonnet-5",
   codex: "gpt-5.5",
   google: "gemini-2.5-pro",
+  // Local (LM Studio): no canonical model — depends on whatever is loaded.
+  local: "",
 };
 
 /**
@@ -78,6 +80,8 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
     heavy: NEWEST_MODELS.codex, // no ultra-codex tier yet — same as standard
   },
   google: GOOGLE_MODELS,
+  // Local: no catalog — model is whatever LM Studio has loaded.
+  local: { light: "", standard: "", heavy: "" },
 };
 
 /**
@@ -116,6 +120,10 @@ export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
   // Gemini models have 1M+ token context windows; cap conservatively to
   // leave room for system prompt, tool definitions, and model overhead.
   google: 800_000,
+  // Local (LM Studio): conservative default — actual limit depends on the
+  // loaded model. Users running large context models can set a higher cap
+  // via llm.local.model config if needed.
+  local: 128_000,
 };
 
 /**
@@ -288,6 +296,17 @@ export function resolveVendorModel(
     }
     return TIER_MODELS.google.standard;
   }
+  if (vendor === "local") {
+    // Light tier: prefer lightModel, then fall back to model, then "".
+    if (weight === "light" && config?.local?.lightModel) {
+      return config.local.lightModel;
+    }
+    // Standard/heavy: prefer top-level model > llm.local.model > "" (use whatever is loaded).
+    if (config?.model) return config.model;
+    if (config?.local?.model) return config.local.model;
+    return ""; // LM Studio uses whichever model is currently loaded
+  }
+
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).
   return (NEWEST_MODELS as Record<string, string>)[vendor] ?? "";

@@ -115,6 +115,7 @@ export type {
   LLMVendor,
   CodexConfig,
   GoogleConfig,
+  LocalConfig,
   LLMConfig,
   LLMClient,
   TaskWeight,
@@ -218,6 +219,11 @@ export {
   parseGeminiTokenUsage,
   validateGeminiModelId,
 } from "./google-api-provider.js";
+
+export {
+  createLocalApiProvider,
+} from "./local-api-provider.js";
+export type { LocalApiProviderOptions } from "./local-api-provider.js";
 export type {
   GoogleApiProviderOptions,
   GeminiContent,

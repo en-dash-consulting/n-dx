@@ -404,7 +404,9 @@ export function classifyLLMError(
       ? "Check Codex CLI login (codex login) and your network connection, then try again."
       : vendor === "google"
         ? "Check your Google API key (GEMINI_API_KEY) and network connection, then retry."
-        : "Check your API key and network connection, then try again.";
+        : vendor === "local"
+          ? "Check that your local LLM server (LM Studio) is running at the configured host/port."
+          : "Check your API key and network connection, then try again.";
   return {
     message: `Failed to ${label}: ${err.message}${suffix}`,
     suggestion: authHint,

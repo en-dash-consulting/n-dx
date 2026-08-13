@@ -43,6 +43,7 @@ import { createClient } from "./create-client.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
 import { createOpenAiApiProvider, resolveOpenAiApiKey } from "./openai-api-provider.js";
 import { createGoogleApiProvider, resolveGoogleApiKey } from "./google-api-provider.js";
+import { createLocalApiProvider } from "./local-api-provider.js";
 
 // ── Factory type ──────────────────────────────────────────────────────────
 
@@ -205,6 +206,11 @@ export function createDefaultRegistry(): ProviderRegistry {
   // Google: API provider using the Gemini REST API.
   registry.register("google", (config) => {
     return createGoogleApiProvider({ googleConfig: config.google });
+  });
+
+  // Local: OpenAI-compatible provider for LM Studio and similar local servers.
+  registry.register("local", (config) => {
+    return createLocalApiProvider({ localConfig: config.local });
   });
 
   return registry;
