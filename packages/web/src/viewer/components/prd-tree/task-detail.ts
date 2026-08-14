@@ -56,6 +56,7 @@ const STATUS_OPTIONS: Array<{ value: ItemStatus; label: string; icon: string }> 
   { value: "failing", label: "Failing", icon: "⚠" },
   { value: "blocked", label: "Blocked", icon: "⊘" },
   { value: "deferred", label: "Deferred", icon: "◌" },
+  { value: "cancelled", label: "Cancelled", icon: "⊗" },
   { value: "deleted", label: "Deleted", icon: "✕" },
 ];
 
@@ -1227,6 +1228,25 @@ function ExecuteTaskButton({
             resultMessage.startsWith("Execution completed") ? " success" : " error"
           }`,
         }, resultMessage)
+      : null,
+
+    // Stop button (shown while execution is active)
+    isActive
+      ? h("button", {
+          class: "task-execute-stop-btn",
+          title: "Cancel this execution",
+          "aria-label": "Stop execution",
+          onClick: async () => {
+            try {
+              await fetch(`/api/hench/execute/${item.id}/terminate`, { method: "POST" });
+            } catch {
+              // ignore \u2014 server will clean up
+            }
+          },
+        },
+          h("span", null, "\u23f9"),
+          " Stop",
+        )
       : null,
 
     // Live progress indicator (shown during execution)

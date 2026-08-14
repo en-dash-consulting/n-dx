@@ -116,6 +116,7 @@ export type {
   CodexConfig,
   GoogleConfig,
   LocalConfig,
+  LocalVerifierConfig,
   LLMConfig,
   LLMClient,
   TaskWeight,

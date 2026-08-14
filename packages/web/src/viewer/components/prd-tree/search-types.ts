@@ -12,6 +12,7 @@ export type SearchItemStatus =
   | "failing"
   | "blocked"
   | "deferred"
+  | "cancelled"
   | "deleted";
 
 export interface SearchablePRDItem {

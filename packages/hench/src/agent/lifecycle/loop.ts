@@ -785,6 +785,81 @@ async function executeLocalToolCalls(
   return results;
 }
 
+// ---------------------------------------------------------------------------
+// Verifier
+// ---------------------------------------------------------------------------
+
+/**
+ * Call a second local model and ask it to review the primary model's solution.
+ *
+ * Returns `{ verdict: "PASS" | "FAIL", reasoning: string }`.
+ * Any network or parse error yields PASS so the run continues normally —
+ * a verifier failure should never block task completion.
+ */
+async function callVerifier(
+  cfg: { host?: string; port?: number; model?: string },
+  briefText: string,
+  primaryFinalMessage: string,
+): Promise<{ verdict: "PASS" | "FAIL"; reasoning: string }> {
+  const host = typeof cfg.host === "string" && cfg.host ? cfg.host : "localhost";
+  const port = typeof cfg.port === "number" && cfg.port > 0 ? cfg.port : 1235;
+  const model = typeof cfg.model === "string" ? cfg.model : "";
+  const baseUrl = `http://${host}:${port}/v1`;
+
+  const systemContent =
+    "You are an independent code reviewer. Your only job is to verify whether a proposed " +
+    "solution correctly and completely addresses the task requirements. Be concise and objective. " +
+    "On the FIRST line of your response write exactly PASS or FAIL (uppercase only, nothing else). " +
+    "Then explain your reasoning on subsequent lines.";
+
+  const userContent =
+    `## Task Requirements\n\n${briefText}\n\n` +
+    `## Agent Solution Summary\n\n${primaryFinalMessage}\n\n` +
+    "Does this solution correctly and completely satisfy the task requirements and acceptance criteria? " +
+    "First line: PASS or FAIL. Then explain.";
+
+  try {
+    const reqBody: Record<string, unknown> = {
+      messages: [
+        { role: "system", content: systemContent },
+        { role: "user", content: userContent },
+      ],
+      max_tokens: 1024,
+      temperature: 0.1,
+    };
+    if (model) reqBody["model"] = model;
+
+    const resp = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reqBody),
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      detail(`[Verifier] Endpoint error ${resp.status}: ${parseLmStudioError(resp.status, body)} — skipping`);
+      return { verdict: "PASS", reasoning: "(Verification skipped — verifier endpoint error)" };
+    }
+
+    const data = await resp.json() as Record<string, unknown>;
+    const choices = (data["choices"] as Array<Record<string, unknown>> | undefined) ?? [];
+    const msg = (choices[0]?.["message"] as Record<string, unknown> | undefined) ?? {};
+    const content = typeof msg["content"] === "string" ? msg["content"] : "";
+
+    // Verdict is on the first non-blank line
+    const firstLine = content.trim().split(/\r?\n/)[0].trim().toUpperCase();
+    const verdict: "PASS" | "FAIL" = firstLine.startsWith("PASS") ? "PASS" : "FAIL";
+
+    return { verdict, reasoning: content.trim() };
+  } catch (err) {
+    detail(`[Verifier] Could not reach ${baseUrl}: ${(err as Error).message} — skipping`);
+    return { verdict: "PASS", reasoning: "(Verification skipped — verifier unreachable)" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+
 /**
  * Local (OpenAI-compatible) agentic tool-use loop.
  *
@@ -832,6 +907,15 @@ async function runLocalToolLoop(params: {
   const maxContextTokens = typeof localCfg?.["maxContextTokens"] === "number"
     ? (localCfg["maxContextTokens"] as number)
     : undefined;
+
+  // Verifier config — second model that reviews the primary's completed solution.
+  const verifierRaw = localCfg?.["verifier"];
+  const verifierCfg = (verifierRaw && typeof verifierRaw === "object")
+    ? verifierRaw as Record<string, unknown>
+    : undefined;
+  const maxVerifierCycles = typeof verifierCfg?.["maxCycles"] === "number"
+    ? (verifierCfg["maxCycles"] as number) : 2;
+  let verifierCycleCount = 0;
 
   // Compile OpenAI-format tool definitions once
   const openAiTools = toOpenAiToolDefs([...TOOL_DEFINITIONS_NEUTRAL]);
@@ -983,8 +1067,36 @@ async function runLocalToolLoop(params: {
         stream(formatModelLabel(model), assistantContent);
       }
 
-      // No tool calls → model is done
+      // No tool calls → model is done; run verifier if configured
       if (rawToolCalls.length === 0 || finishReason === "stop" || finishReason === "end_turn") {
+        if (verifierCfg && verifierCycleCount < maxVerifierCycles) {
+          const vHost = typeof verifierCfg["host"] === "string" && verifierCfg["host"]
+            ? verifierCfg["host"] : "localhost";
+          const vPort = typeof verifierCfg["port"] === "number" && (verifierCfg["port"] as number) > 0
+            ? verifierCfg["port"] as number : 1235;
+          section(`Verifier Review (cycle ${verifierCycleCount + 1}/${maxVerifierCycles})`);
+          detail(`[Verifier] Querying ${vHost}:${vPort} …`);
+          const { verdict, reasoning } = await callVerifier(
+            verifierCfg as { host?: string; port?: number; model?: string },
+            briefText,
+            assistantContent ?? "(no summary provided)",
+          );
+          verifierCycleCount++;
+          stream("Verifier", reasoning);
+          if (verdict === "FAIL") {
+            stream("Verifier", "✗ FAIL — requesting revision from primary model");
+            messages.push({
+              role: "user",
+              content:
+                `An independent reviewer checked your solution and flagged issues:\n\n${reasoning}\n\n` +
+                "Please address the issues above and re-submit your completed solution.",
+            });
+            run.lastActivityAt = new Date().toISOString();
+            await saveRun(henchDir, run);
+            continue; // next turn — primary model gets the feedback
+          }
+          stream("Verifier", "✓ PASS — solution accepted");
+        }
         run.status = "completed";
         run.summary = assistantContent?.slice(0, MAX_SUMMARY_LENGTH) ?? undefined;
         break;

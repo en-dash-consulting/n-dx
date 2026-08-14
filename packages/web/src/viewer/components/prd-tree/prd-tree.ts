@@ -51,6 +51,7 @@ const STATUS_CONFIG: Record<
   failing: { icon: "⚠", cssClass: "prd-status-failing", label: "Failing" },
   deferred: { icon: "◌", cssClass: "prd-status-deferred", label: "Deferred" },
   blocked: { icon: "⊘", cssClass: "prd-status-blocked", label: "Blocked" },
+  cancelled: { icon: "⊗", cssClass: "prd-status-cancelled", label: "Cancelled" },
   deleted: { icon: "✕", cssClass: "prd-status-deleted", label: "Deleted" },
 };
 
