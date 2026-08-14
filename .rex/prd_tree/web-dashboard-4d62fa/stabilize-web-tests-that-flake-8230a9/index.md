@@ -2,9 +2,11 @@
 id: "8230a96e-0108-494d-879b-4a76f7ee4360"
 level: "feature"
 title: "Stabilize web tests that flake under parallel suite load"
-status: "in_progress"
+status: "completed"
 priority: "high"
 startedAt: "2026-08-13T14:43:40.395Z"
+completedAt: "2026-08-14T16:15:04.012Z"
+endedAt: "2026-08-14T16:15:04.012Z"
 acceptanceCriteria:
   - "Ten consecutive full-suite runs pass with no rotating failures"
   - "Each identified flaky test is made deterministic (no timing ratios or shared module state) or explicitly isolated"
@@ -16,4 +18,4 @@ description: "Four distinct web tests have each failed exactly once during full-
 
 | Title | Status |
 |-------|--------|
-| [Typecheck test files in the web package](./typecheck-test-files-in-the-web-package.md) | pending |
+| [Typecheck test files in the web package](./typecheck-test-files-in-the-web-package.md) | completed |

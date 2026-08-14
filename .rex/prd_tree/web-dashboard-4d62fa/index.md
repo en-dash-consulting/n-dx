@@ -26,7 +26,7 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [Runtime Process and Thread Lifecycle Enforcement](./runtime-process-and-thread-8abe3c/index.md) | completed |
 | [Settings Page Completeness and Command-Based Reorganization](./settings-page-completeness-and-dc5e66/index.md) | completed |
 | [SourceVision section runs the full analysis flow with all tabs and recommendations visible](./sourcevision-section-runs-the-a83b1a/index.md) | completed |
-| [Stabilize web tests that flake under parallel suite load](./stabilize-web-tests-that-flake-8230a9/index.md) | in_progress |
+| [Stabilize web tests that flake under parallel suite load](./stabilize-web-tests-that-flake-8230a9/index.md) | completed |
 | [Surface all new functions as dashboard pages/sections](./surface-all-new-functions-as-d7f5ba/index.md) | pending |
 | [Surface per-file cross-zone connections in the expandable Zones graph](./surface-per-file-cross-zone-7da574/index.md) | completed |
 | [Transparent task selection and completion reasoning](./transparent-task-selection-and-cb54ce/index.md) | completed |
