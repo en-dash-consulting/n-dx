@@ -14,7 +14,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs } from "../../prd/llm-gateway.js";
+import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -828,6 +828,10 @@ async function runLocalToolLoop(params: {
   const port = typeof localCfg?.["port"] === "number" && localCfg["port"] > 0
     ? localCfg["port"] : 1234;
   const baseUrl = `http://${host}:${port}/v1`;
+  // Read the optional maxContextTokens limit from config (set via ndx config llm.local.maxContextTokens=N).
+  const maxContextTokens = typeof localCfg?.["maxContextTokens"] === "number"
+    ? (localCfg["maxContextTokens"] as number)
+    : undefined;
 
   // Compile OpenAI-format tool definitions once
   const openAiTools = toOpenAiToolDefs([...TOOL_DEFINITIONS_NEUTRAL]);
@@ -868,6 +872,25 @@ async function runLocalToolLoop(params: {
     messages.push({ role: "system", content: systemPrompt });
   }
   messages.push({ role: "user", content: briefText });
+
+  // Pre-send token check: if maxContextTokens is configured, estimate whether the initial
+  // brief fits before the first request. A rough heuristic (1 token ≈ 3.5 chars) is used
+  // — exact tokenization requires the model's tokenizer. Fails fast with actionable guidance.
+  if (maxContextTokens) {
+    const estimatedTokens = Math.ceil(
+      messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0) / 3.5,
+    );
+    if (estimatedTokens > maxContextTokens) {
+      const est = estimatedTokens.toLocaleString();
+      const limit = maxContextTokens.toLocaleString();
+      throw new Error(
+        `Brief too large for configured context window: ~${est} estimated tokens ` +
+        `vs llm.local.maxContextTokens=${limit}.\n` +
+        `Fix: increase "Context Length" in LM Studio to at least 32 768, then update ` +
+        `'n-dx config llm.local.maxContextTokens 32768'.`,
+      );
+    }
+  }
 
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
@@ -917,7 +940,7 @@ async function runLocalToolLoop(params: {
 
       if (!response.ok) {
         const body = await response.text().catch(() => "");
-        throw new Error(`Local server HTTP ${response.status}: ${body.slice(0, 200)}`);
+        throw new Error(parseLmStudioError(response.status, body));
       }
 
       const data = await response.json() as Record<string, unknown>;

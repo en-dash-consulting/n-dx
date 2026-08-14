@@ -222,6 +222,7 @@ export {
 
 export {
   createLocalApiProvider,
+  parseLmStudioError,
 } from "./local-api-provider.js";
 export type { LocalApiProviderOptions } from "./local-api-provider.js";
 export type {
