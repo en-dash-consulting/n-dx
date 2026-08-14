@@ -24,6 +24,7 @@ import {
 } from "../components/index.js";
 import { CollapsibleSection } from "../components/data-display/collapsible-section.js";
 import type { ActiveRun } from "../components/index.js";
+import { useCliName } from "../hooks/index.js";
 import { usePolling } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { fmtDuration } from "../utils/format.js";
@@ -728,6 +729,7 @@ export interface HenchRunsViewProps {
 }
 
 export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps = {}) {
+  const cliName = useCliName();
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1019,7 +1021,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
       h("div", { class: "hench-empty" },
         h("div", { class: "hench-empty-icon" }, "▶"),
         h("p", null, "No runs yet."),
-        h("p", { class: "hench-empty-hint" }, "Run ", h("code", null, "ndx work"), " to start executing tasks."),
+        h("p", { class: "hench-empty-hint" }, "Run ", h("code", null, `${cliName} work`), " to start executing tasks."),
       ),
     );
   }

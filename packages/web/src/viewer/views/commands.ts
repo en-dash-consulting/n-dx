@@ -8,6 +8,7 @@
 import { h, Fragment } from "preact";
 import { useState, useCallback, useEffect } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
+import { useCliName } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -16,6 +17,7 @@ type OpState = "idle" | "running" | "done" | "error";
 // ── Export Panel ─────────────────────────────────────────────────────
 
 function ExportPanel() {
+  const cliName = useCliName();
   const [state, setState] = useState<OpState>("idle");
   const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +53,7 @@ function ExportPanel() {
     h("div", { class: "cmd-panel-header" },
       h("h3", { class: "cmd-panel-title" }, "\u{1F4E4} Export Dashboard"),
       h("p", { class: "cmd-panel-desc" },
-        "Generate a static, deployable version of this dashboard. Equivalent to ", h("code", null, "ndx export"), "."
+        "Generate a static, deployable version of this dashboard. Equivalent to ", h("code", null, `${cliName} export`), "."
       ),
     ),
 
@@ -129,6 +131,7 @@ function parseSelfHealProgress(output: string): { iteration: string | null; phas
 }
 
 export function SelfHealPanel() {
+  const cliName = useCliName();
   const [state, setState] = useState<OpState>("idle");
   const [confirmed, setConfirmed] = useState(false);
   const [iterations, setIterations] = useState(3);
@@ -222,7 +225,7 @@ export function SelfHealPanel() {
         h("p", { class: "cmd-panel-desc" },
           "Run an iterative improvement loop: analyze \u2192 recommend \u2192 execute. " +
           "This is a long-running operation that will make changes to your PRD. " +
-          "Equivalent to ", h("code", null, "ndx self-heal [N]"), "."
+          "Equivalent to ", h("code", null, `${cliName} self-heal [N]`), "."
         ),
       ),
 
@@ -361,6 +364,7 @@ interface RefreshStatusData {
 }
 
 export function RefreshPanel() {
+  const cliName = useCliName();
   const [state, setState] = useState<OpState>("idle");
   const [fast, setFast] = useState(false);
   const [statusData, setStatusData] = useState<RefreshStatusData | null>(null);
@@ -428,7 +432,7 @@ export function RefreshPanel() {
       h("h3", { class: "cmd-panel-title" }, "\u{1F504} Refresh Data"),
       h("p", { class: "cmd-panel-desc" },
         "Re-run SourceVision analysis and regenerate dashboard data without restarting the server. Equivalent to ",
-        h("code", null, "ndx refresh --data-only"), ".",
+        h("code", null, `${cliName} refresh --data-only`), ".",
       ),
     ),
 

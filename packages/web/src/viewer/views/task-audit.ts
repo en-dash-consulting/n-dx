@@ -13,6 +13,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { BrandedHeader, RexTaskLink, ElapsedTime } from "../components/index.js";
+import { useCliName } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -424,6 +425,7 @@ export interface TaskAuditViewProps {
 }
 
 export function TaskAuditView({ navigateTo }: TaskAuditViewProps = {}) {
+  const cliName = useCliName();
   const [data, setData] = useState<AuditData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -601,7 +603,7 @@ export function TaskAuditView({ navigateTo }: TaskAuditViewProps = {}) {
             h("p", null, "No active tasks."),
             h("p", { class: "audit-empty-hint" },
               "Tasks will appear here when running via ",
-              h("code", null, "ndx work"),
+              h("code", null, `${cliName} work`),
               " or the dashboard.",
             ),
           )

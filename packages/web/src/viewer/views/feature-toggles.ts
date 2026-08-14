@@ -12,6 +12,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { NdxLogoPng } from "../components/index.js";
+import { useCliName, resolveCliLabel } from "../hooks/index.js";
 
 // ── Types (canonical definitions in src/shared/features.ts) ──────────
 import type { FeatureToggle, FeaturesResponse } from "../external.js";
@@ -20,17 +21,17 @@ import type { FeatureToggle, FeaturesResponse } from "../external.js";
 
 const PACKAGE_META: Record<string, { label: string; icon: string; description: string }> = {
   sourcevision: {
-    label: "ndx analyze / plan",
+    label: "{cli} analyze / plan",
     icon: "\u25A3",
     description: "Static analysis, file inventory, import graph, and zone detection",
   },
   rex: {
-    label: "ndx work / ndx sync",
+    label: "{cli} work / {cli} sync",
     icon: "\u25A8",
     description: "PRD management, task tracking, analysis proposals, and Notion sync",
   },
   hench: {
-    label: "ndx work",
+    label: "{cli} work",
     icon: "\u25B6",
     description: "Autonomous agent execution, retry policies, and guard rails",
   },
@@ -98,7 +99,9 @@ function PackageSection({ pkg, toggles, onToggle, saving }: {
   onToggle: (key: string, enabled: boolean) => void;
   saving: string | null;
 }) {
-  const meta = PACKAGE_META[pkg] ?? { label: pkg, icon: "\u2022", description: "" };
+  const cliName = useCliName();
+  const rawMeta = PACKAGE_META[pkg] ?? { label: pkg, icon: "\u2022", description: "" };
+  const meta = { ...rawMeta, label: resolveCliLabel(rawMeta.label, cliName) };
 
   return h("div", { class: "ft-package-section" },
     h("div", { class: `ft-package-header ft-package-${pkg}` },
@@ -159,6 +162,7 @@ function StatsBar({ toggles }: { toggles: FeatureToggle[] }) {
 // ── Main view ────────────────────────────────────────────────────────
 
 export function FeatureTogglesView() {
+  const cliName = useCliName();
   const [toggles, setToggles] = useState<FeatureToggle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -253,7 +257,7 @@ export function FeatureTogglesView() {
         h("p", null, error),
         h("p", { class: "ft-error-hint" },
           "Make sure the n-dx server is running. Run ",
-          h("code", null, "ndx start ."),
+          h("code", null, `${cliName} start .`),
           " to start it.",
         ),
       ),

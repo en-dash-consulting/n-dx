@@ -13,7 +13,8 @@ import {
   HenchActivityIndicator,
 } from "../api.js";
 import { ConfigFooter } from "./config-footer.js";
-import { useProjectMetadata, useFeatureToggle } from "../api.js";
+import { useProjectMetadata, useFeatureToggle, useCliName } from "../api.js";
+import { resolveCliLabel } from "../hooks/index.js";
 import { SOURCEVISION_TABS } from "../api.js";
 
 const STORAGE_KEY = "sidebar-expanded-section";
@@ -63,10 +64,10 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "section", label: "SETTINGS" },
   // Workflow order: General → ndx analyze/plan → ndx work → ndx sync → ndx export
   { type: "item", id: "llm-provider", icon: "\u{1F9E0}", label: "General", minPass: 0 },
-  { type: "item", id: "project-settings", icon: "\u25A3", label: "ndx analyze / plan", minPass: 0 },
-  { type: "item", id: "hench-config", icon: "\u25B6", label: "ndx work", minPass: 0 },
-  { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "ndx sync", minPass: 0, featureGate: "rex.notionSync" },
-  { type: "item", id: "commands", icon: "\u{1F4E4}", label: "ndx export / refresh", minPass: 0 },
+  { type: "item", id: "project-settings", icon: "\u25A3", label: "{cli} analyze / plan", minPass: 0 },
+  { type: "item", id: "hench-config", icon: "\u25B6", label: "{cli} work", minPass: 0 },
+  { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "{cli} sync", minPass: 0, featureGate: "rex.notionSync" },
+  { type: "item", id: "commands", icon: "\u{1F4E4}", label: "{cli} export / refresh", minPass: 0 },
   // Cross-cutting settings (affect multiple commands)
   { type: "item", id: "feature-toggles", icon: "\u{1F4CC}", label: "Feature Flags", minPass: 0 },
   { type: "item", id: "cli-timeouts", icon: "\u23F1", label: "CLI Timeouts", minPass: 0 },
@@ -117,6 +118,7 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   const [mobileOpen, setMobileOpen] = useState(false);
   const projectStatus = useProjectStatus();
   const projectMeta = useProjectMetadata();
+  const cliName = useCliName();
 
   // Feature-gated nav items: subscribe to toggle state
   const notionSyncEnabled = useFeatureToggle("rex.notionSync", false);
@@ -135,15 +137,18 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
     const scopeFiltered = scope && scope !== "all"
       ? SECTIONS.filter((s) => s.product === scope || !s.product)
       : SECTIONS;
-    // Filter out feature-gated items that are disabled
+    // Filter out feature-gated items that are disabled, then resolve the
+    // {cli} placeholder in command-reference labels.
     return scopeFiltered.map((s) => ({
       ...s,
-      items: s.items.filter((item) => {
-        if (!item.featureGate) return true;
-        return enabledGates.get(item.featureGate) ?? false;
-      }),
+      items: s.items
+        .filter((item) => {
+          if (!item.featureGate) return true;
+          return enabledGates.get(item.featureGate) ?? false;
+        })
+        .map((item) => ({ ...item, label: resolveCliLabel(item.label, cliName) })),
     }));
-  }, [scope, enabledGates]);
+  }, [scope, enabledGates, cliName]);
 
   const [expandedSection, setExpandedSection] = useState<string>(() =>
     scope ? (visibleSections[0]?.label ?? getInitialExpanded(view)) : getInitialExpanded(view)
@@ -168,10 +173,10 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   const activeLabel = useMemo(() => {
     for (const section of SECTIONS) {
       const found = section.items.find((item) => item.id === view);
-      if (found) return found.label;
+      if (found) return resolveCliLabel(found.label, cliName);
     }
     return null;
-  }, [view]);
+  }, [view, cliName]);
 
   const handleNav = useCallback((id: ViewId) => {
     onNavigate(id);

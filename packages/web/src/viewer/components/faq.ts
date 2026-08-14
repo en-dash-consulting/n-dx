@@ -1,5 +1,6 @@
 import { h, Fragment } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
+import { useCliName, resolveCliLabel } from "../hooks/index.js";
 
 interface FAQItem {
   question: string;
@@ -19,18 +20,18 @@ const FAQ_SECTIONS: FAQSection[] = [
       {
         question: "How do I set up n-dx for a new project?",
         answer:
-          "Run 'ndx init .' in your project root. This initializes SourceVision (static analysis), Rex (PRD management), and Hench (autonomous agent) directories.",
+          "Run '{cli} init .' in your project root. This initializes SourceVision (static analysis), Rex (PRD management), and Hench (autonomous agent) directories.",
         docLink: { label: "Overview", hash: "overview" },
       },
       {
-        question: "What does 'ndx plan' do?",
+        question: "What does '{cli} plan' do?",
         answer:
-          "It runs SourceVision analysis on your codebase and feeds the results into Rex, which proposes epics, features, and tasks for your PRD. Use 'ndx plan --accept' to add proposals to your PRD.",
+          "It runs SourceVision analysis on your codebase and feeds the results into Rex, which proposes epics, features, and tasks for your PRD. Use '{cli} plan --accept' to add proposals to your PRD.",
       },
       {
         question: "How do I execute tasks autonomously?",
         answer:
-          "Run 'ndx work .' to let Hench pick the next Rex task, build a brief, and execute it using Claude in a tool-use loop. You can target a specific task with '--task=ID'.",
+          "Run '{cli} work .' to let Hench pick the next Rex task, build a brief, and execute it using Claude in a tool-use loop. You can target a specific task with '--task=ID'.",
       },
     ],
   },
@@ -74,7 +75,7 @@ const FAQ_SECTIONS: FAQSection[] = [
       {
         question: "Can I sync my PRD with Notion?",
         answer:
-          "Yes. Configure a Notion adapter, then run 'ndx sync .' to bidirectionally sync your local PRD with a Notion database. Use '--push' or '--pull' for one-way sync.",
+          "Yes. Configure a Notion adapter, then run '{cli} sync .' to bidirectionally sync your local PRD with a Notion database. Use '--push' or '--pull' for one-way sync.",
       },
     ],
   },
@@ -90,13 +91,13 @@ const FAQ_SECTIONS: FAQSection[] = [
       {
         question: "How do I monitor agent progress?",
         answer:
-          "Use 'ndx status .' to check PRD completion. The Hench Runs view in this dashboard shows run history, transcripts, and token usage for each autonomous execution.",
+          "Use '{cli} status .' to check PRD completion. The Hench Runs view in this dashboard shows run history, transcripts, and token usage for each autonomous execution.",
         docLink: { label: "Token Usage", hash: "token-usage" },
       },
       {
         question: "Can I limit which tasks Hench works on?",
         answer:
-          "Yes. Use 'ndx work --task=ID' to target a specific task. You can also use '--dry-run' to see what Hench would do without executing. Configure model and max turns in .hench/config.json.",
+          "Yes. Use '{cli} work --task=ID' to target a specific task. You can also use '--dry-run' to see what Hench would do without executing. Configure model and max turns in .hench/config.json.",
       },
     ],
   },
@@ -116,7 +117,7 @@ const FAQ_SECTIONS: FAQSection[] = [
       {
         question: "Can I run the dashboard in the background?",
         answer:
-          "Yes. Run 'ndx web --background .' to start the dashboard as a daemon. Use 'ndx web stop' to stop it and 'ndx web status' to check if it's running.",
+          "Yes. Run '{cli} web --background .' to start the dashboard as a daemon. Use '{cli} web stop' to stop it and '{cli} web status' to check if it's running.",
       },
     ],
   },
@@ -148,6 +149,7 @@ const VIEW_TO_FAQ_SECTION: Record<string, string> = {
 
 /** Shared FAQ modal body — used by both sidebar FAQ and header FAQ */
 function FAQModal({ onClose, initialSection }: { onClose: () => void; initialSection: string | null }) {
+  const cliName = useCliName();
   const [expandedSection, setExpandedSection] = useState<string | null>(initialSection);
 
   const toggleSection = useCallback((title: string) => {
@@ -193,8 +195,8 @@ function FAQModal({ onClose, initialSection }: { onClose: () => void; initialSec
               ? h("div", { class: "faq-section-items" },
                   section.items.map((item, i) =>
                     h("div", { key: i, class: "faq-item" },
-                      h("div", { class: "faq-question" }, item.question),
-                      h("div", { class: "faq-answer" }, item.answer),
+                      h("div", { class: "faq-question" }, resolveCliLabel(item.question, cliName)),
+                      h("div", { class: "faq-answer" }, resolveCliLabel(item.answer, cliName)),
                       item.docLink
                         ? h("a", {
                             class: "faq-doc-link",
@@ -212,9 +214,9 @@ function FAQModal({ onClose, initialSection }: { onClose: () => void; initialSec
       h("div", { class: "faq-footer" },
         h("p", null,
           "For CLI reference, run ",
-          h("code", null, "ndx --help"),
+          h("code", null, resolveCliLabel("{cli} --help", cliName)),
           " or ",
-          h("code", null, "ndx <command> --help"),
+          h("code", null, resolveCliLabel("{cli} <command> --help", cliName)),
         ),
       ),
     ),

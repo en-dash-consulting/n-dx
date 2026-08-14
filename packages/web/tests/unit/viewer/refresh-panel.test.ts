@@ -34,7 +34,8 @@ describe("RefreshPanel", () => {
       render(h(RefreshPanel, null), root);
     });
     expect(root.textContent).toContain("Refresh Data");
-    expect(root.textContent).toContain("ndx refresh --data-only");
+    // CLI name is project-resolved; assert the command, not the binary name.
+    expect(root.textContent).toContain("refresh --data-only");
     expect(root.querySelector('input[type="checkbox"]')).toBeTruthy();
     expect(root.querySelector("button")?.textContent).toBe("Refresh Data");
   });

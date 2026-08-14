@@ -2,13 +2,16 @@
 id: "46ebab93-68f7-4dfd-bea6-b3e4f6abc1e0"
 level: "task"
 title: "Replace hardcoded 'ndx' command references in dashboard UI with project-resolved CLI name"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "web"
   - "ui"
   - "identity"
 source: "smart-add"
+startedAt: "2026-08-14T17:18:46.985Z"
+completedAt: "2026-08-14T17:28:57.295Z"
+endedAt: "2026-08-14T17:28:57.295Z"
 acceptanceCriteria:
   - "All dashboard UI strings that display CLI command syntax reference cliName from shared state instead of hardcoded 'ndx'"
   - "The PR description includes an audit checklist enumerating every changed file and replaced occurrence"

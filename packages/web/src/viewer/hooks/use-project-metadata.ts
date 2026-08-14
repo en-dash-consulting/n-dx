@@ -101,3 +101,15 @@ export function useCliName(): string {
   const project = useProjectMetadata();
   return project?.cliName ?? DEFAULT_CLI_NAME;
 }
+
+/**
+ * Substitute the project's CLI name into a label template.
+ *
+ * Module-level constant tables (sidebar nav, breadcrumb metadata, page
+ * titles) are declared before any hook can run, so they carry a `{cli}`
+ * placeholder that the rendering component resolves. Keeping the token
+ * greppable makes it obvious which strings are command references.
+ */
+export function resolveCliLabel(template: string, cliName: string): string {
+  return template.replace(/\{cli\}/g, cliName);
+}

@@ -10,6 +10,7 @@ import { h, Fragment } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
+import { useCliName } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -679,6 +680,7 @@ function pollJob(
  * sees what would change and confirms. `ndx ci` is read-only.
  */
 export function ValidationActions({ onChanged }: { onChanged?: () => void }) {
+  const cliName = useCliName();
   const [fixState, setFixState] = useState<ActionState>("idle");
   const [fixReport, setFixReport] = useState<unknown>(null);
   const [ciState, setCiState] = useState<ActionState>("idle");
@@ -803,7 +805,7 @@ export function ValidationActions({ onChanged }: { onChanged?: () => void }) {
         h("h4", { class: "cmd-panel-title" }, "CI check"),
         h("p", { class: "cmd-panel-desc" },
           "Run the analysis pipeline and validate PRD health. Equivalent to ",
-          h("code", null, "ndx ci"), ". Read-only.",
+          h("code", null, `${cliName} ci`), ". Read-only.",
         ),
         h("div", { class: "cmd-panel-actions" },
           h("button", {

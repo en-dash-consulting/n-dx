@@ -61,40 +61,6 @@ async function fetchScope(): Promise<string | null> {
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
-/** Human-readable page titles for each view, used to update document.title on navigation. */
-const VIEW_TITLE_MAP: Partial<Record<import("./types.js").ViewId, string>> = {
-  overview: "Overview",
-  graph: "Import Graph",
-  zones: "Zones",
-  analysis: "Analyze & Import",
-  files: "Files",
-  routes: "Routes",
-  architecture: "Architecture",
-  problems: "Problems",
-  suggestions: "Suggestions",
-  "pr-markdown": "PR Report",
-  "rex-dashboard": "Rex Dashboard",
-  prd: "Tasks",
-  "token-usage": "Token Usage",
-  validation: "Validation",
-  requirements: "Requirements",
-  "notion-config": "Notion Sync",
-  integrations: "Integrations",
-  "hench-runs": "Runs",
-  "hench-audit": "Audit",
-  "hench-config": "ndx work",
-  "hench-templates": "Templates",
-  "hench-optimization": "Optimization",
-  "hench-adaptive": "Adaptive",
-  "feature-toggles": "Feature Flags",
-  "cli-timeouts": "CLI Timeouts",
-  commands: "ndx export / refresh",
-  "command-reference": "All Commands",
-  "llm-provider": "General",
-  "project-settings": "ndx analyze / plan",
-  "merge-graph": "Context Graph",
-};
-
 function getInitialSidebarCollapsed(): boolean {
   try {
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
@@ -194,11 +160,9 @@ function App({ scope }: { scope: string | null }) {
     document.getElementById("main-content")?.scrollTo(0, 0);
   }, [view]);
 
-  // Update browser <title> on route change so screen readers announce the new page
-  useEffect(() => {
-    const label = VIEW_TITLE_MAP[view] ?? view;
-    document.title = `${label} | n-dx`;
-  }, [view]);
+  // document.title is owned by <Breadcrumb>, which has the project name and
+  // product context. A second writer here raced it: whichever effect ran last
+  // won, so the title silently lost its product segment.
 
   // Update browser favicon to match the active product section
   useEffect(() => {

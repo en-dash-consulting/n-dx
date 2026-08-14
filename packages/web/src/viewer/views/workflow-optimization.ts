@@ -11,6 +11,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
+import { useCliName } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -328,6 +329,7 @@ function DecisionHistoryBar({ history }: {
 // ── Main view ────────────────────────────────────────────────────────
 
 export function WorkflowOptimizationView() {
+  const cliName = useCliName();
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -509,7 +511,7 @@ export function WorkflowOptimizationView() {
         h("p", null, "No run data available for analysis."),
         h("p", { class: "wf-empty-hint" },
           "Execute some tasks with ",
-          h("code", null, "ndx work"),
+          h("code", null, `${cliName} work`),
           " to generate workflow data.",
         ),
       ),

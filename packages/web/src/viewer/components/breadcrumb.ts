@@ -12,7 +12,7 @@
 import { h } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
-import { useProjectMetadata } from "../hooks/index.js";
+import { useProjectMetadata, useCliName, resolveCliLabel } from "../hooks/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,20 +59,20 @@ const VIEW_META: Record<ViewId, ViewMeta> = {
   "token-usage":         { product: "global",       label: "Token Usage",     productLabel: "Global" },
   validation:            { product: "rex",          label: "Validation",      productLabel: "Rex" },
   requirements:          { product: "rex",          label: "Requirements",    productLabel: "Rex" },
-  "notion-config":       { product: "global",       label: "ndx sync",           productLabel: "Settings" },
+  "notion-config":       { product: "global",       label: "{cli} sync",           productLabel: "Settings" },
   integrations:          { product: "rex",          label: "Integrations",       productLabel: "Rex" },
   "hench-runs":          { product: "hench",        label: "Runs",               productLabel: "Hench" },
   "hench-audit":         { product: "hench",        label: "Audit",              productLabel: "Hench" },
-  "hench-config":        { product: "global",       label: "ndx work",           productLabel: "Settings" },
+  "hench-config":        { product: "global",       label: "{cli} work",           productLabel: "Settings" },
   "hench-templates":     { product: "hench",        label: "Templates",          productLabel: "Hench" },
   "hench-optimization":  { product: "hench",        label: "Optimization",       productLabel: "Hench" },
   "hench-adaptive":      { product: "hench",        label: "Adaptive",           productLabel: "Hench" },
   "feature-toggles":     { product: "global",       label: "Feature Flags",      productLabel: "Settings" },
   "cli-timeouts":        { product: "global",       label: "CLI Timeouts",       productLabel: "Settings" },
-  "commands":            { product: "global",       label: "ndx export / refresh", productLabel: "Settings" },
+  "commands":            { product: "global",       label: "{cli} export / refresh", productLabel: "Settings" },
   "command-reference":   { product: "global",       label: "All Commands",         productLabel: "Commands" },
   "llm-provider":        { product: "global",       label: "General",            productLabel: "Settings" },
-  "project-settings":    { product: "global",       label: "ndx analyze / plan", productLabel: "Settings" },
+  "project-settings":    { product: "global",       label: "{cli} analyze / plan", productLabel: "Settings" },
   "merge-graph":         { product: "rex",          label: "Context Graph",       productLabel: "Rex" },
 };
 
@@ -97,18 +97,20 @@ function Separator() {
 
 export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
   const project = useProjectMetadata();
+  const cliName = useCliName();
 
   // Keep document.title in sync with project + current view
   useEffect(() => {
     const meta = VIEW_META[view];
     const parts: string[] = [];
-    if (meta) parts.push(`${meta.label} — ${meta.productLabel}`);
+    if (meta) parts.push(`${resolveCliLabel(meta.label, cliName)} — ${meta.productLabel}`);
     if (project) parts.push(project.name);
     parts.push("n-dx");
     document.title = parts.join(" | ");
-  }, [project, view]);
+  }, [project, view, cliName]);
 
-  const meta = VIEW_META[view];
+  const rawMeta = VIEW_META[view];
+  const meta = rawMeta ? { ...rawMeta, label: resolveCliLabel(rawMeta.label, cliName) } : rawMeta;
 
   /** Truncated project name — max 28 chars. */
   const projectName = useMemo(() => {
