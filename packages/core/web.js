@@ -17,7 +17,7 @@
  *   ndx start status [dir]           Check if server is running
  */
 
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import { createConnection } from "net";
 import { readFile, writeFile, unlink, access } from "fs/promises";
 import { join, resolve } from "path";
@@ -79,6 +79,47 @@ function isPortInUse(port) {
       res(false);
     });
   });
+}
+
+/**
+ * Find and kill whichever process is listening on `port`.
+ * Returns true if the port was freed, false if kill failed.
+ */
+async function killPortOccupant(port) {
+  try {
+    let pid = null;
+    if (process.platform === "win32") {
+      // netstat -ano lists TCP listeners; grep for ":PORT " at the local address
+      const out = execSync(`netstat -ano`, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
+      for (const line of out.split("\n")) {
+        // Look for lines like "  TCP    127.0.0.1:3117    0.0.0.0:0    LISTENING    12345"
+        const m = line.match(/TCP\s+[\d.]+:(\d+)\s+[\d.:]+\s+LISTENING\s+(\d+)/i);
+        if (m && parseInt(m[1], 10) === port) {
+          pid = parseInt(m[2], 10);
+          break;
+        }
+      }
+      if (pid) {
+        execSync(`taskkill /F /PID ${pid}`, { stdio: "ignore" });
+      }
+    } else {
+      // lsof is available on macOS and most Linux distros
+      const out = execSync(`lsof -ti tcp:${port}`, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] }).trim();
+      if (out) {
+        pid = parseInt(out.split("\n")[0], 10);
+        execSync(`kill -9 ${pid}`, { stdio: "ignore" });
+      }
+    }
+    if (!pid) return false;
+    // Wait for the port to free up
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      if (!(await isPortInUse(port))) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -376,19 +417,23 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     await removePortFile(absDir);
   }
 
-  // Fail clearly if the target port is occupied by something we don't own.
-  // This prevents the silent "bump to 3118" confusion.
-  // Retry briefly to let the OS release the port after a stop.
-  {
+  // If port is still occupied, wait briefly for the OS to release it after the
+  // graceful stop above. If it's still busy after that, force-kill the occupant.
+  if (await isPortInUse(port)) {
+    // Give the just-stopped process time to release the socket (up to 2s)
     let portFree = false;
     for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 200));
       if (!(await isPortInUse(port))) { portFree = true; break; }
-      await new Promise((r) => setTimeout(r, 300));
     }
     if (!portFree) {
-      console.error(`Port ${port} is already in use by another process.`);
-      console.error(`Choose a different port with --port=N or set web.port in .n-dx.json`);
-      return 1;
+      // Something else is holding the port — kill it
+      log(`Port ${port} is in use by another process — clearing it…`);
+      const freed = await killPortOccupant(port);
+      if (!freed) {
+        console.error(`Port ${port} is occupied and could not be cleared. Choose a different port with --port=N or set web.port in .n-dx.json`);
+        return 1;
+      }
     }
   }
 
