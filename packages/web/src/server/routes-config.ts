@@ -11,7 +11,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, dirname, basename, resolve } from "node:path";
 import type { ServerContext } from "./types.js";
 import {jsonResponse} from "./response-utils.js";// ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ function readJSON(path: string): Record<string, unknown> | null {
 }
 
 /** Extract configuration summary from project files. */
-function extractConfig(ctx: ServerContext): NdxConfigSummary {
+async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
   const henchConfigPath = join(ctx.projectDir, ".hench", "config.json");
   const ndxConfigPath = join(ctx.projectDir, ".n-dx.json");
   const pkgPath = join(ctx.projectDir, "package.json");
@@ -131,6 +131,55 @@ function extractConfig(ctx: ServerContext): NdxConfigSummary {
     const henchModel = henchConfig?.model;
     model = (typeof legacyModel === "string" && legacyModel.length > 0 ? legacyModel : null) ??
             (typeof henchModel === "string" && henchModel.length > 0 ? henchModel : null);
+  }
+
+  // For local vendor: query LM Studio for the currently loaded model.
+  // If the live model differs from the stored config, write it back to .n-dx.json
+  // so the displayed name stays in sync without requiring ndx init.
+  if (vendor === "local" && llmConfig) {
+    const localCfg = llmConfig.local && typeof llmConfig.local === "object"
+      ? llmConfig.local as Record<string, unknown>
+      : {};
+    const host = typeof localCfg.host === "string" ? localCfg.host : "localhost";
+    const port = typeof localCfg.port === "number" ? localCfg.port : 1234;
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const resp = await fetch(`http://${host}:${port}/v1/models`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (resp.ok) {
+        const data = await resp.json() as { data?: Array<{ id: string }> };
+        const liveModel = data.data?.[0]?.id ?? null;
+        if (liveModel && liveModel !== model) {
+          // Persist live model back to .n-dx.json so config stays current
+          try {
+            const updated: Record<string, unknown> = ndxConfig ? { ...ndxConfig } : {};
+            if (!updated.llm || typeof updated.llm !== "object") {
+              updated.llm = { vendor: "local" };
+            }
+            const llm = updated.llm as Record<string, unknown>;
+            if (!llm.local || typeof llm.local !== "object") {
+              llm.local = {};
+            }
+            (llm.local as Record<string, unknown>).model = liveModel;
+            writeFileSync(ndxConfigPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
+            // Invalidate cache so next request re-reads from disk
+            configCache = null;
+          } catch {
+            // Write failure is non-fatal — still return the live model
+          }
+          model = liveModel;
+        } else if (liveModel) {
+          model = liveModel;
+        }
+      }
+    } catch {
+      // LM Studio not reachable — use stored config value
+    }
   }
 
   // Provider
@@ -300,7 +349,7 @@ export async function handleConfigRoute(
       return true;
     }
 
-    const config = extractConfig(ctx);
+    const config = await extractConfig(ctx);
     configCache = { config, projectDir: ctx.projectDir, timestamp: now };
     jsonResponse(res, 200, config);
     return true;

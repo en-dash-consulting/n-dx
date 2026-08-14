@@ -982,7 +982,7 @@ async function handleTemplateDelete(
 // ── Task execution ───────────────────────────────────────────────────
 
 /** Actionable statuses — only tasks in these states can be triggered. */
-const ACTIONABLE_STATUSES = new Set(["pending", "blocked"]);
+const ACTIONABLE_STATUSES = new Set(["pending", "blocked", "deferred"]);
 
 /** Execution status for a single task run. */
 export interface TaskExecutionStatus {
@@ -1183,7 +1183,10 @@ async function handleExecute(
   // Resolve hench binary
   const henchBin = join(ctx.projectDir, "node_modules", ".bin", "hench");
   const henchFallback = join(ctx.projectDir, "packages", "hench", "dist", "cli", "index.js");
-  const args = ["run", `--task=${taskId}`, "--auto", ctx.projectDir];
+  // Pass --reset-deferred when executing a deferred task so hench resets it to pending before running
+  const args = status === "deferred"
+    ? ["run", `--task=${taskId}`, "--auto", "--reset-deferred", ctx.projectDir]
+    : ["run", `--task=${taskId}`, "--auto", ctx.projectDir];
 
   const binPath = existsSync(henchBin) ? henchBin : "node";
   const binArgs = existsSync(henchBin) ? args : [henchFallback, ...args];
