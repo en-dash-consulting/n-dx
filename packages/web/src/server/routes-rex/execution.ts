@@ -130,7 +130,8 @@ async function runHenchForEpic(ctx: ServerContext, epicId: string): Promise<{ co
 
   const handle = spawnManaged(binPath, binArgs, {
     cwd: ctx.projectDir,
-    stdio: "inherit",
+    stdio: "pipe",
+    windowsHide: true,
     env: { ...process.env },
   });
 

@@ -452,6 +452,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     const child = spawn(process.execPath, [script, ...serveArgs], {
       stdio: "ignore",
       detached: true,
+      windowsHide: true,
       env: serverEnv,
     });
     child.unref();

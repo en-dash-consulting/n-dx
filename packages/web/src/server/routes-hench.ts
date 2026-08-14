@@ -1211,6 +1211,7 @@ async function handleExecute(
   const childProc = spawn(binPath, binArgs, {
     cwd: ctx.projectDir,
     stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
     env: { ...process.env },
   });
 
