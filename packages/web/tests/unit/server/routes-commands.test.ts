@@ -617,3 +617,135 @@ describe("commands route — self-heal stop", () => {
     }
   });
 });
+
+describe("commands route — validation actions (fix, ci, reshape)", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    execMock.mockReset();
+    tmpDir = await mkdtemp(join(tmpdir(), "commands-validation-"));
+    await mkdir(join(tmpDir, ".rex"), { recursive: true });
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    const started = await startRouteTestServer((req, res) =>
+      handleCommandsRoute(req, res, ctx),
+    );
+    server = started.server;
+    port = started.port;
+  });
+
+  afterEach(async () => {
+    await closeRouteTestServer(server);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  function post(path: string, body: unknown = {}) {
+    return fetch(`http://127.0.0.1:${port}/api/commands/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function waitFor(path: string): Promise<Record<string, unknown>> {
+    for (let i = 0; i < 50; i++) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/commands/${path}`);
+      const body = (await res.json()) as Record<string, unknown>;
+      if (!body.running) return body;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error(`${path} did not finish`);
+  }
+
+  // ── rex fix ──
+  it("fix previews with --dry-run and returns the parsed report", async () => {
+    execMock.mockResolvedValue({
+      stdout: JSON.stringify({ fixed: 0, issues: [{ kind: "timestamp", id: "t1" }] }),
+      stderr: "", error: null,
+    });
+    const res = await post("fix", { dryRun: true });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.dryRun).toBe(true);
+    expect(body.report.issues).toHaveLength(1);
+
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).toContain("fix");
+    expect(args).toContain("--format=json");
+    expect(args).toContain("--dry-run");
+  });
+
+  it("fix applies without --dry-run", async () => {
+    execMock.mockResolvedValue({ stdout: JSON.stringify({ fixed: 3 }), stderr: "", error: null });
+    const body = await (await post("fix", {})).json();
+    expect(body.dryRun).toBe(false);
+    expect(body.report.fixed).toBe(3);
+    expect(execMock.mock.calls[0][1] as string[]).not.toContain("--dry-run");
+  });
+
+  it("fix falls back to raw output when stdout is not JSON", async () => {
+    execMock.mockResolvedValue({ stdout: "fixed 2 timestamps", stderr: "", error: null });
+    const body = await (await post("fix", {})).json();
+    expect(body.output).toContain("fixed 2 timestamps");
+    expect(body.report).toBeUndefined();
+  });
+
+  // ── ndx ci ──
+  it("ci runs asynchronously and exposes a structured result", async () => {
+    execMock.mockResolvedValue({
+      stdout: JSON.stringify({ health: 82, findings: 4, passed: true }),
+      stderr: "", error: null,
+    });
+    const res = await post("ci");
+    expect(res.status).toBe(202);
+    const status = await waitFor("ci/status");
+    expect(status.error).toBeNull();
+    expect((status.report as Record<string, unknown>).health).toBe(82);
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).toContain("ci");
+    expect(args).toContain("--format=json");
+  });
+
+  it("ci rejects a concurrent run with 409", async () => {
+    let release: (() => void) | undefined;
+    execMock.mockImplementation(() => new Promise((resolve) => {
+      release = () => resolve({ stdout: "{}", stderr: "", error: null });
+    }));
+    expect((await post("ci")).status).toBe(202);
+    expect((await post("ci")).status).toBe(409);
+    release?.();
+    await waitFor("ci/status");
+  });
+
+  // ── rex reshape ──
+  it("reshape previews with --dry-run by default", async () => {
+    execMock.mockResolvedValue({
+      stdout: JSON.stringify({ proposals: [{ action: "merge", ids: ["a", "b"] }] }),
+      stderr: "", error: null,
+    });
+    expect((await post("reshape", {})).status).toBe(202);
+    const status = await waitFor("reshape/status");
+    expect((status.report as { proposals: unknown[] }).proposals).toHaveLength(1);
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).toContain("reshape");
+    expect(args).toContain("--dry-run");
+    expect(args).not.toContain("--accept");
+  });
+
+  it("reshape applies with --accept when confirmed", async () => {
+    execMock.mockResolvedValue({ stdout: "{}", stderr: "", error: null });
+    await post("reshape", { accept: true });
+    await waitFor("reshape/status");
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).toContain("--accept");
+    expect(args).not.toContain("--dry-run");
+  });
+});

@@ -630,6 +630,248 @@ function BlockingChains({
 
 // ── Main View Component ──────────────────────────────────────────────
 
+// ── Validation actions (rex fix, ndx ci, rex reshape) ────────────────
+
+type ActionState = "idle" | "running" | "previewed" | "done" | "error";
+
+interface AsyncJobWire {
+  running: boolean;
+  finishedAt: string | null;
+  report: unknown;
+  output: string;
+  error: string | null;
+}
+
+async function postJson(url: string, body: unknown): Promise<Response> {
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+/** Poll an async job's status endpoint until it reports finished. */
+function pollJob(
+  statusUrl: string,
+  onDone: (status: AsyncJobWire) => void,
+): () => void {
+  const interval = setInterval(async () => {
+    try {
+      const res = await fetch(statusUrl);
+      if (!res.ok) return;
+      const status = await res.json() as AsyncJobWire;
+      if (!status.running && status.finishedAt) {
+        clearInterval(interval);
+        onDone(status);
+      }
+    } catch {
+      // Ignore transient poll failures
+    }
+  }, 2000);
+  return () => clearInterval(interval);
+}
+
+/**
+ * Repair, verify, and restructure actions for the PRD.
+ *
+ * Each destructive action previews first: `rex fix` runs with `--dry-run` and
+ * `rex reshape` with `--dry-run`, so nothing is written until the operator
+ * sees what would change and confirms. `ndx ci` is read-only.
+ */
+export function ValidationActions({ onChanged }: { onChanged?: () => void }) {
+  const [fixState, setFixState] = useState<ActionState>("idle");
+  const [fixReport, setFixReport] = useState<unknown>(null);
+  const [ciState, setCiState] = useState<ActionState>("idle");
+  const [ciReport, setCiReport] = useState<Record<string, unknown> | null>(null);
+  const [reshapeState, setReshapeState] = useState<ActionState>("idle");
+  const [reshapeReport, setReshapeReport] = useState<Record<string, unknown> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const cancelPolls = useRef<Array<() => void>>([]);
+  useEffect(() => () => {
+    for (const cancel of cancelPolls.current) cancel();
+  }, []);
+
+  const runFix = useCallback(async (dryRun: boolean) => {
+    setFixState("running");
+    setError(null);
+    try {
+      const res = await postJson("/api/commands/fix", { dryRun });
+      const body = await res.json() as { error?: string; report?: unknown; output?: string };
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setFixReport(body.report ?? body.output ?? null);
+      setFixState(dryRun ? "previewed" : "done");
+      if (!dryRun) onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setFixState("error");
+    }
+  }, [onChanged]);
+
+  const runCi = useCallback(async () => {
+    setCiState("running");
+    setError(null);
+    try {
+      const res = await postJson("/api/commands/ci", {});
+      if (!res.ok && res.status !== 409) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      cancelPolls.current.push(pollJob("/api/commands/ci/status", (status) => {
+        if (status.error) {
+          setError(status.error);
+          setCiState("error");
+          return;
+        }
+        setCiReport((status.report as Record<string, unknown>) ?? null);
+        setCiState("done");
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setCiState("error");
+    }
+  }, []);
+
+  const runReshape = useCallback(async (accept: boolean) => {
+    setReshapeState("running");
+    setError(null);
+    try {
+      const res = await postJson("/api/commands/reshape", { accept });
+      if (!res.ok && res.status !== 409) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      cancelPolls.current.push(pollJob("/api/commands/reshape/status", (status) => {
+        if (status.error) {
+          setError(status.error);
+          setReshapeState("error");
+          return;
+        }
+        setReshapeReport((status.report as Record<string, unknown>) ?? null);
+        setReshapeState(accept ? "done" : "previewed");
+        if (accept) onChanged?.();
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setReshapeState("error");
+    }
+  }, [onChanged]);
+
+  const proposals = Array.isArray(reshapeReport?.proposals)
+    ? reshapeReport!.proposals as Array<Record<string, unknown>>
+    : [];
+
+  return h("section", { class: "validation-actions", "aria-label": "PRD repair and verification actions" },
+    h("h3", { class: "section-header" }, "Actions"),
+
+    error
+      ? h("div", { class: "cmd-result cmd-result-error", role: "alert" }, error)
+      : null,
+
+    h("div", { class: "validation-action-row" },
+      // ── rex fix ──
+      h("div", { class: "cmd-panel validation-action" },
+        h("h4", { class: "cmd-panel-title" }, "Fix issues"),
+        h("p", { class: "cmd-panel-desc" },
+          "Repair common validation problems (timestamps, stale references, statuses). Equivalent to ",
+          h("code", null, "rex fix"), ".",
+        ),
+        h("div", { class: "cmd-panel-actions" },
+          h("button", {
+            class: "cmd-btn cmd-btn-primary",
+            disabled: fixState === "running",
+            onClick: () => runFix(true),
+          }, fixState === "running" ? "Working…" : "Preview fixes"),
+          fixState === "previewed"
+            ? h("button", {
+                class: "cmd-btn cmd-btn-confirm",
+                onClick: () => runFix(false),
+              }, "Apply fixes")
+            : null,
+        ),
+        fixReport
+          ? h("pre", { class: "cmd-result-output" },
+              typeof fixReport === "string" ? fixReport : JSON.stringify(fixReport, null, 2))
+          : null,
+        fixState === "done"
+          ? h("p", { class: "cmd-result cmd-result-ok", role: "status" }, "Fixes applied.")
+          : null,
+      ),
+
+      // ── ndx ci ──
+      h("div", { class: "cmd-panel validation-action" },
+        h("h4", { class: "cmd-panel-title" }, "CI check"),
+        h("p", { class: "cmd-panel-desc" },
+          "Run the analysis pipeline and validate PRD health. Equivalent to ",
+          h("code", null, "ndx ci"), ". Read-only.",
+        ),
+        h("div", { class: "cmd-panel-actions" },
+          h("button", {
+            class: "cmd-btn cmd-btn-primary",
+            disabled: ciState === "running",
+            onClick: runCi,
+          }, ciState === "running" ? "Running…" : "Run CI check"),
+        ),
+        ciState === "running"
+          ? h("p", { class: "cmd-panel-hint", role: "status" }, "Running the full pipeline — this can take a few minutes.")
+          : null,
+        ciReport
+          ? h("ul", { class: "validation-ci-results" },
+              Object.entries(ciReport).map(([key, value]) =>
+                h("li", { key },
+                  h("strong", null, `${key}: `),
+                  typeof value === "object" ? JSON.stringify(value) : String(value),
+                ),
+              ),
+            )
+          : null,
+      ),
+
+      // ── rex reshape ──
+      h("div", { class: "cmd-panel validation-action" },
+        h("h4", { class: "cmd-panel-title" }, "Reshape PRD"),
+        h("p", { class: "cmd-panel-desc" },
+          "LLM-driven restructuring: merge duplicates, re-level items, split oversized ones. Equivalent to ",
+          h("code", null, "rex reshape"), ".",
+        ),
+        h("div", { class: "cmd-panel-warning" },
+          h("span", { class: "cmd-panel-warning-icon" }, "⚠️"),
+          h("div", null,
+            h("strong", null, "Restructures the PRD."),
+            " Proposals are previewed first; nothing changes until you apply them.",
+          ),
+        ),
+        h("div", { class: "cmd-panel-actions" },
+          h("button", {
+            class: "cmd-btn cmd-btn-primary",
+            disabled: reshapeState === "running",
+            onClick: () => runReshape(false),
+          }, reshapeState === "running" ? "Working…" : "Reshape PRD (preview)"),
+          reshapeState === "previewed" && proposals.length > 0
+            ? h("button", {
+                class: "cmd-btn cmd-btn-danger",
+                onClick: () => runReshape(true),
+              }, `Apply reshape (${proposals.length})`)
+            : null,
+        ),
+        reshapeState === "previewed" && proposals.length === 0
+          ? h("p", { class: "cmd-panel-hint", role: "status" }, "No restructuring proposed — the PRD shape looks fine.")
+          : null,
+        proposals.length > 0
+          ? h("ul", { class: "validation-reshape-proposals" },
+              proposals.map((p, i) =>
+                h("li", { key: i, class: "mono-sm" }, JSON.stringify(p)),
+              ),
+            )
+          : null,
+        reshapeState === "done"
+          ? h("p", { class: "cmd-result cmd-result-ok", role: "status" }, "Reshape applied.")
+          : null,
+      ),
+    ),
+  );
+}
+
 export function ValidationView({ navigateTo }: { navigateTo?: NavigateTo }) {
   const [report, setReport] = useState<ValidationReport | null>(null);
   const [graphData, setGraphData] = useState<DependencyGraphData | null>(null);
@@ -755,6 +997,10 @@ export function ValidationView({ navigateTo }: { navigateTo?: NavigateTo }) {
                   h("p", null, 'Click "Run Validation" to check your PRD for issues.'),
                 )
               : null,
+
+            // Repair / verify / restructure actions. Re-runs validation after
+            // any action that wrote to the PRD.
+            h(ValidationActions, { onChanged: runValidation }),
           )
         : null,
 

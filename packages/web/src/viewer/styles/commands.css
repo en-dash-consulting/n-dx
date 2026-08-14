@@ -524,3 +524,34 @@
 .req-status-pending { color: var(--text-muted); }
 .req-status-in_progress { color: var(--yellow); }
 .req-status-blocked { color: var(--red); }
+
+/* ── Validation actions (fix / CI / reshape) ───────────────────────── */
+
+.validation-actions {
+  margin-top: var(--space-5);
+}
+
+.validation-action-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+
+.validation-action .cmd-panel-title {
+  font-size: var(--font-base);
+  margin: 0 0 4px;
+}
+
+.validation-ci-results,
+.validation-reshape-proposals {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  font-size: var(--font-sm);
+}
+
+.validation-ci-results li,
+.validation-reshape-proposals li {
+  padding: 2px 0;
+  word-break: break-word;
+}

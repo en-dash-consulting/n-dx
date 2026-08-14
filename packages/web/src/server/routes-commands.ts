@@ -14,6 +14,11 @@
  * POST /api/commands/refresh         — refresh SourceVision data (live server; --data-only --live-server)
  * GET  /api/commands/refresh/status  — check running refresh status
  * GET  /api/commands/manifest        — grouped command reference with resolved CLI name and availability
+ * POST /api/commands/fix             — rex fix (body: { dryRun?: boolean }); repairs PRD validation issues
+ * POST /api/commands/ci              — ndx ci analysis + health validation (async, see status)
+ * GET  /api/commands/ci/status       — CI check status and structured report
+ * POST /api/commands/reshape         — rex reshape (body: { accept?: boolean }); previews unless accepted
+ * GET  /api/commands/reshape/status  — reshape status and proposal report
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -650,6 +655,194 @@ function handleRefreshStatus(
   return true;
 }
 
+// ── Async job helper ──────────────────────────────────────────────────
+
+/**
+ * Status of a background command that produces a structured report.
+ *
+ * `ci` and `reshape` both run a long CLI pass and return JSON, so they share
+ * one shape rather than each growing its own near-identical singleton.
+ */
+interface AsyncJobStatus {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /** Parsed `--format=json` payload, when the CLI produced one. */
+  report: unknown;
+  /** Raw output tail — the fallback when stdout was not JSON. */
+  output: string;
+  error: string | null;
+}
+
+function newJobStatus(): AsyncJobStatus {
+  return { running: false, startedAt: null, finishedAt: null, report: null, output: "", error: null };
+}
+
+const ciStatus = newJobStatus();
+const reshapeStatus = newJobStatus();
+
+/**
+ * Start a background CLI job that reports through `status`, or answer 409 when
+ * one is already in flight. Returns 202 immediately; the caller polls.
+ */
+function startAsyncJob(
+  res: ServerResponse,
+  status: AsyncJobStatus,
+  label: string,
+  bin: string,
+  cmdArgs: string[],
+  ctx: ServerContext,
+  timeout: number,
+  broadcast?: WebSocketBroadcaster,
+  broadcastType?: string,
+): boolean {
+  if (status.running) {
+    jsonResponse(res, 409, { error: `${label} is already running`, startedAt: status.startedAt });
+    return true;
+  }
+
+  status.running = true;
+  status.startedAt = new Date().toISOString();
+  status.finishedAt = null;
+  status.report = null;
+  status.output = "";
+  status.error = null;
+
+  jsonResponse(res, 202, {
+    ok: true,
+    startedAt: status.startedAt,
+    message: `${label} started. Poll the status endpoint for progress.`,
+  });
+
+  foundationExec(bin, cmdArgs, {
+    cwd: ctx.projectDir,
+    timeout,
+    maxBuffer: 20 * 1024 * 1024,
+  }).then((result) => {
+    status.running = false;
+    status.finishedAt = new Date().toISOString();
+    status.output = (result.stdout || "").trim().slice(-5000);
+    try {
+      status.report = JSON.parse(result.stdout);
+    } catch {
+      status.report = null; // not JSON — `output` carries the text
+    }
+    status.error = result.error ? (result.stderr || result.error.message).slice(-1000) : null;
+
+    if (broadcast && broadcastType) {
+      broadcast({ type: broadcastType, ok: !result.error, timestamp: status.finishedAt });
+    }
+  }).catch((err: unknown) => {
+    status.running = false;
+    status.finishedAt = new Date().toISOString();
+    status.error = String(err);
+  });
+
+  return true;
+}
+
+// ── Validation actions: rex fix, ndx ci, rex reshape ──────────────────
+
+/**
+ * POST /api/commands/fix — `rex fix`, repairing common PRD validation issues.
+ *
+ * `{ dryRun: true }` adds `--dry-run` so the dashboard can show what would
+ * change before touching the PRD. Synchronous: fix is a fast local pass.
+ */
+async function handleFix(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  let dryRun = false;
+  try {
+    const body = await readBody(req);
+    if (body) dryRun = (JSON.parse(body) as { dryRun?: boolean }).dryRun === true;
+  } catch {
+    // Use defaults
+  }
+
+  const { bin, args: prefixArgs } = resolveRexBin(ctx);
+  const cmdArgs = [...prefixArgs, "fix", "--format=json"];
+  if (dryRun) cmdArgs.push("--dry-run");
+  cmdArgs.push(ctx.projectDir);
+
+  try {
+    const result = await foundationExec(bin, cmdArgs, {
+      cwd: ctx.projectDir,
+      timeout: 120_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    if (result.error && !result.stdout) {
+      errorResponse(res, 500, `Fix failed: ${result.stderr || result.error.message}`);
+      return true;
+    }
+
+    if (broadcast && !dryRun) {
+      broadcast({ type: "rex:prd-changed", source: "fix", timestamp: new Date().toISOString() });
+    }
+
+    try {
+      jsonResponse(res, 200, { ok: true, dryRun, report: JSON.parse(result.stdout) });
+    } catch {
+      jsonResponse(res, 200, { ok: true, dryRun, output: result.stdout.trim().slice(-2000) });
+    }
+  } catch (err) {
+    errorResponse(res, 500, String(err));
+  }
+  return true;
+}
+
+/** POST /api/commands/ci — `ndx ci` analysis + PRD health validation. */
+function handleCi(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): boolean {
+  const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  return startAsyncJob(
+    res, ciStatus, "CI check", bin,
+    [...prefixArgs, "ci", "--format=json", ctx.projectDir],
+    ctx, 900_000, // 15 minutes — runs the full analysis pipeline
+    broadcast, "commands:ci-finished",
+  );
+}
+
+/**
+ * POST /api/commands/reshape — `rex reshape`, LLM-driven PRD restructuring.
+ *
+ * Defaults to `--dry-run` so the dashboard always previews proposals first;
+ * `{ accept: true }` applies them. Async because the LLM pass is slow.
+ */
+async function handleReshape(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  let accept = false;
+  try {
+    const body = await readBody(req);
+    if (body) accept = (JSON.parse(body) as { accept?: boolean }).accept === true;
+  } catch {
+    // Preview by default — never restructure the PRD without an explicit accept.
+  }
+
+  const { bin, args: prefixArgs } = resolveRexBin(ctx);
+  const cmdArgs = [...prefixArgs, "reshape", "--format=json"];
+  cmdArgs.push(accept ? "--accept" : "--dry-run");
+  cmdArgs.push(ctx.projectDir);
+
+  return startAsyncJob(
+    res, reshapeStatus, "Reshape", bin, cmdArgs, ctx,
+    900_000, // 15 minutes — LLM restructuring pass
+    broadcast, accept ? "rex:prd-changed" : undefined,
+  );
+}
+
 // ── Command reference manifest ────────────────────────────────────────
 
 type CommandStatus = "available" | "needs-init" | "needs-llm";
@@ -836,6 +1029,23 @@ export function handleCommandsRoute(
   }
   if (path === "manifest" && method === "GET") {
     return handleManifest(req, res, ctx);
+  }
+  if (path === "fix" && method === "POST") {
+    return handleFix(req, res, ctx, broadcast);
+  }
+  if (path === "ci" && method === "POST") {
+    return handleCi(req, res, ctx, broadcast);
+  }
+  if (path === "ci/status" && method === "GET") {
+    jsonResponse(res, 200, { ...ciStatus });
+    return true;
+  }
+  if (path === "reshape" && method === "POST") {
+    return handleReshape(req, res, ctx, broadcast);
+  }
+  if (path === "reshape/status" && method === "GET") {
+    jsonResponse(res, 200, { ...reshapeStatus });
+    return true;
   }
 
   return false;

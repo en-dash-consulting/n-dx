@@ -48,7 +48,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `ndx refresh` | **partial** | high | "Refresh Data" panel triggers the data phases live (`--data-only --live-server`); full UI rebuild still requires the terminal (server must stop) |
 | `ndx self-heal` | **full** | medium | Trigger, status poll, iteration/phase display, and a Stop control that cancels the running loop |
 | `ndx export` | partial | medium | Export trigger exists; deploy flow not exposed |
-| `ndx ci` | **none** | medium | No trigger or results view |
+| `ndx ci` | **full** | medium | Run-CI-check action in the Validation view with structured results from `--format=json` |
 | `ndx config` | full | medium | Settings section: General (LLM provider), project settings, hench config, Notion, feature flags, CLI timeouts — grouped by CLI command |
 | `ndx auth` | none | low | Credential check is terminal-adjacent; a status chip in LLM settings would suffice |
 | `ndx pair-programming` / `bicker` | none | low | Experimental; not yet a dashboard workflow |
@@ -68,8 +68,8 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `rex health` | full | medium | Health gauge on dashboard |
 | `rex reorganize` | full | medium | Reorganize panel with preview + apply |
 | `rex prune` | full | medium | Prune preview + confirmation + execute |
-| `rex reshape` | **none** | medium | LLM restructuring has no dashboard entry point (high-risk op that would benefit from a diff-preview flow) |
-| `rex fix` | **none** | medium | Validation view shows issues but offers no fix action |
+| `rex reshape` | **full** | medium | Reshape action in the Validation view: previews proposals via `--dry-run`, applies only on explicit confirm |
+| `rex fix` | **full** | medium | Fix action in the Validation view: `--dry-run` preview, then apply, then automatic re-validation |
 | `rex verify` | **full** | medium | Requirements page renders coverage + traceability matrix (per-item CRUD deferred to the task detail panel) |
 | `rex analyze` / `import` | partial | medium | Same orphaned-panel regression as `ndx plan` |
 | `rex usage` | full | medium | Same coverage as `ndx usage` |
@@ -184,9 +184,9 @@ The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, P
 
 5. ~~**Requirements / traceability page**~~ — **done 2026-08-13** (REX → Requirements: coverage stats + expandable traceability matrix).
 6. ~~**Adaptive-optimization page**~~ — **done 2026-08-13** (HENCH → Adaptive view: metrics, apply/dismiss/lock, settings, overrides, history).
-7. **`rex fix` action** — "Fix issues" button in the Validation view → new POST `/api/rex/fix`.
-8. **`rex reshape` flow** — reshape trigger with diff preview + confirm.
-9. **`ndx ci` trigger** — "Run CI check" → structured results panel.
+7. ~~**`rex fix` action**~~ — **done 2026-08-14** (Validation view, dry-run preview then apply).
+8. ~~**`rex reshape` flow**~~ — **done 2026-08-14** (preview proposals, apply on confirm).
+9. ~~**`ndx ci` trigger**~~ — **done 2026-08-14** (async run with structured JSON results).
 10. ~~**Token usage depth**~~ — **closed 2026-08-14, no work needed**: the capabilities were already present via `utilization` (see the API table). The audit had flagged unused *endpoints*, not missing features.
 11. ~~**Self-heal live view**~~ — **done 2026-08-14**: iteration/phase display parsed from loop output, plus a Stop control (new `POST /api/commands/self-heal/stop`, backed by AbortSignal support added to the foundation `exec`).
 
