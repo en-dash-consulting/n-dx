@@ -202,6 +202,10 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
     authMethod = "api-key";
   } else if (provider === "cli" || hasCliPath) {
     authMethod = "cli";
+  } else if (vendor === "local" || vendor === "google") {
+    // Local (LM Studio/Ollama) and Google use a REST API — no CLI or API key needed.
+    // Treat as "api-key" so the footer shows ✓ rather than ⚠.
+    authMethod = "api-key";
   }
 
   // Token budget
