@@ -65,6 +65,20 @@ export interface LocalConfig {
    * When set, resolveVendorModel uses this model for light-weight tasks.
    */
   lightModel?: string;
+  /**
+   * Maximum context window size in tokens for the local model.
+   *
+   * When set, hench will check whether the assembled brief fits before
+   * sending it to LM Studio. If the estimated token count exceeds this value,
+   * the run will fail fast with a clear error instead of a cryptic HTTP 400.
+   *
+   * Typical values: 8192 (LM Studio default), 32768, 65536, 131072.
+   * Set this to match "Context Length" in your LM Studio model settings.
+   *
+   * If unset, no pre-send check is performed; the server error is still
+   * surfaced with actionable guidance via parseLmStudioError.
+   */
+  maxContextTokens?: number;
 }
 
 /** Optional Google Gemini-specific config section in `.n-dx.json`. */

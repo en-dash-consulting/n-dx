@@ -585,16 +585,37 @@ async function selectTask(
   if (tasks.length === 0) {
     const scope = epicId ? "within the specified epic" : "in PRD";
     output(`No actionable tasks found ${scope}.`);
-    // Check for deferred/failing tasks and suggest --reset-deferred
+    // Check for deferred/failing tasks and offer to reset them interactively.
     const doc = await store.loadDocument();
     const deferredCount = countTasksByStatus(doc.items, ["deferred", "failing"]);
-    if (deferredCount > 0) {
+    if (deferredCount > 0 && process.stdin.isTTY) {
+      output(colorWarn(`  ${deferredCount} task(s) are deferred or failing.`));
+      const answer = await promptUser("  Reset them to pending and continue? [y/N] ");
+      if (answer.toLowerCase() === "y" || answer.toLowerCase() === "yes") {
+        await resetDeferredTasks(store);
+        // Reload tasks after reset
+        tasks = await getActionableTasks(store);
+        if (epicId) {
+          const freshDoc = await store.loadDocument();
+          const epicTaskIds = collectEpicTaskIds(freshDoc.items, epicId);
+          tasks = tasks.filter((t) => epicTaskIds.has(t.id));
+        }
+        if (tasks.length === 0) {
+          output("Still no actionable tasks after reset.");
+          process.exit(0);
+        }
+      } else {
+        process.exit(0);
+      }
+    } else if (deferredCount > 0) {
       output(colorWarn(
         `  ${deferredCount} task(s) are deferred or failing — ` +
-        `run with --reset-deferred to reset them to pending and retry.`,
+        `run 'ndx work --reset-deferred' to reset them and retry.`,
       ));
+      process.exit(0);
+    } else {
+      process.exit(0);
     }
-    process.exit(0);
   }
 
   info("\nActionable tasks (by priority):\n");
@@ -1053,6 +1074,59 @@ export async function cmdRun(
   if (provider === "cli" && !dryRun && llmVendor !== "google" && llmVendor !== "local") {
     const customPath = resolveVendorCliPath(llmConfig);
     requireLLMCLI(llmVendor as "claude" | "codex", customPath);
+  }
+
+  // Local vendor preflight: verify the LM Studio server is reachable and a model is loaded.
+  // Fails fast before task selection and brief assembly to give the user a clear error instead
+  // of a mid-run context-window or connection failure deep in the loop.
+  if (llmVendor === "local" && !dryRun) {
+    const localCfg = llmConfig?.local;
+    const host = localCfg?.host ?? "localhost";
+    const port = localCfg?.port ?? 1234;
+    const baseUrl = `http://${host}:${port}/v1`;
+    try {
+      const res = await fetch(`${baseUrl}/models`, {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        throw new CLIError(
+          `LM Studio server responded with HTTP ${res.status} on GET /v1/models.`,
+          `Check that LM Studio is running at ${host}:${port} and a model is loaded.`,
+        );
+      }
+      type ModelsResponse = { data?: Array<{ id?: string; context_length?: number }> };
+      const data = await res.json() as ModelsResponse;
+      const models = data.data ?? [];
+      if (models.length === 0) {
+        throw new CLIError(
+          `LM Studio is running at ${host}:${port} but no models are loaded.`,
+          "Open LM Studio and load a model before running 'ndx work'.",
+        );
+      }
+      // Surface model count and context window so the user can verify their setup.
+      const modelId = models[0].id ?? "(unknown)";
+      const contextLen = models[0].context_length;
+      const ctxNote = contextLen
+        ? ` (context window: ${contextLen.toLocaleString()} tokens)`
+        : "";
+      info(`✓ LM Studio ready — ${models.length} model(s) available, active: ${modelId}${ctxNote}`);
+      if (contextLen && contextLen < 16_384) {
+        info(
+          colorWarn(
+            `  ⚠ Context window is only ${contextLen.toLocaleString()} tokens — ` +
+            `briefs often exceed 32 768 tokens. Increase "Context Length" in LM Studio.`,
+          ),
+        );
+      }
+    } catch (err) {
+      if (err instanceof CLIError) throw err;
+      throw new CLIError(
+        `Cannot reach LM Studio at ${host}:${port}: ${(err as Error).message}`,
+        "Ensure LM Studio is running and the server is started (port matches your config).",
+      );
+    }
   }
 
   const iterations = flags.iterations ? safeParseInt(flags.iterations, "iterations") : 1;
