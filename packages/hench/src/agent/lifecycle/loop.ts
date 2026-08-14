@@ -14,7 +14,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs } from "../../prd/llm-gateway.js";
+import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -661,14 +661,18 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       if (run.status === "running") {
         run.status = "timeout";
         run.error = `Exceeded max turns (${maxTurns})`;
-        await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+        // Local LLM timeouts are retryable: model may need more context window or turns.
+        // Use "pending" so the task reappears as actionable on the next run.
+        await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
       }
     }
   } catch (err) {
     run.status = "failed";
     run.error = (err as Error).message;
     console.error(`[Error] ${run.error}`);
-    await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+    // Infrastructure failures (context window overflow, network errors) are retryable.
+    // Use "pending" so the task reappears as actionable after the user fixes the issue.
+    await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
   } finally {
     process.removeListener("SIGINT", handleSignal);
   }
@@ -917,7 +921,7 @@ async function runLocalToolLoop(params: {
 
       if (!response.ok) {
         const body = await response.text().catch(() => "");
-        throw new Error(`Local server HTTP ${response.status}: ${body.slice(0, 200)}`);
+        throw new Error(parseLmStudioError(response.status, body));
       }
 
       const data = await response.json() as Record<string, unknown>;
@@ -978,13 +982,17 @@ async function runLocalToolLoop(params: {
     if (run.status === "running") {
       run.status = "timeout";
       run.error = `Exceeded max turns (${maxTurns})`;
-      await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+      // Local LLM timeouts are retryable: model may need a larger context window or more turns.
+      // Reset to "pending" so the task reappears as actionable after the user adjusts LM Studio config.
+      await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
     }
   } catch (err) {
     run.status = "failed";
     run.error = (err as Error).message;
     console.error(`[Error] ${run.error}`);
-    await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+    // Infrastructure failures (context window overflow, network errors) are retryable.
+    // Reset to "pending" so the task reappears as actionable after the user fixes the issue.
+    await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
   } finally {
     process.removeListener("SIGINT", handleSignal);
   }

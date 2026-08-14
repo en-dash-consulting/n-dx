@@ -84,8 +84,11 @@ function resolveBaseUrl(localConfig?: LocalConfig): string {
  * LM Studio wraps its errors in `{ error: { message, code, type } }`.
  * This function extracts the inner message and rewrites known patterns into
  * actionable guidance (e.g. context-window overflow → "increase Context Length").
+ *
+ * Exported so that consumers (e.g. the hench local tool loop) can reuse the
+ * same error formatting instead of truncating raw JSON blobs.
  */
-function parseLmStudioError(status: number, rawBody: string): string {
+export function parseLmStudioError(status: number, rawBody: string): string {
   let innerMessage: string | null = null;
   try {
     const parsed = JSON.parse(rawBody) as Record<string, unknown>;

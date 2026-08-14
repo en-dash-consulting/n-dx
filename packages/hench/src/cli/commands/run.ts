@@ -304,6 +304,60 @@ export async function getEpicScopeInfo(
 }
 
 // ---------------------------------------------------------------------------
+// Deferred/failing task reset (--reset-deferred)
+// ---------------------------------------------------------------------------
+
+/**
+ * Count tasks with a given set of statuses (across the full tree).
+ * Walks the PRD tree recursively; counts only leaf-level items.
+ */
+function countTasksByStatus(items: PRDItem[], statuses: string[]): number {
+  const statusSet = new Set(statuses);
+  let count = 0;
+  const walk = (list: PRDItem[]) => {
+    for (const item of list) {
+      if (statusSet.has(item.status)) count++;
+      if (item.children) walk(item.children);
+    }
+  };
+  walk(items);
+  return count;
+}
+
+/**
+ * Reset all deferred and failing tasks to pending so they can be retried.
+ *
+ * Used by --reset-deferred to let the user restart a run where all tasks
+ * failed (e.g. after fixing LM Studio context window size). Returns the
+ * number of tasks that were reset.
+ */
+async function resetDeferredTasks(store: PRDStore): Promise<number> {
+  const doc = await store.loadDocument();
+  const toReset: Array<{ id: string; title: string }> = [];
+
+  const walk = (items: PRDItem[]) => {
+    for (const item of items) {
+      if (item.status === "deferred" || item.status === "failing") {
+        toReset.push({ id: item.id, title: item.title });
+      }
+      if (item.children) walk(item.children);
+    }
+  };
+  walk(doc.items);
+
+  for (const t of toReset) {
+    await store.updateItem(t.id, { status: "pending" });
+  }
+
+  if (toReset.length > 0) {
+    info(`\nReset ${toReset.length} task(s) to pending:`);
+    for (const t of toReset) info(`  ${colorStatus("pending", "○")} ${t.id}: ${t.title}`);
+  }
+
+  return toReset.length;
+}
+
+// ---------------------------------------------------------------------------
 // Loop helpers (exported for testing)
 // ---------------------------------------------------------------------------
 
@@ -531,6 +585,15 @@ async function selectTask(
   if (tasks.length === 0) {
     const scope = epicId ? "within the specified epic" : "in PRD";
     output(`No actionable tasks found ${scope}.`);
+    // Check for deferred/failing tasks and suggest --reset-deferred
+    const doc = await store.loadDocument();
+    const deferredCount = countTasksByStatus(doc.items, ["deferred", "failing"]);
+    if (deferredCount > 0) {
+      output(colorWarn(
+        `  ${deferredCount} task(s) are deferred or failing — ` +
+        `run with --reset-deferred to reset them to pending and retry.`,
+      ));
+    }
     process.exit(0);
   }
 
@@ -972,6 +1035,17 @@ export async function cmdRun(
   // branch is a safety net for projects configured outside of those flows.
   if ((llmVendor === "google" || llmVendor === "local") && provider === "cli" && !dryRun) {
     provider = "api";
+  }
+
+  // --reset-deferred: reset all deferred/failing tasks to pending before running.
+  // This lets the user retry tasks that were deferred by infrastructure failures
+  // (e.g. context window overflow) without manually editing each task.
+  if (flags["reset-deferred"] === "true") {
+    const store = await resolveStore(rexDir);
+    const resetCount = await resetDeferredTasks(store);
+    if (resetCount === 0) {
+      info("\nNo deferred or failing tasks to reset.");
+    }
   }
 
   // Fail fast if CLI provider selected but vendor CLI binary not available.
