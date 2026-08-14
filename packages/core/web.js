@@ -367,19 +367,30 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   // --- Check for stale PID / already running ---
   const existing = await readPidFile(absDir);
   if (existing && isProcessRunning(existing.pid)) {
-    console.error(`${label} is already running (PID ${existing.pid}, port ${existing.port}).`);
-    console.error(`  URL: http://localhost:${existing.port}`);
-    console.error(`Use '${stopCmd}' to stop it first.`);
-    return 1;
+    // Auto-restart: stop the old server so ndx start is idempotent.
+    log(`Stopping previous ${label} (PID ${existing.pid}, port ${existing.port})…`);
+    await stopServer(absDir, label);
   } else if (existing) {
     // Stale PID file — clean up
     await removePidFile(absDir);
     await removePortFile(absDir);
   }
 
-  // Note: Port availability is checked inside the server process itself,
-  // which will automatically fall back to the next available port in the
-  // range 3117–3200 if the configured port is already in use.
+  // Fail clearly if the target port is occupied by something we don't own.
+  // This prevents the silent "bump to 3118" confusion.
+  // Retry briefly to let the OS release the port after a stop.
+  {
+    let portFree = false;
+    for (let i = 0; i < 10; i++) {
+      if (!(await isPortInUse(port))) { portFree = true; break; }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    if (!portFree) {
+      console.error(`Port ${port} is already in use by another process.`);
+      console.error(`Choose a different port with --port=N or set web.port in .n-dx.json`);
+      return 1;
+    }
+  }
 
   // --- Build serve args ---
   const serveArgs = ["serve", `--port=${port}`, absDir];
@@ -422,7 +433,8 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     await writePidFile(absDir, child.pid, actualPort);
 
     if (actualPort !== port) {
-      log(`Port ${port} is in use — using port ${actualPort} instead.`);
+      console.error(`Warning: requested port ${port} was taken; server bound to ${actualPort}.`);
+      console.error(`  URL: http://localhost:${actualPort}`);
     }
 
     log(`${label} started in background (PID ${child.pid}).`);
