@@ -421,6 +421,12 @@ export interface SpawnToolOptions {
    * 0 or undefined = no timeout (wait indefinitely).
    */
   timeout?: number;
+  /**
+   * Windows-only: when true, suppress the console window that Windows would
+   * otherwise create for console-subsystem executables spawned from a headless
+   * (background/daemon) process.  Ignored on non-Windows platforms.
+   */
+  windowsHide?: boolean;
 }
 
 /** Result from {@link spawnTool}. */
@@ -477,6 +483,7 @@ export function spawnTool(
       env,
       stdio: "ignore",
       detached: true,
+      windowsHide: opts.windowsHide ?? false,
     });
     child.unref();
     return Promise.resolve({
@@ -493,6 +500,7 @@ export function spawnTool(
       cwd,
       env,
       stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
+      windowsHide: opts.windowsHide ?? false,
     });
 
     let stdout = "";
@@ -571,6 +579,7 @@ export function spawnManaged(
     cwd,
     env,
     stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
+    windowsHide: opts.windowsHide ?? false,
   });
 
   const done = new Promise<SpawnToolResult>((resolve) => {
