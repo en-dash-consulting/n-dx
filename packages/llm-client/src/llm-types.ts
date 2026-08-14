@@ -52,6 +52,31 @@ export interface CodexConfig {
   lightModel?: string;
 }
 
+/**
+ * Config for a second local model that reviews primary output.
+ *
+ * When set, hench queries this endpoint after the primary model finishes a task
+ * and asks it to verify the solution against the task requirements. If the
+ * verifier returns FAIL, it feeds the reasoning back to the primary as a new
+ * user message and lets it revise — up to `maxCycles` times.
+ *
+ * The verifier needs no tool access; any chat-completion endpoint works.
+ * A smaller/faster model is a good choice (lower VRAM, lower latency).
+ */
+export interface LocalVerifierConfig {
+  /** Host for the verifier server. Defaults to `"localhost"`. */
+  host?: string;
+  /** Port for the verifier server. Defaults to `1235`. */
+  port?: number;
+  /** Model to use on the verifier endpoint. When unset, uses whatever is loaded. */
+  model?: string;
+  /**
+   * Maximum number of FAIL → revise cycles per run (default: 2).
+   * Once exhausted the run finalizes with whatever state the primary is in.
+   */
+  maxCycles?: number;
+}
+
 /** Optional local model config section in `.n-dx.json` (e.g. LM Studio). */
 export interface LocalConfig {
   /** Host for the local server. Defaults to `"localhost"`. */
@@ -79,6 +104,16 @@ export interface LocalConfig {
    * surfaced with actionable guidance via parseLmStudioError.
    */
   maxContextTokens?: number;
+  /**
+   * Second-model verifier. When set, hench sends the primary model's completed
+   * solution to this endpoint for review before finalizing the run.
+   *
+   * Example (two LM Studio instances, or one Ollama serving two models):
+   * ```json
+   * "verifier": { "port": 1235, "model": "qwen2.5-7b", "maxCycles": 2 }
+   * ```
+   */
+  verifier?: LocalVerifierConfig;
 }
 
 /** Optional Google Gemini-specific config section in `.n-dx.json`. */

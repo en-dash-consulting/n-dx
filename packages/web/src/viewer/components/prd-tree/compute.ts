@@ -82,6 +82,7 @@ export function countChildStatuses(
     failing: 0,
     deferred: 0,
     blocked: 0,
+    cancelled: 0,
     deleted: 0,
   };
   for (const child of children) {

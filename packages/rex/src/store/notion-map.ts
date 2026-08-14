@@ -78,7 +78,8 @@ export const STATUS_OPTIONS: Record<ItemStatus, NotionStatusOption> = {
   failing:     { name: "Failing",      color: "red",     group: "In progress" },
   deferred:    { name: "Deferred",     color: "yellow",  group: "To-do" },
   blocked:     { name: "Blocked",      color: "red",     group: "In progress" },
-  deleted:     { name: "Deleted",     color: "default", group: "Complete" },
+  cancelled:   { name: "Cancelled",    color: "gray",    group: "Complete" },
+  deleted:     { name: "Deleted",      color: "default", group: "Complete" },
 };
 
 /**

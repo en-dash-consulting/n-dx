@@ -18,6 +18,7 @@ export const ALL_STATUSES: ItemStatus[] = [
   "failing",
   "blocked",
   "deferred",
+  "cancelled",
   "deleted",
 ];
 
@@ -29,6 +30,7 @@ const STATUS_DISPLAY: Record<ItemStatus, { icon: string; label: string; cssClass
   failing:     { icon: "\u26A0", label: "Failing",     cssClass: "prd-status-failing" },
   blocked:     { icon: "\u2298", label: "Blocked",     cssClass: "prd-status-blocked" },
   deferred:    { icon: "\u25CC", label: "Deferred",    cssClass: "prd-status-deferred" },
+  cancelled:   { icon: "\u2297", label: "Cancelled",   cssClass: "prd-status-cancelled" },
   deleted:     { icon: "\u2715", label: "Deleted",     cssClass: "prd-status-deleted" },
 };
 

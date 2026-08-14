@@ -68,7 +68,7 @@ export function detectOrphanBlockedBy(items: FixItem[]): FixAction[] {
 }
 
 export function detectParentChildMisalignment(items: FixItem[]): FixAction[] {
-  const terminalStatuses = new Set<FixItemStatus>(["completed", "deferred", "deleted"]);
+  const terminalStatuses = new Set<FixItemStatus>(["completed", "deferred", "cancelled", "deleted"]);
   const actions: FixAction[] = [];
 
   for (const { item } of walkFixTree(items)) {
@@ -139,7 +139,7 @@ function applyOrphanBlockedByFixes(items: FixItem[]): number {
 }
 
 function applyParentChildFixes(items: FixItem[], now: string): number {
-  const terminalStatuses = new Set<FixItemStatus>(["completed", "deferred", "deleted"]);
+  const terminalStatuses = new Set<FixItemStatus>(["completed", "deferred", "cancelled", "deleted"]);
   let count = 0;
 
   for (const { item } of walkFixTree(items)) {
