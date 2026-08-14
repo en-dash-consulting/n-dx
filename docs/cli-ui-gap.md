@@ -50,7 +50,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `ndx export` | partial | medium | Export trigger exists; deploy flow not exposed |
 | `ndx ci` | **full** | medium | Run-CI-check action in the Validation view with structured results from `--format=json` |
 | `ndx config` | full | medium | Settings section: General (LLM provider), project settings, hench config, Notion, feature flags, CLI timeouts — grouped by CLI command |
-| `ndx auth` | none | low | Credential check is terminal-adjacent; a status chip in LLM settings would suffice |
+| `ndx auth` | **full** | low | Credential status chip in Settings → General (GET `/api/commands/auth`), with re-check |
 | `ndx pair-programming` / `bicker` | none | low | Experimental; not yet a dashboard workflow |
 | `ndx init` | n/a | — | One-time setup; dashboard requires init to exist |
 | `ndx start` / `ndx dev` | n/a | — | These commands launch the dashboard |
@@ -76,7 +76,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `rex sync` | full | medium | Via sync triggers |
 | `rex adapter` | partial | low | Integrations view provides schema-driven config for registered adapters; no add/remove |
 | `rex report` | none | low | JSON for CI; health view covers interactive use |
-| `rex facets` (MCP `facets`) | partial | low | Facet filters in PRD tree; no facet-distribution view |
+| `rex facets` (MCP `facets`) | partial | low | **Deferred by decision (2026-08-14).** Facet filters exist in the PRD tree. A distribution view was scoped and skipped: `facets` is MCP-only (no CLI command), no facets are configured in this project, and the panel would render an empty state for most users. Revisit if facet configuration becomes common. |
 | `rex migrate-to-md` / `migrate-folder-tree-filenames` / `backfill-commit-attribution` | n/a | — | One-time migrations; terminal-only by design |
 | `rex mcp` | n/a | — | Server plumbing; MCP HTTP endpoints served by the dashboard itself |
 
@@ -87,7 +87,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `sourcevision analyze` | full | high | Run Analysis trigger + eight data views |
 | `sourcevision pr-markdown` | full | medium | PR Markdown tab with per-section copy + freshness state |
 | `sourcevision validate` | none | low | No UI to validate `.sourcevision/` outputs; freshness indicator partially covers intent |
-| `sourcevision export-pdf` | **none** | medium | No export-as-PDF control; natural fit next to the existing Export panel |
+| `sourcevision export-pdf` | **full** | medium | "Export PDF report" beside the Export panel; reports the written path (the viewer sandbox blocks page-initiated downloads) |
 | `sourcevision workspace` | none | low | Multi-repo aggregation has no dashboard concept yet (project switcher `/api/projects` is single-repo) |
 | `sourcevision serve` | n/a | — | Legacy standalone viewer; superseded by `ndx start` |
 | `sourcevision reset` | n/a | — | Destructive; intentionally terminal-only |
@@ -102,7 +102,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `hench status` / `show` | full | medium | Runs view: history, transcript, token breakdown, files changed |
 | `hench config` | full | medium | ndx work settings view (GET/PUT `/api/hench/config`) |
 | `hench template` | full | medium | Templates view: gallery, apply, save, delete |
-| `hench validate-tokens` | none | low | Vendor token-accuracy check; diagnostics already shown per-run — trigger could live in Runs view |
+| `hench validate-tokens` | **full** | low | "Validate token reporting" trigger in the Runs view, beside the per-run token diagnostics |
 | `hench record` | n/a | — | Plumbing for the /ndx-work assisted-run skill |
 | `hench init` | n/a | — | Covered by `ndx init` |
 
@@ -125,7 +125,7 @@ MCP tools are AI-assistant-facing; the dashboard need not mirror them 1:1. Cover
 | `reorganize` | Reorganize panel | full |
 | `health` | Health gauge | full |
 | `facets` | Facet filters (no distribution view) | partial |
-| `append_log` | — | n/a (agent write path; execution log has no viewer, see gap list) |
+| `append_log` | Activity view (REX → Activity) renders the log | full |
 | `sync_with_remote` | Sync triggers | full |
 | `get_token_usage` | Token Usage view (utilization only) | partial |
 | `get_capabilities` | — | n/a (protocol handshake) |
@@ -192,12 +192,12 @@ The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, P
 
 ### Tier 3 — low impact
 
-12. **`sourcevision export-pdf` control** next to the Export panel.
+12. ~~**`sourcevision export-pdf` control**~~ — **done 2026-08-14**.
 13. ~~**`set_file_archetype` override UI**~~ — **done 2026-08-12** (Files tab Archetype column with override control).
-14. **Facet distribution view** (MCP `facets` parity).
-15. **`ndx auth` status chip** in LLM settings.
-16. **`hench validate-tokens` trigger** in the Runs view.
-17. **Execution-log viewer** (`.rex/execution-log.jsonl`; `append_log` observability).
+14. ~~**Facet distribution view**~~ — **deferred 2026-08-14** with rationale (see the rex CLI table): MCP-only, unconfigured in practice, would render empty for most projects.
+15. ~~**`ndx auth` status chip**~~ — **done 2026-08-14** (Settings → General).
+16. ~~**`hench validate-tokens` trigger**~~ — **done 2026-08-14**.
+17. ~~**Execution-log viewer**~~ — **done 2026-08-14**: REX → Activity renders the full log with event filtering and search.
 
 ## Intentionally terminal-only (excluded)
 
@@ -212,5 +212,5 @@ The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, P
 | `rex migrate-*` / `backfill-commit-attribution` | One-time migrations |
 | `rex mcp` / `sourcevision mcp` | Transport plumbing; HTTP MCP is served by the dashboard |
 | `hench record` | Skill-integration plumbing |
-| MCP `append_log` (write path), `get_capabilities` | Agent/protocol-facing |
+| MCP `get_capabilities` | Protocol handshake |
 | `/api/sv/*` read endpoints | External/MCP-facing API by design; viewer reads `/data/*.json` |

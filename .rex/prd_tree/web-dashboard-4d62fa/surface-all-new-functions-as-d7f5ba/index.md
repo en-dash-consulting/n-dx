@@ -2,13 +2,16 @@
 id: "d7f5ba08-a413-44f2-a560-0423be6b4413"
 level: "feature"
 title: "Surface all new functions as dashboard pages/sections"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "web"
   - "ui"
   - "coverage"
 source: "ndx-capture"
+startedAt: "2026-08-14T17:45:43.769Z"
+completedAt: "2026-08-14T17:45:43.769Z"
+endedAt: "2026-08-14T17:45:43.769Z"
 acceptanceCriteria:
   - "A documented audit inventory lists every backend/CLI/MCP function without UI coverage"
   - "Each uncovered function gains a dashboard page or section, or a documented exclusion with rationale"
@@ -21,5 +24,5 @@ description: "The dashboard UI lags behind the toolkit's actual capabilities: fu
 
 | Title | Status |
 |-------|--------|
-| [Implement new dashboard pages/sections for uncovered functions](./implement-new-dashboard-pages-974800/index.md) | in_progress |
+| [Implement new dashboard pages/sections for uncovered functions](./implement-new-dashboard-pages-974800/index.md) | completed |
 | [Audit functions lacking dashboard UI coverage](./audit-functions-lacking-15afda.md) | completed |

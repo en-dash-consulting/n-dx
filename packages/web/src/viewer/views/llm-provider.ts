@@ -218,6 +218,55 @@ function VendorSection({
 
 // ── Toast ─────────────────────────────────────────────────────────────
 
+/**
+ * Credential status for the configured provider.
+ *
+ * Runs the same check as `<cli> auth`, so a missing or invalid key is visible
+ * here rather than only when an agent command fails later.
+ */
+export function AuthStatusChip() {
+  const cliName = useCliName();
+  const [state, setState] = useState<"checking" | "ok" | "bad">("checking");
+  const [detail, setDetail] = useState<string | null>(null);
+
+  const check = useCallback(async () => {
+    setState("checking");
+    setDetail(null);
+    try {
+      const res = await fetch("/api/commands/auth");
+      const body = await res.json() as { ok?: boolean; error?: string | null; output?: string };
+      if (body.ok) {
+        setState("ok");
+        setDetail(body.output?.split("\n").filter(Boolean).pop() ?? null);
+      } else {
+        setState("bad");
+        setDetail(body.error ?? "Credential check failed");
+      }
+    } catch (err) {
+      setState("bad");
+      setDetail(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  useEffect(() => { check(); }, [check]);
+
+  return h("div", { class: `auth-chip auth-chip-${state}`, role: "status", "aria-live": "polite" },
+    h("span", { class: "auth-chip-dot", "aria-hidden": "true" }),
+    h("span", { class: "auth-chip-label" },
+      state === "checking" ? "Checking credentials…"
+        : state === "ok" ? "Credentials OK"
+        : "Credentials not usable",
+    ),
+    detail ? h("span", { class: "auth-chip-detail" }, detail) : null,
+    h("button", {
+      class: "cmd-btn cmd-btn-small",
+      onClick: check,
+      disabled: state === "checking",
+      title: `Re-run ${cliName} auth`,
+    }, "Re-check"),
+  );
+}
+
 function SaveToast({ message }: { message: string | null }) {
   if (!message) return null;
   return h("div", { class: "llm-toast", role: "status", "aria-live": "polite" },
@@ -413,6 +462,9 @@ export function LlmProviderView() {
         " and take effect on the next run.",
       ),
     ),
+
+    // ── Credential status for the configured provider
+    h(AuthStatusChip, null),
 
     // ── Error banner
     error

@@ -749,3 +749,81 @@ describe("commands route — validation actions (fix, ci, reshape)", () => {
     expect(args).not.toContain("--dry-run");
   });
 });
+
+describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    execMock.mockReset();
+    tmpDir = await mkdtemp(join(tmpdir(), "commands-tier3-"));
+    await mkdir(join(tmpDir, ".rex"), { recursive: true });
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    const started = await startRouteTestServer((req, res) =>
+      handleCommandsRoute(req, res, ctx),
+    );
+    server = started.server;
+    port = started.port;
+  });
+
+  afterEach(async () => {
+    await closeRouteTestServer(server);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("auth reports ok when the credential check exits cleanly", async () => {
+    execMock.mockResolvedValue({ stdout: "claude: credentials OK", stderr: "", error: null, exitCode: 0 });
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/auth`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(String(body.output)).toContain("credentials OK");
+    expect(execMock.mock.calls[0][1] as string[]).toContain("auth");
+  });
+
+  it("auth reports not-ok with the failure text when credentials are missing", async () => {
+    execMock.mockResolvedValue({
+      stdout: "", stderr: "No API key found for vendor claude",
+      error: new Error("exit 1"), exitCode: 1,
+    });
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
+    expect(body.ok).toBe(false);
+    expect(String(body.error)).toContain("No API key found");
+  });
+
+  it("validate-tokens runs the hench check and returns its output", async () => {
+    execMock.mockResolvedValue({ stdout: "token reporting accurate", stderr: "", error: null });
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/validate-tokens`, { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(String(body.output)).toContain("token reporting accurate");
+    expect(execMock.mock.calls[0][1] as string[]).toContain("validate-tokens");
+  });
+
+  it("export-pdf reports the written path", async () => {
+    execMock.mockResolvedValue({
+      stdout: "Wrote .sourcevision/report.pdf", stderr: "", error: null,
+    });
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/export-pdf`, { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(String(body.output)).toContain("report.pdf");
+    expect(execMock.mock.calls[0][1] as string[]).toContain("export-pdf");
+  });
+
+  it("export-pdf surfaces a failure", async () => {
+    execMock.mockResolvedValue({ stdout: "", stderr: "no analysis data", error: new Error("exit 1") });
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/export-pdf`, { method: "POST" });
+    expect(res.status).toBe(500);
+    expect(String((await res.json()).error)).toContain("no analysis data");
+  });
+});

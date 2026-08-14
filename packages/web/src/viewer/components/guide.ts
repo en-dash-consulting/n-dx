@@ -80,6 +80,12 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     lookFor: "Pending proposals awaiting review. Analysis history events showing what recent runs produced. Duplicate proposals that should be rejected rather than accepted.",
     actions: "Use Smart Add to draft items from a description. Run a project scan to generate proposals, then accept or reject each one. Batch-import a spec file to seed the PRD.",
   },
+  activity: {
+    title: "Activity",
+    description: "The append-only PRD execution log: status changes, item mutations, syncs, reorganizes, and agent work-log entries.",
+    lookFor: "Unexpected status flips, bursts of automated changes, and gaps where work happened without being logged.",
+    actions: "Filter by event to isolate one kind of change, or search a detail string or item id to trace a single item's history.",
+  },
   requirements: {
     title: "Requirements",
     description: "Requirement coverage and the traceability matrix: every requirement, the item it is defined on, the descendants it applies to, and how it is validated.",

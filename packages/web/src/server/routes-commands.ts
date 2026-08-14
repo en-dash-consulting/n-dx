@@ -19,6 +19,9 @@
  * GET  /api/commands/ci/status       — CI check status and structured report
  * POST /api/commands/reshape         — rex reshape (body: { accept?: boolean }); previews unless accepted
  * GET  /api/commands/reshape/status  — reshape status and proposal report
+ * GET  /api/commands/auth            — verify LLM provider credentials (read-only)
+ * POST /api/commands/validate-tokens — hench vendor token-accuracy check
+ * POST /api/commands/export-pdf      — sourcevision PDF report (returns the written path)
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -843,6 +846,98 @@ async function handleReshape(
   );
 }
 
+// ── Tier 3: credential check and small package triggers ───────────────
+
+/**
+ * GET /api/commands/auth — verify LLM provider credentials.
+ *
+ * Read-only (hence GET): runs `ndx auth`, whose exit code answers "are the
+ * configured provider's credentials usable". Surfaced as a chip in LLM
+ * settings so a missing key is visible *before* an agent command fails.
+ */
+async function handleAuth(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  try {
+    const result = await foundationExec(bin, [...prefixArgs, "auth", ctx.projectDir], {
+      cwd: ctx.projectDir,
+      timeout: 60_000,
+      maxBuffer: 2 * 1024 * 1024,
+    });
+    const ok = !result.error;
+    jsonResponse(res, 200, {
+      ok,
+      output: result.stdout.trim().slice(-2000),
+      error: ok ? null : (result.stderr || result.error?.message || "Credential check failed").slice(-1000),
+    });
+  } catch (err) {
+    // Report the failure in the body rather than as a 500: "could not check"
+    // is a legitimate chip state, not a broken endpoint.
+    jsonResponse(res, 200, { ok: false, output: "", error: String(err) });
+  }
+  return true;
+}
+
+/** POST /api/commands/validate-tokens — hench vendor token-accuracy check. */
+async function handleValidateTokens(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  const { bin, args: prefixArgs } = resolveNdxCli(
+    ctx.projectDir, "hench", "@n-dx/hench",
+    ["packages", "hench", "dist", "cli", "index.js"],
+  );
+  try {
+    const result = await foundationExec(bin, [...prefixArgs, "validate-tokens", ctx.projectDir], {
+      cwd: ctx.projectDir,
+      timeout: 120_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    if (result.error && !result.stdout) {
+      errorResponse(res, 500, `Token validation failed: ${result.stderr || result.error.message}`);
+      return true;
+    }
+    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-4000) });
+  } catch (err) {
+    errorResponse(res, 500, String(err));
+  }
+  return true;
+}
+
+/**
+ * POST /api/commands/export-pdf — sourcevision PDF report.
+ *
+ * Reports the path the CLI wrote. The dashboard cannot hand the file to the
+ * browser (the viewer sandbox blocks downloads it initiates), so the path is
+ * the useful result.
+ */
+async function handleExportPdf(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  const { bin, args: prefixArgs } = resolveSvBin(ctx);
+  try {
+    const result = await foundationExec(bin, [...prefixArgs, "export-pdf", ctx.projectDir], {
+      cwd: ctx.projectDir,
+      timeout: 300_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    if (result.error && !result.stdout) {
+      errorResponse(res, 500, `PDF export failed: ${result.stderr || result.error.message}`);
+      return true;
+    }
+    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+  } catch (err) {
+    errorResponse(res, 500, String(err));
+  }
+  return true;
+}
+
 // ── Command reference manifest ────────────────────────────────────────
 
 type CommandStatus = "available" | "needs-init" | "needs-llm";
@@ -1029,6 +1124,15 @@ export function handleCommandsRoute(
   }
   if (path === "manifest" && method === "GET") {
     return handleManifest(req, res, ctx);
+  }
+  if (path === "auth" && method === "GET") {
+    return handleAuth(req, res, ctx);
+  }
+  if (path === "validate-tokens" && method === "POST") {
+    return handleValidateTokens(req, res, ctx);
+  }
+  if (path === "export-pdf" && method === "POST") {
+    return handleExportPdf(req, res, ctx);
   }
   if (path === "fix" && method === "POST") {
     return handleFix(req, res, ctx, broadcast);

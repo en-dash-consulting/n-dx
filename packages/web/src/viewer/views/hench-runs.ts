@@ -728,6 +728,47 @@ export interface HenchRunsViewProps {
   initialRunId?: string | null;
 }
 
+/**
+ * Vendor token-accuracy check (`hench validate-tokens`).
+ *
+ * Lives here because per-run token diagnostics are already on this page — this
+ * verifies the vendor's reported numbers are trustworthy.
+ */
+function ValidateTokensTrigger() {
+  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [output, setOutput] = useState<string | null>(null);
+
+  const run = useCallback(async () => {
+    setState("running");
+    setOutput(null);
+    try {
+      const res = await fetch("/api/commands/validate-tokens", { method: "POST" });
+      const body = await res.json() as { ok?: boolean; error?: string; output?: string };
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setOutput(body.output ?? "Token reporting verified.");
+      setState("done");
+    } catch (err) {
+      setOutput(err instanceof Error ? err.message : String(err));
+      setState("error");
+    }
+  }, []);
+
+  return h("div", { class: "hench-validate-tokens" },
+    h("button", {
+      class: "cmd-inline-trigger",
+      onClick: run,
+      disabled: state === "running",
+      title: "Verify that the vendor reports token usage accurately",
+    }, state === "running" ? "Validating\u2026" : "Validate token reporting"),
+    output
+      ? h("pre", {
+          class: `cmd-result-output${state === "error" ? " cmd-inline-result-err" : ""}`,
+          role: state === "error" ? "alert" : "status",
+        }, output)
+      : null,
+  );
+}
+
 export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps = {}) {
   const cliName = useCliName();
   const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -1007,6 +1048,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
       h("div", { class: "hench-runs-header" },
         h(BrandedHeader, { product: "hench", title: "Hench", class: "branded-header-hench" }),
         h("h2", null, "Execution History"),
+        h(ValidateTokensTrigger, null),
       ),
       deepLinkError
         ? h("div", { class: "hench-deep-link-error", role: "alert" },

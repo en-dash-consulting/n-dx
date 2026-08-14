@@ -555,3 +555,45 @@
   padding: 2px 0;
   word-break: break-word;
 }
+
+/* ── Tier 3 surfaces: auth chip, activity log ─────────────────────── */
+
+.auth-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  margin: var(--space-3) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+}
+
+.auth-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.auth-chip-ok .auth-chip-dot { background: var(--green); }
+.auth-chip-bad .auth-chip-dot { background: var(--red); }
+
+.auth-chip-label { font-weight: var(--weight-semibold); }
+.auth-chip-bad .auth-chip-label { color: var(--red); }
+.auth-chip-detail { color: var(--text-muted); }
+
+.activity-container { max-width: 1100px; }
+
+.activity-when { white-space: nowrap; color: var(--text-muted); }
+
+.activity-detail { word-break: break-word; }
+
+.hench-validate-tokens {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

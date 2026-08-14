@@ -22,6 +22,27 @@ function ExportPanel() {
   const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [outDir, setOutDir] = useState("");
+  const [pdfState, setPdfState] = useState<OpState>("idle");
+  const [pdfOutput, setPdfOutput] = useState<string | null>(null);
+
+  /**
+   * Generate the sourcevision PDF report. Reports the written path: the viewer
+   * sandbox blocks downloads the page initiates, so the path is the result.
+   */
+  const handleExportPdf = useCallback(async () => {
+    setPdfState("running");
+    setPdfOutput(null);
+    try {
+      const res = await fetch("/api/commands/export-pdf", { method: "POST" });
+      const body = await res.json() as { ok?: boolean; error?: string; output?: string };
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setPdfOutput(body.output ?? "PDF written.");
+      setPdfState("done");
+    } catch (err) {
+      setPdfOutput(err instanceof Error ? err.message : String(err));
+      setPdfState("error");
+    }
+  }, []);
 
   const handleExport = useCallback(async () => {
     setState("running");
@@ -75,7 +96,20 @@ function ExportPanel() {
         onClick: handleExport,
         disabled: state === "running",
       }, state === "running" ? "Exporting..." : "Export Dashboard"),
+      h("button", {
+        class: "cmd-btn cmd-btn-secondary",
+        onClick: handleExportPdf,
+        disabled: pdfState === "running",
+        title: `Generate a PDF analysis report (${cliName} sourcevision export-pdf)`,
+      }, pdfState === "running" ? "Generating PDF\u2026" : "Export PDF report"),
     ),
+
+    pdfOutput
+      ? h("pre", {
+          class: `cmd-result-output${pdfState === "error" ? " cmd-inline-result-err" : ""}`,
+          role: pdfState === "error" ? "alert" : "status",
+        }, pdfOutput)
+      : null,
 
     state === "running"
       ? h("div", { class: "cmd-progress", role: "status", "aria-live": "polite" },

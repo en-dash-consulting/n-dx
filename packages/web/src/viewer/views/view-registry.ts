@@ -38,6 +38,7 @@ import {
   TokenUsageView,
   ValidationView,
   RequirementsView,
+  ActivityView,
   TaskAuditView,
   WorkflowOptimizationView,
   MergeGraphView,
@@ -130,6 +131,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "requirements": () =>
     h(RequirementsView, null),
+
+  "activity": () =>
+    h(ActivityView, null),
 
   "notion-config": () =>
     h(NotionConfigView, null),

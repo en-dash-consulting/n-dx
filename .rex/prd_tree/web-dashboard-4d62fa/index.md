@@ -2,9 +2,10 @@
 id: "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7"
 level: "epic"
 title: "Web Dashboard"
-status: "pending"
+status: "completed"
 startedAt: "2026-03-24T05:27:03.754Z"
-endedAt: "2026-07-24T19:40:06.608Z"
+completedAt: "2026-08-14T17:45:44.458Z"
+endedAt: "2026-08-14T17:45:44.458Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
 ---
 
@@ -27,7 +28,7 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [Settings Page Completeness and Command-Based Reorganization](./settings-page-completeness-and-dc5e66/index.md) | completed |
 | [SourceVision section runs the full analysis flow with all tabs and recommendations visible](./sourcevision-section-runs-the-a83b1a/index.md) | completed |
 | [Stabilize web tests that flake under parallel suite load](./stabilize-web-tests-that-flake-8230a9/index.md) | completed |
-| [Surface all new functions as dashboard pages/sections](./surface-all-new-functions-as-d7f5ba/index.md) | pending |
+| [Surface all new functions as dashboard pages/sections](./surface-all-new-functions-as-d7f5ba/index.md) | completed |
 | [Surface per-file cross-zone connections in the expandable Zones graph](./surface-per-file-cross-zone-7da574/index.md) | completed |
 | [Transparent task selection and completion reasoning](./transparent-task-selection-and-cb54ce/index.md) | completed |
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-5dd63e.md) | completed |

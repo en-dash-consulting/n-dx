@@ -22,6 +22,7 @@ export type ViewId =
   | "token-usage"
   | "validation"
   | "requirements"
+  | "activity"
   | "notion-config"
   | "integrations"
   | "hench-runs"

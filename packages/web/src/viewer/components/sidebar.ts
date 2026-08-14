@@ -50,6 +50,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "item", id: "merge-graph", icon: "\u29c9", label: "Context Graph", minPass: 0 },
   { type: "item", id: "validation", icon: "\u2714", label: "Validation", minPass: 0 },
   { type: "item", id: "requirements", icon: "\u2696", label: "Requirements", minPass: 0 },
+  { type: "item", id: "activity", icon: "\u231A", label: "Activity", minPass: 0 },
   { type: "item", id: "integrations", icon: "\u{1F517}", label: "Integrations", minPass: 0, featureGate: "rex.integrations" },
   { type: "section", label: "HENCH", product: "hench" },
   { type: "item", id: "hench-runs", icon: "\u25B6", label: "Runs", minPass: 0 },
