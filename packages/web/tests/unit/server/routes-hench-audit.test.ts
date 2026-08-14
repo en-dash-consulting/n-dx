@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { handleHenchRoute, resetHenchRouteStateForTests } from "../../../src/server/routes-hench.js";
+import { closeRouteTestServer, TEST_HOST } from "../../helpers/server-route-test-support.js";
 
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
@@ -20,7 +21,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
         res.end("Not found");
       }
     });
-    server.listen(0, () => {
+    server.listen(0, TEST_HOST, () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -35,6 +36,7 @@ describe("GET /api/hench/audit", () => {
   let port: number;
 
   beforeEach(async () => {
+    resetHenchRouteStateForTests();
     tmpDir = await mkdtemp(join(tmpdir(), "hench-audit-"));
     const runsDir = join(tmpDir, ".hench", "runs");
     await mkdir(runsDir, { recursive: true });
@@ -48,12 +50,12 @@ describe("GET /api/hench/audit", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("returns empty entries when no running tasks", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/audit`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/audit`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.entries).toEqual([]);
@@ -62,7 +64,7 @@ describe("GET /api/hench/audit", () => {
   });
 
   it("includes system resource info", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/audit`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/audit`);
     const data = await res.json();
     const info = data.systemInfo;
     expect(typeof info.serverPid).toBe("number");
@@ -91,7 +93,7 @@ describe("GET /api/hench/audit", () => {
     };
     await writeFile(join(runsDir, "run-audit-1.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/audit`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/audit`);
     const data = await res.json();
     expect(data.entries).toHaveLength(1);
 
@@ -125,7 +127,7 @@ describe("GET /api/hench/audit", () => {
     };
     await writeFile(join(runsDir, "run-stale.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/audit`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/audit`);
     const data = await res.json();
     expect(data.entries).toHaveLength(1);
     expect(data.entries[0].stale).toBe(true);
@@ -147,7 +149,7 @@ describe("GET /api/hench/audit", () => {
     };
     await writeFile(join(runsDir, "run-done.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/audit`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/audit`);
     const data = await res.json();
     expect(data.entries).toEqual([]);
   });
@@ -160,6 +162,7 @@ describe("POST /api/hench/execute/:taskId/terminate", () => {
   let port: number;
 
   beforeEach(async () => {
+    resetHenchRouteStateForTests();
     tmpDir = await mkdtemp(join(tmpdir(), "hench-terminate-"));
     const runsDir = join(tmpDir, ".hench", "runs");
     await mkdir(runsDir, { recursive: true });
@@ -173,13 +176,13 @@ describe("POST /api/hench/execute/:taskId/terminate", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("returns 404 when no active execution found", async () => {
     const res = await fetch(
-      `http://localhost:${port}/api/hench/execute/nonexistent/terminate`,
+      `http://127.0.0.1:${port}/api/hench/execute/nonexistent/terminate`,
       { method: "POST" },
     );
     expect(res.status).toBe(404);
@@ -204,7 +207,7 @@ describe("POST /api/hench/execute/:taskId/terminate", () => {
     await writeFile(join(runsDir, "run-term.json"), JSON.stringify(run));
 
     const res = await fetch(
-      `http://localhost:${port}/api/hench/execute/task-term/terminate`,
+      `http://127.0.0.1:${port}/api/hench/execute/task-term/terminate`,
       { method: "POST" },
     );
     expect(res.status).toBe(200);
@@ -241,7 +244,7 @@ describe("POST /api/hench/execute/:taskId/terminate", () => {
     await writeFile(join(runsDir, "run-completed.json"), JSON.stringify(run));
 
     const res = await fetch(
-      `http://localhost:${port}/api/hench/execute/task-completed/terminate`,
+      `http://127.0.0.1:${port}/api/hench/execute/task-completed/terminate`,
       { method: "POST" },
     );
     expect(res.status).toBe(404);

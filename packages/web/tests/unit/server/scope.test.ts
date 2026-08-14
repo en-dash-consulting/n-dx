@@ -15,6 +15,7 @@ import { handleSourcevisionRoute } from "../../../src/server/routes-sourcevision
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
 import { jsonResponse } from "../../../src/server/response-utils.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 type InScopeFn = (pkg: ViewerScope) => boolean;
 
@@ -61,7 +62,7 @@ function startScopedServer(
       res.end("Not found");
     });
 
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -129,36 +130,36 @@ describe("Scope filtering", () => {
     it("returns null scope when no scope is set", async () => {
       const { server, port } = await startScopedServer(ctx);
       try {
-        const res = await fetch(`http://localhost:${port}/api/config`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/config`);
         expect(res.status).toBe(200);
         const data = await res.json();
         expect(data.scope).toBeNull();
       } finally {
-        server.close();
+        await closeRouteTestServer(server);
       }
     });
 
     it("returns the scope when set to sourcevision", async () => {
       const { server, port } = await startScopedServer(ctx, "sourcevision");
       try {
-        const res = await fetch(`http://localhost:${port}/api/config`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/config`);
         expect(res.status).toBe(200);
         const data = await res.json();
         expect(data.scope).toBe("sourcevision");
       } finally {
-        server.close();
+        await closeRouteTestServer(server);
       }
     });
 
     it("returns the scope when set to rex", async () => {
       const { server, port } = await startScopedServer(ctx, "rex");
       try {
-        const res = await fetch(`http://localhost:${port}/api/config`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/config`);
         expect(res.status).toBe(200);
         const data = await res.json();
         expect(data.scope).toBe("rex");
       } finally {
-        server.close();
+        await closeRouteTestServer(server);
       }
     });
   });
@@ -173,24 +174,24 @@ describe("Scope filtering", () => {
       port = started.port;
     });
 
-    afterEach(() => {
-      server.close();
+    afterEach(async () => {
+      await closeRouteTestServer(server);
     });
 
     it("serves sourcevision API routes", async () => {
-      const res = await fetch(`http://localhost:${port}/api/sv/manifest`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/sv/manifest`);
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.project).toBe("test-project");
     });
 
     it("blocks rex API routes", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/prd`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prd`);
       expect(res.status).toBe(404);
     });
 
     it("blocks hench API routes", async () => {
-      const res = await fetch(`http://localhost:${port}/api/hench/runs`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs`);
       expect(res.status).toBe(404);
     });
   });
@@ -205,22 +206,22 @@ describe("Scope filtering", () => {
       port = started.port;
     });
 
-    afterEach(() => {
-      server.close();
+    afterEach(async () => {
+      await closeRouteTestServer(server);
     });
 
     it("serves rex API routes", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/prd`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prd`);
       expect(res.status).toBe(200);
     });
 
     it("blocks sourcevision API routes", async () => {
-      const res = await fetch(`http://localhost:${port}/api/sv/manifest`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/sv/manifest`);
       expect(res.status).toBe(404);
     });
 
     it("blocks hench API routes", async () => {
-      const res = await fetch(`http://localhost:${port}/api/hench/runs`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs`);
       expect(res.status).toBe(404);
     });
   });
@@ -235,27 +236,27 @@ describe("Scope filtering", () => {
       port = started.port;
     });
 
-    afterEach(() => {
-      server.close();
+    afterEach(async () => {
+      await closeRouteTestServer(server);
     });
 
     it("serves sourcevision API routes", async () => {
-      const res = await fetch(`http://localhost:${port}/api/sv/manifest`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/sv/manifest`);
       expect(res.status).toBe(200);
     });
 
     it("serves rex API routes", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/prd`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prd`);
       expect(res.status).toBe(200);
     });
 
     it("serves hench API routes", async () => {
-      const res = await fetch(`http://localhost:${port}/api/hench/runs`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs`);
       expect(res.status).toBe(200);
     });
 
     it("returns null scope in config", async () => {
-      const res = await fetch(`http://localhost:${port}/api/config`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/config`);
       const data = await res.json();
       expect(data.scope).toBeNull();
     });

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal hench config for testing. */
 function makeConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -48,7 +49,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -88,14 +89,14 @@ describe("Hench Templates API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   // ── GET /api/hench/templates ────────────────────────────────────────
 
   it("GET /api/hench/templates returns built-in templates", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -127,7 +128,7 @@ describe("Hench Templates API routes", () => {
       }]),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/templates`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates`);
     const body = await res.json();
 
     const custom = body.templates.find((t: { id: string }) => t.id === "my-custom");
@@ -137,7 +138,7 @@ describe("Hench Templates API routes", () => {
   });
 
   it("GET /api/hench/templates has complete metadata on each template", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates`);
     const body = await res.json();
 
     for (const template of body.templates) {
@@ -154,7 +155,7 @@ describe("Hench Templates API routes", () => {
   // ── GET /api/hench/templates/:id ────────────────────────────────────
 
   it("GET /api/hench/templates/:id returns a specific template", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates/quick-iteration`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/quick-iteration`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -164,14 +165,14 @@ describe("Hench Templates API routes", () => {
   });
 
   it("GET /api/hench/templates/:id returns 404 for unknown template", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates/nonexistent`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/nonexistent`);
     expect(res.status).toBe(404);
   });
 
   // ── POST /api/hench/templates ───────────────────────────────────────
 
   it("POST /api/hench/templates creates a user template", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -198,7 +199,7 @@ describe("Hench Templates API routes", () => {
   });
 
   it("POST /api/hench/templates rejects built-in template ID", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -212,7 +213,7 @@ describe("Hench Templates API routes", () => {
   });
 
   it("POST /api/hench/templates rejects invalid ID format", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -224,7 +225,7 @@ describe("Hench Templates API routes", () => {
   });
 
   it("POST /api/hench/templates rejects missing ID", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -238,7 +239,7 @@ describe("Hench Templates API routes", () => {
   // ── POST /api/hench/templates/:id/apply ─────────────────────────────
 
   it("POST /api/hench/templates/:id/apply applies template to config", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates/quick-iteration/apply`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/quick-iteration/apply`, {
       method: "POST",
     });
     expect(res.status).toBe(200);
@@ -257,7 +258,7 @@ describe("Hench Templates API routes", () => {
   });
 
   it("POST /api/hench/templates/:id/apply preserves untouched fields", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates/quick-iteration/apply`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/quick-iteration/apply`, {
       method: "POST",
     });
     expect(res.status).toBe(200);
@@ -270,7 +271,7 @@ describe("Hench Templates API routes", () => {
   });
 
   it("POST /api/hench/templates/:id/apply returns 404 for unknown template", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates/nonexistent/apply`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/nonexistent/apply`, {
       method: "POST",
     });
     expect(res.status).toBe(404);
@@ -279,7 +280,7 @@ describe("Hench Templates API routes", () => {
   it("POST /api/hench/templates/:id/apply returns 404 when no config", async () => {
     await rm(join(henchDir, "config.json"));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/templates/quick-iteration/apply`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/quick-iteration/apply`, {
       method: "POST",
     });
     expect(res.status).toBe(404);
@@ -302,7 +303,7 @@ describe("Hench Templates API routes", () => {
       }]),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/templates/to-delete`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/to-delete`, {
       method: "DELETE",
     });
     expect(res.status).toBe(200);
@@ -317,14 +318,14 @@ describe("Hench Templates API routes", () => {
   });
 
   it("DELETE /api/hench/templates/:id rejects built-in templates", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates/quick-iteration`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/quick-iteration`, {
       method: "DELETE",
     });
     expect(res.status).toBe(400);
   });
 
   it("DELETE /api/hench/templates/:id returns 404 for unknown template", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/templates/nonexistent`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates/nonexistent`, {
       method: "DELETE",
     });
     expect(res.status).toBe(404);

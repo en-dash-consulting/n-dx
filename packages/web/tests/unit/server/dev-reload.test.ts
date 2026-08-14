@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { resolveStaticAssets, handleStaticRoute } from "../../../src/server/routes-static.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 describe("Dev live-reload", () => {
   let tmpDir: string;
@@ -95,7 +96,7 @@ describe("Dev live-reload", () => {
           res.writeHead(404);
           res.end("Not found");
         });
-        srv.listen(0, () => {
+        srv.listen(0, "127.0.0.1", () => {
           const addr = srv.address();
           const p = typeof addr === "object" && addr ? addr.port : 0;
           resolve({ server: srv, port: p });
@@ -103,7 +104,7 @@ describe("Dev live-reload", () => {
       });
 
       try {
-        const res = await fetch(`http://localhost:${port}/`);
+        const res = await fetch(`http://127.0.0.1:${port}/`);
         expect(res.status).toBe(200);
         expect(res.headers.get("content-type")).toBe("text/html");
         expect(res.headers.get("cache-control")).toBe("no-cache");
@@ -111,7 +112,7 @@ describe("Dev live-reload", () => {
         const html = await res.text();
         expect(html).toContain("new WebSocket(url)");
       } finally {
-        server.close();
+        await closeRouteTestServer(server);
       }
     });
   });

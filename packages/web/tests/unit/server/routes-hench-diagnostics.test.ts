@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
@@ -20,7 +21,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
         res.end("Not found");
       }
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -48,7 +49,7 @@ describe("Hench runs diagnostics in API", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -76,7 +77,7 @@ describe("Hench runs diagnostics in API", () => {
     };
     await writeFile(join(runsDir, "run-diag-1.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/runs`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.runs).toHaveLength(1);
@@ -100,7 +101,7 @@ describe("Hench runs diagnostics in API", () => {
     };
     await writeFile(join(runsDir, "run-legacy-1.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/runs`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.runs).toHaveLength(1);
@@ -136,7 +137,7 @@ describe("Hench runs diagnostics in API", () => {
     };
     await writeFile(join(runsDir, "run-detail-diag.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/runs/run-detail-diag`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs/run-detail-diag`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.diagnostics).toBeDefined();
@@ -172,7 +173,7 @@ describe("Hench runs diagnostics in API", () => {
     };
     await writeFile(join(runsDir, "run-partial.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/runs`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.runs[0].vendor).toBe("codex");

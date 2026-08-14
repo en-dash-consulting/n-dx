@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
@@ -20,7 +21,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
         res.end("Not found");
       }
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -48,12 +49,12 @@ describe("GET /api/hench/memory", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("returns 200 with memory status", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/memory`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/memory`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.system).toBeDefined();
@@ -64,7 +65,7 @@ describe("GET /api/hench/memory", () => {
   });
 
   it("returns system memory fields", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/memory`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/memory`);
     const data = await res.json();
     const sys = data.system;
     expect(typeof sys.totalBytes).toBe("number");
@@ -79,7 +80,7 @@ describe("GET /api/hench/memory", () => {
   });
 
   it("returns server process memory fields", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/memory`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/memory`);
     const data = await res.json();
     const srv = data.server;
     expect(typeof srv.pid).toBe("number");
@@ -94,13 +95,13 @@ describe("GET /api/hench/memory", () => {
   });
 
   it("returns a valid health level", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/memory`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/memory`);
     const data = await res.json();
     expect(["healthy", "warning", "critical"]).toContain(data.health);
   });
 
   it("returns load average and CPU count", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/memory`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/memory`);
     const data = await res.json();
     expect(Array.isArray(data.loadAvg)).toBe(true);
     expect(data.loadAvg).toHaveLength(3);
@@ -113,7 +114,7 @@ describe("GET /api/hench/memory", () => {
   });
 
   it("returns empty processes when no active executions", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/memory`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/memory`);
     const data = await res.json();
     expect(data.processes).toEqual([]);
   });

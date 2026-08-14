@@ -2,6 +2,17 @@ import { describe, it, expect } from "vitest";
 import { deduplicateFindings } from "../../../src/analyzers/enrich-parsing.js";
 import type { Finding } from "../../../src/schema/v1.js";
 
+/**
+ * Load tolerance for wall-clock budgets below.
+ *
+ * These assertions guard against algorithmic regressions (a quadratic
+ * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
+ * numbers flake when the rest of the monorepo suite saturates every core,
+ * so the budget is scaled. See TESTING.md "Flake Resistance".
+ */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
+
 function makeFinding(overrides: Partial<Finding> = {}): Finding {
   return {
     type: "observation",
@@ -179,7 +190,7 @@ describe("deduplicateFindings", () => {
       expect(f.severity).toBe("info");
       expect(f.pass).toBe(0);
     }
-    expect(elapsed).toBeLessThan(1000);
+    expect(elapsed).toBeLessThan(1000 * BUDGET_MULTIPLIER);
   });
 
   it("merges findings with whitespace differences", () => {

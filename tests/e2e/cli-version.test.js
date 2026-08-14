@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { run, runResult } from "./e2e-helpers.js";
+import { run, runResult, DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 
@@ -13,7 +13,7 @@ const CORE_PKG = JSON.parse(readFileSync(CORE_PKG_PATH, "utf-8"));
 function runVersion(flags = []) {
   return execFileSync(process.execPath, [CLI_PATH, "version", ...flags], {
     encoding: "utf-8",
-    timeout: 10000,
+    timeout: DEFAULT_TIMEOUT,
     stdio: "pipe",
   }).trim();
 }

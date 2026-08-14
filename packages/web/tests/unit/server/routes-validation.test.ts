@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleValidationRoute } from "../../../src/server/routes-validation.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Create a minimal valid PRD document. */
 function makePRD(items: unknown[]) {
@@ -24,7 +25,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -54,7 +55,7 @@ describe("Validation & Dependency Graph API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -62,7 +63,7 @@ describe("Validation & Dependency Graph API routes", () => {
 
   describe("GET /api/rex/validate", () => {
     it("returns 404 when no PRD exists", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/validate`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/validate`);
       expect(res.status).toBe(404);
     });
 
@@ -95,7 +96,7 @@ describe("Validation & Dependency Graph API routes", () => {
         ])),
       );
 
-      const res = await fetch(`http://localhost:${port}/api/rex/validate`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/validate`);
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.ok).toBe(true);
@@ -116,7 +117,7 @@ describe("Validation & Dependency Graph API routes", () => {
         ])),
       );
 
-      const res = await fetch(`http://localhost:${port}/api/rex/validate`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/validate`);
       const data = await res.json();
       expect(data.ok).toBe(false);
       const hierarchyCheck = data.checks.find((c: { name: string }) => c.name === "hierarchy placement");
@@ -162,7 +163,7 @@ describe("Validation & Dependency Graph API routes", () => {
         ])),
       );
 
-      const res = await fetch(`http://localhost:${port}/api/rex/validate`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/validate`);
       const data = await res.json();
       const cycleCheck = data.checks.find((c: { name: string }) => c.name === "blockedBy cycles");
       expect(cycleCheck.pass).toBe(false);
@@ -200,7 +201,7 @@ describe("Validation & Dependency Graph API routes", () => {
         ])),
       );
 
-      const res = await fetch(`http://localhost:${port}/api/rex/validate`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/validate`);
       const data = await res.json();
       // Stuck tasks are warnings, so overall validation may still pass
       const stuckCheck = data.checks.find((c: { name: string }) => c.name === "stuck tasks");
@@ -222,7 +223,7 @@ describe("Validation & Dependency Graph API routes", () => {
         ])),
       );
 
-      const res = await fetch(`http://localhost:${port}/api/rex/validate`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/validate`);
       const data = await res.json();
       const check = data.checks.find((c: { name: string }) => c.name === "hierarchy placement");
       expect(check.errors[0].itemTitle).toBe("Misplaced Feature");
@@ -233,7 +234,7 @@ describe("Validation & Dependency Graph API routes", () => {
 
   describe("GET /api/rex/dependency-graph", () => {
     it("returns 404 when no PRD exists", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/dependency-graph`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/dependency-graph`);
       expect(res.status).toBe(404);
     });
 
@@ -262,7 +263,7 @@ describe("Validation & Dependency Graph API routes", () => {
         ])),
       );
 
-      const res = await fetch(`http://localhost:${port}/api/rex/dependency-graph`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/dependency-graph`);
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.nodes).toHaveLength(0);
@@ -295,7 +296,7 @@ describe("Validation & Dependency Graph API routes", () => {
         ])),
       );
 
-      const res = await fetch(`http://localhost:${port}/api/rex/dependency-graph`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/dependency-graph`);
       const data = await res.json();
       expect(data.nodes.length).toBe(3);
       expect(data.edges.length).toBe(2);
@@ -338,7 +339,7 @@ describe("Validation & Dependency Graph API routes", () => {
         ])),
       );
 
-      const res = await fetch(`http://localhost:${port}/api/rex/dependency-graph`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/dependency-graph`);
       const data = await res.json();
       expect(data.cycleNodeIds.length).toBeGreaterThan(0);
       expect(data.cycleNodeIds).toContain("task-a");
@@ -372,7 +373,7 @@ describe("Validation & Dependency Graph API routes", () => {
         ])),
       );
 
-      const res = await fetch(`http://localhost:${port}/api/rex/dependency-graph`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/dependency-graph`);
       const data = await res.json();
       expect(data.criticalBlockers.length).toBeGreaterThan(0);
       expect(data.criticalBlockers[0].id).toBe("task-1");
@@ -405,7 +406,7 @@ describe("Validation & Dependency Graph API routes", () => {
         ])),
       );
 
-      const res = await fetch(`http://localhost:${port}/api/rex/dependency-graph`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/dependency-graph`);
       const data = await res.json();
       expect(data.blockingChains.length).toBeGreaterThan(0);
       // Should have a chain of length 3: task-1 -> task-2 -> task-3

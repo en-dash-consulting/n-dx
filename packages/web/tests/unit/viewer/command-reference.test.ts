@@ -107,7 +107,7 @@ describe("CommandReferenceView", () => {
   });
 
   it("Run POSTs the declared endpoint and records a last-run outcome", async () => {
-    const fetchMock = vi.fn(async (url: string) => ({
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => ({
       ok: true,
       status: 200,
       json: async () => (String(url).endsWith("/manifest") ? MANIFEST : { ok: true }),
@@ -126,7 +126,7 @@ describe("CommandReferenceView", () => {
     });
 
     expect(fetchMock.mock.calls.some(
-      ([u, init]) => String(u) === "/api/commands/sv-analyze" && (init as RequestInit)?.method === "POST",
+      ([u, init]) => String(u) === "/api/commands/sv-analyze" && (init as RequestInit | undefined)?.method === "POST",
     )).toBe(true);
     expect(rowFor("analyze").textContent).toContain("last run");
   });

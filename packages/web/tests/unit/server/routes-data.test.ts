@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { createDataWatcher, handleDataRoute } from "../../../src/server/routes-data.js";
-import { startRouteTestServer } from "../../helpers/server-route-test-support.js";
+import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Start a test server that only runs data routes. */
 function startTestServer(
@@ -52,12 +52,12 @@ describe("Data routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("GET /data lists available files", async () => {
-    const res = await fetch(`http://localhost:${port}/data`);
+    const res = await fetch(`http://127.0.0.1:${port}/data`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.files).toContain("manifest.json");
@@ -66,14 +66,14 @@ describe("Data routes", () => {
   });
 
   it("GET /data/manifest.json serves sourcevision data", async () => {
-    const res = await fetch(`http://localhost:${port}/data/manifest.json`);
+    const res = await fetch(`http://127.0.0.1:${port}/data/manifest.json`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.project).toBe("test");
   });
 
   it("GET /data/prd.json serves Rex data from .rex/", async () => {
-    const res = await fetch(`http://localhost:${port}/data/prd.json`);
+    const res = await fetch(`http://127.0.0.1:${port}/data/prd.json`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.schema).toBe("rex/v1");
@@ -81,7 +81,7 @@ describe("Data routes", () => {
   });
 
   it("GET /data/status returns mtimes for live reload", async () => {
-    const res = await fetch(`http://localhost:${port}/data/status`);
+    const res = await fetch(`http://127.0.0.1:${port}/data/status`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.mtimes).toBeDefined();
@@ -89,7 +89,7 @@ describe("Data routes", () => {
   });
 
   it("returns 404 for non-existent data file", async () => {
-    const res = await fetch(`http://localhost:${port}/data/nonexistent.json`);
+    const res = await fetch(`http://127.0.0.1:${port}/data/nonexistent.json`);
     expect(res.status).toBe(404);
   });
 
@@ -98,7 +98,7 @@ describe("Data routes", () => {
     const http = await import("node:http");
     const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
       const req = http.request(
-        { hostname: "localhost", port, path: "/data/../../../etc/passwd", method: "GET" },
+        { hostname: "127.0.0.1", port, path: "/data/../../../etc/passwd", method: "GET" },
         (res) => {
           let body = "";
           res.on("data", (chunk: Buffer) => { body += chunk.toString(); });

@@ -7,6 +7,7 @@ import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import { parseDocument, serializeDocument } from "@n-dx/rex";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function readPRDFromMd(rexDir: string) {
   const raw = readFileSync(join(rexDir, "prd.md"), "utf-8");
@@ -70,7 +71,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -101,12 +102,12 @@ describe("Rex API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("GET /api/rex/prd returns full PRD document", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/prd`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/prd`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.schema).toBe("rex/v1");
@@ -116,7 +117,7 @@ describe("Rex API routes", () => {
   });
 
   it("GET /api/rex/stats returns tree stats", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/stats`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/stats`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.title).toBe("Test Project");
@@ -128,7 +129,7 @@ describe("Rex API routes", () => {
   });
 
   it("GET /api/rex/next returns next actionable task", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/next`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/next`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.task).not.toBeNull();
@@ -138,7 +139,7 @@ describe("Rex API routes", () => {
   });
 
   it("GET /api/rex/items/:id returns single item", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-2`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-2`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.id).toBe("task-2");
@@ -147,14 +148,14 @@ describe("Rex API routes", () => {
   });
 
   it("GET /api/rex/items/:id returns 404 for unknown item", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/nonexistent`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/nonexistent`);
     expect(res.status).toBe(404);
     const data = await res.json();
     expect(data.error).toContain("not found");
   });
 
   it("PATCH /api/rex/items/:id updates item status", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-2`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-2`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "in_progress" }),
@@ -165,13 +166,13 @@ describe("Rex API routes", () => {
 
     // Verify the change was persisted
     const prd = readPRDFromMd(rexDir);
-    const task2 = prd.items[0].children[1];
+    const task2 = prd.items[0]!.children![1]!;
     expect(task2.status).toBe("in_progress");
     expect(task2.startedAt).toBeDefined();
   });
 
   it("PATCH /api/rex/items/:id sets completedAt for completed status", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-1`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-1`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "completed" }),
@@ -179,13 +180,13 @@ describe("Rex API routes", () => {
     expect(res.status).toBe(200);
 
     const prd = readPRDFromMd(rexDir);
-    const task1 = prd.items[0].children[0];
+    const task1 = prd.items[0]!.children![0]!;
     expect(task1.status).toBe("completed");
     expect(task1.completedAt).toBeDefined();
   });
 
   it("PATCH /api/rex/items/:id returns 404 for unknown item", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/nonexistent`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/nonexistent`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "completed" }),
@@ -194,7 +195,7 @@ describe("Rex API routes", () => {
   });
 
   it("GET /api/rex/log returns empty entries when no log exists", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/log`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/log`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.entries).toEqual([]);
@@ -208,11 +209,11 @@ describe("Rex API routes", () => {
     ];
     await writeFile(join(rexDir, "execution-log.jsonl"), entries.join("\n") + "\n");
 
-    const allRes = await fetch(`http://localhost:${port}/api/rex/log`);
+    const allRes = await fetch(`http://127.0.0.1:${port}/api/rex/log`);
     const allData = await allRes.json();
     expect(allData.entries).toHaveLength(3);
 
-    const limitRes = await fetch(`http://localhost:${port}/api/rex/log?limit=2`);
+    const limitRes = await fetch(`http://127.0.0.1:${port}/api/rex/log?limit=2`);
     const limitData = await limitRes.json();
     expect(limitData.entries).toHaveLength(2);
     // Should return the last 2
@@ -225,18 +226,18 @@ describe("Rex API routes", () => {
     const { unlink } = await import("node:fs/promises");
     await unlink(join(rexDir, "prd.md"));
 
-    const prdRes = await fetch(`http://localhost:${port}/api/rex/prd`);
+    const prdRes = await fetch(`http://127.0.0.1:${port}/api/rex/prd`);
     expect(prdRes.status).toBe(404);
 
-    const statsRes = await fetch(`http://localhost:${port}/api/rex/stats`);
+    const statsRes = await fetch(`http://127.0.0.1:${port}/api/rex/stats`);
     expect(statsRes.status).toBe(404);
 
-    const nextRes = await fetch(`http://localhost:${port}/api/rex/next`);
+    const nextRes = await fetch(`http://127.0.0.1:${port}/api/rex/next`);
     expect(nextRes.status).toBe(404);
   });
 
   it("does not handle non-Rex API paths", async () => {
-    const res = await fetch(`http://localhost:${port}/api/other`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/other`);
     expect(res.status).toBe(404);
     const text = await res.text();
     expect(text).toBe("Not found");
@@ -246,7 +247,7 @@ describe("Rex API routes", () => {
 
   describe("POST /api/rex/items/merge", () => {
     it("returns 400 with fewer than 2 source IDs", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/items/merge`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/merge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sourceIds: ["task-1"], targetId: "task-1" }),
@@ -255,7 +256,7 @@ describe("Rex API routes", () => {
     });
 
     it("returns 400 when target is not in source IDs", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/items/merge`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/merge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sourceIds: ["task-1", "task-2"], targetId: "task-3" }),
@@ -266,7 +267,7 @@ describe("Rex API routes", () => {
     it("returns 400 when items are not siblings", async () => {
       // task-1 is under epic-1, we'd need another task at root level
       // to trigger the siblings error. Instead, use non-existent items.
-      const res = await fetch(`http://localhost:${port}/api/rex/items/merge`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/merge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sourceIds: ["task-1", "nonexistent"], targetId: "task-1" }),
@@ -277,7 +278,7 @@ describe("Rex API routes", () => {
     });
 
     it("preview mode returns preview without modifying data", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/items/merge`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/merge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -296,13 +297,13 @@ describe("Rex API routes", () => {
 
       // Verify data was NOT modified
       const prd = readPRDFromMd(rexDir);
-      const taskIds = prd.items[0].children.map((t: { id: string }) => t.id);
+      const taskIds = prd.items[0]!.children!.map((t: { id: string }) => t.id);
       expect(taskIds).toContain("task-1");
       expect(taskIds).toContain("task-2");
     });
 
     it("merges two tasks and removes absorbed item", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/items/merge`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/merge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -318,13 +319,13 @@ describe("Rex API routes", () => {
 
       // Verify task-2 is gone from disk
       const prd = readPRDFromMd(rexDir);
-      const taskIds = prd.items[0].children.map((t: { id: string }) => t.id);
+      const taskIds = prd.items[0]!.children!.map((t: { id: string }) => t.id);
       expect(taskIds).toContain("task-1");
       expect(taskIds).not.toContain("task-2");
     });
 
     it("merges with custom title", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/items/merge`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/merge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -336,12 +337,12 @@ describe("Rex API routes", () => {
       expect(res.status).toBe(200);
 
       const prd = readPRDFromMd(rexDir);
-      const task1 = prd.items[0].children.find((t: { id: string }) => t.id === "task-1");
-      expect(task1.title).toBe("Merged Task");
+      const task1 = prd.items[0]!.children!.find((t: { id: string }) => t.id === "task-1");
+      expect(task1!.title).toBe("Merged Task");
     });
 
     it("logs the merge in execution log", async () => {
-      await fetch(`http://localhost:${port}/api/rex/items/merge`, {
+      await fetch(`http://127.0.0.1:${port}/api/rex/items/merge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -365,12 +366,12 @@ describe("Rex API routes", () => {
     it("returns empty items when nothing is prunable", async () => {
       // Rewrite PRD with no completed items
       const prd = readPRDFromMd(rexDir);
-      for (const child of prd.items[0].children) {
+      for (const child of prd.items[0]!.children!) {
         if (child.status === "completed") child.status = "pending";
       }
       await writeFile(join(rexDir, "prd.md"), serializeDocument(prd as never));
 
-      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.ok).toBe(true);
@@ -382,13 +383,13 @@ describe("Rex API routes", () => {
     it("identifies a completed leaf task as prunable", async () => {
       // Set all children of epic-1 to completed, then the epic itself
       const prd = readPRDFromMd(rexDir);
-      for (const child of prd.items[0].children) {
+      for (const child of prd.items[0]!.children!) {
         child.status = "completed";
       }
-      prd.items[0].status = "completed";
+      prd.items[0]!.status = "completed";
       await writeFile(join(rexDir, "prd.md"), serializeDocument(prd as never));
 
-      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.ok).toBe(true);
@@ -402,7 +403,7 @@ describe("Rex API routes", () => {
     it("finds prunable subtree within active parent", async () => {
       // Only set task-3 (already completed) as the only completed subtree
       // task-3 is a leaf node that is already completed in the fixture
-      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.ok).toBe(true);
@@ -417,12 +418,12 @@ describe("Rex API routes", () => {
       const { unlink } = await import("node:fs/promises");
       await unlink(join(rexDir, "prd.md"));
 
-      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       expect(res.status).toBe(404);
     });
 
     it("returns estimated storage savings and level breakdown", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.ok).toBe(true);
@@ -442,13 +443,13 @@ describe("Rex API routes", () => {
     it("filters by minAge query parameter", async () => {
       // task-3 was completed on 2026-01-01 — more than 30 days ago
       // With minAge=0, it should be prunable
-      const res0 = await fetch(`http://localhost:${port}/api/rex/prune/preview?minAge=0`);
+      const res0 = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview?minAge=0`);
       const data0 = await res0.json();
       expect(data0.hasPrunableItems).toBe(true);
       expect(data0.items).toHaveLength(1);
 
       // With minAge=99999, nothing should be old enough
-      const resHigh = await fetch(`http://localhost:${port}/api/rex/prune/preview?minAge=99999`);
+      const resHigh = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview?minAge=99999`);
       const dataHigh = await resHigh.json();
       expect(dataHigh.hasPrunableItems).toBe(false);
       expect(dataHigh.items).toHaveLength(0);
@@ -456,26 +457,26 @@ describe("Rex API routes", () => {
 
     it("filters by statuses query parameter", async () => {
       // Default: only "completed" — should find task-3
-      const resDefault = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const resDefault = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       const dataDefault = await resDefault.json();
       expect(dataDefault.hasPrunableItems).toBe(true);
 
       // Filter by "deferred" only — should find nothing
-      const resDeferred = await fetch(`http://localhost:${port}/api/rex/prune/preview?statuses=deferred`);
+      const resDeferred = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview?statuses=deferred`);
       const dataDeferred = await resDeferred.json();
       expect(dataDeferred.hasPrunableItems).toBe(false);
       expect(dataDeferred.criteria.statuses).toEqual(["deferred"]);
     });
 
     it("returns completedAt in prunable items", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       const data = await res.json();
       expect(data.items).toHaveLength(1);
       expect(data.items[0].completedAt).toBe("2026-01-01T00:00:00.000Z");
     });
 
     it("returns prunableIds for visual diff highlighting", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       const data = await res.json();
       expect(data.prunableIds).toBeDefined();
       expect(Array.isArray(data.prunableIds)).toBe(true);
@@ -487,15 +488,15 @@ describe("Rex API routes", () => {
     it("returns prunableIds with all subtree descendants", async () => {
       // Make the entire epic fully completed so the whole subtree is prunable
       const prd = readPRDFromMd(rexDir);
-      for (const child of prd.items[0].children) {
+      for (const child of prd.items[0]!.children!) {
         child.status = "completed";
         child.completedAt = "2026-01-01T00:00:00.000Z";
       }
-      prd.items[0].status = "completed";
-      prd.items[0].completedAt = "2026-01-01T00:00:00.000Z";
+      prd.items[0]!.status = "completed";
+      prd.items[0]!.completedAt = "2026-01-01T00:00:00.000Z";
       await writeFile(join(rexDir, "prd.md"), serializeDocument(prd as never));
 
-      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       const data = await res.json();
       // prunableIds should include epic-1 + all 3 children
       expect(data.prunableIds).toHaveLength(4);
@@ -506,7 +507,7 @@ describe("Rex API routes", () => {
     });
 
     it("returns epicImpact with before/after completion stats", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       const data = await res.json();
       expect(data.epicImpact).toBeDefined();
       expect(Array.isArray(data.epicImpact)).toBe(true);
@@ -528,12 +529,12 @@ describe("Rex API routes", () => {
 
     it("returns empty epicImpact when nothing is prunable", async () => {
       const prd = readPRDFromMd(rexDir);
-      for (const child of prd.items[0].children) {
+      for (const child of prd.items[0]!.children!) {
         if (child.status === "completed") child.status = "pending";
       }
       await writeFile(join(rexDir, "prd.md"), serializeDocument(prd as never));
 
-      const res = await fetch(`http://localhost:${port}/api/rex/prune/preview`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune/preview`);
       const data = await res.json();
       expect(data.epicImpact).toEqual([]);
       expect(data.prunableIds).toEqual([]);
@@ -543,7 +544,7 @@ describe("Rex API routes", () => {
   describe("POST /api/rex/prune", () => {
     it("prunes completed items and archives them", async () => {
       // task-3 is already completed and a leaf
-      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirmCount: 1 }),
@@ -558,7 +559,7 @@ describe("Rex API routes", () => {
 
       // Verify task-3 is gone from PRD
       const prd = readPRDFromMd(rexDir);
-      const taskIds = prd.items[0].children.map((t: { id: string }) => t.id);
+      const taskIds = prd.items[0]!.children!.map((t: { id: string }) => t.id);
       expect(taskIds).not.toContain("task-3");
       expect(taskIds).toContain("task-1");
       expect(taskIds).toContain("task-2");
@@ -572,7 +573,7 @@ describe("Rex API routes", () => {
     });
 
     it("creates a backup when requested", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ backup: true, confirmCount: 1 }),
@@ -591,12 +592,12 @@ describe("Rex API routes", () => {
     it("returns nothing to prune when all items are active", async () => {
       // Remove the completed task-3
       const prd = readPRDFromMd(rexDir);
-      prd.items[0].children = prd.items[0].children.filter(
+      prd.items[0]!.children = prd.items[0]!.children!.filter(
         (t: { id: string }) => t.id !== "task-3",
       );
       await writeFile(join(rexDir, "prd.md"), serializeDocument(prd as never));
 
-      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -609,7 +610,7 @@ describe("Rex API routes", () => {
     });
 
     it("rejects stale prune when confirmCount does not match", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirmCount: 999 }),
@@ -620,7 +621,7 @@ describe("Rex API routes", () => {
     });
 
     it("logs the prune in execution log", async () => {
-      await fetch(`http://localhost:${port}/api/rex/prune`, {
+      await fetch(`http://127.0.0.1:${port}/api/rex/prune`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirmCount: 1 }),
@@ -638,7 +639,7 @@ describe("Rex API routes", () => {
       const { unlink } = await import("node:fs/promises");
       await unlink(join(rexDir, "prd.md"));
 
-      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -648,7 +649,7 @@ describe("Rex API routes", () => {
 
     it("prunes with criteria filtering", async () => {
       // task-3 is completed, should be prunable with default criteria
-      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -665,7 +666,7 @@ describe("Rex API routes", () => {
 
     it("respects minAge criteria during prune execution", async () => {
       // task-3 completed on 2026-01-01 — with minAge=99999 nothing should be pruned
-      const res = await fetch(`http://localhost:${port}/api/rex/prune`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/prune`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -684,7 +685,7 @@ describe("Rex API routes", () => {
 
   describe("POST /api/rex/proposals/accept-edited", () => {
     it("accepts edited proposals and creates PRD items", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/proposals/accept-edited`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept-edited`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -713,7 +714,7 @@ describe("Rex API routes", () => {
       expect(data.addedCount).toBe(3); // epic + feature + task
 
       // Verify PRD was updated
-      const prdRes = await fetch(`http://localhost:${port}/api/rex/prd`);
+      const prdRes = await fetch(`http://127.0.0.1:${port}/api/rex/prd`);
       const prd = await prdRes.json();
       const newEpic = prd.items.find((i: { title: string }) => i.title === "New Epic");
       expect(newEpic).toBeTruthy();
@@ -725,7 +726,7 @@ describe("Rex API routes", () => {
     });
 
     it("skips deselected items", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/proposals/accept-edited`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept-edited`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -756,7 +757,7 @@ describe("Rex API routes", () => {
     });
 
     it("validates required titles for selected items", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/proposals/accept-edited`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept-edited`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -774,7 +775,7 @@ describe("Rex API routes", () => {
     });
 
     it("skips validation for deselected items with empty titles", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/proposals/accept-edited`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept-edited`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -799,7 +800,7 @@ describe("Rex API routes", () => {
     });
 
     it("supports validate-only mode", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/proposals/accept-edited`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept-edited`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -819,7 +820,7 @@ describe("Rex API routes", () => {
     });
 
     it("returns 400 when no proposals provided", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/proposals/accept-edited`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept-edited`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ proposals: [] }),
@@ -828,7 +829,7 @@ describe("Rex API routes", () => {
     });
 
     it("returns 400 when nothing is selected", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/proposals/accept-edited`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept-edited`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -851,7 +852,7 @@ describe("Rex API routes", () => {
         JSON.stringify([{ epic: { title: "Pending" }, features: [] }]),
       );
 
-      await fetch(`http://localhost:${port}/api/rex/proposals/accept-edited`, {
+      await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept-edited`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -868,7 +869,7 @@ describe("Rex API routes", () => {
     });
 
     it("logs acceptance in execution log", async () => {
-      await fetch(`http://localhost:${port}/api/rex/proposals/accept-edited`, {
+      await fetch(`http://127.0.0.1:${port}/api/rex/proposals/accept-edited`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -891,7 +892,7 @@ describe("Rex API routes", () => {
 
   describe("POST /api/rex/smart-add-preview", () => {
     it("returns 400 when text is empty", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/smart-add-preview`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/smart-add-preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: "" }),
@@ -902,7 +903,7 @@ describe("Rex API routes", () => {
     });
 
     it("returns 400 when text field is missing", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/smart-add-preview`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/smart-add-preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -913,7 +914,7 @@ describe("Rex API routes", () => {
     });
 
     it("returns empty proposals for text shorter than 5 characters", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/smart-add-preview`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/smart-add-preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: "abc" }),
@@ -927,7 +928,7 @@ describe("Rex API routes", () => {
 
   describe("POST /api/rex/batch-import", () => {
     it("rejects request with no items", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/batch-import`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/batch-import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: [] }),
@@ -938,7 +939,7 @@ describe("Rex API routes", () => {
     });
 
     it("rejects request with missing items array", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/batch-import`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/batch-import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -949,7 +950,7 @@ describe("Rex API routes", () => {
     });
 
     it("rejects item with empty content", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/batch-import`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/batch-import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -962,7 +963,7 @@ describe("Rex API routes", () => {
     });
 
     it("rejects item with whitespace-only content", async () => {
-      const res = await fetch(`http://localhost:${port}/api/rex/batch-import`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/batch-import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

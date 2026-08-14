@@ -44,6 +44,7 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 // Import AFTER mock registration
 import { handleRexRoute } from "../../src/server/routes-rex/index.js";
 import type { ServerContext } from "../../src/server/types.js";
+import { closeRouteTestServer } from "../helpers/server-route-test-support.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -86,7 +87,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
 }
 
 async function post(port: number, path: string, body: unknown): Promise<Response> {
-  return fetch(`http://localhost:${port}${path}`, {
+  return fetch(`http://127.0.0.1:${port}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -126,7 +127,7 @@ describe("smart-add endpoint → rex CLI dispatch", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 

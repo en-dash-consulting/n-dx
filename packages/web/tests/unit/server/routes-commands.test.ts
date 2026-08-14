@@ -24,7 +24,7 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleCommandsRoute } from "../../../src/server/routes-commands.js";
-import { startRouteTestServer } from "../../helpers/server-route-test-support.js";
+import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const RECOMMENDATIONS = [
   { id: "a", title: "Rec A", level: "feature", priority: "high", source: "sourcevision" },
@@ -56,7 +56,7 @@ describe("commands route — recommend", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -67,7 +67,7 @@ describe("commands route — recommend", () => {
       error: null,
     });
 
-    const res = await fetch(`http://localhost:${port}/api/commands/recommend`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/recommend`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -88,7 +88,7 @@ describe("commands route — recommend", () => {
   it("reports count 0 when there are no recommendations", async () => {
     execMock.mockResolvedValue({ stdout: "[]", stderr: "", error: null });
 
-    const res = await fetch(`http://localhost:${port}/api/commands/recommend`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/recommend`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -107,7 +107,7 @@ describe("commands route — recommend", () => {
       error: null,
     });
 
-    const res = await fetch(`http://localhost:${port}/api/commands/recommend`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/recommend`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -144,14 +144,14 @@ describe("commands route — refresh (live-server data refresh)", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   /** Poll the status endpoint until running=false (bounded). */
   async function waitForFinish(): Promise<Record<string, unknown>> {
     for (let i = 0; i < 50; i++) {
-      const res = await fetch(`http://localhost:${port}/api/commands/refresh/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/commands/refresh/status`);
       const body = (await res.json()) as Record<string, unknown>;
       if (!body.running) return body;
       await new Promise((r) => setTimeout(r, 20));
@@ -166,7 +166,7 @@ describe("commands route — refresh (live-server data refresh)", () => {
       error: null,
     });
 
-    const res = await fetch(`http://localhost:${port}/api/commands/refresh`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -187,7 +187,7 @@ describe("commands route — refresh (live-server data refresh)", () => {
   it("forwards fast mode as --fast", async () => {
     execMock.mockResolvedValue({ stdout: "[refresh] ok", stderr: "", error: null });
 
-    await fetch(`http://localhost:${port}/api/commands/refresh`, {
+    await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fast: true }),
@@ -207,14 +207,14 @@ describe("commands route — refresh (live-server data refresh)", () => {
         }),
     );
 
-    const first = await fetch(`http://localhost:${port}/api/commands/refresh`, {
+    const first = await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
     expect(first.status).toBe(202);
 
-    const second = await fetch(`http://localhost:${port}/api/commands/refresh`, {
+    const second = await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -237,7 +237,7 @@ describe("commands route — refresh (live-server data refresh)", () => {
       error: null,
     });
 
-    await fetch(`http://localhost:${port}/api/commands/refresh`, {
+    await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -259,7 +259,7 @@ describe("commands route — refresh (live-server data refresh)", () => {
       error: new Error("exit 1"),
     });
 
-    await fetch(`http://localhost:${port}/api/commands/refresh`, {
+    await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -293,13 +293,13 @@ describe("commands route — sv-analyze full flow (async)", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   async function waitForFinish(): Promise<Record<string, unknown>> {
     for (let i = 0; i < 50; i++) {
-      const res = await fetch(`http://localhost:${port}/api/commands/sv-analyze/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze/status`);
       const body = (await res.json()) as Record<string, unknown>;
       if (!body.running) return body;
       await new Promise((r) => setTimeout(r, 20));
@@ -310,7 +310,7 @@ describe("commands route — sv-analyze full flow (async)", () => {
   it("full mode returns 202 and spawns analyze --full in the background", async () => {
     execMock.mockResolvedValue({ stdout: "Phase 1 done\nPass 4 complete", stderr: "", error: null });
 
-    const res = await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ full: true }),
@@ -330,7 +330,7 @@ describe("commands route — sv-analyze full flow (async)", () => {
   it("quick mode stays synchronous and returns 200 with output", async () => {
     execMock.mockResolvedValue({ stdout: "quick analysis ok", stderr: "", error: null });
 
-    const res = await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lite: true }),
@@ -352,14 +352,14 @@ describe("commands route — sv-analyze full flow (async)", () => {
       }),
     );
 
-    const first = await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+    const first = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ full: true }),
     });
     expect(first.status).toBe(202);
 
-    const second = await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+    const second = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ full: true }),
@@ -377,7 +377,7 @@ describe("commands route — sv-analyze full flow (async)", () => {
       error: null,
     });
 
-    await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+    await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ full: true }),
@@ -389,7 +389,7 @@ describe("commands route — sv-analyze full flow (async)", () => {
   it("captures a failed full run into status.error", async () => {
     execMock.mockResolvedValue({ stdout: "", stderr: "no LLM credentials", error: new Error("exit 1") });
 
-    await fetch(`http://localhost:${port}/api/commands/sv-analyze`, {
+    await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ full: true }),
@@ -422,12 +422,12 @@ describe("commands route — manifest (command reference)", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   async function getManifest(): Promise<Record<string, any>> {
-    const res = await fetch(`http://localhost:${port}/api/commands/manifest`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/manifest`);
     expect(res.status).toBe(200);
     return res.json() as Promise<Record<string, any>>;
   }

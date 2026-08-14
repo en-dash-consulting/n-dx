@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:net";
+import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 const LOOPBACK_HOST = "127.0.0.1";
@@ -12,7 +13,7 @@ function runResult(args) {
   try {
     const stdout = execFileSync("node", [CLI_PATH, "web", ...args], {
       encoding: "utf-8",
-      timeout: 10000,
+      timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
     });
     return { stdout, stderr: "", code: 0 };
@@ -336,7 +337,7 @@ describe("n-dx web", { timeout: 120_000 }, () => {
     it("shows start/dashboard in the main help output", () => {
       const output = execFileSync("node", [CLI_PATH], {
         encoding: "utf-8",
-        timeout: 10000,
+        timeout: DEFAULT_TIMEOUT,
         stdio: "pipe",
       });
       expect(output).toContain("start");

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 const CLI_PATH = join(ROOT, "packages/core/cli.js");
@@ -46,7 +47,7 @@ describe("tool path resolution", () => {
     for (const tool of ["rex", "hench", "sourcevision", "sv"]) {
       const output = execFileSync("node", [CLI_PATH, tool, "--help"], {
         encoding: "utf-8",
-        timeout: 10000,
+        timeout: DEFAULT_TIMEOUT,
         stdio: "pipe",
       });
       expect(output.length).toBeGreaterThan(0);

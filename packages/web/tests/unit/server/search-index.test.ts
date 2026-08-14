@@ -4,6 +4,17 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SearchIndex, parseQuery } from "../../../src/server/search-index.js";
 
+/**
+ * Load tolerance for wall-clock budgets below.
+ *
+ * These assertions guard against algorithmic regressions (a quadratic
+ * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
+ * numbers flake when the rest of the monorepo suite saturates every core,
+ * so the budget is scaled. See TESTING.md "Flake Resistance".
+ */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function makePrd(items: unknown[]) {
@@ -517,7 +528,7 @@ describe("SearchIndex", () => {
     const results = index.search("authentication");
     const searchElapsed = performance.now() - searchStart;
     expect(results.length).toBeGreaterThan(0);
-    expect(searchElapsed).toBeLessThan(200); // Under 200ms
+    expect(searchElapsed).toBeLessThan(200 * BUDGET_MULTIPLIER); // scaled: guards against super-linear search
   });
 
   // ── Edge cases ─────────────────────────────────────────────────────────

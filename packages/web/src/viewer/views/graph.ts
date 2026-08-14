@@ -447,8 +447,12 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
   const [hoverPreviewSide, setHoverPreviewSide] = useState<"left" | "right">("right");
   const [hoverExternalZoneId, setHoverExternalZoneId] = useState<string | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
-  const [focusHistory, setFocusHistory] = useState<string[]>([]);
-  const [focusHistoryIndex, setFocusHistoryIndex] = useState(-1);
+  // Dependency-preview navigation history. Entries and the cursor are one
+  // state value on purpose — see rememberFocusFile.
+  const [focusNav, setFocusNav] = useState<{ entries: string[]; index: number }>({
+    entries: [],
+    index: -1,
+  });
   // Hover-to-spotlight state for the File Street View graph. Hovering an
   // edge highlights it + its endpoints; hovering a node highlights every
   // edge touching it. Lets the user trace "what connects to what" when many
@@ -609,21 +613,31 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
   }, [focusFile, focusPackage, mode, streetViewMode]);
 
   useEffect(() => {
-    if (!focusFile || focusHistory.length) return;
-    setFocusHistory([focusFile]);
-    setFocusHistoryIndex(0);
-  }, [focusFile, focusHistory.length]);
+    if (!focusFile) return;
+    setFocusNav((prev) => (prev.entries.length ? prev : { entries: [focusFile], index: 0 }));
+  }, [focusFile]);
 
   const rememberFocusFile = useCallback((path: string) => {
-    setFocusHistory((prev) => {
-      const current = focusHistoryIndex >= 0 ? prev[focusHistoryIndex] : null;
+    setFocusNav((prev) => {
+      // Entries and index live in one state value so they can never disagree.
+      // They used to be separate states, which made this callback read a
+      // stale index whenever the click was handled by a render older than
+      // the one that seeded the history — the entry list already held the
+      // previous file while the captured index was still -1, so the base was
+      // computed as empty, `path` became the only entry, and Back stayed
+      // disabled for good. Reading `prev.index` inside the updater removes
+      // that window; `focusFile` is still the outgoing value here (the
+      // setFocusFile from this same click has not been applied yet) and only
+      // seeds the very first entry.
+      const base = prev.index >= 0
+        ? prev.entries.slice(0, prev.index + 1)
+        : (focusFile && focusFile !== path ? [focusFile] : []);
+      const current = base.length > 0 ? base[base.length - 1] : null;
       if (current === path) return prev;
-      const base = focusHistoryIndex >= 0 ? prev.slice(0, focusHistoryIndex + 1) : [];
-      const next = [...base, path].slice(-24);
-      setFocusHistoryIndex(next.length - 1);
-      return next;
+      const entries = [...base, path].slice(-24);
+      return { entries, index: entries.length - 1 };
     });
-  }, [focusHistoryIndex]);
+  }, [focusFile]);
 
   const handleFileClick = useCallback(
     (path: string, source: FocusSource = { kind: "file", path }) => {
@@ -671,8 +685,8 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
       setMode("file");
       setFocusFile(p);
       setFocusSource({ kind: "zone", zoneId });
-      setFocusHistory([p]);
-      setFocusHistoryIndex(0);
+      // Opening a zone starts a fresh history rooted at that zone's entry file.
+      setFocusNav({ entries: [p], index: 0 });
       setHoverPreviewFile(null);
       setCodebaseMapExpanded(false);
       setStreetViewMode("closed");
@@ -692,19 +706,19 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
   );
 
   const moveFocusHistory = useCallback((direction: -1 | 1) => {
-    setFocusHistoryIndex((current) => {
-      const next = current + direction;
-      if (next < 0 || next >= focusHistory.length) return current;
-      const path = focusHistory[next];
+    setFocusNav((prev) => {
+      const next = prev.index + direction;
+      if (next < 0 || next >= prev.entries.length) return prev;
+      const path = prev.entries[next];
       setMode("file");
       setFocusFile(path);
       setFocusSource({ kind: "file", path });
       setHoverPreviewFile(null);
       setStreetViewMode("dialog");
       if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
-      return next;
+      return { entries: prev.entries, index: next };
     });
-  }, [focusHistory]);
+  }, []);
 
   const updateSurfaceView = useCallback((surface: SurfaceKind, updater: (view: Viewport) => Viewport) => {
     if (surface === "codebase") setCodebaseView(updater);
@@ -1252,8 +1266,8 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
             : focusSource.kind === "cycle"
               ? `Driven by cycle: ${basename(focusSource.path)}`
               : "Default starting point";
-  const canGoBack = focusHistoryIndex > 0;
-  const canGoForward = focusHistoryIndex >= 0 && focusHistoryIndex < focusHistory.length - 1;
+  const canGoBack = focusNav.index > 0;
+  const canGoForward = focusNav.index >= 0 && focusNav.index < focusNav.entries.length - 1;
 
   const edgePaths: {
     d: string;

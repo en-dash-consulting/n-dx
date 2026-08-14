@@ -11,6 +11,7 @@ import {
   extractRepoName,
   clearProjectMetadataCache,
 } from "../../../src/server/routes-project.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Start a test server that only runs project routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
@@ -21,7 +22,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -184,7 +185,7 @@ describe("Project API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -194,7 +195,7 @@ describe("Project API routes", () => {
       JSON.stringify({ name: "test-proj", description: "A test", version: "0.1.0" }),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/project`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/project`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
 
@@ -206,7 +207,7 @@ describe("Project API routes", () => {
   });
 
   it("GET /api/project falls back to directory name", async () => {
-    const res = await fetch(`http://localhost:${port}/api/project`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/project`);
     expect(res.status).toBe(200);
 
     const data = await res.json();
@@ -216,12 +217,12 @@ describe("Project API routes", () => {
   });
 
   it("returns 404 for non-project routes", async () => {
-    const res = await fetch(`http://localhost:${port}/api/other`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/other`);
     expect(res.status).toBe(404);
   });
 
   it("returns 404 for POST to /api/project", async () => {
-    const res = await fetch(`http://localhost:${port}/api/project`, { method: "POST" });
+    const res = await fetch(`http://127.0.0.1:${port}/api/project`, { method: "POST" });
     expect(res.status).toBe(404);
   });
 
@@ -231,7 +232,7 @@ describe("Project API routes", () => {
       JSON.stringify({ name: "cached-project" }),
     );
 
-    const res1 = await fetch(`http://localhost:${port}/api/project`);
+    const res1 = await fetch(`http://127.0.0.1:${port}/api/project`);
     const data1 = await res1.json();
     expect(data1.name).toBe("cached-project");
 
@@ -241,7 +242,7 @@ describe("Project API routes", () => {
       JSON.stringify({ name: "updated-project" }),
     );
 
-    const res2 = await fetch(`http://localhost:${port}/api/project`);
+    const res2 = await fetch(`http://127.0.0.1:${port}/api/project`);
     const data2 = await res2.json();
     // Should still be cached (30s TTL)
     expect(data2.name).toBe("cached-project");
@@ -267,19 +268,19 @@ describe("Project API — resolved CLI name", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("returns cliName 'n-dx' when cli.name is absent from config", async () => {
-    const res = await fetch(`http://localhost:${port}/api/project`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/project`);
     const body = await res.json();
     expect(body.cliName).toBe("n-dx");
   });
 
   it("returns the configured cli.name when present", async () => {
     await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ cli: { name: "myapp" } }));
-    const res = await fetch(`http://localhost:${port}/api/project`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/project`);
     const body = await res.json();
     expect(body.cliName).toBe("myapp");
   });

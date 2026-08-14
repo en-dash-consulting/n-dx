@@ -837,36 +837,49 @@ describe("counting performance", () => {
       return root;
     }
 
-    const small = createFlat(200);
-    const large = createFlat(800);
+    // Complexity is measured by counting traversal steps, not wall-clock time.
+    // The previous version compared medians of batched runs and allowed a 30×
+    // ratio to absorb timing noise; under parallel-suite load it still
+    // measured 43× and failed. Traversal-step counts are exact and identical
+    // on every machine, so the same regression is caught deterministically.
+    const traversalProps = ["firstChild", "nextSibling", "parentNode"] as const;
 
-    // Measure batched work so jsdom timer noise does not dominate the ratio.
-    function median(fn: () => void, n = 15): number {
-      fn();
-      fn(); // warmup
-      const times: number[] = [];
-      for (let i = 0; i < n; i++) {
-        const s = performance.now();
-        fn();
-        times.push(performance.now() - s);
+    function countTraversalOps(root: HTMLDivElement): number {
+      const originals = traversalProps.map((prop) => {
+        const descriptor = Object.getOwnPropertyDescriptor(Node.prototype, prop);
+        if (!descriptor?.get) throw new Error(`Node.prototype.${prop} is not an accessor`);
+        return { prop, descriptor, get: descriptor.get };
+      });
+
+      let ops = 0;
+      for (const { prop, get } of originals) {
+        Object.defineProperty(Node.prototype, prop, {
+          configurable: true,
+          get(this: Node) {
+            ops++;
+            return get.call(this);
+          },
+        });
       }
-      times.sort((a, b) => a - b);
-      return times[Math.floor(times.length / 2)];
-    }
-
-    function runBatch(root: HTMLDivElement, iterations = 25): void {
-      for (let i = 0; i < iterations; i++) {
+      try {
         countDOMNodes(root);
+      } finally {
+        for (const { prop, descriptor } of originals) {
+          Object.defineProperty(Node.prototype, prop, descriptor);
+        }
       }
+      return ops;
     }
 
-    const time1 = median(() => runBatch(small));
-    const time2 = median(() => runBatch(large));
+    const smallOps = countTraversalOps(createFlat(200));
+    const largeOps = countTraversalOps(createFlat(800));
 
-    // If O(n), large ~4× small. If O(n²), large ~16× small.
-    // Accept up to 30× to tolerate timing noise on loaded CI machines.
-    const ratio = (time2 + 0.1) / (time1 + 0.1);
-    expect(ratio).toBeLessThan(30);
+    // 4× the nodes ⇒ ~4× the traversal steps when O(n).
+    // An O(n²) walk would be ~16×, so anything under 6× proves linearity
+    // while leaving room for the fixed per-call overhead.
+    expect(smallOps).toBeGreaterThan(0);
+    expect(largeOps / smallOps).toBeLessThan(6);
+    expect(largeOps / smallOps).toBeGreaterThan(2);
   });
 });
 

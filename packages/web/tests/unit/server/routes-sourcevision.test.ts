@@ -6,7 +6,7 @@ import { execSync } from "node:child_process";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleSourcevisionRoute } from "../../../src/server/routes-sourcevision.js";
-import { startRouteTestServer } from "../../helpers/server-route-test-support.js";
+import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Start a test server that only runs sourcevision routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
@@ -75,12 +75,12 @@ describe("Sourcevision API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("GET /api/sv/manifest returns manifest data", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/manifest`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/manifest`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.project).toBe("test-project");
@@ -88,7 +88,7 @@ describe("Sourcevision API routes", () => {
   });
 
   it("GET /api/sv/inventory returns inventory data", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/inventory`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/inventory`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.files).toHaveLength(2);
@@ -96,7 +96,7 @@ describe("Sourcevision API routes", () => {
   });
 
   it("GET /api/sv/zones returns zones data", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/zones`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/zones`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.zones).toHaveLength(2);
@@ -104,7 +104,7 @@ describe("Sourcevision API routes", () => {
   });
 
   it("GET /api/sv/components returns components data", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/components`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/components`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.components).toHaveLength(1);
@@ -112,7 +112,7 @@ describe("Sourcevision API routes", () => {
   });
 
   it("GET /api/sv/context returns CONTEXT.md", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/context`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/context`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("text/markdown");
     const text = await res.text();
@@ -121,7 +121,7 @@ describe("Sourcevision API routes", () => {
 
   it("GET /api/sv/pr-markdown returns markdown when present", async () => {
     await writeFile(join(svDir, "pr-markdown.md"), "## PR Summary\n\n- Added tab");
-    const res = await fetch(`http://localhost:${port}/api/sv/pr-markdown`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
     expect(res.status).toBe(200);
     const data = await res.json() as {
       markdown?: string | null;
@@ -147,7 +147,7 @@ describe("Sourcevision API routes", () => {
       }),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/sv/pr-markdown`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
     expect(res.status).toBe(200);
     const data = await res.json() as {
       markdown?: string | null;
@@ -165,7 +165,7 @@ describe("Sourcevision API routes", () => {
     const originalPath = process.env.PATH;
     process.env.PATH = "";
     try {
-      const res = await fetch(`http://localhost:${port}/api/sv/pr-markdown`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.availability).toBe("unsupported");
@@ -177,7 +177,7 @@ describe("Sourcevision API routes", () => {
   });
 
   it("GET /api/sv/pr-markdown reports no-repo state outside git repository", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/pr-markdown`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.availability).toBe("no-repo");
@@ -202,7 +202,7 @@ describe("Sourcevision API routes", () => {
     execSync("git commit -m 'feature change'", { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(svDir, "pr-markdown.md"), "## Snapshot v1\n\n- `alpha.txt`");
 
-    const firstRes = await fetch(`http://localhost:${port}/api/sv/pr-markdown`);
+    const firstRes = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
     expect(firstRes.status).toBe(200);
     const first = await firstRes.json();
     expect(first.markdown).toContain("Snapshot v1");
@@ -213,13 +213,13 @@ describe("Sourcevision API routes", () => {
     await appendFile(join(tmpDir, "alpha.txt"), "dirty\n");
     await writeFile(join(tmpDir, "scratch.tmp"), "temp\n");
 
-    const secondRes = await fetch(`http://localhost:${port}/api/sv/pr-markdown`);
+    const secondRes = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
     const second = await secondRes.json();
     expect(second.markdown).toBe(first.markdown);
   });
 
   it("GET /api/sv/pr-markdown/state returns a signature payload", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/pr-markdown/state`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown/state`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data).toHaveProperty("signature");
@@ -241,7 +241,7 @@ describe("Sourcevision API routes", () => {
     const staleDate = new Date(Date.now() - (31 * 60 * 1000));
     await utimes(markdownPath, staleDate, staleDate);
 
-    const res = await fetch(`http://localhost:${port}/api/sv/pr-markdown/state`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown/state`);
     const data = await res.json();
     expect(data.cacheStatus).toBe("stale");
     expect(typeof data.generatedAt).toBe("string");
@@ -255,7 +255,7 @@ describe("Sourcevision API routes", () => {
     execSync("git add only.txt", { cwd: tmpDir, stdio: "ignore" });
     execSync("git commit -m 'init'", { cwd: tmpDir, stdio: "ignore" });
 
-    const res = await fetch(`http://localhost:${port}/api/sv/pr-markdown`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.availability).toBe("ready");
@@ -273,7 +273,7 @@ describe("Sourcevision API routes", () => {
     execSync("git commit -m 'init'", { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(svDir, "pr-markdown.md"), "## Existing Summary\n\n- fallback");
 
-    const res = await fetch(`http://localhost:${port}/api/sv/pr-markdown`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
     expect(res.status).toBe(200);
     const data = await res.json();
     const markdown = String(data.markdown ?? "");
@@ -281,7 +281,7 @@ describe("Sourcevision API routes", () => {
   });
 
   it("POST /api/sv/pr-markdown/refresh returns 404 (removed)", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/pr-markdown/refresh`, { method: "POST" });
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown/refresh`, { method: "POST" });
     expect(res.status).toBe(404);
   });
 
@@ -293,26 +293,26 @@ describe("Sourcevision API routes", () => {
     execSync("git add tracked.txt", { cwd: tmpDir, stdio: "ignore" });
     execSync("git commit -m 'init'", { cwd: tmpDir, stdio: "ignore" });
 
-    const beforeRes = await fetch(`http://localhost:${port}/api/sv/pr-markdown/state`);
+    const beforeRes = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown/state`);
     const before = await beforeRes.json();
 
     await writeFile(join(svDir, "pr-markdown.md"), "## refreshed");
 
-    const afterRes = await fetch(`http://localhost:${port}/api/sv/pr-markdown/state`);
+    const afterRes = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown/state`);
     const after = await afterRes.json();
 
     expect(before.signature).not.toBe(after.signature);
   });
 
   it("GET /api/sv/pr-markdown returns null when missing", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/pr-markdown`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.markdown).toBeNull();
   });
 
   it("GET /api/sv/summary returns aggregate stats", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/summary`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/summary`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.hasManifest).toBe(true);
@@ -334,25 +334,25 @@ describe("Sourcevision API routes", () => {
 
     const emptyStarted = await startTestServer(emptyCtx);
     try {
-      const res = await fetch(`http://localhost:${emptyStarted.port}/api/sv/manifest`);
+      const res = await fetch(`http://127.0.0.1:${emptyStarted.port}/api/sv/manifest`);
       expect(res.status).toBe(404);
       const data = await res.json();
       expect(data.error).toContain("No manifest data");
     } finally {
-      emptyStarted.server.close();
+      await closeRouteTestServer(emptyStarted.server);
       await rm(emptyDir, { recursive: true, force: true });
     }
   });
 
   it("does not handle non-sv API paths", async () => {
-    const res = await fetch(`http://localhost:${port}/api/other`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/other`);
     expect(res.status).toBe(404);
     const text = await res.text();
     expect(text).toBe("Not found");
   });
 
   it("does not handle POST requests", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/manifest`, { method: "POST" });
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/manifest`, { method: "POST" });
     expect(res.status).toBe(404);
   });
 });
@@ -411,12 +411,12 @@ describe("Sourcevision capability routes (next-steps, classifications, archetype
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("GET /api/sv/next-steps derives prioritized steps from zones findings", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/next-steps`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/next-steps`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body.steps)).toBe(true);
@@ -425,7 +425,7 @@ describe("Sourcevision capability routes (next-steps, classifications, archetype
   });
 
   it("GET /api/sv/next-steps supports priority and limit params", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/next-steps?priority=high&limit=1`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/next-steps?priority=high&limit=1`);
     const body = await res.json();
     expect(body.steps.length).toBeLessThanOrEqual(1);
     for (const s of body.steps) expect(s.priority).toBe("high");
@@ -433,12 +433,12 @@ describe("Sourcevision capability routes (next-steps, classifications, archetype
 
   it("GET /api/sv/next-steps 404s without zones data", async () => {
     await rm(join(svDir, "zones.json"));
-    const res = await fetch(`http://localhost:${port}/api/sv/next-steps`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/next-steps`);
     expect(res.status).toBe(404);
   });
 
   it("GET /api/sv/classifications serves the classifications file", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/classifications`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/classifications`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.archetypes).toHaveLength(2);
@@ -446,7 +446,7 @@ describe("Sourcevision capability routes (next-steps, classifications, archetype
   });
 
   it("POST /api/sv/archetype persists an override to .n-dx.json", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/archetype`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/archetype`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: "src/utils.ts", archetype: "entrypoint" }),
@@ -461,7 +461,7 @@ describe("Sourcevision capability routes (next-steps, classifications, archetype
   });
 
   it("POST /api/sv/archetype rejects an unknown archetype with the valid list", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/archetype`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/archetype`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: "src/utils.ts", archetype: "nonsense" }),
@@ -472,7 +472,7 @@ describe("Sourcevision capability routes (next-steps, classifications, archetype
   });
 
   it("POST /api/sv/archetype rejects a file not in the inventory", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/archetype`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/archetype`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: "src/ghost.ts", archetype: "utility" }),

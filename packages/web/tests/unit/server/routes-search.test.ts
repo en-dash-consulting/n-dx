@@ -5,6 +5,18 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleSearchRoute, clearSearchIndexCache } from "../../../src/server/routes-search.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
+
+/**
+ * Load tolerance for wall-clock budgets below.
+ *
+ * These assertions guard against algorithmic regressions (a quadratic
+ * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
+ * numbers flake when the rest of the monorepo suite saturates every core,
+ * so the budget is scaled. See TESTING.md "Flake Resistance".
+ */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -31,7 +43,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -61,7 +73,7 @@ describe("Search API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -74,7 +86,7 @@ describe("Search API routes", () => {
     ]);
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd));
 
-    const res = await fetch(`http://localhost:${port}/api/search?q=authentication`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/search?q=authentication`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
 
@@ -100,7 +112,7 @@ describe("Search API routes", () => {
     ]);
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd));
 
-    const res = await fetch(`http://localhost:${port}/api/search?q=authentication`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/search?q=authentication`);
     const data = await res.json();
 
     const result = data.results[0];
@@ -131,7 +143,7 @@ describe("Search API routes", () => {
     ]);
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd));
 
-    const res = await fetch(`http://localhost:${port}/api/search?q=search`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/search?q=search`);
     const data = await res.json();
 
     expect(data.results.length).toBe(2);
@@ -142,26 +154,26 @@ describe("Search API routes", () => {
   // ── Error handling ─────────────────────────────────────────────────────
 
   it("returns 400 when q parameter is missing", async () => {
-    const res = await fetch(`http://localhost:${port}/api/search`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/search`);
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toContain("q");
   });
 
   it("returns 400 when q parameter is empty", async () => {
-    const res = await fetch(`http://localhost:${port}/api/search?q=`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/search?q=`);
     expect(res.status).toBe(400);
   });
 
   it("returns 405 for non-GET methods", async () => {
-    const res = await fetch(`http://localhost:${port}/api/search?q=test`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/search?q=test`, {
       method: "POST",
     });
     expect(res.status).toBe(405);
   });
 
   it("returns 404 for non-search routes", async () => {
-    const res = await fetch(`http://localhost:${port}/api/other`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/other`);
     expect(res.status).toBe(404);
   });
 
@@ -174,7 +186,7 @@ describe("Search API routes", () => {
     const prd = makePrd(items);
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd));
 
-    const res = await fetch(`http://localhost:${port}/api/search?q=search&limit=5`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/search?q=search&limit=5`);
     const data = await res.json();
     expect(data.count).toBe(5);
     expect(data.results.length).toBe(5);
@@ -184,7 +196,7 @@ describe("Search API routes", () => {
     const prd = makePrd([makeItem({ id: "1", title: "Search item" })]);
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd));
 
-    const res = await fetch(`http://localhost:${port}/api/search?q=search&limit=abc`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/search?q=search&limit=abc`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.results.length).toBeGreaterThan(0);
@@ -193,7 +205,7 @@ describe("Search API routes", () => {
   // ── Empty PRD ──────────────────────────────────────────────────────────
 
   it("returns empty results when no PRD exists", async () => {
-    const res = await fetch(`http://localhost:${port}/api/search?q=test`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/search?q=test`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.count).toBe(0);
@@ -204,7 +216,7 @@ describe("Search API routes", () => {
     const prd = makePrd([]);
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd));
 
-    const res = await fetch(`http://localhost:${port}/api/search?q=test`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/search?q=test`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.count).toBe(0);
@@ -225,11 +237,11 @@ describe("Search API routes", () => {
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd));
 
     // Warm up the index
-    await fetch(`http://localhost:${port}/api/search?q=implement`);
+    await fetch(`http://127.0.0.1:${port}/api/search?q=implement`);
 
     // Measure actual search time
     const start = performance.now();
-    const res = await fetch(`http://localhost:${port}/api/search?q=implement`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/search?q=implement`);
     const elapsed = performance.now() - start;
     expect(res.status).toBe(200);
 
@@ -237,7 +249,7 @@ describe("Search API routes", () => {
     // The server-side elapsed time should be well under 200ms
     expect(data.elapsed_ms).toBeLessThan(200);
     // Total round-trip should also be reasonable
-    expect(elapsed).toBeLessThan(500); // generous for network overhead
+    expect(elapsed).toBeLessThan(500 * BUDGET_MULTIPLIER); // generous for network overhead
   });
 
   // ── Query features ─────────────────────────────────────────────────────
@@ -250,7 +262,7 @@ describe("Search API routes", () => {
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd));
 
     const res = await fetch(
-      `http://localhost:${port}/api/search?q=${encodeURIComponent('"user authentication"')}`,
+      `http://127.0.0.1:${port}/api/search?q=${encodeURIComponent('"user authentication"')}`,
     );
     const data = await res.json();
     expect(data.count).toBe(1);
@@ -266,7 +278,7 @@ describe("Search API routes", () => {
     await writeFile(join(rexDir, "prd.json"), JSON.stringify(prd));
 
     const res = await fetch(
-      `http://localhost:${port}/api/search?q=${encodeURIComponent("authentication OR database")}`,
+      `http://127.0.0.1:${port}/api/search?q=${encodeURIComponent("authentication OR database")}`,
     );
     const data = await res.json();
     expect(data.count).toBe(2);
