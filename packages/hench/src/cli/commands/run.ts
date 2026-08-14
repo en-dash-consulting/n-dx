@@ -585,16 +585,37 @@ async function selectTask(
   if (tasks.length === 0) {
     const scope = epicId ? "within the specified epic" : "in PRD";
     output(`No actionable tasks found ${scope}.`);
-    // Check for deferred/failing tasks and suggest --reset-deferred
+    // Check for deferred/failing tasks and offer to reset them interactively.
     const doc = await store.loadDocument();
     const deferredCount = countTasksByStatus(doc.items, ["deferred", "failing"]);
-    if (deferredCount > 0) {
+    if (deferredCount > 0 && process.stdin.isTTY) {
+      output(colorWarn(`  ${deferredCount} task(s) are deferred or failing.`));
+      const answer = await promptUser("  Reset them to pending and continue? [y/N] ");
+      if (answer.toLowerCase() === "y" || answer.toLowerCase() === "yes") {
+        await resetDeferredTasks(store);
+        // Reload tasks after reset
+        tasks = await getActionableTasks(store);
+        if (epicId) {
+          const freshDoc = await store.loadDocument();
+          const epicTaskIds = collectEpicTaskIds(freshDoc.items, epicId);
+          tasks = tasks.filter((t) => epicTaskIds.has(t.id));
+        }
+        if (tasks.length === 0) {
+          output("Still no actionable tasks after reset.");
+          process.exit(0);
+        }
+      } else {
+        process.exit(0);
+      }
+    } else if (deferredCount > 0) {
       output(colorWarn(
         `  ${deferredCount} task(s) are deferred or failing — ` +
-        `run with --reset-deferred to reset them to pending and retry.`,
+        `run 'ndx work --reset-deferred' to reset them and retry.`,
       ));
+      process.exit(0);
+    } else {
+      process.exit(0);
     }
-    process.exit(0);
   }
 
   info("\nActionable tasks (by priority):\n");
