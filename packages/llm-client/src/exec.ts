@@ -55,6 +55,13 @@ export interface ExecOptions {
   maxBuffer?: number;
   /** Environment variables for the child process. Defaults to inheriting parent env. */
   env?: NodeJS.ProcessEnv;
+  /**
+   * Abort signal. Aborting kills the child process; the promise then resolves
+   * with the output captured so far and an `AbortError`. Lets long-running
+   * commands be cancelled by an operator (e.g. the dashboard stopping a
+   * self-heal loop) without the caller having to manage a ChildProcess.
+   */
+  signal?: AbortSignal;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,10 +85,10 @@ export function exec(
   args: string[],
   opts: ExecOptions,
 ): Promise<ExecResult> {
-  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env } = opts;
+  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env, signal } = opts;
 
   return new Promise((resolve) => {
-    const child = execFile(cmd, args, { cwd, timeout, maxBuffer, env }, (
+    const child = execFile(cmd, args, { cwd, timeout, maxBuffer, env, signal }, (
       error,
       stdout,
       stderr,

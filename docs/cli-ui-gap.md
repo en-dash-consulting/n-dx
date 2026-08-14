@@ -1,6 +1,6 @@
 # CLI ↔ Dashboard Coverage Gap Inventory
 
-_Last updated: 2026-08-12_
+_Last updated: 2026-08-14_
 
 ## Methodology
 
@@ -44,9 +44,9 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `ndx plan` / `--accept` | **partial** | high | **Regression:** smart-add preview + accept-edited work (SmartAddInput), but the proposal-review panel (`AnalyzePanel` → `/api/rex/analyze`, `/api/rex/proposals*`) is only mounted by the orphaned `views/analysis.ts` |
 | `ndx add` | full | high | Smart-add input with debounced preview, accept-edited flow |
 | `ndx status` | full | high | Rex dashboard + PRD tree |
-|  `ndx usage` | **partial** | high | Token Usage view consumes only `/api/token/utilization`; `by-period` (day/week/month grouping), `by-command`, `budget`, `events` endpoints exist but have no UI |
+| `ndx usage` | **full** | high | Period grouping (day/week/month toggle), per-command breakdown with package filter, and budget alerts by severity — all served by the aggregate `/api/token/utilization` endpoint |
 | `ndx refresh` | **partial** | high | "Refresh Data" panel triggers the data phases live (`--data-only --live-server`); full UI rebuild still requires the terminal (server must stop) |
-| `ndx self-heal` | partial | medium | Trigger + status poll exist; no live phase display or stop control |
+| `ndx self-heal` | **full** | medium | Trigger, status poll, iteration/phase display, and a Stop control that cancels the running loop |
 | `ndx export` | partial | medium | Export trigger exists; deploy flow not exposed |
 | `ndx ci` | **none** | medium | No trigger or results view |
 | `ndx config` | full | medium | Settings section: General (LLM provider), project settings, hench config, Notion, feature flags, CLI timeouts — grouped by CLI command |
@@ -72,7 +72,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `rex fix` | **none** | medium | Validation view shows issues but offers no fix action |
 | `rex verify` | **full** | medium | Requirements page renders coverage + traceability matrix (per-item CRUD deferred to the task detail panel) |
 | `rex analyze` / `import` | partial | medium | Same orphaned-panel regression as `ndx plan` |
-| `rex usage` | partial | medium | Same gaps as  `ndx usage` |
+| `rex usage` | full | medium | Same coverage as `ndx usage` |
 | `rex sync` | full | medium | Via sync triggers |
 | `rex adapter` | partial | low | Integrations view provides schema-driven config for registered adapters; no add/remove |
 | `rex report` | none | low | JSON for CI; health view covers interactive use |
@@ -161,7 +161,7 @@ Roughly 2,900 lines of built view code were unreachable; both views are now regi
 | ~~`/api/hench/adaptive/*`~~ | 873 lines, 10 endpoints | **Done 2026-08-13**: Adaptive Optimization view (HENCH → Adaptive) consumes all 10 endpoints |
 | ~~`/api/rex/requirements/*`~~ | 575 lines | **Done 2026-08-13**: Requirements page (REX → Requirements) renders coverage + traceability; per-item CRUD deferred to the task detail panel |
 | `/api/sv/*` (all except `pr-markdown`) | 8 endpoints | Viewer reads `/data/*.json` directly; these serve external/MCP consumers — **document as external API, not a UI gap** |
-| `/api/token/{summary,events,by-command,by-period,budget}` | 5 endpoints | Token Usage view uses only `utilization` |
+| `/api/token/{summary,events,by-command,by-period,budget}` | 5 endpoints | **Not a UI gap (verified 2026-08-14).** `utilization` returns `commands`, `budget` and `trend` in one response, and the Token Usage view already renders all three — a day/week/month toggle (`ndx usage --group` parity), a per-command table with package filtering, and budget alerts by severity. These five are the granular/external split of the same data; wiring them separately would duplicate working UI and add redundant requests. |
 | `/api/hench/{metrics,metrics/snapshots,memory/history,memory/leaks,runs/health}` | 5 endpoints | Panels exist for live memory/concurrency; historical metrics unexposed |
 | `/api/rex/{next,stats}` | 2 endpoints | Dashboard consumes `/api/rex/dashboard` instead; candidates for removal or documentation |
 
@@ -187,8 +187,8 @@ The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, P
 7. **`rex fix` action** — "Fix issues" button in the Validation view → new POST `/api/rex/fix`.
 8. **`rex reshape` flow** — reshape trigger with diff preview + confirm.
 9. **`ndx ci` trigger** — "Run CI check" → structured results panel.
-10. **Token usage depth** — wire `by-period` / `by-command` / `budget` endpoints into the Token Usage view (restores `ndx usage --group=…` parity).
-11. **Self-heal live view** — phase/iteration display + stop control on top of the existing status endpoint.
+10. ~~**Token usage depth**~~ — **closed 2026-08-14, no work needed**: the capabilities were already present via `utilization` (see the API table). The audit had flagged unused *endpoints*, not missing features.
+11. ~~**Self-heal live view**~~ — **done 2026-08-14**: iteration/phase display parsed from loop output, plus a Stop control (new `POST /api/commands/self-heal/stop`, backed by AbortSignal support added to the foundation `exec`).
 
 ### Tier 3 — low impact
 

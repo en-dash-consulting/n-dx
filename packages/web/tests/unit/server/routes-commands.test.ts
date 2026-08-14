@@ -523,3 +523,97 @@ describe("commands route — manifest (command reference)", () => {
     expect(all.find((c: Record<string, unknown>) => c.name === "status").status).toBe("available");
   });
 });
+
+describe("commands route — self-heal stop", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    execMock.mockReset();
+    tmpDir = await mkdtemp(join(tmpdir(), "commands-selfheal-"));
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    const started = await startRouteTestServer((req, res) =>
+      handleCommandsRoute(req, res, ctx),
+    );
+    server = started.server;
+    port = started.port;
+  });
+
+  afterEach(async () => {
+    await closeRouteTestServer(server);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  async function statusOnce(): Promise<Record<string, unknown>> {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/self-heal/status`);
+    return res.json() as Promise<Record<string, unknown>>;
+  }
+
+  it("409s when asked to stop with nothing running", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/self-heal/stop`, { method: "POST" });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(String(body.error)).toMatch(/not running|no self-heal/i);
+  });
+
+  it("aborts the running loop and records it as stopped", async () => {
+    // Honour the abort signal the handler passes, the way exec does.
+    execMock.mockImplementation((_bin: string, _args: string[], opts: { signal?: AbortSignal }) =>
+      new Promise((resolve) => {
+        opts.signal?.addEventListener("abort", () => {
+          const err = new Error("aborted") as Error & { name: string };
+          err.name = "AbortError";
+          resolve({ stdout: "iteration 1 of 3\n", stderr: "", error: err });
+        });
+      }),
+    );
+
+    const start = await fetch(`http://127.0.0.1:${port}/api/commands/self-heal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ iterations: 3 }),
+    });
+    expect(start.status).toBe(202);
+    expect((await statusOnce()).running).toBe(true);
+
+    const stop = await fetch(`http://127.0.0.1:${port}/api/commands/self-heal/stop`, { method: "POST" });
+    expect(stop.status).toBe(200);
+    expect((await stop.json()).ok).toBe(true);
+
+    for (let i = 0; i < 50; i++) {
+      const s = await statusOnce();
+      if (!s.running) {
+        expect(s.stopped).toBe(true);
+        expect(s.finishedAt).toBeTruthy();
+        // An operator-requested stop is not an error condition.
+        expect(s.error).toBeNull();
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error("self-heal did not stop");
+  });
+
+  it("passes an abort signal to the spawned loop", async () => {
+    execMock.mockImplementation((_b: string, _a: string[], opts: { signal?: AbortSignal }) => {
+      expect(opts.signal).toBeInstanceOf(AbortSignal);
+      return Promise.resolve({ stdout: "done", stderr: "", error: null });
+    });
+    await fetch(`http://127.0.0.1:${port}/api/commands/self-heal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    for (let i = 0; i < 50; i++) {
+      if (!(await statusOnce()).running) return;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  });
+});

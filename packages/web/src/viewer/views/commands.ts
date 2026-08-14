@@ -104,9 +104,31 @@ interface SelfHealStatusData {
   iterations: number;
   output: string;
   error: string | null;
+  /** True when the run ended because an operator pressed Stop. */
+  stopped?: boolean;
 }
 
-function SelfHealPanel() {
+/**
+ * Pull the newest iteration and phase markers out of the loop's output.
+ *
+ * `ndx self-heal` prints its progress as it goes; the status endpoint returns
+ * the tail of that output, so the freshest matching lines describe where the
+ * loop currently is.
+ */
+function parseSelfHealProgress(output: string): { iteration: string | null; phase: string | null } {
+  const lines = output.split("\n").map((l) => l.trim()).filter(Boolean);
+  let iteration: string | null = null;
+  let phase: string | null = null;
+  for (const line of lines) {
+    const iter = /iteration\s+(\d+\s*(?:\/|of)\s*\d+)/i.exec(line);
+    if (iter) iteration = `iteration ${iter[1].replace(/\s*of\s*/i, "/")}`;
+    const ph = /\b(analyz\w*|recommend\w*|execut\w*)\b/i.exec(line);
+    if (ph) phase = ph[1].toLowerCase();
+  }
+  return { iteration, phase };
+}
+
+export function SelfHealPanel() {
   const [state, setState] = useState<OpState>("idle");
   const [confirmed, setConfirmed] = useState(false);
   const [iterations, setIterations] = useState(3);
@@ -125,7 +147,8 @@ function SelfHealPanel() {
         setStatusData(data);
         if (!data.running && data.finishedAt) {
           clearInterval(interval);
-          if (data.error) {
+          // A stop the operator asked for is a normal outcome, not a failure.
+          if (data.error && !data.stopped) {
             setError(data.error);
             setState("error");
           } else {
@@ -170,6 +193,20 @@ function SelfHealPanel() {
       setState("error");
     }
   }, [iterations]);
+
+  const handleStop = useCallback(async () => {
+    try {
+      const res = await fetch("/api/commands/self-heal/stop", { method: "POST" });
+      if (!res.ok && res.status !== 409) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      // The polling loop picks up running=false / stopped=true.
+    } catch (err) {
+      setError(String(err));
+      setState("error");
+    }
+  }, []);
 
   const handleReset = useCallback(() => {
     setState("idle");
@@ -254,6 +291,23 @@ function SelfHealPanel() {
                 "Started: ", new Date(statusData.startedAt).toLocaleTimeString(),
               )
             : null,
+          (() => {
+            const progress = statusData ? parseSelfHealProgress(statusData.output) : null;
+            return progress && (progress.iteration || progress.phase)
+              ? h("p", { class: "cmd-phase-item", role: "status", "aria-live": "polite" },
+                  progress.iteration ?? "",
+                  progress.iteration && progress.phase ? " \u00b7 " : "",
+                  progress.phase ? `phase: ${progress.phase}` : "",
+                )
+              : null;
+          })(),
+          h("div", { class: "cmd-panel-actions" },
+            h("button", {
+              class: "cmd-btn cmd-btn-danger",
+              onClick: handleStop,
+              title: "Stop the loop after the current step",
+            }, "Stop"),
+          ),
           h("p", { class: "cmd-panel-hint" }, "Poll rate: 2 seconds. This may take several minutes."),
         )
       : null,
@@ -261,8 +315,10 @@ function SelfHealPanel() {
     state === "done"
       ? h("div", null,
           h("div", { class: "cmd-result-success", role: "status" },
-            h("span", { class: "cmd-result-icon" }, "\u2713"),
-            h("span", null, "Self-heal complete."),
+            h("span", { class: "cmd-result-icon" }, statusData?.stopped ? "\u25A0" : "\u2713"),
+            h("span", null, statusData?.stopped
+              ? "Self-heal stopped by request."
+              : "Self-heal complete."),
           ),
           statusData?.output
             ? h("pre", { class: "cmd-result-output" }, statusData.output)

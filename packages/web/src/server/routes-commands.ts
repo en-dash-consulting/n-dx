@@ -10,6 +10,7 @@
  * POST /api/commands/export          — ndx export static dashboard
  * POST /api/commands/self-heal       — ndx self-heal iterative loop (body: { iterations?: number })
  * GET  /api/commands/self-heal/status — check running self-heal status
+ * POST /api/commands/self-heal/stop   — cancel the running self-heal loop
  * POST /api/commands/refresh         — refresh SourceVision data (live server; --data-only --live-server)
  * GET  /api/commands/refresh/status  — check running refresh status
  * GET  /api/commands/manifest        — grouped command reference with resolved CLI name and availability
@@ -36,7 +37,17 @@ interface SelfHealStatus {
   iterations: number;
   output: string;
   error: string | null;
+  /** True when the last run ended because an operator pressed Stop. */
+  stopped: boolean;
 }
+
+/**
+ * Abort handle for the in-flight self-heal loop.
+ *
+ * Kept outside the wire status (an AbortController is not serialisable) so the
+ * stop endpoint can cancel the child process without holding a ChildProcess.
+ */
+let selfHealAbort: AbortController | null = null;
 
 // Module-level singleton — one self-heal at a time per server process.
 const selfHealStatus: SelfHealStatus = {
@@ -46,6 +57,7 @@ const selfHealStatus: SelfHealStatus = {
   iterations: 0,
   output: "",
   error: null,
+  stopped: false,
 };
 
 // ── Binary resolution helpers ─────────────────────────────────────────
@@ -419,6 +431,8 @@ async function handleSelfHeal(
   selfHealStatus.iterations = iterations;
   selfHealStatus.output = "";
   selfHealStatus.error = null;
+  selfHealStatus.stopped = false;
+  selfHealAbort = new AbortController();
 
   if (broadcast) {
     broadcast({ type: "commands:self-heal-started", timestamp: selfHealStatus.startedAt });
@@ -437,33 +451,66 @@ async function handleSelfHeal(
     cwd: ctx.projectDir,
     timeout: 600_000, // 10 minutes
     maxBuffer: 20 * 1024 * 1024,
+    signal: selfHealAbort.signal,
   }).then((result) => {
+    // An operator-requested stop is a normal outcome, not a failure: the
+    // AbortError it produces must not be reported as an error.
+    const wasStopped = selfHealAbort?.signal.aborted === true;
     selfHealStatus.running = false;
     selfHealStatus.finishedAt = new Date().toISOString();
     selfHealStatus.output = (result.stdout || "").trim().slice(-5000);
-    selfHealStatus.error = result.error ? (result.stderr || result.error.message).slice(-1000) : null;
+    selfHealStatus.stopped = wasStopped;
+    selfHealStatus.error = !wasStopped && result.error
+      ? (result.stderr || result.error.message).slice(-1000)
+      : null;
+    selfHealAbort = null;
 
     if (broadcast) {
       broadcast({
         type: "commands:self-heal-finished",
-        ok: !result.error,
+        ok: wasStopped || !result.error,
+        stopped: wasStopped,
         timestamp: selfHealStatus.finishedAt,
       });
     }
   }).catch((err: unknown) => {
+    const wasStopped = selfHealAbort?.signal.aborted === true;
     selfHealStatus.running = false;
     selfHealStatus.finishedAt = new Date().toISOString();
-    selfHealStatus.error = String(err);
+    selfHealStatus.stopped = wasStopped;
+    selfHealStatus.error = wasStopped ? null : String(err);
+    selfHealAbort = null;
 
     if (broadcast) {
       broadcast({
         type: "commands:self-heal-finished",
-        ok: false,
+        ok: wasStopped,
+        stopped: wasStopped,
         timestamp: selfHealStatus.finishedAt,
       });
     }
   });
 
+  return true;
+}
+
+/**
+ * POST /api/commands/self-heal/stop — cancel the running loop.
+ *
+ * Self-heal makes autonomous PRD and code changes, so an operator needs a way
+ * to interrupt it. Aborting kills the child; the run then reports
+ * `stopped: true` with no error.
+ */
+function handleSelfHealStop(
+  _req: IncomingMessage,
+  res: ServerResponse,
+): boolean {
+  if (!selfHealStatus.running || !selfHealAbort) {
+    jsonResponse(res, 409, { error: "Self-heal is not running" });
+    return true;
+  }
+  selfHealAbort.abort();
+  jsonResponse(res, 200, { ok: true, message: "Stop requested; the loop will halt after the current step." });
   return true;
 }
 
@@ -777,6 +824,9 @@ export function handleCommandsRoute(
   }
   if (path === "self-heal/status" && method === "GET") {
     return handleSelfHealStatus(req, res);
+  }
+  if (path === "self-heal/stop" && method === "POST") {
+    return handleSelfHealStop(req, res);
   }
   if (path === "refresh" && method === "POST") {
     return handleRefresh(req, res, ctx, broadcast);
