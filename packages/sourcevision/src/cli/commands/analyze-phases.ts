@@ -58,11 +58,16 @@ import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers
 
 // ── Shared context passed between phases ─────────────────────────────
 
+/** Highest enrichment pass — the level `--full` runs to. */
+export const MAX_ENRICHMENT_PASS = 4;
+
 export interface AnalyzeContext {
   absDir: string;
   svDir: string;
   fullMode: boolean;
   fastMode: boolean;
+  /** Run enrichment passes up to this pass (2–4). `--full` implies 4. */
+  targetPass?: number;
   tokenUsage: AnalyzeTokenUsage;
   /** Result from phase 1 (inventory), used by later phases for incremental hints. */
   inventoryResult: InventoryResult | null;
@@ -357,14 +362,16 @@ export async function runZonesPhase(ctx: AnalyzeContext, extraArgs: string[]): P
     const outPath = join(ctx.svDir, DATA_FILES.zones);
     writeFileSync(outPath, toCanonicalJSON(zones));
 
-    // --full: run remaining enrichment passes up to 4. We stop early when a
+    // --full / --target-pass=<N>: run remaining enrichment passes up to the
+    // target (--full targets MAX_ENRICHMENT_PASS). We stop early when a
     // pass produces no observable change to zone identity or findings —
     // continuing past convergence costs ~1 LLM call per zone batch per pass
     // and contributes nothing. The fingerprint covers zone id, zone name,
     // findings count, and insight count: if a pass touches any of those it
     // counts as productive, otherwise we bail.
-    if (ctx.fullMode && enrich) {
-      const targetPass = 4;
+    const enrichTarget = ctx.fullMode ? MAX_ENRICHMENT_PASS : ctx.targetPass;
+    if (enrichTarget !== undefined && enrich) {
+      const targetPass = enrichTarget;
       const currentPass = zones.enrichmentPass ?? 0;
       const passesNeeded = targetPass - currentPass;
 
