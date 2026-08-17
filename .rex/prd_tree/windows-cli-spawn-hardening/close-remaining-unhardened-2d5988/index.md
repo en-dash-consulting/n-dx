@@ -23,5 +23,5 @@ description: "This epic routed the four known CLI spawn sites (plus pair-program
 
 | Title | Status |
 |-------|--------|
-| [Harden claude-integration execSync sites and make the DEP0190 guard self-maintaining](./harden-claude-integration-679731.md) | pending |
+| [Harden claude-integration execSync sites and make the DEP0190 guard self-maintaining](./harden-claude-integration-679731.md) | completed |
 | [Make ndx export --deploy=github work on Windows (rm -rf and POSIX shell syntax)](./make-ndx-export-deploy-github-c990fd.md) | pending |

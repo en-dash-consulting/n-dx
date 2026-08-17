@@ -2,7 +2,7 @@
 id: "67973131-6101-470b-bd9d-1cb6a98698c4"
 level: "task"
 title: "Harden claude-integration execSync sites and make the DEP0190 guard self-maintaining"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -12,6 +12,11 @@ tags:
   - "testing"
   - "architecture"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-17T20:38:53.248Z"
+completedAt: "2026-08-17T20:51:41.224Z"
+endedAt: "2026-08-17T20:51:41.224Z"
+resolutionType: "code-change"
+resolutionDetail: "Part 1: all six claude-integration.js execSync sites (mcp remove/add + four --version probes) now use execFileSyncCli from win-spawn.js; unused execSync/logCliInvocation imports and duplicate manual logging removed. Part 2: deleted the hardcoded 12-file DEP0190_SCOPE and replaced it with a tree-wide scan (packages/ + scripts/ + pr-check.js) banning exec/execSync imports, shell:process.platform, and shell:true+args, with exemptions in a SHELL_STRING_EXEMPT map carrying reasons — export.js pointing at task c990fd76, plus ci.js and pr-check.js pnpm cases that were previously only mentioned in a comment and never enforced. Added a >100-file assertion so a broken scan cannot pass vacuously. TDD per AC5: a new file importing execSync failed the guard with no guard edit needed, then passed once hardened; probe deleted. Corrected the task's premise — paths WERE quoted in the old strings, so the & concern applied only to manifest-derived constants; the real defect is a trailing backslash escaping its own closing quote, which can exit 0 having stored a truncated command. Proved fixed on C:\\Users\\Tom&Jerry\\my proj (v2)\\ (backslash doubled, & stays quoted, 9 argv -> 9 tokens). AC2 not verified end-to-end by design: real `ndx init` would run `claude mcp remove --scope user rex` and delete the developer's live MCP registrations. AC6 needed no work — mcp add failures already surface at claude-integration.js:447 and assistant-integration.js:190. Also dropped claude-integration.js from the child_process allowlists in architecture-policy.test.js and ci.js (no longer imports child_process). Fixed 10 tests asserting the old implementation: re-pointed claude-discovery.test.js mocks from child_process to the win-spawn boundary, and updated mcp-registration.test.js source regexes to the argv shape. Typecheck clean; root suite 90 files / 2066 passed / 0 failed; rex's 3 failures are the known ambient-load flakes from task 676af18f."
 acceptanceCriteria:
   - "All six claude-integration.js execSync sites route through win-spawn.js execFileSyncCli; no hand-built command strings remain"
   - "`ndx init` registers MCP servers successfully from a project path containing a space, an & character, and a trailing backslash"

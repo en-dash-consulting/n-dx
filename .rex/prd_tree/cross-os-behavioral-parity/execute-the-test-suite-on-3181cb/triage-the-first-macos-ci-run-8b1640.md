@@ -2,7 +2,7 @@
 id: "8b16401f-3532-4cd9-9d8b-90e128c1fa24"
 level: "task"
 title: "Triage the first macOS CI run of the root suite"
-status: "pending"
+status: "blocked"
 priority: "high"
 tags:
   - "cross-os"
