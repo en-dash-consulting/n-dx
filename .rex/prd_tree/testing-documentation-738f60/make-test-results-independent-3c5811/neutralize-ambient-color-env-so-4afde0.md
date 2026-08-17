@@ -2,7 +2,7 @@
 id: "4afde06c-532e-4d2e-966e-6006f4860278"
 level: "task"
 title: "Neutralize ambient color env so FORCE_COLOR does not fail 24 tests"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "testing"
@@ -10,6 +10,11 @@ tags:
   - "developer-experience"
   - "core"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-17T21:15:56.307Z"
+completedAt: "2026-08-17T21:31:39.949Z"
+endedAt: "2026-08-17T21:31:39.949Z"
+resolutionType: "code-change"
+resolutionDetail: "tests/setup-color-env.js (vitest setupFile) deletes FORCE_COLOR and COLORTERM and sets NO_COLOR=1, wired into the root config and all five package configs — setupFiles rather than globalSetup because it must run inside each worker before any module reads the memoised color caches, and because mutating the worker's env is what makes spawned CLI children inherit the neutralized values. web's existing setupFiles entry was appended to, not replaced. Root suite: 24 color failures -> 0; verified 91 files / 2070 passed / 0 failed BOTH with FORCE_COLOR=3 COLORTERM=truecolor and with them unset. Scope correctly grew to sourcevision, which had 9 more of the same class (9 -> 0, 1691 passed). AC5 holds by construction: zero existing test files modified, so no assertion could have been relaxed. AC6 was already met by tests/e2e/cli-tty-color.test.js (12 tests asserting ANSI IS emitted under FORCE_COLOR=1 and suppressed otherwise) — confirmed green rather than duplicated; added tests/unit/color-env-neutralized.test.js as a guard against the setupFile being removed. AC1 NOT literally achievable: `pnpm test` still exits non-zero due to PRE-EXISTING non-color failures — rex 4 files (known ambient-load set, task 676af18f), hench 32, web 7 — each measured identically with and without the color vars, and hench re-verified with the changeset stashed. Zero color-attributable failures remain anywhere. Side discovery filed as task 741bacf1: hench and web never execute in a full run because pnpm stops at rex's flakes, hiding those 39 failures (and likely on CI too, which runs the same command)."
 acceptanceCriteria:
   - "The full suite passes with FORCE_COLOR=3 and COLORTERM=truecolor set in the invoking shell"
   - "The full suite still passes with those variables unset"
