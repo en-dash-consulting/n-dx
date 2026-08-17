@@ -1684,13 +1684,10 @@ const SHELL_SCAN_ROOT_FILES = ["pr-check.js"];
  * elsewhere names the task so the exemption can be retired.
  */
 const SHELL_STRING_EXEMPT = new Map([
-  [
-    "packages/core/export.js",
-    "20+ git/rex invocations built as command strings, plus POSIX-only `rm -rf` " +
-      "and `2>/dev/null || true` that fail outright on Windows. Being fixed " +
-      "separately — PRD task c990fd76 ('Make ndx export --deploy=github work on " +
-      "Windows'). Retire this entry when that lands.",
-  ],
+  // packages/core/export.js was exempt here for its 16 hand-built git/rex
+  // command strings and its POSIX-only `rm -rf` / `2>/dev/null || true`. All of
+  // it now goes through win-spawn.js argv or Node's fs.rmSync, so the exemption
+  // was retired rather than left standing (PRD task c990fd76).
   [
     "packages/core/ci.js",
     "`shell: process.platform === \"win32\"` on the `pnpm docs:build` spawn. pnpm " +

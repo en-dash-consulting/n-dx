@@ -2,7 +2,7 @@
 id: "c990fd76-cedc-405f-8e36-86a98fa015cc"
 level: "task"
 title: "Make ndx export --deploy=github work on Windows (rm -rf and POSIX shell syntax)"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -10,6 +10,11 @@ tags:
   - "export"
   - "spawn"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-17T20:53:59.502Z"
+completedAt: "2026-08-17T21:04:22.919Z"
+endedAt: "2026-08-17T21:04:22.919Z"
+resolutionType: "code-change"
+resolutionDetail: "Fixed an undiscovered blocker first: export.js's `await import(resolvePackagePath(...))` passed a bare absolute path, which Node's ESM loader rejects on Windows (ERR_UNSUPPORTED_ESM_URL_SCHEME, \"Received protocol 'c:'\"), aborting `ndx export` before any work. Wrapped in pathToFileURL(...).href. Verified export.js was the only production instance of that pattern. Then the documented items: `rm -rf \"<path>\"` -> rmSync({recursive,force}) with no shell (the original had no try/catch, so it threw and aborted the deploy on Windows); `git rm -rf . 2>/dev/null || true` -> argv git in a JS try/catch; and all 16 remaining execSync command strings -> execFileSyncCli argv, removing hand-quoting of tmpWorktree/dir that breaks on trailing backslashes and & / ^. Corrected the task's premise: unquoted ${branch} was not an injection vector since branch is the hardcoded \"n-dx-dashboard\"; the real exposure was project-derived paths. Retired export.js from SHELL_STRING_EXEMPT so the guard now scans it (56 tests green). VERIFIED END-TO-END on Windows per AC4/AC6: scratch repo named `e & p (v2)` with a LOCAL BARE origin so no real deploy target was contacted — EXIT=0, 28 files pushed, no .ndx-deploy-tmp leaked; a second run exercised the existing-branch worktree route (vs orphan) and also returned EXIT=0. Two environmental false starts recorded in the log (Windows MAX_PATH from a 170-char scratch base; missing git identity), neither an export.js defect. Typecheck clean; root suite 90 files / 2066 passed / 0 failed; rex's 3 failures are the known ambient-load flakes (task 676af18f)."
 acceptanceCriteria:
   - "The rm -rf loop is replaced with Node fs rm({recursive:true, force:true}) — no shell invocation for file deletion"
   - "No POSIX-only shell syntax (2>/dev/null, || true, /dev/null) remains in export.js"

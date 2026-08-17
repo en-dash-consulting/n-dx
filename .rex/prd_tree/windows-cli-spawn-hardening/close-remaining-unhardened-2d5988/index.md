@@ -2,7 +2,7 @@
 id: "2d5988dc-74a2-4723-8234-0f7a8b7becfc"
 level: "feature"
 title: "Close remaining unhardened shell-string spawn sites"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -11,6 +11,9 @@ tags:
   - "core"
   - "gh:37"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-17T21:04:25.277Z"
+completedAt: "2026-08-17T21:04:25.277Z"
+endedAt: "2026-08-17T21:04:25.277Z"
 acceptanceCriteria:
   - "No production spawn/exec site builds a Windows command line by hand — all route through win-spawn.js / spawnCli / execFileSyncCli"
   - "The DEP0190 guard fails when a new file introduces an unhardened shell-string spawn, without that file needing to be manually enumerated first"
@@ -24,4 +27,4 @@ description: "This epic routed the four known CLI spawn sites (plus pair-program
 | Title | Status |
 |-------|--------|
 | [Harden claude-integration execSync sites and make the DEP0190 guard self-maintaining](./harden-claude-integration-679731.md) | completed |
-| [Make ndx export --deploy=github work on Windows (rm -rf and POSIX shell syntax)](./make-ndx-export-deploy-github-c990fd.md) | pending |
+| [Make ndx export --deploy=github work on Windows (rm -rf and POSIX shell syntax)](./make-ndx-export-deploy-github-c990fd.md) | completed |

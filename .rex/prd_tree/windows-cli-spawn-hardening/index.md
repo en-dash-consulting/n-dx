@@ -21,7 +21,7 @@ description: "Combined fix for GitHub issues #37 (P0), #68, #69 — all one root
 
 | Title | Status |
 |-------|--------|
-| [Close remaining unhardened shell-string spawn sites](./close-remaining-unhardened-2d5988/index.md) | pending |
+| [Close remaining unhardened shell-string spawn sites](./close-remaining-unhardened-2d5988/index.md) | completed |
 | [Collapse the Windows quoting twin to a single implementation](./collapse-the-windows-quoting-099473/index.md) | pending |
 | [Unify cross-OS process-tree termination behind one contract](./unify-cross-os-process-tree-e54028/index.md) | completed |
 | [Add centralized spawnCli Windows-safe helper](./add-centralized-spawncli-752587.md) | completed |
