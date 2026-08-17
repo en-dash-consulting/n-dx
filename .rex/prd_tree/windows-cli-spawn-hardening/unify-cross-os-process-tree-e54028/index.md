@@ -12,8 +12,8 @@ tags:
   - "testing"
 source: "exploration-2026-08-17"
 startedAt: "2026-08-17T19:29:05.945Z"
-completedAt: "2026-08-17T19:29:05.945Z"
-endedAt: "2026-08-17T19:29:05.945Z"
+completedAt: "2026-08-17T19:37:00.220Z"
+endedAt: "2026-08-17T19:37:00.220Z"
 acceptanceCriteria:
   - "Callers of child-lifecycle.js never branch on process.platform for termination — one `terminateTree` contract covers both OSes"
   - "PLATFORM_SUPPORTS_PROCESS_GROUPS is no longer part of the module's public surface"
@@ -27,5 +27,6 @@ description: "packages/core/child-lifecycle.js branches on `process.platform` in
 
 | Title | Status |
 |-------|--------|
+| [Fix POSIX group-kill escalation gated on the direct child instead of the group](./fix-posix-group-kill-escalation-deb8d3.md) | completed |
 | [Implement single terminateTree contract dispatching kill(-pgid) / taskkill /T /F](./implement-single-terminatetree-e6f25b.md) | completed |
 | [Un-skip the 6 Windows process-cleanup e2e cases with grandchild assertions (TDD red step)](./un-skip-the-6-windows-process-134db3.md) | completed |

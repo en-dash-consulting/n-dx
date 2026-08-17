@@ -85,18 +85,41 @@ describe("treeKillSpawnOptions", () => {
 });
 
 describe("terminateTree — POSIX process-group strategy", () => {
-  it("signals the process group, escalating to SIGKILL when the child survives", async () => {
+  /**
+   * A fake `process.kill` for a group. Records delivered signals (excluding
+   * signal-0 existence probes, which are plumbing rather than behaviour) and
+   * models whether the group still holds members.
+   */
+  function makeGroupKiller({ drainOn = null, child = null } = {}) {
+    const signals = [];
+    let members = true;
+
+    const fn = (pgid, signal) => {
+      if (signal === 0) {
+        if (!members) throw new Error("ESRCH");
+        return;
+      }
+      signals.push([pgid, signal]);
+      if (signal === drainOn) {
+        members = false;
+        if (child) setTimeout(() => child.close(0, signal), 0);
+      }
+      return true;
+    };
+
+    fn.signals = signals;
+    return fn;
+  }
+
+  it("signals the process group, escalating to SIGKILL when the group survives", async () => {
     const child = new FakeChildProcess();
     child.pid = 4321;
-    const groupSignals = [];
+    // Nothing drains the group, so escalation is required.
+    const killGroup = makeGroupKiller();
 
-    await terminateTree(child, {
-      forceKillTimeoutMs: 5,
-      platform: "linux",
-      killGroup: (pid, signal) => groupSignals.push([pid, signal]),
-    });
+    await terminateTree(child, { forceKillTimeoutMs: 20, platform: "linux", killGroup });
 
-    expect(groupSignals).toEqual([
+    expect(killGroup.signals).toEqual([
       [-4321, "SIGTERM"],
       [-4321, "SIGKILL"],
     ]);
@@ -105,19 +128,11 @@ describe("terminateTree — POSIX process-group strategy", () => {
   it("stops after SIGTERM when the group exits during the grace period", async () => {
     const child = new FakeChildProcess();
     child.pid = 4321;
-    const groupSignals = [];
+    const killGroup = makeGroupKiller({ drainOn: "SIGTERM", child });
 
-    const pending = terminateTree(child, {
-      forceKillTimeoutMs: 500,
-      platform: "linux",
-      killGroup: (pid, signal) => {
-        groupSignals.push([pid, signal]);
-        setTimeout(() => child.close(0, "SIGTERM"), 0);
-      },
-    });
+    await terminateTree(child, { forceKillTimeoutMs: 500, platform: "linux", killGroup });
 
-    await pending;
-    expect(groupSignals).toEqual([[-4321, "SIGTERM"]]);
+    expect(killGroup.signals).toEqual([[-4321, "SIGTERM"]]);
   });
 
   it("falls back to a direct child kill when the group signal fails", async () => {
@@ -133,6 +148,60 @@ describe("terminateTree — POSIX process-group strategy", () => {
     });
 
     expect(child.killSignals).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+
+  it("SIGKILLs the group when the leader exits but grandchildren ignore SIGTERM", async () => {
+    // The leak this guards: a group-kill escalation gated on the DIRECT child's
+    // liveness. The leader commonly handles SIGTERM and exits promptly while a
+    // grandchild ignores it — so "child exited" says nothing about the group,
+    // and returning early strands every surviving group member.
+    const child = new FakeChildProcess();
+    child.pid = 4321;
+    const groupSignals = [];
+    let groupMembersRemain = true;
+
+    const killGroup = (pid, signal) => {
+      groupSignals.push([pid, signal]);
+      if (signal === 0) {
+        // Existence probe: the group still holds the stubborn grandchild.
+        if (!groupMembersRemain) throw new Error("ESRCH");
+        return;
+      }
+      if (signal === "SIGTERM") {
+        // Leader obeys and exits; grandchild does not.
+        setTimeout(() => child.close(0, "SIGTERM"), 0);
+      }
+      if (signal === "SIGKILL") groupMembersRemain = false;
+    };
+
+    await terminateTree(child, { forceKillTimeoutMs: 40, platform: "linux", killGroup });
+
+    const escalations = groupSignals.filter(([, s]) => s === "SIGKILL");
+    expect(escalations).toEqual([[-4321, "SIGKILL"]]);
+  });
+
+  it("does not signal a group that has already drained", async () => {
+    const child = new FakeChildProcess();
+    child.pid = 4321;
+    const groupSignals = [];
+    let groupMembersRemain = true;
+
+    const killGroup = (pid, signal) => {
+      groupSignals.push([pid, signal]);
+      if (signal === 0) {
+        if (!groupMembersRemain) throw new Error("ESRCH");
+        return;
+      }
+      if (signal === "SIGTERM") {
+        // Whole group exits during the grace period, leader included.
+        groupMembersRemain = false;
+        setTimeout(() => child.close(0, "SIGTERM"), 0);
+      }
+    };
+
+    await terminateTree(child, { forceKillTimeoutMs: 200, platform: "linux", killGroup });
+
+    expect(groupSignals.some(([, s]) => s === "SIGKILL")).toBe(false);
   });
 });
 

@@ -106,6 +106,44 @@ function traceStrategy(message) {
 }
 
 /**
+ * Whether a process group still has any member.
+ *
+ * Signal 0 runs the kernel's existence/permission check without delivering
+ * anything, so this is a probe rather than a kill.
+ *
+ * PID-REUSE SAFETY: a pgid stays allocated for as long as the group has
+ * members, and a pgid is its leader's PID, so that PID cannot be recycled
+ * underneath us while anyone is still in the group. Probing immediately before
+ * signalling therefore cannot target an unrelated process. If the group drains
+ * in between, the follow-up signal fails with ESRCH and is swallowed.
+ */
+function groupHasMembers(pgid, killGroup) {
+  try {
+    killGroup(pgid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Wait (bounded) for every member of a process group to exit.
+ *
+ * Polls rather than awaiting the child's "exit" event: the direct child is only
+ * one member, and a tree kill has to care about all of them.
+ */
+async function waitForGroupExit(pgid, killGroup, timeoutMs, intervalMs = 25) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (!groupHasMembers(pgid, killGroup)) return;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await delay(Math.min(intervalMs, remaining));
+  }
+}
+
+/**
  * Terminate an entire process group rooted at the child's PID.
  *
  * Sends SIGTERM to the process group (process.kill(-pgid, signal)), which
@@ -122,32 +160,30 @@ async function terminateProcessGroup(child, forceKillTimeoutMs, killGroup) {
     return terminateChildProcess(child, forceKillTimeoutMs);
   }
 
-  traceStrategy(`process group kill -${child.pid} (SIGTERM, then SIGKILL)`);
+  const pgid = -child.pid;
+  traceStrategy(`process group kill ${pgid} (SIGTERM, then SIGKILL)`);
 
   try {
-    killGroup(-child.pid, "SIGTERM");
+    killGroup(pgid, "SIGTERM");
   } catch {
     // Group kill failed (e.g. child already exited or pgid not available).
     return terminateChildProcess(child, forceKillTimeoutMs);
   }
 
-  await Promise.race([
-    waitForChildExit(child),
-    delay(forceKillTimeoutMs),
-  ]);
+  // Wait on the GROUP, not the direct child. The leader commonly installs a
+  // SIGTERM handler and exits promptly while a grandchild ignores the signal,
+  // so the child's exit says nothing about whether the tree is gone.
+  await waitForGroupExit(pgid, killGroup, forceKillTimeoutMs);
 
-  if (!isChildRunning(child)) return;
+  if (!groupHasMembers(pgid, killGroup)) return;
 
   try {
-    killGroup(-child.pid, "SIGKILL");
+    killGroup(pgid, "SIGKILL");
   } catch {
-    // Group may have already exited between SIGTERM and SIGKILL — ignore.
+    // Group may have drained between the probe and SIGKILL — ignore.
   }
 
-  await Promise.race([
-    waitForChildExit(child),
-    delay(forceKillTimeoutMs),
-  ]);
+  await waitForGroupExit(pgid, killGroup, forceKillTimeoutMs);
 }
 
 /**
