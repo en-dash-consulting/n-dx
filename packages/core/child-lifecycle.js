@@ -11,6 +11,17 @@ const SIGNAL_EXIT_CODES = {
  */
 export const PLATFORM_SUPPORTS_PROCESS_GROUPS = process.platform !== "win32";
 
+/**
+ * Whether child-lifecycle diagnostics should be written to stderr.
+ * Opt-in via NDX_DEBUG_LIFECYCLE / NDX_DEBUG — the direct-kill path is the
+ * intended behaviour on platforms without process groups, so announcing it on
+ * every invocation is noise rather than a warning users can act on.
+ */
+export function isLifecycleDebugEnabled(env = process.env) {
+  const v = env.NDX_DEBUG_LIFECYCLE ?? env.NDX_DEBUG;
+  return v === "1" || v === "true" || v === "yes";
+}
+
 function isChildRunning(child) {
   return child.exitCode === null && child.signalCode === null;
 }
@@ -116,13 +127,14 @@ async function terminateProcessGroup(child, forceKillTimeoutMs) {
  * @param {number} [options.forceKillTimeoutMs=5000] - Grace period before escalating to SIGKILL.
  * @param {boolean} [options.processGroups=false] - When true, terminate the entire process group
  *   instead of only the direct child.  Requires children to be spawned with `detached: true` so
- *   each child is its own process group leader.  No-op on Windows (logs a one-time warning).
+ *   each child is its own process group leader.  No-op on Windows, which falls back to direct
+ *   child kill (logs a one-time notice only when NDX_DEBUG_LIFECYCLE / NDX_DEBUG is set).
  */
 export function createChildProcessTracker({
   forceKillTimeoutMs = DEFAULT_FORCE_KILL_TIMEOUT_MS,
   processGroups = false,
 } = {}) {
-  if (processGroups && !PLATFORM_SUPPORTS_PROCESS_GROUPS) {
+  if (processGroups && !PLATFORM_SUPPORTS_PROCESS_GROUPS && isLifecycleDebugEnabled()) {
     process.stderr.write(
       "[child-lifecycle] process group cleanup is not supported on this platform; falling back to direct child kill\n",
     );

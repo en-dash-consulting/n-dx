@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createChildProcessTracker,
   installTrackedChildProcessHandlers,
+  isLifecycleDebugEnabled,
   PLATFORM_SUPPORTS_PROCESS_GROUPS,
 } from "../../packages/core/child-lifecycle.js";
 
@@ -53,14 +54,32 @@ describe("PLATFORM_SUPPORTS_PROCESS_GROUPS", () => {
   });
 });
 
-describe("createChildProcessTracker — processGroups: true on unsupported platform", () => {
-  it("logs a one-time warning to stderr when process groups are unavailable", () => {
-    if (PLATFORM_SUPPORTS_PROCESS_GROUPS) {
-      // Cannot simulate Windows on a POSIX host without full mocking of the
-      // process object — skip rather than produce a spurious false-positive.
-      return;
-    }
+describe("isLifecycleDebugEnabled", () => {
+  it("is off when neither variable is set", () => {
+    expect(isLifecycleDebugEnabled({})).toBe(false);
+  });
 
+  it("accepts 1 / true / yes on either variable", () => {
+    for (const value of ["1", "true", "yes"]) {
+      expect(isLifecycleDebugEnabled({ NDX_DEBUG_LIFECYCLE: value })).toBe(true);
+      expect(isLifecycleDebugEnabled({ NDX_DEBUG: value })).toBe(true);
+    }
+  });
+
+  it("rejects other values", () => {
+    for (const value of ["", "0", "false", "no", "on"]) {
+      expect(isLifecycleDebugEnabled({ NDX_DEBUG: value })).toBe(false);
+    }
+  });
+
+  it("lets the scoped variable override the global one", () => {
+    expect(isLifecycleDebugEnabled({ NDX_DEBUG_LIFECYCLE: "0", NDX_DEBUG: "1" })).toBe(false);
+  });
+});
+
+describe("createChildProcessTracker — processGroups: true on unsupported platform", () => {
+  /** Collect stderr writes produced while `fn` runs. */
+  function captureStderr(fn) {
     const writes = [];
     const originalWrite = process.stderr.write.bind(process.stderr);
     process.stderr.write = (chunk, ...rest) => {
@@ -69,11 +88,39 @@ describe("createChildProcessTracker — processGroups: true on unsupported platf
     };
 
     try {
-      createChildProcessTracker({ processGroups: true });
-      expect(writes.some((w) => w.includes("process group cleanup is not supported"))).toBe(true);
+      fn();
     } finally {
       process.stderr.write = originalWrite;
     }
+
+    return writes;
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("stays silent by default so every CLI invocation is not annotated", () => {
+    vi.stubEnv("NDX_DEBUG_LIFECYCLE", "");
+    vi.stubEnv("NDX_DEBUG", "");
+
+    const writes = captureStderr(() => createChildProcessTracker({ processGroups: true }));
+
+    expect(writes.some((w) => w.includes("process group cleanup is not supported"))).toBe(false);
+  });
+
+  it("logs a one-time notice to stderr when debug is enabled", () => {
+    if (PLATFORM_SUPPORTS_PROCESS_GROUPS) {
+      // Cannot simulate Windows on a POSIX host without full mocking of the
+      // process object — skip rather than produce a spurious false-positive.
+      return;
+    }
+
+    vi.stubEnv("NDX_DEBUG_LIFECYCLE", "1");
+
+    const writes = captureStderr(() => createChildProcessTracker({ processGroups: true }));
+
+    expect(writes.some((w) => w.includes("process group cleanup is not supported"))).toBe(true);
   });
 });
 
