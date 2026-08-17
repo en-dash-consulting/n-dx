@@ -4,8 +4,8 @@ level: "epic"
 title: "Web Dashboard"
 status: "completed"
 startedAt: "2026-03-24T05:27:03.754Z"
-completedAt: "2026-08-17T15:41:44.480Z"
-endedAt: "2026-08-17T15:41:44.480Z"
+completedAt: "2026-08-17T16:08:07.467Z"
+endedAt: "2026-08-17T16:08:07.467Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
 ---
 
@@ -33,5 +33,6 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [Transparent task selection and completion reasoning](./transparent-task-selection-and-cb54ce/index.md) | completed |
 | [Fix undefined design tokens and standardize buttons on General and analyze/plan settings pages](./fix-undefined-design-tokens-and-623a33.md) | completed |
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-5dd63e.md) | completed |
+| [Match settings-page text boxes to the Analyze & Import input style and fix dark-mode native form chrome](./match-settings-page-text-boxes-136a8c.md) | completed |
 | [Overview Next Steps panel: consistent formatting, copyable items, and capture-to-PRD action](./overview-next-steps-panel-acebe9.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-a58edb.md) | completed |
