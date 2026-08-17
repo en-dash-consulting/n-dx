@@ -531,12 +531,12 @@ export function LlmProviderView() {
             `${dirtyKeys.size + dirtyToggles.size + (vendorDirty ? 1 : 0)} unsaved change${dirtyKeys.size + dirtyToggles.size + (vendorDirty ? 1 : 0) === 1 ? "" : "s"}`,
           ),
           h("button", {
-            class: "llm-btn llm-btn-secondary",
+            class: "cmd-btn cmd-btn-secondary",
             onClick: handleDiscard,
             disabled: saving,
           }, "Discard"),
           h("button", {
-            class: "llm-btn llm-btn-primary",
+            class: "cmd-btn cmd-btn-primary",
             onClick: handleSave,
             disabled: saving,
           }, saving ? "Saving\u2026" : "Save changes"),

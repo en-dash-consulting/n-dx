@@ -519,12 +519,12 @@ export function ProjectSettingsView() {
             hasErrors ? "Fix errors before saving" : "You have unsaved changes",
           ),
           h("button", {
-            class: "ps-btn ps-btn-secondary",
+            class: "cmd-btn cmd-btn-secondary",
             onClick: handleDiscard,
             disabled: saving,
           }, "Discard"),
           h("button", {
-            class: `ps-btn ps-btn-primary${hasErrors ? " ps-btn-disabled" : ""}`,
+            class: "cmd-btn cmd-btn-primary",
             onClick: handleSave,
             disabled: saving || hasErrors,
           }, saving ? "Saving\u2026" : "Save changes"),
