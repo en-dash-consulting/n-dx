@@ -2,7 +2,7 @@
 id: "134db348-9786-4723-9d68-501931faa499"
 level: "task"
 title: "Un-skip the 6 Windows process-cleanup e2e cases with grandchild assertions (TDD red step)"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -11,6 +11,11 @@ tags:
   - "tdd"
   - "core"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-17T18:27:27.113Z"
+completedAt: "2026-08-17T18:43:09.399Z"
+endedAt: "2026-08-17T18:43:09.399Z"
+resolutionType: "code-change"
+resolutionDetail: "All 6 cases now execute and pass on Windows (commit 102f9ec4); root suite 2025 passed / 5 skipped / 0 failed, up from 2019 passed / 11 skipped. The real blocker was that the fixtures could not run on Windows at all: --import needed a file:// URL (ERR_UNSUPPORTED_ESM_URL_SCHEME) and all three preload regexes hardcoded forward slashes. AC4 (cases must be RED, demonstrating the leak) is NOT satisfiable and was not engineered: process.kill(pid,\"SIGINT\") is TerminateProcess on Windows so the handler never runs (parent exits 1, not 128+2), and the host Job Object reaps the tree regardless of ndx — verified with a probe containing no n-dx code. Documented in the test headers and pushed into the sibling terminateTree task, whose verification strategy was rewritten to assert the strategy RAN rather than rely on liveness."
 acceptanceCriteria:
   - "All 6 previously-skipped cases across the 3 files execute on Windows (no longer reported as skipped)"
   - "Assertions identify surviving child/grandchild PIDs without relying on process groups (tasklist or process.kill(pid, 0))"
