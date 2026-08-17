@@ -74,7 +74,7 @@
 
 .llm-vendor-card-active {
   border-color: var(--accent);
-  background: var(--accent-subtle) 8%, transparent));
+  background: var(--accent-subtle);
 }
 
 .llm-vendor-name {
@@ -182,21 +182,24 @@
   align-items: center;
 }
 
+/* Matches the Analyze & Import input box (.smart-add-textarea) */
 .llm-text-input {
   width: 100%;
   max-width: 400px;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg));
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
   color: var(--text);
-  font-size: 0.875rem;
+  font-size: var(--font-base);
   font-family: var(--font-mono, monospace);
+  transition: border-color var(--transition-normal);
 }
 
 .llm-text-input:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
 }
 
 /* Legacy notice */

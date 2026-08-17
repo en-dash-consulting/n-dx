@@ -121,20 +121,23 @@
 }
 
 /* Inputs */
+/* Matches the Analyze & Import input box (.smart-add-textarea) */
 .ps-number-input {
   width: 120px;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg));
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
   color: var(--text);
-  font-size: 0.875rem;
+  font-size: var(--font-base);
   font-family: var(--font-mono, monospace);
+  transition: border-color var(--transition-normal);
 }
 
 .ps-number-input:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
 }
 
 .ps-number-input.ps-input-error {
@@ -142,18 +145,19 @@
 }
 
 .ps-select {
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg));
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
   color: var(--text);
-  font-size: 0.875rem;
+  font-size: var(--font-base);
   min-width: 160px;
 }
 
 .ps-select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
 }
 
 /* Zone pins table */
@@ -190,20 +194,23 @@
   vertical-align: middle;
 }
 
+/* Matches the Analyze & Import input box (.smart-add-textarea) */
 .ps-pin-input {
   width: 100%;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg));
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
   color: var(--text);
-  font-size: 0.8125rem;
+  font-size: var(--font-sm);
   font-family: var(--font-mono, monospace);
+  transition: border-color var(--transition-normal);
 }
 
 .ps-pin-input:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
 }
 
 .ps-pin-remove {
