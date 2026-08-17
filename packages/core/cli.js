@@ -108,6 +108,7 @@ import {
 import {
   createChildProcessTracker,
   installTrackedChildProcessHandlers,
+  treeKillSpawnOptions,
 } from "./child-lifecycle.js";
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
@@ -320,7 +321,7 @@ class ExitRequest extends Error {
   }
 }
 
-const childTracker = createChildProcessTracker({ processGroups: true });
+const childTracker = createChildProcessTracker({ treeKill: true });
 let exitPromise = null;
 
 /**
@@ -346,13 +347,12 @@ let staleCheckResult = null;
 const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "auth"]);
 
 /**
- * On POSIX systems, spawn each child with `detached: true` so it becomes the
- * leader of a new process group.  This lets the process-group-aware tracker
- * kill grandchildren (spawned by the child) by signalling `-pgid` instead of
- * only the direct child PID.  On Windows the flag is omitted — process groups
- * are not supported and detached mode has different semantics there.
+ * Spawn options that make each child tree-killable by the tracker. Owned by
+ * child-lifecycle.js so this file does not test `process.platform` itself — the
+ * platform difference (POSIX needs `detached: true` for a process group;
+ * Windows needs nothing) is the termination layer's business, not the CLI's.
  */
-const SPAWN_DETACHED = process.platform !== "win32" ? { detached: true } : {};
+const SPAWN_DETACHED = treeKillSpawnOptions();
 
 function spawnTracked(command, args, options) {
   return childTracker.register(spawn(command, args, { ...SPAWN_DETACHED, ...options }));

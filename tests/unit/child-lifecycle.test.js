@@ -1,10 +1,12 @@
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as childLifecycle from "../../packages/core/child-lifecycle.js";
 import {
   createChildProcessTracker,
   installTrackedChildProcessHandlers,
   isLifecycleDebugEnabled,
-  PLATFORM_SUPPORTS_PROCESS_GROUPS,
+  terminateTree,
+  treeKillSpawnOptions,
 } from "../../packages/core/child-lifecycle.js";
 
 class FakeChildProcess extends EventEmitter {
@@ -41,16 +43,280 @@ class FakeProcess extends EventEmitter {
   }
 }
 
-describe("PLATFORM_SUPPORTS_PROCESS_GROUPS", () => {
-  it("is false on Windows", () => {
-    // We can only assert the value is a boolean — the actual platform determines
-    // the value.  On non-Windows CI this is true; on Windows it is false.
-    expect(typeof PLATFORM_SUPPORTS_PROCESS_GROUPS).toBe("boolean");
-    if (process.platform === "win32") {
-      expect(PLATFORM_SUPPORTS_PROCESS_GROUPS).toBe(false);
-    } else {
-      expect(PLATFORM_SUPPORTS_PROCESS_GROUPS).toBe(true);
+/**
+ * A fake taskkill child: an EventEmitter that records how it was invoked and
+ * lets the test decide the exit code (0 = killed, 128 = "process not found").
+ */
+function makeFakeSpawn({ exitCode = 0, emit = true } = {}) {
+  const calls = [];
+  const spawnImpl = (binary, args, options) => {
+    const proc = new EventEmitter();
+    calls.push({ binary, args, options });
+    if (emit) {
+      // Defer so the caller can attach listeners first.
+      setTimeout(() => proc.emit("close", exitCode), 0);
     }
+    return proc;
+  };
+  spawnImpl.calls = calls;
+  return spawnImpl;
+}
+
+describe("PLATFORM_SUPPORTS_PROCESS_GROUPS is no longer public", () => {
+  it("is not exported — callers must not branch on platform themselves", () => {
+    expect("PLATFORM_SUPPORTS_PROCESS_GROUPS" in childLifecycle).toBe(false);
+  });
+});
+
+describe("treeKillSpawnOptions", () => {
+  it("requests a new process group on POSIX so the group can be signalled", () => {
+    expect(treeKillSpawnOptions("linux")).toEqual({ detached: true });
+    expect(treeKillSpawnOptions("darwin")).toEqual({ detached: true });
+  });
+
+  it("requests nothing on Windows, where detached means 'new console'", () => {
+    expect(treeKillSpawnOptions("win32")).toEqual({});
+  });
+
+  it("defaults to the running platform", () => {
+    const expected = process.platform === "win32" ? {} : { detached: true };
+    expect(treeKillSpawnOptions()).toEqual(expected);
+  });
+});
+
+describe("terminateTree — POSIX process-group strategy", () => {
+  it("signals the process group, escalating to SIGKILL when the child survives", async () => {
+    const child = new FakeChildProcess();
+    child.pid = 4321;
+    const groupSignals = [];
+
+    await terminateTree(child, {
+      forceKillTimeoutMs: 5,
+      platform: "linux",
+      killGroup: (pid, signal) => groupSignals.push([pid, signal]),
+    });
+
+    expect(groupSignals).toEqual([
+      [-4321, "SIGTERM"],
+      [-4321, "SIGKILL"],
+    ]);
+  });
+
+  it("stops after SIGTERM when the group exits during the grace period", async () => {
+    const child = new FakeChildProcess();
+    child.pid = 4321;
+    const groupSignals = [];
+
+    const pending = terminateTree(child, {
+      forceKillTimeoutMs: 500,
+      platform: "linux",
+      killGroup: (pid, signal) => {
+        groupSignals.push([pid, signal]);
+        setTimeout(() => child.close(0, "SIGTERM"), 0);
+      },
+    });
+
+    await pending;
+    expect(groupSignals).toEqual([[-4321, "SIGTERM"]]);
+  });
+
+  it("falls back to a direct child kill when the group signal fails", async () => {
+    const child = new FakeChildProcess();
+    child.pid = 4321;
+
+    await terminateTree(child, {
+      forceKillTimeoutMs: 5,
+      platform: "linux",
+      killGroup: () => {
+        throw new Error("ESRCH");
+      },
+    });
+
+    expect(child.killSignals).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+});
+
+describe("terminateTree — Windows taskkill strategy", () => {
+  it("invokes taskkill with /T for the child's PID and never signals a group", async () => {
+    const child = new FakeChildProcess();
+    child.pid = 9876;
+    const spawnImpl = makeFakeSpawn({ exitCode: 0 });
+    let groupCalls = 0;
+
+    // The fake taskkill does not actually stop the child, so close it as the
+    // real one would; otherwise the fallback path muddies the assertion.
+    setTimeout(() => child.close(1, null), 2);
+
+    await terminateTree(child, {
+      forceKillTimeoutMs: 200,
+      platform: "win32",
+      spawnCliImpl: spawnImpl,
+      killGroup: () => { groupCalls += 1; },
+    });
+
+    expect(spawnImpl.calls).toHaveLength(1);
+    expect(spawnImpl.calls[0].binary).toBe("taskkill");
+    expect(spawnImpl.calls[0].args).toEqual(["/PID", "9876", "/T", "/F"]);
+    expect(groupCalls).toBe(0);
+  });
+
+  it("treats a non-zero taskkill exit (process already gone) as success", async () => {
+    const child = new FakeChildProcess();
+    child.pid = 9876;
+    // 128 is taskkill's "process not found" — a normal shutdown race.
+    const spawnImpl = makeFakeSpawn({ exitCode: 128 });
+    setTimeout(() => child.close(1, null), 2);
+
+    await expect(
+      terminateTree(child, {
+        forceKillTimeoutMs: 200,
+        platform: "win32",
+        spawnCliImpl: spawnImpl,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("does not throw when taskkill itself cannot be spawned", async () => {
+    const child = new FakeChildProcess();
+    child.pid = 9876;
+    const spawnImpl = () => {
+      throw new Error("ENOENT: taskkill missing");
+    };
+
+    await expect(
+      terminateTree(child, {
+        forceKillTimeoutMs: 5,
+        platform: "win32",
+        spawnCliImpl: spawnImpl,
+      }),
+    ).resolves.toBeUndefined();
+
+    // Falls back to the direct kill so the child is still dealt with.
+    expect(child.killSignals).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+
+  it("falls back to a direct child kill when taskkill leaves the child alive", async () => {
+    const child = new FakeChildProcess();
+    child.pid = 9876;
+    const spawnImpl = makeFakeSpawn({ exitCode: 0 });
+
+    await terminateTree(child, {
+      forceKillTimeoutMs: 5,
+      platform: "win32",
+      spawnCliImpl: spawnImpl,
+    });
+
+    expect(spawnImpl.calls).toHaveLength(1);
+    expect(child.killSignals).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+
+  it("does not hang when taskkill never exits — the wait is bounded", async () => {
+    const child = new FakeChildProcess();
+    child.pid = 9876;
+    const spawnImpl = makeFakeSpawn({ emit: false });
+
+    await expect(
+      terminateTree(child, {
+        forceKillTimeoutMs: 5,
+        platform: "win32",
+        spawnCliImpl: spawnImpl,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("skips taskkill entirely when the child has no PID", async () => {
+    const child = new FakeChildProcess();
+    child.pid = undefined;
+    const spawnImpl = makeFakeSpawn({ exitCode: 0 });
+
+    await terminateTree(child, {
+      forceKillTimeoutMs: 5,
+      platform: "win32",
+      spawnCliImpl: spawnImpl,
+    });
+
+    expect(spawnImpl.calls).toHaveLength(0);
+    expect(child.killSignals).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+});
+
+describe("terminateTree — strategy tracing", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function captureStderrAsync() {
+    const writes = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk, ...rest) => {
+      writes.push(String(chunk));
+      return originalWrite(chunk, ...rest);
+    };
+    return {
+      writes,
+      restore: () => {
+        process.stderr.write = originalWrite;
+      },
+    };
+  }
+
+  it("names the Windows strategy when NDX_DEBUG_LIFECYCLE is set", async () => {
+    vi.stubEnv("NDX_DEBUG_LIFECYCLE", "1");
+    const child = new FakeChildProcess();
+    child.pid = 9876;
+    setTimeout(() => child.close(1, null), 2);
+
+    const cap = captureStderrAsync();
+    try {
+      await terminateTree(child, {
+        forceKillTimeoutMs: 200,
+        platform: "win32",
+        spawnCliImpl: makeFakeSpawn({ exitCode: 0 }),
+      });
+    } finally {
+      cap.restore();
+    }
+
+    expect(cap.writes.join("")).toContain("taskkill");
+  });
+
+  it("names the POSIX strategy when NDX_DEBUG_LIFECYCLE is set", async () => {
+    vi.stubEnv("NDX_DEBUG_LIFECYCLE", "1");
+    const child = new FakeChildProcess();
+    child.pid = 4321;
+
+    const cap = captureStderrAsync();
+    try {
+      await terminateTree(child, {
+        forceKillTimeoutMs: 5,
+        platform: "linux",
+        killGroup: () => {},
+      });
+    } finally {
+      cap.restore();
+    }
+
+    expect(cap.writes.join("")).toContain("process group");
+  });
+
+  it("stays silent without the debug flag", async () => {
+    vi.stubEnv("NDX_DEBUG_LIFECYCLE", "");
+    vi.stubEnv("NDX_DEBUG", "");
+    const child = new FakeChildProcess();
+    child.pid = 4321;
+
+    const cap = captureStderrAsync();
+    try {
+      await terminateTree(child, {
+        forceKillTimeoutMs: 5,
+        platform: "linux",
+        killGroup: () => {},
+      });
+    } finally {
+      cap.restore();
+    }
+
+    expect(cap.writes.join("")).toBe("");
   });
 });
 
@@ -77,7 +343,7 @@ describe("isLifecycleDebugEnabled", () => {
   });
 });
 
-describe("createChildProcessTracker — processGroups: true on unsupported platform", () => {
+describe("createChildProcessTracker — treeKill construction", () => {
   /** Collect stderr writes produced while `fn` runs. */
   function captureStderr(fn) {
     const writes = [];
@@ -100,27 +366,17 @@ describe("createChildProcessTracker — processGroups: true on unsupported platf
     vi.unstubAllEnvs();
   });
 
-  it("stays silent by default so every CLI invocation is not annotated", () => {
-    vi.stubEnv("NDX_DEBUG_LIFECYCLE", "");
-    vi.stubEnv("NDX_DEBUG", "");
-
-    const writes = captureStderr(() => createChildProcessTracker({ processGroups: true }));
-
-    expect(writes.some((w) => w.includes("process group cleanup is not supported"))).toBe(false);
-  });
-
-  it("logs a one-time notice to stderr when debug is enabled", () => {
-    if (PLATFORM_SUPPORTS_PROCESS_GROUPS) {
-      // Cannot simulate Windows on a POSIX host without full mocking of the
-      // process object — skip rather than produce a spurious false-positive.
-      return;
-    }
-
+  it("says nothing at construction time, even with debug enabled", () => {
+    // The old construction-time notice claimed Windows was "falling back to
+    // direct child kill". That is no longer true — Windows tree-kills via
+    // taskkill — and a capability announcement fired on every `ndx` invocation
+    // regardless of whether a child was ever spawned. Strategy reporting now
+    // happens in terminateTree, at the point a strategy actually runs.
     vi.stubEnv("NDX_DEBUG_LIFECYCLE", "1");
 
-    const writes = captureStderr(() => createChildProcessTracker({ processGroups: true }));
+    const writes = captureStderr(() => createChildProcessTracker({ treeKill: true }));
 
-    expect(writes.some((w) => w.includes("process group cleanup is not supported"))).toBe(true);
+    expect(writes.join("")).toBe("");
   });
 });
 

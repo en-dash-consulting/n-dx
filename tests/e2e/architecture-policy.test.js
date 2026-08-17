@@ -1674,6 +1674,7 @@ const DEP0190_SCOPE = [
   "packages/core/config.js",
   "packages/core/pair-programming.js",
   "packages/core/win-spawn.js",
+  "packages/core/child-lifecycle.js",
   "packages/sourcevision/src/analyzers/branch-work-collector.ts",
   "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
   "packages/sourcevision/src/util/exec-cli.ts",

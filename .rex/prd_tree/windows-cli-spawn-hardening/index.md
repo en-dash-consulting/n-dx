@@ -23,7 +23,7 @@ description: "Combined fix for GitHub issues #37 (P0), #68, #69 — all one root
 |-------|--------|
 | [Close remaining unhardened shell-string spawn sites](./close-remaining-unhardened-2d5988/index.md) | pending |
 | [Collapse the Windows quoting twin to a single implementation](./collapse-the-windows-quoting-099473/index.md) | pending |
-| [Unify cross-OS process-tree termination behind one contract](./unify-cross-os-process-tree-e54028/index.md) | pending |
+| [Unify cross-OS process-tree termination behind one contract](./unify-cross-os-process-tree-e54028/index.md) | completed |
 | [Add centralized spawnCli Windows-safe helper](./add-centralized-spawncli-752587.md) | completed |
 | [Add diagnoseCliInvocation helper and wire it into spawn error paths (closes #68)](./add-diagnosecliinvocation-5a7bcd.md) | completed |
 | [Changeset and cross-shell validation](./changeset-and-cross-shell-validation.md) | completed |

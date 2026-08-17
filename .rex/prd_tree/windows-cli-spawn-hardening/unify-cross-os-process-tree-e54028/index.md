@@ -2,7 +2,7 @@
 id: "e5402817-c4fd-4bbc-b44e-6c979bed6199"
 level: "feature"
 title: "Unify cross-OS process-tree termination behind one contract"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -11,6 +11,9 @@ tags:
   - "core"
   - "testing"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-17T19:29:05.945Z"
+completedAt: "2026-08-17T19:29:05.945Z"
+endedAt: "2026-08-17T19:29:05.945Z"
 acceptanceCriteria:
   - "Callers of child-lifecycle.js never branch on process.platform for termination — one `terminateTree` contract covers both OSes"
   - "PLATFORM_SUPPORTS_PROCESS_GROUPS is no longer part of the module's public surface"
@@ -24,5 +27,5 @@ description: "packages/core/child-lifecycle.js branches on `process.platform` in
 
 | Title | Status |
 |-------|--------|
-| [Implement single terminateTree contract dispatching kill(-pgid) / taskkill /T /F](./implement-single-terminatetree-e6f25b.md) | pending |
+| [Implement single terminateTree contract dispatching kill(-pgid) / taskkill /T /F](./implement-single-terminatetree-e6f25b.md) | completed |
 | [Un-skip the 6 Windows process-cleanup e2e cases with grandchild assertions (TDD red step)](./un-skip-the-6-windows-process-134db3.md) | completed |

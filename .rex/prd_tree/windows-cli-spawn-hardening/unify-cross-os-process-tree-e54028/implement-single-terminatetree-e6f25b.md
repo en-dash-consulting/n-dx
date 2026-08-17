@@ -2,7 +2,7 @@
 id: "e6f25b4d-ee6a-4dfe-89b6-a6520f3fd0e4"
 level: "task"
 title: "Implement single terminateTree contract dispatching kill(-pgid) / taskkill /T /F"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -12,6 +12,11 @@ tags:
 blockedBy:
   - "134db348-9786-4723-9d68-501931faa499"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-17T19:19:25.768Z"
+completedAt: "2026-08-17T19:29:00.183Z"
+endedAt: "2026-08-17T19:29:00.183Z"
+resolutionType: "code-change"
+resolutionDetail: "Single terminateTree(child, opts) contract in child-lifecycle.js: POSIX kill(-pgid) SIGTERM→SIGKILL, Windows taskkill /PID <pid> /T /F via win-spawn.js spawnCli, both falling back to direct child kill. PLATFORM_SUPPORTS_PROCESS_GROUPS unexported; processGroups option renamed treeKill; cli.js's SPAWN_DETACHED conditional moved into exported treeKillSpawnOptions() so no caller branches on platform. TDD: 16 red tests first, 24 green. Strategy-ran verification per the revised AC: unit tests assert taskkill's exact argv and that killGroup is unused on win32, plus a live real-path run printing \"[child-lifecycle] taskkill /PID 22852 /T /F\" that reaped child+grandchild while the parent stayed alive (so not host Job Object containment). platform/spawnCliImpl/killGroup are injectable so both branches are testable on Linux-only CI. Construction-time notice removed (its \"falling back to direct child kill\" text became false). Windows no-graceful-phase, Job-Objects-rejected, and force-kill-of-ndx-itself limitations documented in JSDoc. child-lifecycle.js added to DEP0190_SCOPE. Root suite 89 files/2039 passed/0 failed; typecheck green; remaining rex failures are pre-existing wall-clock flakes that pass in isolation."
 acceptanceCriteria:
   - "A single exported terminateTree(child, timeoutMs) replaces the caller-facing choice between group and direct kill"
   - "PLATFORM_SUPPORTS_PROCESS_GROUPS is removed from the module's public exports; no caller branches on process.platform for termination"

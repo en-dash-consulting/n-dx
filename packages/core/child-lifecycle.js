@@ -1,3 +1,5 @@
+import { spawnCli } from "./win-spawn.js";
+
 const DEFAULT_FORCE_KILL_TIMEOUT_MS = 5000;
 const SIGNAL_EXIT_CODES = {
   SIGHUP: 1,
@@ -6,10 +8,33 @@ const SIGNAL_EXIT_CODES = {
 };
 
 /**
- * Whether the current platform supports POSIX process groups.
- * On Windows, process.kill(-pgid, signal) is not implemented.
+ * Whether `platform` supports POSIX process groups.
+ *
+ * Deliberately NOT exported: callers should ask for a tree kill via
+ * {@link terminateTree} and let this module pick the strategy. An exported
+ * capability flag invites callers to branch on the platform themselves, which
+ * is how the two spawn/terminate platform conditionals in cli.js arose.
  */
-export const PLATFORM_SUPPORTS_PROCESS_GROUPS = process.platform !== "win32";
+function supportsProcessGroups(platform) {
+  return platform !== "win32";
+}
+
+/**
+ * Spawn options a child needs in order to be tree-killable later.
+ *
+ * POSIX: `detached: true` makes the child a process-group leader, which is what
+ * lets `process.kill(-pgid)` reach grandchildren. Windows: nothing — `detached`
+ * there means "new console", not "new process group", and taskkill walks the
+ * tree by PID regardless.
+ *
+ * Exported so callers spawn correctly without testing `process.platform`.
+ *
+ * @param {NodeJS.Platform} [platform]
+ * @returns {{ detached?: boolean }}
+ */
+export function treeKillSpawnOptions(platform = process.platform) {
+  return supportsProcessGroups(platform) ? { detached: true } : {};
+}
 
 /**
  * Whether child-lifecycle diagnostics should be written to stderr.
@@ -73,6 +98,13 @@ async function terminateChildProcess(child, forceKillTimeoutMs) {
   ]);
 }
 
+/** Report which termination strategy ran (opt-in; see isLifecycleDebugEnabled). */
+function traceStrategy(message) {
+  if (isLifecycleDebugEnabled()) {
+    process.stderr.write(`[child-lifecycle] ${message}\n`);
+  }
+}
+
 /**
  * Terminate an entire process group rooted at the child's PID.
  *
@@ -81,19 +113,19 @@ async function terminateChildProcess(child, forceKillTimeoutMs) {
  * spawned by the child.  Falls back to direct kill if the group kill fails.
  *
  * Only effective when the child was spawned with `detached: true`, which makes
- * it the leader of a new process group.
+ * it the leader of a new process group — see {@link treeKillSpawnOptions}.
  */
-async function terminateProcessGroup(child, forceKillTimeoutMs) {
+async function terminateProcessGroup(child, forceKillTimeoutMs, killGroup) {
   if (!isChildRunning(child)) return;
 
   if (!child.pid) {
     return terminateChildProcess(child, forceKillTimeoutMs);
   }
 
-  let groupKillSucceeded = false;
+  traceStrategy(`process group kill -${child.pid} (SIGTERM, then SIGKILL)`);
+
   try {
-    process.kill(-child.pid, "SIGTERM");
-    groupKillSucceeded = true;
+    killGroup(-child.pid, "SIGTERM");
   } catch {
     // Group kill failed (e.g. child already exited or pgid not available).
     return terminateChildProcess(child, forceKillTimeoutMs);
@@ -106,12 +138,10 @@ async function terminateProcessGroup(child, forceKillTimeoutMs) {
 
   if (!isChildRunning(child)) return;
 
-  if (groupKillSucceeded) {
-    try {
-      process.kill(-child.pid, "SIGKILL");
-    } catch {
-      // Group may have already exited between SIGTERM and SIGKILL — ignore.
-    }
+  try {
+    killGroup(-child.pid, "SIGKILL");
+  } catch {
+    // Group may have already exited between SIGTERM and SIGKILL — ignore.
   }
 
   await Promise.race([
@@ -121,27 +151,128 @@ async function terminateProcessGroup(child, forceKillTimeoutMs) {
 }
 
 /**
+ * Windows counterpart to a POSIX process-group kill: `taskkill /T /F`.
+ *
+ * `/T` terminates the whole tree rooted at the PID, which is the closest
+ * analogue to signalling a process group. Windows has no equivalent of the
+ * POSIX graceful phase:
+ *
+ * - `process.kill(pid, "SIGTERM")` is `TerminateProcess` on Windows — the
+ *   target gets no chance to run cleanup handlers, so a "graceful" SIGTERM pass
+ *   buys nothing while still burning the grace period.
+ * - `taskkill /T` without `/F` posts WM_CLOSE, which only a process pumping a
+ *   window-message loop acts on. Node children do not, so it would time out.
+ *
+ * So this goes straight to `/F` and the absence of a graceful phase on Windows
+ * is a documented limitation, not an oversight.
+ *
+ * NOT USED: Job Objects are the architecturally correct primitive — a job with
+ * `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` reaps its whole tree with semantics
+ * exactly analogous to a process group. They are rejected here because they
+ * require a native addon, which would put a compiled dependency in the
+ * orchestration tier of a pure-JS package.
+ *
+ * LIMITATION: taskkill is spawned during shutdown. If the ndx process is itself
+ * force-killed (`TerminateProcess`, Task Manager "End task", or a parent's own
+ * `taskkill /F`), no handler runs and this never executes — the tree then
+ * survives unless the host placed it in a Job Object.
+ */
+async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl) {
+  if (!isChildRunning(child)) return;
+
+  if (!child.pid) {
+    return terminateChildProcess(child, forceKillTimeoutMs);
+  }
+
+  traceStrategy(`taskkill /PID ${child.pid} /T /F`);
+
+  try {
+    // Routed through win-spawn.js rather than a hand-built command line:
+    // repo policy (the DEP0190 guard in tests/e2e/architecture-policy.test.js)
+    // bans ad-hoc Windows command strings.
+    const killer = spawnCliImpl(
+      "taskkill",
+      ["/PID", String(child.pid), "/T", "/F"],
+      { stdio: "ignore", windowsHide: true },
+    );
+
+    // Bounded: a taskkill that never reports back must not wedge shutdown.
+    // Any exit code counts as done — a non-zero status usually means
+    // "process not found" (128), which during shutdown is a normal race, not
+    // an error worth surfacing or throwing on.
+    await Promise.race([
+      new Promise((resolve) => {
+        killer.once("close", resolve);
+        killer.once("error", resolve);
+      }),
+      delay(forceKillTimeoutMs),
+    ]);
+  } catch {
+    // taskkill itself could not be spawned — fall through to the direct kill.
+  }
+
+  await Promise.race([
+    waitForChildExit(child),
+    delay(forceKillTimeoutMs),
+  ]);
+
+  if (!isChildRunning(child)) return;
+
+  // taskkill did not get it (or never ran): still deal with the direct child.
+  return terminateChildProcess(child, forceKillTimeoutMs);
+}
+
+/**
+ * Terminate a child and every process beneath it, using whichever primitive the
+ * platform provides.
+ *
+ * This is the single termination contract: callers never choose between a group
+ * kill and a direct kill, and never test `process.platform`. POSIX signals the
+ * process group; Windows runs `taskkill /T /F`. Both fall back to killing the
+ * direct child if the tree-wide attempt fails or leaves it running.
+ *
+ * Children must be spawned with {@link treeKillSpawnOptions} for the POSIX path
+ * to reach grandchildren.
+ *
+ * @param {import("child_process").ChildProcess} child
+ * @param {object} [options]
+ * @param {number} [options.forceKillTimeoutMs=5000] Grace period before escalating.
+ * @param {NodeJS.Platform} [options.platform] Overridable so both strategies are
+ *   testable on any host — CI runs the suite on Linux only, so without this seam
+ *   the Windows branch would ship untested.
+ * @param {Function} [options.spawnCliImpl] Injectable spawn (defaults to win-spawn's spawnCli).
+ * @param {Function} [options.killGroup] Injectable group signaller (defaults to process.kill).
+ * @returns {Promise<void>}
+ */
+export async function terminateTree(child, {
+  forceKillTimeoutMs = DEFAULT_FORCE_KILL_TIMEOUT_MS,
+  platform = process.platform,
+  spawnCliImpl = spawnCli,
+  killGroup = (pid, signal) => process.kill(pid, signal),
+} = {}) {
+  if (!isChildRunning(child)) return;
+
+  return supportsProcessGroups(platform)
+    ? terminateProcessGroup(child, forceKillTimeoutMs, killGroup)
+    : terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl);
+}
+
+/**
  * Create a tracker that registers and cleans up child processes.
  *
  * @param {object} [options]
  * @param {number} [options.forceKillTimeoutMs=5000] - Grace period before escalating to SIGKILL.
- * @param {boolean} [options.processGroups=false] - When true, terminate the entire process group
- *   instead of only the direct child.  Requires children to be spawned with `detached: true` so
- *   each child is its own process group leader.  No-op on Windows, which falls back to direct
- *   child kill (logs a one-time notice only when NDX_DEBUG_LIFECYCLE / NDX_DEBUG is set).
+ * @param {boolean} [options.treeKill=false] - When true, terminate the child's entire process
+ *   tree via {@link terminateTree} instead of only the direct child. Spawn such children with
+ *   {@link treeKillSpawnOptions} so the POSIX path can reach grandchildren. Named for the intent
+ *   rather than the POSIX mechanism: Windows has no process groups but does tree-kill.
  */
 export function createChildProcessTracker({
   forceKillTimeoutMs = DEFAULT_FORCE_KILL_TIMEOUT_MS,
-  processGroups = false,
+  treeKill = false,
 } = {}) {
-  if (processGroups && !PLATFORM_SUPPORTS_PROCESS_GROUPS && isLifecycleDebugEnabled()) {
-    process.stderr.write(
-      "[child-lifecycle] process group cleanup is not supported on this platform; falling back to direct child kill\n",
-    );
-  }
-
-  const terminate = (processGroups && PLATFORM_SUPPORTS_PROCESS_GROUPS)
-    ? terminateProcessGroup
+  const terminate = treeKill
+    ? (child, timeoutMs) => terminateTree(child, { forceKillTimeoutMs: timeoutMs })
     : terminateChildProcess;
 
   const children = new Set();
