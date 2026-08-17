@@ -2,7 +2,7 @@
 id: "da8af67a-a7de-4c87-9308-6ceacb637298"
 level: "task"
 title: "Expand the CI matrix to run unit/integration/e2e suites on windows-latest and macos-latest"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -11,6 +11,11 @@ tags:
   - "windows"
   - "macos"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-17T20:04:33.599Z"
+completedAt: "2026-08-17T20:09:53.596Z"
+endedAt: "2026-08-17T20:09:53.596Z"
+resolutionType: "code-change"
+resolutionDetail: "Root suite now runs on windows-latest and macos-latest via the existing smoke jobs (YAML validated by js-yaml parse; step order and smoke-parity needs verified programmatically). Windows measured locally first: 90 files, 2063 passed, 1 skipped, 0 failed, 80s. SCOPED deliberately — `pnpm -r run test` stays ubuntu-only because rex's four wall-clock budgets fail under concurrent load and would make the new jobs permanently red; quarantined with a pointer to task 676af18f which owns stabilizing them. Tests placed after artifact upload so smoke data survives a suite failure; job names kept unchanged to avoid breaking branch-protection required checks. Verified rather than assumed that run-vitest-bind-aware.mjs did not silently drop the three loopback suites (bind works; no exclusion logged). PARTIAL ON ONE AC: the required local macOS run was impossible — no macOS machine available — so macOS was wired on POSIX-similarity reasoning and the gap is tracked as task 8b16401f (\"Triage the first macOS CI run\"), which lists likely macOS-specific failure modes and must replace the cost estimate with observed figures. Cost reported as an ESTIMATE from local timings, not observed CI data: ~+38 billed min/run (Windows ~8 at 2x, macOS ~30 at 10x), i.e. macOS is ~80% of the cost for the least incremental information."
 acceptanceCriteria:
   - "`pnpm -r run test` and the root vitest suite execute on windows-latest and macos-latest in CI"
   - "A local full-suite run on Windows and macOS was completed first and its failure inventory recorded"

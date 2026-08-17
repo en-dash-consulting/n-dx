@@ -151,6 +151,23 @@ jobs:
           name: ndx-cli-smoke-macos
           path: ndx-cli-smoke-macos.json
 
+      # Runs AFTER the upload deliberately: a test failure then still leaves the
+      # smoke artifact published, so this job's collection contract with
+      # smoke-parity is unaffected by suite results. (smoke-parity is skipped
+      # when this job fails, because it `needs` it — the artifact itself is
+      # intact and the next green run compares normally.)
+      #
+      # SCOPE — root suite only. tests/** is where every cross-OS behaviour
+      # lives: spawn/quoting, child-process lifecycle, config file permissions,
+      # init, and the CLI e2e flows. The per-package suites (`pnpm -r run test`)
+      # stay ubuntu-only for now: rex carries four wall-clock performance budgets
+      # that fail under concurrent load and would make this job permanently red,
+      # which would get it disabled and lose all cross-OS coverage. Tracked as
+      # "Stabilize rex's load-sensitive performance assertions" (676af18f);
+      # add `pnpm -r run test` here once that lands.
+      - name: Run root e2e / integration tests
+        run: node scripts/run-vitest-bind-aware.mjs root
+
   smoke-windows:
     name: CLI Smoke (Windows)
     runs-on: windows-latest
@@ -185,6 +202,17 @@ jobs:
         with:
           name: ndx-cli-smoke-windows
           path: ndx-cli-smoke-windows.json
+
+      # See the equivalent step in smoke-macos for why this runs after the
+      # upload and why only the root suite runs here.
+      #
+      # Measured locally on Windows 11 before this job was wired (2026-08-17):
+      # 90 files, 2063 passed, 1 skipped, 0 failed, 80s wall. The full
+      # `pnpm -r run test` also passes on Windows apart from the two rex
+      # wall-clock budgets noted above (llm-client 1213, sourcevision 1691,
+      # rex 4403 passed / 2 failed).
+      - name: Run root e2e / integration tests
+        run: node scripts/run-vitest-bind-aware.mjs root
 
   smoke-parity:
     name: CLI Smoke Parity
