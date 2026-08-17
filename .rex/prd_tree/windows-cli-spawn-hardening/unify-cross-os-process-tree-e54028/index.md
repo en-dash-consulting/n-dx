@@ -25,4 +25,4 @@ description: "packages/core/child-lifecycle.js branches on `process.platform` in
 | Title | Status |
 |-------|--------|
 | [Implement single terminateTree contract dispatching kill(-pgid) / taskkill /T /F](./implement-single-terminatetree-e6f25b.md) | pending |
-| [Un-skip Windows tree-cleanup e2e tests with a grandchild assertion (TDD red step)](./un-skip-windows-tree-cleanup-134db3.md) | pending |
+| [Un-skip the 6 Windows process-cleanup e2e cases with grandchild assertions (TDD red step)](./un-skip-the-6-windows-process-134db3.md) | pending |
