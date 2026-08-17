@@ -66,6 +66,7 @@
     "llm-model-catalog.js",
     "child-lifecycle.js",
     "cli-log.js",
+    "file-permissions.js",
     "cli-timeout.js",
     "update-check.js",
     "pair-programming.js",

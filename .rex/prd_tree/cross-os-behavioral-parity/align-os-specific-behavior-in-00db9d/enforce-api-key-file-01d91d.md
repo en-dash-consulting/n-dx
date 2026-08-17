@@ -2,7 +2,7 @@
 id: "01d91dd7-523a-4e49-ad76-f442e6484002"
 level: "task"
 title: "Enforce API-key file permissions on Windows via ACLs, or stop claiming they are set"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -11,6 +11,11 @@ tags:
   - "core"
   - "config"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-17T19:43:24.905Z"
+completedAt: "2026-08-17T19:55:17.943Z"
+endedAt: "2026-08-17T19:55:17.943Z"
+resolutionType: "code-change"
+resolutionDetail: "New packages/core/file-permissions.js attempts AND verifies owner-only restriction: POSIX chmod 0600 + stat readback; Windows icacls /inheritance:r /grant:r DOMAIN\\user:F via win-spawn.js + DACL readback requiring no inherited (I) entries and no foreign principal (exit code deliberately not trusted). config.js warns at write time when verification fails, naming file/cause/alternative, so the code can never claim protection it did not achieve. Help text now describes what the running platform actually does. Premises verified empirically first: chmod(0o600) on Windows left mode 0666 and an all-inherited DACL (SYSTEM + Administrators + user), and access(X_OK) succeeded on a plain JSON file. cli_path executable check now explicitly skipped on Windows via executableBitIsMeaningful(), with PATHEXT rejected because it would refuse extensionless pnpm/npm shims. All four Windows skips in cli-config.test.js enabled (143 passing, 0 skipped) with mode assertions on POSIX and DACL assertions on Windows. 18 new unit tests cover both branches via injected seams. An existing guard caught file-permissions.js missing from package.json \"files\" (would have broken npm installs) — added. Live: real `ndx config claude.api_key` now yields ACL of exactly <user>:(F). Typecheck clean; root suite 90 files / 2063 passed / 0 failed. Noted for follow-up: a local administrator can still take ownership, so this matches 0600's intent against other non-admin users but is not admin-proof."
 acceptanceCriteria:
   - "On Windows, either the API-key file's ACL is restricted to the current user, or the user is explicitly warned at storage time that it is not"
   - "`ndx config --help` no longer asserts 0600 permissions on platforms where they are not applied"

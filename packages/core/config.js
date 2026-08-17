@@ -13,15 +13,30 @@ import {
   writeFile,
   access,
   constants,
-  chmod,
   stat,
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { execFileSyncCli } from "./win-spawn.js";
+import {
+  describeUnrestrictedFile,
+  restrictFileToOwner,
+} from "./file-permissions.js";
 export { quoteWindowsToken, buildWindowsCliCommandLine } from "./win-spawn.js";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
 const LOCAL_CONFIG_FILE = ".n-dx.local.json";
+
+/**
+ * How the API-key file is actually protected on this platform.
+ *
+ * Stated per-platform because the help text used to promise "0600 (owner-only)"
+ * everywhere. On Windows that was false: `fs.chmod` cannot express a POSIX mode
+ * and leaves the DACL untouched, so the key stayed readable by other users while
+ * the docs said otherwise. See file-permissions.js.
+ */
+const API_KEY_PERMISSION_NOTE = process.platform === "win32"
+  ? "File ACL restricted to your user account (verified; warns if it cannot be)."
+  : "File permissions set to 0600 (owner-only) for security.";
 
 /**
  * Keys that are machine-specific and should be written to .n-dx.local.json
@@ -100,8 +115,14 @@ async function saveJSON(path, data) {
 }
 
 /**
- * Save .n-dx.json with owner-only permissions (0o600) when it contains
- * sensitive data like API keys. Otherwise uses standard permissions.
+ * Save .n-dx.json restricted to its owner when it contains sensitive data like
+ * API keys. Otherwise uses standard permissions.
+ *
+ * Restriction is attempted AND verified (see file-permissions.js): on Windows a
+ * bare `chmod(path, 0o600)` changes nothing about who can read the file, so a
+ * silent chmod would have left the key exposed while appearing to protect it.
+ * When verification fails the user is told, because a false assurance about an
+ * API key is worse than a stated limitation.
  */
 async function saveProjectJSON(path, data) {
   await saveJSON(path, data);
@@ -111,9 +132,11 @@ async function saveProjectJSON(path, data) {
       typeof data.llm.claude.api_key === "string") ||
     (data?.llm?.codex?.api_key && typeof data.llm.codex.api_key === "string") ||
     (data?.llm?.google?.api_key && typeof data.llm.google.api_key === "string");
-  if (hasSensitiveData) {
-    await chmod(path, 0o600);
-  }
+  if (!hasSensitiveData) return;
+
+  const result = await restrictFileToOwner(path);
+  const warning = describeUnrestrictedFile(path, result);
+  if (warning) process.stderr.write(`${warning}\n`);
 }
 
 /**
@@ -343,7 +366,27 @@ function coerceValue(newValue, existingValue) {
 // ── Claude config validation ─────────────────────────────────────────────────
 
 /**
- * Validate claude.cli_path: check the file exists and is executable.
+ * Whether an executable-bit check is meaningful on this platform.
+ *
+ * SKIPPED BY DESIGN ON WINDOWS. NTFS has no executable bit, and Node documents
+ * `fs.constants.X_OK` as having no effect there — it degrades to `F_OK`.
+ * Measured: `access("key.json", X_OK)` SUCCEEDS for a plain JSON file, so the
+ * check cannot reject anything and its "Run: chmod +x" hint is nonsense advice
+ * on Windows.
+ *
+ * REJECTED ALTERNATIVE: requiring a PATHEXT extension (.exe/.cmd/.bat). It would
+ * reject real binaries — as win-spawn.js documents, pnpm/npm global installs
+ * place an extensionless POSIX script beside the `.CMD` shim, and users
+ * legitimately point cli_path at either. A validation that rejects valid input is
+ * worse than no validation, so existence (F_OK) is the honest limit here and
+ * spawn-time diagnostics (diagnoseCliInvocation) cover the rest.
+ */
+function executableBitIsMeaningful(platform = process.platform) {
+  return platform !== "win32";
+}
+
+/**
+ * Validate claude.cli_path: check the file exists and — on POSIX — is executable.
  * Throws with a helpful message on failure.
  */
 async function validateCliPath(value) {
@@ -355,12 +398,14 @@ async function validateCliPath(value) {
         "  Provide an absolute path to the Claude Code CLI binary.",
     );
   }
-  try {
-    await access(value, constants.X_OK);
-  } catch {
-    throw new Error(
-      `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
-    );
+  if (executableBitIsMeaningful()) {
+    try {
+      await access(value, constants.X_OK);
+    } catch {
+      throw new Error(
+        `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
+      );
+    }
   }
 }
 
@@ -394,12 +439,14 @@ async function validateCodexCliPath(value) {
     );
   }
 
-  try {
-    await access(value, constants.X_OK);
-  } catch {
-    throw new Error(
-      `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
-    );
+  if (executableBitIsMeaningful()) {
+    try {
+      await access(value, constants.X_OK);
+    } catch {
+      throw new Error(
+        `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
+      );
+    }
   }
 }
 
@@ -1200,7 +1247,7 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     Validated: must start with "sk-ant-". Use --force
                                     to skip validation.
                                     Note: stored in .n-dx.json — add to .gitignore.
-                                    File permissions set to 0600 (owner-only) for security.
+                                    ${API_KEY_PERMISSION_NOTE}
   claude.api_endpoint      string    Anthropic API base URL (optional)
                                     Override the default API endpoint for proxies or
                                     compatible services.

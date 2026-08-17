@@ -710,10 +710,22 @@ describe("n-dx config", () => {
         expect(stderr).toContain("/nonexistent/path/to/claude");
       });
 
-      it.skipIf(process.platform === "win32")("rejects cli_path when file is not executable", async () => {
+      it("rejects cli_path when file is not executable (POSIX only)", async () => {
         const nonExecPath = join(tmpDir, "not-executable");
         await writeFile(nonExecPath, "#!/bin/sh\necho hi\n");
         await chmod(nonExecPath, 0o644); // readable but not executable
+
+        if (isWin) {
+          // SKIPPED BY DESIGN, asserted rather than silently skipped: NTFS has
+          // no executable bit and Node's X_OK degrades to F_OK on Windows, so
+          // an existing file is always accepted. Rejecting on a PATHEXT
+          // extension instead would refuse the extensionless POSIX scripts that
+          // pnpm/npm global installs place beside their .CMD shims. See
+          // executableBitIsMeaningful() in packages/core/config.js.
+          const output = run(["claude.cli_path", nonExecPath, tmpDir]);
+          expect(output).toContain(`claude.cli_path = ${nonExecPath}`);
+          return;
+        }
 
         const stderr = runFail(["claude.cli_path", nonExecPath, tmpDir]);
         expect(stderr).toContain("not executable");
@@ -798,11 +810,12 @@ describe("n-dx config", () => {
       expect(stderr).toContain("No Claude configuration set");
     });
 
-    it.skipIf(process.platform === "win32")("tests cli_path with configured binary", async () => {
-      // Create a fake claude binary that outputs a version
-      const fakeClaude = join(tmpDir, "fake-claude");
-      await writeFile(fakeClaude, "#!/bin/sh\necho '1.0.0-test'\n");
-      await chmod(fakeClaude, 0o755);
+    it("tests cli_path with configured binary", async () => {
+      // writeFakeBinary emits a .cmd on Windows and a chmod 755 sh script on
+      // POSIX, so this no longer needs a platform skip.
+      const fakeClaude = await writeFakeBinary(join(tmpDir, "fake-claude"), {
+        stdout: "1.0.0-test",
+      });
 
       run(["claude.cli_path", fakeClaude, tmpDir]);
       const output = run(["--test-connection", tmpDir]);
@@ -934,42 +947,81 @@ describe("n-dx config", () => {
   // ── Secure file permissions ──────────────────────────────────────────────
 
   describe("secure file permissions", () => {
-    it.skipIf(process.platform === "win32")("sets .n-dx.json to 0600 when api_key is present", async () => {
+    /**
+     * Assert a file is readable only by its owner, in whatever terms the
+     * platform actually enforces.
+     *
+     * POSIX: mode 0600. Windows: NTFS has no POSIX mode — `chmod(path, 0o600)`
+     * leaves the DACL untouched and the mode still reads back 0666 — so the
+     * check has to be the DACL itself: no inherited `(I)` entries (inheritance
+     * broken) and no principal other than the current user.
+     */
+    async function expectOwnerOnly(path) {
+      if (!isWin) {
+        const { mode } = await stat(path);
+        expect(mode & 0o777).toBe(0o600);
+        return;
+      }
+
+      const acl = execFileSync("icacls", [path], { encoding: "utf-8" });
+      const aces = acl
+        .split(/\r?\n/)
+        .map((l) => l.replace(path, "").trim())
+        .filter((l) => /^.*?:(\([^)]*\))+$/.test(l));
+
+      expect(aces.length).toBeGreaterThan(0);
+      expect(aces.filter((a) => a.includes("(I)"))).toEqual([]);
+      const me = process.env.USERNAME.toLowerCase();
+      for (const ace of aces) {
+        const identity = ace.slice(0, ace.indexOf(":(")).toLowerCase();
+        expect(identity.split("\\").pop()).toBe(me);
+      }
+    }
+
+    /** Assert a file was NOT locked down to its owner. */
+    async function expectNotOwnerOnly(path) {
+      if (!isWin) {
+        const { mode } = await stat(path);
+        expect(mode & 0o777).not.toBe(0o600);
+        return;
+      }
+      // Untouched files keep the directory's inherited ACL.
+      const acl = execFileSync("icacls", [path], { encoding: "utf-8" });
+      expect(acl).toContain("(I)");
+    }
+
+    it("restricts .n-dx.json to the owner when api_key is present", async () => {
       run(["claude.api_key", "sk-ant-test-key-123", tmpDir]);
 
-      const fileStat = await stat(join(tmpDir, ".n-dx.json"));
-      // 0o600 = owner read/write only (decimal 384)
-      const mode = fileStat.mode & 0o777;
-      expect(mode).toBe(0o600);
+      await expectOwnerOnly(join(tmpDir, ".n-dx.json"));
     });
 
     it("does not restrict permissions when no api_key present", async () => {
       // claude.model is not machine-local, writes to .n-dx.json
       run(["claude.model", "claude-sonnet-4-6", tmpDir]);
 
-      const fileStat = await stat(join(tmpDir, ".n-dx.json"));
-      const mode = fileStat.mode & 0o777;
-      // Should not be 0o600 — default file permissions apply
-      expect(mode).not.toBe(0o600);
+      await expectNotOwnerOnly(join(tmpDir, ".n-dx.json"));
     });
 
-    it.skipIf(process.platform === "win32")("restricts permissions when api_key is added to existing config", async () => {
+    it("restricts permissions when api_key is added to existing config", async () => {
       // First set a non-sensitive value
       run(["claude.cli_path", "/some/path", "--force", tmpDir]);
-      const beforeStat = await stat(LOCAL_CONFIG_PATH(tmpDir));
-      const beforeMode = beforeStat.mode & 0o777;
-      expect(beforeMode).not.toBe(0o600);
+      await expectNotOwnerOnly(LOCAL_CONFIG_PATH(tmpDir));
 
       // Now add an API key
       run(["claude.api_key", "sk-ant-secure-key", tmpDir]);
-      const afterStat = await stat(SHARED_CONFIG_PATH(tmpDir));
-      const afterMode = afterStat.mode & 0o777;
-      expect(afterMode).toBe(0o600);
+      await expectOwnerOnly(SHARED_CONFIG_PATH(tmpDir));
     });
 
-    it("mentions 0600 permissions in help text", () => {
+    it("describes the actual protection for this platform in help text", () => {
       const output = run(["--help"]);
-      expect(output).toContain("0600");
+      // Claiming 0600 on Windows would be false: chmod cannot set it there.
+      if (isWin) {
+        expect(output).toContain("ACL restricted to your user account");
+        expect(output).not.toContain("0600");
+      } else {
+        expect(output).toContain("0600");
+      }
     });
   });
 
