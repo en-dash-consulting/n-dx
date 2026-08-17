@@ -2,8 +2,11 @@
 id: "acebe9ce-090f-480e-a9fd-e578f2b34a2b"
 level: "feature"
 title: "Overview Next Steps panel: consistent formatting, copyable items, and capture-to-PRD action"
-status: "pending"
+status: "completed"
 priority: "medium"
+startedAt: "2026-08-17T14:08:28.748Z"
+completedAt: "2026-08-17T14:25:03.854Z"
+endedAt: "2026-08-17T14:25:03.854Z"
 acceptanceCriteria:
   - "Next Steps panel uses the same section styling as sibling Overview panels (headers, spacing, typography) in both light and dark themes"
   - "Each next-step item has a copy control that copies its title and description; a copy-all control copies the full list as markdown"

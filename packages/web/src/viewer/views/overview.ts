@@ -164,14 +164,51 @@ interface NextStep {
   category: string;
 }
 
+/** Copy text to the clipboard with a legacy execCommand fallback. */
+function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const input = document.createElement("textarea");
+      input.value = text;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      resolve();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+/** Format the full step list as a numbered markdown list. */
+function stepsToMarkdown(steps: NextStep[]): string {
+  return steps
+    .map((s, i) => `${i + 1}. **[${s.priority}]** ${s.title} — ${s.description}`)
+    .join("\n");
+}
+
 /**
  * Prioritized next-step recommendations — the UI twin of the sourcevision
  * MCP `get_next_steps` tool. Rendered on the Overview so recommendations are
  * visible at any enrichment pass (the Suggestions tab requires pass ≥ 4).
- * Renders nothing when no steps are available yet.
+ * Renders nothing while loading and when no steps are available — the same
+ * convention as the other data-driven Overview sections.
+ *
+ * Each step can be copied individually, the whole list can be copied as
+ * markdown, and the panel footer offers a confirm-guarded "Capture to PRD"
+ * action that files the findings via POST /api/rex/capture-next-steps.
  */
 export function NextStepsPanel() {
   const [steps, setSteps] = useState<NextStep[] | null>(null);
+  const [copied, setCopied] = useState<number | "all" | null>(null);
+  const [capture, setCapture] = useState<"idle" | "confirm" | "capturing" | "done" | "error">("idle");
+  const [captureMsg, setCaptureMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,18 +225,112 @@ export function NextStepsPanel() {
     return () => { cancelled = true; };
   }, []);
 
+  const handleCopy = useCallback((text: string, which: number | "all") => {
+    copyText(text).then(() => {
+      setCopied(which);
+      setTimeout(() => setCopied((c) => (c === which ? null : c)), 2000);
+    }).catch(() => {
+      // Silent fail — button feedback simply doesn't appear
+    });
+  }, []);
+
+  const handleCapture = useCallback(async () => {
+    if (!steps) return;
+    setCapture("capturing");
+    setCaptureMsg(null);
+    try {
+      const res = await fetch("/api/rex/capture-next-steps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ steps }),
+      });
+      const body = await res.json().catch(() => ({})) as { created?: number; skipped?: number; error?: string };
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      const created = body.created ?? 0;
+      const skipped = body.skipped ?? 0;
+      setCaptureMsg(
+        `✓ Captured ${created} to PRD` +
+        (skipped > 0 ? ` (${skipped} duplicate${skipped === 1 ? "" : "s"} skipped)` : ""),
+      );
+      setCapture("done");
+    } catch (err) {
+      setCaptureMsg(String(err instanceof Error ? err.message : err));
+      setCapture("error");
+    }
+  }, [steps]);
+
   if (!steps) return null;
 
-  return h("div", { class: "overview-next-steps" },
-    h("h3", { class: "section-header" }, "Next Steps"),
+  return h("div", { class: "overview-section overview-next-steps" },
+    h("div", { class: "section-header-row" },
+      h("h3", null, "Next Steps"),
+      h("button", {
+        class: "link-btn next-steps-copy-all",
+        onClick: () => handleCopy(stepsToMarkdown(steps), "all"),
+        title: "Copy all recommendations as a markdown list",
+        "aria-label": "Copy all next steps as markdown",
+        type: "button",
+      }, copied === "all" ? "✓ Copied" : "Copy all"),
+    ),
     h("ol", { class: "next-steps-list" },
       steps.map((s, i) =>
         h("li", { key: i, class: "next-step-item" },
-          h("span", { class: `tag next-step-priority-${s.priority}` }, s.priority),
-          h("strong", null, ` ${s.title}`),
+          h("div", { class: "next-step-row" },
+            h("span", { class: `next-step-priority next-step-priority-${s.priority}` }, s.priority),
+            h("span", { class: "next-step-title" }, s.title),
+            h("button", {
+              class: "next-step-copy",
+              onClick: () => handleCopy(`${s.title} — ${s.description}`, i),
+              title: "Copy this recommendation",
+              "aria-label": `Copy "${s.title}"`,
+              type: "button",
+            }, copied === i ? "✓" : "⎘"),
+          ),
           h("div", { class: "next-step-desc" }, s.description),
         ),
       ),
+    ),
+    h("div", { class: "next-steps-footer" },
+      capture === "idle" || capture === "done" || capture === "error"
+        ? h("button", {
+            class: "cmd-inline-trigger next-steps-capture-btn",
+            onClick: () => { setCapture("confirm"); setCaptureMsg(null); },
+            title: "File these recommendations as PRD items so they can be worked on",
+            type: "button",
+          },
+            h("span", { "aria-hidden": "true" }, "\u{1F4CB}"),
+            "Capture to PRD",
+          )
+        : null,
+      capture === "confirm"
+        ? h("span", { class: "next-steps-confirm" },
+            `Capture ${steps.length} finding${steps.length === 1 ? "" : "s"} into the PRD?`,
+            h("button", {
+              class: "cmd-inline-trigger next-steps-confirm-btn",
+              onClick: handleCapture,
+              type: "button",
+            }, "Confirm"),
+            h("button", {
+              class: "cmd-inline-trigger next-steps-cancel-btn",
+              onClick: () => setCapture("idle"),
+              type: "button",
+            }, "Cancel"),
+          )
+        : null,
+      capture === "capturing"
+        ? h("span", { class: "next-steps-confirm", "aria-busy": "true" },
+            h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }),
+            "Capturing...",
+          )
+        : null,
+      h("span", { role: "status", "aria-live": "polite" },
+        capture === "done" && captureMsg
+          ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, captureMsg)
+          : null,
+      ),
+      capture === "error" && captureMsg
+        ? h("span", { class: "cmd-inline-result cmd-inline-result-err", role: "alert" }, captureMsg)
+        : null,
     ),
   );
 }
