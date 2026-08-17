@@ -17,11 +17,18 @@
  * table of edge-case tokens (spaces, embedded quotes, trailing backslash,
  * cmd.exe metacharacters, empty string, %VAR%).
  *
- * llm-client is imported from its built dist (root tests run against compiled
- * artifacts; the vitest globalSetup verifies the build exists).
+ * BOTH twins are imported from SOURCE. Do not repoint llm-client at
+ * `dist/public.js`: comparing a source-side twin against a compiled-artifact
+ * twin makes an unbuilt change to exec.ts look like a divergence between the
+ * two packages. That misfire has already happened once — dist still held the
+ * pre-`WINDOWS_BARE_BINARY_RE` builder, so this test reported
+ * `"claude" "--print" "hi"` against source's `claude "--print" "hi"` when the
+ * two implementations were in fact identical and only the build was stale.
+ * Integration tests that spawn real CLIs have good reason to run against
+ * compiled output; a pure-function parity guard does not.
  */
 import { describe, it, expect } from "vitest";
-import { buildWindowsCliCommandLine as buildLlm } from "../../packages/llm-client/dist/public.js";
+import { buildWindowsCliCommandLine as buildLlm } from "../../packages/llm-client/src/exec.ts";
 import { buildWindowsCliCommandLine as buildWinSpawn } from "../../packages/core/win-spawn.js";
 import { buildWindowsCliCommandLine as buildConfig } from "../../packages/core/config.js";
 
