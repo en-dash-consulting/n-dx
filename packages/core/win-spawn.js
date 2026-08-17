@@ -14,6 +14,7 @@
  */
 
 import { execFileSync, spawn } from "node:child_process";
+import { logCliInvocation } from "./cli-log.js";
 
 /**
  * Quote a single token for a Windows cmd.exe verbatim command line.
@@ -97,6 +98,7 @@ export function buildWindowsCliCommandLine(binary, args) {
 export function execFileSyncCli(binary, args, options) {
   if (process.platform === "win32") {
     const cmdLine = buildWindowsCliCommandLine(binary, args);
+    logCliInvocation({ binary, args, cwd: options?.cwd, via: "execFileSyncCli", commandLine: cmdLine });
     // Outer quote pair: cmd.exe /s strips only the outermost quotes, keeping
     // per-token inner quotes (spaced paths) intact.
     return execFileSync("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
@@ -104,6 +106,7 @@ export function execFileSyncCli(binary, args, options) {
       windowsVerbatimArguments: true,
     });
   }
+  logCliInvocation({ binary, args, cwd: options?.cwd, via: "execFileSyncCli" });
   return execFileSync(binary, args, options);
 }
 
@@ -122,10 +125,12 @@ export function execFileSyncCli(binary, args, options) {
 export function spawnCli(binary, args, options = {}) {
   if (process.platform === "win32") {
     const cmdLine = buildWindowsCliCommandLine(binary, args);
+    logCliInvocation({ binary, args, cwd: options.cwd, via: "spawnCli", commandLine: cmdLine });
     return spawn("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
       ...options,
       windowsVerbatimArguments: true,
     });
   }
+  logCliInvocation({ binary, args, cwd: options.cwd, via: "spawnCli" });
   return spawn(binary, args, options);
 }

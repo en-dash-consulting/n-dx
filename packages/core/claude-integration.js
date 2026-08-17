@@ -20,6 +20,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, rmdirSync, unlinkSy
 import { createRequire } from "module";
 import { join, resolve } from "path";
 import { execSync } from "child_process";
+import { logCliInvocation } from "./cli-log.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import {
@@ -198,12 +199,22 @@ function registerMcpServers(dir) {
     // `claude mcp add` fails if the server already exists in any scope.
     for (const scope of ["local", "project", "user"]) {
       try {
+        logCliInvocation({
+          binary: claudeCmd,
+          args: ["mcp", "remove", "--scope", scope, name],
+          via: "claude-integration:registerMcpServers",
+        });
         execSync(`"${claudeCmd}" mcp remove --scope ${scope} ${name}`, { stdio: "ignore", timeout: 5_000 });
       } catch {
         // Server may not exist in this scope — continue cleanup.
       }
     }
     try {
+      logCliInvocation({
+        binary: claudeCmd,
+        args: ["mcp", "add", name, "--", "node", bin, descriptor.mcpCommand, absDir],
+        via: "claude-integration:registerMcpServers",
+      });
       execSync(
         `"${claudeCmd}" mcp add ${name} -- node "${bin}" ${descriptor.mcpCommand} "${absDir}"`,
         { stdio: "pipe", timeout: 10_000 },

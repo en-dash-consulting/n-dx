@@ -31,6 +31,7 @@ import { execFile, execFileSync, spawn } from "node:child_process";
 import type { ChildProcess, StdioOptions } from "node:child_process";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
+import { logCliInvocation } from "./cli-log.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -966,6 +967,7 @@ export function spawnCli(
 
   if (_platform === "win32") {
     const cmdLine = buildWindowsCliCommandLine(cliBinary, args);
+    logCliInvocation({ binary: cliBinary, args, cwd, via: "spawnCli", platform: _platform, commandLine: cmdLine });
     // Wrap the whole command line in an extra pair of quotes: `cmd.exe /s`
     // strips only the outermost quote pair, leaving the inner per-token quotes
     // (e.g. around a path containing spaces) intact. Without this wrapper, /s
@@ -976,5 +978,6 @@ export function spawnCli(
     });
   }
 
+  logCliInvocation({ binary: cliBinary, args, cwd, via: "spawnCli", platform: _platform });
   return spawn(cliBinary, args, baseOpts);
 }

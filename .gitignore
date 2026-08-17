@@ -45,3 +45,12 @@ scripts/HENCH_CALLGRAPH_FINDINGS.md
 
 # macOS
 .DS_Store
+
+# Vendor CLI invocation log (packages/*/cli-log.*) and its rotated generation.
+# Local operational history — never committed.
+claude_commands.log
+claude_commands.log.1
+
+# Scratch argv-capture files written by e2e fake-CLI fixtures
+claude.args
+codex.args
