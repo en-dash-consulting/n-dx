@@ -2543,30 +2543,9 @@
   cursor: pointer;
 }
 
-.rex-analyze-btn {
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: var(--font-base);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
+/* Visuals come from the shared cmd-btn system; only layout remains. */
 .rex-analyze-btn-run {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
   margin-left: auto;
-}
-
-.rex-analyze-btn-run:hover {
-  opacity: 0.9;
-}
-
-.rex-analyze-btn-run:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .rex-analyze-progress {
@@ -2633,19 +2612,6 @@
   font-size: var(--font-base);
   color: var(--text-dim);
   font-weight: var(--weight-medium);
-}
-
-.rex-analyze-select-btn {
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: var(--font-sm);
-  cursor: pointer;
-  padding: 2px var(--space-1);
-}
-
-.rex-analyze-select-btn:hover {
-  text-decoration: underline;
 }
 
 /* Proposals */
@@ -2770,32 +2736,6 @@
 .rex-analyze-accept-bar {
   display: flex;
   justify-content: flex-end;
-}
-
-.rex-analyze-btn-accept {
-  background: var(--green);
-  border-color: var(--green);
-  color: #fff;
-}
-
-.rex-analyze-btn-accept:hover {
-  opacity: 0.9;
-}
-
-.rex-analyze-btn-accept:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Review & Edit toggle button */
-.rex-analyze-btn-review {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.rex-analyze-btn-review:hover {
-  opacity: 0.9;
 }
 
 /* ── Proposal Editor ─────────────────────────────────────────────── */
@@ -4778,52 +4718,16 @@
   border-top: 1px solid var(--border);
 }
 
-.smart-add-btn {
-  padding: var(--space-2) var(--space-4);
-  font-size: var(--font-sm);
-  font-weight: var(--weight-medium);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-normal);
+/* Visuals come from the shared cmd-btn system; only layout remains. */
+.smart-add-btn-review,
+.smart-add-btn-accept {
   flex: 1;
   text-align: center;
 }
 
-.smart-add-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.smart-add-btn-review {
-  background: var(--bg-surface);
-  color: var(--text);
-}
-
-.smart-add-btn-review:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.smart-add-btn-accept {
-  background: var(--accent);
-  color: #000;
-  border-color: var(--accent);
-}
-
-.smart-add-btn-accept:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
 .smart-add-btn-generate {
   margin-top: var(--space-2);
-  background: var(--accent);
-  color: #000;
-  border-color: var(--accent);
   align-self: flex-end;
-}
-
-.smart-add-btn-generate:hover:not(:disabled) {
-  opacity: 0.9;
 }
 
 /* Compact variant (dashboard embedding) */

@@ -2,8 +2,11 @@
 id: "a58edbcf-4588-47ef-9c99-eb02aac46f41"
 level: "feature"
 title: "Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles"
-status: "pending"
+status: "completed"
 priority: "medium"
+startedAt: "2026-08-17T15:17:01.173Z"
+completedAt: "2026-08-17T15:22:18.470Z"
+endedAt: "2026-08-17T15:22:18.470Z"
 acceptanceCriteria:
   - "All buttons on the Rex Analysis page use the standard dashboard button styles (size, color tokens, hover/disabled states) — no ad-hoc styling"
   - "Page formatting (headings, panels, spacing, lists/tables) on the Analysis page matches existing dashboard conventions"
