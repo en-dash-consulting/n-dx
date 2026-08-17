@@ -2,7 +2,7 @@
 id: "01d923cb-e8b0-49d1-bd33-9a57b1d4ec9e"
 level: "task"
 title: "Repoint the Windows quoting parity test at src/exec.ts instead of dist/public.js"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -11,6 +11,11 @@ tags:
   - "llm-client"
   - "quick-win"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-17T18:01:55.779Z"
+completedAt: "2026-08-17T18:18:21.505Z"
+endedAt: "2026-08-17T18:18:21.505Z"
+resolutionType: "code-change"
+resolutionDetail: "Repointed the parity test at packages/llm-client/src/exec.ts (bc7d413a). Both negative checks verified: green with dist reverted to the old divergent builder, red when the source twins genuinely diverge. Also fixed two pre-existing failures per workflow step 5 — GNU tar drive-letter parsing in published-package-loadability (ba2d106c) and a CRLF-shebang collection failure in obfuscated-code-policy (worktree re-checkout, no commit) — plus an incremental-build false positive in my earlier dist-staleness check (3579538b)."
 acceptanceCriteria:
   - "tests/unit/windows-quoting-parity.test.js imports the llm-client twin from packages/llm-client/src/exec.ts, not dist/"
   - "The test passes with a deliberately stale dist/ present (delete or revert packages/llm-client/dist/exec.js and confirm it still passes) — proving build-independence"

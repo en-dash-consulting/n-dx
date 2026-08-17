@@ -25,4 +25,4 @@ description: "`quoteWindowsToken` / `buildWindowsCliCommandLine` exist twice, by
 | Title | Status |
 |-------|--------|
 | [Extract quoteWindowsToken into a zero-dependency shared module (retire the twin)](./extract-quotewindowstoken-into-f3f909.md) | pending |
-| [Repoint the Windows quoting parity test at src/exec.ts instead of dist/public.js](./repoint-the-windows-quoting-01d923.md) | pending |
+| [Repoint the Windows quoting parity test at src/exec.ts instead of dist/public.js](./repoint-the-windows-quoting-01d923.md) | completed |
