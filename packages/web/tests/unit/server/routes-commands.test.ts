@@ -386,6 +386,37 @@ describe("commands route — sv-analyze full flow (async)", () => {
     expect(status.recentOutput).toContain("Enrichment pass 4 complete");
   });
 
+  it("targetPass runs async and spawns --target-pass=N without --full", async () => {
+    execMock.mockResolvedValue({ stdout: "Enrichment pass 3 complete", stderr: "", error: null });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetPass: 3 }),
+    });
+    expect(res.status).toBe(202);
+    const body = await res.json();
+    expect(body.message).toContain("pass 3");
+
+    const status = await waitForFinish();
+    expect(status.error).toBeNull();
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).toContain("--target-pass=3");
+    expect(args).not.toContain("--full");
+  });
+
+  it("rejects out-of-range or non-integer targetPass with 400", async () => {
+    for (const targetPass of [1, 5, 2.5, "3"]) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetPass }),
+      });
+      expect(res.status).toBe(400);
+    }
+    expect(execMock).not.toHaveBeenCalled();
+  });
+
   it("captures a failed full run into status.error", async () => {
     execMock.mockResolvedValue({ stdout: "", stderr: "no LLM credentials", error: new Error("exit 1") });
 

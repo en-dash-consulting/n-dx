@@ -112,7 +112,7 @@ const FAQ_SECTIONS: FAQSection[] = [
       {
         question: "What do the locked navigation items mean?",
         answer:
-          "Items marked with P2, P3, or P4 badges require additional SourceVision enrichment passes. Run more 'sourcevision analyze' passes to unlock Architecture, Problems, and Suggestions views.",
+          "Items marked with P2, P3, or P4 badges require additional SourceVision enrichment passes. You can still open them — each locked view offers a button to run just the passes it needs, or to run the full analysis and unlock every view at once.",
       },
       {
         question: "Can I run the dashboard in the background?",

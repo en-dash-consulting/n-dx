@@ -118,6 +118,19 @@
 
 .locked-view p { margin-bottom: var(--space-2); font-size: 14px; }
 
+.locked-actions {
+  margin-top: var(--space-4);
+  justify-content: center;
+}
+
+.enrichment-gate-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 .locked-hint code {
   background: var(--bg-surface);
   border: 1px solid var(--border);

@@ -359,13 +359,17 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
           },
             section.items.map((entry) => {
               const locked = entry.minPass > 0 && enrichmentPass < entry.minPass;
+              // Locked views stay navigable — they render an EnrichmentGate
+              // page offering to run the analysis passes they need.
               return h("button", {
                 key: entry.id,
                 type: "button",
                 class: `nav-item ${view === entry.id ? "active" : ""} ${locked ? "locked" : ""}`,
-                onClick: locked ? undefined : () => handleNav(entry.id),
-                disabled: locked ? true : undefined,
-                tabIndex: !locked && !isExpanded ? -1 : undefined,
+                onClick: () => handleNav(entry.id),
+                tabIndex: !isExpanded ? -1 : undefined,
+                title: locked
+                  ? `Requires enrichment pass ${entry.minPass} — open to run the analysis`
+                  : undefined,
                 "aria-current": view === entry.id ? "page" : undefined,
               },
                 h("span", { class: "nav-icon", "aria-hidden": "true" }, entry.icon),

@@ -145,10 +145,12 @@ const svAnalyzeStatus: SvAnalyzeStatus = {
  *
  * Quick runs (default / `lite: true`) execute synchronously and return 200
  * with the output. Full runs (`full: true` — all four enrichment passes,
- * which unlock the Architecture/Problems/Suggestions tabs) can take many
- * minutes of LLM work, so they run as an async singleton: 202 immediately,
- * progress via GET /api/commands/sv-analyze/status. Either way the viewer's
- * data polling repopulates the tabs when the new files land.
+ * which unlock the Architecture/Problems/Suggestions tabs) and targeted
+ * runs (`targetPass: 2–4` — enrichment up to just the pass a locked view
+ * needs) can take many minutes of LLM work, so they run as an async
+ * singleton: 202 immediately, progress via
+ * GET /api/commands/sv-analyze/status. Either way the viewer's data polling
+ * repopulates the tabs when the new files land.
  */
 async function handleSvAnalyze(
   req: IncomingMessage,
@@ -158,12 +160,20 @@ async function handleSvAnalyze(
 ): Promise<boolean> {
   let lite = false;
   let full = false;
+  let targetPass: number | undefined;
   try {
     const body = await readBody(req);
     if (body) {
-      const input = JSON.parse(body) as { lite?: boolean; full?: boolean };
+      const input = JSON.parse(body) as { lite?: boolean; full?: boolean; targetPass?: number };
       lite = !!input.lite;
       full = !!input.full;
+      if (input.targetPass !== undefined) {
+        if (!Number.isInteger(input.targetPass) || input.targetPass < 2 || input.targetPass > 4) {
+          errorResponse(res, 400, "targetPass must be an integer between 2 and 4");
+          return true;
+        }
+        targetPass = input.targetPass;
+      }
     }
   } catch {
     // Use defaults
@@ -173,9 +183,12 @@ async function handleSvAnalyze(
   const cmdArgs = [...prefixArgs, "analyze"];
   if (lite) cmdArgs.push("--lite");
   if (full) cmdArgs.push("--full");
+  else if (targetPass !== undefined) cmdArgs.push(`--target-pass=${targetPass}`);
   cmdArgs.push(ctx.projectDir);
 
-  if (full) {
+  // Both full runs and targeted enrichment runs involve LLM passes that can
+  // take minutes — run them as the async singleton with status polling.
+  if (full || targetPass !== undefined) {
     if (svAnalyzeStatus.running) {
       jsonResponse(res, 409, {
         error: "A full analysis is already running",
@@ -197,7 +210,9 @@ async function handleSvAnalyze(
     jsonResponse(res, 202, {
       ok: true,
       startedAt: svAnalyzeStatus.startedAt,
-      message: "Full analysis started. Poll /api/commands/sv-analyze/status for progress.",
+      message: full
+        ? "Full analysis started. Poll /api/commands/sv-analyze/status for progress."
+        : `Enrichment to pass ${targetPass} started. Poll /api/commands/sv-analyze/status for progress.`,
     });
 
     foundationExec(bin, cmdArgs, {
