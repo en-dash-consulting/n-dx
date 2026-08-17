@@ -114,9 +114,9 @@ export function AnalyzeControls() {
 
   const busy = state === "running" || state === "running-full";
 
-  return h("div", { class: "overview-reanalyze" },
+  return h("div", { class: "overview-reanalyze cmd-panel-actions" },
     h("button", {
-      class: "cmd-inline-trigger",
+      class: "cmd-btn cmd-btn-primary",
       onClick: handleQuick,
       disabled: busy,
       "aria-busy": state === "running",
@@ -128,7 +128,7 @@ export function AnalyzeControls() {
       state === "running" ? "Analyzing..." : "Re-analyze",
     ),
     h("button", {
-      class: "cmd-inline-trigger",
+      class: "cmd-btn cmd-btn-secondary",
       onClick: handleFull,
       disabled: busy,
       "aria-busy": state === "running-full",

@@ -188,6 +188,18 @@
   border-radius: 6px;
 }
 
+/* Analyze trigger row */
+.overview-reanalyze {
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.overview-reanalyze .cmd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Next Steps panel */
 .next-steps-list {
   display: flex;
