@@ -28,7 +28,7 @@ description: "The sibling CI-matrix task (da8af67a) put the ROOT suite on window
 | [Cover both prompt-delivery shapes per platform in hench adapter tests](./cover-both-prompt-delivery-0de025.md) | completed |
 | [Fix POSIX fixture assumptions in hench and web tests (/tmp, git quoting, absolute-path check)](./fix-posix-fixture-assumptions-861495.md) | completed |
 | [Fix the hardcoded "/" after join() in web's boundary-check exemptions](./fix-the-hardcoded-after-join-in-30235f.md) | completed |
-| [Give web's graph-view tests a getBoundingClientRect stub (jsdom returns 0x0)](./give-web-s-graph-view-tests-a-3be5b1.md) | pending |
+| [Give web's graph-view tests a getBoundingClientRect stub (jsdom returns 0x0)](./give-web-s-graph-view-tests-a-3be5b1.md) | completed |
 | [Make hench and web temp-dir cleanup survive Windows file locking (EBUSY)](./make-hench-and-web-temp-dir-8e7962.md) | completed |
 | [Normalize POSIX path-separator assertions in hench test-runner and guard tests](./normalize-posix-path-separator-7c8977.md) | completed |
 | [Stop git's autocrlf breaking hench rollback and sigint fixtures](./stop-git-s-autocrlf-breaking-a38d61.md) | completed |

@@ -2,7 +2,7 @@
 id: "3be5b199-ad38-404c-93a5-54369508882f"
 level: "task"
 title: "Give web's graph-view tests a getBoundingClientRect stub (jsdom returns 0x0)"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "testing"
@@ -10,6 +10,9 @@ tags:
   - "jsdom"
   - "viewer"
 source: "exploration-2026-08-18"
+startedAt: "2026-08-18T19:43:56.209Z"
+completedAt: "2026-08-18T20:00:55.368Z"
+endedAt: "2026-08-18T20:00:55.368Z"
 acceptanceCriteria:
   - "Both graph-view failures pass, in isolation and as part of the full web suite"
   - "getBoundingClientRect is stubbed with dimensions that make the asserted transform arithmetic explicit rather than coincidental"

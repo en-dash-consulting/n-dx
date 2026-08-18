@@ -16,6 +16,7 @@ blockedBy:
   - "8e79620a-b732-4fe7-b414-be6719b9b9b9"
   - "0de02514-ca19-47f0-be65-14a034476b60"
   - "676af18f-c764-45e3-812c-6755fa0004c7"
+  - "3be5b199-ad38-404c-93a5-54369508882f"
 source: "exploration-2026-08-17"
 acceptanceCriteria:
   - "The Windows CI job runs the per-package suites via scripts/run-all-tests.mjs packages"
