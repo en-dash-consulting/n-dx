@@ -10,6 +10,7 @@ import {
   buildScopedCommand,
   runPostTaskTests,
 } from "../../../src/tools/test-runner.js";
+import { osPath, osPrefix } from "../../helpers/index.js";
 
 // ---------------------------------------------------------------------------
 // isTestFile
@@ -49,48 +50,53 @@ describe("isTestFile", () => {
 
 describe("candidateTestPaths", () => {
   it("returns the file itself if it is already a test file", () => {
+    // NOT osPath(): this is the early-return path (test-runner.ts:101), which
+    // echoes the input verbatim rather than constructing a path with join(). So
+    // the separators are whatever the caller passed — unlike every other case
+    // below, where production builds the path and therefore uses the OS
+    // separator. Wrapping this one would assert the wrong contract.
     const paths = candidateTestPaths("src/foo.test.ts");
     expect(paths).toEqual(["src/foo.test.ts"]);
   });
 
   it("generates co-located test and spec variants", () => {
     const paths = candidateTestPaths("src/agent/loop.ts");
-    expect(paths).toContain("src/agent/loop.test.ts");
-    expect(paths).toContain("src/agent/loop.spec.ts");
+    expect(paths).toContain(osPath("src/agent/loop.test.ts"));
+    expect(paths).toContain(osPath("src/agent/loop.spec.ts"));
   });
 
   it("generates __tests__ directory variants", () => {
     const paths = candidateTestPaths("src/agent/loop.ts");
-    expect(paths).toContain(join("src/agent/__tests__/loop.test.ts"));
-    expect(paths).toContain(join("src/agent/__tests__/loop.spec.ts"));
+    expect(paths).toContain(osPath("src/agent/__tests__/loop.test.ts"));
+    expect(paths).toContain(osPath("src/agent/__tests__/loop.spec.ts"));
   });
 
   it("generates tests/ directory variants", () => {
     const paths = candidateTestPaths("src/agent/loop.ts");
-    expect(paths).toContain(join("src/agent/tests/loop.test.ts"));
-    expect(paths).toContain(join("src/agent/tests/loop.spec.ts"));
+    expect(paths).toContain(osPath("src/agent/tests/loop.test.ts"));
+    expect(paths).toContain(osPath("src/agent/tests/loop.spec.ts"));
   });
 
   it("generates mirrored src → tests paths", () => {
     const paths = candidateTestPaths("src/agent/loop.ts");
-    expect(paths).toContain(join("tests/agent/loop.test.ts"));
-    expect(paths).toContain(join("tests/agent/loop.spec.ts"));
+    expect(paths).toContain(osPath("tests/agent/loop.test.ts"));
+    expect(paths).toContain(osPath("tests/agent/loop.spec.ts"));
     // Also __tests__ mirror
-    expect(paths).toContain(join("__tests__/agent/loop.test.ts"));
+    expect(paths).toContain(osPath("__tests__/agent/loop.test.ts"));
   });
 
   it("does not generate src → tests mirror for non-src paths", () => {
     const paths = candidateTestPaths("lib/utils.ts");
     // Should still have co-located candidates
-    expect(paths).toContain("lib/utils.test.ts");
+    expect(paths).toContain(osPath("lib/utils.test.ts"));
     // But no mirror paths
-    expect(paths.every((p) => !p.startsWith("tests/"))).toBe(true);
+    expect(paths.every((p) => !p.startsWith(osPrefix("tests/")))).toBe(true);
   });
 
   it("preserves file extension", () => {
     const paths = candidateTestPaths("src/foo.jsx");
-    expect(paths).toContain("src/foo.test.jsx");
-    expect(paths).toContain("src/foo.spec.jsx");
+    expect(paths).toContain(osPath("src/foo.test.jsx"));
+    expect(paths).toContain(osPath("src/foo.spec.jsx"));
   });
 });
 
@@ -115,7 +121,7 @@ describe("findRelevantTests", () => {
     await writeFile(join(tmpDir, "src/agent/loop.test.ts"), "");
 
     const tests = await findRelevantTests(tmpDir, ["src/agent/loop.ts"]);
-    expect(tests).toEqual(["src/agent/loop.test.ts"]);
+    expect(tests).toEqual([osPath("src/agent/loop.test.ts")]);
   });
 
   it("finds .spec variant co-located test file", async () => {
@@ -124,7 +130,7 @@ describe("findRelevantTests", () => {
     await writeFile(join(tmpDir, "src/utils/helpers.spec.ts"), "");
 
     const tests = await findRelevantTests(tmpDir, ["src/utils/helpers.ts"]);
-    expect(tests).toContain("src/utils/helpers.spec.ts");
+    expect(tests).toContain(osPath("src/utils/helpers.spec.ts"));
   });
 
   it("finds test files in __tests__ directory", async () => {
@@ -134,7 +140,7 @@ describe("findRelevantTests", () => {
     await writeFile(join(tmpDir, "src/agent/__tests__/loop.test.ts"), "");
 
     const tests = await findRelevantTests(tmpDir, ["src/agent/loop.ts"]);
-    expect(tests).toContain(join("src/agent/__tests__/loop.test.ts"));
+    expect(tests).toContain(osPath("src/agent/__tests__/loop.test.ts"));
   });
 
   it("finds test files via src → tests mirror", async () => {
@@ -144,7 +150,7 @@ describe("findRelevantTests", () => {
     await writeFile(join(tmpDir, "tests/agent/loop.test.ts"), "");
 
     const tests = await findRelevantTests(tmpDir, ["src/agent/loop.ts"]);
-    expect(tests).toContain(join("tests/agent/loop.test.ts"));
+    expect(tests).toContain(osPath("tests/agent/loop.test.ts"));
   });
 
   it("returns test file itself when a test file is in the changed list", async () => {
@@ -152,7 +158,7 @@ describe("findRelevantTests", () => {
     await writeFile(join(tmpDir, "src/agent/loop.test.ts"), "");
 
     const tests = await findRelevantTests(tmpDir, ["src/agent/loop.test.ts"]);
-    expect(tests).toEqual(["src/agent/loop.test.ts"]);
+    expect(tests).toEqual([osPath("src/agent/loop.test.ts")]);
   });
 
   it("returns empty array for files with no related tests", async () => {
@@ -169,7 +175,7 @@ describe("findRelevantTests", () => {
       "src/foo.ts",
       "src/foo.ts", // duplicate input
     ]);
-    expect(tests).toEqual(["src/foo.test.ts"]);
+    expect(tests).toEqual([osPath("src/foo.test.ts")]);
   });
 
   it("deduplicates when multiple source files map to the same test", async () => {
@@ -206,7 +212,7 @@ describe("findRelevantTests", () => {
     ]);
     const unique = [...new Set(tests)];
     expect(tests).toEqual(unique);
-    expect(tests).toContain("src/foo.test.ts");
+    expect(tests).toContain(osPath("src/foo.test.ts"));
   });
 
   it("finds tests for multiple distinct source files", async () => {
@@ -217,8 +223,8 @@ describe("findRelevantTests", () => {
     await writeFile(join(tmpDir, "src/bar.test.ts"), "");
 
     const tests = await findRelevantTests(tmpDir, ["src/foo.ts", "src/bar.ts"]);
-    expect(tests).toContain("src/foo.test.ts");
-    expect(tests).toContain("src/bar.test.ts");
+    expect(tests).toContain(osPath("src/foo.test.ts"));
+    expect(tests).toContain(osPath("src/bar.test.ts"));
     expect(tests).toHaveLength(2);
   });
 
@@ -229,8 +235,8 @@ describe("findRelevantTests", () => {
     await writeFile(join(tmpDir, "src/foo.spec.ts"), "");
 
     const tests = await findRelevantTests(tmpDir, ["src/foo.ts"]);
-    expect(tests).toContain("src/foo.test.ts");
-    expect(tests).toContain("src/foo.spec.ts");
+    expect(tests).toContain(osPath("src/foo.test.ts"));
+    expect(tests).toContain(osPath("src/foo.spec.ts"));
   });
 
   it("handles empty filesChanged array", async () => {

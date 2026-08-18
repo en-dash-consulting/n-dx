@@ -5,7 +5,7 @@
 
 import { vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { tmpdir } from "node:os";
 import type { PRDStore, PRDItem } from "@n-dx/rex";
 import { WINDOWS_STDIN_PROMPT_SEPARATOR } from "../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
@@ -295,6 +295,38 @@ export async function cleanupProjectDir(projectDir: string): Promise<void> {
   } catch {
     // Ignore cleanup errors
   }
+}
+
+// ── Path expectations ─────────────────────────────────────────────────────────
+
+/**
+ * Convert a POSIX-style path literal into this platform's separator.
+ *
+ * Production helpers such as candidateTestPaths build paths with path.join, so
+ * they emit "src\agent\loop.test.ts" on Windows and "src/agent/loop.test.ts" on
+ * POSIX. Test expectations are written with forward slashes because that reads
+ * better, so they need converting rather than the assertion being loosened —
+ * `expect(paths).toContain(osPath("src/agent/loop.test.ts"))` stays an exact
+ * match on both platforms.
+ *
+ * Use this for RELATIVE paths. For an absolute path that production produces via
+ * path.resolve, build the expectation with resolve() against the same root so the
+ * drive letter matches too (see tests/unit/guard/paths.test.ts).
+ */
+export function osPath(posixPath: string): string {
+  return join(...posixPath.split("/"));
+}
+
+/**
+ * A directory prefix with this platform's separator, e.g. "tests/" -> "tests\".
+ *
+ * Needed because osPath() cannot express a trailing separator: join() drops the
+ * empty final segment. Without this, `p.startsWith("tests/")` is VACUOUSLY FALSE
+ * on Windows, so a "does not generate mirror paths" assertion would pass without
+ * checking anything.
+ */
+export function osPrefix(posixPrefix: string): string {
+  return osPath(posixPrefix.replace(/\/$/, "")) + sep;
 }
 
 // ── Claude CLI delivery decoding ──────────────────────────────────────────────

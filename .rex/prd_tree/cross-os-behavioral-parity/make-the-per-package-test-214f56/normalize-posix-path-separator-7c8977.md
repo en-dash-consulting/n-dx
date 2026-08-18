@@ -2,7 +2,7 @@
 id: "7c897777-eb2e-42a0-bb80-0f33a84b7713"
 level: "task"
 title: "Normalize POSIX path-separator assertions in hench test-runner and guard tests"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -11,6 +11,11 @@ tags:
   - "hench"
   - "paths"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-18T16:36:52.024Z"
+completedAt: "2026-08-18T16:44:53.531Z"
+endedAt: "2026-08-18T16:44:53.531Z"
+resolutionType: "code-change"
+resolutionDetail: "All 15 path-separator failures fixed with zero production change (empty `git diff packages/hench/src`); hench 20 -> 5 failures, 6 -> 3 files. Added osPath()/osPrefix() to tests/helpers as the single shared approach and standardised the pre-existing bare join() calls onto them; guard/paths.test.ts instead uses resolve(projectDir, ...) because validatePath returns a drive-qualified resolved path that join() could never match. AC6 answered FIRST because it could have changed the expectations: the open question is a REAL production defect, filed as c7f341e2 — findRelevantTests returns OS-native paths, buildScopedCommand joins them into a command string, and execShellCmd runs it via `sh -c` on every platform, so sh eats the backslashes and vitest exits 1 with \"No test files found\"; every scoped post-task test run on Windows therefore reports failure regardless of the code (a false negative, not a silent pass). Verified vitest itself handles backslash filters fine when passed without a shell. Caught two of my own errors: wrapping the already-a-test-file case in osPath() broke a passing test, because that path early-returns the input verbatim rather than constructing it (reverted with an explanatory comment); and I wasted attempts on shell escaping before using Edit. Found a VACUOUS assertion — `!p.startsWith(\"tests/\")` can never be true on Windows — and proved the osPrefix() fix restored real coverage by injecting an unconditional-mirror regression, which made that assertion fail with \"expected false to be true\" along with both mirror tests, then reverting. POSIX behaviour is preserved by construction (osPath is the identity for forward-slash input), stated as reasoning since no POSIX host was available. Typecheck clean; root suite 91 files / 2070 passed unaffected. Remaining hench failures are EBUSY (8e79620a) and CRLF (a38d6142)."
 acceptanceCriteria:
   - "All 15 path-separator failures pass on Windows"
   - "Assertions remain exact — no substring, regex, or basename-only matching was introduced to avoid separators"
