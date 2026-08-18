@@ -2,7 +2,7 @@
 id: "a38d6142-bcaa-4fa1-ad57-bbdc413b2cff"
 level: "task"
 title: "Stop git's autocrlf breaking hench rollback and sigint fixtures"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "cross-os"
@@ -11,6 +11,9 @@ tags:
   - "hench"
   - "line-endings"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-18T19:41:46.897Z"
+completedAt: "2026-08-18T19:41:46.897Z"
+endedAt: "2026-08-18T19:41:46.897Z"
 acceptanceCriteria:
   - "The temp git repos in these fixtures set core.autocrlf=false so line endings do not depend on the developer's global config"
   - "All three failures pass on Windows"

@@ -19,18 +19,13 @@ import { exec as execCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
+import { initGitFixtureRepo } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
 // ---------------------------------------------------------------------------
 // Helpers shared across suites
 // ---------------------------------------------------------------------------
-
-async function setupGitRepo(dir: string): Promise<void> {
-  await execAsync("git init", { cwd: dir });
-  await execAsync("git config user.email test@test.com", { cwd: dir });
-  await execAsync("git config user.name Test", { cwd: dir });
-}
 
 async function makeInitialCommit(dir: string, file: string, content: string): Promise<void> {
   await writeFile(join(dir, file), content, "utf-8");
@@ -109,7 +104,7 @@ describe("Co-Authored-By trailer — autonomous path (--auto/--loop)", () => {
     await mkdir(join(henchDir, "runs"), { recursive: true });
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
-    await setupGitRepo(projectDir);
+    await initGitFixtureRepo(projectDir);
     originalIsTTY = process.stdin.isTTY;
   });
 
@@ -198,7 +193,7 @@ describe("Co-Authored-By trailer — interactive path (--yes)", () => {
     await mkdir(join(henchDir, "runs"), { recursive: true });
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
-    await setupGitRepo(projectDir);
+    await initGitFixtureRepo(projectDir);
     originalIsTTY = process.stdin.isTTY;
   });
 
@@ -305,7 +300,7 @@ describe("Co-Authored-By trailer — rollback path", () => {
     await mkdir(join(henchDir, "runs"), { recursive: true });
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
-    await setupGitRepo(projectDir);
+    await initGitFixtureRepo(projectDir);
     originalIsTTY = process.stdin.isTTY;
   });
 

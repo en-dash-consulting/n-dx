@@ -9,14 +9,9 @@ import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
 import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
+import { initGitFixtureRepo } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
-
-async function setupGitRepo(dir: string): Promise<void> {
-  await execAsync("git init", { cwd: dir });
-  await execAsync("git config user.email test@test.com", { cwd: dir });
-  await execAsync("git config user.name Test", { cwd: dir });
-}
 
 function buildCompletedRun(taskId: string): RunRecord {
   return {
@@ -60,7 +55,7 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await setupGitRepo(projectDir);
+    await initGitFixtureRepo(projectDir);
 
     // Create a tracked task file in prd_tree
     const taskSlug = "task-slug-abc";

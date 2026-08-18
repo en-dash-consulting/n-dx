@@ -7,6 +7,8 @@ import { vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join, sep } from "node:path";
 import { tmpdir } from "node:os";
+import { execFile, execFileSync } from "node:child_process";
+import { promisify } from "node:util";
 import type { PRDStore, PRDItem } from "@n-dx/rex";
 import { WINDOWS_STDIN_PROMPT_SEPARATOR } from "../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
 import type { CliRunResult } from "../../src/agent/lifecycle/event-accumulator.js";
@@ -269,6 +271,59 @@ export async function sleep(ms: number): Promise<void> {
  * project; use cleanupProjectDir when it is.
  */
 export const RM_RETRY = { maxRetries: 10, retryDelay: 100 } as const;
+
+// ── Git fixture repos ─────────────────────────────────────────────────────────
+
+/**
+ * Config every fixture repo needs, as argv for `git config`.
+ *
+ * The identity settings are there so commits can be made at all. The line-ending
+ * settings are there so the repo does not inherit the machine's:
+ * `core.autocrlf=true` is the Git-for-Windows installer default and lands in
+ * SYSTEM config, so it applies even to a developer who has never set it and
+ * cannot be cleared by their own global config. Under it, a test writes LF, git
+ * checks the file back out as CRLF, and a byte-exact content assertion fails —
+ * git behaving exactly as configured, while looking like a rollback defect.
+ *
+ * Pinning it per-repo keeps those assertions byte-exact, which is the point:
+ * normalizing line endings in the comparison instead would let a rollback that
+ * subtly corrupted a file still pass. This mirrors what .gitattributes already
+ * does for n-dx's own written files.
+ */
+const GIT_FIXTURE_CONFIG: readonly string[][] = [
+  ["user.email", "test@test.com"],
+  ["user.name", "Test"],
+  ["core.autocrlf", "false"],
+  ["core.eol", "lf"],
+];
+
+/**
+ * Initialize a temp directory as a git repo suitable for fixtures.
+ *
+ * Use this rather than hand-rolling `git init` + config: 14 test files create
+ * fixture repos, and a repo that misses the line-ending config fails only on
+ * Windows and only in byte-exact assertions.
+ *
+ * Argv form throughout — a `git config user.name 'Test User'` shell string would
+ * keep its single quotes on Windows, since cmd.exe does not strip them.
+ *
+ * @see initGitFixtureRepoSync for fixtures whose setup is synchronous.
+ */
+export async function initGitFixtureRepo(dir: string): Promise<void> {
+  const run = promisify(execFile);
+  await run("git", ["init"], { cwd: dir });
+  for (const args of GIT_FIXTURE_CONFIG) {
+    await run("git", ["config", ...args], { cwd: dir });
+  }
+}
+
+/** Synchronous {@link initGitFixtureRepo}, for fixtures that set up in a sync beforeEach. */
+export function initGitFixtureRepoSync(dir: string): void {
+  execFileSync("git", ["init"], { cwd: dir, stdio: "ignore" });
+  for (const args of GIT_FIXTURE_CONFIG) {
+    execFileSync("git", ["config", ...args], { cwd: dir, stdio: "ignore" });
+  }
+}
 
 /**
  * Sets up a temporary project directory with hench and rex configuration.

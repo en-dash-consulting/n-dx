@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { execFileSync, execSync } from "node:child_process";
 import { toolGit } from "../../../src/tools/git.js";
 import type { ToolGuard } from "../../../src/tools/contracts.js";
+import { initGitFixtureRepoSync } from "../../helpers/index.js";
 
 function createGitGuard(allowedGitSubcommands: string[]): ToolGuard {
   return {
@@ -40,9 +41,7 @@ describe("toolGit", () => {
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-test-git-"));
     guard = createGitGuard(DEFAULT_ALLOWED_GIT_SUBCOMMANDS);
-    execSync("git init", { cwd: projectDir });
-    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: projectDir });
-    execFileSync("git", ["config", "user.name", "Test"], { cwd: projectDir });
+    initGitFixtureRepoSync(projectDir);
   });
 
   afterEach(async () => {

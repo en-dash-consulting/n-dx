@@ -31,4 +31,4 @@ description: "The sibling CI-matrix task (da8af67a) put the ROOT suite on window
 | [Give web's graph-view tests a getBoundingClientRect stub (jsdom returns 0x0)](./give-web-s-graph-view-tests-a-3be5b1.md) | pending |
 | [Make hench and web temp-dir cleanup survive Windows file locking (EBUSY)](./make-hench-and-web-temp-dir-8e7962.md) | completed |
 | [Normalize POSIX path-separator assertions in hench test-runner and guard tests](./normalize-posix-path-separator-7c8977.md) | completed |
-| [Stop git's autocrlf breaking hench rollback and sigint fixtures](./stop-git-s-autocrlf-breaking-a38d61.md) | pending |
+| [Stop git's autocrlf breaking hench rollback and sigint fixtures](./stop-git-s-autocrlf-breaking-a38d61.md) | completed |
