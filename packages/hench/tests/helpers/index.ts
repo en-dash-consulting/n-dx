@@ -255,6 +255,22 @@ export async function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Retry settings for removing a temp directory that a child process may still be
+ * holding. Node's fs.rm retries only the codes that signal exactly this — EBUSY,
+ * EPERM, ENOTEMPTY, EMFILE, ENFILE — so a real error (a bad path, a permission
+ * problem that will not clear) still fails immediately rather than stalling for
+ * the whole window.
+ *
+ * Node backs off linearly, so the window is retryDelay * n(n+1)/2 — roughly 5.5s
+ * here. That is sized to outlast a child that exits on its own within a few
+ * seconds while still failing in bounded time when a lock will never clear.
+ *
+ * Spread this into an fs.rm call when the directory is not a setupProjectDir
+ * project; use cleanupProjectDir when it is.
+ */
+export const RM_RETRY = { maxRetries: 10, retryDelay: 100 } as const;
+
+/**
  * Sets up a temporary project directory with hench and rex configuration.
  * Returns the paths to the project, hench, and rex directories.
  * Remember to clean up with `rm(projectDir, { recursive: true })`.
@@ -288,13 +304,19 @@ export async function setupProjectDir(prefix: string = "hench-test-"): Promise<{
 
 /**
  * Cleans up a test project directory created by setupProjectDir.
+ *
+ * Retries rather than giving up. On Windows a directory cannot be removed while
+ * any process holds a handle inside it — most often as its current working
+ * directory — and a child that has just been signalled has not necessarily let go
+ * by the time teardown runs. POSIX allows unlinking an open file, so the retry
+ * only ever engages on Windows.
+ *
+ * Failures propagate deliberately. Swallowing them turns a leaked temp directory
+ * into an invisible problem, and the retry means a transient lock no longer
+ * reaches the caller as an error in the first place.
  */
 export async function cleanupProjectDir(projectDir: string): Promise<void> {
-  try {
-    await rm(projectDir, { recursive: true, force: true });
-  } catch {
-    // Ignore cleanup errors
-  }
+  await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
 }
 
 // ── Path expectations ─────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 id: "8e79620a-b732-4fe7-b414-be6719b9b9b9"
 level: "task"
 title: "Make hench and web temp-dir cleanup survive Windows file locking (EBUSY)"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "cross-os"
@@ -11,6 +11,9 @@ tags:
   - "hench"
   - "process-lifecycle"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-18T17:35:52.399Z"
+completedAt: "2026-08-18T18:06:07.491Z"
+endedAt: "2026-08-18T18:06:07.491Z"
 acceptanceCriteria:
   - "All four cases pass on Windows across at least 5 consecutive runs, not just once"
   - "Cleanup still happens — the fix does not skip removal or swallow the error"

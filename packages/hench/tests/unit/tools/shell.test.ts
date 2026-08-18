@@ -1,20 +1,34 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { GuardRails } from "../../../src/guard/index.js";
 import { toolRunCommand } from "../../../src/tools/shell.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
+import { cleanupProjectDir } from "../../helpers/index.js";
 
 /**
- * Load tolerance for wall-clock budgets below.
+ * How long a deliberately-timed-out command keeps running.
  *
- * These assertions guard against algorithmic regressions (a quadratic
- * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
- * numbers flake when the rest of the monorepo suite saturates every core,
- * so the budget is scaled. See TESTING.md "Flake Resistance".
+ * It has to exceed the timeouts asserted below so the timeout is what ends the
+ * call, and it has to stay well inside RM_RETRY's ~5.5s window so the orphan it
+ * leaves has exited before teardown gives up. The orphan is not incidental: a
+ * timeout terminates the spawned `sh`, not the `node` that sh started, so that
+ * `node` outlives the call still holding projectDir as its cwd — and on Windows
+ * that blocks rmdir.
+ *
+ * That orphan is a production defect, tracked as a9951988 (a timed-out command
+ * keeps running and keeps writing). Bounding its lifetime here is a test-side
+ * accommodation, not a fix; this constant should stop being load-bearing once the
+ * timeout performs a real tree kill.
  */
-const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+const TIMEOUT_ORPHAN_LIFETIME_MS = 3000;
+
+// No BUDGET_MULTIPLIER in this file. Its one timing assertion is bounded by
+// TIMEOUT_ORPHAN_LIFETIME_MS above, because that assertion's job is to sit BELOW
+// the command's own lifetime — scaling it independently would lift it past that
+// lifetime and make it vacuous. See the assertion for the full reasoning, and
+// TESTING.md "Flake Resistance" for budgets that genuinely should be scaled.
 
 
 describe("toolRunCommand", () => {
@@ -27,7 +41,7 @@ describe("toolRunCommand", () => {
   });
 
   afterEach(async () => {
-    await rm(projectDir, { recursive: true, force: true });
+    await cleanupProjectDir(projectDir);
   });
 
   describe("allowed commands", () => {
@@ -213,9 +227,14 @@ describe("toolRunCommand", () => {
   });
 
   describe("timeout handling", () => {
+    // The commands below outlive their timeout by enough to guarantee it fires,
+    // but not by so much that the orphan they leave behind outlasts teardown.
+    // execShell's timeout kills the `sh` it spawned, not sh's own child, so the
+    // inner `node` survives holding projectDir as its cwd — see
+    // TIMEOUT_ORPHAN_LIFETIME_MS.
     it("handles command timeout", async () => {
       const result = await toolRunCommand(guard, projectDir, {
-        command: "node -e \"setTimeout(() => {}, 60000)\"",
+        command: `node -e "setTimeout(() => {}, ${TIMEOUT_ORPHAN_LIFETIME_MS})"`,
         timeout: 500,
       });
       expect(result).toContain("timed out");
@@ -232,14 +251,25 @@ describe("toolRunCommand", () => {
     it("respects custom timeout parameter", async () => {
       const start = Date.now();
       const result = await toolRunCommand(guard, projectDir, {
-        command: "node -e \"setTimeout(() => {}, 10000)\"",
+        command: `node -e "setTimeout(() => {}, ${TIMEOUT_ORPHAN_LIFETIME_MS})"`,
         timeout: 200,
       });
       const elapsed = Date.now() - start;
 
       expect(result).toContain("timed out");
-      // Should timeout in roughly 200ms, not 10s
-      expect(elapsed).toBeLessThan(2000 * BUDGET_MULTIPLIER);
+      // Must return on the 200ms timeout, not by waiting for the command, which
+      // runs for TIMEOUT_ORPHAN_LIFETIME_MS. Bounded BY that lifetime rather than
+      // by a magic number, because the lifetime is what makes the two outcomes
+      // distinguishable at all.
+      //
+      // DO NOT scale this through BUDGET_MULTIPLIER. This is not a latency budget
+      // that a slow machine should be forgiven for missing — it is a discrimination
+      // between "returned on timeout" (~200ms) and "waited for the command"
+      // (~3000ms). Multiplying it by 20 puts the bound at 40s, above the command's
+      // own lifetime, so the failure case would pass and the assertion would test
+      // nothing. A bound whose whole job is to sit below another number cannot be
+      // scaled independently of it.
+      expect(elapsed).toBeLessThan(TIMEOUT_ORPHAN_LIFETIME_MS);
     });
   });
 
