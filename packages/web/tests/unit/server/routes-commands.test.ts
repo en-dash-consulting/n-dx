@@ -26,7 +26,8 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 });
 
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleCommandsRoute } from "../../../src/server/routes-commands.js";
+import { handleCommandsRoute, invalidateAuthCheckCache } from "../../../src/server/routes-commands.js";
+import { handleLlmRoute } from "../../../src/server/routes-llm.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 // ── spawnManaged mock helpers ─────────────────────────────────────────
@@ -1156,6 +1157,9 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
 
   beforeEach(async () => {
     execMock.mockReset();
+    // The auth result is cached module-wide for the server's lifetime;
+    // tests must not see each other's cached verdicts.
+    invalidateAuthCheckCache();
     tmpDir = await mkdtemp(join(tmpdir(), "commands-tier3-"));
     await mkdir(join(tmpDir, ".rex"), { recursive: true });
     ctx = {
@@ -1164,9 +1168,12 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
       rexDir: join(tmpDir, ".rex"),
       dev: false,
     };
-    const started = await startRouteTestServer((req, res) =>
-      handleCommandsRoute(req, res, ctx),
-    );
+    const started = await startRouteTestServer(async (req, res) => {
+      // The LLM config route participates so the PUT-invalidates-auth-cache
+      // wiring is exercised end-to-end.
+      if (await handleLlmRoute(req, res, ctx)) return true;
+      return handleCommandsRoute(req, res, ctx);
+    });
     server = started.server;
     port = started.port;
   });
@@ -1194,6 +1201,68 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     const body = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
     expect(body.ok).toBe(false);
     expect(String(body.error)).toContain("No API key found");
+  });
+
+  it("auth serves repeat requests from cache instead of respawning", async () => {
+    // The settings page mounts the chip on every navigation — each visit
+    // must not cost a 60s-budget subprocess.
+    execMock.mockResolvedValue({ stdout: "claude: credentials OK", stderr: "", error: null });
+    const first = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
+    const second = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
+
+    expect(execMock).toHaveBeenCalledTimes(1);
+    expect(first.cached).toBe(false);
+    expect(second.cached).toBe(true);
+    expect(second.ok).toBe(true);
+  });
+
+  it("auth?refresh=true forces a fresh check", async () => {
+    execMock.mockResolvedValueOnce({ stdout: "", stderr: "No API key", error: new Error("exit 1") });
+    execMock.mockResolvedValueOnce({ stdout: "claude: credentials OK", stderr: "", error: null });
+
+    const stale = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
+    expect(stale.ok).toBe(false);
+
+    const fresh = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth?refresh=true`)).json();
+    expect(execMock).toHaveBeenCalledTimes(2);
+    expect(fresh.ok).toBe(true);
+    expect(fresh.cached).toBe(false);
+  });
+
+  it("concurrent auth requests share one spawn", async () => {
+    let release!: (r: { stdout: string; stderr: string; error: null }) => void;
+    execMock.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+
+    const a = fetch(`http://127.0.0.1:${port}/api/commands/auth`);
+    const b = fetch(`http://127.0.0.1:${port}/api/commands/auth?refresh=true`);
+    await new Promise((r) => setTimeout(r, 20));
+    release({ stdout: "claude: credentials OK", stderr: "", error: null });
+
+    const [bodyA, bodyB] = await Promise.all([
+      (await a).json(), (await b).json(),
+    ]);
+    expect(execMock).toHaveBeenCalledTimes(1);
+    expect(bodyA.ok).toBe(true);
+    expect(bodyB.ok).toBe(true);
+  });
+
+  it("saving LLM config invalidates the cached auth verdict", async () => {
+    execMock.mockResolvedValueOnce({ stdout: "", stderr: "No API key", error: new Error("exit 1") });
+    execMock.mockResolvedValueOnce({ stdout: "claude: credentials OK", stderr: "", error: null });
+
+    expect((await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json()).ok).toBe(false);
+
+    const put = await fetch(`http://127.0.0.1:${port}/api/llm/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes: { "llm.vendor": "claude" } }),
+    });
+    expect(put.status).toBe(200);
+
+    // No ?refresh needed: the save itself must drop the stale verdict.
+    const after = await (await fetch(`http://127.0.0.1:${port}/api/commands/auth`)).json();
+    expect(execMock).toHaveBeenCalledTimes(2);
+    expect(after.ok).toBe(true);
   });
 
   it("validate-tokens runs the hench check and returns its output", async () => {

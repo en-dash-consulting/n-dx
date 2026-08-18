@@ -2,8 +2,11 @@
 id: "e46feb51-c637-4b86-b39e-cb8ab72f0dc7"
 level: "task"
 title: "Cache the auth credential check; stop spawning ndx auth on every settings mount"
-status: "pending"
+status: "completed"
 priority: "medium"
+startedAt: "2026-08-18T22:50:58.512Z"
+completedAt: "2026-08-18T22:54:57.622Z"
+endedAt: "2026-08-18T22:54:57.622Z"
 acceptanceCriteria:
   - "Navigating to General settings repeatedly does not spawn ndx auth each time"
   - "The cached result invalidates when LLM config is saved; Re-check forces a fresh check without stacking processes"

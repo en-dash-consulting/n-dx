@@ -999,18 +999,32 @@ async function handleReshape(
 
 // ── Tier 3: credential check and small package triggers ───────────────
 
+interface AuthCheckResult {
+  ok: boolean;
+  output: string;
+  error: string | null;
+}
+
 /**
- * GET /api/commands/auth — verify LLM provider credentials.
+ * Cached `ndx auth` result and the check currently in flight, if any.
  *
- * Read-only (hence GET): runs `ndx auth`, whose exit code answers "are the
- * configured provider's credentials usable". Surfaced as a chip in LLM
- * settings so a missing key is visible *before* an agent command fails.
+ * The check spawns a subprocess with a 60s budget, and the settings page
+ * mounts its chip on every navigation — without a cache, each visit costs a
+ * spawn and rapid Re-checks stack processes. What the check reports only
+ * changes when credentials or LLM config change, so the result is cached for
+ * the server's lifetime and invalidated on LLM config saves
+ * ({@link invalidateAuthCheckCache}); `?refresh=true` forces a fresh run.
+ * Concurrent requests share the in-flight check instead of spawning again.
  */
-async function handleAuth(
-  _req: IncomingMessage,
-  res: ServerResponse,
-  ctx: ServerContext,
-): Promise<boolean> {
+let authCheckCache: AuthCheckResult | null = null;
+let authCheckInFlight: Promise<AuthCheckResult> | null = null;
+
+/** Drop the cached credential-check result (call when LLM config changes). */
+export function invalidateAuthCheckCache(): void {
+  authCheckCache = null;
+}
+
+async function runAuthCheck(ctx: ServerContext): Promise<AuthCheckResult> {
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
   try {
     const result = await foundationExec(bin, [...prefixArgs, "auth", ctx.projectDir], {
@@ -1019,16 +1033,50 @@ async function handleAuth(
       maxBuffer: 2 * 1024 * 1024,
     });
     const ok = !result.error;
-    jsonResponse(res, 200, {
+    return {
       ok,
       output: result.stdout.trim().slice(-2000),
       error: ok ? null : (result.stderr || result.error?.message || "Credential check failed").slice(-1000),
-    });
+    };
   } catch (err) {
     // Report the failure in the body rather than as a 500: "could not check"
     // is a legitimate chip state, not a broken endpoint.
-    jsonResponse(res, 200, { ok: false, output: "", error: String(err) });
+    return { ok: false, output: "", error: String(err) };
   }
+}
+
+/**
+ * GET /api/commands/auth — verify LLM provider credentials.
+ *
+ * Read-only (hence GET): runs `ndx auth`, whose exit code answers "are the
+ * configured provider's credentials usable". Surfaced as a chip in LLM
+ * settings so a missing key is visible *before* an agent command fails.
+ * Served from cache after the first check; `?refresh=true` re-runs it.
+ */
+async function handleAuth(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  const refresh = new URL(req.url || "/", "http://localhost")
+    .searchParams.get("refresh") === "true";
+
+  if (!refresh && authCheckCache) {
+    jsonResponse(res, 200, { ...authCheckCache, cached: true });
+    return true;
+  }
+
+  // Whoever asks while a check runs gets that check's answer — a forced
+  // refresh included, since the in-flight result is just as fresh.
+  if (!authCheckInFlight) {
+    authCheckInFlight = runAuthCheck(ctx).then((result) => {
+      authCheckCache = result;
+      authCheckInFlight = null;
+      return result;
+    });
+  }
+  const result = await authCheckInFlight;
+  jsonResponse(res, 200, { ...result, cached: false });
   return true;
 }
 

@@ -229,11 +229,13 @@ export function AuthStatusChip() {
   const [state, setState] = useState<"checking" | "ok" | "bad">("checking");
   const [detail, setDetail] = useState<string | null>(null);
 
-  const check = useCallback(async () => {
+  const check = useCallback(async (force = false) => {
     setState("checking");
     setDetail(null);
     try {
-      const res = await fetch("/api/commands/auth");
+      // Force bypasses the server's cached result; the plain form is served
+      // from cache, so navigating to this page doesn't spawn a subprocess.
+      const res = await fetch(force ? "/api/commands/auth?refresh=true" : "/api/commands/auth");
       const body = await res.json() as { ok?: boolean; error?: string | null; output?: string };
       if (body.ok) {
         setState("ok");
@@ -260,7 +262,8 @@ export function AuthStatusChip() {
     detail ? h("span", { class: "auth-chip-detail" }, detail) : null,
     h("button", {
       class: "cmd-btn cmd-btn-small",
-      onClick: check,
+      // Not `onClick: check` — that would pass the MouseEvent as `force`.
+      onClick: () => check(true),
       disabled: state === "checking",
       title: `Re-run ${cliName} auth`,
     }, "Re-check"),
