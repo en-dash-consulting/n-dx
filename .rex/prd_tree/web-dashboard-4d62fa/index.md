@@ -2,9 +2,8 @@
 id: "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7"
 level: "epic"
 title: "Web Dashboard"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-24T05:27:03.754Z"
-completedAt: "2026-08-17T16:08:07.467Z"
 endedAt: "2026-08-17T16:08:07.467Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
 ---
@@ -18,6 +17,7 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [CLI Command Coverage Audit and Dashboard Trigger Controls](./cli-command-coverage-audit-and-749cec/index.md) | completed |
 | [Dashboard Route Ownership Decoupling](./dashboard-route-ownership-decoupling/index.md) | completed |
 | [Dedicated Commands Reference Section in Web Dashboard](./dedicated-commands-reference-6f8afa/index.md) | completed |
+| [Fix verified code-review findings on dashboard command triggers](./fix-verified-code-review-868493/index.md) | pending |
 | [Item completion timeline view](./item-completion-timeline-view/index.md) | completed |
 | [N-Rex Easter Egg — Triple-Click Dino Takeover](./n-rex-easter-egg-triple-click-331928/index.md) | completed |
 | [ndx as the single CLI interface](./ndx-as-the-single-cli-interface/index.md) | completed |
