@@ -850,7 +850,10 @@ async function handleReshape(
   }
 
   const { bin, args: prefixArgs } = resolveRexBin(ctx);
-  const cmdArgs = [...prefixArgs, "reshape", "--format=json"];
+  // --quiet is load-bearing: reshape emits info() progress lines to stdout
+  // even with --format=json, which would break the JSON.parse in
+  // startAsyncJob. Quiet suppresses info() while result() still emits JSON.
+  const cmdArgs = [...prefixArgs, "reshape", "--format=json", "--quiet"];
   cmdArgs.push(accept ? "--accept" : "--dry-run");
   cmdArgs.push(ctx.projectDir);
 

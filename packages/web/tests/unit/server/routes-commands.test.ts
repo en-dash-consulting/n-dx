@@ -779,6 +779,30 @@ describe("commands route — validation actions (fix, ci, reshape)", () => {
     expect(args).toContain("--accept");
     expect(args).not.toContain("--dry-run");
   });
+
+  it("reshape spawns with --quiet so stdout is pure JSON", async () => {
+    // Without --quiet, reshape interleaves info() progress prose with the
+    // --format=json payload and the report parse below can never succeed.
+    execMock.mockResolvedValue({
+      stdout: JSON.stringify({ dryRun: true, proposals: [] }),
+      stderr: "", error: null,
+    });
+    await post("reshape", {});
+    const status = await waitFor("reshape/status");
+    expect(execMock.mock.calls[0][1] as string[]).toContain("--quiet");
+    expect((status.report as { proposals: unknown[] }).proposals).toEqual([]);
+  });
+
+  it("reshape reports a null report when stdout mixes prose with JSON", async () => {
+    // Regression shape for the pre---quiet failure mode: prose before the
+    // JSON payload must fall back to raw output, never a bogus parse.
+    const mixed = `Analyzing PRD structure...\n${JSON.stringify({ proposals: [{ id: "p1" }] })}`;
+    execMock.mockResolvedValue({ stdout: mixed, stderr: "", error: null });
+    await post("reshape", {});
+    const status = await waitFor("reshape/status");
+    expect(status.report).toBeNull();
+    expect(status.output).toContain("Analyzing PRD structure...");
+  });
 });
 
 describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)", () => {

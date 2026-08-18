@@ -16,7 +16,7 @@ description: "Code review of the feature/add-new-dashboards-in-UI branch surface
 | [Command manifest: treat absent llm.vendor as claude in hasLlmVendor](./command-manifest-treat-absent-29a2a7.md) | pending |
 | [Fix ANSI strip regex in parseRefreshPhases: missing escape byte](./fix-ansi-strip-regex-in-f256f5.md) | pending |
 | [Reconcile command manifest descriptions and triggers with actual endpoints](./reconcile-command-manifest-56a686.md) | pending |
-| [Reshape trigger: spawn rex reshape with --quiet so stdout parses as JSON](./reshape-trigger-spawn-rex-032fba.md) | pending |
+| [Reshape trigger: spawn rex reshape with --quiet so stdout parses as JSON](./reshape-trigger-spawn-rex-032fba.md) | completed |
 | [resolveNdxBin: resolve @n-dx/core from the server module graph before the dogfood path](./resolvendxbin-resolve-n-dx-core-44bea9.md) | pending |
 | [Single shared lock for sv-analyze, refresh, and ci (.sourcevision writers)](./single-shared-lock-for-sv-7ac28a.md) | pending |
 | [Stream job output incrementally via spawnManaged so progress UI renders while running](./stream-job-output-incrementally-35a6da.md) | pending |

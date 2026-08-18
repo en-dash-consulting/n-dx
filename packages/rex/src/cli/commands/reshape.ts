@@ -169,7 +169,11 @@ async function _cmdReshapeCore(
   }
 
   if (allProposals.length === 0) {
-    result("No reshape proposals — PRD structure looks good.");
+    if (flags.format === "json") {
+      result(JSON.stringify({ dryRun, proposals: [], tokenUsage }, null, 2));
+    } else {
+      result("No reshape proposals — PRD structure looks good.");
+    }
     return;
   }
 

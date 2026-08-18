@@ -2,8 +2,11 @@
 id: "032fbaf4-b120-4dc1-9bc3-004bc3d9d93f"
 level: "task"
 title: "Reshape trigger: spawn rex reshape with --quiet so stdout parses as JSON"
-status: "pending"
+status: "completed"
 priority: "critical"
+startedAt: "2026-08-18T21:37:45.149Z"
+completedAt: "2026-08-18T21:41:07.153Z"
+endedAt: "2026-08-18T21:41:07.153Z"
 acceptanceCriteria:
   - "Reshape preview with proposals renders the proposal list and the Apply button (report parses non-null)"
   - "The spawned reshape command includes --quiet so stdout is pure JSON in the proposals case"

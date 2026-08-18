@@ -349,3 +349,28 @@ describe("smartPrune model resolution", () => {
     );
   });
 });
+
+// ── reshape --format=json stdout purity ──────────────────────────────
+
+describe("cmdReshape --format=json output", () => {
+  it("emits a parseable JSON report when there are no proposals (quiet mode)", async () => {
+    // The web dashboard spawns `rex reshape --format=json --quiet` and
+    // JSON.parses the entire stdout. The zero-proposal path used to print
+    // prose via result(), which quiet does not suppress — stdout must be
+    // pure JSON in this mode.
+    const { setQuiet } = await import("../../src/cli/output.js");
+    await setupTmpDir();
+    setQuiet(true);
+    try {
+      await cmdReshape(tmpDir, { format: "json", "dry-run": "true" });
+    } finally {
+      setQuiet(false);
+    }
+
+    const logMock = console.log as ReturnType<typeof vi.fn>;
+    const stdout = logMock.mock.calls.map((c) => c.join(" ")).join("\n");
+    const parsed = JSON.parse(stdout) as { dryRun: boolean; proposals: unknown[] };
+    expect(parsed.dryRun).toBe(true);
+    expect(parsed.proposals).toEqual([]);
+  });
+});
