@@ -1115,8 +1115,12 @@ interface ManifestCommand {
   /**
    * Dashboard trigger, when the command supports one. Deliberately absent
    * for: `work` (requires task selection — use the next-task card),
-   * `self-heal` (destructive; confirmation-gated panel), and terminal-side
-   * commands (init, auth, config, start, dev).
+   * `self-heal` (destructive; confirmation-gated panel), `plan` (no endpoint
+   * runs the full plan pipeline — /api/rex/analyze skips the sourcevision
+   * step, so a button labeled with the plan invocation would misrepresent
+   * what ran), and terminal-side commands (init, auth, config, start, dev).
+   * `rex fix` and `rex reshape` are likewise deliberately not manifest rows:
+   * they are confirmation-gated actions owned by the Validation view.
    */
   trigger?: CommandTrigger;
 }
@@ -1145,15 +1149,21 @@ const COMMAND_MANIFEST: ManifestGroup[] = [
   },
   {
     id: "analysis", label: "Analysis", commands: [
-      { name: "analyze", description: "Run codebase analysis (--deep, --full, --lite)", requires: "init", trigger: { endpoint: "/api/commands/sv-analyze", method: "POST", statusEndpoint: "/api/commands/sv-analyze/status" } },
+      // The analyze trigger posts an empty body — the synchronous quick
+      // analysis (200) — so it declares no statusEndpoint; the sv-analyze
+      // status endpoint only applies to full runs started from the
+      // Overview/SourceVision views.
+      { name: "analyze", description: "Run codebase analysis (--deep, --full, --lite; Run performs a quick analysis)", requires: "init", trigger: { endpoint: "/api/commands/sv-analyze", method: "POST" } },
       { name: "recommend", description: "Show or accept sourcevision-based recommendations", requires: "llm", trigger: { endpoint: "/api/commands/recommend", method: "POST" } },
-      { name: "refresh", description: "Refresh dashboard data and UI artifacts", requires: "init", trigger: { endpoint: "/api/commands/refresh", method: "POST", statusEndpoint: "/api/commands/refresh/status" } },
-      { name: "ci", description: "Run the analysis pipeline and validate PRD health", requires: "init" },
+      { name: "refresh", description: "Refresh dashboard data (Run uses --data-only; rebuilding UI artifacts needs a terminal run)", requires: "init", trigger: { endpoint: "/api/commands/refresh", method: "POST", statusEndpoint: "/api/commands/refresh/status" } },
+      { name: "ci", description: "Run the analysis pipeline and validate PRD health", requires: "init", trigger: { endpoint: "/api/commands/ci", method: "POST", statusEndpoint: "/api/commands/ci/status" } },
     ],
   },
   {
     id: "planning", label: "Planning", commands: [
-      { name: "plan", description: "Analyze the codebase and generate PRD proposals (--accept to apply)", requires: "llm", trigger: { endpoint: "/api/rex/analyze", method: "POST" } },
+      // No trigger: /api/rex/analyze runs only the rex step, and a Run
+      // button beside the "plan" invocation would claim the full pipeline.
+      { name: "plan", description: "Analyze the codebase and generate PRD proposals (--accept to apply)", requires: "llm" },
       { name: "add", description: "Add PRD items from freeform descriptions, files, or stdin", requires: "llm" },
       { name: "status", description: "Show the PRD status tree with completion stats", requires: "init" },
       { name: "next", description: "Print the next actionable task", requires: "init" },

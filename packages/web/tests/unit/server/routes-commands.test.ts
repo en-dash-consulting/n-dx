@@ -781,8 +781,11 @@ describe("commands route — manifest (command reference)", () => {
     const body = await getManifest();
     const all = body.groups.flatMap((g: { commands: Array<Record<string, any>> }) => g.commands);
 
+    // Empty-body POST takes the synchronous quick path (200, never 202), so
+    // declaring a statusEndpoint here would describe a branch RunCell can
+    // never reach.
     const analyze = all.find((c: Record<string, any>) => c.name === "analyze");
-    expect(analyze.trigger).toMatchObject({ endpoint: "/api/commands/sv-analyze", method: "POST" });
+    expect(analyze.trigger).toEqual({ endpoint: "/api/commands/sv-analyze", method: "POST" });
 
     const refresh = all.find((c: Record<string, any>) => c.name === "refresh");
     expect(refresh.trigger).toMatchObject({
@@ -790,13 +793,21 @@ describe("commands route — manifest (command reference)", () => {
       method: "POST",
       statusEndpoint: "/api/commands/refresh/status",
     });
+    // The trigger runs --data-only; the description must not claim UI
+    // artifacts are rebuilt.
+    expect(refresh.description).toContain("--data-only");
 
-    const plan = all.find((c: Record<string, any>) => c.name === "plan");
-    expect(plan.trigger).toMatchObject({ endpoint: "/api/rex/analyze", method: "POST" });
+    const ci = all.find((c: Record<string, any>) => c.name === "ci");
+    expect(ci.trigger).toMatchObject({
+      endpoint: "/api/commands/ci",
+      method: "POST",
+      statusEndpoint: "/api/commands/ci/status",
+    });
 
     // Excluded by design: work needs task selection; self-heal is
-    // confirmation-gated; init/config are terminal-side.
-    for (const name of ["work", "self-heal", "init", "config"]) {
+    // confirmation-gated; plan has no endpoint that runs the full
+    // sourcevision-then-rex pipeline; init/config are terminal-side.
+    for (const name of ["work", "self-heal", "plan", "init", "config"]) {
       const cmd = all.find((c: Record<string, any>) => c.name === name);
       expect(cmd.trigger).toBeUndefined();
     }

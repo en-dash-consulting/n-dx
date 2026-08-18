@@ -2,8 +2,11 @@
 id: "56a6860c-eb30-4f0a-bd3f-c3b9830e25e0"
 level: "task"
 title: "Reconcile command manifest descriptions and triggers with actual endpoints"
-status: "pending"
+status: "completed"
 priority: "medium"
+startedAt: "2026-08-18T22:49:28.655Z"
+completedAt: "2026-08-18T22:50:35.809Z"
+endedAt: "2026-08-18T22:50:35.809Z"
 acceptanceCriteria:
   - "plan and refresh row descriptions match what their triggers actually run (or the triggers are removed)"
   - "ci trigger presence and fix/reshape manifest entries are reconciled deliberately"
