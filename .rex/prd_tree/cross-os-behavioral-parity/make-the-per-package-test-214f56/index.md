@@ -26,7 +26,9 @@ description: "The sibling CI-matrix task (da8af67a) put the ROOT suite on window
 |-------|--------|
 | [Add the per-package suites to the Windows CI job](./add-the-per-package-suites-to-2b2b78.md) | pending |
 | [Cover both prompt-delivery shapes per platform in hench adapter tests](./cover-both-prompt-delivery-0de025.md) | pending |
-| [Fix the trivial POSIX fixture assumptions in hench tests (/tmp, git quoting, absolute-path check)](./fix-the-trivial-posix-fixture-861495.md) | pending |
-| [Make hench temp-dir cleanup survive Windows file locking (EBUSY)](./make-hench-temp-dir-cleanup-8e7962.md) | pending |
+| [Fix POSIX fixture assumptions in hench and web tests (/tmp, git quoting, absolute-path check)](./fix-posix-fixture-assumptions-861495.md) | pending |
+| [Fix the hardcoded "/" after join() in web's boundary-check exemptions](./fix-the-hardcoded-after-join-in-30235f.md) | pending |
+| [Give web's graph-view tests a getBoundingClientRect stub (jsdom returns 0x0)](./give-web-s-graph-view-tests-a-3be5b1.md) | pending |
+| [Make hench and web temp-dir cleanup survive Windows file locking (EBUSY)](./make-hench-and-web-temp-dir-8e7962.md) | pending |
 | [Normalize POSIX path-separator assertions in hench test-runner and guard tests](./normalize-posix-path-separator-7c8977.md) | pending |
 | [Stop git's autocrlf breaking hench rollback and sigint fixtures](./stop-git-s-autocrlf-breaking-a38d61.md) | pending |

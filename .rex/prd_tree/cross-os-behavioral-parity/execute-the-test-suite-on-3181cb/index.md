@@ -23,5 +23,6 @@ description: "The root enabler for every other parity item: no automated test ex
 
 | Title | Status |
 |-------|--------|
+| [Confirm on ubuntu CI that the hench/web failures are Windows-specific as predicted](./confirm-on-ubuntu-ci-that-the-4a63ef.md) | blocked |
 | [Expand the CI matrix to run unit/integration/e2e suites on windows-latest and macos-latest](./expand-the-ci-matrix-to-run-da8af6.md) | completed |
 | [Triage the first macOS CI run of the root suite](./triage-the-first-macos-ci-run-8b1640.md) | blocked |

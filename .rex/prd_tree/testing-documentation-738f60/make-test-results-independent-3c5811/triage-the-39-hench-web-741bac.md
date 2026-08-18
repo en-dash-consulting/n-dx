@@ -2,7 +2,7 @@
 id: "741bacf1-0314-4bc3-8f50-400e8c673bfb"
 level: "task"
 title: "Triage the 39 hench/web failures now that the run no longer hides them"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "testing"
@@ -12,6 +12,11 @@ tags:
   - "web"
   - "visibility"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-18T16:07:34.685Z"
+completedAt: "2026-08-18T16:07:34.685Z"
+endedAt: "2026-08-18T16:07:34.685Z"
+resolutionType: "code-change"
+resolutionDetail: "All 39 failures triaged with causes proven rather than assumed. hench's 32 were triaged last session (7 causes, all test-side and Windows-specific, zero production bugs). web's were triaged now: 4 causes, and THREE ARE SHARED WITH HENCH — git single-quoting (routes-sourcevision.test.ts:202, same as hench git.test.ts), EBUSY on rmdir (routes-hench-execute, same as hench shell.test.ts), and path separators (boundary-check, though via a different mechanism: `join(...) + \"/\"` yields \"viewer\\crash/\" on Windows, 9 occurrences, all exemption-side so the failure mode is false-positive rather than a silently unenforced rule). The fourth, graph-view's 2, is NOT Windows-specific: use-pan-zoom.ts:103 divides by getBoundingClientRect().height, which jsdom reports as 0 with no stub anywhere in packages/web/tests, so the pan math is degenerate — and both cases exist in 231c72f3's parent whose hook already had that division, making them long-standing red rather than a #321 regression. Also established the count variance (5 vs 7 across runs) is routes-hench-execute being intermittent, consistent with a handle-release race. Corrected one of my own first reads mid-triage: I attributed graph-view to the deltaY clamp and checked before concluding — that clamp is in the ctrlKey ZOOM branch while the test takes the unclamped PAN branch. Fix work filed under feature 214f5636: two new tasks (boundary-check separators; graph-view jsdom stub) plus two existing hench tasks extended to cover web's instances rather than duplicated. AC1 (read the first CI run) could not be done — branch unpushed, gh absent, no CI run exists — so it was split into blocked task 4a63ef64, which now carries a falsifiable prediction from the triage (hench green on ubuntu; web red only in graph-view's two cases) instead of an open question."
 acceptanceCriteria:
   - "The first CI run after the masking fix is read, and it is recorded whether the hench/web failures reproduce on ubuntu or are Windows-specific"
   - "The 32 hench failures are triaged with causes recorded; a shared root cause is proven rather than assumed"
