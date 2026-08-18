@@ -661,14 +661,18 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       if (run.status === "running") {
         run.status = "timeout";
         run.error = `Exceeded max turns (${maxTurns})`;
-        await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+        // Local LLM timeouts are retryable: model may need more context window or turns.
+        // Use "pending" so the task reappears as actionable on the next run.
+        await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
       }
     }
   } catch (err) {
     run.status = "failed";
     run.error = (err as Error).message;
     console.error(`[Error] ${run.error}`);
-    await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+    // Infrastructure failures (context window overflow, network errors) are retryable.
+    // Use "pending" so the task reappears as actionable after the user fixes the issue.
+    await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
   } finally {
     process.removeListener("SIGINT", handleSignal);
   }
