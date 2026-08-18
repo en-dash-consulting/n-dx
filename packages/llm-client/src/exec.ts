@@ -32,7 +32,7 @@ import type { ChildProcess, StdioOptions } from "node:child_process";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { logCliInvocation } from "./cli-log.js";
-import { terminateProcessTree } from "./process-tree.js";
+import { terminateProcessTree, treeKillSpawnOptions } from "./process-tree.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,11 +92,12 @@ const DEFAULT_MAX_BUFFER = 1024 * 1024; // 1 MiB
  * ## Timeout semantics
  *
  * A reported timeout means the command has actually stopped, descendants
- * included. Getting there means NOT using execFile's own `timeout` option: that
- * signals the spawned process only, so anything it had started kept running —
- * still holding handles, still writing — while the caller had already been told
- * the command was done. See {@link terminateProcessTree}; opt out with
- * `treeKill: false`.
+ * included. That requires owning both halves: the timer (execFile's own `timeout`
+ * signals the spawned process only, so anything it started kept running while the
+ * caller had already been told the command was done) and the spawn (execFile
+ * cannot make the child a process-group leader, because it drops the `detached`
+ * option). Hence spawn plus manual buffering here. See {@link terminateProcessTree};
+ * opt out with `treeKill: false`.
  *
  * `exitCode: null` remains the timeout signal.
  */
@@ -114,7 +115,14 @@ export function exec(
     _platform = process.platform as NodeJS.Platform,
   } = opts;
 
+  const display = [cmd, ...args].join(" ");
+
   return new Promise((resolve) => {
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+    let overflowed: "stdout" | "stderr" | null = null;
     let timedOut = false;
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -126,64 +134,144 @@ export function exec(
       resolve(result);
     };
 
-    // NO `detached` here, deliberately. execFile builds its own options object for
-    // spawn and drops anything outside its curated set, so `detached` never
-    // arrives and the child is not a process-group leader — an earlier version
-    // passed it and looked correct while POSIX descendants survived every timeout.
-    // terminateProcessTree does not rely on a group existing; see its docblock.
-    const child = execFile(
-      cmd,
-      args,
-      { cwd, maxBuffer, env },
-      (error, stdout, stderr) => {
-        // `exitCode: null` means "killed", per ExecResult. Our own timer is one
-        // way that happens; a signal from outside this process is another, and it
-        // reports the same way it always did.
-        const killed = error
-          ? (error as NodeJS.ErrnoException & { code?: number | string }).code === "ETIMEDOUT" ||
-            (error as { killed?: boolean }).killed === true
-          : false;
+    const text = (chunks: Buffer[]): string => Buffer.concat(chunks).toString("utf-8");
 
+    let child: ChildProcess;
+    try {
+      child = spawn(cmd, args, {
+        cwd,
+        env,
+        stdio: ["pipe", "pipe", "pipe"],
+        // This is the reason exec spawns rather than execFile'ing. execFile builds
+        // its own options object for spawn and silently drops anything outside its
+        // curated set, `detached` included — so on POSIX the child was never a
+        // process-group leader, kill(-pid) failed with ESRCH, and only the direct
+        // child died while its descendants kept running. Here the option actually
+        // arrives.
+        ...(treeKill ? treeKillSpawnOptions(_platform) : {}),
+      });
+    } catch (error) {
+      // spawn throws synchronously for invalid arguments (bad cwd type, etc.).
+      finish({ stdout: "", stderr: "", exitCode: 1, error: error as Error });
+      return;
+    }
+
+    /** Stop the command, taking its descendants with it when treeKill is on. */
+    const stopChild = async (): Promise<void> => {
+      if (treeKill) await terminateProcessTree(child, { platform: _platform });
+      else child.kill("SIGKILL");
+    };
+
+    // maxBuffer is a ceiling, not a suggestion: past it, stop the command rather
+    // than accumulate without bound. Counted in bytes, and chunks are concatenated
+    // as Buffers rather than decoded per chunk so a multi-byte character split
+    // across two reads cannot be mangled.
+    const collect = (chunks: Buffer[], stream: "stdout" | "stderr") => (chunk: Buffer): void => {
+      const total = stream === "stdout" ? (stdoutBytes += chunk.length) : (stderrBytes += chunk.length);
+      if (total > maxBuffer) {
+        if (!overflowed) {
+          overflowed = stream;
+          void stopChild();
+        }
+        return;
+      }
+      chunks.push(chunk);
+    };
+
+    child.stdout?.on("data", collect(stdoutChunks, "stdout"));
+    child.stderr?.on("data", collect(stderrChunks, "stderr"));
+
+    child.once("error", (error: Error) => {
+      // Spawn failure (ENOENT and friends). execFile surfaced these as a non-null
+      // error with a non-numeric code, which mapped to exitCode 1.
+      finish({ stdout: text(stdoutChunks), stderr: text(stderrChunks), exitCode: 1, error });
+    });
+
+    child.once("close", (code: number | null, signal: NodeJS.Signals | null) => {
+      const stdout = text(stdoutChunks);
+      const stderr = text(stderrChunks);
+
+      if (overflowed) {
         finish({
-          stdout: (stdout ?? "").toString(),
-          stderr: (stderr ?? "").toString(),
-          exitCode:
-            timedOut || killed
-              ? null
-              : error
-                ? typeof (error as { code?: number }).code === "number"
-                  ? ((error as { code?: number }).code ?? 1)
-                  : 1
-                : 0,
-          error: (error as Error | null) ?? null,
+          stdout,
+          stderr,
+          exitCode: null,
+          error: Object.assign(new Error(`${overflowed} maxBuffer length exceeded`), {
+            code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+            killed: true,
+          }),
         });
-      },
-    );
+        return;
+      }
+
+      // `exitCode: null` means "killed", per ExecResult. Our own timer is one way
+      // that happens; a signal from outside this process is another, and it
+      // reports the same way it always did.
+      if (timedOut || signal !== null) {
+        finish({ stdout, stderr, exitCode: null, error: killedError(display, timeout, timedOut, signal) });
+        return;
+      }
+
+      const exitCode = code ?? 1;
+      finish({
+        stdout,
+        stderr,
+        exitCode,
+        error:
+          exitCode === 0
+            ? null
+            : Object.assign(new Error(`Command failed: ${display}\n${stderr}`), { code: exitCode }),
+      });
+    });
 
     if (timeout > 0) {
       timer = setTimeout(() => {
         timedOut = true;
-        void (async () => {
-          if (treeKill) {
-            await terminateProcessTree(child, { platform: _platform });
-          } else {
-            child.kill("SIGKILL");
-          }
-          // Normally the execFile callback has already fired by now (the tree is
-          // gone, so its pipes closed) and this is a no-op. It is the backstop
-          // for a kill that could not finish the job: resolve rather than hang,
-          // with whatever the callback has not yet delivered left empty.
-          finish({ stdout: "", stderr: "", exitCode: null, error: null });
-        })();
+        void stopChild().then(() => {
+          // Normally "close" has already fired by now (the tree is gone, so its
+          // pipes closed) and this is a no-op. It is the backstop for a kill that
+          // could not finish the job: resolve rather than hang, reporting whatever
+          // output was collected before the timeout.
+          finish({
+            stdout: text(stdoutChunks),
+            stderr: text(stderrChunks),
+            exitCode: null,
+            error: killedError(display, timeout, true, null),
+          });
+        });
       }, timeout);
     }
 
-    // Close the child's stdin immediately. `execFile` pipes stdio by default
-    // but the parent never writes anything — leaving stdin open makes any
+    // Close the child's stdin immediately. stdio is piped so callers get buffered
+    // output, but the parent never writes anything — leaving stdin open makes any
     // child that reads from stdin (e.g. `rex add` calling readStdin() in a
     // non-TTY) hang forever waiting for an EOF that will never arrive.
     child.stdin?.end();
   });
+}
+
+/**
+ * The error that accompanies `exitCode: null`.
+ *
+ * execFile always populated `error` when a process was killed — ETIMEDOUT for its
+ * own timeout, a `killed: true` error for an outside signal — and callers may
+ * branch on it, so the shape is preserved rather than left null.
+ */
+function killedError(
+  display: string,
+  timeout: number,
+  timedOut: boolean,
+  signal: NodeJS.Signals | null,
+): Error {
+  return timedOut
+    ? Object.assign(new Error(`Command timed out after ${timeout}ms: ${display}`), {
+        code: "ETIMEDOUT",
+        killed: true,
+      })
+    : Object.assign(new Error(`Command was killed with ${signal}: ${display}`), {
+        killed: true,
+        signal,
+      });
 }
 
 /**

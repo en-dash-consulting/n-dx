@@ -8,21 +8,57 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * Optionally, a test command can be run for additional verification.
  */
 
-// Mock child_process.execFile before importing the module
+// Mock child_process before importing the module.
+//
+// validateCompletion runs git and the test command through exec, which SPAWNS
+// rather than calling execFile: execFile drops the `detached` option and so
+// cannot make a child a process-group leader.
 vi.mock("node:child_process", () => ({
   execFile: vi.fn(),
+  spawn: vi.fn(),
 }));
 
-import { execFile } from "node:child_process";
+import { EventEmitter } from "node:events";
+import { execFile, spawn } from "node:child_process";
 
-const mockExecFile = vi.mocked(execFile);
+const mockSpawn = vi.mocked(spawn);
 
+/** A child that emits the given output then exits. No pid, so the tree kill
+ *  short-circuits to a direct kill instead of signalling a real process group. */
+function childEmitting(stdout: string, stderr: string, code: number) {
+  const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
+  const out = new EventEmitter();
+  const err = new EventEmitter();
+  Object.assign(child, {
+    pid: undefined,
+    exitCode: null,
+    signalCode: null,
+    stdout: out,
+    stderr: err,
+    stdin: { end: () => {} },
+    kill: () => true,
+  });
+  setImmediate(() => {
+    if (stdout) out.emit("data", Buffer.from(stdout));
+    if (stderr) err.emit("data", Buffer.from(stderr));
+    child.emit("close", code, null);
+  });
+  return child as unknown as ReturnType<typeof spawn>;
+}
+
+/** Every spawned command answers the same way. */
 function mockExecFileResult(stdout: string, stderr = "", error: Error | null = null) {
-  mockExecFile.mockImplementation(
-    ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
-      cb(error, stdout, stderr);
-    }) as typeof execFile,
-  );
+  mockSpawn.mockImplementation((() => childEmitting(stdout, stderr, error ? 1 : 0)) as unknown as typeof spawn);
+}
+
+/** Answer each spawned command in turn: git diff first, then the test command. */
+function mockExecFileSequence(...results: { stdout?: string; stderr?: string; code?: number }[]) {
+  let call = 0;
+  mockSpawn.mockImplementation((() => {
+    const r = results[Math.min(call, results.length - 1)]!;
+    call += 1;
+    return childEmitting(r.stdout ?? "", r.stderr ?? "", r.code ?? 0);
+  }) as unknown as typeof spawn);
 }
 
 beforeEach(() => {
@@ -83,16 +119,9 @@ describe("validateCompletion", () => {
 
     // First call: git diff (has changes)
     // Second call: test command (succeeds)
-    let callCount = 0;
-    mockExecFile.mockImplementation(
-      ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
-        callCount++;
-        if (callCount === 1) {
-          cb(null, " src/foo.ts | 5 +++--\n 1 file changed\n", "");
-        } else {
-          cb(null, "All tests passed", "");
-        }
-      }) as typeof execFile,
+    mockExecFileSequence(
+      { stdout: " src/foo.ts | 5 +++--\n 1 file changed\n", stderr: "", code: 0 },
+      { stdout: "All tests passed", stderr: "", code: 0 },
     );
 
     const result = await validateCompletion("/project", {
@@ -108,18 +137,9 @@ describe("validateCompletion", () => {
   it("fails when test command fails", async () => {
     const { validateCompletion } = await import("../../../src/agent/completion.js");
 
-    let callCount = 0;
-    mockExecFile.mockImplementation(
-      ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
-        callCount++;
-        if (callCount === 1) {
-          cb(null, " src/foo.ts | 5 +++--\n 1 file changed\n", "");
-        } else {
-          const err = new Error("test failed");
-          (err as NodeJS.ErrnoException).code = "1";
-          cb(err, "", "FAIL: 2 tests failed");
-        }
-      }) as typeof execFile,
+    mockExecFileSequence(
+      { stdout: " src/foo.ts | 5 +++--\n 1 file changed\n", stderr: "", code: 0 },
+      { stdout: "", stderr: "FAIL: 2 tests failed", code: 1 },
     );
 
     const result = await validateCompletion("/project", {
@@ -166,7 +186,7 @@ describe("validateCompletion", () => {
     await validateCompletion("/project");
 
     // Should use git diff HEAD to catch both staged and unstaged changes
-    const callArgs = mockExecFile.mock.calls[0];
+    const callArgs = mockSpawn.mock.calls[0]!;
     expect(callArgs[0]).toBe("git");
     expect(callArgs[1]).toContain("--stat");
     expect(callArgs[1]).toContain("HEAD");
@@ -179,7 +199,7 @@ describe("validateCompletion", () => {
 
     await validateCompletion("/project", { startingHead: "abc123" });
 
-    const callArgs = mockExecFile.mock.calls[0];
+    const callArgs = mockSpawn.mock.calls[0]!;
     expect(callArgs[0]).toBe("git");
     expect(callArgs[1]).toContain("--stat");
     expect(callArgs[1]).toContain("abc123");
@@ -202,23 +222,18 @@ describe("validateCompletion", () => {
     expect(result.hasChanges).toBe(true);
 
     // Verify it diffed against the starting commit, not HEAD
-    const callArgs = mockExecFile.mock.calls[0];
+    const callArgs = mockSpawn.mock.calls[0]!;
     expect(callArgs[1]).toContain("abc123");
   });
 
   it("uses error message as reason when test command fails with empty stderr", async () => {
     const { validateCompletion } = await import("../../../src/agent/completion.js");
 
-    let callCount = 0;
-    mockExecFile.mockImplementation(
-      ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
-        callCount++;
-        if (callCount === 1) {
-          cb(null, " src/foo.ts | 5 +++--\n 1 file changed\n", "");
-        } else {
-          cb(new Error("Command failed with exit code 1"), "", "");
-        }
-      }) as typeof execFile,
+    // Empty stderr on failure: the reason has to come from the error's message,
+    // which exec synthesizes as "Command failed: <command>\n<stderr>".
+    mockExecFileSequence(
+      { stdout: " src/foo.ts | 5 +++--\n 1 file changed\n", stderr: "", code: 0 },
+      { stdout: "", stderr: "", code: 1 },
     );
 
     const result = await validateCompletion("/project", {
@@ -228,22 +243,19 @@ describe("validateCompletion", () => {
     expect(result.valid).toBe(false);
     expect(result.testsRan).toBe(true);
     expect(result.testsPassed).toBe(false);
-    expect(result.reason).toBe("Tests failed: Command failed with exit code 1");
+    // stderr was empty, so the reason can only have come from the error's message.
+    // Not pinned to execFile's exact wording ("Command failed with exit code 1"):
+    // exec synthesizes its own now, as "Command failed: <command>\n<stderr>".
+    expect(result.reason).toMatch(/^Tests failed: /);
+    expect(result.reason).toContain("npm test");
   });
 
   it("runs both git diff and the test command", async () => {
     const { validateCompletion } = await import("../../../src/agent/completion.js");
 
-    let callCount = 0;
-    mockExecFile.mockImplementation(
-      ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
-        callCount++;
-        if (callCount === 1) {
-          cb(null, " src/foo.ts | 5 +++--\n", "");
-        } else {
-          cb(null, "ok", "");
-        }
-      }) as typeof execFile,
+    mockExecFileSequence(
+      { stdout: " src/foo.ts | 5 +++--\n", stderr: "", code: 0 },
+      { stdout: "ok", stderr: "", code: 0 },
     );
 
     await validateCompletion("/project", {
@@ -251,7 +263,7 @@ describe("validateCompletion", () => {
       timeout: 60_000,
     });
 
-    expect(mockExecFile.mock.calls).toHaveLength(2);
+    expect(mockSpawn.mock.calls).toHaveLength(2);
     // The timeout is no longer observable at this boundary: exec keeps the timer
     // itself so a timeout can kill the command's whole tree. Propagation is
     // asserted in tests/unit/validation/completion-timeout.test.ts, which mocks
@@ -265,7 +277,7 @@ describe("validateCompletion", () => {
 
     await validateCompletion("/my/project/dir");
 
-    const opts = mockExecFile.mock.calls[0][2] as { cwd: string };
+    const opts = mockSpawn.mock.calls[0][2] as { cwd: string };
     expect(opts.cwd).toBe("/my/project/dir");
   });
 
@@ -279,7 +291,7 @@ describe("validateCompletion", () => {
     });
 
     // Should only call git diff, not the test command
-    expect(mockExecFile).toHaveBeenCalledTimes(1);
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
     expect(result.valid).toBe(false);
     expect(result.hasChanges).toBe(false);
     expect(result.testsRan).toBeUndefined();
@@ -288,16 +300,9 @@ describe("validateCompletion", () => {
   it("validates with startingHead and test command combined", async () => {
     const { validateCompletion } = await import("../../../src/agent/completion.js");
 
-    let callCount = 0;
-    mockExecFile.mockImplementation(
-      ((_cmd: string, _args: string[], _opts: unknown, cb: Function) => {
-        callCount++;
-        if (callCount === 1) {
-          cb(null, " src/foo.ts | 10 ++++---\n 1 file changed\n", "");
-        } else {
-          cb(null, "All tests passed", "");
-        }
-      }) as typeof execFile,
+    mockExecFileSequence(
+      { stdout: " src/foo.ts | 10 ++++---\n 1 file changed\n", stderr: "", code: 0 },
+      { stdout: "All tests passed", stderr: "", code: 0 },
     );
 
     const result = await validateCompletion("/project", {
@@ -306,12 +311,12 @@ describe("validateCompletion", () => {
     });
 
     // Git diff should use startingHead
-    const gitArgs = mockExecFile.mock.calls[0][1] as string[];
+    const gitArgs = mockSpawn.mock.calls[0][1] as string[];
     expect(gitArgs).toContain("def456");
     expect(gitArgs).not.toContain("HEAD");
 
     // Test command should have run via sh -c
-    const testArgs = mockExecFile.mock.calls[1];
+    const testArgs = mockSpawn.mock.calls[1];
     expect(testArgs[0]).toBe("sh");
     expect(testArgs[1]).toContain("-c");
     expect(testArgs[1]).toContain("pnpm test");

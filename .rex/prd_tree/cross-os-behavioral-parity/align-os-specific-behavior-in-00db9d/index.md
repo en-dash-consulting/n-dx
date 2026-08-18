@@ -31,5 +31,5 @@ description: "Three verified places where the same n-dx command delivers a diffe
 | [hench's RunChangeDetector shares the mtime-granularity blind spot](./hench-s-runchangedetector-e560e5.md) | pending |
 | [hench's scoped post-task test run always fails on Windows (backslash paths eaten by sh -c)](./hench-s-scoped-post-task-test-c7f341.md) | completed |
 | [Route ndx start stop through the unified terminateTree contract](./route-ndx-start-stop-through-042a5a.md) | pending |
-| [Spawn exec's children through spawn so POSIX can create a real process group](./spawn-exec-s-children-through-58161d.md) | pending |
+| [Spawn exec's children through spawn so POSIX can create a real process group](./spawn-exec-s-children-through-58161d.md) | completed |
 | [Tree-kill on shell-command timeout: a timed-out command keeps running and keeps writing](./tree-kill-on-shell-command-a99519.md) | completed |

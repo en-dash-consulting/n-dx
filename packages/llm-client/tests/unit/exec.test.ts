@@ -13,6 +13,7 @@ vi.mock("node:child_process", () => ({
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound } from "../../src/exec.js";
 import { resolve } from "node:path";
+import { fakeSpawn } from "../helpers/fake-spawn.js";
 
 const mockExecFile = vi.mocked(execFile);
 const mockExecFileSync = vi.mocked(execFileSync);
@@ -47,11 +48,13 @@ beforeEach(() => {
 });
 
 describe("exec", () => {
+  // exec spawns rather than calling execFile: execFile builds its own options
+  // object for spawn and silently drops anything outside its curated set,
+  // `detached` included, so it cannot make a child a process-group leader. These
+  // mock spawn and assert its event shape (data on the streams, then `close`).
+
   it("resolves with structured output on success", async () => {
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      (callback as Function)(null, "hello world\n", "");
-      return {} as ReturnType<typeof execFile>;
-    });
+    mockSpawn.mockImplementation(fakeSpawn({ stdout: "hello world\n" }).impl);
 
     const result = await exec("echo", ["hello"], { cwd: "/tmp", timeout: 5000 });
 
@@ -62,116 +65,113 @@ describe("exec", () => {
   });
 
   it("resolves with error info on failure (never rejects)", async () => {
-    const err = Object.assign(new Error("failed"), { code: 1 });
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      (callback as Function)(err, "", "some error\n");
-      return {} as ReturnType<typeof execFile>;
-    });
+    mockSpawn.mockImplementation(fakeSpawn({ stderr: "some error\n", code: 1 }).impl);
 
     const result = await exec("false", [], { cwd: "/tmp", timeout: 5000 });
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toBe("some error\n");
-    expect(result.error).toBe(err);
+    // execFile handed back its own Error; the equivalent is now synthesized, so
+    // this pins the content rather than object identity.
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error?.message).toContain("false");
+    expect(result.error?.message).toContain("some error");
+    expect((result.error as { code?: number }).code).toBe(1);
   });
 
-  it("returns null exitCode on ETIMEDOUT", async () => {
-    const err = Object.assign(new Error("timed out"), { code: "ETIMEDOUT" });
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      (callback as Function)(err, "", "");
-      return {} as ReturnType<typeof execFile>;
-    });
+  it("returns null exitCode when the command is killed by a signal", async () => {
+    // Not only our own timeout: an outside signal reports the same way, which the
+    // ExecResult contract has always promised ("null when the process was killed").
+    mockSpawn.mockImplementation(fakeSpawn({ signal: "SIGTERM" }).impl);
 
-    const result = await exec("sleep", ["100"], { cwd: "/tmp", timeout: 1000 });
+    const result = await exec("sleep", ["100"], { cwd: "/tmp", timeout: 60000 });
 
     expect(result.exitCode).toBeNull();
-    expect(result.error).toBe(err);
+    expect(result.error).toBeInstanceOf(Error);
+    expect((result.error as { killed?: boolean }).killed).toBe(true);
   });
 
-  it("passes cwd and maxBuffer to execFile but keeps the timeout itself", async () => {
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      (callback as Function)(null, "", "");
-      return {} as ReturnType<typeof execFile>;
-    });
+  it("passes cwd, env and piped stdio to spawn, and keeps the timeout itself", async () => {
+    const spawned = fakeSpawn();
+    mockSpawn.mockImplementation(spawned.impl);
 
     await exec("ls", ["-la"], {
       cwd: "/home",
       timeout: 10000,
       maxBuffer: 2048,
+      env: { PATH: "/usr/bin" },
       _platform: "linux",
     });
 
-    // `timeout` is deliberately NOT forwarded. execFile's timeout signals only
-    // the process it spawned, leaving that process's own children running — so
-    // exec owns the timer and kills the tree instead.
-    expect(mockExecFile).toHaveBeenCalledWith(
-      "ls",
-      ["-la"],
-      { cwd: "/home", maxBuffer: 2048, env: undefined },
-      expect.any(Function),
-    );
+    const opts = spawned.calls[0]!.opts;
+    expect(spawned.calls[0]!.cmd).toBe("ls");
+    expect(spawned.calls[0]!.args).toEqual(["-la"]);
+    expect(opts.cwd).toBe("/home");
+    expect(opts.env).toEqual({ PATH: "/usr/bin" });
+    // stdio is a genuinely-forwarded option, and the proof that options now reach
+    // the child at all: execFile would have discarded it.
+    expect(opts.stdio).toEqual(["pipe", "pipe", "pipe"]);
+    // Neither of these belongs to spawn: exec owns the timer so it can kill the
+    // tree, and buffers output itself so maxBuffer is enforced here.
+    expect(opts).not.toHaveProperty("timeout");
+    expect(opts).not.toHaveProperty("maxBuffer");
   });
 
-  it("never asks execFile for a detached child, on any platform", async () => {
-    // execFile builds its own options object for spawn and drops anything outside
-    // its curated set, so `detached` would be silently ignored. An earlier version
-    // passed it and read as correct while POSIX descendants survived every
-    // timeout — the group kill had no group to signal. Asserted on both platforms
-    // so nobody reintroduces it believing it does something.
-    for (const platform of ["linux", "win32"] as const) {
-      mockExecFile.mockClear();
-      mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-        (callback as Function)(null, "", "");
-        return {} as ReturnType<typeof execFile>;
-      });
+  it("asks for a process-group leader on POSIX and not on Windows", async () => {
+    // The whole point of spawning: `detached` makes the child a group leader so a
+    // timeout can signal the group. Under execFile this option was dropped, which
+    // is why the POSIX tree kill silently did nothing.
+    for (const [platform, expected] of [["linux", true], ["win32", undefined]] as const) {
+      const spawned = fakeSpawn();
+      mockSpawn.mockReset();
+      mockSpawn.mockImplementation(spawned.impl);
 
       await exec("ls", ["-la"], { cwd: "/home", timeout: 10000, _platform: platform });
 
-      expect(mockExecFile.mock.calls[0]![2]).not.toHaveProperty("detached");
+      expect(spawned.calls[0]!.opts.detached).toBe(expected);
     }
   });
 
-  it("passes the same options whether or not treeKill is requested", async () => {
-    // treeKill changes what happens ON TIMEOUT, not how the child is spawned.
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      (callback as Function)(null, "", "");
-      return {} as ReturnType<typeof execFile>;
-    });
+  it("leaves the child in this process's group when treeKill is off", async () => {
+    const spawned = fakeSpawn();
+    mockSpawn.mockImplementation(spawned.impl);
 
     await exec("ls", [], { cwd: "/tmp", timeout: 5000, treeKill: false, _platform: "linux" });
 
-    expect(mockExecFile).toHaveBeenCalledWith(
-      "ls",
-      [],
-      { cwd: "/tmp", maxBuffer: 1024 * 1024, env: undefined },
-      expect.any(Function),
-    );
+    expect(spawned.calls[0]!.opts).not.toHaveProperty("detached");
   });
 
-  it("uses default maxBuffer of 1 MiB when not specified", async () => {
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      (callback as Function)(null, "", "");
-      return {} as ReturnType<typeof execFile>;
-    });
+  it("closes stdin immediately so a child reading stdin cannot hang", async () => {
+    // Regression: stdio is piped, and a child that reads stdin in a non-TTY (e.g.
+    // `rex add` calling readStdin()) waits forever for an EOF nobody sends.
+    const spawned = fakeSpawn({ stdout: "ok" });
+    mockSpawn.mockImplementation(spawned.impl);
 
-    await exec("ls", [], { cwd: "/tmp", timeout: 5000, _platform: "win32" });
+    await exec("cat", [], { cwd: "/tmp", timeout: 5000 });
 
-    expect(mockExecFile).toHaveBeenCalledWith(
-      "ls",
-      [],
-      { cwd: "/tmp", maxBuffer: 1024 * 1024, env: undefined },
-      expect.any(Function),
-    );
+    expect(spawned.children[0]!.stdinEnded).toBe(true);
+  });
+
+  it("enforces maxBuffer by stopping the command", async () => {
+    // maxBuffer used to be execFile's job. Now it is ours, so it needs its own
+    // coverage: past the ceiling the command is stopped rather than buffered.
+    mockSpawn.mockImplementation(fakeSpawn({ stdout: "way past the ceiling", hang: true }).impl);
+
+    const result = await exec("noisy", [], { cwd: "/tmp", timeout: 60000, maxBuffer: 4 });
+
+    expect(result.exitCode).toBeNull();
+    expect(result.error?.message).toContain("maxBuffer");
+    expect((result.error as { code?: string }).code).toBe("ERR_CHILD_PROCESS_STDIO_MAXBUFFER");
   });
 
   it("gives up on its own timer when the command never finishes", async () => {
-    // The timeout is no longer execFile's, so something has to prove ours still
-    // fires. A child that never calls back would hang forever without it.
-    mockExecFile.mockImplementation(() => ({}) as ReturnType<typeof execFile>);
+    // The timeout is not spawn's, so something has to prove ours still fires. A
+    // child that never closes would hang forever without it.
+    mockSpawn.mockImplementation(fakeSpawn({ hang: true }).impl);
 
     vi.useFakeTimers();
     try {
-      const pending = exec("sleep", ["600"], { cwd: "/tmp", timeout: 5000 });
+      const pending = exec("sleep", ["600"], { cwd: "/tmp", timeout: 5000, _platform: "linux" });
       await vi.advanceTimersByTimeAsync(5000);
       const result = await pending;
 
@@ -181,11 +181,30 @@ describe("exec", () => {
     }
   });
 
-  it("handles null stdout/stderr gracefully", async () => {
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      (callback as Function)(null, null, null);
-      return {} as ReturnType<typeof execFile>;
-    });
+  it("resolves with exitCode 1 when the spawn itself fails", async () => {
+    const failure = Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" });
+    mockSpawn.mockImplementation(fakeSpawn({ spawnError: failure }).impl);
+
+    const result = await exec("nope", [], { cwd: "/tmp", timeout: 5000 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.error?.message).toContain("ENOENT");
+  });
+
+  it("handles a child with no stdio streams gracefully", async () => {
+    mockSpawn.mockImplementation((() => {
+      const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
+      Object.assign(child, {
+        pid: 1,
+        exitCode: null,
+        signalCode: null,
+        stdout: null,
+        stderr: null,
+        stdin: null,
+      });
+      setImmediate(() => child.emit("close", 0, null));
+      return child as unknown as ReturnType<typeof spawn>;
+    }) as unknown as typeof spawn);
 
     const result = await exec("test", [], { cwd: "/tmp", timeout: 5000 });
 
@@ -221,29 +240,22 @@ describe("execStdout", () => {
 
 describe("execShellCmd", () => {
   it("wraps command in sh -c", async () => {
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      (callback as Function)(null, "ok", "");
-      return {} as ReturnType<typeof execFile>;
-    });
+    const spawned = fakeSpawn({ stdout: "ok" });
+    mockSpawn.mockImplementation(spawned.impl);
 
     await execShellCmd("echo hello | head", { cwd: "/tmp", timeout: 5000 });
 
-    expect(mockExecFile).toHaveBeenCalledWith(
-      "sh",
-      ["-c", "echo hello | head"],
-      // No `timeout` key: exec owns the timer so it can kill the tree. A shell is
-      // the case that most needs it — `sh` dies on signal while the command it
-      // started does not.
-      expect.objectContaining({ cwd: "/tmp" }),
-      expect.any(Function),
-    );
+    expect(spawned.calls[0]!.cmd).toBe("sh");
+    expect(spawned.calls[0]!.args).toEqual(["-c", "echo hello | head"]);
+    expect(spawned.calls[0]!.opts.cwd).toBe("/tmp");
+    // No `timeout` key: exec owns the timer so it can kill the tree. A shell is
+    // the case that most needs it — `sh` dies on signal while the command it
+    // started does not.
+    expect(spawned.calls[0]!.opts).not.toHaveProperty("timeout");
   });
 
   it("returns ExecResult from the shell invocation", async () => {
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      (callback as Function)(null, "hello\n", "");
-      return {} as ReturnType<typeof execFile>;
-    });
+    mockSpawn.mockImplementation(fakeSpawn({ stdout: "hello\n" }).impl);
 
     const result = await execShellCmd("echo hello", { cwd: "/tmp", timeout: 5000 });
 

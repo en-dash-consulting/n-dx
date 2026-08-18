@@ -8,6 +8,8 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { execFile, execFileSync } from "node:child_process";
+import { EventEmitter } from "node:events";
+import { appendFileSync } from "node:fs";
 import { promisify } from "node:util";
 import type { PRDStore, PRDItem } from "@n-dx/rex";
 import { WINDOWS_STDIN_PROMPT_SEPARATOR } from "../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
@@ -271,6 +273,72 @@ export async function sleep(ms: number): Promise<void> {
  * project; use cleanupProjectDir when it is.
  */
 export const RM_RETRY = { maxRetries: 10, retryDelay: 100 } as const;
+
+// ── Spawn mocks ───────────────────────────────────────────────────────────────
+
+/**
+ * Commands that a run pipeline spawns incidentally, alongside the vendor CLI.
+ *
+ * `exec` spawns rather than calling execFile (execFile drops the `detached`
+ * option, so it cannot make a child a process-group leader), which means
+ * `exec("git", ["status", …])` now shows up at the same mocked `spawn` as the CLI.
+ * `ps` and `taskkill` appear too, from the tree kill on timeout.
+ */
+const ANCILLARY_SPAWNS = new Set(["git", "ps", "taskkill"]);
+
+function isAncillarySpawn(command: string, args: string[] = []): boolean {
+  const base = command.replace(/^.*[\\/]/, "").replace(/\.exe$/i, "");
+  if (ANCILLARY_SPAWNS.has(base)) return true;
+
+  // Shell-wrapped form: execShellCmd runs `sh -c "git diff --name-only HEAD"`, so
+  // the command is `sh` and only the script names git. Missing this is what kept
+  // retry counts one too high after exec started spawning.
+  if ((base === "sh" || base === "bash") && args[0] === "-c") {
+    const first = (args[1] ?? "").trimStart().split(/\s+/)[0] ?? "";
+    if (ANCILLARY_SPAWNS.has(first.replace(/^.*[\\/]/, ""))) return true;
+  }
+
+  // A `--version` probe runs the vendor binary but is not a run turn:
+  // detectCliAvailability reaches it through exec, which spawns now.
+  return args.length === 1 && args[0] === "--version";
+}
+
+/** A child process that produces no output and exits 0. */
+function benignChild(): EventEmitter {
+  const proc = new EventEmitter() as EventEmitter & Record<string, unknown>;
+  Object.assign(proc, {
+    pid: undefined,
+    exitCode: null,
+    signalCode: null,
+    stdout: new EventEmitter(),
+    stderr: new EventEmitter(),
+    stdin: { end: () => {} },
+    kill: () => true,
+  });
+  queueMicrotask(() => proc.emit("close", 0, null));
+  return proc;
+}
+
+/**
+ * Route incidental spawns away from a scripted CLI queue.
+ *
+ * Tests script the vendor CLI with `mockImplementationOnce` chains, which are
+ * order-based: one unrelated spawn shifts every subsequent response and the
+ * failures look like broken token accounting rather than a desynchronized mock.
+ * Wrap the mock with this so only CLI invocations consume the queue.
+ *
+ * @example
+ *   vi.doMock("node:child_process", async (importOriginal) => ({
+ *     ...(await importOriginal()),
+ *     spawn: cliSpawnsOnly(mockSpawn),
+ *   }));
+ */
+export function cliSpawnsOnly(
+  cliMock: (command: string, args?: string[], opts?: unknown) => unknown,
+): (command: string, args?: string[], opts?: unknown) => unknown {
+  return (command: string, args?: string[], opts?: unknown) =>
+    isAncillarySpawn(command, args) ? benignChild() : cliMock(command, args, opts);
+}
 
 // ── Git fixture repos ─────────────────────────────────────────────────────────
 

@@ -22,6 +22,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initConfig } from "../../src/store/config.js";
+import { cliSpawnsOnly } from "../helpers/index.js";
 
 // The temp project dirs created below have no git repo, so the real
 // `validateCompletion` would fail (`git diff --stat HEAD` exits non-zero,
@@ -197,7 +198,7 @@ describe("Codex self-heal batch pipeline — integration", () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     mockSpawn.mockImplementationOnce(() =>
@@ -255,7 +256,7 @@ describe("Codex self-heal batch pipeline — integration", () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     mockSpawn
@@ -303,7 +304,7 @@ describe("Codex self-heal batch pipeline — integration", () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     mockSpawn
@@ -363,7 +364,7 @@ describe("Codex self-heal batch pipeline — integration", () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     // All attempts fail (1 initial + 1 retry = 2 calls total).
@@ -406,7 +407,7 @@ describe("Codex self-heal batch pipeline — integration", () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     mockSpawn.mockImplementation(() =>
@@ -464,7 +465,7 @@ describe("Codex self-heal batch pipeline — integration", () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     mockSpawn
@@ -522,7 +523,7 @@ describe("Codex self-heal batch pipeline — integration", () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     mockSpawn.mockImplementationOnce(() =>

@@ -27,6 +27,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initConfig } from "../../src/store/config.js";
 import { SELF_HEAL_TAG } from "@n-dx/rex/dist/store/index.js";
+import { cliSpawnsOnly } from "../helpers/index.js";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -176,7 +177,7 @@ describe("self-heal tag scoping — integration", () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     // Codex succeeds on the first attempt.
@@ -229,7 +230,7 @@ describe("self-heal tag scoping — integration", () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     mockSpawn.mockImplementationOnce(() =>
@@ -271,7 +272,7 @@ describe("self-heal tag scoping — integration", () => {
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     mockSpawn

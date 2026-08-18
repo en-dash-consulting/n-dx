@@ -2,13 +2,16 @@
 id: "58161d5e-ae2a-45aa-9dec-10036b3cf74d"
 level: "task"
 title: "Spawn exec's children through spawn so POSIX can create a real process group"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
   - "process-lifecycle"
   - "llm-client"
   - "correctness"
+startedAt: "2026-08-18T22:42:27.302Z"
+completedAt: "2026-08-18T23:12:09.588Z"
+endedAt: "2026-08-18T23:12:09.588Z"
 acceptanceCriteria:
   - "exec spawns via spawn, and options passed to it demonstrably reach the child — asserted by a test that would fail under execFile's option-dropping"
   - "A child spawned by exec on POSIX is a process-group leader, proven by a real-process test that kills the group and observes descendants die"
