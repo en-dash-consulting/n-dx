@@ -2,8 +2,11 @@
 id: "35a6da7c-a1a4-496a-8189-9cee15e5b486"
 level: "task"
 title: "Stream job output incrementally via spawnManaged so progress UI renders while running"
-status: "pending"
+status: "completed"
 priority: "critical"
+startedAt: "2026-08-18T21:44:26.106Z"
+completedAt: "2026-08-18T21:54:29.075Z"
+endedAt: "2026-08-18T21:54:29.075Z"
 acceptanceCriteria:
   - "While a full sv-analyze, refresh, or self-heal runs, the status endpoints return incrementally growing output/phases"
   - "AnalyzeControls, enrichment-gate, RefreshPanel, and SelfHealPanel show live progress during running:true"

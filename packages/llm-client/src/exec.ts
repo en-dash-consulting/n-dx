@@ -55,13 +55,6 @@ export interface ExecOptions {
   maxBuffer?: number;
   /** Environment variables for the child process. Defaults to inheriting parent env. */
   env?: NodeJS.ProcessEnv;
-  /**
-   * Abort signal. Aborting kills the child process; the promise then resolves
-   * with the output captured so far and an `AbortError`. Lets long-running
-   * commands be cancelled by an operator (e.g. the dashboard stopping a
-   * self-heal loop) without the caller having to manage a ChildProcess.
-   */
-  signal?: AbortSignal;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,10 +78,10 @@ export function exec(
   args: string[],
   opts: ExecOptions,
 ): Promise<ExecResult> {
-  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env, signal } = opts;
+  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env } = opts;
 
   return new Promise((resolve) => {
-    const child = execFile(cmd, args, { cwd, timeout, maxBuffer, env, signal }, (
+    const child = execFile(cmd, args, { cwd, timeout, maxBuffer, env }, (
       error,
       stdout,
       stderr,
@@ -428,6 +421,13 @@ export interface SpawnToolOptions {
    * 0 or undefined = no timeout (wait indefinitely).
    */
   timeout?: number;
+  /**
+   * Called with each stdout chunk as it arrives. Fires only when `stdio`
+   * is `"pipe"`. Lets a long-running child stream progress to the caller —
+   * e.g. the web dashboard surfacing live phase output while a job runs —
+   * while the result still carries the full accumulated text on exit.
+   */
+  onStdout?: (chunk: string) => void;
 }
 
 /** Result from {@link spawnTool}. */
@@ -534,7 +534,9 @@ export function spawnTool(
 
     if (stdio === "pipe") {
       child.stdout!.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString();
+        const text = chunk.toString();
+        stdout += text;
+        opts.onStdout?.(text);
       });
       child.stderr!.on("data", (chunk: Buffer) => {
         stderr += chunk.toString();
@@ -613,7 +615,9 @@ export function spawnManaged(
 
     if (stdio === "pipe") {
       child.stdout!.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString();
+        const text = chunk.toString();
+        stdout += text;
+        opts.onStdout?.(text);
       });
       child.stderr!.on("data", (chunk: Buffer) => {
         stderr += chunk.toString();

@@ -28,7 +28,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
-import { exec as foundationExec } from "@n-dx/llm-client";
+import { exec as foundationExec, spawnManaged } from "@n-dx/llm-client";
+import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { readCliName } from "./cli-name.js";
@@ -50,12 +51,13 @@ interface SelfHealStatus {
 }
 
 /**
- * Abort handle for the in-flight self-heal loop.
+ * Handle for the in-flight self-heal loop.
  *
- * Kept outside the wire status (an AbortController is not serialisable) so the
- * stop endpoint can cancel the child process without holding a ChildProcess.
+ * Kept outside the wire status (a process handle is not serialisable) so the
+ * stop endpoint can signal the child without the status carrying it.
  */
-let selfHealAbort: AbortController | null = null;
+let selfHealChild: ManagedChild | null = null;
+let selfHealStopRequested = false;
 
 // Module-level singleton — one self-heal at a time per server process.
 const selfHealStatus: SelfHealStatus = {
@@ -116,6 +118,21 @@ function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
   if (existsSync(bin)) return { bin, args: [] };
   const fallback = join(ctx.projectDir, "packages", "core", "cli.js");
   return { bin: "node", args: [fallback] };
+}
+
+/**
+ * Map a managed child's exit to a status error string (null on success).
+ * `exitCode: null` means the spawn-level timeout fired and killed the child.
+ */
+function managedChildError(
+  result: SpawnToolResult,
+  timeoutMs: number,
+): string | null {
+  if (result.exitCode === 0) return null;
+  if (result.exitCode === null) {
+    return `Timed out after ${Math.round(timeoutMs / 1000)}s`;
+  }
+  return (result.stderr || `Exited with code ${result.exitCode}`).slice(-1000);
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────
@@ -215,23 +232,30 @@ async function handleSvAnalyze(
         : `Enrichment to pass ${targetPass} started. Poll /api/commands/sv-analyze/status for progress.`,
     });
 
-    foundationExec(bin, cmdArgs, {
+    // spawnManaged with piped stdio streams stdout chunk-by-chunk, so the
+    // status endpoint shows live progress while the passes run — the
+    // buffered exec() only hands output over after the child exits.
+    const analyzeTimeout = 1_800_000; // 30 minutes — four LLM enrichment passes
+    const child = spawnManaged(bin, cmdArgs, {
       cwd: ctx.projectDir,
-      timeout: 1_800_000, // 30 minutes — four LLM enrichment passes
-      maxBuffer: 20 * 1024 * 1024,
-    }).then((result) => {
+      timeout: analyzeTimeout,
+      stdio: "pipe",
+      onStdout: (chunk) => {
+        svAnalyzeStatus.recentOutput =
+          (svAnalyzeStatus.recentOutput + chunk).slice(-3000);
+      },
+    });
+    child.done.then((result) => {
       svAnalyzeStatus.running = false;
       svAnalyzeStatus.finishedAt = new Date().toISOString();
       svAnalyzeStatus.recentOutput = (result.stdout || "").trim().slice(-3000);
-      svAnalyzeStatus.error = result.error
-        ? (result.stderr || result.error.message).slice(-1000)
-        : null;
+      svAnalyzeStatus.error = managedChildError(result, analyzeTimeout);
 
       if (broadcast) {
         broadcast({
           type: "sv:data-changed",
           source: "sv-analyze-full",
-          ok: !result.error,
+          ok: !svAnalyzeStatus.error,
           timestamp: svAnalyzeStatus.finishedAt,
         });
       }
@@ -455,7 +479,7 @@ async function handleSelfHeal(
   selfHealStatus.output = "";
   selfHealStatus.error = null;
   selfHealStatus.stopped = false;
-  selfHealAbort = new AbortController();
+  selfHealStopRequested = false;
 
   if (broadcast) {
     broadcast({ type: "commands:self-heal-started", timestamp: selfHealStatus.startedAt });
@@ -469,40 +493,50 @@ async function handleSelfHeal(
     message: "Self-heal started. Poll /api/commands/self-heal/status for progress.",
   });
 
-  // Run in background (fire-and-forget from response perspective)
-  foundationExec(bin, cmdArgs, {
+  // Run in background (fire-and-forget from response perspective).
+  // spawnManaged streams stdout as it arrives — the SelfHealPanel parses
+  // iteration/phase progress from `output` while the loop is running — and
+  // its kill() backs the stop endpoint.
+  const selfHealTimeout = 600_000; // 10 minutes
+  const child = spawnManaged(bin, cmdArgs, {
     cwd: ctx.projectDir,
-    timeout: 600_000, // 10 minutes
-    maxBuffer: 20 * 1024 * 1024,
-    signal: selfHealAbort.signal,
-  }).then((result) => {
+    timeout: selfHealTimeout,
+    stdio: "pipe",
+    onStdout: (chunk) => {
+      selfHealStatus.output = (selfHealStatus.output + chunk).slice(-5000);
+    },
+  });
+  selfHealChild = child;
+  child.done.then((result) => {
     // An operator-requested stop is a normal outcome, not a failure: the
-    // AbortError it produces must not be reported as an error.
-    const wasStopped = selfHealAbort?.signal.aborted === true;
+    // kill it triggers must not be reported as an error.
+    const wasStopped = selfHealStopRequested;
     selfHealStatus.running = false;
     selfHealStatus.finishedAt = new Date().toISOString();
     selfHealStatus.output = (result.stdout || "").trim().slice(-5000);
     selfHealStatus.stopped = wasStopped;
-    selfHealStatus.error = !wasStopped && result.error
-      ? (result.stderr || result.error.message).slice(-1000)
-      : null;
-    selfHealAbort = null;
+    selfHealStatus.error = wasStopped
+      ? null
+      : managedChildError(result, selfHealTimeout);
+    selfHealChild = null;
+    selfHealStopRequested = false;
 
     if (broadcast) {
       broadcast({
         type: "commands:self-heal-finished",
-        ok: wasStopped || !result.error,
+        ok: wasStopped || !selfHealStatus.error,
         stopped: wasStopped,
         timestamp: selfHealStatus.finishedAt,
       });
     }
   }).catch((err: unknown) => {
-    const wasStopped = selfHealAbort?.signal.aborted === true;
+    const wasStopped = selfHealStopRequested;
     selfHealStatus.running = false;
     selfHealStatus.finishedAt = new Date().toISOString();
     selfHealStatus.stopped = wasStopped;
     selfHealStatus.error = wasStopped ? null : String(err);
-    selfHealAbort = null;
+    selfHealChild = null;
+    selfHealStopRequested = false;
 
     if (broadcast) {
       broadcast({
@@ -521,18 +555,19 @@ async function handleSelfHeal(
  * POST /api/commands/self-heal/stop — cancel the running loop.
  *
  * Self-heal makes autonomous PRD and code changes, so an operator needs a way
- * to interrupt it. Aborting kills the child; the run then reports
- * `stopped: true` with no error.
+ * to interrupt it. Killing the managed child (SIGTERM) ends the loop; the run
+ * then reports `stopped: true` with no error.
  */
 function handleSelfHealStop(
   _req: IncomingMessage,
   res: ServerResponse,
 ): boolean {
-  if (!selfHealStatus.running || !selfHealAbort) {
+  if (!selfHealStatus.running || !selfHealChild) {
     jsonResponse(res, 409, { error: "Self-heal is not running" });
     return true;
   }
-  selfHealAbort.abort();
+  selfHealStopRequested = true;
+  selfHealChild.kill("SIGTERM");
   jsonResponse(res, 200, { ok: true, message: "Stop requested; the loop will halt after the current step." });
   return true;
 }
@@ -636,22 +671,34 @@ async function handleRefresh(
     message: "Refresh started. Poll /api/commands/refresh/status for progress.",
   });
 
-  foundationExec(bin, cmdArgs, {
+  // spawnManaged streams stdout as it arrives so the RefreshPanel can show
+  // completed `[refresh]` phases while the run is still going. Phase parsing
+  // needs whole lines, so accumulate the raw stream (capped) rather than
+  // parsing the tail-sliced display output.
+  const refreshTimeout = 300_000; // 5 minutes — data analysis, no UI build
+  let streamed = "";
+  const child = spawnManaged(bin, cmdArgs, {
     cwd: ctx.projectDir,
-    timeout: 300_000, // 5 minutes — data analysis, no UI build
-    maxBuffer: 20 * 1024 * 1024,
-  }).then((result) => {
+    timeout: refreshTimeout,
+    stdio: "pipe",
+    onStdout: (chunk) => {
+      streamed = (streamed + chunk).slice(-1_000_000);
+      refreshStatus.output = streamed.trim().slice(-5000);
+      refreshStatus.phases = parseRefreshPhases(streamed);
+    },
+  });
+  child.done.then((result) => {
     refreshStatus.running = false;
     refreshStatus.finishedAt = new Date().toISOString();
     refreshStatus.output = (result.stdout || "").trim().slice(-5000);
     refreshStatus.phases = parseRefreshPhases(result.stdout || "");
-    refreshStatus.error = result.error ? (result.stderr || result.error.message).slice(-1000) : null;
+    refreshStatus.error = managedChildError(result, refreshTimeout);
 
     if (broadcast) {
       broadcast({
         type: "sv:data-changed",
         source: "refresh",
-        ok: !result.error,
+        ok: !refreshStatus.error,
         timestamp: refreshStatus.finishedAt,
       });
     }

@@ -15,16 +15,70 @@ import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 
 // Mock the CLI exec so the route returns controlled stdout without spawning rex.
-// `vi.hoisted` makes execMock available inside the hoisted vi.mock factory.
-const { execMock } = vi.hoisted(() => ({ execMock: vi.fn() }));
+// `vi.hoisted` makes the mocks available inside the hoisted vi.mock factory.
+const { execMock, spawnManagedMock } = vi.hoisted(() => ({
+  execMock: vi.fn(),
+  spawnManagedMock: vi.fn(),
+}));
 vi.mock("@n-dx/llm-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@n-dx/llm-client")>();
-  return { ...actual, exec: execMock };
+  return { ...actual, exec: execMock, spawnManaged: spawnManagedMock };
 });
 
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleCommandsRoute } from "../../../src/server/routes-commands.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
+
+// ── spawnManaged mock helpers ─────────────────────────────────────────
+
+interface ManagedResult {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+interface ManagedSpawnOpts {
+  onStdout?: (chunk: string) => void;
+}
+
+/**
+ * Configure spawnManagedMock to return a child whose completion the test
+ * controls. Returns:
+ *  - `finish(result)` — resolve the child's `done` promise
+ *  - `emit(chunk)`    — stream a stdout chunk through the caller's onStdout
+ *  - `kill`           — the handle's kill mock (spied for stop tests)
+ */
+function stubManagedChild(opts?: { killFinishes?: ManagedResult }) {
+  let finish!: (r: ManagedResult) => void;
+  const done = new Promise<ManagedResult>((resolve) => { finish = resolve; });
+  let onStdout: ((chunk: string) => void) | undefined;
+  const kill = vi.fn(() => {
+    if (opts?.killFinishes) finish(opts.killFinishes);
+    return true;
+  });
+  spawnManagedMock.mockImplementation(
+    (_bin: string, _args: string[], spawnOpts: ManagedSpawnOpts) => {
+      onStdout = spawnOpts.onStdout;
+      return { done, kill, pid: 4242 };
+    },
+  );
+  return {
+    finish,
+    emit: (chunk: string) => onStdout?.(chunk),
+    kill,
+  };
+}
+
+/** Configure spawnManagedMock to finish immediately with `result`. */
+function stubManagedRun(result: Partial<ManagedResult>) {
+  const full: ManagedResult = { exitCode: 0, stdout: "", stderr: "", ...result };
+  spawnManagedMock.mockImplementation(
+    (_bin: string, _args: string[], spawnOpts: ManagedSpawnOpts) => {
+      if (full.stdout) spawnOpts.onStdout?.(full.stdout);
+      return { done: Promise.resolve(full), kill: vi.fn(() => true), pid: 4242 };
+    },
+  );
+}
 
 const RECOMMENDATIONS = [
   { id: "a", title: "Rec A", level: "feature", priority: "high", source: "sourcevision" },
@@ -128,6 +182,7 @@ describe("commands route — refresh (live-server data refresh)", () => {
 
   beforeEach(async () => {
     execMock.mockReset();
+    spawnManagedMock.mockReset();
     tmpDir = await mkdtemp(join(tmpdir(), "commands-refresh-"));
     await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
     ctx = {
@@ -160,11 +215,7 @@ describe("commands route — refresh (live-server data refresh)", () => {
   }
 
   it("returns 202 and spawns ndx refresh with --data-only --live-server", async () => {
-    execMock.mockResolvedValue({
-      stdout: "[refresh] starting — 2 steps planned\n[refresh] complete",
-      stderr: "",
-      error: null,
-    });
+    stubManagedRun({ stdout: "[refresh] starting — 2 steps planned\n[refresh] complete" });
 
     const res = await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
       method: "POST",
@@ -176,8 +227,8 @@ describe("commands route — refresh (live-server data refresh)", () => {
     expect(body.ok).toBe(true);
 
     await waitForFinish();
-    expect(execMock).toHaveBeenCalledTimes(1);
-    const args = execMock.mock.calls[0][1] as string[];
+    expect(spawnManagedMock).toHaveBeenCalledTimes(1);
+    const args = spawnManagedMock.mock.calls[0][1] as string[];
     expect(args).toContain("refresh");
     expect(args).toContain("--data-only");
     expect(args).toContain("--live-server");
@@ -185,7 +236,7 @@ describe("commands route — refresh (live-server data refresh)", () => {
   });
 
   it("forwards fast mode as --fast", async () => {
-    execMock.mockResolvedValue({ stdout: "[refresh] ok", stderr: "", error: null });
+    stubManagedRun({ stdout: "[refresh] ok" });
 
     await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
       method: "POST",
@@ -193,19 +244,12 @@ describe("commands route — refresh (live-server data refresh)", () => {
       body: JSON.stringify({ fast: true }),
     });
     await waitForFinish();
-    const args = execMock.mock.calls[0][1] as string[];
+    const args = spawnManagedMock.mock.calls[0][1] as string[];
     expect(args).toContain("--fast");
   });
 
   it("rejects a concurrent refresh with 409 while one is running", async () => {
-    let release: (() => void) | undefined;
-    execMock.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          release = () =>
-            resolve({ stdout: "[refresh] done", stderr: "", error: null });
-        }),
-    );
+    const child = stubManagedChild();
 
     const first = await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
       method: "POST",
@@ -221,20 +265,18 @@ describe("commands route — refresh (live-server data refresh)", () => {
     });
     expect(second.status).toBe(409);
 
-    release?.();
+    child.finish({ exitCode: 0, stdout: "[refresh] done", stderr: "" });
     await waitForFinish();
   });
 
   it("status endpoint exposes phases parsed from [refresh] output", async () => {
-    execMock.mockResolvedValue({
+    stubManagedRun({
       stdout: [
         "[refresh] starting — 2 steps planned",
         "[refresh] state snapshot captured (3 files)",
         "some delegated tool output",
         "[refresh] complete",
       ].join("\n"),
-      stderr: "",
-      error: null,
     });
 
     await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
@@ -252,12 +294,39 @@ describe("commands route — refresh (live-server data refresh)", () => {
     expect(status.finishedAt).toBeTruthy();
   });
 
-  it("captures a failure into status.error", async () => {
-    execMock.mockResolvedValue({
-      stdout: "",
-      stderr: "refresh exploded",
-      error: new Error("exit 1"),
+  it("streams phases and output into status while the run is still going", async () => {
+    // Regression: the buffered exec() only surfaced output after exit, so
+    // the RefreshPanel's live phase list was always empty during a run.
+    const child = stubManagedChild();
+
+    await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
     });
+
+    child.emit("[refresh] starting — 2 steps planned\n");
+    child.emit("[refresh] state snapshot captured (3 files)\npartial li");
+
+    const live = await (await fetch(`http://127.0.0.1:${port}/api/commands/refresh/status`)).json();
+    expect(live.running).toBe(true);
+    expect(live.phases).toEqual([
+      "starting — 2 steps planned",
+      "state snapshot captured (3 files)",
+    ]);
+    expect(live.output).toContain("starting — 2 steps planned");
+
+    child.finish({
+      exitCode: 0,
+      stdout: "[refresh] starting — 2 steps planned\n[refresh] state snapshot captured (3 files)\npartial line ok\n[refresh] complete",
+      stderr: "",
+    });
+    const done = await waitForFinish();
+    expect(done.phases).toHaveLength(3);
+  });
+
+  it("captures a failure into status.error", async () => {
+    stubManagedRun({ exitCode: 1, stderr: "refresh exploded" });
 
     await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
       method: "POST",
@@ -277,6 +346,7 @@ describe("commands route — sv-analyze full flow (async)", () => {
 
   beforeEach(async () => {
     execMock.mockReset();
+    spawnManagedMock.mockReset();
     tmpDir = await mkdtemp(join(tmpdir(), "commands-svfull-"));
     await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
     ctx = {
@@ -308,7 +378,7 @@ describe("commands route — sv-analyze full flow (async)", () => {
   }
 
   it("full mode returns 202 and spawns analyze --full in the background", async () => {
-    execMock.mockResolvedValue({ stdout: "Phase 1 done\nPass 4 complete", stderr: "", error: null });
+    stubManagedRun({ stdout: "Phase 1 done\nPass 4 complete" });
 
     const res = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
       method: "POST",
@@ -322,7 +392,7 @@ describe("commands route — sv-analyze full flow (async)", () => {
     const status = await waitForFinish();
     expect(status.error).toBeNull();
     expect(status.finishedAt).toBeTruthy();
-    const args = execMock.mock.calls[0][1] as string[];
+    const args = spawnManagedMock.mock.calls[0][1] as string[];
     expect(args).toContain("analyze");
     expect(args).toContain("--full");
   });
@@ -345,12 +415,7 @@ describe("commands route — sv-analyze full flow (async)", () => {
   });
 
   it("rejects a concurrent full run with 409", async () => {
-    let release: (() => void) | undefined;
-    execMock.mockImplementation(
-      () => new Promise((resolve) => {
-        release = () => resolve({ stdout: "done", stderr: "", error: null });
-      }),
-    );
+    const child = stubManagedChild();
 
     const first = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
       method: "POST",
@@ -366,28 +431,38 @@ describe("commands route — sv-analyze full flow (async)", () => {
     });
     expect(second.status).toBe(409);
 
-    release?.();
+    child.finish({ exitCode: 0, stdout: "done", stderr: "" });
     await waitForFinish();
   });
 
   it("status exposes recent output lines while and after running", async () => {
-    execMock.mockResolvedValue({
-      stdout: ["Phase 1: inventory", "Phase 3: zones", "Enrichment pass 4 complete"].join("\n"),
-      stderr: "",
-      error: null,
-    });
+    // Regression: the buffered exec() populated recentOutput only after
+    // exit, so AnalyzeControls and the enrichment gate showed nothing
+    // during the minutes-long run.
+    const child = stubManagedChild();
 
     await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ full: true }),
     });
+
+    child.emit("Phase 1: inventory\nPhase 3: zones\n");
+    const live = await (await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze/status`)).json();
+    expect(live.running).toBe(true);
+    expect(live.recentOutput).toContain("Phase 3: zones");
+
+    child.finish({
+      exitCode: 0,
+      stdout: ["Phase 1: inventory", "Phase 3: zones", "Enrichment pass 4 complete"].join("\n"),
+      stderr: "",
+    });
     const status = await waitForFinish();
     expect(status.recentOutput).toContain("Enrichment pass 4 complete");
   });
 
   it("targetPass runs async and spawns --target-pass=N without --full", async () => {
-    execMock.mockResolvedValue({ stdout: "Enrichment pass 3 complete", stderr: "", error: null });
+    stubManagedRun({ stdout: "Enrichment pass 3 complete" });
 
     const res = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
       method: "POST",
@@ -400,7 +475,7 @@ describe("commands route — sv-analyze full flow (async)", () => {
 
     const status = await waitForFinish();
     expect(status.error).toBeNull();
-    const args = execMock.mock.calls[0][1] as string[];
+    const args = spawnManagedMock.mock.calls[0][1] as string[];
     expect(args).toContain("--target-pass=3");
     expect(args).not.toContain("--full");
   });
@@ -415,10 +490,11 @@ describe("commands route — sv-analyze full flow (async)", () => {
       expect(res.status).toBe(400);
     }
     expect(execMock).not.toHaveBeenCalled();
+    expect(spawnManagedMock).not.toHaveBeenCalled();
   });
 
   it("captures a failed full run into status.error", async () => {
-    execMock.mockResolvedValue({ stdout: "", stderr: "no LLM credentials", error: new Error("exit 1") });
+    stubManagedRun({ exitCode: 1, stderr: "no LLM credentials" });
 
     await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
       method: "POST",
@@ -577,6 +653,7 @@ describe("commands route — self-heal stop", () => {
 
   beforeEach(async () => {
     execMock.mockReset();
+    spawnManagedMock.mockReset();
     tmpDir = await mkdtemp(join(tmpdir(), "commands-selfheal-"));
     ctx = {
       projectDir: tmpDir,
@@ -608,17 +685,12 @@ describe("commands route — self-heal stop", () => {
     expect(String(body.error)).toMatch(/not running|no self-heal/i);
   });
 
-  it("aborts the running loop and records it as stopped", async () => {
-    // Honour the abort signal the handler passes, the way exec does.
-    execMock.mockImplementation((_bin: string, _args: string[], opts: { signal?: AbortSignal }) =>
-      new Promise((resolve) => {
-        opts.signal?.addEventListener("abort", () => {
-          const err = new Error("aborted") as Error & { name: string };
-          err.name = "AbortError";
-          resolve({ stdout: "iteration 1 of 3\n", stderr: "", error: err });
-        });
-      }),
-    );
+  it("kills the running loop and records it as stopped", async () => {
+    // The child exits on the SIGTERM the stop endpoint sends (a signal
+    // death surfaces as a non-zero/null exit code, never exit 0).
+    const child = stubManagedChild({
+      killFinishes: { exitCode: null, stdout: "iteration 1 of 3\n", stderr: "" },
+    });
 
     const start = await fetch(`http://127.0.0.1:${port}/api/commands/self-heal`, {
       method: "POST",
@@ -631,6 +703,7 @@ describe("commands route — self-heal stop", () => {
     const stop = await fetch(`http://127.0.0.1:${port}/api/commands/self-heal/stop`, { method: "POST" });
     expect(stop.status).toBe(200);
     expect((await stop.json()).ok).toBe(true);
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
 
     for (let i = 0; i < 50; i++) {
       const s = await statusOnce();
@@ -646,16 +719,23 @@ describe("commands route — self-heal stop", () => {
     throw new Error("self-heal did not stop");
   });
 
-  it("passes an abort signal to the spawned loop", async () => {
-    execMock.mockImplementation((_b: string, _a: string[], opts: { signal?: AbortSignal }) => {
-      expect(opts.signal).toBeInstanceOf(AbortSignal);
-      return Promise.resolve({ stdout: "done", stderr: "", error: null });
-    });
+  it("streams loop output into status while running", async () => {
+    // Regression: the buffered exec() populated `output` only after exit,
+    // so SelfHealPanel's iteration/phase progress never rendered mid-run.
+    const child = stubManagedChild();
+
     await fetch(`http://127.0.0.1:${port}/api/commands/self-heal`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ iterations: 3 }),
     });
+
+    child.emit("Self-heal iteration 2/3\nPhase: recommend\n");
+    const live = await statusOnce();
+    expect(live.running).toBe(true);
+    expect(String(live.output)).toContain("iteration 2/3");
+
+    child.finish({ exitCode: 0, stdout: "Self-heal complete", stderr: "" });
     for (let i = 0; i < 50; i++) {
       if (!(await statusOnce()).running) return;
       await new Promise((r) => setTimeout(r, 20));
