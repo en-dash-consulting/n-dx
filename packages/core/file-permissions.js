@@ -182,7 +182,37 @@ async function restrictViaAcl(path, { execFileSyncCliImpl, userInfoImpl }) {
     };
   }
 
-  const aces = parseIcaclsOutput(output, path);
+  let aces = parseIcaclsOutput(output, path);
+
+  // `/inheritance:r` strips inherited ACEs and `/grant:r` replaces the
+  // user's own grants — but neither touches EXPLICIT ACEs other principals
+  // already hold. Files created under some directories start with explicit
+  // (non-inherited) ACEs for SYSTEM and Administrators (GitHub-hosted
+  // Windows runners' %TEMP% is one), so the grant alone leaves the key
+  // readable by them. Remove each leftover explicitly, then re-verify.
+  // The user's own grant is already in place, so removal cannot lock us out.
+  const leftoverExplicit = [...new Set(
+    aces
+      .filter((ace) => !ace.flags.includes("I") && !sameIdentity(ace.identity, username))
+      .map((ace) => ace.identity),
+  )];
+  if (leftoverExplicit.length > 0) {
+    try {
+      execFileSyncCliImpl(
+        "icacls",
+        [path, ...leftoverExplicit.flatMap((identity) => ["/remove", identity])],
+        { stdio: "ignore" },
+      );
+      output = execFileSyncCliImpl("icacls", [path], { encoding: "utf-8" });
+      aces = parseIcaclsOutput(output, path);
+    } catch (err) {
+      return {
+        restricted: false,
+        method: "windows-acl",
+        detail: `icacls failed removing ${leftoverExplicit.join(", ")}: ${err?.message ?? err}`,
+      };
+    }
+  }
 
   if (aces.length === 0) {
     return {

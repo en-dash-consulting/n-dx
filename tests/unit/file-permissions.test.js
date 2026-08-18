@@ -225,6 +225,80 @@ Successfully processed 1 files`;
       }),
     ).resolves.toMatchObject({ restricted: false });
   });
+
+  it("removes explicit foreign ACEs the grant leaves behind", async () => {
+    // GitHub-hosted Windows runners: files under %TEMP% start with EXPLICIT
+    // (non-inherited) ACEs for SYSTEM and Administrators. /inheritance:r and
+    // /grant:r touch neither, so the key would stay readable by them.
+    const EXPLICIT_SHARED = `${WIN_PATH} NT AUTHORITY\\SYSTEM:(F)
+                             BUILTIN\\Administrators:(F)
+                             runnervm\\runneradmin:(F)
+
+Successfully processed 1 files; Failed processing 0 files`;
+    const RESTRICTED = `${WIN_PATH} runnervm\\runneradmin:(F)
+
+Successfully processed 1 files; Failed processing 0 files`;
+
+    const calls = [];
+    const readbacks = [EXPLICIT_SHARED, RESTRICTED];
+    const icacls = (binary, args, options) => {
+      calls.push({ binary, args, options });
+      if (args.length === 1) return readbacks.shift();
+      return "";
+    };
+
+    const result = await restrictFileToOwner(WIN_PATH, {
+      platform: "win32",
+      execFileSyncCliImpl: icacls,
+      userInfoImpl: () => ({ username: "runneradmin" }),
+    });
+
+    // grant → read → remove leftovers → re-read
+    expect(calls).toHaveLength(4);
+    expect(calls[2].args[0]).toBe(WIN_PATH);
+    expect(calls[2].args).toContain("/remove");
+    expect(calls[2].args).toContain("NT AUTHORITY\\SYSTEM");
+    expect(calls[2].args).toContain("BUILTIN\\Administrators");
+    expect(calls[2].args).not.toContain("runnervm\\runneradmin");
+    expect(result.restricted).toBe(true);
+    expect(result.method).toBe("windows-acl");
+  });
+
+  it("does not run a removal pass when the grant already left the ACL owner-only", async () => {
+    const icacls = makeIcacls(ICACLS_RESTRICTED);
+
+    await restrictFileToOwner(WIN_PATH, {
+      platform: "win32",
+      execFileSyncCliImpl: icacls,
+      userInfoImpl: () => ({ username: "smhal" }),
+    });
+
+    // grant → read, nothing else.
+    expect(icacls.calls).toHaveLength(2);
+  });
+
+  it("reports unrestricted when the removal call fails", async () => {
+    const EXPLICIT_SHARED = `${WIN_PATH} NT AUTHORITY\\SYSTEM:(F)
+                             HH_PC_1\\smhal:(F)\n`;
+    let callCount = 0;
+    const icacls = (_binary, args) => {
+      callCount += 1;
+      if (args.includes("/remove")) throw new Error("removal denied");
+      if (args.length === 1) return EXPLICIT_SHARED;
+      return "";
+    };
+
+    const result = await restrictFileToOwner(WIN_PATH, {
+      platform: "win32",
+      execFileSyncCliImpl: icacls,
+      userInfoImpl: () => ({ username: "smhal" }),
+    });
+
+    expect(callCount).toBe(3);
+    expect(result.restricted).toBe(false);
+    expect(result.detail).toContain("NT AUTHORITY\\SYSTEM");
+    expect(result.detail).toContain("removal denied");
+  });
 });
 
 describe("describeUnrestrictedFile", () => {

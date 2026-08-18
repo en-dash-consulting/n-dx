@@ -985,9 +985,26 @@ describe("n-dx config", () => {
         expect(mode & 0o777).not.toBe(0o600);
         return;
       }
-      // Untouched files keep the directory's inherited ACL.
+      // Untouched files keep whatever ACL their directory produced. That is
+      // usually inherited `(I)` entries, but not always: on GitHub-hosted
+      // Windows runners, files under %TEMP% get EXPLICIT ACEs for SYSTEM,
+      // Administrators, and the user. So assert the semantic negation of
+      // owner-only — inheritance still in effect, or some principal other
+      // than the current user holds access — rather than the `(I)` marker.
       const acl = execFileSync("icacls", [path], { encoding: "utf-8" });
-      expect(acl).toContain("(I)");
+      const aces = acl
+        .split(/\r?\n/)
+        .map((l) => l.replace(path, "").trim())
+        .filter((l) => /^.*?:(\([^)]*\))+$/.test(l));
+
+      expect(aces.length).toBeGreaterThan(0);
+      const me = process.env.USERNAME.toLowerCase();
+      const inherited = aces.some((a) => a.includes("(I)"));
+      const foreign = aces.some((a) => {
+        const identity = a.slice(0, a.indexOf(":(")).toLowerCase();
+        return identity.split("\\").pop() !== me;
+      });
+      expect(inherited || foreign).toBe(true);
     }
 
     it("restricts .n-dx.json to the owner when api_key is present", async () => {
