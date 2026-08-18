@@ -1,0 +1,23 @@
+---
+id: "0de02514-ca19-47f0-be65-14a034476b60"
+level: "task"
+title: "Cover both prompt-delivery shapes per platform in hench adapter tests"
+status: "pending"
+priority: "high"
+tags:
+  - "cross-os"
+  - "windows"
+  - "testing"
+  - "hench"
+  - "prompt-delivery"
+  - "coverage-gap"
+source: "exploration-2026-08-17"
+acceptanceCriteria:
+  - "All seven failures pass on Windows"
+  - "Assertions cover BOTH the POSIX argv shape and the Windows stdin-embedded shape — not whichever one the current platform produces"
+  - "The Windows branch of buildClaudeCliArgs is exercised by a test that can run on any OS (preferably via an injected platform seam rather than process.platform)"
+  - "The parity tests assert effective delivered prompt content rather than argv position, so they test the property they are named for"
+  - "No assertion was relaxed to substring or presence-only matching"
+  - "If a production change is made for testability, it does not alter runtime behaviour on either platform"
+description: "Seven failures, and the only group in this triage that is about missing COVERAGE rather than a bad fixture. Handle it last and most carefully.\n\n  tests/unit/agent/prompt-delivery-adapters.test.ts ..... 2\n  tests/unit/agent/prompt-envelope-parity.test.ts ....... 2\n  tests/unit/agent/prompt-parity.test.ts ................ 2\n  tests/unit/agent/claude-cli-adapter.test.ts ........... 1\n\nSymptoms:\n  expected 'You are Hench, an autonomous AI agent…' to be 'Implement user authentication with JW…'\n  expected [ '-p', '--output-format', …(4) ] to include '--system-prompt'\n  expected [ '-p', '--output-format', …(4) ] to include 'Bash(git commit:*)'\n  expected -1 to be greater than -1\n\nTHE PRODUCTION CODE IS DELIBERATE AND DOCUMENTED — buildClaudeCliArgs in\npackages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts:106-129:\n\n    const isWindows = process.platform === \"win32\";\n    // On Windows, cmd.exe can't handle multi-line strings or special chars\n    // like ( ) & | in CLI args. Embed system prompt in stdin instead.\n    const stdinContent = isWindows\n      ? `${input.systemPrompt}\n\n---\n\n${input.promptText}`\n      : input.promptText;\n    ...\n    ...(isWindows ? [] : [\"--system-prompt\", input.systemPrompt]),\n    ...(isWindows ? [input.allowedTools.join(\",\")] : input.allowedTools),\n\nOn Windows the --system-prompt flag is omitted and the system prompt is prepended to STDIN instead,\nand allowed-tools is collapsed into one comma-separated argument. The prompt IS delivered — only the\nchannel differs — and the reason is the same cmd.exe newline hazard (BatBadBut class) that the\nspawn-hardening epic fixed for the codex adapter. This is not a bug to remove.\n\nTHE ACTUAL GAP: no test asserts the WINDOWS shape. The four files above assert the POSIX argv layout\nunconditionally, so on Windows they fail, and on POSIX they pass while never exercising the Windows\nbranch. That branch therefore ships unverified on the only platform it exists for — precisely the\ncondition the parent epic was created to eliminate.\n\nWHAT TO DO:\n- Make each assertion platform-aware and assert BOTH shapes: on POSIX that --system-prompt carries the\n  system prompt and allowed-tools are separate argv entries; on Windows that the flag is absent, that\n  stdinContent begins with the system prompt followed by the --- separator and then the task prompt, and\n  that allowed-tools is a single comma-joined argument containing each expected entry.\n- Better still, drive the platform through an injected value rather than process.platform so BOTH\n  branches run on BOTH OSes — the same seam technique used for terminateTree's platform argument in\n  packages/core/child-lifecycle.js. That converts a permanently half-tested function into a fully\n  tested one and is the higher-value outcome here. It requires a small production change\n  (buildClaudeCliArgs taking an optional platform), which is justified for testability.\n- The parity tests (prompt-parity, prompt-envelope-parity) claim to check CONTENT equivalence between\n  the Claude and Codex delivery channels. Express that in terms of the EFFECTIVE delivered prompt —\n  what the model ultimately receives — rather than argv position. Framed that way the assertion becomes\n  true on both platforms and actually tests the property it is named for.\n\nDO NOT relax these to substring or presence-only checks. Prompt delivery is the contract they exist to\nprotect: the earlier \"remove claude-cli-adapter manual --allowed-tools pre-quoting\" work landed because a\ndouble-quoting regression there made tool-permission patterns silently fail to match, stalling autonomous\nruns on permission prompts. A loosened assertion would have let that through."
+---

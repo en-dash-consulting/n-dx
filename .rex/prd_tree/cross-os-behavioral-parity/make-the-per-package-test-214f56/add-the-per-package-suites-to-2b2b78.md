@@ -1,0 +1,28 @@
+---
+id: "2b2b78ad-fe27-4657-8ae2-edcb17ccc681"
+level: "task"
+title: "Add the per-package suites to the Windows CI job"
+status: "pending"
+priority: "medium"
+tags:
+  - "cross-os"
+  - "windows"
+  - "ci"
+  - "testing"
+blockedBy:
+  - "861495a7-09ad-4848-ab88-21f33e1770ae"
+  - "7c897777-eb2e-42a0-bb80-0f33a84b7713"
+  - "a38d6142-bcaa-4fa1-ad57-bbdc413b2cff"
+  - "8e79620a-b732-4fe7-b414-be6719b9b9b9"
+  - "0de02514-ca19-47f0-be65-14a034476b60"
+  - "676af18f-c764-45e3-812c-6755fa0004c7"
+source: "exploration-2026-08-17"
+acceptanceCriteria:
+  - "The Windows CI job runs the per-package suites via scripts/run-all-tests.mjs packages"
+  - "Neither `pnpm -r run test` nor `--no-bail` is used, so one failing package can neither hide the others nor report green"
+  - "The stale 'per-package is ubuntu-only' scope comments in the smoke jobs are updated"
+  - "Wall-clock and billed-minute delta is measured and reported, not assumed"
+  - "An explicit recorded decision on whether per-package also runs on macOS"
+  - "The job is green on merge — not landed red on the assumption someone will fix it later"
+description: "The payoff for this feature. Task da8af67a put the ROOT suite on windows-latest and macos-latest but deliberately kept `pnpm -r run test` ubuntu-only, with the reason written into .github/workflows/ci.yml: the per-package suites were red on Windows, and a permanently-red job gets disabled, losing all cross-OS coverage. Once the siblings land, that constraint is gone.\n\nTHE CHANGE ITSELF IS SMALL. The smoke-windows job already does checkout -> pnpm -> setup-node ->\ninstall -> build -> collect -> upload -> root suite. Add:\n\n    - name: Run per-package tests\n      run: node scripts/run-all-tests.mjs packages\n\nUse that runner, NOT `pnpm -r run test`: the latter bails on the first failing package, which is what\nhid hench's and web's failures in the first place. And NOT `pnpm -r --no-bail run test`, which pnpm\ndocuments as exiting 0 even when a script fails — that would report a red suite as green. The comment\nexplaining this is already in ci.yml next to the ubuntu step; keep the two consistent.\n\nAlso update the SCOPE comment in the smoke-macos and smoke-windows jobs, which currently states that\nper-package tests are ubuntu-only and points at task 676af18f. Leaving a stale explanation is worse\nthan having none.\n\nBLOCKED BY all five hench fix tasks plus 676af18f (rex's load-sensitive wall-clock budgets, which fail\nunder concurrent load on any machine and would fail more readily on a shared 2-core runner).\n\nNOT captured as a blocker but genuinely required: web's 7 Windows failures are not yet triaged — see\ntask 741bacf1. They must be resolved too, and their fix tasks will land under this same feature. Check\nthat before starting.\n\nCOST, and worth stating in the PR: this roughly doubles what the Windows job executes. Windows runners\nbill at 2x Linux minutes on GitHub-hosted private plans, and per-package adds ~5,800 hench+web tests\nplus rex's 4,448 on top of the root suite's 2,070. Measure the delta and report it rather than assuming\nit is acceptable — if it is not, scoping to the OS-sensitive packages is a legitimate outcome, but say\nwhich are excluded and why in the workflow file.\n\nmacOS: decide explicitly whether per-package joins that job too. It bills at 10x, and the earlier\nestimate put macOS at ~80% of the matrix's added cost for the least incremental information since ubuntu\nalready covers POSIX. Windows-only is the defensible default; record the decision either way."
+---
