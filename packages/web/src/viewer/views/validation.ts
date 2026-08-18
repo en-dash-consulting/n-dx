@@ -720,12 +720,23 @@ export function ValidationActions({ onChanged }: { onChanged?: () => void }) {
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       cancelPolls.current.push(pollJob("/api/commands/ci/status", (status) => {
+        // ndx ci exits 1 when a check fails while still printing its full
+        // JSON report, and the server records any non-zero exit as
+        // status.error. A parsed report is a result to render — its own `ok`
+        // field carries pass/fail — so the error banner is reserved for runs
+        // that produced no report at all.
+        const report = status.report as Record<string, unknown> | null;
+        if (report) {
+          setCiReport(report);
+          setCiState("done");
+          return;
+        }
         if (status.error) {
           setError(status.error);
           setCiState("error");
           return;
         }
-        setCiReport((status.report as Record<string, unknown>) ?? null);
+        setCiReport(null);
         setCiState("done");
       }));
     } catch (err) {

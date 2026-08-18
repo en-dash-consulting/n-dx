@@ -116,6 +116,63 @@ describe("ValidationActions", () => {
     expect(root.textContent).toContain("4");
   });
 
+  it("renders the CI report when a failing check exits non-zero", async () => {
+    // ndx ci exits 1 when a check fails while still printing the complete
+    // JSON report, and the server records the non-zero exit in status.error.
+    // "CI found problems, here they are" must render as the report, not as a
+    // red banner holding the stderr tail.
+    stub((url) => {
+      if (url.endsWith("/ci")) return { status: 202, body: { ok: true } };
+      if (url.endsWith("/ci/status")) {
+        return {
+          status: 200,
+          body: {
+            running: false, finishedAt: "t",
+            report: { ok: false, steps: [{ name: "boundary-check", ok: false }] },
+            output: "", error: "Exited with code 1",
+          },
+        };
+      }
+      return { status: 200, body: {} };
+    });
+    mount();
+
+    await act(async () => {
+      findButton(root, "Run CI check")!.click();
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(root.textContent).toContain("boundary-check");
+    expect(root.textContent).not.toContain("Exited with code 1");
+  });
+
+  it("falls back to the error banner when CI produced no report", async () => {
+    stub((url) => {
+      if (url.endsWith("/ci")) return { status: 202, body: { ok: true } };
+      if (url.endsWith("/ci/status")) {
+        return {
+          status: 200,
+          body: { running: false, finishedAt: "t", report: null, output: "", error: "ENOENT: ndx not found" },
+        };
+      }
+      return { status: 200, body: {} };
+    });
+    mount();
+
+    await act(async () => {
+      findButton(root, "Run CI check")!.click();
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(root.textContent).toContain("ENOENT: ndx not found");
+  });
+
   it("requires confirmation before applying a reshape", async () => {
     stub((url) => {
       if (url.endsWith("/reshape")) return { status: 202, body: { ok: true } };

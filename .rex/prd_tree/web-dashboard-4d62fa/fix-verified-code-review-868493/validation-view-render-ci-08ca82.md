@@ -2,8 +2,11 @@
 id: "08ca827b-1a2d-4c32-b555-64a5eaffc271"
 level: "task"
 title: "Validation view: render CI report on failing exit instead of raw error banner"
-status: "pending"
+status: "completed"
 priority: "medium"
+startedAt: "2026-08-18T22:47:44.556Z"
+completedAt: "2026-08-18T22:48:50.763Z"
+endedAt: "2026-08-18T22:48:50.763Z"
 acceptanceCriteria:
   - "A CI run that exits 1 with a parsed JSON report renders the report with its ok:false state"
   - "The error banner appears only when no report was parsed"
