@@ -228,7 +228,7 @@ describe("StatusFilter component", () => {
     expect(arg.size).toBe(ALL_STATUSES.length);
   });
 
-  it("renders 7 status chips", () => {
+  it("renders a chip per status", () => {
     const root = renderToDiv(
       h(StatusFilter, {
         activeStatuses: defaultStatusFilter(),
@@ -236,7 +236,7 @@ describe("StatusFilter component", () => {
       }),
     );
     const chips = root.querySelectorAll(".prd-status-chip");
-    expect(chips.length).toBe(7);
+    expect(chips.length).toBe(ALL_STATUSES.length);
   });
 
   it("sets aria-pressed on preset buttons", () => {
