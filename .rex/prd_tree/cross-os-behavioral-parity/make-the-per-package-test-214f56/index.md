@@ -2,7 +2,7 @@
 id: "214f5636-f4c2-426b-af58-ba24c4e49a76"
 level: "feature"
 title: "Make the per-package test suites pass on Windows"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -11,6 +11,9 @@ tags:
   - "hench"
   - "web"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-18T20:39:08.283Z"
+completedAt: "2026-08-18T20:39:08.283Z"
+endedAt: "2026-08-18T20:39:08.283Z"
 acceptanceCriteria:
   - "@n-dx/hench passes on Windows with no test weakened to achieve it"
   - "@n-dx/web passes on Windows (after its own triage) with the same constraint"
@@ -24,7 +27,7 @@ description: "The sibling CI-matrix task (da8af67a) put the ROOT suite on window
 
 | Title | Status |
 |-------|--------|
-| [Add the per-package suites to the Windows CI job](./add-the-per-package-suites-to-2b2b78.md) | pending |
+| [Add the per-package suites to the Windows CI job](./add-the-per-package-suites-to-2b2b78.md) | completed |
 | [Cover both prompt-delivery shapes per platform in hench adapter tests](./cover-both-prompt-delivery-0de025.md) | completed |
 | [Fix POSIX fixture assumptions in hench and web tests (/tmp, git quoting, absolute-path check)](./fix-posix-fixture-assumptions-861495.md) | completed |
 | [Fix the hardcoded "/" after join() in web's boundary-check exemptions](./fix-the-hardcoded-after-join-in-30235f.md) | completed |

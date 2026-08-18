@@ -2,7 +2,7 @@
 id: "2b2b78ad-fe27-4657-8ae2-edcb17ccc681"
 level: "task"
 title: "Add the per-package suites to the Windows CI job"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "cross-os"
@@ -20,6 +20,8 @@ blockedBy:
   - "8f4878b4-9492-40fe-8256-91b8379221a3"
 source: "exploration-2026-08-17"
 startedAt: "2026-08-18T20:05:19.476Z"
+completedAt: "2026-08-18T20:39:03.594Z"
+endedAt: "2026-08-18T20:39:03.594Z"
 acceptanceCriteria:
   - "The Windows CI job runs the per-package suites via scripts/run-all-tests.mjs packages"
   - "Neither `pnpm -r run test` nor `--no-bail` is used, so one failing package can neither hide the others nor report green"
