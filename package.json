@@ -14,7 +14,7 @@
     "dev": "pnpm -r run dev",
     "typecheck": "pnpm -r run typecheck",
     "test": "node scripts/run-vitest-bind-aware.mjs root && pnpm -r run test",
-    "validate": "pnpm -r run validate",
+    "validate": "pnpm -r --parallel run validate",
     "verify": "pnpm security:obfuscation && vitest run tests/e2e && node packages/core/ci.js .",
     "security:obfuscation": "node scripts/check-obfuscated-code.mjs",
     "gauntlet": "vitest run tests/gauntlet --exclude '**/sourcevision-evals/evals.test.js'",
