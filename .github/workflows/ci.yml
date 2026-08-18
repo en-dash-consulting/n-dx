@@ -76,8 +76,14 @@ jobs:
       - name: PR check
         run: pnpm pr-check
 
+      # NOT `pnpm -r run test`: that bails on the first failing package, and
+      # because hench and web depend on rex they are ordered after it — so a red
+      # rex meant they never executed and their absence from the log read as
+      # "nothing to report". This runner executes every package regardless and
+      # still exits non-zero if any failed. (`pnpm -r --no-bail` is not an
+      # option: pnpm documents it as exiting 0 even when a script fails.)
       - name: Run unit tests
-        run: pnpm -r run test
+        run: node scripts/run-all-tests.mjs packages
 
       # Root-level e2e / integration / gauntlet suites live in tests/** and are
       # NOT covered by `pnpm -r run test` (which only runs per-package tests).

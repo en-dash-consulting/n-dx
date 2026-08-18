@@ -13,7 +13,7 @@
     "build": "pnpm -r run build",
     "dev": "pnpm -r run dev",
     "typecheck": "pnpm -r run typecheck",
-    "test": "node scripts/run-vitest-bind-aware.mjs root && pnpm -r run test",
+    "test": "node scripts/run-all-tests.mjs",
     "validate": "pnpm -r run validate",
     "verify": "pnpm security:obfuscation && vitest run tests/e2e && node packages/core/ci.js .",
     "security:obfuscation": "node scripts/check-obfuscated-code.mjs",
