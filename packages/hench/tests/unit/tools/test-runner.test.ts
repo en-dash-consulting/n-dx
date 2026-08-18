@@ -365,6 +365,52 @@ describe("buildScopedCommand", () => {
     const cmd = buildScopedCommand("vitest", "vitest", ["tests/foo.test.ts"]);
     expect(cmd).toBe("vitest run tests/foo.test.ts");
   });
+
+  // ── Shell-safety of embedded paths ──────────────────────────────────────
+  //
+  // The command produced here is executed via execShellCmd, i.e.
+  // `exec("sh", ["-c", cmd])` on EVERY platform. A POSIX shell reads each
+  // backslash as an escape, so an OS-native Windows path embedded in this string
+  // arrives at the runner as "srcagentloop.test.ts", the filter matches nothing,
+  // and vitest exits 1 — every scoped post-task run on Windows reported failure
+  // regardless of the code. These assert the separator that reaches the shell,
+  // independently of the host, so the regression cannot come back on Linux CI.
+
+  it("emits forward slashes even when given OS-native backslash paths", () => {
+    const cmd = buildScopedCommand("vitest run", "vitest", [
+      "src\\agent\\loop.test.ts",
+      "src\\utils\\helpers.test.ts",
+    ]);
+
+    expect(cmd).toBe("vitest run src/agent/loop.test.ts src/utils/helpers.test.ts");
+    // The specific failure mode: a backslash surviving into the command string.
+    expect(cmd).not.toContain("\\");
+  });
+
+  it("emits forward slashes for the package-manager wrapper form too", () => {
+    const cmd = buildScopedCommand("pnpm test", "vitest", ["src\\agent\\loop.test.ts"]);
+
+    // No "run" here: that subcommand is only injected when the runner appears
+    // explicitly in the command. The wrapper branch appends files after "--".
+    expect(cmd).toBe("pnpm test -- src/agent/loop.test.ts");
+    expect(cmd).not.toContain("\\");
+  });
+
+  it("emits forward-slash Go package patterns from backslash paths", () => {
+    // Go package patterns REQUIRE forward slashes — "./internal\handler/..." is
+    // not merely shell-fragile, it is invalid Go syntax.
+    const cmd = buildScopedCommand("go test ./...", "go", [
+      "internal\\handler\\user_test.go",
+    ]);
+
+    expect(cmd).toBe("go test ./internal/handler/...");
+    expect(cmd).not.toContain("\\");
+  });
+
+  it("leaves already-POSIX paths untouched", () => {
+    const cmd = buildScopedCommand("vitest run", "vitest", ["src/agent/loop.test.ts"]);
+    expect(cmd).toBe("vitest run src/agent/loop.test.ts");
+  });
 });
 
 // ---------------------------------------------------------------------------

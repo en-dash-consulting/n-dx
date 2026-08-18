@@ -2,7 +2,7 @@
 id: "c7f341e2-a738-43a8-ac07-dab04287f824"
 level: "task"
 title: "hench's scoped post-task test run always fails on Windows (backslash paths eaten by sh -c)"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -11,6 +11,11 @@ tags:
   - "bug"
   - "test-runner"
 source: "exploration-2026-08-18"
+startedAt: "2026-08-18T17:15:13.473Z"
+completedAt: "2026-08-18T17:24:08.271Z"
+endedAt: "2026-08-18T17:24:08.271Z"
+resolutionType: "code-change"
+resolutionDetail: "Fixed with option 1: added toCommandPath(p) = p.split(sep).join(\"/\") applied ONCE at the top of buildScopedCommand, which covers the vitest/jest/mocha branch, the pnpm-wrapper branch and the Go branch together. findRelevantTests untouched and still OS-native for stat() (AC2). Used `sep` rather than a blunt backslash replace so POSIX is the identity and a legal backslash in a POSIX filename is preserved. FOUND A SECOND INSTANCE the task did not list: goPackagePaths derives patterns from dirname(f), producing \"./internal\\handler/...\" on Windows — invalid Go syntax, not just shell-fragile — fixed by the same single normalisation. END-TO-END VERIFIED against the real hench project with OS-native inputs: command to sh became \"npx vitest run tests/unit/store/run-log.test.ts\", ran=true passed=true with the runner reporting 11 tests, two files reported 36 tests, and a KNOWN-FAILING file reported passed=false with \"2 failed | 32 passed\" — proving the verdict tracks the real outcome rather than being green because nothing matched. Recorded a harness false alarm: a synthetic fixture under packages/hench/.e2e-tmp reported passed=false because vitest walked up and used hench's own config (include: tests/**), not because of the fix; abandoned it for the real project. Four platform-independent regression tests assert the exact command string and that no backslash survives (AC4); corrected one of my own wrong expectations (the wrapper branch does not inject \"run\"). execShellCmd's unconditional `sh -c` LEFT IN PLACE as an accepted limitation (AC3/AC6): it is shared across three packages, `sh` exists on most Windows dev boxes via Git for Windows, and switching to cmd.exe would re-introduce quoting problems that win-spawn.js cannot help with for a shell string. Any other caller embedding an OS-native path in a shell string has the same latent bug — this fixes the instance, not the class, deliberately. Typecheck clean; test-runner.test.ts 92/92; root suite 91 files / 2070 passed; hench's remaining 5 failures are EBUSY (8e79620a) and CRLF (a38d6142)."
 acceptanceCriteria:
   - "A scoped post-task test run on Windows actually executes the targeted tests and reports pass/fail based on their real result"
   - "The fix is applied where paths become a shell command, not where they are used as filesystem paths — findRelevantTests keeps returning values valid for stat()"

@@ -26,5 +26,5 @@ description: "Three verified places where the same n-dx command delivers a diffe
 |-------|--------|
 | [Decide and document the Windows available-memory strategy for hench admission](./decide-and-document-the-windows-cd8060.md) | pending |
 | [Enforce API-key file permissions on Windows via ACLs, or stop claiming they are set](./enforce-api-key-file-01d91d.md) | completed |
-| [hench's scoped post-task test run always fails on Windows (backslash paths eaten by sh -c)](./hench-s-scoped-post-task-test-c7f341.md) | pending |
+| [hench's scoped post-task test run always fails on Windows (backslash paths eaten by sh -c)](./hench-s-scoped-post-task-test-c7f341.md) | completed |
 | [Route ndx start stop through the unified terminateTree contract](./route-ndx-start-stop-through-042a5a.md) | pending |
