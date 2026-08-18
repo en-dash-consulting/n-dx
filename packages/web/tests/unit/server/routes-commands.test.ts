@@ -338,6 +338,104 @@ describe("commands route — refresh (live-server data refresh)", () => {
   });
 });
 
+describe("commands route — ndx binary resolution ladder", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+  let savedCliPath: string | undefined;
+
+  beforeEach(async () => {
+    execMock.mockReset();
+    spawnManagedMock.mockReset();
+    savedCliPath = process.env["N_DX_CLI_PATH"];
+    delete process.env["N_DX_CLI_PATH"];
+    tmpDir = await mkdtemp(join(tmpdir(), "commands-ndxbin-"));
+    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    const started = await startRouteTestServer((req, res) =>
+      handleCommandsRoute(req, res, ctx),
+    );
+    server = started.server;
+    port = started.port;
+  });
+
+  afterEach(async () => {
+    if (savedCliPath === undefined) delete process.env["N_DX_CLI_PATH"];
+    else process.env["N_DX_CLI_PATH"] = savedCliPath;
+    await closeRouteTestServer(server);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  /** Trigger refresh (which resolves the ndx bin) and wait for it to finish. */
+  async function runRefresh(): Promise<void> {
+    stubManagedRun({ stdout: "[refresh] ok" });
+    await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    for (let i = 0; i < 50; i++) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/commands/refresh/status`);
+      if (!((await res.json()) as { running: boolean }).running) return;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error("refresh did not finish");
+  }
+
+  it("prefers the project-local .bin/ndx when present", async () => {
+    const { writeFile: wf, mkdir: md } = await import("node:fs/promises");
+    const binDir = join(tmpDir, "node_modules", ".bin");
+    await md(binDir, { recursive: true });
+    await wf(join(binDir, "ndx"), "#!/bin/sh\n");
+
+    await runRefresh();
+    expect(spawnManagedMock.mock.calls[0][0]).toBe(join(binDir, "ndx"));
+  });
+
+  it("uses N_DX_CLI_PATH when set and no local bin exists", async () => {
+    // ndx start sets this to the launching CLI's own path, which is valid
+    // for any install layout (global, npm, pnpm) — unlike the dogfood
+    // packages/core/cli.js path, which only exists in the n-dx monorepo.
+    const { writeFile: wf } = await import("node:fs/promises");
+    const cliPath = join(tmpDir, "installed-cli.js");
+    await wf(cliPath, "// stand-in for @n-dx/core/cli.js\n");
+    process.env["N_DX_CLI_PATH"] = cliPath;
+
+    await runRefresh();
+    expect(spawnManagedMock.mock.calls[0][0]).toBe("node");
+    expect((spawnManagedMock.mock.calls[0][1] as string[])[0]).toBe(cliPath);
+  });
+
+  // Below the env rung, the exact result is environment-dependent: whether
+  // @n-dx/core resolves from the web module graph varies with the test
+  // runner's module resolver (vitest pools differ from plain Node, where it
+  // never resolves in this workspace — web must not depend on core). Both
+  // remaining rungs end in core/cli.js, so these tests pin the ladder's
+  // shape, not a specific path.
+  it("ignores a stale N_DX_CLI_PATH that points at a missing file", async () => {
+    const stale = join(tmpDir, "gone", "cli.js");
+    process.env["N_DX_CLI_PATH"] = stale;
+
+    await runRefresh();
+    const target = (spawnManagedMock.mock.calls[0][1] as string[])[0];
+    expect(target).not.toBe(stale);
+    expect(target.endsWith(join("core", "cli.js"))).toBe(true);
+  });
+
+  it("falls through to a real cli.js when no local bin or env exists", async () => {
+    await runRefresh();
+    expect(spawnManagedMock.mock.calls[0][0]).toBe("node");
+    const target = (spawnManagedMock.mock.calls[0][1] as string[])[0];
+    expect(target.endsWith(join("core", "cli.js"))).toBe(true);
+  });
+});
+
 describe("commands route — sv-analyze full flow (async)", () => {
   let tmpDir: string;
   let ctx: ServerContext;

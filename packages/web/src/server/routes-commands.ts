@@ -113,9 +113,37 @@ function resolveRexBin(ctx: ServerContext): { bin: string; args: string[] } {
     ["packages", "rex", "dist", "cli", "index.js"]);
 }
 
+/**
+ * Resolve the ndx orchestrator CLI. Ladder:
+ *
+ *  1. Project-local `node_modules/.bin/ndx` — the analyzed project's own
+ *     install wins, matching {@link resolveNdxCli}.
+ *  2. `N_DX_CLI_PATH` — set by the launching CLI (cli.js) for every child it
+ *     spawns, so a server started by `ndx start` always knows the running
+ *     install's cli.js, whatever the layout (global, npm, pnpm, monorepo).
+ *  3. `@n-dx/core/cli.js` resolved from THIS server's module graph — covers
+ *     servers not started via ndx on flat (npm-hoisted) installs. Unlike the
+ *     domain CLIs, this step often fails by design: web cannot declare
+ *     @n-dx/core as a dependency (core depends on web — a cycle), so strict
+ *     pnpm layouts won't resolve it.
+ *  4. The monorepo dogfood path — valid solely when the analyzed project is
+ *     the n-dx repo itself.
+ */
 function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
   const bin = join(ctx.projectDir, "node_modules", ".bin", "ndx");
   if (existsSync(bin)) return { bin, args: [] };
+
+  const envCli = process.env["N_DX_CLI_PATH"];
+  if (envCli && existsSync(envCli)) return { bin: "node", args: [envCli] };
+
+  try {
+    const req = createRequire(import.meta.url);
+    const cli = req.resolve("@n-dx/core/cli.js");
+    if (existsSync(cli)) return { bin: "node", args: [cli] };
+  } catch {
+    /* fall through to dogfood path */
+  }
+
   const fallback = join(ctx.projectDir, "packages", "core", "cli.js");
   return { bin: "node", args: [fallback] };
 }

@@ -123,6 +123,13 @@ import {
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
 
+// Advertise this CLI's own path to every child process. The web server's
+// command triggers (refresh, ci, auth, self-heal, export) re-invoke ndx and
+// need a path that works on analyzed projects that aren't this monorepo —
+// the server cannot resolve @n-dx/core from its own module graph (core
+// depends on web, so the reverse edge would be a cycle).
+process.env.N_DX_CLI_PATH = fileURLToPath(import.meta.url);
+
 /** Map monorepo directory names to npm package names. */
 const PKG_NAMES = {
   "packages/rex": "@n-dx/rex",
