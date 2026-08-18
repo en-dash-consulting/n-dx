@@ -325,6 +325,30 @@ describe("commands route — refresh (live-server data refresh)", () => {
     expect(done.phases).toHaveLength(3);
   });
 
+  it("parses phases from ANSI-colored output", async () => {
+    // cli.js colorizes when FORCE_COLOR is set (the child inherits the
+    // server's env), emitting \x1b[36m[refresh]\x1b[39m …. The strip regex
+    // must consume the escape byte too — dropping only "[36m" leaves a bare
+    // \x1b before "[refresh]" and every startsWith("[refresh]") check fails.
+    stubManagedRun({
+      stdout: [
+        "\x1b[36m[refresh]\x1b[39m \x1b[1mdata\x1b[22m -> starting — 2 steps planned",
+        "\x1b[36m[refresh]\x1b[39m complete",
+      ].join("\n"),
+    });
+
+    await fetch(`http://127.0.0.1:${port}/api/commands/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const status = await waitForFinish();
+    expect(status.phases).toEqual([
+      "data -> starting — 2 steps planned",
+      "complete",
+    ]);
+  });
+
   it("captures a failure into status.error", async () => {
     stubManagedRun({ exitCode: 1, stderr: "refresh exploded" });
 

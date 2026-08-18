@@ -14,7 +14,7 @@ description: "Code review of the feature/add-new-dashboards-in-UI branch surface
 |-------|--------|
 | [Cache the auth credential check; stop spawning ndx auth on every settings mount](./cache-the-auth-credential-check-e46feb.md) | pending |
 | [Command manifest: treat absent llm.vendor as claude in hasLlmVendor](./command-manifest-treat-absent-29a2a7.md) | completed |
-| [Fix ANSI strip regex in parseRefreshPhases: missing escape byte](./fix-ansi-strip-regex-in-f256f5.md) | pending |
+| [Fix ANSI strip regex in parseRefreshPhases: missing escape byte](./fix-ansi-strip-regex-in-f256f5.md) | completed |
 | [Reconcile command manifest descriptions and triggers with actual endpoints](./reconcile-command-manifest-56a686.md) | pending |
 | [Reshape trigger: spawn rex reshape with --quiet so stdout parses as JSON](./reshape-trigger-spawn-rex-032fba.md) | completed |
 | [resolveNdxBin: resolve @n-dx/core from the server module graph before the dogfood path](./resolvendxbin-resolve-n-dx-core-44bea9.md) | completed |

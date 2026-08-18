@@ -635,8 +635,11 @@ const refreshStatus: RefreshStatus = {
 
 /** Extract the `[refresh] …` phase lines from CLI output (ANSI stripped). */
 function parseRefreshPhases(stdout: string): string[] {
+  // Written as the \x1b ESCAPE SEQUENCE, not a raw ESC byte: the raw byte
+  // is invisible in most views, which has already caused this regex to be
+  // misread as missing its escape prefix entirely.
   // eslint-disable-next-line no-control-regex
-  const plain = stdout.replace(/\[[0-9;]*m/g, "");
+  const plain = stdout.replace(/\x1b\[[0-9;]*m/g, "");
   return plain
     .split("\n")
     .filter((line) => line.startsWith("[refresh]"))
