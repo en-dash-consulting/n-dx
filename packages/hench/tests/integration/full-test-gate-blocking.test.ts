@@ -37,11 +37,15 @@ describe("Full Test Suite Gate Blocking Integration", () => {
     );
 
     // Initialize git repository
-    await import("node:child_process").then(({ execSync }) => {
+    await import("node:child_process").then(({ execFileSync }) => {
       try {
-        execSync("git init", { cwd: projectDir });
-        execSync("git config user.email 'test@example.com'", { cwd: projectDir });
-        execSync("git config user.name 'Test User'", { cwd: projectDir });
+        // argv, not a shell string: cmd.exe does not strip single quotes, so
+        // "user.name 'Test User'" would store the quotes literally and a value
+        // containing a space splits into two arguments. The surrounding catch
+        // would have hidden either outcome.
+        execFileSync("git", ["init"], { cwd: projectDir });
+        execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: projectDir });
+        execFileSync("git", ["config", "user.name", "Test User"], { cwd: projectDir });
       } catch {
         // Git might not be available in test environment
       }

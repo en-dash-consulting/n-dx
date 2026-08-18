@@ -366,9 +366,23 @@ describe("buildScopedCommand", () => {
 // ---------------------------------------------------------------------------
 
 describe("runPostTaskTests", () => {
+  // A REAL directory, not "/tmp": path.resolve("/tmp") is "C:\tmp" on Windows
+  // and does not exist, so every spawn here failed on a nonexistent cwd. That
+  // broke the two output-asserting tests and, worse, let the others pass for the
+  // wrong reason — a spawn that never ran looks like a command that failed.
+  let projectDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-post-task-tests-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
   it("returns ran=false when no test command configured", async () => {
     const result = await runPostTaskTests({
-      projectDir: "/tmp",
+      projectDir,
       filesChanged: ["src/foo.ts"],
       testCommand: undefined,
     });
@@ -379,7 +393,7 @@ describe("runPostTaskTests", () => {
 
   it("returns ran=false when no files changed", async () => {
     const result = await runPostTaskTests({
-      projectDir: "/tmp",
+      projectDir,
       filesChanged: [],
       testCommand: "npm test",
     });
@@ -391,21 +405,21 @@ describe("runPostTaskTests", () => {
   it("runs the full test command when runner is not scopeable", async () => {
     // Use a command that will succeed quickly
     const result = await runPostTaskTests({
-      projectDir: "/tmp",
+      projectDir,
       filesChanged: ["src/foo.ts"],
-      testCommand: "echo 'all tests passed'",
+      testCommand: "echo all tests passed",
       timeout: 5000,
     });
 
     expect(result.ran).toBe(true);
     expect(result.passed).toBe(true);
-    expect(result.command).toBe("echo 'all tests passed'");
+    expect(result.command).toBe("echo all tests passed");
     expect(result.targetedFiles).toEqual([]);
   });
 
   it("reports failure when test command exits non-zero", async () => {
     const result = await runPostTaskTests({
-      projectDir: "/tmp",
+      projectDir,
       filesChanged: ["src/foo.ts"],
       testCommand: "sh -c 'exit 1'",
       timeout: 5000,
@@ -417,9 +431,9 @@ describe("runPostTaskTests", () => {
 
   it("captures test output", async () => {
     const result = await runPostTaskTests({
-      projectDir: "/tmp",
+      projectDir,
       filesChanged: ["src/foo.ts"],
-      testCommand: "echo 'Tests: 5 passed, 0 failed'",
+      testCommand: "echo Tests: 5 passed, 0 failed",
       timeout: 5000,
     });
 
@@ -429,7 +443,7 @@ describe("runPostTaskTests", () => {
 
   it("measures test duration", async () => {
     const result = await runPostTaskTests({
-      projectDir: "/tmp",
+      projectDir,
       filesChanged: ["src/foo.ts"],
       testCommand: "echo ok",
       timeout: 5000,
@@ -445,10 +459,22 @@ describe("runPostTaskTests", () => {
 // ---------------------------------------------------------------------------
 
 describe("runTestGate", () => {
+  // Same reason as runPostTaskTests above: these previously passed
+  // projectDir: "/tmp", which is the nonexistent "C:\tmp" on Windows.
+  let projectDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-test-gate-"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
   it("skips gate when no files changed", async () => {
     const { runTestGate } = await import("../../../src/tools/test-runner.js");
     const result = await runTestGate({
-      projectDir: "/tmp",
+      projectDir,
       filesChanged: [],
     });
 
@@ -461,7 +487,7 @@ describe("runTestGate", () => {
   it("returns failed gate on non-zero exit code", async () => {
     const { runTestGate } = await import("../../../src/tools/test-runner.js");
     const result = await runTestGate({
-      projectDir: "/tmp",
+      projectDir,
       filesChanged: ["src/foo.ts"],
       timeout: 1000,
     });
@@ -476,7 +502,7 @@ describe("runTestGate", () => {
   it("includes command in result", async () => {
     const { runTestGate } = await import("../../../src/tools/test-runner.js");
     const result = await runTestGate({
-      projectDir: "/tmp",
+      projectDir,
       filesChanged: ["src/foo.ts"],
       timeout: 1000,
     });
@@ -489,7 +515,7 @@ describe("runTestGate", () => {
   it("measures total duration", async () => {
     const { runTestGate } = await import("../../../src/tools/test-runner.js");
     const result = await runTestGate({
-      projectDir: "/tmp",
+      projectDir,
       filesChanged: ["src/foo.ts"],
       timeout: 1000,
     });

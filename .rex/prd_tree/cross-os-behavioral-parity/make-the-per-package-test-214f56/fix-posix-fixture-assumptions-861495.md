@@ -2,7 +2,7 @@
 id: "861495a7-09ad-4848-ab88-21f33e1770ae"
 level: "task"
 title: "Fix POSIX fixture assumptions in hench and web tests (/tmp, git quoting, absolute-path check)"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -11,6 +11,11 @@ tags:
   - "hench"
   - "quick-win"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-18T16:23:35.849Z"
+completedAt: "2026-08-18T16:32:01.284Z"
+endedAt: "2026-08-18T16:32:01.284Z"
+resolutionType: "code-change"
+resolutionDetail: "All six named failures fixed; hench 25 -> 20 failures (8 -> 6 files) and web's routes-sourcevision failure gone, with every remaining failure in both packages mapping to a known sibling task. The AC's grep revealed ~19 execSync git shell strings across FIVE files rather than the 3 named — all converted to argv execFileSync. Explained the distribution: `-m 'base'` succeeds on Windows storing a literally-quoted message, while `-m 'test commit'` splits into `-m` `'test` plus a stray pathspec and fails, so only space-containing messages surfaced. Deliberately left alone (verified by reading context): plan-only-detection:52 and summary:142,229 match the grep but are fixture data for a mocked git tool, not shell; and unquoted strings like `execSync(\"git init\")` are safe under cmd.exe. Cause C was 10 `projectDir: \"/tmp\"` sites, not 2 — path.resolve(\"/tmp\") is the nonexistent \"C:\tmp\", which broke the two output-asserting tests AND let four others pass for the wrong reason; all now use real mkdtemp fixtures. Also resolved a triage puzzle: routes-sourcevision:212 never ran because :202 threw first in the same test. Found and fixed in passing (not one of the six): run-log's `split(\"/\").at(-1)` returned the whole path on Windows and its assertions passed by accident — now basename(), which is strictly stricter. Recorded a mistake: the broad `projectDir: \"/tmp\",` replace also hit the sibling runTestGate describe and broke 4 tests with a ReferenceError; caught on the next run and fixed by adding the fixture there. No assertion weakened. Typecheck clean; root suite 91 files / 2070 passed unaffected."
 acceptanceCriteria:
   - "run-log.test.ts uses path.isAbsolute rather than a leading-slash check"
   - "Both hench git.test.ts sites and web's routes-sourcevision.test.ts:202 invoke git with argv rather than a quoted command string"

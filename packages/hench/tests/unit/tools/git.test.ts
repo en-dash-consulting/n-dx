@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { toolGit } from "../../../src/tools/git.js";
 import type { ToolGuard } from "../../../src/tools/contracts.js";
 
@@ -41,8 +41,8 @@ describe("toolGit", () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-test-git-"));
     guard = createGitGuard(DEFAULT_ALLOWED_GIT_SUBCOMMANDS);
     execSync("git init", { cwd: projectDir });
-    execSync("git config user.email 'test@test.com'", { cwd: projectDir });
-    execSync("git config user.name 'Test'", { cwd: projectDir });
+    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: projectDir });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: projectDir });
   });
 
   afterEach(async () => {
@@ -72,7 +72,7 @@ describe("toolGit", () => {
     it("runs git log on repo with commits", async () => {
       await writeFile(join(projectDir, "test.txt"), "hello");
       execSync("git add test.txt", { cwd: projectDir });
-      execSync("git commit -m 'test commit'", { cwd: projectDir });
+      execFileSync("git", ["commit", "-m", "test commit"], { cwd: projectDir });
 
       const result = await toolGit(guard, projectDir, { subcommand: "log" });
       expect(result).toContain("test commit");
@@ -81,7 +81,7 @@ describe("toolGit", () => {
     it("runs git diff", async () => {
       await writeFile(join(projectDir, "test.txt"), "hello");
       execSync("git add test.txt", { cwd: projectDir });
-      execSync("git commit -m 'initial'", { cwd: projectDir });
+      execFileSync("git", ["commit", "-m", "initial"], { cwd: projectDir });
       await writeFile(join(projectDir, "test.txt"), "hello world");
 
       const result = await toolGit(guard, projectDir, { subcommand: "diff" });
@@ -177,7 +177,7 @@ describe("toolGit", () => {
     it("handles args with special characters safely", async () => {
       await writeFile(join(projectDir, "test.txt"), "hello");
       execSync("git add test.txt", { cwd: projectDir });
-      execSync("git commit -m 'test commit'", { cwd: projectDir });
+      execFileSync("git", ["commit", "-m", "test commit"], { cwd: projectDir });
 
       // Args with special chars should be handled safely
       const result = await toolGit(guard, projectDir, {

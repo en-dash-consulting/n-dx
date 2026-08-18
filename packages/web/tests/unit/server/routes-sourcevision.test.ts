@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm, appendFile, utimes } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleSourcevisionRoute } from "../../../src/server/routes-sourcevision.js";
@@ -193,13 +193,13 @@ describe("Sourcevision API routes", () => {
     await writeFile(join(tmpDir, "alpha.txt"), "one\n");
     await writeFile(join(tmpDir, "beta.txt"), "start\n");
     execSync("git add alpha.txt beta.txt", { cwd: tmpDir, stdio: "ignore" });
-    execSync("git commit -m 'base'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "base"], { cwd: tmpDir, stdio: "ignore" });
 
     execSync("git checkout -b feature/pr-md", { cwd: tmpDir, stdio: "ignore" });
     await appendFile(join(tmpDir, "alpha.txt"), "two\nthree\n");
     await writeFile(join(tmpDir, "zeta.txt"), "new\n");
     execSync("git add alpha.txt zeta.txt", { cwd: tmpDir, stdio: "ignore" });
-    execSync("git commit -m 'feature change'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "feature change"], { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(svDir, "pr-markdown.md"), "## Snapshot v1\n\n- `alpha.txt`");
 
     const firstRes = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
@@ -209,7 +209,7 @@ describe("Sourcevision API routes", () => {
 
     await writeFile(join(tmpDir, "late.txt"), "later\n");
     execSync("git add late.txt", { cwd: tmpDir, stdio: "ignore" });
-    execSync("git commit -m 'later change'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "later change"], { cwd: tmpDir, stdio: "ignore" });
     await appendFile(join(tmpDir, "alpha.txt"), "dirty\n");
     await writeFile(join(tmpDir, "scratch.tmp"), "temp\n");
 
@@ -234,7 +234,7 @@ describe("Sourcevision API routes", () => {
     execSync("git config user.name Test", { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(tmpDir, "tracked.txt"), "one\n");
     execSync("git add tracked.txt", { cwd: tmpDir, stdio: "ignore" });
-    execSync("git commit -m 'init'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir, stdio: "ignore" });
 
     const markdownPath = join(svDir, "pr-markdown.md");
     await writeFile(markdownPath, "## stale snapshot");
@@ -253,7 +253,7 @@ describe("Sourcevision API routes", () => {
     execSync("git config user.name Test", { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(tmpDir, "only.txt"), "content\n");
     execSync("git add only.txt", { cwd: tmpDir, stdio: "ignore" });
-    execSync("git commit -m 'init'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir, stdio: "ignore" });
 
     const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
     expect(res.status).toBe(200);
@@ -270,7 +270,7 @@ describe("Sourcevision API routes", () => {
     execSync("git config user.name Test", { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(tmpDir, "only.txt"), "content\n");
     execSync("git add only.txt", { cwd: tmpDir, stdio: "ignore" });
-    execSync("git commit -m 'init'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(svDir, "pr-markdown.md"), "## Existing Summary\n\n- fallback");
 
     const res = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown`);
@@ -291,7 +291,7 @@ describe("Sourcevision API routes", () => {
     execSync("git config user.name Test", { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(tmpDir, "tracked.txt"), "one\n");
     execSync("git add tracked.txt", { cwd: tmpDir, stdio: "ignore" });
-    execSync("git commit -m 'init'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir, stdio: "ignore" });
 
     const beforeRes = await fetch(`http://127.0.0.1:${port}/api/sv/pr-markdown/state`);
     const before = await beforeRes.json();
