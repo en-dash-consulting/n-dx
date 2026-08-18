@@ -231,7 +231,7 @@ describe("validateCompletion", () => {
     expect(result.reason).toBe("Tests failed: Command failed with exit code 1");
   });
 
-  it("forwards custom timeout to git and test commands", async () => {
+  it("runs both git diff and the test command", async () => {
     const { validateCompletion } = await import("../../../src/agent/completion.js");
 
     let callCount = 0;
@@ -251,23 +251,11 @@ describe("validateCompletion", () => {
       timeout: 60_000,
     });
 
-    // Both git diff and test command should receive the custom timeout
     expect(mockExecFile.mock.calls).toHaveLength(2);
-    const gitOpts = mockExecFile.mock.calls[0][2] as { timeout: number };
-    const testOpts = mockExecFile.mock.calls[1][2] as { timeout: number };
-    expect(gitOpts.timeout).toBe(60_000);
-    expect(testOpts.timeout).toBe(60_000);
-  });
-
-  it("uses default timeout when none specified", async () => {
-    const { validateCompletion } = await import("../../../src/agent/completion.js");
-
-    mockExecFileResult(" src/foo.ts | 5 +++--\n");
-
-    await validateCompletion("/project");
-
-    const opts = mockExecFile.mock.calls[0][2] as { timeout: number };
-    expect(opts.timeout).toBe(30_000);
+    // The timeout is no longer observable at this boundary: exec keeps the timer
+    // itself so a timeout can kill the command's whole tree. Propagation is
+    // asserted in tests/unit/validation/completion-timeout.test.ts, which mocks
+    // the exec module rather than node:child_process.
   });
 
   it("passes projectDir as cwd to git diff", async () => {

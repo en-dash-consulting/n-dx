@@ -32,6 +32,7 @@ import type { ChildProcess, StdioOptions } from "node:child_process";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { logCliInvocation } from "./cli-log.js";
+import { terminateProcessTree, treeKillSpawnOptions } from "./process-tree.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -56,6 +57,20 @@ export interface ExecOptions {
   maxBuffer?: number;
   /** Environment variables for the child process. Defaults to inheriting parent env. */
   env?: NodeJS.ProcessEnv;
+  /**
+   * On timeout, terminate the command's whole process tree rather than only the
+   * process that was spawned. Defaults to true.
+   *
+   * Opt out only when the child must stay in this process's own process group —
+   * e.g. it needs to receive the terminal's Ctrl-C alongside the parent. Opting
+   * out means a timeout may leave descendants running.
+   */
+  treeKill?: boolean;
+  /**
+   * @internal Override platform detection — for unit tests only.
+   * Production callers must never pass this.
+   */
+  _platform?: NodeJS.Platform;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,39 +88,94 @@ const DEFAULT_MAX_BUFFER = 1024 * 1024; // 1 MiB
  *
  * This is the primary abstraction — all other helpers build on it.
  * Resolves (never rejects) so callers can inspect exitCode/error directly.
+ *
+ * ## Timeout semantics
+ *
+ * A reported timeout means the command has actually stopped, descendants
+ * included. Getting there means NOT using execFile's own `timeout` option: that
+ * signals the spawned process only, so anything it had started kept running —
+ * still holding handles, still writing — while the caller had already been told
+ * the command was done. See {@link terminateProcessTree}; opt out with
+ * `treeKill: false`.
+ *
+ * `exitCode: null` remains the timeout signal.
  */
 export function exec(
   cmd: string,
   args: string[],
   opts: ExecOptions,
 ): Promise<ExecResult> {
-  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env } = opts;
+  const {
+    cwd,
+    timeout,
+    maxBuffer = DEFAULT_MAX_BUFFER,
+    env,
+    treeKill = true,
+    _platform = process.platform as NodeJS.Platform,
+  } = opts;
 
   return new Promise((resolve) => {
-    const child = execFile(cmd, args, { cwd, timeout, maxBuffer, env }, (
-      error,
-      stdout,
-      stderr,
-    ) => {
-      const isTimeout = error
-        ? (error as NodeJS.ErrnoException & { code?: number | string }).code === "ETIMEDOUT" ||
-          (error as { killed?: boolean }).killed === true
-        : false;
+    let timedOut = false;
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-      resolve({
-        stdout: (stdout ?? "").toString(),
-        stderr: (stderr ?? "").toString(),
-        exitCode:
-          error
-            ? (isTimeout
+    const finish = (result: ExecResult): void => {
+      if (timer) clearTimeout(timer);
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    // The child is spawned as a process-group leader on POSIX so the group kill
+    // can reach its descendants. On Windows this adds nothing (see
+    // treeKillSpawnOptions) and would cost libuv's job-object protection.
+    const child = execFile(
+      cmd,
+      args,
+      { cwd, maxBuffer, env, ...(treeKill ? treeKillSpawnOptions(_platform) : {}) },
+      (error, stdout, stderr) => {
+        // `exitCode: null` means "killed", per ExecResult. Our own timer is one
+        // way that happens; a signal from outside this process is another, and it
+        // reports the same way it always did.
+        const killed = error
+          ? (error as NodeJS.ErrnoException & { code?: number | string }).code === "ETIMEDOUT" ||
+            (error as { killed?: boolean }).killed === true
+          : false;
+
+        finish({
+          stdout: (stdout ?? "").toString(),
+          stderr: (stderr ?? "").toString(),
+          exitCode:
+            timedOut || killed
               ? null
-              : typeof (error as { code?: number }).code === "number"
-                ? ((error as { code?: number }).code ?? 1)
-                : 1)
-            : 0,
-        error: error as Error | null,
-      });
-    });
+              : error
+                ? typeof (error as { code?: number }).code === "number"
+                  ? ((error as { code?: number }).code ?? 1)
+                  : 1
+                : 0,
+          error: (error as Error | null) ?? null,
+        });
+      },
+    );
+
+    if (timeout > 0) {
+      timer = setTimeout(() => {
+        timedOut = true;
+        void (async () => {
+          if (treeKill) {
+            await terminateProcessTree(child, { platform: _platform });
+          } else {
+            child.kill("SIGKILL");
+          }
+          // Normally the execFile callback has already fired by now (the tree is
+          // gone, so its pipes closed) and this is a no-op. It is the backstop
+          // for a kill that could not finish the job: resolve rather than hang,
+          // with whatever the callback has not yet delivered left empty.
+          finish({ stdout: "", stderr: "", exitCode: null, error: null });
+        })();
+      }, timeout);
+    }
+
     // Close the child's stdin immediately. `execFile` pipes stdio by default
     // but the parent never writes anything — leaving stdin open makes any
     // child that reads from stdin (e.g. `rex add` calling readStdin() in a

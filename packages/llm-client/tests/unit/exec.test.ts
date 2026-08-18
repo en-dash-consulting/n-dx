@@ -88,18 +88,62 @@ describe("exec", () => {
     expect(result.error).toBe(err);
   });
 
-  it("passes cwd, timeout, and maxBuffer to execFile", async () => {
+  it("passes cwd and maxBuffer to execFile but keeps the timeout itself", async () => {
     mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
       (callback as Function)(null, "", "");
       return {} as ReturnType<typeof execFile>;
     });
 
-    await exec("ls", ["-la"], { cwd: "/home", timeout: 10000, maxBuffer: 2048 });
+    await exec("ls", ["-la"], {
+      cwd: "/home",
+      timeout: 10000,
+      maxBuffer: 2048,
+      _platform: "linux",
+    });
 
+    // `timeout` is deliberately NOT forwarded. execFile's timeout signals only
+    // the process it spawned, leaving that process's own children running — so
+    // exec owns the timer and kills the tree instead. `detached` makes the child
+    // a process-group leader, which is what lets the group kill reach them.
     expect(mockExecFile).toHaveBeenCalledWith(
       "ls",
       ["-la"],
-      { cwd: "/home", timeout: 10000, maxBuffer: 2048 },
+      { cwd: "/home", maxBuffer: 2048, env: undefined, detached: true },
+      expect.any(Function),
+    );
+  });
+
+  it("does not ask for a process group on Windows", async () => {
+    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+      (callback as Function)(null, "", "");
+      return {} as ReturnType<typeof execFile>;
+    });
+
+    await exec("ls", ["-la"], { cwd: "/home", timeout: 10000, _platform: "win32" });
+
+    // Windows has no process groups, and `detached` there means "new console" —
+    // it would also take the child out of libuv's job object. taskkill /T walks
+    // the tree by pid regardless.
+    expect(mockExecFile).toHaveBeenCalledWith(
+      "ls",
+      ["-la"],
+      { cwd: "/home", maxBuffer: 1024 * 1024, env: undefined },
+      expect.any(Function),
+    );
+  });
+
+  it("leaves the child in this process's group when treeKill is off", async () => {
+    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+      (callback as Function)(null, "", "");
+      return {} as ReturnType<typeof execFile>;
+    });
+
+    await exec("ls", [], { cwd: "/tmp", timeout: 5000, treeKill: false, _platform: "linux" });
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      "ls",
+      [],
+      { cwd: "/tmp", maxBuffer: 1024 * 1024, env: undefined },
       expect.any(Function),
     );
   });
@@ -110,14 +154,31 @@ describe("exec", () => {
       return {} as ReturnType<typeof execFile>;
     });
 
-    await exec("ls", [], { cwd: "/tmp", timeout: 5000 });
+    await exec("ls", [], { cwd: "/tmp", timeout: 5000, _platform: "win32" });
 
     expect(mockExecFile).toHaveBeenCalledWith(
       "ls",
       [],
-      { cwd: "/tmp", timeout: 5000, maxBuffer: 1024 * 1024 },
+      { cwd: "/tmp", maxBuffer: 1024 * 1024, env: undefined },
       expect.any(Function),
     );
+  });
+
+  it("gives up on its own timer when the command never finishes", async () => {
+    // The timeout is no longer execFile's, so something has to prove ours still
+    // fires. A child that never calls back would hang forever without it.
+    mockExecFile.mockImplementation(() => ({}) as ReturnType<typeof execFile>);
+
+    vi.useFakeTimers();
+    try {
+      const pending = exec("sleep", ["600"], { cwd: "/tmp", timeout: 5000 });
+      await vi.advanceTimersByTimeAsync(5000);
+      const result = await pending;
+
+      expect(result.exitCode).toBe(null);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("handles null stdout/stderr gracefully", async () => {
@@ -170,7 +231,10 @@ describe("execShellCmd", () => {
     expect(mockExecFile).toHaveBeenCalledWith(
       "sh",
       ["-c", "echo hello | head"],
-      expect.objectContaining({ cwd: "/tmp", timeout: 5000 }),
+      // No `timeout` key: exec owns the timer so it can kill the tree. A shell is
+      // the case that most needs it — `sh` dies on signal while the command it
+      // started does not.
+      expect.objectContaining({ cwd: "/tmp" }),
       expect.any(Function),
     );
   });

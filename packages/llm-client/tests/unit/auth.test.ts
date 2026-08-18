@@ -48,10 +48,14 @@ describe("detectCliAvailability", () => {
 
     const result = await detectCliAvailability({ claudeConfig: {} });
     expect(result).toBe(true);
+    // The 5s bound is still requested, but it is no longer visible here: exec
+    // keeps the timer itself so a timeout can kill the command's whole tree
+    // rather than just the process it spawned. The bound is covered in
+    // exec.test.ts ("gives up on its own timer...").
     expect(mockExecFile).toHaveBeenCalledWith(
       "claude",
       ["--version"],
-      expect.objectContaining({ timeout: 5000 }),
+      expect.any(Object),
       expect.any(Function),
     );
   });

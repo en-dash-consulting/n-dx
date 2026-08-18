@@ -2,7 +2,7 @@
 id: "a9951988-b99c-409e-bd55-23f720319bf3"
 level: "task"
 title: "Tree-kill on shell-command timeout: a timed-out command keeps running and keeps writing"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -10,6 +10,9 @@ tags:
   - "hench"
   - "process-lifecycle"
   - "correctness"
+startedAt: "2026-08-18T18:28:16.866Z"
+completedAt: "2026-08-18T18:50:04.677Z"
+endedAt: "2026-08-18T18:50:04.677Z"
 acceptanceCriteria:
   - "A command terminated by timeout leaves no surviving descendant process: a probe like the one above shows the process count returning to its pre-run value"
   - "No file written by the command appears after execShell has returned the timeout message"

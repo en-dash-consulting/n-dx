@@ -32,6 +32,11 @@ const ROOT = join(import.meta.dirname, "../..");
 const ALLOWED = new Set([
   // Foundation abstraction itself (llm-client is the canonical foundation)
   "packages/llm-client/src/exec.ts",
+  // Tree termination — part of the same foundation abstraction. It needs raw
+  // spawn for `taskkill /T /F` (the Windows analogue of signalling a process
+  // group) and cannot route through exec.ts's spawnCli without creating an import
+  // cycle, since exec.ts consumes this module for its timeout kill.
+  "packages/llm-client/src/process-tree.ts",
   // CLI streaming providers — need raw spawn for event-by-event parsing
   "packages/llm-client/src/cli-provider.ts",
   "packages/llm-client/src/codex-cli-provider.ts",

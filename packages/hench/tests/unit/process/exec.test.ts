@@ -45,7 +45,7 @@ describe("exec", () => {
     expect(result.error).toBe(err);
   });
 
-  it("passes cwd, timeout, and maxBuffer to execFile", async () => {
+  it("passes cwd and maxBuffer to execFile but keeps the timeout itself", async () => {
     mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
       (callback as Function)(null, "", "");
       return {} as ReturnType<typeof execFile>;
@@ -53,12 +53,17 @@ describe("exec", () => {
 
     await exec("ls", ["-la"], { cwd: "/home", timeout: 10000, maxBuffer: 2048 });
 
+    // `timeout` is deliberately NOT forwarded: execFile's timeout signals only
+    // the process it spawned, so anything that process started kept running after
+    // the caller was told the command stopped. exec owns the timer and kills the
+    // whole tree instead — see @n-dx/llm-client's process-tree module.
     expect(mockExecFile).toHaveBeenCalledWith(
       "ls",
       ["-la"],
-      { cwd: "/home", timeout: 10000, maxBuffer: 2048 },
+      expect.objectContaining({ cwd: "/home", maxBuffer: 2048 }),
       expect.any(Function),
     );
+    expect(mockExecFile.mock.calls[0]![2]).not.toHaveProperty("timeout");
   });
 });
 
@@ -87,7 +92,9 @@ describe("execShellCmd", () => {
     expect(mockExecFile).toHaveBeenCalledWith(
       "sh",
       ["-c", "echo hello | head"],
-      expect.objectContaining({ cwd: "/tmp", timeout: 5000 }),
+      // No `timeout` key — exec owns the timer. A shell is the case that most
+      // needs it: `sh` dies on signal, the command it started does not.
+      expect.objectContaining({ cwd: "/tmp" }),
       expect.any(Function),
     );
   });

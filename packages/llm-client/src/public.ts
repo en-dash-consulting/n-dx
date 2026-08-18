@@ -276,6 +276,14 @@ export type {
   CliInvocationDiagnosis,
 } from "./exec.js";
 
+// Process-tree termination — a kill that reaches descendants, not just the child.
+export {
+  terminateProcessTree,
+  treeKillSpawnOptions,
+  treeKillCommand,
+} from "./process-tree.js";
+export type { TerminateTreeOptions } from "./process-tree.js";
+
 // Project directory constants
 export { PROJECT_DIRS } from "./project-dirs.js";
 export type { ProjectDir } from "./project-dirs.js";

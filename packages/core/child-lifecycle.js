@@ -187,6 +187,22 @@ async function terminateProcessGroup(child, forceKillTimeoutMs, killGroup) {
 }
 
 /**
+ * The Windows tree-kill command, as argv.
+ *
+ * TWIN: mirrored by `treeKillCommand` in
+ * `packages/llm-client/src/process-tree.ts`. The two exist separately because the
+ * orchestration tier must not import from packages (spawn-only rule) — the same
+ * constraint that forces the `quoteWindowsToken` twin. Any change here MUST be
+ * mirrored there; `tests/unit/tree-kill-parity.test.js` fails if they diverge.
+ *
+ * @param {number} pid
+ * @returns {{ command: string, args: string[] }}
+ */
+export function treeKillCommand(pid) {
+  return { command: "taskkill", args: ["/PID", String(pid), "/T", "/F"] };
+}
+
+/**
  * Windows counterpart to a POSIX process-group kill: `taskkill /T /F`.
  *
  * `/T` terminates the whole tree rooted at the PID, which is the closest
@@ -226,11 +242,8 @@ async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl) {
     // Routed through win-spawn.js rather than a hand-built command line:
     // repo policy (the DEP0190 guard in tests/e2e/architecture-policy.test.js)
     // bans ad-hoc Windows command strings.
-    const killer = spawnCliImpl(
-      "taskkill",
-      ["/PID", String(child.pid), "/T", "/F"],
-      { stdio: "ignore", windowsHide: true },
-    );
+    const { command, args } = treeKillCommand(child.pid);
+    const killer = spawnCliImpl(command, args, { stdio: "ignore", windowsHide: true });
 
     // Bounded: a taskkill that never reports back must not wedge shutdown.
     // Any exit code counts as done — a non-zero status usually means
