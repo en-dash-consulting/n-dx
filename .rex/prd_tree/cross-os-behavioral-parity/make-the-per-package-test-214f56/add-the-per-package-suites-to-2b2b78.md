@@ -17,7 +17,9 @@ blockedBy:
   - "0de02514-ca19-47f0-be65-14a034476b60"
   - "676af18f-c764-45e3-812c-6755fa0004c7"
   - "3be5b199-ad38-404c-93a5-54369508882f"
+  - "8f4878b4-9492-40fe-8256-91b8379221a3"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-18T20:05:19.476Z"
 acceptanceCriteria:
   - "The Windows CI job runs the per-package suites via scripts/run-all-tests.mjs packages"
   - "Neither `pnpm -r run test` nor `--no-bail` is used, so one failing package can neither hide the others nor report green"
