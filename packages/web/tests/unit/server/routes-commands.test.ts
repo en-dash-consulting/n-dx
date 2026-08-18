@@ -543,15 +543,29 @@ describe("commands route — manifest (command reference)", () => {
     expect(all.find((c: Record<string, unknown>) => c.name === "status").status).toBe("available");
   });
 
-  it("marks LLM-requiring commands needs-llm when initialized without a vendor", async () => {
+  it("marks LLM-requiring commands available when initialized without an explicit vendor", async () => {
+    // The CLI resolves an absent llm.vendor to "claude" (config.js
+    // runAuthCheck), so a project that never set a vendor key can still run
+    // every LLM command — the manifest must not report needs-llm for it.
     const { mkdir: md } = await import("node:fs/promises");
     for (const d of [".rex", ".sourcevision", ".hench"]) {
       await md(join(tmpDir, d), { recursive: true });
     }
     const body = await getManifest();
     const all = body.groups.flatMap((g: { commands: Array<Record<string, unknown>> }) => g.commands);
-    expect(all.find((c: Record<string, unknown>) => c.name === "work").status).toBe("needs-llm");
+    expect(all.find((c: Record<string, unknown>) => c.name === "work").status).toBe("available");
     expect(all.find((c: Record<string, unknown>) => c.name === "status").status).toBe("available");
+  });
+
+  it("marks LLM-requiring commands available with an llm section that has only a model", async () => {
+    const { writeFile: wf, mkdir: md } = await import("node:fs/promises");
+    for (const d of [".rex", ".sourcevision", ".hench"]) {
+      await md(join(tmpDir, d), { recursive: true });
+    }
+    await wf(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { claude: { model: "claude-opus-4-6" } } }));
+    const body = await getManifest();
+    const all = body.groups.flatMap((g: { commands: Array<Record<string, unknown>> }) => g.commands);
+    expect(all.find((c: Record<string, unknown>) => c.name === "plan").status).toBe("available");
   });
 });
 

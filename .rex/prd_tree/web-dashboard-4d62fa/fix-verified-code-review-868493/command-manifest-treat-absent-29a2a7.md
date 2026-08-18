@@ -2,8 +2,11 @@
 id: "29a2a782-dfe9-40f6-ad62-1de097395062"
 level: "task"
 title: "Command manifest: treat absent llm.vendor as claude in hasLlmVendor"
-status: "pending"
+status: "completed"
 priority: "critical"
+startedAt: "2026-08-18T21:41:18.055Z"
+completedAt: "2026-08-18T21:44:07.017Z"
+endedAt: "2026-08-18T21:44:07.017Z"
 acceptanceCriteria:
   - "A project whose .n-dx.json lacks llm.vendor shows plan/recommend/add/work/self-heal/pair-programming as available when initialized"
   - "needs-llm renders only when no vendor is resolvable at all"

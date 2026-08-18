@@ -25,7 +25,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { exec as foundationExec } from "@n-dx/llm-client";
@@ -1000,7 +1000,8 @@ interface ManifestGroup {
  * whatever this returns, so new commands appear without UI code changes.
  *
  * `requires: "init"` — needs the tool directories (.rex/.sourcevision/.hench).
- * `requires: "llm"` — additionally needs a configured LLM vendor.
+ * `requires: "llm"` — additionally drives an LLM. Informational: the CLI
+ * resolves an absent llm.vendor to "claude", so this never gates status.
  */
 const COMMAND_MANIFEST: ManifestGroup[] = [
   {
@@ -1044,17 +1045,6 @@ const COMMAND_MANIFEST: ManifestGroup[] = [
   },
 ];
 
-/** Check whether the project has an LLM vendor configured. */
-function hasLlmVendor(projectDir: string): boolean {
-  try {
-    const raw = readFileSync(join(projectDir, ".n-dx.json"), "utf-8");
-    const config = JSON.parse(raw) as { llm?: { vendor?: unknown } };
-    return typeof config.llm?.vendor === "string" && config.llm.vendor.length > 0;
-  } catch {
-    return false;
-  }
-}
-
 /** GET /api/commands/manifest — grouped command reference with availability. */
 function handleManifest(
   _req: IncomingMessage,
@@ -1064,17 +1054,16 @@ function handleManifest(
   const cliName = readCliName(ctx.projectDir);
   const initialized = [".rex", ".sourcevision", ".hench"]
     .every((d) => existsSync(join(ctx.projectDir, d)));
-  const llmConfigured = hasLlmVendor(ctx.projectDir);
 
+  // An LLM vendor is always resolvable: the CLI treats an absent (or empty,
+  // or malformed) llm.vendor as "claude" (config.js runAuthCheck, reshape's
+  // getLLMVendor() ?? "claude"), so an explicit vendor key must not gate
+  // availability — LLM commands run fine on projects that never set one.
+  // "needs-llm" stays in the wire type for when vendor resolution gains a
+  // real failure mode; nothing produces it today.
   const statusFor = (cmd: ManifestCommand): CommandStatus => {
-    if (cmd.requires === "llm") {
-      if (!initialized) return "needs-init";
-      return llmConfigured ? "available" : "needs-llm";
-    }
-    if (cmd.requires === "init") {
-      return initialized ? "available" : "needs-init";
-    }
-    return "available";
+    if (!cmd.requires) return "available";
+    return initialized ? "available" : "needs-init";
   };
 
   jsonResponse(res, 200, {
