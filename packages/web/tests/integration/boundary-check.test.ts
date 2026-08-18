@@ -31,9 +31,24 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 
 const WEB_SRC = join(import.meta.dirname!, "..", "..", "src");
+
+/**
+ * Path of `file` relative to src/, always POSIX-style regardless of host OS.
+ *
+ * Every zone rule below compares this against a literal like "viewer/crash/".
+ * Those literals used to be built with join(…) + "/", which produced
+ * "viewer\crash/" on Windows — a separator that can never appear in a real
+ * path — so nine exemptions silently stopped matching and the checks they guard
+ * ran anyway. Normalising once here lets every comparison use plain forward
+ * slashes, which also matches the import specifiers being inspected (module
+ * paths are forward-slash on every platform).
+ */
+function relPosix(file: string): string {
+  return relative(WEB_SRC, file).split(sep).join("/");
+}
 
 /** Recursively collect all .ts files under a directory. */
 function collectTsFiles(dir: string): string[] {
@@ -87,7 +102,7 @@ describe("server/client boundary", () => {
 
     try {
       for (const file of collectTsFiles(serverDir)) {
-        const rel = relative(WEB_SRC, file);
+        const rel = relPosix(file);
         for (const imp of extractImportPaths(file)) {
           if (imp.includes("/viewer/") || imp.match(/\.\.\/viewer\b/)) {
             violations.push(`${rel} imports "${imp}"`);
@@ -108,22 +123,22 @@ describe("server/client boundary", () => {
 
     try {
       for (const file of collectTsFiles(viewerDir)) {
-        const rel = relative(WEB_SRC, file);
+        const rel = relPosix(file);
         // The gateway itself is allowed to import from outside
-        if (rel === join("viewer", "external.ts")) continue;
+        if (rel === "viewer/external.ts") continue;
 
         // Messaging infrastructure is allowed to import directly from shared/
         // to avoid creating a zone-level dependency inversion through external.ts.
         // The shared/ directory is neutral (neither server nor viewer), so
         // messaging utilities can access it without violating the server/client boundary.
-        const isMessaging = rel.startsWith(join("viewer", "messaging") + "/") ||
-          rel === join("viewer", "messaging");
+        const isMessaging = rel.startsWith("viewer/messaging/") ||
+          rel === "viewer/messaging";
 
         // Crash detection is a standalone module with zero framework dependencies.
         // It imports ViewId directly from shared/ to avoid a bidirectional cycle
         // (crash → external.ts → crash via performance/index.ts re-exports).
-        const isCrash = rel.startsWith(join("viewer", "crash") + "/") ||
-          rel === join("viewer", "crash");
+        const isCrash = rel.startsWith("viewer/crash/") ||
+          rel === "viewer/crash";
 
         for (const imp of extractImportPaths(file)) {
           // Check for direct imports to schema/ from viewer files
@@ -170,10 +185,10 @@ describe("server/client boundary", () => {
 
     try {
       for (const file of collectTsFiles(viewerDir)) {
-        const rel = relative(WEB_SRC, file);
+        const rel = relPosix(file);
 
         for (const zone of BARREL_ZONES) {
-          const zonePrefix = join("viewer", zone) + "/";
+          const zonePrefix = `viewer/${zone}/`;
 
           // Files inside the sub-zone can import freely from siblings
           if (rel.startsWith(zonePrefix)) continue;
@@ -212,7 +227,7 @@ describe("server/client boundary", () => {
 
     try {
       for (const file of collectTsFiles(sharedDir)) {
-        const rel = relative(WEB_SRC, file);
+        const rel = relPosix(file);
         for (const imp of extractImportPaths(file)) {
           if (
             imp.includes("/viewer/") || imp.match(/\.\.\/viewer\b/) ||
@@ -288,10 +303,10 @@ describe("server/client boundary", () => {
 
     try {
       for (const file of collectTsFiles(viewerDir)) {
-        const rel = relative(WEB_SRC, file);
+        const rel = relPosix(file);
 
         // Files inside components/ can import freely from siblings
-        if (rel.startsWith(join("viewer", "components") + "/")) continue;
+        if (rel.startsWith("viewer/components/")) continue;
 
         for (const imp of extractImportPaths(file)) {
           for (const component of componentFiles) {
@@ -330,7 +345,7 @@ describe("server/client boundary", () => {
 
     try {
       for (const file of collectTsFiles(viewerDir)) {
-        const rel = relative(WEB_SRC, file);
+        const rel = relPosix(file);
         for (const imp of extractRuntimeImportPaths(file)) {
           if (imp.includes("/server/") || imp.match(/\.\.\/server\b/)) {
             violations.push(`${rel} imports "${imp}"`);
@@ -363,13 +378,13 @@ describe("server/client boundary", () => {
       for (const dir of ["server", "viewer"]) {
         const base = join(WEB_SRC, dir);
         for (const file of collectTsFiles(base)) {
-          const rel = relative(WEB_SRC, file);
+          const rel = relPosix(file);
 
           // Crash zone exemption (documented cycle avoidance)
-          if (rel.startsWith(join("viewer", "crash") + "/")) continue;
+          if (rel.startsWith("viewer/crash/")) continue;
 
           // Messaging exemption (documented shared/ direct access)
-          if (rel.startsWith(join("viewer", "messaging") + "/")) continue;
+          if (rel.startsWith("viewer/messaging/")) continue;
 
           for (const imp of extractImportPaths(file)) {
             for (const leaf of SHARED_LEAF_FILES) {
@@ -429,7 +444,7 @@ describe("server/client boundary", () => {
             for (const imp of extractImportPaths(file)) {
               // Match both barrel imports (shared/index) and direct imports (shared/<mod>)
               if (imp.includes(`shared/${mod}`) || imp.includes("shared/index")) {
-                const rel = relative(WEB_SRC, file);
+                const rel = relPosix(file);
                 // Extract the top-level zone: "server", "viewer", or "viewer/<subzone>"
                 const parts = rel.split("/");
                 const zone = parts[0] === "viewer" && parts.length > 2
@@ -471,10 +486,10 @@ describe("server/client boundary", () => {
 
     // Files that compose the viewer-prd-interaction zone
     const ZONE_FILES = new Set([
-      join("viewer", "views", "prd.ts"),
-      join("viewer", "components", "prd-tree", "bulk-actions.ts"),
-      join("viewer", "hooks", "use-toast.ts"),
-      join("viewer", "hooks", "use-feature-toggle.ts"),
+      "viewer/views/prd.ts",
+      "viewer/components/prd-tree/bulk-actions.ts",
+      "viewer/hooks/use-toast.ts",
+      "viewer/hooks/use-feature-toggle.ts",
     ]);
 
     // Hook file stems that must stay contained
@@ -482,14 +497,14 @@ describe("server/client boundary", () => {
 
     try {
       for (const file of collectTsFiles(viewerDir)) {
-        const rel = relative(WEB_SRC, file);
+        const rel = relPosix(file);
 
         // Files inside the zone can import freely
         if (ZONE_FILES.has(rel)) continue;
 
         // The hooks barrel (index.ts) re-exports all hooks including contained ones —
         // it is a passthrough, not a consumer
-        if (rel === join("viewer", "hooks", "index.ts")) continue;
+        if (rel === "viewer/hooks/index.ts") continue;
 
         for (const imp of extractImportPaths(file)) {
           for (const hook of CONTAINED_HOOKS) {
@@ -515,7 +530,7 @@ describe("server/client boundary", () => {
 
     try {
       for (const file of collectTsFiles(viewerDir)) {
-        const rel = relative(WEB_SRC, file);
+        const rel = relPosix(file);
         for (const imp of extractImportPaths(file)) {
           if (imp.includes("/server/") || imp.match(/\.\.\/server\b/)) {
             violations.push(`${rel} imports "${imp}"`);
@@ -553,7 +568,7 @@ describe("server/client boundary", () => {
 
     try {
       for (const file of collectTsFiles(serverDir)) {
-        const rel = relative(WEB_SRC, file);
+        const rel = relPosix(file);
         for (const imp of extractImportPaths(file)) {
           if (imp.includes("/viewer/") || imp.match(/\.\.\/viewer\b/)) {
             found.push(`${rel} imports "${imp}"`);
@@ -629,8 +644,8 @@ describe("server/client boundary", () => {
       const violations: string[] = [];
       try {
         for (const file of collectTsFiles(viewerDir)) {
-          const rel = relative(WEB_SRC, file);
-          if (rel.startsWith(join("viewer", "hooks") + "/")) continue;
+          const rel = relPosix(file);
+          if (rel.startsWith("viewer/hooks/")) continue;
 
           for (const imp of extractImportPaths(file)) {
             if (
@@ -683,10 +698,10 @@ describe("server/client boundary", () => {
 
     try {
       for (const file of collectTsFiles(viewerDir)) {
-        const rel = relative(WEB_SRC, file);
+        const rel = relPosix(file);
 
         // Files inside hooks/ can import from siblings freely
-        if (rel.startsWith(join("viewer", "hooks") + "/")) continue;
+        if (rel.startsWith("viewer/hooks/")) continue;
 
         for (const imp of extractImportPaths(file)) {
           for (const hook of hookLeafFiles) {
@@ -794,10 +809,10 @@ describe("server/client boundary", () => {
     // to leaf-import ui-hub component files.
     try {
       for (const file of collectTsFiles(viewerDir)) {
-        const rel = relative(WEB_SRC, file);
+        const rel = relPosix(file);
 
         // Files inside the components/ directory can import siblings freely
-        if (rel.startsWith(join("viewer", "components") + "/")) continue;
+        if (rel.startsWith("viewer/components/")) continue;
 
         for (const imp of extractImportPaths(file)) {
           for (const leaf of UI_HUB_LEAVES) {

@@ -2,7 +2,7 @@
 id: "30235fba-a44c-493e-b58a-33a9f86e5743"
 level: "task"
 title: "Fix the hardcoded \"/\" after join() in web's boundary-check exemptions"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -12,6 +12,11 @@ tags:
   - "paths"
   - "architecture"
 source: "exploration-2026-08-18"
+startedAt: "2026-08-18T16:58:43.027Z"
+completedAt: "2026-08-18T17:03:21.446Z"
+endedAt: "2026-08-18T17:03:21.446Z"
+resolutionType: "code-change"
+resolutionDetail: "Both failures fixed; web 6 -> 4 failures (3 -> 2 files) with no production change (empty `git diff packages/web/src`), which is also how AC4 was met — the documented crash/ and messaging/ bypasses pass without touching any import. Chose normalise-at-the-source over patching nine comparisons: one relPosix() helper (relative(WEB_SRC,file).split(sep).join(\"/\")) applied at all 14 rel-computation sites, with every comparison literal converted to forward slashes. The scope was larger than the nine reported sites and missing the extras would have created NEW false positives: normalising rel invalidates every join()-built comparison, so 17 literals needed converting including four that previously WORKED (the ZONE_FILES Set checked with .has(rel), and the three `rel === join(...)` equality checks). Filesystem join() calls were deliberately left OS-native since they feed readdirSync/readFileSync. AC6 proven by injecting a real violation — a direct ../../shared/view-id.js import into viewer/views/analysis.ts, in neither exempt zone — which both rules flagged; reverted from backup with the diff confirmed empty. Grepped for the same pattern in ci.js and root e2e suites: none, so the class was confined to this file. POSIX preserved by construction (split(sep).join(\"/\") is a no-op when sep is \"/\"), stated as reasoning since no POSIX host was available. Side benefit: violation messages now print forward-slash paths identically on every platform. Typecheck clean; boundary-check 15/15; root suite 91 files / 2070 passed unaffected. web's remaining 4 are graph-view (3be5b199) and the intermittent EBUSY pair (8e79620a)."
 acceptanceCriteria:
   - "Both currently-failing boundary-check assertions pass on Windows"
   - "All nine join()+\"/\" sites are corrected, not just the two that surface today"
