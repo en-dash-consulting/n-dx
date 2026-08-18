@@ -255,15 +255,18 @@ describe("toolRunCommand", () => {
       const elapsed = Date.now() - start;
 
       expect(result).toContain("timed out");
-      // Must return on the 200ms timeout, not by waiting for the command out.
-      // Expressed as a fraction of TIMEOUT_COMMAND_LIFETIME_MS rather than as a
-      // magic number: this bound's only job is to sit between the two outcomes
-      // (~200ms vs ~60s), so it must move with the lifetime it discriminates
-      // against. A tenth of it leaves 30x slack for a loaded machine while still
-      // sitting 10x below the failure value — and it cannot be scaled through
-      // BUDGET_MULTIPLIER into meaninglessness, which is what would happen to a
-      // standalone number here.
-      expect(elapsed).toBeLessThan(TIMEOUT_COMMAND_LIFETIME_MS / 10);
+      // Must return on the timeout, not on the command finishing. The bound is
+      // derived from the command's own lifetime rather than hardcoded: what
+      // matters is "far sooner than 60s", not any particular millisecond count.
+      // A fixed 2000ms was cutting it close — the tree kill spawns taskkill on
+      // Windows, which took ~660ms of that budget on a loaded dev machine and
+      // would take longer on a 2-core runner.
+      //
+      // This is also why the bound must not be scaled through BUDGET_MULTIPLIER:
+      // its whole job is to sit between the two outcomes (~200ms vs ~60s), so it
+      // has to move with the lifetime it discriminates against. Scaling it
+      // independently lifts it past that lifetime and the assertion tests nothing.
+      expect(elapsed).toBeLessThan(TIMEOUT_COMMAND_LIFETIME_MS / 4);
     });
   });
 

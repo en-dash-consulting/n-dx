@@ -193,43 +193,183 @@ async function waitForGroupExit(
   }
 }
 
+/** Run a command and return its stdout, bounded. Empty string on any failure. */
+function captureStdout(
+  spawnImpl: typeof spawn,
+  command: string,
+  args: string[],
+  timeoutMs: number,
+): Promise<string> {
+  return new Promise((resolve) => {
+    let out = "";
+    let settled = false;
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      resolve(out);
+    };
+
+    try {
+      const proc = spawnImpl(command, args, { stdio: ["ignore", "pipe", "ignore"] });
+      proc.stdout?.on("data", (chunk: Buffer) => {
+        out += chunk.toString();
+      });
+      proc.once("close", finish);
+      proc.once("error", () => {
+        out = "";
+        finish();
+      });
+      setTimeout(finish, timeoutMs);
+    } catch {
+      finish();
+    }
+  });
+}
+
 /**
- * POSIX: signal the whole process group, escalating SIGTERM → SIGKILL.
+ * Every descendant pid of `rootPid`, deepest last.
  *
- * Only reaches grandchildren when the child was spawned with
- * {@link treeKillSpawnOptions}, which makes it a group leader.
+ * `ps -A -o pid=,ppid=` is the portable form: the `=` suppresses headers, and it
+ * behaves the same on Linux and macOS. Reading /proc would avoid the spawn but is
+ * Linux-only.
+ *
+ * Used because a process group is not always available — see
+ * {@link terminatePosixTree}.
  */
-async function terminateProcessGroup(
+async function posixDescendants(
+  rootPid: number,
+  spawnImpl: typeof spawn,
+  timeoutMs: number,
+): Promise<number[]> {
+  const listing = await captureStdout(spawnImpl, "ps", ["-A", "-o", "pid=,ppid="], timeoutMs);
+  if (!listing) return [];
+
+  const childrenOf = new Map<number, number[]>();
+  for (const line of listing.split("\n")) {
+    const [pidText, ppidText] = line.trim().split(/\s+/);
+    const pid = Number.parseInt(pidText ?? "", 10);
+    const ppid = Number.parseInt(ppidText ?? "", 10);
+    if (!Number.isInteger(pid) || !Number.isInteger(ppid)) continue;
+    const siblings = childrenOf.get(ppid);
+    if (siblings) siblings.push(pid);
+    else childrenOf.set(ppid, [pid]);
+  }
+
+  // Breadth-first, so the returned order is shallowest-first; callers signal in
+  // reverse to take leaves before their parents.
+  const found: number[] = [];
+  const queue = [rootPid];
+  const seen = new Set<number>([rootPid]);
+  while (queue.length > 0) {
+    const next = queue.shift()!;
+    for (const kid of childrenOf.get(next) ?? []) {
+      if (seen.has(kid)) continue;
+      seen.add(kid);
+      found.push(kid);
+      queue.push(kid);
+    }
+  }
+  return found;
+}
+
+/** Whether a single pid is still alive. Signal 0 is a probe, not a kill. */
+function pidIsAlive(
+  pid: number,
+  signalPid: NonNullable<TerminateTreeOptions["killGroup"]>,
+): boolean {
+  try {
+    signalPid(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * POSIX: signal the whole process group, then sweep any descendant the group kill
+ * could not reach.
+ *
+ * THE GROUP IS OFTEN NOT THERE. A group kill only works when the child was
+ * spawned with {@link treeKillSpawnOptions}, and `child_process.execFile` cannot
+ * do that: it builds its own options object for `spawn` and silently drops
+ * anything outside its curated set, `detached` included. (Verified: passing
+ * `stdio: "ignore"` to execFile is likewise ignored and the streams are still
+ * piped.) So for every caller that buffers output through execFile, `kill(-pid)`
+ * fails with ESRCH and the descendants survive — which is exactly what shipped
+ * and what ubuntu CI caught: a timed-out command kept writing 13 more files.
+ *
+ * The sweep therefore does not depend on how the child was spawned. The group
+ * kill is kept as the fast path because it is atomic and cheap when available.
+ */
+async function terminatePosixTree(
   child: ChildProcess,
   forceKillTimeoutMs: number,
   killGroup: NonNullable<TerminateTreeOptions["killGroup"]>,
+  spawnImpl: typeof spawn,
 ): Promise<void> {
   if (!isChildRunning(child)) return;
   if (!child.pid) return terminateChildProcess(child, forceKillTimeoutMs);
 
-  const pgid = -child.pid;
+  const rootPid = child.pid;
+  const pgid = -rootPid;
 
+  // Collect descendants BEFORE signalling: once the direct child dies its
+  // children are reparented to init and the pid->ppid links to it are gone.
+  const descendants = await posixDescendants(rootPid, spawnImpl, forceKillTimeoutMs);
+
+  let groupSignalled = false;
   try {
     killGroup(pgid, "SIGTERM");
+    groupSignalled = true;
   } catch {
-    // Group kill unavailable (child already exited, or it was not spawned
-    // detached so there is no group of its own) — deal with the direct child.
-    return terminateChildProcess(child, forceKillTimeoutMs);
+    // No group of its own (the common execFile case) or already exited. The
+    // descendant sweep below covers it; do not return early.
   }
 
-  // Wait on the GROUP, not the direct child. A shell commonly exits promptly on
-  // SIGTERM while the command it started ignores it, so the child's exit says
-  // nothing about whether the tree is gone.
-  await waitForGroupExit(pgid, killGroup, forceKillTimeoutMs);
-  if (!groupHasMembers(pgid, killGroup)) return;
-
-  try {
-    killGroup(pgid, "SIGKILL");
-  } catch {
-    // Group may have drained between the probe and the signal — ignore.
+  if (groupSignalled) {
+    // Wait on the GROUP, not the direct child. A shell commonly exits promptly on
+    // SIGTERM while the command it started ignores it, so the child's exit says
+    // nothing about whether the tree is gone.
+    await waitForGroupExit(pgid, killGroup, forceKillTimeoutMs);
+    if (groupHasMembers(pgid, killGroup)) {
+      try {
+        killGroup(pgid, "SIGKILL");
+      } catch {
+        // Group may have drained between the probe and the signal — ignore.
+      }
+      await waitForGroupExit(pgid, killGroup, forceKillTimeoutMs);
+    }
   }
 
-  await waitForGroupExit(pgid, killGroup, forceKillTimeoutMs);
+  // Sweep whatever the group kill did not reach, leaves before parents so a
+  // parent cannot spawn a replacement after its child was taken.
+  const stragglers = [...descendants].reverse().filter((pid) => pidIsAlive(pid, killGroup));
+  for (const pid of stragglers) {
+    try {
+      killGroup(pid, "SIGTERM");
+    } catch {
+      // Already gone.
+    }
+  }
+
+  if (stragglers.length > 0) {
+    const deadline = Date.now() + forceKillTimeoutMs;
+    while (Date.now() < deadline && stragglers.some((pid) => pidIsAlive(pid, killGroup))) {
+      await delay(Math.min(GROUP_POLL_INTERVAL_MS, Math.max(0, deadline - Date.now())));
+    }
+    for (const pid of stragglers) {
+      if (!pidIsAlive(pid, killGroup)) continue;
+      try {
+        killGroup(pid, "SIGKILL");
+      } catch {
+        // Already gone.
+      }
+    }
+  }
+
+  // The direct child last: it may have ignored the group signal, and it is the
+  // one whose exit the caller is awaiting.
+  await terminateChildProcess(child, forceKillTimeoutMs);
 }
 
 /**
@@ -303,6 +443,6 @@ export async function terminateProcessTree(
   if (!isChildRunning(child)) return;
 
   return supportsProcessGroups(platform)
-    ? terminateProcessGroup(child, forceKillTimeoutMs, killGroup)
+    ? terminatePosixTree(child, forceKillTimeoutMs, killGroup, spawnImpl)
     : terminateWindowsTree(child, forceKillTimeoutMs, spawnImpl);
 }

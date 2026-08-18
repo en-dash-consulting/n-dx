@@ -95,24 +95,119 @@ describe("treeKillCommand", () => {
 });
 
 describe("terminateProcessTree — POSIX", () => {
+  /**
+   * A `ps -A -o pid=,ppid=` stand-in. Injected in every POSIX case: without it
+   * these tests shell out to the host's real ps, which makes them depend on the
+   * machine's actual process table.
+   */
+  function fakePs(listing: string) {
+    const calls: string[][] = [];
+    const impl = ((command: string, args: string[]) => {
+      calls.push([command, ...args]);
+      const proc = new EventEmitter() as EventEmitter & { stdout: EventEmitter };
+      proc.stdout = new EventEmitter();
+      setTimeout(() => {
+        proc.stdout.emit("data", Buffer.from(listing));
+        proc.emit("close", 0);
+      }, 1);
+      return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
+    }) as unknown as typeof import("node:child_process").spawn;
+    return { impl, calls };
+  }
+
+  /** No descendants — the root pid is the only entry. */
+  const NO_CHILDREN = " 4242     1\n";
+
   const posix = { platform: "linux" as NodeJS.Platform, forceKillTimeoutMs: 150 };
 
-  it("signals the process group, not the child", async () => {
+  it("signals the process group, not just the child", async () => {
     const child = fakeChild(4242);
     const group = fakeGroup({ drainsOn: "SIGTERM" });
 
-    await terminateProcessTree(child, { ...posix, killGroup: group.kill });
+    await terminateProcessTree(child, {
+      ...posix,
+      killGroup: group.kill,
+      spawnImpl: fakePs(NO_CHILDREN).impl,
+    });
 
     // Negative pid is what makes this reach descendants rather than just the child.
-    expect(group.calls).toEqual([{ pid: -4242, signal: "SIGTERM" }]);
-    expect(child.kills).toEqual([]);
+    expect(group.calls[0]).toEqual({ pid: -4242, signal: "SIGTERM" });
+    // The direct child is still dealt with afterwards: it may have ignored the
+    // group signal, and it is the handle whose exit the caller awaits.
+    expect(child.kills).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+
+  it("sweeps descendants when there is no process group to signal", async () => {
+    // The execFile case: `detached` never reaches spawn, so kill(-pid) fails with
+    // ESRCH and the group phase is skipped entirely. Descendants must still die —
+    // this is the exact regression ubuntu CI caught.
+    const child = fakeChild(4242);
+    const alive = new Set([4242, 5000, 6000]);
+    const signalled: { pid: number; signal: NodeJS.Signals | 0 }[] = [];
+    const killGroup = (pid: number, signal: NodeJS.Signals | 0): void => {
+      if (pid < 0) throw new Error("ESRCH"); // not a group leader
+      if (signal === 0) {
+        if (!alive.has(pid)) throw new Error("ESRCH");
+        return;
+      }
+      signalled.push({ pid, signal });
+      alive.delete(pid);
+    };
+
+    // 5000 is a child of the root, 6000 a child of 5000.
+    const ps = fakePs(" 4242     1\n 5000  4242\n 6000  5000\n 7000     1\n");
+    await terminateProcessTree(child, { ...posix, killGroup, spawnImpl: ps.impl });
+
+    expect(ps.calls[0]).toEqual(["ps", "-A", "-o", "pid=,ppid="]);
+    // Leaves before parents, and the unrelated pid 7000 is untouched.
+    expect(signalled.map((s) => s.pid)).toEqual([6000, 5000]);
+    expect(signalled.every((s) => s.signal === "SIGTERM")).toBe(true);
+  });
+
+  it("escalates a straggler that ignores SIGTERM", async () => {
+    const child = fakeChild(4242);
+    const stubborn = 5000;
+    const signalled: { pid: number; signal: NodeJS.Signals | 0 }[] = [];
+    const killGroup = (pid: number, signal: NodeJS.Signals | 0): void => {
+      if (pid < 0) throw new Error("ESRCH");
+      if (signal === 0) return; // never dies, so the probe always succeeds
+      signalled.push({ pid, signal });
+    };
+
+    await terminateProcessTree(child, {
+      ...posix,
+      killGroup,
+      spawnImpl: fakePs(` 4242     1\n ${stubborn}  4242\n`).impl,
+    });
+
+    expect(signalled).toEqual([
+      { pid: stubborn, signal: "SIGTERM" },
+      { pid: stubborn, signal: "SIGKILL" },
+    ]);
+  });
+
+  it("survives a ps that is unavailable or unparsable", async () => {
+    // No ps on PATH, or output in an unexpected shape: the direct child must still
+    // be terminated rather than the whole call throwing.
+    const child = fakeChild(4242);
+    const spawnImpl = (() => {
+      throw new Error("ENOENT");
+    }) as unknown as typeof import("node:child_process").spawn;
+
+    await terminateProcessTree(child, {
+      ...posix,
+      killGroup: fakeGroup({ drainsOn: "SIGTERM" }).kill,
+      spawnImpl,
+    });
+
+    expect(child.kills).toEqual(["SIGTERM", "SIGKILL"]);
   });
 
   it("escalates to SIGKILL when the group outlives SIGTERM", async () => {
     const child = fakeChild(4242);
     const group = fakeGroup({ drainsOn: "SIGKILL" });
 
-    await terminateProcessTree(child, { ...posix, killGroup: group.kill });
+    await terminateProcessTree(child, { ...posix, killGroup: group.kill, spawnImpl: fakePs(NO_CHILDREN).impl });
 
     expect(group.calls.map((c) => c.signal)).toEqual(["SIGTERM", "SIGKILL"]);
   });
@@ -124,7 +219,7 @@ describe("terminateProcessTree — POSIX", () => {
     const child = fakeChild(4242);
     const group = fakeGroup({ drainsOn: "SIGKILL" });
 
-    const done = terminateProcessTree(child, { ...posix, killGroup: group.kill });
+    const done = terminateProcessTree(child, { ...posix, killGroup: group.kill, spawnImpl: fakePs(NO_CHILDREN).impl });
     child.simulateExit();
     await done;
 
@@ -138,7 +233,7 @@ describe("terminateProcessTree — POSIX", () => {
       throw new Error("EPERM");
     });
 
-    await terminateProcessTree(child, { ...posix, killGroup });
+    await terminateProcessTree(child, { ...posix, killGroup, spawnImpl: fakePs(NO_CHILDREN).impl });
 
     expect(child.kills).toEqual(["SIGTERM", "SIGKILL"]);
   });
@@ -147,7 +242,7 @@ describe("terminateProcessTree — POSIX", () => {
     const child = fakeChild(undefined);
     const group = fakeGroup({ drainsOn: "SIGTERM" });
 
-    await terminateProcessTree(child, { ...posix, killGroup: group.kill });
+    await terminateProcessTree(child, { ...posix, killGroup: group.kill, spawnImpl: fakePs(NO_CHILDREN).impl });
 
     expect(group.calls).toEqual([]);
     expect(child.kills).toEqual(["SIGTERM", "SIGKILL"]);

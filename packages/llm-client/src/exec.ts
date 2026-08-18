@@ -32,7 +32,7 @@ import type { ChildProcess, StdioOptions } from "node:child_process";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { logCliInvocation } from "./cli-log.js";
-import { terminateProcessTree, treeKillSpawnOptions } from "./process-tree.js";
+import { terminateProcessTree } from "./process-tree.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -126,13 +126,15 @@ export function exec(
       resolve(result);
     };
 
-    // The child is spawned as a process-group leader on POSIX so the group kill
-    // can reach its descendants. On Windows this adds nothing (see
-    // treeKillSpawnOptions) and would cost libuv's job-object protection.
+    // NO `detached` here, deliberately. execFile builds its own options object for
+    // spawn and drops anything outside its curated set, so `detached` never
+    // arrives and the child is not a process-group leader — an earlier version
+    // passed it and looked correct while POSIX descendants survived every timeout.
+    // terminateProcessTree does not rely on a group existing; see its docblock.
     const child = execFile(
       cmd,
       args,
-      { cwd, maxBuffer, env, ...(treeKill ? treeKillSpawnOptions(_platform) : {}) },
+      { cwd, maxBuffer, env },
       (error, stdout, stderr) => {
         // `exitCode: null` means "killed", per ExecResult. Our own timer is one
         // way that happens; a signal from outside this process is another, and it

@@ -103,36 +103,36 @@ describe("exec", () => {
 
     // `timeout` is deliberately NOT forwarded. execFile's timeout signals only
     // the process it spawned, leaving that process's own children running — so
-    // exec owns the timer and kills the tree instead. `detached` makes the child
-    // a process-group leader, which is what lets the group kill reach them.
+    // exec owns the timer and kills the tree instead.
     expect(mockExecFile).toHaveBeenCalledWith(
       "ls",
       ["-la"],
-      { cwd: "/home", maxBuffer: 2048, env: undefined, detached: true },
+      { cwd: "/home", maxBuffer: 2048, env: undefined },
       expect.any(Function),
     );
   });
 
-  it("does not ask for a process group on Windows", async () => {
-    mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
-      (callback as Function)(null, "", "");
-      return {} as ReturnType<typeof execFile>;
-    });
+  it("never asks execFile for a detached child, on any platform", async () => {
+    // execFile builds its own options object for spawn and drops anything outside
+    // its curated set, so `detached` would be silently ignored. An earlier version
+    // passed it and read as correct while POSIX descendants survived every
+    // timeout — the group kill had no group to signal. Asserted on both platforms
+    // so nobody reintroduces it believing it does something.
+    for (const platform of ["linux", "win32"] as const) {
+      mockExecFile.mockClear();
+      mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
+        (callback as Function)(null, "", "");
+        return {} as ReturnType<typeof execFile>;
+      });
 
-    await exec("ls", ["-la"], { cwd: "/home", timeout: 10000, _platform: "win32" });
+      await exec("ls", ["-la"], { cwd: "/home", timeout: 10000, _platform: platform });
 
-    // Windows has no process groups, and `detached` there means "new console" —
-    // it would also take the child out of libuv's job object. taskkill /T walks
-    // the tree by pid regardless.
-    expect(mockExecFile).toHaveBeenCalledWith(
-      "ls",
-      ["-la"],
-      { cwd: "/home", maxBuffer: 1024 * 1024, env: undefined },
-      expect.any(Function),
-    );
+      expect(mockExecFile.mock.calls[0]![2]).not.toHaveProperty("detached");
+    }
   });
 
-  it("leaves the child in this process's group when treeKill is off", async () => {
+  it("passes the same options whether or not treeKill is requested", async () => {
+    // treeKill changes what happens ON TIMEOUT, not how the child is spawned.
     mockExecFile.mockImplementation((_cmd, _args, _opts, callback) => {
       (callback as Function)(null, "", "");
       return {} as ReturnType<typeof execFile>;

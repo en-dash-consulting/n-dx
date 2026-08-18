@@ -373,13 +373,20 @@ describe("buildScopedCommand", () => {
   // backslash as an escape, so an OS-native Windows path embedded in this string
   // arrives at the runner as "srcagentloop.test.ts", the filter matches nothing,
   // and vitest exits 1 — every scoped post-task run on Windows reported failure
-  // regardless of the code. These assert the separator that reaches the shell,
-  // independently of the host, so the regression cannot come back on Linux CI.
+  // regardless of the code.
+  //
+  // The INPUT is built with osPath() rather than hardcoded backslashes.
+  // toCommandPath splits on `sep`, which is deliberately the identity on POSIX —
+  // a backslash is a legal character in a POSIX filename — so hardcoded
+  // backslashes assert Windows behaviour and fail on a Linux host. That is
+  // exactly how these passed locally and broke ubuntu CI. osPath gives each
+  // platform the path its own path.join would produce, while the OUTPUT
+  // assertion stays forward-slashed on both, which is the actual contract.
 
-  it("emits forward slashes even when given OS-native backslash paths", () => {
+  it("emits forward slashes even when given OS-native paths", () => {
     const cmd = buildScopedCommand("vitest run", "vitest", [
-      "src\\agent\\loop.test.ts",
-      "src\\utils\\helpers.test.ts",
+      osPath("src/agent/loop.test.ts"),
+      osPath("src/utils/helpers.test.ts"),
     ]);
 
     expect(cmd).toBe("vitest run src/agent/loop.test.ts src/utils/helpers.test.ts");
@@ -388,7 +395,7 @@ describe("buildScopedCommand", () => {
   });
 
   it("emits forward slashes for the package-manager wrapper form too", () => {
-    const cmd = buildScopedCommand("pnpm test", "vitest", ["src\\agent\\loop.test.ts"]);
+    const cmd = buildScopedCommand("pnpm test", "vitest", [osPath("src/agent/loop.test.ts")]);
 
     // No "run" here: that subcommand is only injected when the runner appears
     // explicitly in the command. The wrapper branch appends files after "--".
@@ -396,11 +403,11 @@ describe("buildScopedCommand", () => {
     expect(cmd).not.toContain("\\");
   });
 
-  it("emits forward-slash Go package patterns from backslash paths", () => {
+  it("emits forward-slash Go package patterns from OS-native paths", () => {
     // Go package patterns REQUIRE forward slashes — "./internal\handler/..." is
     // not merely shell-fragile, it is invalid Go syntax.
     const cmd = buildScopedCommand("go test ./...", "go", [
-      "internal\\handler\\user_test.go",
+      osPath("internal/handler/user_test.go"),
     ]);
 
     expect(cmd).toBe("go test ./internal/handler/...");
