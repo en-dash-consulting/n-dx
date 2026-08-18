@@ -10,18 +10,6 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 - **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores all PRD state in a slug-based folder tree at `.rex/prd_tree/`: one directory per item with an `index.md` file. No JSON files are written by PRD mutations.
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
 
-## Monorepo Structure
-
-```
-packages/
-  core/            # CLI orchestrator (published as @n-dx/core)
-  sourcevision/    # analysis engine
-  rex/             # PRD + task tracker
-  hench/           # autonomous agent
-  llm-client/      # vendor-neutral LLM foundation (claude adapter + future vendors)
-  web/             # dashboard + MCP HTTP server
-```
-
 ### Architecture
 
 Four-tier dependency hierarchy (each layer imports only from the layer below):
@@ -65,14 +53,6 @@ Within the web package, four internal zones form a hub topology with `web-viewer
 | Naming | Mixed: `rex`, `sourcevision`, `hench` (unscoped) / `@n-dx/web`, `@n-dx/llm-client` (scoped) | Intentional: CLI tools use short unscoped names for `npx`/`pnpm exec`; internal-only packages use the `@n-dx/` scope |
 | Subpath exports | `"./dist/*": "./dist/*"` | Intentional escape hatch — not public API, no stability guarantee. See `PACKAGE_GUIDELINES.md` for acceptable/prohibited uses |
 
-Build and test:
-
-```sh
-pnpm build          # build all packages
-pnpm test           # test all packages
-pnpm typecheck      # typecheck all packages
-```
-
 ## Assistant Instruction Files
 
 `ndx init` generates per-assistant instruction files from a shared source of truth (`packages/core/assistant-assets/project-guidance.md`). Each file has a defined role:
@@ -86,11 +66,6 @@ pnpm typecheck      # typecheck all packages
 **Design invariant:** Both `AGENTS.md` and `CLAUDE.md` derive their base project documentation (Packages, Architecture, Commands, Key Files) from `project-guidance.md`. Vendor-specific additions are layered on top — never inlined into the shared template. This prevents instruction drift between assistant surfaces.
 
 Re-run `ndx init` to regenerate all instruction files after changes to `packages/core/assistant-assets/`.
-
-## Command Aliases
-
-Both `n-dx` and `ndx` work identically (`ndx` is shorter to type).
-`sv` is an alias for `sourcevision`.
 
 ## n-dx Orchestration Commands
 
@@ -138,18 +113,6 @@ hench <command> [args]
 sourcevision <command> [args]
 sv <command> [args]               # alias for sourcevision
 ```
-
-### Rex commands
-
-`init`, `status`, `next`, `add`, `remove`, `update`, `validate`, `analyze`, `recommend`, `mcp`
-
-### Sourcevision commands
-
-`init`, `analyze`, `serve`, `validate`, `reset`, `mcp`
-
-### Hench commands
-
-`init`, `run`, `status`, `show`
 
 ## Changeset Versioning
 

@@ -15,56 +15,7 @@ Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragili
 - **Addition review required:** Treat these as risk zones requiring active review on additions. Changes have a wide blast radius.
 - **Cohesion monitoring:** If a zone's cohesion drops below its current value after a change, the change needs explicit justification.
 
-##### web-shared addition policy
-
-`web-shared` has low cohesion (0.36) and high coupling (0.64). The zone contains 5 files (below the 5-file threshold for reliable metrics), so the measured values reflect the inherent low internal relationship between its modules (data-file constants, feature flags, view identifiers, routing helpers) rather than structural decay. Note: Louvain may merge this zone into `web-viewer` when shared imports create a strong bridge to viewer files — if that happens, pin the shared files back to `web-shared` on the next analysis. In addition to the universal governance rules above:
-
-- **Framework-agnostic only:** `web-shared` must not contain Preact/React imports or server-only (`node:*`) imports. If a utility needs framework APIs, it belongs in the consuming zone.
-- **Barrel import enforcement:** Consumers must import through `shared/index.ts` rather than directly from leaf files (`data-files.ts`, `view-id.ts`). Enforced by `boundary-check.test.ts`.
-- **Two-consumer rule (automated):** Every module in `shared/` must have at least two distinct consumer zones. Enforced by the "shared/ modules have at least two consumer zones" assertion in `boundary-check.test.ts`.
-
-##### rex-satellite zone policy
-
-Both `chunked-review` and `prd-fix-command` are satellite zones of `rex-cli` with cohesion 0.25 and coupling 0.75. In addition to the universal governance rules:
-
-- **CLI-only content:** These zones must contain only CLI command handlers and their direct support modules. Domain logic belongs in `rex-prd-engine` (e.g., `src/core/`).
-- **Subdirectory convention:** Satellite zone files should be grouped into subdirectories under `packages/rex/src/cli/commands/` to make zone boundaries visible in the file tree.
-
-##### crash zone proactive governance
-
-`crash` (cohesion 0.5, unidirectional coupling: web-viewer → crash) sits at the dual-fragility threshold boundary. Crash imports web-shared directly (documented bypass) rather than web-viewer. Apply the two-consumer rule proactively to new crash zone additions before cohesion degrades further.
-
-##### viewer-ui-hub governance
-
-`viewer-ui-hub` (cohesion 0.38, coupling 0.63) is the intentional Preact UI composition hub — it assembles sidebar, config-footer, faq, and logos components. Its dual-fragility metrics are **structurally expected** for a UI composition root: it imports broadly from `web-viewer` (high coupling) while its internal files serve distinct UI concerns (low cohesion). In addition to the universal governance rules:
-
-- **No domain logic:** This zone must contain only UI composition components and their direct rendering helpers. Data fetching and state management belong in hooks or views.
-- **Monitor fan-out:** The bidirectional 74-edge coupling with the web dashboard platform zone is the largest cross-zone relationship in the web package — audit import direction periodically to ensure inbound imports enter through `api.ts` or composition-root wiring rather than ad-hoc leaf reach-ins.
-- **Satellite consolidation:** Three micro-zones (theme-toggle, search-overlay, graph-view-tests) are community-detection artifacts pointing at this hub — consolidating them reduces zone noise without losing architectural boundaries.
-
-##### web-server zone stability
-
-`web-server` (composition root — Express routes, gateways, MCP handlers) is prone to dissolving into `web-viewer` in Louvain analysis because server files import from `packages/web/src/shared/` (required by the barrel-import policy), and shared files are also imported by viewer files, creating a Louvain connectivity bridge. If the zone dissolves:
-
-1. Check `stability.reassignedFiles` in `.sourcevision/zones.json` for `[file, "web-server", "web-viewer"]` entries
-2. Update `.sourcevision/hints.md` with re-analysis guidance
-3. The zone pins in `.n-dx.json` targeting `"web-server"` are no-ops when the zone is absent — they will re-activate if the zone re-appears in Louvain output
-4. The actual server/viewer boundary is enforced by `boundary-check.test.ts` regardless of zone detection — zone dissolution is a metrics artifact, not an architectural violation
-
-##### hench-agent internal governance
-
-`hench-agent` (160+ files, 31 directories) is the second-largest zone in the monorepo. Internal sub-zone boundaries:
-
-- **`agent/`** — Agent loop, tool dispatch, conversation management
-- **`prd/`** — PRD integration via `rex-gateway.ts` and `llm-gateway.ts`
-- **`brief/`** — Task brief construction and context gathering
-- **`tools/`** — Tool implementations (file ops, shell, search)
-- **`process/`** — Process lifecycle, concurrency management
-
-Rules:
-- Each sub-zone directory should maintain a barrel `index.ts` re-exporting its public API.
-- Cross-sub-zone imports should flow through barrels, not reach into internal modules.
-- Boundary assertions should be added to hench's test suite before the zone reaches web-viewer's scale.
+Package-specific zone governance for `web`, `rex`, and `hench` now lives in each package's own `CLAUDE.md` (`packages/web/CLAUDE.md`, `packages/rex/CLAUDE.md`, `packages/hench/CLAUDE.md`), which loads only when working under that directory.
 
 > **Spawn-exempt exception:** `config.js` directly reads/writes package config files (`.rex/config.json`, `.hench/config.json`, `.sourcevision/manifest.json`, `.n-dx.json`) rather than delegating to spawned CLIs. This is intentional — config operations require cross-package reads, atomic merges, and validation logic that cannot be expressed as a single CLI spawn. It is the only orchestration-tier script that breaks the spawn-only rule.
 
@@ -141,14 +92,4 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/prd_tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
 
-#### HTTP-request concurrency (web server)
-
-When `ndx start` is running, the web server holds in-process caches (aggregation cache, PRD tree snapshot) that are populated from disk on demand. External CLI commands that write to the same files can cause stale or partial reads:
-
-| Scenario | Risk | Mitigation |
-|----------|------|------------|
-| Dashboard reads PRD while `ndx plan` writes to `.rex/prd_tree/` | Partial aggregate read or stale derived JSON | Restart server after plan (`ndx start stop && ndx start`) |
-| MCP request during `ndx work` PRD update | Momentarily stale status — hench writes are small atomic updates | Acceptable — dashboard polls and self-corrects within seconds |
-| Concurrent dashboard API requests | Safe — Express serializes requests per-connection; no shared mutable state between request handlers | No action needed |
-
-**General rule for HTTP:** The web server treats disk files as read-only and never holds write locks. The folder tree watcher refreshes `.rex/.cache/prd.json` automatically for most PRD mutations. Any command that bulk-rewrites `.sourcevision/` (ci, refresh) should be followed by a server restart to flush stale caches.
+HTTP-request concurrency notes for the web server live in `packages/web/CLAUDE.md`.
