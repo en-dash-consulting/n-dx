@@ -362,6 +362,122 @@ describe("commands route — refresh (live-server data refresh)", () => {
   });
 });
 
+describe("commands route — shared .sourcevision write lock", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    execMock.mockReset();
+    spawnManagedMock.mockReset();
+    tmpDir = await mkdtemp(join(tmpdir(), "commands-svlock-"));
+    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    const started = await startRouteTestServer((req, res) =>
+      handleCommandsRoute(req, res, ctx),
+    );
+    server = started.server;
+    port = started.port;
+  });
+
+  afterEach(async () => {
+    await closeRouteTestServer(server);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  function post(path: string, body: unknown = {}) {
+    return fetch(`http://127.0.0.1:${port}/api/commands/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function waitForFinish(path: string): Promise<void> {
+    for (let i = 0; i < 50; i++) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/commands/${path}/status`);
+      if (!((await res.json()) as { running: boolean }).running) return;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw new Error(`${path} did not finish`);
+  }
+
+  // sv-analyze --full, refresh --data-only, and ndx ci all write
+  // .sourcevision/ — the CLAUDE.md concurrency contract forbids running any
+  // two of them at once, and dashboard buttons made that one click away.
+
+  it("rejects refresh while a full analysis runs, naming the in-flight job", async () => {
+    const child = stubManagedChild();
+    expect((await post("sv-analyze", { full: true })).status).toBe(202);
+
+    const res = await post("refresh", {});
+    expect(res.status).toBe(409);
+    const body = await res.json() as { error: string; runningJob: string };
+    expect(body.error).toContain("full analysis");
+    expect(body.runningJob).toBe("full analysis");
+
+    child.finish({ exitCode: 0, stdout: "", stderr: "" });
+    await waitForFinish("sv-analyze");
+  });
+
+  it("rejects ci while a refresh runs, naming the in-flight job", async () => {
+    const child = stubManagedChild();
+    expect((await post("refresh", {})).status).toBe(202);
+
+    const res = await post("ci", {});
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toContain("refresh");
+
+    child.finish({ exitCode: 0, stdout: "", stderr: "" });
+    await waitForFinish("refresh");
+  });
+
+  it("rejects a quick analysis while a full run is in flight", async () => {
+    const child = stubManagedChild();
+    expect((await post("sv-analyze", { full: true })).status).toBe(202);
+
+    const res = await post("sv-analyze", { lite: true });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toContain("full analysis");
+    expect(execMock).not.toHaveBeenCalled();
+
+    child.finish({ exitCode: 0, stdout: "", stderr: "" });
+    await waitForFinish("sv-analyze");
+  });
+
+  it("a quick analysis holds the lock against other writers", async () => {
+    let release!: (r: { stdout: string; stderr: string; error: null }) => void;
+    execMock.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+
+    const quick = post("sv-analyze", { lite: true });
+    // Let the quick handler reach the exec call and take the lock.
+    await new Promise((r) => setTimeout(r, 20));
+
+    const res = await post("refresh", {});
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toContain("quick analysis");
+
+    release({ stdout: "ok", stderr: "", error: null });
+    expect((await quick).status).toBe(200);
+  });
+
+  it("releases the lock when the job finishes, including failures", async () => {
+    stubManagedRun({ exitCode: 1, stderr: "boom" });
+    await post("sv-analyze", { full: true });
+    await waitForFinish("sv-analyze");
+
+    stubManagedRun({ stdout: "[refresh] ok" });
+    expect((await post("refresh", {})).status).toBe(202);
+    await waitForFinish("refresh");
+  });
+});
+
 describe("commands route — ndx binary resolution ladder", () => {
   let tmpDir: string;
   let ctx: ServerContext;

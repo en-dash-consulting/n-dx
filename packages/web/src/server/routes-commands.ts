@@ -163,6 +163,38 @@ function managedChildError(
   return (result.stderr || `Exited with code ${result.exitCode}`).slice(-1000);
 }
 
+// ── Shared .sourcevision write lock ───────────────────────────────────
+
+/**
+ * Human label of the `.sourcevision/`-writing job currently in flight, or
+ * null when none is.
+ *
+ * sv-analyze (every mode, including the synchronous quick path), refresh
+ * --data-only, and ndx ci all rewrite `.sourcevision/`. The concurrency
+ * contract forbids overlapping writers, but the per-job `running` flags
+ * cannot see each other — three dashboard buttons could start three
+ * concurrent writers. One shared lock covers them all, so a second writer
+ * gets a 409 naming whatever is actually running instead of clobbering it.
+ */
+let svWriteJob: string | null = null;
+
+/** Take the lock or answer 409 naming the in-flight job. */
+function acquireSvWriteLock(res: ServerResponse, jobName: string): boolean {
+  if (svWriteJob) {
+    jsonResponse(res, 409, {
+      error: `Cannot start ${jobName}: ${svWriteJob} is already running`,
+      runningJob: svWriteJob,
+    });
+    return false;
+  }
+  svWriteJob = jobName;
+  return true;
+}
+
+function releaseSvWriteLock(): void {
+  svWriteJob = null;
+}
+
 // ── Handlers ──────────────────────────────────────────────────────────
 
 // ── Full-analysis state tracking ─────────────────────────────────────
@@ -241,6 +273,8 @@ async function handleSvAnalyze(
       });
       return true;
     }
+    const jobLabel = full ? "full analysis" : "targeted analysis";
+    if (!acquireSvWriteLock(res, jobLabel)) return true;
 
     svAnalyzeStatus.running = true;
     svAnalyzeStatus.startedAt = new Date().toISOString();
@@ -287,15 +321,21 @@ async function handleSvAnalyze(
           timestamp: svAnalyzeStatus.finishedAt,
         });
       }
+      releaseSvWriteLock();
     }).catch((err: unknown) => {
       svAnalyzeStatus.running = false;
       svAnalyzeStatus.finishedAt = new Date().toISOString();
       svAnalyzeStatus.error = String(err);
+      releaseSvWriteLock();
     });
 
     return true;
   }
 
+  // The quick path is synchronous but still rewrites .sourcevision/, so it
+  // takes the same lock — a quick re-analyze on top of a full run corrupts
+  // the analysis exactly like any other overlapping writer.
+  if (!acquireSvWriteLock(res, "quick analysis")) return true;
   try {
     const result = await foundationExec(bin, cmdArgs, {
       cwd: ctx.projectDir,
@@ -318,6 +358,8 @@ async function handleSvAnalyze(
     });
   } catch (err) {
     errorResponse(res, 500, String(err));
+  } finally {
+    releaseSvWriteLock();
   }
   return true;
 }
@@ -683,6 +725,9 @@ async function handleRefresh(
   if (fast) cmdArgs.push("--fast");
   cmdArgs.push(ctx.projectDir);
 
+  // Refresh runs sourcevision analyze under the hood — same writer lock.
+  if (!acquireSvWriteLock(res, "refresh")) return true;
+
   refreshStatus.running = true;
   refreshStatus.startedAt = new Date().toISOString();
   refreshStatus.finishedAt = null;
@@ -733,10 +778,12 @@ async function handleRefresh(
         timestamp: refreshStatus.finishedAt,
       });
     }
+    releaseSvWriteLock();
   }).catch((err: unknown) => {
     refreshStatus.running = false;
     refreshStatus.finishedAt = new Date().toISOString();
     refreshStatus.error = String(err);
+    releaseSvWriteLock();
   });
 
   return true;
@@ -791,9 +838,14 @@ function startAsyncJob(
   timeout: number,
   broadcast?: WebSocketBroadcaster,
   broadcastType?: string,
+  /** Set when the job writes .sourcevision/ — takes the shared writer lock. */
+  svWriteLockLabel?: string,
 ): boolean {
   if (status.running) {
     jsonResponse(res, 409, { error: `${label} is already running`, startedAt: status.startedAt });
+    return true;
+  }
+  if (svWriteLockLabel && !acquireSvWriteLock(res, svWriteLockLabel)) {
     return true;
   }
 
@@ -828,10 +880,12 @@ function startAsyncJob(
     if (broadcast && broadcastType) {
       broadcast({ type: broadcastType, ok: !result.error, timestamp: status.finishedAt });
     }
+    if (svWriteLockLabel) releaseSvWriteLock();
   }).catch((err: unknown) => {
     status.running = false;
     status.finishedAt = new Date().toISOString();
     status.error = String(err);
+    if (svWriteLockLabel) releaseSvWriteLock();
   });
 
   return true;
@@ -904,6 +958,7 @@ function handleCi(
     [...prefixArgs, "ci", "--format=json", ctx.projectDir],
     ctx, 900_000, // 15 minutes — runs the full analysis pipeline
     broadcast, "commands:ci-finished",
+    "CI check", // runs the analysis pipeline → writes .sourcevision/
   );
 }
 
