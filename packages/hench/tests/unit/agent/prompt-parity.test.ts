@@ -39,7 +39,11 @@ import {
   FULL_PROMPT_SECTIONS,
   MINIMAL_PROMPT_SECTIONS,
 } from "../../fixtures/cross-vendor-runtime.js";
-import { buildClaudeCliArgs } from "../../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
+import {
+  buildClaudeCliArgs,
+  WINDOWS_STDIN_PROMPT_SEPARATOR,
+} from "../../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
+import { decodeClaudeDelivery } from "../../helpers/index.js";
 
 // ── Deterministic test fixtures ──────────────────────────────────────────────
 
@@ -191,15 +195,15 @@ describe("prompt envelope section parity for a given task", () => {
     // Codex: combined as SYSTEM:\n...\nTASK:\n...
     const codexPrompt = `SYSTEM:\n${sys}\n\nTASK:\n${task}`;
 
-    // Both channels carry the same system prompt content
-    const systemPromptIndex = args.indexOf("--system-prompt");
-    expect(systemPromptIndex).toBeGreaterThan(-1);
-    const claudeSystemPrompt = args[systemPromptIndex + 1];
-    expect(claudeSystemPrompt).toBe(sys);
+    // "Same content, different channel" is the claim this test's name makes, so
+    // decode Claude's channel rather than asserting an argv index — that index
+    // does not exist on Windows, where the system prompt travels on stdin.
+    const claudeDelivered = decodeClaudeDelivery(args, stdinContent);
+
+    expect(claudeDelivered.systemPrompt).toBe(sys);
     expect(codexPrompt).toContain(sys);
 
-    // Both channels carry the same task prompt content
-    expect(stdinContent).toBe(task);
+    expect(claudeDelivered.taskPrompt).toBe(task);
     expect(codexPrompt).toContain(task);
   });
 
@@ -355,9 +359,20 @@ describe("baseline prompt output for regression comparison", () => {
       promptText: task,
       allowedTools: ["Read"],
     });
-    expect(args).toContain("--system-prompt");
-    expect(args[args.indexOf("--system-prompt") + 1]).toBe(sys);
-    expect(stdinContent).toBe(task);
+    // "Structurally predictable" has to mean predictable PER PLATFORM: on POSIX
+    // the system prompt is an argv flag, on Windows it is prepended to stdin.
+    // Assert the shape explicitly for both rather than the POSIX one only.
+    const delivered = decodeClaudeDelivery(args, stdinContent);
+    if (delivered.shape === "posix") {
+      expect(args).toContain("--system-prompt");
+      expect(args[args.indexOf("--system-prompt") + 1]).toBe(sys);
+      expect(stdinContent).toBe(task);
+    } else {
+      expect(args).not.toContain("--system-prompt");
+      expect(stdinContent).toBe(`${sys}${WINDOWS_STDIN_PROMPT_SEPARATOR}${task}`);
+    }
+    expect(delivered.systemPrompt).toBe(sys);
+    expect(delivered.taskPrompt).toBe(task);
 
     // Codex delivery: combined SYSTEM/TASK prompt via stdin
     const codexPrompt = `SYSTEM:\n${sys}\n\nTASK:\n${task}`;

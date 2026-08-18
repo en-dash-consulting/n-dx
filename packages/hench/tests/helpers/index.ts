@@ -8,6 +8,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { PRDStore, PRDItem } from "@n-dx/rex";
+import { WINDOWS_STDIN_PROMPT_SEPARATOR } from "../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
 import type { CliRunResult } from "../../src/agent/lifecycle/event-accumulator.js";
 import type { RunRecord } from "../../src/schema/v1.js";
 import type { PromptEnvelope } from "../../src/schema/v1.js";
@@ -294,4 +295,70 @@ export async function cleanupProjectDir(projectDir: string): Promise<void> {
   } catch {
     // Ignore cleanup errors
   }
+}
+
+// ── Claude CLI delivery decoding ──────────────────────────────────────────────
+
+/**
+ * What the Claude CLI session will actually receive, independent of which channel
+ * carried it.
+ *
+ * buildClaudeCliArgs delivers the same three things two different ways:
+ *
+ *   POSIX    system prompt in `--system-prompt <value>`, task prompt on stdin,
+ *            each allowed-tool as its own argv entry.
+ *   Windows  `--system-prompt` omitted and BOTH prompts on stdin separated by
+ *            `\n\n---\n\n`, allowed-tools collapsed into one comma-joined argv
+ *            entry — because cmd.exe cannot carry a multi-line argument safely.
+ *
+ * Tests that assert argv POSITIONS therefore encode one platform's shape and fail
+ * on the other. Decoding first lets them assert the property they actually care
+ * about — that the model receives this system prompt, this task prompt and these
+ * tools — with exact equality rather than a loosened substring match.
+ *
+ * The shape is detected from the presence of `--system-prompt`, which is not a
+ * heuristic: Windows always omits that flag and POSIX always includes it, so the
+ * signal is exact.
+ */
+export function decodeClaudeDelivery(
+  args: readonly string[],
+  stdinContent: string,
+): { systemPrompt: string; taskPrompt: string; allowedTools: string[]; shape: "posix" | "windows" } {
+  const sysIdx = args.indexOf("--system-prompt");
+  const isPosixShape = sysIdx > -1;
+
+  const toolsIdx = args.indexOf("--allowed-tools");
+  if (toolsIdx === -1) {
+    throw new Error("decodeClaudeDelivery: --allowed-tools missing from args");
+  }
+  // Tool entries run until the next flag (or the end of argv).
+  const afterFlag = args.slice(toolsIdx + 1);
+  const nextFlag = afterFlag.findIndex((a) => a.startsWith("--"));
+  const toolTokens = nextFlag === -1 ? afterFlag : afterFlag.slice(0, nextFlag);
+  const allowedTools = isPosixShape
+    ? [...toolTokens]
+    : (toolTokens[0] ?? "").split(",").filter(Boolean);
+
+  if (isPosixShape) {
+    return {
+      systemPrompt: args[sysIdx + 1]!,
+      taskPrompt: stdinContent,
+      allowedTools,
+      shape: "posix",
+    };
+  }
+
+  const at = stdinContent.indexOf(WINDOWS_STDIN_PROMPT_SEPARATOR);
+  if (at === -1) {
+    throw new Error(
+      "decodeClaudeDelivery: no --system-prompt flag and no stdin separator — " +
+      "the system prompt is not being delivered by either channel",
+    );
+  }
+  return {
+    systemPrompt: stdinContent.slice(0, at),
+    taskPrompt: stdinContent.slice(at + WINDOWS_STDIN_PROMPT_SEPARATOR.length),
+    allowedTools,
+    shape: "windows",
+  };
 }

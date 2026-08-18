@@ -2,7 +2,7 @@
 id: "0de02514-ca19-47f0-be65-14a034476b60"
 level: "task"
 title: "Cover both prompt-delivery shapes per platform in hench adapter tests"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -12,6 +12,11 @@ tags:
   - "prompt-delivery"
   - "coverage-gap"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-18T16:11:31.967Z"
+completedAt: "2026-08-18T16:20:53.520Z"
+endedAt: "2026-08-18T16:20:53.520Z"
+resolutionType: "code-change"
+resolutionDetail: "Added an optional `platform` parameter to buildClaudeCliArgs (defaulting to process.platform, so runtime output is unchanged — guarded by a test asserting the one-arg and two-arg calls are equal) and extracted the \"\n\n---\n\n\" literal into an exported WINDOWS_STDIN_PROMPT_SEPARATOR. Added decodeClaudeDelivery() to tests/helpers, which returns what the session effectively receives regardless of channel, detecting the shape from `--system-prompt` presence (exact, not heuristic). Every failing assertion was re-expressed as exact equality on delivered CONTENT rather than an argv position that exists on only one platform. The rewrites are STRICTER than what they replaced: three parity tests had guarded their system-prompt check behind `process.platform !== \"win32\"` and so never verified it on Windows at all, and two more tests early-returned on Windows entirely — all now run on both platforms. The git-scoping test now decodes the allowed-tools list and asserts exact set membership plus absence of Bash(git:*), Bash(git reset:*), Bash(git clean:*). Added 5 tests driving both shapes explicitly via the seam, including one comparing the two shapes' decoded content. Proved no relaxation by injecting a truncation into the Windows branch (2 tests failed), reverting, and injecting the same into the POSIX branch (2 tests failed). Recorded a mistake: a `git checkout --` used to undo the first injection also discarded the seam; caught and re-applied, then used targeted replaces. Typecheck clean; hench 32 failures/12 files -> 25/8, exactly the 7 owned here with no collateral, and vendor-adapter-contract (which also calls this function) still passes."
 acceptanceCriteria:
   - "All seven failures pass on Windows"
   - "Assertions cover BOTH the POSIX argv shape and the Windows stdin-embedded shape — not whichever one the current platform produces"

@@ -32,6 +32,7 @@ import {
   STANDARD_POLICY,
   FULL_ACCESS_POLICY,
 } from "../../fixtures/cross-vendor-runtime.js";
+import { decodeClaudeDelivery } from "../../helpers/index.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -52,26 +53,27 @@ describe("AC1: Claude adapter uses assemblePrompt() for system/task split", () =
 
     const config = claudeCliAdapter.buildSpawnConfig(envelope, DEFAULT_EXECUTION_POLICY, {});
 
-    // On non-Windows, system prompt is in --system-prompt arg
-    if (process.platform !== "win32") {
-      const sysIdx = config.args.indexOf("--system-prompt");
-      expect(sysIdx).toBeGreaterThan(-1);
-      expect(config.args[sysIdx + 1]).toBe(systemPrompt);
-    }
+    // Decoded rather than read off argv positions. The previous version guarded
+    // the --system-prompt check with `if (process.platform !== "win32")`, so on
+    // Windows the system prompt was never verified at all — and then asserted
+    // stdinContent === taskPrompt unconditionally, which is false on Windows
+    // where the system prompt shares stdin. Decoding checks BOTH prompts on BOTH
+    // platforms, which is stricter than what it replaces.
+    const delivered = decodeClaudeDelivery(config.args, config.stdinContent ?? "");
 
-    // Task prompt is in stdin content
-    expect(config.stdinContent).toBe(taskPrompt);
+    expect(delivered.systemPrompt).toBe(systemPrompt);
+    expect(delivered.taskPrompt).toBe(taskPrompt);
   });
 
-  it("system sections (system + workflow) go to --system-prompt, task sections to stdin", () => {
-    if (process.platform === "win32") return;
-
+  it("system sections (system + workflow) reach the system channel, task sections the task channel", () => {
+    // Previously `if (process.platform === "win32") return;` — so the split this
+    // test exists to verify was never checked on Windows, the platform whose
+    // delivery shape is the unusual one. Decoding drops the skip.
     const envelope = createFullEnvelope();
     const config = claudeCliAdapter.buildSpawnConfig(envelope, DEFAULT_EXECUTION_POLICY, {});
 
-    const sysIdx = config.args.indexOf("--system-prompt");
-    const systemArg = config.args[sysIdx + 1] as string;
-    const stdinContent = config.stdinContent!;
+    const { systemPrompt: systemArg, taskPrompt: stdinContent } =
+      decodeClaudeDelivery(config.args, config.stdinContent ?? "");
 
     // System prompt should contain system and workflow content
     expect(systemArg).toContain("You are Hench, an autonomous AI agent.");
@@ -89,17 +91,14 @@ describe("AC1: Claude adapter uses assemblePrompt() for system/task split", () =
     expect(stdinContent).not.toContain("You are Hench, an autonomous AI agent.");
   });
 
-  it("minimal envelope: system goes to --system-prompt, brief to stdin", () => {
-    if (process.platform === "win32") return;
-
+  it("minimal envelope: system reaches the system channel, brief the task channel", () => {
     const envelope = createMinimalEnvelope();
     const config = claudeCliAdapter.buildSpawnConfig(envelope, DEFAULT_EXECUTION_POLICY, {});
 
-    const sysIdx = config.args.indexOf("--system-prompt");
-    const systemArg = config.args[sysIdx + 1] as string;
+    const delivered = decodeClaudeDelivery(config.args, config.stdinContent ?? "");
 
-    expect(systemArg).toBe("You are Hench.");
-    expect(config.stdinContent).toBe("Fix the bug.");
+    expect(delivered.systemPrompt).toBe("You are Hench.");
+    expect(delivered.taskPrompt).toBe("Fix the bug.");
   });
 
   it("model override is passed through correctly", () => {
@@ -382,11 +381,14 @@ describe("Cross-vendor parity: prompt delivery", () => {
     // Codex: both in stdinContent as SYSTEM:/TASK:; "-" is the positional sentinel
     const codexConfig = codexCliAdapter.buildSpawnConfig(envelope, DEFAULT_EXECUTION_POLICY, {});
 
-    if (process.platform !== "win32") {
-      const sysIdx = claudeConfig.args.indexOf("--system-prompt");
-      expect(claudeConfig.args[sysIdx + 1]).toBe(systemPrompt);
-    }
-    expect(claudeConfig.stdinContent).toBe(taskPrompt);
+    // Claude's channel differs by platform (argv flag on POSIX, stdin on
+    // Windows); Codex always combines both into stdin. Comparing DELIVERED
+    // CONTENT is what makes this a cross-vendor parity assertion rather than a
+    // statement about one platform's argv layout.
+    const claudeDelivered = decodeClaudeDelivery(claudeConfig.args, claudeConfig.stdinContent ?? "");
+
+    expect(claudeDelivered.systemPrompt).toBe(systemPrompt);
+    expect(claudeDelivered.taskPrompt).toBe(taskPrompt);
 
     expect(codexConfig.stdinContent).toContain(systemPrompt);
     expect(codexConfig.stdinContent).toContain(taskPrompt);

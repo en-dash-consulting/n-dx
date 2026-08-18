@@ -103,13 +103,26 @@ export interface ClaudeCliInput {
   permissionMode?: PermissionMode;
 }
 
-export function buildClaudeCliArgs(input: ClaudeCliInput): { args: string[]; stdinContent: string } {
-  const isWindows = process.platform === "win32";
+/** Separates the system prompt from the task prompt when both travel via stdin. */
+export const WINDOWS_STDIN_PROMPT_SEPARATOR = "\n\n---\n\n";
+
+/**
+ * @param platform Overridable ONLY so tests can exercise both delivery shapes on
+ *   any host. Defaults to the real platform, so runtime behaviour is unchanged —
+ *   every production caller passes one argument. Without this seam the Windows
+ *   branch below could only ever be executed on Windows, and CI runs on Linux, so
+ *   the branch that exists specifically for Windows shipped unverified.
+ */
+export function buildClaudeCliArgs(
+  input: ClaudeCliInput,
+  platform: NodeJS.Platform = process.platform,
+): { args: string[]; stdinContent: string } {
+  const isWindows = platform === "win32";
 
   // On Windows, cmd.exe can't handle multi-line strings or special chars
   // like ( ) & | in CLI args. Embed system prompt in stdin instead.
   const stdinContent = isWindows
-    ? `${input.systemPrompt}\n\n---\n\n${input.promptText}`
+    ? `${input.systemPrompt}${WINDOWS_STDIN_PROMPT_SEPARATOR}${input.promptText}`
     : input.promptText;
 
   const args = [

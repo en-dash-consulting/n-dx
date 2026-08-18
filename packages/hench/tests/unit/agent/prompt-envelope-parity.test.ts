@@ -40,6 +40,7 @@ import {
   READONLY_POLICY,
   FULL_ACCESS_POLICY,
 } from "../../fixtures/cross-vendor-runtime.js";
+import { decodeClaudeDelivery } from "../../helpers/index.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -333,11 +334,16 @@ describe("AC2: section content equivalence between adapters", () => {
       // Extract content and verify it's the same across adapters.
       const canonical = assemblePrompt(envelope);
 
-      if (process.platform !== "win32") {
-        const sysIdx = claudeConfig.args.indexOf("--system-prompt");
-        expect(claudeConfig.args[sysIdx + 1]).toBe(canonical.systemPrompt);
-      }
-      expect(claudeConfig.stdinContent).toBe(canonical.taskPrompt);
+      // Content equivalence, not argv layout: Claude's channel for the system
+      // prompt is an argv flag on POSIX and stdin on Windows, so asserting a
+      // position made this test platform-bound and skipped the system-prompt
+      // check entirely on Windows.
+      const claudeDelivered = decodeClaudeDelivery(
+        claudeConfig.args,
+        claudeConfig.stdinContent ?? "",
+      );
+      expect(claudeDelivered.systemPrompt).toBe(canonical.systemPrompt);
+      expect(claudeDelivered.taskPrompt).toBe(canonical.taskPrompt);
 
       expect(codexConfig.stdinContent).toBe(
         `SYSTEM:\n${canonical.systemPrompt}\n\nTASK:\n${canonical.taskPrompt}`,
@@ -353,7 +359,11 @@ describe("AC2: section content equivalence between adapters", () => {
     const claude = claudeCliAdapter.buildSpawnConfig(envelope, DEFAULT_EXECUTION_POLICY, { model: "claude-opus-4" });
     const codex = codexCliAdapter.buildSpawnConfig(envelope, DEFAULT_EXECUTION_POLICY, { model: "gpt-5-codex" });
 
-    expect(claude.stdinContent).toBe(canonical.taskPrompt);
+    // Both prompts checked, not just the task one — a model override must not
+    // disturb either, and on Windows both share the stdin channel.
+    const claudeDelivered = decodeClaudeDelivery(claude.args, claude.stdinContent ?? "");
+    expect(claudeDelivered.systemPrompt).toBe(canonical.systemPrompt);
+    expect(claudeDelivered.taskPrompt).toBe(canonical.taskPrompt);
 
     expect(codex.stdinContent).toContain(canonical.systemPrompt);
     expect(codex.stdinContent).toContain(canonical.taskPrompt);

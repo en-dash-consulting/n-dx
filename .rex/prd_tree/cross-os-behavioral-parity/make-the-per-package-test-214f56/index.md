@@ -25,7 +25,7 @@ description: "The sibling CI-matrix task (da8af67a) put the ROOT suite on window
 | Title | Status |
 |-------|--------|
 | [Add the per-package suites to the Windows CI job](./add-the-per-package-suites-to-2b2b78.md) | pending |
-| [Cover both prompt-delivery shapes per platform in hench adapter tests](./cover-both-prompt-delivery-0de025.md) | pending |
+| [Cover both prompt-delivery shapes per platform in hench adapter tests](./cover-both-prompt-delivery-0de025.md) | completed |
 | [Fix POSIX fixture assumptions in hench and web tests (/tmp, git quoting, absolute-path check)](./fix-posix-fixture-assumptions-861495.md) | pending |
 | [Fix the hardcoded "/" after join() in web's boundary-check exemptions](./fix-the-hardcoded-after-join-in-30235f.md) | pending |
 | [Give web's graph-view tests a getBoundingClientRect stub (jsdom returns 0x0)](./give-web-s-graph-view-tests-a-3be5b1.md) | pending |
