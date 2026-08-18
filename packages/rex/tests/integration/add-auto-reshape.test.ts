@@ -5,7 +5,8 @@
  *  - Hash-suffix duplicate siblings are merged after add
  *  - --no-reshape suppresses the pass
  *  - A live reshape.lock causes the pass to be skipped
- *  - Latency on a 100-item subtree stays under 500ms
+ *  - Scoped pass cost grows sub-quadratically with sibling count (a complexity
+ *    gate, not a wall-clock budget — see that test for why)
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -28,15 +29,11 @@ import {
 import { loadArchive, ARCHIVE_FILE } from "../../src/core/archive.js";
 import type { PRDItem } from "../../src/schema/index.js";
 
-/**
- * Load tolerance for wall-clock budgets below.
- *
- * These assertions guard against algorithmic regressions (a quadratic
- * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
- * numbers flake when the rest of the monorepo suite saturates every core,
- * so the budget is scaled. See TESTING.md "Flake Resistance".
- */
-const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+// No BUDGET_MULTIPLIER here. The perf assertion below guards complexity, and it
+// now says so directly by comparing growth between two sibling counts rather than
+// scaling an absolute wall-clock budget. See that test for the reasoning, and
+// TESTING.md "Flake Resistance" for where scaled absolute budgets are still the
+// right tool (genuine latency budgets, not complexity claims).
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -448,31 +445,73 @@ describe("cmdAdd scoped consolidation pass", () => {
     expect(lastBatch.items.length).toBeGreaterThan(0);
   });
 
-  it("scoped pass completes within 500ms on a 100-item sibling subtree", async () => {
+  /**
+   * This replaced an absolute `expect(elapsed).toBeLessThan(500)`.
+   *
+   * That budget measured the machine rather than the code: it passed in isolation
+   * and, under full-suite load, was observed timing out at the 30s test limit —
+   * 60x over — with runScopedConsolidationPass unchanged. A gate that is red for
+   * reasons unrelated to its subject stops being read.
+   *
+   * What it was guarding is that the pass stays SCOPED: cost should track the
+   * sibling set it examines, not blow up super-linearly as that set grows. So
+   * measure two sibling counts back-to-back in the same process and assert the
+   * growth. Ambient load scales both readings, so the ratio holds on a busy
+   * machine while a real complexity regression still trips it.
+   */
+  // 60s, not the 30s default: comparing two sizes means building 125 items via
+  // addItem, and each add re-serializes the tree, so SETUP dominates — measured
+  // ~14s locally while the two timed passes together are ~190ms of it. The old
+  // single-size version fit in 30s, so raising this is a direct cost of the
+  // two-point measurement. Note this is a timeout, not the assertion: it guards
+  // against a hang, and the pass/fail decision is the ratio below.
+  it("scoped pass cost grows sub-quadratically with sibling count", { timeout: 60_000 }, async () => {
     const store = await resolveStore(rexDir);
 
-    // Build an epic with 99 feature siblings (no hash-suffix duplicates)
-    const epicId = randomUUID();
-    await store.addItem({ id: epicId, title: "Big Epic", level: "epic", status: "pending" });
-    for (let i = 0; i < 99; i++) {
+    /**
+     * Build an epic with `siblings` features, then time the consolidation pass
+     * triggered by one more. Returns the pass duration in ms.
+     */
+    async function timeScopedPass(epicTitle: string, siblings: number): Promise<number> {
+      const epicId = randomUUID();
+      await store.addItem({ id: epicId, title: epicTitle, level: "epic", status: "pending" });
+      for (let i = 0; i < siblings; i++) {
+        await store.addItem(
+          { id: randomUUID(), title: `${epicTitle} Feature ${i}`, level: "feature", status: "pending" },
+          epicId,
+        );
+      }
+
+      // Added directly, bypassing cmdAdd overhead, so only the pass is timed.
+      const newId = randomUUID();
       await store.addItem(
-        { id: randomUUID(), title: `Feature ${i}`, level: "feature", status: "pending" },
+        { id: newId, title: `${epicTitle} Feature unique`, level: "feature", status: "pending" },
         epicId,
       );
+
+      const start = performance.now();
+      await runScopedConsolidationPass(rexDir, store, newId, {});
+      return performance.now() - start;
     }
 
-    // Add the 100th item directly (bypassing cmdAdd overhead)
-    const newId = randomUUID();
-    await store.addItem(
-      { id: newId, title: "Feature unique", level: "feature", status: "pending" },
-      epicId,
-    );
+    const smallSiblings = 25;
+    const largeSiblings = 100;
+    const sizeRatio = largeSiblings / smallSiblings;
 
-    // Time just the scoped consolidation pass (no filesystem migration overhead)
-    const start = Date.now();
-    await runScopedConsolidationPass(rexDir, store, newId, {});
-    const elapsed = Date.now() - start;
+    const smallMs = await timeScopedPass("Small Epic", smallSiblings);
+    const largeMs = await timeScopedPass("Big Epic", largeSiblings);
 
-    expect(elapsed).toBeLessThan(500 * BUDGET_MULTIPLIER);
+    // MEASURED when written: 4.3x for a 4x increase (25 siblings 35.6ms,
+    // 100 siblings 151.9ms) — the pass is linear in sibling count today. The
+    // bound sits at 3x the size ratio, leaving ~2.8x headroom over that
+    // observation while still tripping on a quadratic regression (~16x).
+    const timeRatio = largeMs / Math.max(smallMs, 0.1);
+    expect(
+      timeRatio,
+      `scoped pass scaled ${timeRatio.toFixed(1)}x for a ${sizeRatio}x sibling increase ` +
+      `(${smallSiblings}: ${smallMs.toFixed(1)}ms, ${largeSiblings}: ${largeMs.toFixed(1)}ms). ` +
+      `It was linear (~${sizeRatio}x) when this test was written; a quadratic ` +
+      `regression would show ~${(sizeRatio * sizeRatio).toFixed(0)}x.`,
+    ).toBeLessThan(sizeRatio * 3);
   });
 });

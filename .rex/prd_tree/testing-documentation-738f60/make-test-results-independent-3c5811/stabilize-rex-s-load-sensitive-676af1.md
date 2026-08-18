@@ -2,7 +2,7 @@
 id: "676af18f-c764-45e3-812c-6755fa0004c7"
 level: "task"
 title: "Stabilize rex's load-sensitive performance assertions"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "testing"
@@ -11,6 +11,11 @@ tags:
   - "rex"
   - "ci"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-18T15:21:50.276Z"
+completedAt: "2026-08-18T15:53:59.776Z"
+endedAt: "2026-08-18T15:53:59.776Z"
+resolutionType: "code-change"
+resolutionDetail: "Classified all four and treated each per cause. profile-prd-tree-write -> BENCHMARK (every assertion was toBeGreaterThan(0), so it was never a gate): renamed to .bench-manual.ts, out of the default include, runnable via new `pnpm --filter @n-dx/rex bench` with a dedicated vitest.bench.config.ts and fileParallelism off. folder-tree-parser and add-auto-reshape -> GATES, absolute wall-clock replaced with same-run two-size ratio assertions; bounds derived from measured baselines (parse 6.3x for 11.3x size; scoped pass 4.3x for 4x siblings) and recorded in comments, each still catching a quadratic regression. prd-tree-atomic-writes -> NOT a budget but a BROKEN test: it pushed \"second-start\" before the second writer ever requested the lock and after a fixed 10ms sleep, so it asserted \"addItem finishes within 10ms\" rather than serialization; replaced with an event-based assertion at the lock itself plus a no-lost-writes test. Also corrected the task's premise: packages already run sequentially since the masking fix, so the flakes came from rex's own parallel workers, and the suggested --workspace-concurrency=1 would not have helped. VERIFIED: 3 consecutive rex-only runs green (4406 passed each), then 3 consecutive full `pnpm test` runs with rex PASS and zero failures across all five timing-sensitive files. Disclosed cost: the reshape test builds 125 items to measure two sizes (~14s, setup-dominated) and needed an explicit 60s timeout as a hang guard. Fifth same-class file (write-path-profile, absolute 5s/20s/60s budgets, seen failing once at 5005ms) filed separately as 94e03432 rather than folded in."
 acceptanceCriteria:
   - "The four named files pass as part of a full concurrent `pnpm test` run, repeatedly (at least 3 consecutive runs)"
   - "Each of the four is explicitly classified as regression gate or benchmark, with the reasoning recorded"
