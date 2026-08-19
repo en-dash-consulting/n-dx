@@ -2,7 +2,7 @@
 id: "94e03432-9a48-4efc-80d0-7c3f927a932e"
 level: "task"
 title: "Convert write-path-profile's absolute budgets to scaling assertions"
-status: "pending"
+status: "completed"
 priority: "low"
 tags:
   - "testing"
@@ -10,6 +10,11 @@ tags:
   - "performance"
   - "rex"
 source: "exploration-2026-08-18"
+startedAt: "2026-08-19T15:31:55.610Z"
+completedAt: "2026-08-19T16:01:07.897Z"
+endedAt: "2026-08-19T16:01:07.897Z"
+resolutionType: "code-change"
+resolutionDetail: "Deleted the absolute REGRESSION_BUDGETS and replaced them with per-phase small-to-large growth assertions (39.6x size step) over the existing three fixtures, using a per-phase min-of-3 to filter load spikes. Bound is 4x linear, derived from four clean runs whose worst reading was 83.3x, and verified in both directions: a 6x bound was tried first and let a real n^2 degradation of parseFolderTree pass at 200.9x, while 4x fails it at 188.2x. Measurements, the OS-dependence of the ratio, and a re-derivation recipe recorded in the file. Green across three consecutive full rex-suite runs."
 acceptanceCriteria:
   - "Per-phase assertions compare growth across the existing small/medium/large fixtures rather than absolute milliseconds"
   - "The chosen bound is derived from a measured baseline, and that measurement is recorded in a comment"
