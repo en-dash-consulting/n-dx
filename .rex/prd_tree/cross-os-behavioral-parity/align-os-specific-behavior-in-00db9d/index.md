@@ -24,7 +24,7 @@ description: "Three verified places where the same n-dx command delivers a diffe
 
 | Title | Status |
 |-------|--------|
-| [Decide and document the Windows available-memory strategy for hench admission](./decide-and-document-the-windows-cd8060.md) | pending |
+| [Decide and document the Windows available-memory strategy for hench admission](./decide-and-document-the-windows-cd8060.md) | completed |
 | [Enforce API-key file permissions on Windows via ACLs, or stop claiming they are set](./enforce-api-key-file-01d91d.md) | completed |
 | [Freeze-verify-kill: make the POSIX tree kill definitive for timeouts](./freeze-verify-kill-make-the-71e448.md) | completed |
 | [Guard usePanZoom against a zero-sized element, and give the hook its first test](./guard-usepanzoom-against-a-zero-40eeec.md) | pending |

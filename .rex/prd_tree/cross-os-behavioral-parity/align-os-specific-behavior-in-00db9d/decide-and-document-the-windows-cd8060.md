@@ -2,7 +2,7 @@
 id: "cd8060d7-e028-48f1-9843-deea23eabeed"
 level: "task"
 title: "Decide and document the Windows available-memory strategy for hench admission"
-status: "pending"
+status: "completed"
 priority: "low"
 tags:
   - "cross-os"
@@ -11,6 +11,9 @@ tags:
   - "memory"
   - "investigate"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-19T14:33:38.632Z"
+completedAt: "2026-08-19T14:40:41.511Z"
+endedAt: "2026-08-19T14:40:41.511Z"
 acceptanceCriteria:
   - "A measurement on real Windows hardware comparing os.freemem() against a standby-inclusive available-memory figure under load"
   - "A recorded decision: implement a Windows-specific reader, or accept the fallback with the reasoning documented in the module JSDoc"
