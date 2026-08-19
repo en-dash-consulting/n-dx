@@ -244,8 +244,19 @@ export function exec(
       // `exitCode: null` means "killed", per ExecResult. Our own timer is one way
       // that happens; a signal from outside this process is another, and it
       // reports the same way it always did.
-      if (timedOut || signal !== null) {
-        finish({ stdout, stderr, exitCode: null, error: killedError(display, timeout, timedOut, signal) });
+      //
+      // When OUR timer fired, resolution belongs to the timeout path, which settles
+      // only after stopChild() has finished. Resolving here instead would settle as
+      // soon as the direct child's pipes closed — and with `shell: true` that is the
+      // moment the SHELL dies, while a grandchild may still be alive holding the cwd
+      // and any port it bound. The caller then proceeds against a live tree: on
+      // Windows that surfaced as `EBUSY: rmdir` when a test tore its workspace down
+      // (hench tests/unit/tools/shell.test.ts), and silently as a leaked process
+      // everywhere else. An externally delivered signal is not ours to wait on, so
+      // it still reports immediately.
+      if (timedOut) return;
+      if (signal !== null) {
+        finish({ stdout, stderr, exitCode: null, error: killedError(display, timeout, false, signal) });
         return;
       }
 
@@ -264,18 +275,23 @@ export function exec(
     if (timeout > 0) {
       timer = setTimeout(() => {
         timedOut = true;
-        void stopChild().then(() => {
-          // Normally "close" has already fired by now (the tree is gone, so its
-          // pipes closed) and this is a no-op. It is the backstop for a kill that
-          // could not finish the job: resolve rather than hang, reporting whatever
-          // output was collected before the timeout.
-          finish({
-            stdout: text(stdoutChunks),
-            stderr: text(stderrChunks),
-            exitCode: null,
-            error: killedError(display, timeout, true, null),
+        // This is the ONLY path that resolves a timeout — the "close" handler now
+        // defers to it (see there for why). So it must always settle, including when
+        // the kill itself fails: a rejected stopChild used to leave nothing to
+        // resolve the promise, which only went unnoticed because "close" was
+        // finishing first. Report the timeout regardless of how the kill went; a
+        // tree that outlived its kill is surfaced by child-lifecycle's diagnostics,
+        // not by hanging the caller.
+        void stopChild()
+          .catch(() => { /* best effort — see above */ })
+          .then(() => {
+            finish({
+              stdout: text(stdoutChunks),
+              stderr: text(stderrChunks),
+              exitCode: null,
+              error: killedError(display, timeout, true, null),
+            });
           });
-        });
       }, timeout);
     }
 

@@ -110,6 +110,33 @@ describe("a timed-out shell test command takes its children with it", () => {
     return (await readdir(dir)).filter((f) => f.startsWith("tick-")).length;
   }
 
+  /**
+   * Wait (bounded) for a pid to disappear.
+   *
+   * WHY THIS POLLS, having deliberately not polled at first. The strict form —
+   * asserting the child is already gone the instant the promise settles — reads
+   * like the stronger test, and it passed on Windows, where taskkill /T /F removes
+   * the tree synchronously. It FAILED on macOS CI, because on POSIX pid-absence is
+   * not synchronous with "the kill completed": SIGKILL delivery and reaping are
+   * asynchronous, and `kill(pid, 0)` still succeeds for a process that has been
+   * killed but not yet reaped. The escalation case exposes that window because the
+   * SIGKILL lands at the very end of the awaited termination rather than at the
+   * start.
+   *
+   * So pid-liveness cannot carry the "settled only after termination" claim on
+   * POSIX. The frozen tick count below carries it instead — a process that is gone
+   * writes nothing — and this bounded wait covers the reap window. Matching
+   * packages/llm-client/tests/integration/exec-timeout-tree-kill.test.ts, which
+   * polls for the same reason.
+   */
+  async function waitForDeath(pid, timeoutMs = 5000) {
+    const deadline = Date.now() + timeoutMs;
+    while (isAlive(pid) && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return !isAlive(pid);
+  }
+
   it("kills the command beneath the shell, not just the shell", async () => {
     const result = await runShellTestCommand("node child.js && echo done", dir, 1_500);
 
@@ -123,14 +150,13 @@ describe("a timed-out shell test command takes its children with it", () => {
     const atResolve = await tickCount();
     expect(atResolve, "the test command never did any work").toBeGreaterThan(0);
 
-    // No polling, deliberately. The promise must not settle until termination has
-    // completed, so the child is required to be dead ALREADY — a caller that sees
-    // "timed out" must never be able to observe the tree still running. A waitFor
-    // here would hide exactly the defect this line exists to catch.
-    expect(isAlive(childPid), "child still alive when the timeout was reported").toBe(false);
+    expect(await waitForDeath(childPid), "child survived the timeout").toBe(true);
 
-    // And it stopped working, rather than merely becoming unsignallable: a survivor
-    // ticking every 100ms would add ~6 files over this window.
+    // The load-bearing assertion, and the reap-independent one: the tree stopped
+    // WORKING by the time the timeout was reported. atResolve was sampled the
+    // instant the promise settled, so a tree still running then would add ~6 files
+    // over this window. This is what pins "does not settle until termination",
+    // which pid-liveness cannot do on POSIX — see waitForDeath.
     await new Promise((r) => setTimeout(r, 600));
     expect(await tickCount()).toBe(atResolve);
   });
@@ -146,8 +172,9 @@ describe("a timed-out shell test command takes its children with it", () => {
     expect(atResolve, "the stubborn command never did any work").toBeGreaterThan(0);
 
     // A SIGTERM-ignoring child is the whole point: without escalation it survives
-    // its own timeout indefinitely.
-    expect(isAlive(childPid), "SIGTERM-ignoring child survived the timeout").toBe(false);
+    // its own timeout indefinitely. Bounded wait rather than an instant check —
+    // this is the case that exposed the POSIX reap window, see waitForDeath.
+    expect(await waitForDeath(childPid), "SIGTERM-ignoring child survived the timeout").toBe(true);
 
     await new Promise((r) => setTimeout(r, 600));
     expect(await tickCount()).toBe(atResolve);
