@@ -982,7 +982,7 @@ async function handleTemplateDelete(
 // ── Task execution ───────────────────────────────────────────────────
 
 /** Actionable statuses — only tasks in these states can be triggered. */
-const ACTIONABLE_STATUSES = new Set(["pending", "blocked"]);
+const ACTIONABLE_STATUSES = new Set(["pending", "blocked", "deferred"]);
 
 /** Execution status for a single task run. */
 export interface TaskExecutionStatus {
@@ -993,9 +993,16 @@ export interface TaskExecutionStatus {
   startedAt: string;
   finishedAt?: string;
   lastOutput?: string;
+  /** Live tokens/sec metric from the most recent LLM turn (API-mode vendors only). */
+  tokensPerSecond?: number;
   error?: string;
   exitCode?: number | null;
 }
+
+/** Regex (global) to find all tok/s metrics in a chunk via matchAll. */
+const TOK_PER_SEC_RE = /⚡\s*([\d.]+)\s*tok\/s/g;
+/** Regex (non-global) to test whether a single line is a tok/s metric line. */
+const TOK_PER_SEC_LINE_RE = /⚡\s*[\d.]+\s*tok\/s/;
 
 /** Track active task executions to prevent concurrent runs on the same task. */
 const activeExecutions = new Map<string, {
@@ -1152,7 +1159,7 @@ async function handleExecute(
   // Validate task is actionable
   const status = task.status as string;
   if (!ACTIONABLE_STATUSES.has(status)) {
-    errorResponse(res, 409, `Task is in "${status}" status and cannot be executed. Only pending or blocked tasks can be triggered.`);
+    errorResponse(res, 409, `Task is in "${status}" status and cannot be executed. Only pending, blocked, or deferred tasks can be triggered.`);
     return true;
   }
 
@@ -1176,7 +1183,10 @@ async function handleExecute(
   // Resolve hench binary
   const henchBin = join(ctx.projectDir, "node_modules", ".bin", "hench");
   const henchFallback = join(ctx.projectDir, "packages", "hench", "dist", "cli", "index.js");
-  const args = ["run", `--task=${taskId}`, "--auto", ctx.projectDir];
+  // Pass --reset-deferred when executing a deferred task so hench resets it to pending before running
+  const args = status === "deferred"
+    ? ["run", `--task=${taskId}`, "--auto", "--reset-deferred", ctx.projectDir]
+    : ["run", `--task=${taskId}`, "--auto", ctx.projectDir];
 
   const binPath = existsSync(henchBin) ? henchBin : "node";
   const binArgs = existsSync(henchBin) ? args : [henchFallback, ...args];
@@ -1195,11 +1205,43 @@ async function handleExecute(
     startedAt: new Date().toISOString(),
   };
 
-  // Spawn hench process
+  // Spawn hench process with streaming stdout so the UI can show live output.
   const handle = spawnManaged(binPath, binArgs, {
     cwd: ctx.projectDir,
     stdio: "pipe",
+    windowsHide: true,
     env: { ...process.env },
+    onStdout(text) {
+      const entry = activeExecutions.get(taskId);
+      if (!entry) return;
+
+      let changed = false;
+
+      // Extract tok/s metric — use the LAST match in the chunk (most recent
+      // turn wins when multiple turns arrive in one I/O buffer).
+      const tokMatches = [...text.matchAll(TOK_PER_SEC_RE)];
+      if (tokMatches.length > 0) {
+        const last = tokMatches[tokMatches.length - 1];
+        entry.state.tokensPerSecond = parseFloat(last[1]);
+        changed = true;
+      }
+
+      // Broadcast the last non-blank, non-metric line as a live status hint.
+      // Filter out tok/s lines so the metric only appears in the dedicated badge.
+      const lastLine = text
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l && !TOK_PER_SEC_LINE_RE.test(l))
+        .at(-1);
+      if (lastLine) {
+        entry.state.lastOutput = lastLine;
+        changed = true;
+      }
+
+      if (changed) {
+        broadcastExecState(broadcast, { ...entry.state });
+      }
+    },
   });
 
   // Track active execution
@@ -1233,7 +1275,7 @@ async function handleExecute(
           entry.state.error = result.stderr.slice(-200);
         }
         if (result.stdout) {
-          entry.state.lastOutput = result.stdout.slice(-200);
+          entry.state.lastOutput = result.stdout.split("\n").filter((l) => l.trim()).at(-1) ?? "";
         }
         broadcastExecState(broadcast, { ...entry.state });
       }

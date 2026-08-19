@@ -68,6 +68,16 @@ export function authFailureGuidance(vendor: LLMVendor | string | undefined): Aut
           VERIFY_CREDENTIALS_STEP,
         ],
       };
+    case "local":
+      return {
+        provider: "Local",
+        headline: `Cannot reach local LLM server — ${CANONICAL_CAUSE}.`,
+        remediation: [
+          "Start LM Studio and enable the local server in Developer > Local Server",
+          "Check host/port: ndx config llm.local.host — ndx config llm.local.port",
+          VERIFY_CREDENTIALS_STEP,
+        ],
+      };
     case "claude":
     default:
       return {

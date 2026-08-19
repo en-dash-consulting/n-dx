@@ -732,11 +732,11 @@ export function formatToolHelp(tool) {
 const ORCHESTRATOR_HELP_DEFS = {
   init: {
     summary: "initialize all tools",
-    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude or codex) unless --provider is given.\nProvisions assistant surfaces for both Claude and Codex unless limited\nby --no-claude, --no-codex, --claude-only, --codex-only, or --assistants=.\n\nThe init summary reports each assistant surface separately, listing the\nspecific artifacts (instruction files, skills, permissions, MCP servers)\nthat were provisioned for the repo.",
+    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude, codex, google, or local) unless --provider is given.\nProvisions assistant surfaces for both Claude and Codex unless limited\nby --no-claude, --no-codex, --claude-only, --codex-only, or --assistants=.\n\nThe init summary reports each assistant surface separately, listing the\nspecific artifacts (instruction files, skills, permissions, MCP servers)\nthat were provisioned for the repo.",
     usage: "ndx init [options] [dir]",
     options: [
       { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
-      { flag: "--provider=<vendor>", description: "LLM vendor to configure: claude or codex (skips interactive prompt)" },
+      { flag: "--provider=<vendor>", description: "LLM vendor to configure: claude, codex, google, or local (skips interactive prompt)" },
       { flag: "--model=<id>", description: "Model ID to persist (used with --provider)" },
       { flag: "--claude-model=<id>", description: "Claude model ID (implies --provider=claude)" },
       { flag: "--codex-model=<id>", description: "Codex model ID (implies --provider=codex)" },
@@ -869,7 +869,7 @@ const ORCHESTRATOR_HELP_DEFS = {
   },
   work: {
     summary: "execute the next task autonomously",
-    description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.\nRequires explicit vendor config: run 'ndx config llm.vendor claude'\nor 'ndx config llm.vendor codex' before using this command.",
+    description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.\nRequires explicit vendor config: run 'ndx config llm.vendor claude',\n'ndx config llm.vendor codex', or 'ndx config llm.vendor local' before using this command.",
     usage: "ndx work [options] [dir]",
     options: [
       { flag: "--task=<id>", description: "Target a specific Rex task ID" },

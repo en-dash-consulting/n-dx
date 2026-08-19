@@ -20,6 +20,12 @@ export function isModelCompatibleWithVendor(
     return trimmed.startsWith("gemini-");
   }
 
+  if (vendor === "local") {
+    // Local vendor accepts any non-empty model string — LM Studio will validate
+    // against its own loaded model list. Empty string means "use whatever is loaded".
+    return true;
+  }
+
   return /^(gpt-|o\d|codex)/i.test(trimmed);
 }
 

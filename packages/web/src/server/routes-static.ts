@@ -129,7 +129,11 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
 
 /** Check if the project has been initialized (any tool directory exists). */
 export function isProjectInitialized(ctx: ServerContext): boolean {
-  return existsSync(join(ctx.svDir, "manifest.json")) || existsSync(join(ctx.rexDir, "prd.json"));
+  return (
+    existsSync(join(ctx.svDir, "manifest.json")) ||
+    existsSync(join(ctx.rexDir, "prd.json")) ||
+    existsSync(join(ctx.rexDir, "prd_tree"))
+  );
 }
 
 /** Handle static asset requests. Returns true if the request was handled. */

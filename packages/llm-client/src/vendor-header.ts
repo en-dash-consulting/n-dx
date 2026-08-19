@@ -83,7 +83,9 @@ export function printVendorModelHeader(
       ? config?.codex?.model
       : vendor === "google"
         ? config?.google?.model
-        : undefined;
+        : vendor === "local"
+          ? config?.local?.model
+          : undefined;
   const configuredFrom: "top-level" | "vendor-pinned" | undefined = config?.model
     ? "top-level"
     : vendorPinnedModel

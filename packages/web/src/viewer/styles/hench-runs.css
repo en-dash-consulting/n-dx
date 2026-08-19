@@ -243,6 +243,60 @@
   color: var(--brand-orange);
 }
 
+/* Live last-output line from dashboard-triggered execution */
+.active-task-last-output {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  font-family: var(--font-mono, monospace);
+  min-width: 0;
+}
+
+.active-task-last-output .active-task-meta-icon {
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.active-task-last-output-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+/* "🔔 Notify me" button — shown when Notification.permission is "default" */
+.active-tasks-notif-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-xs);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.3));
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.active-tasks-notif-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-normal, rgba(128, 128, 128, 0.5));
+}
+
+/* Live tok/s metric from API-mode LLM turns */
+.active-task-toks {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-xs);
+  color: var(--brand-amber, #f59e0b);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Responsive */
 @media (max-width: 700px) {
   .active-task-meta {

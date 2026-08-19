@@ -282,10 +282,10 @@ export async function getEpicScopeInfo(
       totalTasks++;
       if (item.status === "completed") {
         completedTasks++;
-      } else if (item.status === "pending" || item.status === "in_progress") {
+      } else if (item.status === "pending" || item.status === "in_progress" || item.status === "failing") {
         actionableTasks++;
       }
-      // deferred and blocked are neither completed nor actionable
+      // deferred and blocked are neither completed nor actionable; failing IS actionable (retry)
     }
   }
 
@@ -301,6 +301,60 @@ export async function getEpicScopeInfo(
     isComplete,
     hasActionableTasks,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Deferred/failing task reset (--reset-deferred)
+// ---------------------------------------------------------------------------
+
+/**
+ * Count tasks with a given set of statuses (across the full tree).
+ * Walks the PRD tree recursively; counts only leaf-level items.
+ */
+function countTasksByStatus(items: PRDItem[], statuses: string[]): number {
+  const statusSet = new Set(statuses);
+  let count = 0;
+  const walk = (list: PRDItem[]) => {
+    for (const item of list) {
+      if (statusSet.has(item.status)) count++;
+      if (item.children) walk(item.children);
+    }
+  };
+  walk(items);
+  return count;
+}
+
+/**
+ * Reset all deferred and failing tasks to pending so they can be retried.
+ *
+ * Used by --reset-deferred to let the user restart a run where all tasks
+ * failed (e.g. after fixing LM Studio context window size). Returns the
+ * number of tasks that were reset.
+ */
+async function resetDeferredTasks(store: PRDStore): Promise<number> {
+  const doc = await store.loadDocument();
+  const toReset: Array<{ id: string; title: string }> = [];
+
+  const walk = (items: PRDItem[]) => {
+    for (const item of items) {
+      if (item.status === "deferred" || item.status === "failing") {
+        toReset.push({ id: item.id, title: item.title });
+      }
+      if (item.children) walk(item.children);
+    }
+  };
+  walk(doc.items);
+
+  for (const t of toReset) {
+    await store.updateItem(t.id, { status: "pending" });
+  }
+
+  if (toReset.length > 0) {
+    info(`\nReset ${toReset.length} task(s) to pending:`);
+    for (const t of toReset) info(`  ${colorStatus("pending", "○")} ${t.id}: ${t.title}`);
+  }
+
+  return toReset.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -531,7 +585,37 @@ async function selectTask(
   if (tasks.length === 0) {
     const scope = epicId ? "within the specified epic" : "in PRD";
     output(`No actionable tasks found ${scope}.`);
-    process.exit(0);
+    // Check for deferred/failing tasks and offer to reset them interactively.
+    const doc = await store.loadDocument();
+    const deferredCount = countTasksByStatus(doc.items, ["deferred", "failing"]);
+    if (deferredCount > 0 && process.stdin.isTTY) {
+      output(colorWarn(`  ${deferredCount} task(s) are deferred or failing.`));
+      const answer = await promptUser("  Reset them to pending and continue? [y/N] ");
+      if (answer.toLowerCase() === "y" || answer.toLowerCase() === "yes") {
+        await resetDeferredTasks(store);
+        // Reload tasks after reset
+        tasks = await getActionableTasks(store);
+        if (epicId) {
+          const freshDoc = await store.loadDocument();
+          const epicTaskIds = collectEpicTaskIds(freshDoc.items, epicId);
+          tasks = tasks.filter((t) => epicTaskIds.has(t.id));
+        }
+        if (tasks.length === 0) {
+          output("Still no actionable tasks after reset.");
+          process.exit(0);
+        }
+      } else {
+        process.exit(0);
+      }
+    } else if (deferredCount > 0) {
+      output(colorWarn(
+        `  ${deferredCount} task(s) are deferred or failing — ` +
+        `run 'ndx work --reset-deferred' to reset them and retry.`,
+      ));
+      process.exit(0);
+    } else {
+      process.exit(0);
+    }
   }
 
   info("\nActionable tasks (by priority):\n");
@@ -865,7 +949,9 @@ export async function cmdRun(
       ? llmConfig?.claude?.model
       : llmVendor === "codex"
         ? llmConfig?.codex?.model
-        : llmConfig?.google?.model);
+        : llmVendor === "google"
+          ? llmConfig?.google?.model
+          : llmConfig?.local?.model);
   if (!cliModelOverride && activeConfiguredModel) {
     if (
       llmVendor === "claude" &&
@@ -910,7 +996,7 @@ export async function cmdRun(
   // consistent with how --quiet suppresses info() output.
   if (flags.format === "json") setQuiet(true);
 
-  const provider = (flags.provider as "cli" | "api") ?? config.provider;
+  let provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
   const review = flags.review === "true";
   // --no-rollback always wins; otherwise read config (defaults to true).
@@ -964,19 +1050,83 @@ export async function cmdRun(
     );
   }
 
-  // Google only supports API mode (no CLI binary exists).
-  if (llmVendor === "google" && provider === "cli" && !dryRun) {
-    throw new CLIError(
-      "Google vendor does not support CLI mode — it uses the Gemini REST API directly.",
-      "Set 'n-dx config hench.provider api' or switch vendor: 'n-dx config llm.vendor claude'.",
-    );
+  // Google and local only support API mode (no CLI binary exists).
+  // Auto-switch silently — ndx config / ndx init persist hench.provider=api
+  // automatically when local or google is selected as the vendor, so this
+  // branch is a safety net for projects configured outside of those flows.
+  if ((llmVendor === "google" || llmVendor === "local") && provider === "cli" && !dryRun) {
+    provider = "api";
+  }
+
+  // --reset-deferred: reset all deferred/failing tasks to pending before running.
+  // This lets the user retry tasks that were deferred by infrastructure failures
+  // (e.g. context window overflow) without manually editing each task.
+  if (flags["reset-deferred"] === "true") {
+    const store = await resolveStore(rexDir);
+    const resetCount = await resetDeferredTasks(store);
+    if (resetCount === 0) {
+      info("\nNo deferred or failing tasks to reset.");
+    }
   }
 
   // Fail fast if CLI provider selected but vendor CLI binary not available.
-  // Google is excluded — it has no CLI binary and is already guarded above.
-  if (provider === "cli" && !dryRun && llmVendor !== "google") {
+  // Google and local are excluded — they have no CLI binary and are already guarded above.
+  if (provider === "cli" && !dryRun && llmVendor !== "google" && llmVendor !== "local") {
     const customPath = resolveVendorCliPath(llmConfig);
     requireLLMCLI(llmVendor as "claude" | "codex", customPath);
+  }
+
+  // Local vendor preflight: verify the LM Studio server is reachable and a model is loaded.
+  // Fails fast before task selection and brief assembly to give the user a clear error instead
+  // of a mid-run context-window or connection failure deep in the loop.
+  if (llmVendor === "local" && !dryRun) {
+    const localCfg = llmConfig?.local;
+    const host = localCfg?.host ?? "localhost";
+    const port = localCfg?.port ?? 1234;
+    const baseUrl = `http://${host}:${port}/v1`;
+    try {
+      const res = await fetch(`${baseUrl}/models`, {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        throw new CLIError(
+          `LM Studio server responded with HTTP ${res.status} on GET /v1/models.`,
+          `Check that LM Studio is running at ${host}:${port} and a model is loaded.`,
+        );
+      }
+      type ModelsResponse = { data?: Array<{ id?: string; context_length?: number }> };
+      const data = await res.json() as ModelsResponse;
+      const models = data.data ?? [];
+      if (models.length === 0) {
+        throw new CLIError(
+          `LM Studio is running at ${host}:${port} but no models are loaded.`,
+          "Open LM Studio and load a model before running 'ndx work'.",
+        );
+      }
+      // Surface model count and context window so the user can verify their setup.
+      const modelId = models[0].id ?? "(unknown)";
+      const contextLen = models[0].context_length;
+      const ctxNote = contextLen
+        ? ` (context window: ${contextLen.toLocaleString()} tokens)`
+        : "";
+      info(`✓ LM Studio ready — ${models.length} model(s) available, active: ${modelId}${ctxNote}`);
+      if (contextLen && contextLen < 16_384) {
+        info(
+          colorWarn(
+            `  ⚠ Context window is only ${contextLen.toLocaleString()} tokens — ` +
+            `briefs often exceed 32 768 tokens. Increase "Context Length" in LM Studio.`,
+          ),
+        );
+      }
+    } catch (err) {
+      if (err instanceof CLIError) throw err;
+      throw new CLIError(
+        `Cannot reach LM Studio at ${host}:${port}: ${(err as Error).message}`,
+        "Ensure LM Studio is running and the server is started (port matches your config).",
+      );
+    }
   }
 
   const iterations = flags.iterations ? safeParseInt(flags.iterations, "iterations") : 1;

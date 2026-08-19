@@ -52,6 +52,70 @@ export interface CodexConfig {
   lightModel?: string;
 }
 
+/**
+ * Config for a second local model that reviews primary output.
+ *
+ * When set, hench queries this endpoint after the primary model finishes a task
+ * and asks it to verify the solution against the task requirements. If the
+ * verifier returns FAIL, it feeds the reasoning back to the primary as a new
+ * user message and lets it revise — up to `maxCycles` times.
+ *
+ * The verifier needs no tool access; any chat-completion endpoint works.
+ * A smaller/faster model is a good choice (lower VRAM, lower latency).
+ */
+export interface LocalVerifierConfig {
+  /** Host for the verifier server. Defaults to `"localhost"`. */
+  host?: string;
+  /** Port for the verifier server. Defaults to `1235`. */
+  port?: number;
+  /** Model to use on the verifier endpoint. When unset, uses whatever is loaded. */
+  model?: string;
+  /**
+   * Maximum number of FAIL → revise cycles per run (default: 2).
+   * Once exhausted the run finalizes with whatever state the primary is in.
+   */
+  maxCycles?: number;
+}
+
+/** Optional local model config section in `.n-dx.json` (e.g. LM Studio). */
+export interface LocalConfig {
+  /** Host for the local server. Defaults to `"localhost"`. */
+  host?: string;
+  /** Port for the local server. Defaults to `1234` (LM Studio default). */
+  port?: number;
+  /** Default model for local requests. When unset, the server uses whichever model is currently loaded. */
+  model?: string;
+  /**
+   * Model override for the 'light' task weight tier.
+   * When set, resolveVendorModel uses this model for light-weight tasks.
+   */
+  lightModel?: string;
+  /**
+   * Maximum context window size in tokens for the local model.
+   *
+   * When set, hench will check whether the assembled brief fits before
+   * sending it to LM Studio. If the estimated token count exceeds this value,
+   * the run will fail fast with a clear error instead of a cryptic HTTP 400.
+   *
+   * Typical values: 8192 (LM Studio default), 32768, 65536, 131072.
+   * Set this to match "Context Length" in your LM Studio model settings.
+   *
+   * If unset, no pre-send check is performed; the server error is still
+   * surfaced with actionable guidance via parseLmStudioError.
+   */
+  maxContextTokens?: number;
+  /**
+   * Second-model verifier. When set, hench sends the primary model's completed
+   * solution to this endpoint for review before finalizing the run.
+   *
+   * Example (two LM Studio instances, or one Ollama serving two models):
+   * ```json
+   * "verifier": { "port": 1235, "model": "qwen2.5-7b", "maxCycles": 2 }
+   * ```
+   */
+  verifier?: LocalVerifierConfig;
+}
+
 /** Optional Google Gemini-specific config section in `.n-dx.json`. */
 export interface GoogleConfig {
   /** Google API key (from Google AI Studio or GCP). */
@@ -91,6 +155,8 @@ export interface LLMConfig {
   codex?: CodexConfig;
   /** Google Gemini-specific config. */
   google?: GoogleConfig;
+  /** Local model config (LM Studio or other OpenAI-compatible local servers). */
+  local?: LocalConfig;
   /**
    * Enable automatic failover on model/vendor errors.
    * When true, hench retries failed runs on fallback models before surfacing errors.

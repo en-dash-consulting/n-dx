@@ -74,6 +74,13 @@ function resolveAnalyzeTokenEventMetadata(
     };
   }
 
+  if (vendor === "local") {
+    return {
+      vendor,
+      model: normalizeProviderMetadata(resolveVendorModel("local", llmConfig)) ?? "local",
+    };
+  }
+
   return {
     vendor,
     model: UNKNOWN_PROVIDER_METADATA,

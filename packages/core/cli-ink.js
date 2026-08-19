@@ -195,6 +195,7 @@ function InitApp({
   flags,
   provider,
   providerSource,
+  providerSourceKey,
   model,
   modelSource,
   assistantEnabled,
@@ -268,15 +269,21 @@ function InitApp({
       // code + stderr so a genuine failure fails init and any preflight warning is
       // surfaced in the recap — never silently swallowed.
       if (!llmSkipped && provider) {
-        const vendorWrite = await spawnCapture("node", [
-          cliPath, "config", "llm.vendor", provider, dir, "--soft-preflight",
-        ]);
-        if (vendorWrite.code !== 0) {
-          setPhase("assistants", "failed");
-          onComplete(1, vendorWrite.stderr || `Failed to set llm.vendor=${provider}`);
-          return;
+        // Skip the vendor write (and its auth preflight) when the provider
+        // comes from existing config — it's already persisted and re-running
+        // the preflight on every `ndx init` produces noisy auth warnings for
+        // vendors the user hasn't configured yet (e.g. codex without login).
+        if (providerSourceKey !== "config") {
+          const vendorWrite = await spawnCapture("node", [
+            cliPath, "config", "llm.vendor", provider, dir, "--soft-preflight",
+          ]);
+          if (vendorWrite.code !== 0) {
+            setPhase("assistants", "failed");
+            onComplete(1, vendorWrite.stderr || `Failed to set llm.vendor=${provider}`);
+            return;
+          }
+          if (vendorWrite.stderr) llmWarning = vendorWrite.stderr;
         }
-        if (vendorWrite.stderr) llmWarning = vendorWrite.stderr;
         if (model) {
           await spawnAsync("node", [cliPath, "config", `llm.${provider}.model`, model, dir]);
         }

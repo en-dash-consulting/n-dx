@@ -20,7 +20,7 @@
 
 import { getModelsForVendor, getRecommendedModel } from "./llm-model-catalog.js";
 
-const SUPPORTED_PROVIDERS = ["codex", "claude", "google"];
+const SUPPORTED_PROVIDERS = ["codex", "claude", "google", "local"];
 
 /**
  * Legacy model IDs treated as "known" during init so `validateInitFlags` does
@@ -35,6 +35,7 @@ const LEGACY_CATALOG_MODEL_ALIASES = {
   codex: ["gpt-5-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"],
   claude: ["claude-sonnet-4-6"],
   google: [],
+  local: [],
 };
 
 /**
@@ -47,6 +48,7 @@ const PROVIDER_LABELS = {
   codex: "Codex (OpenAI)",
   claude: "Claude (Anthropic)",
   google: "Gemini (Google)",
+  local: "Local (LM Studio)",
 };
 
 /**
@@ -135,6 +137,15 @@ export function resolveInitLLMSelection({ flags, existingConfig, isTTY }) {
     result.needsModelPrompt = isTTY;
   }
 
+  // Always offer provider + model prompts on TTY so the user can confirm or
+  // switch. Suppressed by the respective flag (--provider= / --model=).
+  if (result.provider && isTTY && !flags.provider) {
+    result.needsProviderPrompt = true;
+  }
+  if (result.provider && isTTY && !flags.model) {
+    result.needsModelPrompt = true;
+  }
+
   return result;
 }
 
@@ -152,13 +163,14 @@ export function resolveInitLLMSelection({ flags, existingConfig, isTTY }) {
  * a provider prompt is needed (i.e. isTTY is true). The non-TTY safety
  * fallback returns undefined, which the caller treats as cancellation.
  *
+ * @param {string} [existingProvider]  Currently configured provider — pre-selected as default.
  * @returns {Promise<string|undefined>}  Selected provider or undefined on cancel.
  */
-async function defaultPromptProvider() {
+async function defaultPromptProvider(existingProvider) {
   if (!isInteractiveTerminal()) {
     // Non-TTY environments should not reach here (resolveInitLLMSelection
     // sets needsProviderPrompt=false when isTTY is false). Safety fallback.
-    return undefined;
+    return existingProvider ?? undefined;
   }
 
   try {
@@ -170,11 +182,16 @@ async function defaultPromptProvider() {
       message: PROVIDER_LABELS[p] || p,
     }));
 
+    const initialIndex = existingProvider
+      ? SUPPORTED_PROVIDERS.indexOf(existingProvider)
+      : 0;
+
     const response = await enquirer.prompt({
       type: "select",
       name: "provider",
       message: "Select LLM provider",
       choices,
+      initial: initialIndex >= 0 ? initialIndex : 0,
     });
 
     return response.provider || undefined;
@@ -197,10 +214,11 @@ async function defaultPromptProvider() {
  * recommended model without prompting. Explicit model selection in scripted
  * flows requires the --model= flag.
  *
- * @param {string} provider  The resolved provider (e.g. "codex", "claude").
+ * @param {string} provider      The resolved provider (e.g. "codex", "claude").
+ * @param {string} [existingModel]  Current model from config — pre-selected as default.
  * @returns {Promise<string|undefined>}  Selected model ID or undefined on cancel.
  */
-async function defaultPromptModel(provider) {
+async function defaultPromptModel(provider, existingModel) {
   const models = getModelsForVendor(provider);
   if (!models || models.length === 0) return undefined;
 
@@ -208,7 +226,7 @@ async function defaultPromptModel(provider) {
   if (models.length === 1) return models[0].id;
 
   if (isInteractiveTerminal()) {
-    return promptModelEnquirer(provider, models);
+    return promptModelEnquirer(provider, models, existingModel);
   }
 
   // Non-interactive environment (piped input, CI, test harnesses):
@@ -223,19 +241,33 @@ async function defaultPromptModel(provider) {
 /**
  * Enquirer-based model selector — keyboard-driven, TTY-only.
  *
+ * When `existingModel` is provided (re-prompt on reinit), it is pre-selected
+ * so the user can confirm with Enter or arrow to a different model.
+ * Falls back to the recommended model, then the first entry.
+ *
  * @param {string} provider
  * @param {import("./llm-model-catalog.js").ModelEntry[]} models
+ * @param {string} [existingModel]  Currently configured model (pre-selected default).
  * @returns {Promise<string|undefined>}
  */
-async function promptModelEnquirer(provider, models) {
+async function promptModelEnquirer(provider, models, existingModel) {
   try {
     const { default: Enquirer } = await import("enquirer");
     const enquirer = new Enquirer();
 
     const recommended = getRecommendedModel(provider);
-    const initialIndex = recommended
-      ? models.findIndex((m) => m.id === recommended.id)
-      : 0;
+    // Pre-select the existing model when re-prompting; fall back to recommended.
+    const initialIndex = (() => {
+      if (existingModel) {
+        const idx = models.findIndex((m) => m.id === existingModel);
+        if (idx >= 0) return idx;
+      }
+      if (recommended) {
+        const idx = models.findIndex((m) => m.id === recommended.id);
+        if (idx >= 0) return idx;
+      }
+      return 0;
+    })();
 
     const choices = models.map((m) => ({
       name: m.id,
@@ -258,6 +290,121 @@ async function promptModelEnquirer(provider, models) {
   }
 }
 
+/**
+ * Fetch available models from a running local LLM server (LM Studio / Ollama).
+ *
+ * Sends a GET to /v1/models — the OpenAI-compatible endpoint all local servers
+ * expose. Returns sorted model IDs on success, or an empty array when the server
+ * is unreachable, times out, or returns an unexpected response.
+ *
+ * Pure I/O — no prompting; caller decides how to present the list.
+ *
+ * @param {string} [host]  Server hostname (default: "localhost")
+ * @param {number} [port]  Server port (default: 1234)
+ * @returns {Promise<string[]>}  Sorted model IDs, or [] on failure.
+ */
+async function fetchLocalModels(host = "localhost", port = 1234) {
+  try {
+    const { default: http } = await import("http");
+    return await new Promise((resolve) => {
+      let body = "";
+      const req = http.get(
+        {
+          host,
+          port,
+          path: "/v1/models",
+          headers: { Accept: "application/json" },
+        },
+        (res) => {
+          if (res.statusCode !== 200) { res.resume(); resolve([]); return; }
+          res.setEncoding("utf-8");
+          res.on("data", (chunk) => { body += chunk; });
+          res.on("end", () => {
+            try {
+              const data = JSON.parse(body);
+              const ids = (data?.data ?? [])
+                .map((m) => m.id)
+                .filter(Boolean)
+                .sort();
+              resolve(ids);
+            } catch {
+              resolve([]);
+            }
+          });
+        },
+      );
+      // 3-second timeout — init should not stall waiting for a slow server.
+      req.setTimeout(3000, () => { req.destroy(); resolve([]); });
+      req.on("error", () => resolve([]));
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** Sentinel returned by the select prompt when the user picks "No preference". */
+const LOCAL_NO_PREFERENCE = "__local_no_preference__";
+
+/**
+ * Interactive model selector for the local vendor — fetches the live model list
+ * from the running LM Studio / Ollama server and presents them as a select prompt.
+ *
+ * "No preference" is always the first choice; selecting it leaves the model unset
+ * so LM Studio uses whichever model is currently loaded. If the server is not
+ * running (empty model list), the prompt is skipped — model stays unset.
+ *
+ * @param {string|undefined} existingModel  Current model from config (pre-selected if in list).
+ * @param {string} [host]  Local server host (default: "localhost")
+ * @param {number} [port]  Local server port (default: 1234)
+ * @returns {Promise<string|undefined>}  Selected model ID, or undefined for "no preference" / server down.
+ */
+async function promptLocalModelFromServer(existingModel, host = "localhost", port = 1234) {
+  if (!isInteractiveTerminal()) return existingModel ?? undefined;
+
+  const models = await fetchLocalModels(host, port);
+
+  if (models.length === 0) {
+    // Server not running or no models available — skip silently.
+    // Write to stderr so it doesn't disrupt Enquirer's rendering.
+    process.stderr.write(
+      `  ℹ  No models found at http://${host}:${port}/v1/models — model will remain unset.\n`,
+    );
+    return undefined;
+  }
+
+  // Build choices: "No preference" sentinel first, then the live model list.
+  const choices = [
+    { name: LOCAL_NO_PREFERENCE, message: "No preference — use whatever is currently loaded" },
+    ...models.map((id) => ({ name: id, message: id })),
+  ];
+
+  // Pre-select the existing model if it's in the live list; otherwise "No preference".
+  const initialIndex = (() => {
+    if (existingModel) {
+      const idx = choices.findIndex((c) => c.name === existingModel);
+      if (idx >= 0) return idx;
+    }
+    return 0;
+  })();
+
+  try {
+    const { default: Enquirer } = await import("enquirer");
+    const enquirer = new Enquirer();
+    const response = await enquirer.prompt({
+      type: "select",
+      name: "model",
+      message: `Select local model (${models.length} available at ${host}:${port})`,
+      choices,
+      initial: initialIndex,
+    });
+    return response.model === LOCAL_NO_PREFERENCE ? undefined : (response.model || undefined);
+  } catch (err) {
+    // Ctrl+C or Esc — local model is optional, don't cancel init.
+    if (err === "" || (err && err.message === "")) return undefined;
+    throw err;
+  }
+}
+
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -269,12 +416,16 @@ async function promptModelEnquirer(provider, models) {
  *
  * Prompt functions can be injected for testability.  Defaults:
  * - Provider prompt: enquirer Select with arrow-key navigation (TTY only).
- * - Model prompt: enquirer Select (TTY) or auto-select recommended (non-TTY), driven by llm-model-catalog.js.
+ * - Model prompt (non-local): enquirer Select (TTY) or auto-select recommended (non-TTY), driven by llm-model-catalog.js.
+ * - Model prompt (local): live fetch from /v1/models then enquirer Select; skips silently if server is down.
  *
  * @param {object} resolution                       Output of resolveInitLLMSelection()
  * @param {object} [options]
  * @param {() => Promise<string|undefined>}         [options.promptProvider]  Override provider prompt
- * @param {(provider: string) => Promise<string|undefined>}  [options.promptModel]  Override model prompt
+ * @param {(provider: string) => Promise<string|undefined>}  [options.promptModel]  Override model prompt (non-local)
+ * @param {(existing: string|undefined) => Promise<string|undefined>}  [options.promptLocalModel]  Override local model prompt
+ * @param {string}  [options.localHost]  Local LLM server hostname (default: "localhost")
+ * @param {number}  [options.localPort]  Local LLM server port (default: 1234)
  * @returns {Promise<{ provider?: string, model?: string, providerSource?: string, modelSource?: string, cancelled: boolean }>}
  */
 export async function promptLLMSelection(resolution, options = {}) {
@@ -284,24 +435,58 @@ export async function promptLLMSelection(resolution, options = {}) {
 
   if (needsProviderPrompt) {
     const promptFn = options.promptProvider ?? defaultPromptProvider;
-    const selected = await promptFn();
+    const selected = await promptFn(provider);  // pass existing for pre-selection
     if (selected) {
+      if (selected !== provider) {
+        // Vendor changed — old model belongs to the old vendor, reset it so
+        // the model prompt starts fresh for the new vendor.
+        model = undefined;
+        modelSource = undefined;
+      }
       provider = selected;
       providerSource = "prompt";
-    } else {
+    } else if (providerSource !== "config") {
+      // Esc/Ctrl+C with no prior provider → abort.
+      // If provider was already in config, Esc means "keep existing".
       cancelled = true;
     }
   }
 
-  if (needsModelPrompt && provider) {
-    const promptFn = options.promptModel ?? defaultPromptModel;
-    const selected = await promptFn(provider);
+  // Local vendor: fetch available models live from the server, show as a select
+  // prompt. "No preference" / server-down both return undefined — model stays
+  // unset so LM Studio uses whatever is currently loaded. No cancellation: local
+  // model is always optional.
+  if (needsModelPrompt && provider === "local") {
+    const promptFn = options.promptLocalModel
+      ?? ((existing) => promptLocalModelFromServer(existing, options.localHost, options.localPort));
+    const selected = await promptFn(model);
     if (selected) {
       model = selected;
       modelSource = "prompt";
     } else {
+      // "No preference" selected or server down: clear any previously set model
+      // so config stays clean.
+      model = undefined;
+      modelSource = undefined;
+    }
+  }
+
+  // Non-local vendors: catalog-driven select prompt.
+  // Pass the existing model so it is pre-selected (confirm with Enter or change).
+  // Cancellation (Ctrl+C/Esc) keeps the existing config model and does NOT mark
+  // the selection as cancelled — Esc means "keep what I had", not "abort init".
+  // Only mark cancelled when there was no existing model to fall back to.
+  if (needsModelPrompt && provider && provider !== "local") {
+    const promptFn = options.promptModel ?? defaultPromptModel;
+    const selected = await promptFn(provider, model);
+    if (selected) {
+      model = selected;
+      modelSource = "prompt";
+    } else if (modelSource !== "config") {
+      // No prior model in config — treat cancellation as an abort.
       cancelled = true;
     }
+    // else: model stays as the existing config value; cancelled stays false.
   }
 
   return { provider, model, providerSource, modelSource, cancelled };
