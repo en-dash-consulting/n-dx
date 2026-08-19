@@ -112,6 +112,8 @@ ndx work [dir]            # hench run (pass --task=ID, --auto, --iterations=N, -
                           # The no-plan-mode rule is embedded in the hench system prompt
                           # for all CLI-provider runs (see /no-plan-mode skill).
 ndx self-heal [N] [dir]   # iterative improvement loop (analyze → recommend → execute; --yes for unattended)
+ndx install-sample [dir]  # install a safe, easily destroyable sample webapp to explore autonomous features
+ndx destroy-sample [dir]  # cleanly remove the sample app and its PRD items
 ndx start [dir]           # start server: dashboard + MCP endpoints (--port=N, --background, stop, status)
 ndx status [dir]          # rex status (pass --format=json)
 ndx usage [dir]           # token usage analytics (--format=json, --group=day|week|month)

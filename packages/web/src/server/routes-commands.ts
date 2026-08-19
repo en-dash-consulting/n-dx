@@ -130,6 +130,9 @@ function resolveRexBin(ctx: ServerContext): { bin: string; args: string[] } {
  *     the n-dx repo itself.
  */
 function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
+  if (process.env.NDX_CLI_PATH) {
+    return { bin: "node", args: [process.env.NDX_CLI_PATH] };
+  }
   const bin = join(ctx.projectDir, "node_modules", ".bin", "ndx");
   if (existsSync(bin)) return { bin, args: [] };
 
@@ -500,6 +503,62 @@ async function handleExport(
 
     if (result.error && !result.stdout) {
       errorResponse(res, 500, `Export failed: ${result.stderr || result.error.message}`);
+      return true;
+    }
+
+    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+  } catch (err) {
+    errorResponse(res, 500, String(err));
+  }
+  return true;
+}
+
+/** POST /api/commands/install-sample — ndx install-sample */
+async function handleInstallSample(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  const cmdArgs = [...prefixArgs, "install-sample", ctx.projectDir];
+
+  try {
+    const result = await foundationExec(bin, cmdArgs, {
+      cwd: ctx.projectDir,
+      timeout: 120_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    if (result.error && !result.stdout) {
+      errorResponse(res, 500, `Install failed: ${result.stderr || result.error.message}`);
+      return true;
+    }
+
+    jsonResponse(res, 200, { ok: true, output: result.stdout.trim().slice(-2000) });
+  } catch (err) {
+    errorResponse(res, 500, String(err));
+  }
+  return true;
+}
+
+/** POST /api/commands/destroy-sample — ndx destroy-sample */
+async function handleDestroySample(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<boolean> {
+  const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  const cmdArgs = [...prefixArgs, "destroy-sample", ctx.projectDir];
+
+  try {
+    const result = await foundationExec(bin, cmdArgs, {
+      cwd: ctx.projectDir,
+      timeout: 120_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    if (result.error && !result.stdout) {
+      errorResponse(res, 500, `Destroy failed: ${result.stderr || result.error.message}`);
       return true;
     }
 
@@ -1274,6 +1333,22 @@ function handleManifest(
   return true;
 }
 
+/** GET /api/commands/sample-status — check if sample app exists */
+function handleSampleStatus(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): boolean {
+  const sampleDir = join(ctx.projectDir, "sample-app");
+  const isInstalled = existsSync(sampleDir);
+
+  jsonResponse(res, 200, {
+    ok: true,
+    isInstalled,
+  });
+  return true;
+}
+
 // ── Dispatcher ────────────────────────────────────────────────────────
 
 /** Handle command trigger API requests. Returns true if the request was handled. */
@@ -1304,6 +1379,15 @@ export function handleCommandsRoute(
   }
   if (path === "export" && method === "POST") {
     return handleExport(req, res, ctx);
+  }
+  if (path === "install-sample" && method === "POST") {
+    return handleInstallSample(req, res, ctx);
+  }
+  if (path === "destroy-sample" && method === "POST") {
+    return handleDestroySample(req, res, ctx);
+  }
+  if (path === "sample-status" && method === "GET") {
+    return handleSampleStatus(req, res, ctx);
   }
   if (path === "self-heal" && method === "POST") {
     return handleSelfHeal(req, res, ctx, broadcast);

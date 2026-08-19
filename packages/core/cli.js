@@ -65,6 +65,7 @@ import {
   validateRefreshCompletion,
   rollbackRefreshState,
 } from "./refresh-validate.js";
+import { handleInstallSample, handleDestroySample } from "./sample-app.js";
 
 const CLI_ERROR_CODES = Object.freeze({
   NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
@@ -121,6 +122,7 @@ import {
 } from "./pair-programming.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
+process.env.NDX_CLI_PATH = fileURLToPath(import.meta.url);
 const MONOREPO_ROOT = resolve(__dir, "../..");
 
 // Advertise this CLI's own path to every child process. The web server's
@@ -2515,6 +2517,8 @@ const COMMAND_DISPATCH = new Map([
   ["start",             (rest) => handleStart(rest, "start")],
   ["web",               (rest) => handleStart(rest, "web")],
   ["export",            handleExport],
+  ["install-sample",    handleInstallSample],
+  ["destroy-sample",    handleDestroySample],
   ["config",            handleConfig],
   ["auth",              handleAuth],
   ["self-heal",         handleSelfHeal],

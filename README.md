@@ -11,6 +11,23 @@ AI-powered development toolkit. Analyze a codebase, build a PRD, execute tasks a
 | **[SourceVision](packages/sourcevision)** | **[Rex](packages/rex)** | **[Hench](packages/hench)** |
 | Static analysis & zone detection | PRD management & task tracking | Autonomous agent execution |
 
+## Quick Start / Try the Sample App
+
+Want to explore `n-dx` features in a safe, sandboxed environment? You can generate a sample web application complete with a pre-populated `.rex` PRD tree.
+
+```sh
+ndx install-sample .
+ndx start .
+```
+
+Open the dashboard (default `http://localhost:3117`) to explore the generated PRD items, view codebase analysis, and use the autonomous agent to fix bugs in the sample app.
+
+When you're done, you can cleanly remove the sample app and its PRD items:
+```sh
+ndx destroy-sample .
+```
+*(You can also install and destroy the sample app directly from the Commands view in the dashboard).*
+
 ## Requirements
 
 **Node.js ≥ 18** (Node 22 LTS recommended) · **pnpm ≥ 10**

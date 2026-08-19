@@ -158,7 +158,21 @@ const COMMAND_REGISTRY = [
     category: "Orchestration",
     summary: "Start dashboard and MCP server",
     keywords: ["server", "web", "dashboard", "MCP", "HTTP", "background", "daemon"],
-    related: ["web", "dev"],
+    related: ["status"],
+  },
+  {
+    name: "install-sample",
+    category: "Orchestration",
+    summary: "Install a safe, easily destroyable sample webapp",
+    keywords: ["sample", "demo", "example", "playground", "install"],
+    related: ["destroy-sample", "start", "work"],
+  },
+  {
+    name: "destroy-sample",
+    category: "Orchestration",
+    summary: "Remove the sample webapp and its PRD items",
+    keywords: ["remove", "delete", "destroy", "sample", "demo", "example"],
+    related: ["install-sample"],
   },
   {
     name: "dev",
@@ -1403,6 +1417,8 @@ export function formatMainHelp() {
     ["init [dir]", "Initialize project"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],
+    ["install-sample [dir]", "Install a safe, destroyable sample webapp"],
+    ["destroy-sample [dir]", "Remove the sample webapp and its PRD items"],
   ], pad);
 
   section("ANALYZE", [

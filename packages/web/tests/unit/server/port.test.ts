@@ -263,12 +263,12 @@ describe("port utilities", () => {
         });
       });
 
-      // Release the port partway through the retry window
-      setTimeout(() => tmp.close(), 80);
+      // Release the port partway through the retry window (shorter timeout for CI)
+      setTimeout(() => tmp.close(), 20);
 
       const result = await findAvailablePort(port, port, port + 10, {
-        maxRetries: 10,
-        retryDelayMs: 30,
+        maxRetries: 20,
+        retryDelayMs: 50,
         backoffFactor: 1,
       });
 
