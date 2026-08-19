@@ -17,6 +17,7 @@ type OpState = "idle" | "running" | "done" | "error";
 // ── Sample App Panel ───────────────────────────────────────────────────
 
 function InstallSamplePanel() {
+  const cliName = useCliName();
   const [state, setState] = useState<OpState>("idle");
   const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -123,8 +124,8 @@ function InstallSamplePanel() {
       h("h4", { style: "margin: 0 0 8px 0; color: var(--color-text); font-size: 1.05em; display: flex; align-items: center; gap: 6px;" }, "🚀 Next Steps"),
       h("p", { style: "margin: 0 0 12px 0; color: var(--color-text-muted);" }, "The sample app has been generated in a new `sample-app/` directory along with a dummy PRD! Open your terminal and run the following commands to see n-dx in action:"),
       h("pre", { style: "margin: 0; padding: 10px; background: var(--color-bg-code); border-radius: 6px; color: var(--color-text-code); font-family: monospace; white-space: pre-wrap; font-size: 0.95em;" },
-        "ndx status\n" +
-        "ndx work --auto"
+        `${cliName} status\n` +
+        `${cliName} work --auto`
       )
     ),
 
