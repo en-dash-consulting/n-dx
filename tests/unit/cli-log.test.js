@@ -66,8 +66,33 @@ describe.each(TWINS)("cli-log (%s twin)", (_name, mod) => {
     expect(mod.redactArgs(["--api-key=sk-ant-abc123"])).toEqual(["--api-key=<redacted>"]);
     expect(mod.redactArgs(["sk-ant-api03-XXXXXXXXXXXX"])).toEqual(["<redacted>"]);
     expect(mod.redactArgs(["ghp_0123456789abcdefghij"])).toEqual(["<redacted>"]);
+    // Every entry in SECRET_PATTERNS gets its own case. The two below were
+    // previously unexercised, so either twin could have dropped them — and a
+    // dropped pattern means the key it matches is written to disk in plaintext.
+    expect(mod.redactArgs(["AIzaSyFAKE0000000000000000000000000"])).toEqual(["<redacted>"]);
+    expect(mod.redactArgs(["sk-proj-0123456789abcdef"])).toEqual(["<redacted>"]);
     // Ordinary argv survives untouched.
     expect(mod.redactArgs(["-p", "--output-format", "json"])).toEqual(["-p", "--output-format", "json"]);
+  });
+
+  it("redacts secrets inside a built command line without destroying the string", () => {
+    // The field must stay a string. Passing it through redactArgs instead walks
+    // the characters, which returns an array of letters AND redacts nothing,
+    // since no single character matches a secret pattern.
+    expect(mod.redactCommandLine("claude --api-key sk-ant-abc123 -p hi")).toBe(
+      "claude --api-key <redacted> -p hi",
+    );
+    expect(mod.redactCommandLine("claude --api-key=sk-ant-abc123")).toBe("claude --api-key=<redacted>");
+    expect(mod.redactCommandLine("gemini AIzaSyFAKE0000000000000000000000000")).toBe("gemini <redacted>");
+
+    // Quoted tokens are what buildWindowsCliCommandLine actually emits.
+    expect(mod.redactCommandLine('"C:\\Program Files\\claude\\claude.cmd" --token "ghp_0123456789abcdefghij"')).toBe(
+      '"C:\\Program Files\\claude\\claude.cmd" --token "<redacted>"',
+    );
+    expect(mod.redactCommandLine('claude "--api-key=sk-ant-abc123"')).toBe('claude "--api-key=<redacted>"');
+
+    // A secret-free line is returned verbatim, original spacing included.
+    expect(mod.redactCommandLine("rex  analyze  .")).toBe("rex  analyze  .");
   });
 
   it("writes exactly one parseable JSONL line per invocation", () => {
@@ -127,6 +152,12 @@ describe("cli-log twin parity: llm-client === core", () => {
     { binary: "/usr/local/bin/codex", args: ["exec", "-", ""], cwd: "/proj", platform: "linux" },
     { binary: "claude", args: ["--api-key=sk-ant-q", "ghp_0123456789abcdefghij"], platform: "darwin" },
     { binary: "rex", args: [], platform: "linux", commandLine: 'rex ""' },
+    {
+      binary: "claude",
+      args: ["--api-key", "sk-ant-zzz"],
+      platform: "win32",
+      commandLine: '"C:\\claude\\claude.cmd" --api-key "sk-ant-zzz" AIzaSyFAKE0000000000000000000000000',
+    },
   ];
 
   it("emits byte-identical log lines for the same record", () => {
@@ -140,6 +171,9 @@ describe("cli-log twin parity: llm-client === core", () => {
     for (const record of RECORDS) {
       expect(core.redactArgs(record.args)).toEqual(llm.redactArgs(record.args));
       expect(core.vendorFromBinary(record.binary)).toBe(llm.vendorFromBinary(record.binary));
+      if (record.commandLine) {
+        expect(core.redactCommandLine(record.commandLine)).toBe(llm.redactCommandLine(record.commandLine));
+      }
     }
     for (const v of [undefined, "0", "false", "no", "1", "yes"]) {
       expect(core.isCliLogEnabled({ NDX_CLI_LOG: v })).toBe(llm.isCliLogEnabled({ NDX_CLI_LOG: v }));

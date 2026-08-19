@@ -9,7 +9,8 @@
  * TWIN: mirrored in `packages/core/cli-log.js`. The orchestration tier must not
  * import @n-dx/llm-client (spawn-only rule, enforced by domain-isolation.test.js),
  * so core carries its own copy. Any behavioural change here MUST be mirrored
- * there — `tests/unit/cli-log-parity.test.js` fails if the two diverge.
+ * there — the `cli-log twin parity` block in `tests/unit/cli-log.test.js` fails
+ * if the two diverge.
  *
  * Design constraints:
  * - **Never throws.** Logging must not break a spawn. Every filesystem call is
@@ -95,6 +96,55 @@ export function redactArgs(args: readonly string[]): string[] {
   return out;
 }
 
+/**
+ * Replace secret-bearing tokens inside a fully-built command line.
+ *
+ * `redactArgs` cannot be reused for this. It iterates its argument, so handing
+ * it a string walks the individual characters — which both explodes the logged
+ * field into an array of letters and defeats every pattern, since no single
+ * character matches `^sk-ant-…`. A secret would land in the log in full,
+ * one character per array entry.
+ *
+ * Whitespace runs are preserved so the logged line still reads like the command
+ * that ran. Tokens are matched with the same {@link SECRET_FLAGS} and
+ * `SECRET_PATTERNS` tables as {@link redactArgs}, including through the
+ * surrounding quotes that `buildWindowsCliCommandLine` adds.
+ */
+export function redactCommandLine(line: string): string {
+  const parts = line.split(/(\s+)/);
+  let redactNext = false;
+
+  return parts
+    .map((part) => {
+      // Returned before the redactNext check so a flag and its value stay paired
+      // across the gap between them.
+      if (part === "" || /^\s+$/.test(part)) return part;
+
+      const quoted = part.length > 1 && part.startsWith('"') && part.endsWith('"');
+      const bare = quoted ? part.slice(1, -1) : part;
+      const hide = quoted ? '"<redacted>"' : "<redacted>";
+
+      if (redactNext) {
+        redactNext = false;
+        return hide;
+      }
+
+      const eq = bare.indexOf("=");
+      const flag = eq === -1 ? bare : bare.slice(0, eq);
+
+      if (SECRET_FLAGS.has(flag.toLowerCase())) {
+        if (eq === -1) {
+          redactNext = true;
+          return part;
+        }
+        return quoted ? `"${flag}=<redacted>"` : `${flag}=<redacted>`;
+      }
+
+      return SECRET_PATTERNS.some((re) => re.test(bare)) ? hide : part;
+    })
+    .join("");
+}
+
 /** Derive a coarse vendor label from a binary path or bare command name. */
 export function vendorFromBinary(binary: string): string {
   const base = binary.replace(/\\/g, "/").split("/").pop() ?? binary;
@@ -145,7 +195,7 @@ export function formatCliLogLine(record: CliInvocationRecord, timestamp: string)
   };
   if (record.cwd) entry.cwd = record.cwd;
   if (record.via) entry.via = record.via;
-  if (record.commandLine) entry.commandLine = record.commandLine;
+  if (record.commandLine) entry.commandLine = redactCommandLine(record.commandLine);
   return `${JSON.stringify(entry)}\n`;
 }
 
