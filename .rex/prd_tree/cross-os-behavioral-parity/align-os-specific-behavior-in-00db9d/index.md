@@ -28,7 +28,7 @@ description: "Three verified places where the same n-dx command delivers a diffe
 | [Enforce API-key file permissions on Windows via ACLs, or stop claiming they are set](./enforce-api-key-file-01d91d.md) | completed |
 | [Freeze-verify-kill: make the POSIX tree kill definitive for timeouts](./freeze-verify-kill-make-the-71e448.md) | completed |
 | [Guard usePanZoom against a zero-sized element, and give the hook its first test](./guard-usepanzoom-against-a-zero-40eeec.md) | pending |
-| [hench's RunChangeDetector shares the mtime-granularity blind spot](./hench-s-runchangedetector-e560e5.md) | pending |
+| [hench's RunChangeDetector shares the mtime-granularity blind spot](./hench-s-runchangedetector-e560e5.md) | completed |
 | [hench's scoped post-task test run always fails on Windows (backslash paths eaten by sh -c)](./hench-s-scoped-post-task-test-c7f341.md) | completed |
 | [Route ndx start stop through the unified terminateTree contract](./route-ndx-start-stop-through-042a5a.md) | pending |
 | [Spawn exec's children through spawn so POSIX can create a real process group](./spawn-exec-s-children-through-58161d.md) | completed |

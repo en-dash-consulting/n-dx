@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile, readFile, utimes, unlink } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, readFile, utimes, unlink, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -29,6 +29,24 @@ describe("RunChangeDetector", () => {
 
   async function writeRunFile(name: string, content = '{"id":"test"}'): Promise<void> {
     await writeFile(join(runsDir, name), content, "utf-8");
+  }
+
+  /**
+   * Write a checkpoint in the pre-hash shape: mtime and size only.
+   *
+   * Written directly rather than through saveCheckpoint so it cannot pick up
+   * whatever the current serializer emits — the point is to read a file that a
+   * previous version of hench left behind.
+   */
+  async function det_saveLegacyCheckpoint(checkpoint: {
+    timestamp: string;
+    files: Record<string, { mtimeMs: number; size: number }>;
+  }): Promise<void> {
+    await writeFile(
+      join(runsDir, ".aggregation-checkpoint.json"),
+      JSON.stringify(checkpoint, null, 2),
+      "utf-8",
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -204,6 +222,88 @@ describe("RunChangeDetector", () => {
       expect(second.changes[0]).toEqual(
         expect.objectContaining({ file: "run-a.json", type: "modified" }),
       );
+    });
+
+    it("detects a same-size rewrite whose mtime did not advance", async () => {
+      // The hazard mtime+size alone cannot see. Windows advances file timestamps in
+      // ticks rather than continuously — measured on NTFS, 163 of 200 back-to-back
+      // same-size rewrites produced a byte-identical mtimeMs — so a rewrite of the
+      // same LENGTH inside one tick leaves both values unchanged and the stale
+      // contribution is kept.
+      //
+      // utimes pins the mtime back to its earlier value, reproducing that collision
+      // deterministically and on every platform, so this asserts the contract rather
+      // than the host's timer resolution. Both payloads are the same length by
+      // construction — a size change would mask the problem.
+      const runFile = join(runsDir, "run-a.json");
+      await writeRunFile("run-a.json", '{"id":"aaa"}');
+
+      // Pin BEFORE the first read as well as after the rewrite: a fresh write leaves
+      // a fractional mtimeMs while utimes stores whole milliseconds, so pinning only
+      // the second write would leave the snapshots different and the change would be
+      // detected for the wrong reason.
+      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      await utimes(runFile, pinned, pinned);
+
+      const det = detector();
+      const first = await det.detectChanges();
+      await det.saveCheckpoint(first.checkpoint);
+
+      const before = await stat(runFile);
+      await writeRunFile("run-a.json", '{"id":"bbb"}');
+      await utimes(runFile, pinned, pinned);
+      const after = await stat(runFile);
+
+      // The precondition IS the hazard: identical length, identical mtime.
+      expect(after.size).toBe(before.size);
+      expect(after.mtimeMs).toBe(before.mtimeMs);
+
+      const second = await det.detectChanges();
+      expect(second.changes).toEqual([
+        expect.objectContaining({ file: "run-a.json", type: "modified" }),
+      ]);
+    });
+
+    it("carries a hash only while the mtime is fresh, then drops it", async () => {
+      // The hash exists solely for the window where mtime cannot settle the
+      // question. If it were carried forever, every scan would read every run file
+      // and the checkpoint would stop being a cheap stat comparison. Asserting the
+      // DROP is what proves the steady state converges — merely asserting "no hash
+      // on an old file" would also pass if hashing did not exist at all.
+      const runFile = join(runsDir, "run-a.json");
+      await writeRunFile("run-a.json", '{"id":"aaa"}');
+
+      const det = detector();
+      const fresh = await det.detectChanges();
+      // Just written, so inside the granularity window: hash carried.
+      expect(typeof fresh.checkpoint.files["run-a.json"]?.contentHash).toBe("string");
+      expect(fresh.checkpoint.files["run-a.json"]?.mtimeMayBeShared).toBe(true);
+      await det.saveCheckpoint(fresh.checkpoint);
+
+      // Age the file well past the bound; mtime is now trustworthy on its own.
+      const old = new Date(Date.now() - 60_000);
+      await utimes(runFile, old, old);
+
+      const aged = await det.detectChanges();
+      expect(aged.checkpoint.files["run-a.json"]?.contentHash ?? null).toBeNull();
+      expect(aged.checkpoint.files["run-a.json"]?.mtimeMayBeShared ?? false).toBe(false);
+    });
+
+    it("reads a checkpoint written before content hashing existed", async () => {
+      // Checkpoints are persisted JSON, so older ones carry only mtime and size.
+      // They must keep working: an old checkpoint's mtime is by definition old
+      // enough to trust, so the absence of a hash is not a reason to re-read.
+      const runFile = join(runsDir, "run-a.json");
+      await writeRunFile("run-a.json", '{"id":"aaa"}');
+      const st = await stat(runFile);
+
+      await det_saveLegacyCheckpoint({
+        timestamp: new Date().toISOString(),
+        files: { "run-a.json": { mtimeMs: st.mtimeMs, size: st.size } },
+      });
+
+      const result = await detector().detectChanges();
+      expect(result.changes).toEqual([]);
     });
 
     it("detects deleted files", async () => {

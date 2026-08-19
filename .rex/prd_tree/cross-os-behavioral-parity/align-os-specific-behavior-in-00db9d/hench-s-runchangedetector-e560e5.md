@@ -2,13 +2,16 @@
 id: "e560e58d-5ad3-4546-b438-b8ce3c4996b7"
 level: "task"
 title: "hench's RunChangeDetector shares the mtime-granularity blind spot"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "cross-os"
   - "windows"
   - "hench"
   - "correctness"
+startedAt: "2026-08-19T13:37:07.626Z"
+completedAt: "2026-08-19T13:47:13.755Z"
+endedAt: "2026-08-19T13:47:13.755Z"
 acceptanceCriteria:
   - "A same-size, same-mtime rewrite of a run file is detected by RunChangeDetector, proven by a test that pins mtime with utimes rather than relying on the host's timer resolution"
   - "The steady state remains stat-only — files are not hashed on every scan once their mtime is trustworthy"

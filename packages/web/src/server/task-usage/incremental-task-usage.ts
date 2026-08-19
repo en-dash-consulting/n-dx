@@ -43,6 +43,13 @@
  * to an already-trusted value still reads as unchanged. Only the tests do that,
  * and they do it on purpose to reproduce the tick collision.
  *
+ * TWIN: hench's `RunChangeDetector` applies the same rule, and the two are
+ * deliberately NOT shared — see that file's docblock for the reasoning. The short
+ * version: no module both packages can import is an appropriate home, and unlike
+ * the `quoteWindowsToken` twin these two never need to agree with each other, so
+ * there is nothing for a parity test to assert. Each side carries its own
+ * utimes-pinned test instead. A third copy of this rule should trigger a rethink.
+ *
  * @module web/server/task-usage/incremental-task-usage
  */
 
