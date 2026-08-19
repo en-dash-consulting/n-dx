@@ -26,7 +26,7 @@ description: "Three verified places where the same n-dx command delivers a diffe
 
 | Title | Status |
 |-------|--------|
-| [Confirm AC 7 of the freeze-verify-kill task: a POSIX CI run must actually execute the freeze policy green](./confirm-ac-7-of-the-freeze-50f241.md) | in_progress |
+| [Confirm AC 7 of the freeze-verify-kill task: a POSIX CI run must actually execute the freeze policy green](./confirm-ac-7-of-the-freeze-50f241.md) | completed |
 | [Decide and document the Windows available-memory strategy for hench admission](./decide-and-document-the-windows-cd8060.md) | completed |
 | [Enforce API-key file permissions on Windows via ACLs, or stop claiming they are set](./enforce-api-key-file-01d91d.md) | completed |
 | [Freeze-verify-kill: make the POSIX tree kill definitive for timeouts](./freeze-verify-kill-make-the-71e448.md) | completed |

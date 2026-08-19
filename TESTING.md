@@ -243,32 +243,84 @@ flushed when a DOM query first succeeded.
 
 **Rules:**
 
-- **Never assert on elapsed-time ratios.** Count work instead — traversal
-  steps, call counts, rendered node counts. `countDOMNodes`' complexity test
-  counts `firstChild`/`nextSibling`/`parentNode` accesses, which is exact on
-  every machine. Absolute time budgets remain acceptable as generous
-  hang guardrails (see Timeout Guardrails), but never as ratios.
-- **Scale absolute budgets through `BUDGET_MULTIPLIER`.** Every package that
-  asserts on elapsed time declares
+Almost every wall-clock assertion in this repo is standing in for a *complexity*
+claim — "this must not go quadratic" — not a latency SLA. Three techniques can
+carry that claim. Prefer them in this order; each is strictly more load-immune
+than the one below it.
+
+- **1. Count work, not time.** Traversal steps, call counts, rendered node
+  counts are exact on every machine and cannot flake. `countDOMNodes`' complexity
+  test counts `firstChild`/`nextSibling`/`parentNode` accesses. Reach for a clock
+  only when the cost being guarded is not countable from inside the call — I/O
+  bound work such as the `prd_tree` parse and serialize passes, where what
+  regresses is syscall volume.
+
+- **2. When you must use a clock, assert GROWTH between two sizes** rather than
+  elapsed milliseconds against a constant. Measure two fixture sizes back-to-back
+  in the same process and bound the ratio: ambient load inflates both readings
+  together, so the ratio survives a busy machine while a genuine complexity
+  regression still trips it. Worked examples, each with its derivation recorded in
+  place: `folder-tree-parser.test.ts` (parse, ~11× size step),
+  `add-auto-reshape.test.ts` (scoped pass, 4× sibling step),
+  `write-path-profile.test.ts` (four phases, 39.6× step).
+
+  An earlier version of this section banned ratios outright, after a
+  linear-scaling check measured 43× against a 30× ceiling. That flake was a bound
+  picked without measurement, not a fault in the technique — which is what the
+  next rule exists to prevent.
+
+- **3. Derive a ratio bound from measurement in BOTH directions, and record the
+  numbers.** Clean runs set the floor: take the worst ratio across at least three
+  runs and leave roughly 2× above it. Then **inject the regression you claim to
+  catch and confirm the gate fails.** Skipping that second half is how a bound
+  ends up decorative — `write-path-profile`'s first bound of 6× linear was picked
+  from clean baselines alone and let an artificial O(n²) term through at 200.9×;
+  only injecting the fault exposed it, and 4× linear fails that same fault at
+  188.2×. Take the **minimum** of several timed passes per reading, per phase
+  rather than per pass, so one load spike cannot inflate a single side.
+
+- **Absolute budgets are the weakest tool — hang guardrails only — and are scaled
+  through `BUDGET_MULTIPLIER`.** Every package that asserts on elapsed time
+  declares
   `const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20)`
-  and multiplies its budget by it. These assertions exist to catch algorithmic
-  regressions, not to enforce latency: a 50 ms budget for 2.5 M operations
-  cannot hold while the rest of the suite saturates every core, whereas a
-  quadratic rewrite is orders of magnitude slower and still fails at 20×.
-  Name such a test for the property it guards ("within the scaled linear
-  budget"), never for a millisecond figure the assertion no longer uses.
+  and multiplies its budget by it: a 50 ms budget for 2.5 M operations cannot hold
+  while the rest of the suite saturates every core, whereas a quadratic rewrite is
+  orders of magnitude slower and still fails at 20×. Name such a test for the
+  property it guards ("within the scaled linear budget"), never for a millisecond
+  figure the assertion no longer uses. If the claim is really about complexity,
+  prefer rule 2 and delete the budget rather than scaling it.
+
+- **Never scale a bound whose job is to sit below another number.** Multiplying
+  is only safe for a budget that stands alone. Where a bound exists to
+  *discriminate* between two outcomes, scaling it lifts it past the thing it was
+  distinguishing and the assertion silently starts passing in the failure case.
+  `shell.test.ts` asserted `elapsed < 2000 * BUDGET_MULTIPLIER` (40 s) on a
+  command whose own lifetime was 3 s: "returned on timeout" and "waited for the
+  command" both satisfied it, so the assertion tested nothing. Express such
+  bounds as a fraction of the number they must stay under
+  (`TIMEOUT_COMMAND_LIFETIME_MS / 4`), so they cannot drift apart.
 - **Never click a control whose enabled state depends on a pending effect.**
   Wait for the control to be present *and* enabled, re-querying it each attempt
   — clicking a disabled or replaced element is a silent no-op that then waits
   out the full timeout.
-- **Retry the action, not just the assertion**, when the listener is attached
-  by an effect (`addEventListener` on a ref) or when a settle effect can undo
-  the result. A `wheel` dispatched before its listener attaches is simply lost,
-  and a pan applied just before a view-reset effect fires is wiped. Dispatch
-  *inside* the `waitFor` body so each poll re-sends the gesture. Only do this
-  for intents that tolerate repetition: a toggle that is already in the target
-  state, or a cumulative action whose assertion accepts any converged value
-  (assert "a positive multiple of 40", not "exactly 40").
+- **Flush effects if you can; retry the action only if you cannot.** Both handle
+  the same hazard — a `wheel` dispatched before its listener attaches is lost, and
+  a pan applied just before a view-reset effect fires is wiped — but they are not
+  equal.
+  - *Preferred:* wrap the render and the gesture in `act()` from
+    `preact/test-utils`, which flushes Preact's deferred effects synchronously.
+    The race is then **closed rather than tolerated**, which buys back an exact
+    assertion: `graph-view.test.ts` asserts the transform is exactly
+    `translate(0 -40)`.
+  - *Fallback:* when no flush point exists, dispatch *inside* the `waitFor` body
+    so each poll re-sends the gesture. Only for intents that tolerate repetition:
+    a toggle already in its target state, or a cumulative action whose assertion
+    accepts any converged value ("a positive multiple of 40").
+
+  Note the cost of the fallback, and why it is the fallback: "a positive multiple
+  of 40" no longer distinguishes one correct pan from three, so it cannot catch a
+  gesture applied twice. Retrying widens what counts as success; flushing does
+  not.
 - **Prefer fixing the product when the race is reachable by a user.** The
   focus-history seeding in `graph.ts` was rewritten because a click landing
   before its seeding effect left Back permanently disabled — a real
