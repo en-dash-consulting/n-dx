@@ -36,7 +36,7 @@
 
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import {writeFile} from "node:fs/promises";import { join } from "node:path";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { totalmem, freemem, loadavg, cpus } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
@@ -1206,68 +1206,43 @@ async function handleExecute(
   };
 
   // Spawn hench process with streaming stdout so the UI can show live output.
-  // We use Node's spawn directly (rather than spawnManaged) to attach a stdout
-  // listener before the process exits.
-  const childProc = spawn(binPath, binArgs, {
+  const handle = spawnManaged(binPath, binArgs, {
     cwd: ctx.projectDir,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: "pipe",
     windowsHide: true,
     env: { ...process.env },
+    onStdout(text) {
+      const entry = activeExecutions.get(taskId);
+      if (!entry) return;
+
+      let changed = false;
+
+      // Extract tok/s metric — use the LAST match in the chunk (most recent
+      // turn wins when multiple turns arrive in one I/O buffer).
+      const tokMatches = [...text.matchAll(TOK_PER_SEC_RE)];
+      if (tokMatches.length > 0) {
+        const last = tokMatches[tokMatches.length - 1];
+        entry.state.tokensPerSecond = parseFloat(last[1]);
+        changed = true;
+      }
+
+      // Broadcast the last non-blank, non-metric line as a live status hint.
+      // Filter out tok/s lines so the metric only appears in the dedicated badge.
+      const lastLine = text
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l && !TOK_PER_SEC_LINE_RE.test(l))
+        .at(-1);
+      if (lastLine) {
+        entry.state.lastOutput = lastLine;
+        changed = true;
+      }
+
+      if (changed) {
+        broadcastExecState(broadcast, { ...entry.state });
+      }
+    },
   });
-
-  // Wrap in a ManagedChild-compatible handle so kill/terminate still works
-  let stdout = "";
-  let stderr = "";
-  const donePromise = new Promise<{ exitCode: number | null; stdout: string; stderr: string }>(
-    (resolve) => {
-      childProc.stdout!.on("data", (chunk: Buffer) => {
-        const text = chunk.toString();
-        stdout += text;
-        const entry = activeExecutions.get(taskId);
-        if (!entry) return;
-
-        let changed = false;
-
-        // Extract tok/s metric — use the LAST match in the chunk (most recent
-        // turn wins when multiple turns arrive in one I/O buffer).
-        const tokMatches = [...text.matchAll(TOK_PER_SEC_RE)];
-        if (tokMatches.length > 0) {
-          const last = tokMatches[tokMatches.length - 1];
-          entry.state.tokensPerSecond = parseFloat(last[1]);
-          changed = true;
-        }
-
-        // Broadcast the last non-blank, non-metric line as a live status hint.
-        // Filter out tok/s lines so the metric only appears in the dedicated badge.
-        const lastLine = text
-          .split("\n")
-          .map((l) => l.trim())
-          .filter((l) => l && !TOK_PER_SEC_LINE_RE.test(l))
-          .at(-1);
-        if (lastLine) {
-          entry.state.lastOutput = lastLine;
-          changed = true;
-        }
-
-        if (changed) {
-          broadcastExecState(broadcast, { ...entry.state });
-        }
-      });
-      childProc.stderr!.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString();
-      });
-      childProc.on("error", () => resolve({ exitCode: 1, stdout, stderr }));
-      childProc.on("close", (code) => resolve({ exitCode: code, stdout, stderr }));
-    },
-  );
-
-  const handle: ManagedChild = {
-    done: donePromise,
-    kill(signal) {
-      return childProc.kill(signal);
-    },
-    get pid() { return childProc.pid; },
-  };
 
   // Track active execution
   activeExecutions.set(taskId, { runId, handle, state: execState });
