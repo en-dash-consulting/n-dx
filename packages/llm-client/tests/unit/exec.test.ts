@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
 import { resolve } from "node:path";
 import { fakeSpawn } from "../helpers/fake-spawn.js";
 
@@ -212,6 +212,28 @@ describe("exec", () => {
     expect(result.stderr).toBe("");
     expect(result.exitCode).toBe(0);
   });
+});
+
+describe("freeze-verify-kill is opt-in (BETA)", () => {
+  // The freeze path replaces a sweep that has far more mileage, and its POSIX
+  // behaviour is not yet proven against real processes in CI. Default-off is the
+  // whole point of the flag, so it is asserted rather than assumed.
+
+  it("is disabled by default", () => {
+    expect(isPosixFreezeKillEnabled({})).toBe(false);
+    expect(isPosixFreezeKillEnabled({ NDX_POSIX_FREEZE_KILL: "" })).toBe(false);
+    expect(isPosixFreezeKillEnabled({ NDX_POSIX_FREEZE_KILL: "0" })).toBe(false);
+    // Not switchable by an arbitrary truthy string: an experimental flag should
+    // take a deliberate value, not anything non-empty.
+    expect(isPosixFreezeKillEnabled({ NDX_POSIX_FREEZE_KILL: "maybe" })).toBe(false);
+  });
+
+  it("accepts the same spellings as the other NDX_* opt-ins", () => {
+    for (const value of ["1", "true", "yes"]) {
+      expect(isPosixFreezeKillEnabled({ NDX_POSIX_FREEZE_KILL: value })).toBe(true);
+    }
+  });
+
 });
 
 describe("execStdout", () => {

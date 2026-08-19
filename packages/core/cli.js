@@ -40,7 +40,7 @@ import { createRequire } from "module";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig } from "./config.js";
+import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv } from "./config.js";
 import {
   parseRecommendationsJson,
   formatQueuedTaskSummary,
@@ -431,10 +431,28 @@ function run(script, args) {
   return new Promise((res) => {
     const child = spawnTracked(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",
+      env: childEnv(),
     });
     child.on("close", (code) => res(code ?? 1));
   });
 }
+
+/**
+ * Environment for spawned sub-CLIs: the ambient environment plus any BETA
+ * experimental flags the project has enabled.
+ *
+ * The decision itself lives in config.js's `experimentalEnv` so it is pure and
+ * testable; this only applies it. Resolved once per run rather than per spawn,
+ * because `run()` is called for every sub-CLI and the value cannot change mid-run.
+ */
+function childEnv() {
+  return Object.keys(experimentalEnvFragment).length > 0
+    ? { ...process.env, ...experimentalEnvFragment }
+    : process.env;
+}
+
+/** BETA experimental flags to forward to children. Empty unless opted in. */
+let experimentalEnvFragment = {};
 
 async function runOrDie(script, args) {
   const code = await run(script, args);
@@ -2639,6 +2657,10 @@ async function main() {
   const dir = resolveDir(rest);
   const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
   const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
+
+  // Resolve BETA experimental flags from the same config read, so childEnv() can
+  // forward them to sub-CLIs without a second filesystem hit.
+  experimentalEnvFragment = experimentalEnv(projectConfig);
 
   // ── Stale-project detection (synchronous) ───────────────────────────────
   // Run before command dispatch so the notice can be shown after output.

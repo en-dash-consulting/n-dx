@@ -67,10 +67,37 @@ export interface ExecOptions {
    */
   treeKill?: boolean;
   /**
+   * BETA, default OFF. On timeout, freeze the process tree with SIGSTOP and prove
+   * it is stopped before killing it, instead of signalling and sweeping. POSIX
+   * only; no effect on Windows, which has no pure-JS pause.
+   *
+   * Defaults to {@link isPosixFreezeKillEnabled}, i.e. the NDX_POSIX_FREEZE_KILL
+   * environment flag, so it stays off unless explicitly enabled. It is gated
+   * because the sweep it replaces has been exercised far more: the freeze path's
+   * unit coverage injects its seams, and its real-process behaviour on POSIX is
+   * not yet proven in CI. Pass explicitly to override the flag either way.
+   */
+  freeze?: boolean;
+  /**
    * @internal Override platform detection — for unit tests only.
    * Production callers must never pass this.
    */
   _platform?: NodeJS.Platform;
+}
+
+/**
+ * Whether the BETA freeze-verify-kill timeout path is enabled.
+ *
+ * Off unless `NDX_POSIX_FREEZE_KILL` is 1/true/yes. Follows the opt-in shape
+ * already used by NDX_DEBUG and core's isLifecycleDebugEnabled, so an operator can
+ * enable it for a single run without touching config; `ndx work` also sets it from
+ * the `experimental.posixFreezeTreeKill` project setting.
+ *
+ * Exported so the flag has exactly one definition and can be asserted directly.
+ */
+export function isPosixFreezeKillEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const value = env.NDX_POSIX_FREEZE_KILL;
+  return value === "1" || value === "true" || value === "yes";
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +139,7 @@ export function exec(
     maxBuffer = DEFAULT_MAX_BUFFER,
     env,
     treeKill = true,
+    freeze = isPosixFreezeKillEnabled(env ?? process.env),
     _platform = process.platform as NodeJS.Platform,
   } = opts;
 
@@ -159,14 +187,15 @@ export function exec(
     /**
      * Stop the command, taking its descendants with it when treeKill is on.
      *
-     * `freeze: true` because this is the timeout/runaway path: on POSIX the tree is
-     * SIGSTOPped and proven stopped before anything is killed, so a descendant
-     * cannot fork its way out from under the kill. That deliberately forfeits a
-     * graceful phase — a stopped process cannot act on SIGTERM — which is the right
-     * trade when the command has already overrun its deadline.
+     * `freeze` is the BETA path and defaults OFF: when enabled, POSIX SIGSTOPs the
+     * tree and proves it stopped before killing, so a descendant cannot fork its way
+     * out from under the kill. That deliberately forfeits a graceful phase — a
+     * stopped process cannot act on SIGTERM — which is the right trade once a
+     * command has overrun its deadline, but it is newer than the sweep it replaces,
+     * so it is opt-in until CI has exercised it against real POSIX processes.
      */
     const stopChild = async (): Promise<void> => {
-      if (treeKill) await terminateProcessTree(child, { platform: _platform, freeze: true });
+      if (treeKill) await terminateProcessTree(child, { platform: _platform, freeze });
       else child.kill("SIGKILL");
     };
 

@@ -760,6 +760,32 @@ const CLI_TIMEOUT_DEFAULTS = {
  * Zero is valid and means "no timeout".
  * Exported for unit testing.
  */
+/**
+ * Environment additions that carry BETA experimental settings into spawned CLIs.
+ *
+ * Returns `{}` unless a flag is explicitly enabled, so the common case leaves a
+ * child's environment untouched.
+ *
+ * This translation belongs to the orchestration tier: the foundation code that
+ * acts on the flag (llm-client's `exec`) must not read `.n-dx.json` itself, and a
+ * sub-CLI runs in its own process where an in-memory option could not reach it.
+ * Kept as a pure function so the decision is testable without spawning anything.
+ *
+ * `experimental.posixFreezeTreeKill` must be boolean `true`. A truthy string does
+ * NOT enable it: an experimental default-off switch should require a deliberate
+ * value, and `ndx config` coerces "true" to a boolean anyway.
+ *
+ * @param {Record<string, unknown>} [projectConfig] Merged project config.
+ * @returns {Record<string, string>} Env fragment to spread over a child's env.
+ */
+export function experimentalEnv(projectConfig) {
+  const experimental = projectConfig?.experimental;
+  if (experimental?.posixFreezeTreeKill === true) {
+    return { NDX_POSIX_FREEZE_KILL: "1" };
+  }
+  return {};
+}
+
 export function validateTimeoutMs(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new Error(
@@ -1386,6 +1412,23 @@ Self-heal settings (.n-dx.json):
 
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)
+
+Experimental settings (.n-dx.json) — BETA, off by default:
+  experimental.posixFreezeTreeKill
+                           boolean   BETA. On POSIX, when a command hits its
+                                    timeout, freeze its whole process tree with
+                                    SIGSTOP and verify every process is stopped
+                                    before killing it — so nothing can fork its
+                                    way out from under the kill. Default: false.
+                                    NOT RIGOROUSLY TESTED: the unit coverage
+                                    injects its seams, and its behaviour against
+                                    real POSIX processes is not yet proven in CI.
+                                    The default path (signal, then sweep the
+                                    process table) has far more mileage.
+                                    No effect on Windows, which has no way to
+                                    pause a process from pure JS.
+                                    Equivalent one-off: NDX_POSIX_FREEZE_KILL=1
+                                    Example: n-dx config experimental.posixFreezeTreeKill true
 
 Language detection override (.n-dx.json):
   language                 string    Primary project language (default: "auto")

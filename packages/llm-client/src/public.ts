@@ -264,6 +264,7 @@ export {
   diagnoseCliInvocation,
   isCliNotFoundError,
   diagnoseCliNotFound,
+  isPosixFreezeKillEnabled,
 } from "./exec.js";
 
 export type {
