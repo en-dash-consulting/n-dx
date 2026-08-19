@@ -2,7 +2,7 @@
 id: "042a5aac-09c4-4499-96af-a7c2c75dbb78"
 level: "task"
 title: "Route ndx start stop through the unified terminateTree contract"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "cross-os"
@@ -13,6 +13,9 @@ tags:
 blockedBy:
   - "e6f25b4d-ee6a-4dfe-89b6-a6520f3fd0e4"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-19T14:05:32.034Z"
+completedAt: "2026-08-19T14:19:29.734Z"
+endedAt: "2026-08-19T14:19:29.734Z"
 acceptanceCriteria:
   - "web.js stopServer uses the shared termination primitive rather than its own SIGTERM/SIGKILL sequence"
   - "`ndx start stop` terminates the server's child processes on Windows, not just the recorded server PID"

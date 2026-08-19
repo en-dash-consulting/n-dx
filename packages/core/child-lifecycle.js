@@ -70,32 +70,97 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * The ONE SIGTERM → grace → SIGKILL escalation in this package.
+ *
+ * Written against three injected capabilities rather than a concrete target, so a
+ * live ChildProcess and a bare PID read from a pid file share the same sequence
+ * instead of each growing its own copy. `ndx start stop` previously had a second
+ * implementation in web.js, which meant Windows deficiencies had to be fixed twice
+ * and were not.
+ *
+ * @param {object} target
+ * @param {(signal: string) => boolean} target.signal Deliver a signal. Returns
+ *   false when the target is already gone, which ends the sequence.
+ * @param {() => boolean} target.isAlive Liveness check.
+ * @param {(timeoutMs: number) => Promise<void>} target.waitForExit Resolve when the
+ *   target exits or the timeout elapses — event-driven for a ChildProcess, polling
+ *   for a PID.
+ * @param {number} forceKillTimeoutMs Grace period before SIGKILL, and the bound on
+ *   the wait after it.
+ * @returns {Promise<boolean>} Whether the target is gone.
+ */
+async function escalateTermination({ signal, isAlive, waitForExit }, forceKillTimeoutMs) {
+  if (!isAlive()) return true;
+  if (!signal("SIGTERM")) return !isAlive();
+
+  await waitForExit(forceKillTimeoutMs);
+  if (!isAlive()) return true;
+
+  // SIGTERM is advisory: a process can ignore it, and on Windows it is
+  // TerminateProcess anyway, so reaching here means the graceful phase is over.
+  if (!signal("SIGKILL")) return !isAlive();
+
+  await waitForExit(forceKillTimeoutMs);
+  return !isAlive();
+}
+
+/** Escalation adapter for a live ChildProcess: signals via the handle, waits on events. */
+function childTarget(child) {
+  return {
+    signal: (sig) => {
+      try {
+        child.kill(sig);
+        return true;
+      } catch {
+        return false; // already gone
+      }
+    },
+    isAlive: () => isChildRunning(child),
+    waitForExit: (timeoutMs) =>
+      Promise.race([waitForChildExit(child), delay(timeoutMs)]).then(() => undefined),
+  };
+}
+
+/**
+ * Escalation adapter for a bare PID.
+ *
+ * Polls, because there is no handle to listen on. `kill(pid, 0)` is a probe rather
+ * than a signal, and it CANNOT distinguish a live process from a zombie or from a
+ * recycled PID — so callers that own a pid file must keep their own staleness
+ * handling rather than treating "alive" here as authoritative.
+ */
+function pidTarget(pid, killImpl, pollIntervalMs) {
+  const isAlive = () => {
+    try {
+      killImpl(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  return {
+    isAlive,
+    signal: (sig) => {
+      try {
+        killImpl(pid, sig);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    waitForExit: async (timeoutMs) => {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        if (!isAlive()) return;
+        await delay(Math.min(pollIntervalMs, Math.max(0, deadline - Date.now())));
+      }
+    },
+  };
+}
+
 async function terminateChildProcess(child, forceKillTimeoutMs) {
-  if (!isChildRunning(child)) return;
-
-  try {
-    child.kill("SIGTERM");
-  } catch {
-    return;
-  }
-
-  await Promise.race([
-    waitForChildExit(child),
-    delay(forceKillTimeoutMs),
-  ]);
-
-  if (!isChildRunning(child)) return;
-
-  try {
-    child.kill("SIGKILL");
-  } catch {
-    return;
-  }
-
-  await Promise.race([
-    waitForChildExit(child),
-    delay(forceKillTimeoutMs),
-  ]);
+  await escalateTermination(childTarget(child), forceKillTimeoutMs);
 }
 
 /** Report which termination strategy ran (opt-in; see isLifecycleDebugEnabled). */
@@ -163,27 +228,38 @@ async function terminateProcessGroup(child, forceKillTimeoutMs, killGroup) {
   const pgid = -child.pid;
   traceStrategy(`process group kill ${pgid} (SIGTERM, then SIGKILL)`);
 
-  try {
-    killGroup(pgid, "SIGTERM");
-  } catch {
-    // Group kill failed (e.g. child already exited or pgid not available).
+  if (!groupHasMembers(pgid, killGroup)) {
+    // No group of its own (not spawned detached) or already drained — deal with
+    // the direct child instead.
     return terminateChildProcess(child, forceKillTimeoutMs);
   }
 
-  // Wait on the GROUP, not the direct child. The leader commonly installs a
-  // SIGTERM handler and exits promptly while a grandchild ignores the signal,
-  // so the child's exit says nothing about whether the tree is gone.
-  await waitForGroupExit(pgid, killGroup, forceKillTimeoutMs);
+  // Same escalation as everywhere else, with the GROUP as the target rather than
+  // the direct child: the leader commonly installs a SIGTERM handler and exits
+  // promptly while a grandchild ignores the signal, so the child's exit says
+  // nothing about whether the tree is gone.
+  const drained = await escalateTermination(groupTarget(pgid, killGroup, forceKillTimeoutMs), forceKillTimeoutMs);
+  if (drained) return;
 
-  if (!groupHasMembers(pgid, killGroup)) return;
+  // Group did not drain — the direct child is still the caller's handle.
+  return terminateChildProcess(child, forceKillTimeoutMs);
+}
 
-  try {
-    killGroup(pgid, "SIGKILL");
-  } catch {
-    // Group may have drained between the probe and SIGKILL — ignore.
-  }
-
-  await waitForGroupExit(pgid, killGroup, forceKillTimeoutMs);
+/** Escalation adapter for a POSIX process group. */
+function groupTarget(pgid, killGroup, forceKillTimeoutMs) {
+  return {
+    signal: (sig) => {
+      try {
+        killGroup(pgid, sig);
+        return true;
+      } catch {
+        return false; // group drained between probe and signal
+      }
+    },
+    isAlive: () => groupHasMembers(pgid, killGroup),
+    waitForExit: (timeoutMs) =>
+      waitForGroupExit(pgid, killGroup, Math.min(timeoutMs, forceKillTimeoutMs)),
+  };
 }
 
 /**
@@ -229,20 +305,19 @@ export function treeKillCommand(pid) {
  * `taskkill /F`), no handler runs and this never executes — the tree then
  * survives unless the host placed it in a Job Object.
  */
-async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl) {
-  if (!isChildRunning(child)) return;
-
-  if (!child.pid) {
-    return terminateChildProcess(child, forceKillTimeoutMs);
-  }
-
-  traceStrategy(`taskkill /PID ${child.pid} /T /F`);
-
+/**
+ * Run `taskkill /T /F` against a pid and wait, bounded, for it to report back.
+ *
+ * Shared by the ChildProcess and PID paths so the Windows tree kill is invoked in
+ * exactly one place. Never throws: a taskkill that cannot spawn leaves the caller
+ * to fall back to signalling directly.
+ */
+async function runWindowsTreeKill(pid, forceKillTimeoutMs, spawnCliImpl) {
   try {
     // Routed through win-spawn.js rather than a hand-built command line:
     // repo policy (the DEP0190 guard in tests/e2e/architecture-policy.test.js)
     // bans ad-hoc Windows command strings.
-    const { command, args } = treeKillCommand(child.pid);
+    const { command, args } = treeKillCommand(pid);
     const killer = spawnCliImpl(command, args, { stdio: "ignore", windowsHide: true });
 
     // Bounded: a taskkill that never reports back must not wedge shutdown.
@@ -257,8 +332,19 @@ async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl) {
       delay(forceKillTimeoutMs),
     ]);
   } catch {
-    // taskkill itself could not be spawned — fall through to the direct kill.
+    // taskkill itself could not be spawned — caller falls back to a direct kill.
   }
+}
+
+async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl) {
+  if (!isChildRunning(child)) return;
+
+  if (!child.pid) {
+    return terminateChildProcess(child, forceKillTimeoutMs);
+  }
+
+  traceStrategy(`taskkill /PID ${child.pid} /T /F`);
+  await runWindowsTreeKill(child.pid, forceKillTimeoutMs, spawnCliImpl);
 
   await Promise.race([
     waitForChildExit(child),
@@ -269,6 +355,70 @@ async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl) {
 
   // taskkill did not get it (or never ran): still deal with the direct child.
   return terminateChildProcess(child, forceKillTimeoutMs);
+}
+
+/**
+ * Terminate a process tree given only a PID — the pid-file case.
+ *
+ * Same contract as {@link terminateTree}, for callers that never held the
+ * ChildProcess: `ndx start stop` reads `.n-dx-web.pid` written by an earlier,
+ * unrelated process. It shares {@link escalateTermination}, so there is one
+ * SIGTERM-grace-SIGKILL sequence in this package rather than one per call site.
+ *
+ * WHAT THIS FIXES ON WINDOWS: signalling the recorded PID alone orphaned every
+ * child the server had spawned, because SIGTERM there is TerminateProcess (no
+ * cleanup handlers run) and nothing walks the tree. `taskkill /T` does. The
+ * background server is also spawned `detached: true`, which takes it OUT of
+ * libuv's job object, so nothing else would have reaped its children either.
+ *
+ * A PID IS WEAKER EVIDENCE THAN A HANDLE, and the difference is not papered over:
+ * `kill(pid, 0)` cannot tell a live process from a zombie or from a recycled PID.
+ * Callers owning a pid file must keep their own staleness checks; a true return
+ * here means "not signallable any more", not "the process we meant is gone".
+ *
+ * @param {number} pid
+ * @param {object} [options]
+ * @param {number} [options.forceKillTimeoutMs=5000] Grace period before SIGKILL.
+ * @param {NodeJS.Platform} [options.platform] Overridable so both strategies are
+ *   testable on any host.
+ * @param {Function} [options.spawnCliImpl] Injectable spawn (defaults to win-spawn's spawnCli).
+ * @param {Function} [options.killImpl] Injectable signaller (defaults to process.kill).
+ * @param {number} [options.pollIntervalMs=100] Liveness poll interval.
+ * @returns {Promise<boolean>} Whether the pid is gone.
+ */
+export async function terminateTreeByPid(pid, {
+  forceKillTimeoutMs = DEFAULT_FORCE_KILL_TIMEOUT_MS,
+  platform = process.platform,
+  spawnCliImpl = spawnCli,
+  killImpl = (targetPid, signal) => process.kill(targetPid, signal),
+  pollIntervalMs = 100,
+} = {}) {
+  const target = pidTarget(pid, killImpl, pollIntervalMs);
+  if (!target.isAlive()) return true;
+
+  if (supportsProcessGroups(platform)) {
+    // Signal the GROUP first when the process leads one — the background server is
+    // spawned detached, so on POSIX it does. Falls through to the pid itself when
+    // there is no group (ESRCH), which the escalation below handles.
+    const group = pidTarget(-pid, killImpl, pollIntervalMs);
+    if (group.isAlive()) {
+      traceStrategy(`process group kill ${-pid} (SIGTERM, then SIGKILL)`);
+      await escalateTermination(
+        { ...group, isAlive: target.isAlive },
+        forceKillTimeoutMs,
+      );
+      if (!target.isAlive()) return true;
+    }
+    return escalateTermination(target, forceKillTimeoutMs);
+  }
+
+  traceStrategy(`taskkill /PID ${pid} /T /F`);
+  await runWindowsTreeKill(pid, forceKillTimeoutMs, spawnCliImpl);
+  await target.waitForExit(forceKillTimeoutMs);
+  if (!target.isAlive()) return true;
+
+  // taskkill did not get it (or never ran): fall back to signalling the pid.
+  return escalateTermination(target, forceKillTimeoutMs);
 }
 
 /**

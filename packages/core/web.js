@@ -21,6 +21,7 @@ import { spawn } from "child_process";
 import { createConnection } from "net";
 import { readFile, writeFile, unlink, access } from "fs/promises";
 import { join, resolve } from "path";
+import { terminateTreeByPid } from "./child-lifecycle.js";
 
 const DEFAULT_PORT = 3117;
 const PID_FILE = ".n-dx-web.pid";
@@ -177,29 +178,17 @@ export function isProcessRunning(pid) {
 
 // ── Subcommands ──────────────────────────────────────────────────────────────
 
-/**
- * Poll until a process exits or the deadline is reached.
- *
- * @param {number} pid          Process ID to watch.
- * @param {number} timeoutMs    Maximum wait time in milliseconds.
- * @param {number} [intervalMs] Polling interval. Defaults to 100 ms.
- * @returns {Promise<boolean>}  `true` if the process exited, `false` if timeout.
- */
-export async function waitForProcessExit(pid, timeoutMs, intervalMs = 100) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!isProcessRunning(pid)) return true;
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-  return false;
-}
+// The poll-until-exit helper that used to live here is gone: it existed only to
+// support this file's own SIGTERM → grace → SIGKILL sequence, which now comes from
+// child-lifecycle's terminateTreeByPid. Nothing else imported it.
 
 /**
- * Stop a running background server.
+ * Stop a running background server and everything it spawned.
  *
- * Sends SIGTERM and waits up to `gracePeriodMs` for the server to exit
- * cleanly.  If the server is still alive after the grace period, SIGKILL
- * is sent as a force-kill fallback.
+ * Escalates SIGTERM → grace period → SIGKILL via child-lifecycle's shared
+ * primitive, which also reaches the server's CHILDREN — `taskkill /T` on Windows,
+ * a process-group signal on POSIX (the server is started detached, so it leads a
+ * group there).
  *
  * The default grace period is intentionally short (2 s) so the CLI stop
  * command stays responsive.  For servers that need longer, pass gracePeriodMs
@@ -223,26 +212,21 @@ async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(pro
     return true;
   }
 
-  try {
-    process.kill(info.pid, "SIGTERM");
-  } catch (err) {
-    console.error(`Failed to send SIGTERM to server (PID ${info.pid}): ${err.message}`);
-    return false;
-  }
+  // Delegated to child-lifecycle so the SIGTERM → grace → SIGKILL escalation
+  // exists once in this package. It also takes the server's CHILDREN with it: this
+  // used to signal only the recorded PID, which on Windows meant TerminateProcess
+  // on one process and every `rex analyze` / `hench run` it had spawned orphaned —
+  // and the server is started `detached: true`, which puts it outside libuv's job
+  // object, so nothing else would have reaped them either.
+  const stopped = await terminateTreeByPid(info.pid, {
+    // web.js keeps its own, shorter grace period: `ndx start stop` is interactive
+    // and must stay responsive, where child-lifecycle's tracker defaults to 5s for
+    // shutdown. Consolidating the mechanism must not change the latency.
+    forceKillTimeoutMs: gracePeriodMs,
+  });
 
-  // Wait for graceful exit
-  const exited = await waitForProcessExit(info.pid, gracePeriodMs);
-
-  if (!exited) {
-    // Force-kill unresponsive server
-    log(`Server (PID ${info.pid}) did not exit within ${gracePeriodMs} ms — sending SIGKILL.`);
-    try {
-      process.kill(info.pid, "SIGKILL");
-    } catch {
-      // Process may have exited between the check and the kill — that's fine
-    }
-    // Give SIGKILL a moment to take effect
-    await waitForProcessExit(info.pid, 2_000);
+  if (!stopped) {
+    log(`Server (PID ${info.pid}) did not exit within ${gracePeriodMs} ms of SIGKILL.`);
   }
 
   log(`Stopped ${label} (PID ${info.pid}, port ${info.port}).`);

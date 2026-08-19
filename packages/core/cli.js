@@ -56,7 +56,6 @@ import {
   readPidFile,
   removePidFile,
   removePortFile,
-  waitForProcessExit,
 } from "./web.js";
 import { buildRefreshPlan, RefreshPlanError } from "./refresh-plan.js";
 import { refreshSourcevisionDashboardArtifacts } from "./refresh-artifacts.js";
@@ -109,6 +108,7 @@ import {
   createChildProcessTracker,
   installTrackedChildProcessHandlers,
   treeKillSpawnOptions,
+  terminateTreeByPid,
 } from "./child-lifecycle.js";
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
@@ -723,33 +723,31 @@ async function detectAndCleanConflictingDashboard(absDir) {
   // Live process — terminate gracefully.
   const gracePeriodMs = Number(process.env.N_DX_STOP_GRACE_MS ?? 2_000);
 
+  // Probe with signal 0 before delegating. The shared primitive reports a boolean,
+  // but "not permitted" is a different user-facing outcome from "stopped", so the
+  // distinction has to be drawn here where the status is decided.
   try {
-    process.kill(info.pid, "SIGTERM");
+    process.kill(info.pid, 0);
   } catch (err) {
     if (err?.code === "EPERM") {
-      // No permission to signal the process.
+      // Process exists but is not ours to signal.
       return { status: "stop-failed", pid: info.pid, port: info.port };
     }
-    // ESRCH: process exited between the running-check and the kill — treat as stopped.
+    // ESRCH: exited between the running-check and here — treat as stopped.
     await removePidFile(absDir);
     await removePortFile(absDir);
     return { status: "stopped", pid: info.pid, port: info.port };
   }
 
-  // Wait for graceful exit up to the grace period.
-  await waitForProcessExit(info.pid, gracePeriodMs);
-
-  // Escalate to SIGKILL regardless of whether waitForProcessExit timed out.
-  // kill(pid, 0) returns success for zombie processes (exited but not yet reaped
-  // by their parent), so waitForProcessExit may report a timeout even when the
-  // process has effectively exited.  After SIGKILL, a short settle is sufficient —
-  // we do not poll again because SIGKILL is unblockable and zombies are already done.
-  try {
-    process.kill(info.pid, "SIGKILL");
-  } catch {
-    // Ignore: process is already gone or is a zombie — both are effectively stopped.
-  }
-  await new Promise((r) => setTimeout(r, 100));
+  // Terminate the server AND its children through the shared contract, so this is
+  // not a third copy of the SIGTERM → grace → SIGKILL sequence. On Windows this is
+  // what stops `rex analyze` / `hench run` children being orphaned by a stop.
+  //
+  // The result is deliberately not consulted: `kill(pid, 0)` succeeds for a zombie
+  // (exited, not yet reaped), so "still signallable" does not mean "still running",
+  // and reporting stop-failed on that basis would be wrong. SIGKILL is unblockable,
+  // so by this point the process is done in every sense the caller cares about.
+  await terminateTreeByPid(info.pid, { forceKillTimeoutMs: gracePeriodMs });
 
   await removePidFile(absDir);
   await removePortFile(absDir);
