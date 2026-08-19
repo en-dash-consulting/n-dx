@@ -99,6 +99,19 @@ export interface TerminateTreeOptions {
   spawnImpl?: typeof spawn;
   /** Injectable group signaller for the POSIX path. */
   killGroup?: (pid: number, signal: NodeJS.Signals | 0) => void;
+  /**
+   * POSIX only: freeze the tree with SIGSTOP, prove it is frozen, then SIGKILL —
+   * instead of signalling SIGTERM and sweeping. Defaults to false.
+   *
+   * Use it for timeouts and runaways, where the goal is that the command has
+   * definitively stopped. Do NOT use it for graceful shutdown: a frozen process
+   * cannot act on SIGTERM (the signal queues until SIGCONT), so freezing forfeits
+   * the flush a clean shutdown wants. The two policies are mutually exclusive by
+   * construction, not by preference — see {@link freezeAndKillPosixTree}.
+   *
+   * No effect on Windows, which has no pure-JS pause.
+   */
+  freeze?: boolean;
 }
 
 function isChildRunning(child: ChildProcess): boolean {
@@ -226,12 +239,82 @@ function captureStdout(
   });
 }
 
+/** One snapshot of the process table: who parents whom, and who is stopped. */
+interface ProcessTable {
+  childrenOf: Map<number, number[]>;
+  stateOf: Map<number, string>;
+}
+
+/**
+ * Read the process table once.
+ *
+ * `ps -A -o pid=,ppid=,state=` is the portable form: `=` suppresses headers, and
+ * it behaves the same on Linux and macOS. State comes from the SAME call as
+ * parentage deliberately — the freeze path needs both every pass, and asking
+ * twice would double the spawns for no new information.
+ *
+ * Reading /proc/<pid>/stat would avoid the spawn entirely, but only on Linux.
+ * Deliberately not done: it would mean a second mechanism to keep correct on a
+ * platform this code cannot be exercised on locally, and the cost here is one or
+ * two spawns per kill rather than per poll.
+ */
+async function readProcessTable(
+  spawnImpl: typeof spawn,
+  timeoutMs: number,
+): Promise<ProcessTable> {
+  const listing = await captureStdout(
+    spawnImpl,
+    "ps",
+    ["-A", "-o", "pid=,ppid=,state="],
+    timeoutMs,
+  );
+
+  const childrenOf = new Map<number, number[]>();
+  const stateOf = new Map<number, string>();
+  for (const line of listing.split("\n")) {
+    const [pidText, ppidText, stateText] = line.trim().split(/\s+/);
+    const pid = Number.parseInt(pidText ?? "", 10);
+    const ppid = Number.parseInt(ppidText ?? "", 10);
+    if (!Number.isInteger(pid) || !Number.isInteger(ppid)) continue;
+    if (stateText) stateOf.set(pid, stateText);
+    const siblings = childrenOf.get(ppid);
+    if (siblings) siblings.push(pid);
+    else childrenOf.set(ppid, [pid]);
+  }
+  return { childrenOf, stateOf };
+}
+
+/**
+ * Whether a process is incapable of forking: stopped ('T') or already dead but
+ * unreaped ('Z').
+ *
+ * A zombie counts. It cannot execute, so it satisfies what the freeze is for, and
+ * insisting on 'T' would spin until its parent reaps it. macOS decorates state
+ * with flags ("T+"), hence the prefix test rather than equality.
+ */
+function isFrozenState(state: string | undefined): boolean {
+  return state === undefined || state.startsWith("T") || state.startsWith("Z");
+}
+
+/** Breadth-first descendants of `rootPid` from an already-read table. */
+function descendantsFrom(table: ProcessTable, rootPid: number): number[] {
+  const found: number[] = [];
+  const queue = [rootPid];
+  const seen = new Set<number>([rootPid]);
+  while (queue.length > 0) {
+    const next = queue.shift()!;
+    for (const kid of table.childrenOf.get(next) ?? []) {
+      if (seen.has(kid)) continue;
+      seen.add(kid);
+      found.push(kid);
+      queue.push(kid);
+    }
+  }
+  return found;
+}
+
 /**
  * Every descendant pid of `rootPid`, deepest last.
- *
- * `ps -A -o pid=,ppid=` is the portable form: the `=` suppresses headers, and it
- * behaves the same on Linux and macOS. Reading /proc would avoid the spawn but is
- * Linux-only.
  *
  * Used because a process group is not always available — see
  * {@link terminatePosixTree}.
@@ -241,35 +324,9 @@ async function posixDescendants(
   spawnImpl: typeof spawn,
   timeoutMs: number,
 ): Promise<number[]> {
-  const listing = await captureStdout(spawnImpl, "ps", ["-A", "-o", "pid=,ppid="], timeoutMs);
-  if (!listing) return [];
-
-  const childrenOf = new Map<number, number[]>();
-  for (const line of listing.split("\n")) {
-    const [pidText, ppidText] = line.trim().split(/\s+/);
-    const pid = Number.parseInt(pidText ?? "", 10);
-    const ppid = Number.parseInt(ppidText ?? "", 10);
-    if (!Number.isInteger(pid) || !Number.isInteger(ppid)) continue;
-    const siblings = childrenOf.get(ppid);
-    if (siblings) siblings.push(pid);
-    else childrenOf.set(ppid, [pid]);
-  }
-
-  // Breadth-first, so the returned order is shallowest-first; callers signal in
-  // reverse to take leaves before their parents.
-  const found: number[] = [];
-  const queue = [rootPid];
-  const seen = new Set<number>([rootPid]);
-  while (queue.length > 0) {
-    const next = queue.shift()!;
-    for (const kid of childrenOf.get(next) ?? []) {
-      if (seen.has(kid)) continue;
-      seen.add(kid);
-      found.push(kid);
-      queue.push(kid);
-    }
-  }
-  return found;
+  const table = await readProcessTable(spawnImpl, timeoutMs);
+  if (table.childrenOf.size === 0) return [];
+  return descendantsFrom(table, rootPid);
 }
 
 /** Whether a single pid is still alive. Signal 0 is a probe, not a kill. */
@@ -283,6 +340,103 @@ function pidIsAlive(
   } catch {
     return false;
   }
+}
+
+/** Send a signal, reporting whether it was accepted rather than throwing. */
+function trySignal(
+  signalPid: NonNullable<TerminateTreeOptions["killGroup"]>,
+  pid: number,
+  signal: NodeJS.Signals,
+): boolean {
+  try {
+    signalPid(pid, signal);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * POSIX: freeze the tree, prove it is frozen, then kill it.
+ *
+ * WHY FREEZE FIRST. The alternative — enumerate, then signal — is inference. Its
+ * hole is reparenting: a descendant whose parent dies is adopted by init, and the
+ * pid->ppid link the enumeration depends on dissolves at exactly the moment the
+ * killing starts. Freezing first closes that hole rather than working around it,
+ * because reparenting only happens when a parent EXITS and nothing exits until
+ * the enumeration is finished.
+ *
+ * WHY IT TERMINATES. SIGSTOP cannot be caught, blocked, or ignored, and a stopped
+ * process cannot execute, so it cannot fork. New arrivals can therefore only come
+ * from processes that were still running when the last pass read the table, and
+ * that set shrinks monotonically. The loop runs to a FIXPOINT — a pass that
+ * discovers nothing — rather than a fixed number of rounds, because "two passes is
+ * usually enough" is not a guarantee.
+ *
+ * WHY SIGKILL AND NEVER SIGTERM. A stopped process does not act on SIGTERM: the
+ * signal simply queues until something sends SIGCONT. SIGKILL is delivered to
+ * stopped processes without resuming them. Restoring a graceful phase would mean
+ * SIGCONT per process, which reopens the fork window and forfeits the guarantee —
+ * so freezing and graceful termination are mutually exclusive, and this path is
+ * only for timeouts and runaways. The graceful policy lives in the non-freeze
+ * branch of {@link terminateProcessTree} and is unchanged.
+ *
+ * REMAINING LIMIT: a deliberate double-fork daemon escapes parentage by design.
+ * No enumeration finds it. That is a policy question — whether agent-run commands
+ * may daemonize at all — not a detection one.
+ */
+async function freezeAndKillPosixTree(
+  child: ChildProcess,
+  rootPid: number,
+  forceKillTimeoutMs: number,
+  killGroup: NonNullable<TerminateTreeOptions["killGroup"]>,
+  spawnImpl: typeof spawn,
+): Promise<void> {
+  // FAST PATH: a real process group needs no enumeration at all. Membership is
+  // inherited rather than listed, so both signals are atomic over the whole tree.
+  const pgid = -rootPid;
+  if (trySignal(killGroup, pgid, "SIGSTOP")) {
+    trySignal(killGroup, pgid, "SIGKILL");
+    await waitForGroupExit(pgid, killGroup, forceKillTimeoutMs);
+    return;
+  }
+
+  // FALLBACK: no group of its own (the execFile case, and anything spawned
+  // without `detached`). Freeze the root, then close over its descendants.
+  trySignal(killGroup, rootPid, "SIGSTOP");
+  const frozen = new Set<number>([rootPid]);
+
+  const deadline = Date.now() + forceKillTimeoutMs;
+  let table = await readProcessTable(spawnImpl, forceKillTimeoutMs);
+  for (;;) {
+    const fresh = descendantsFrom(table, rootPid).filter((pid) => !frozen.has(pid));
+    if (fresh.length === 0) break;
+    for (const pid of fresh) {
+      trySignal(killGroup, pid, "SIGSTOP");
+      frozen.add(pid);
+    }
+    if (Date.now() >= deadline) break;
+    table = await readProcessTable(spawnImpl, forceKillTimeoutMs);
+  }
+
+  // VERIFY, rather than assume: a stopped process is observably stopped, so wait
+  // until every member reads as incapable of forking before killing anything. If
+  // the deadline passes first, proceed anyway — a bounded best-effort kill beats
+  // hanging — but the guarantee has degraded and that is worth knowing.
+  while (Date.now() < deadline) {
+    const unfrozen = [...frozen].filter((pid) => !isFrozenState(table.stateOf.get(pid)));
+    if (unfrozen.length === 0) break;
+    await delay(Math.min(GROUP_POLL_INTERVAL_MS, Math.max(0, deadline - Date.now())));
+    table = await readProcessTable(spawnImpl, forceKillTimeoutMs);
+  }
+
+  // Leaves before parents: `frozen` was filled root-first in breadth-first order,
+  // so reversing takes children before the parents that spawned them.
+  for (const pid of [...frozen].reverse()) {
+    if (pidIsAlive(pid, killGroup)) trySignal(killGroup, pid, "SIGKILL");
+  }
+
+  await Promise.race([waitForChildExit(child), delay(forceKillTimeoutMs)]);
 }
 
 /**
@@ -306,11 +460,21 @@ async function terminatePosixTree(
   forceKillTimeoutMs: number,
   killGroup: NonNullable<TerminateTreeOptions["killGroup"]>,
   spawnImpl: typeof spawn,
+  freeze: boolean,
 ): Promise<void> {
   if (!isChildRunning(child)) return;
   if (!child.pid) return terminateChildProcess(child, forceKillTimeoutMs);
 
   const rootPid = child.pid;
+
+  // Timeouts and runaways take the freeze path: stop everything, prove it stopped,
+  // then SIGKILL. Graceful callers fall through to the SIGTERM sweep below, which
+  // gives descendants a chance to exit cleanly. The two are mutually exclusive —
+  // SIGTERM does nothing to a stopped process.
+  if (freeze) {
+    return freezeAndKillPosixTree(child, rootPid, forceKillTimeoutMs, killGroup, spawnImpl);
+  }
+
   const pgid = -rootPid;
 
   // Collect descendants BEFORE signalling: once the direct child dies its
@@ -375,6 +539,21 @@ async function terminatePosixTree(
 /**
  * Windows: `taskkill /T /F`, then fall back to the direct child.
  *
+ * NO FREEZE-VERIFY-KILL HERE, and it is not an omission. Windows has no SIGSTOP:
+ * libuv maps the signals it supports onto TerminateProcess, so `freeze` has no
+ * effect on this branch. Every real equivalent needs native code —
+ * NtSuspendProcess, per-thread SuspendThread, debugger attach, or a Job Object
+ * with JOB_OBJECT_LIMIT_ACTIVE_PROCESS = 1 (containment by denying process
+ * creation rather than by pausing). So the POSIX path can be made definitive and
+ * this one cannot; `taskkill /T` remains a tree walk.
+ *
+ * ITS FAILURE MODE IS THE MIRROR IMAGE OF POSIX'S. POSIX reparents orphans, so a
+ * link to a dead parent disappears — which is why the POSIX path freezes before
+ * enumerating. Windows never reparents, so the link survives its parent's death
+ * and can instead dangle onto a RECYCLED pid. taskkill walks those links, so in
+ * principle it can miss a tree or reach an unrelated process that inherited the
+ * number. Job Objects avoid both, being membership rather than inference.
+ *
  * NOT USED: Job Objects are the architecturally correct primitive — a job with
  * JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE reaps its whole tree with semantics exactly
  * analogous to a process group. Creating one requires a native addon, which would
@@ -438,11 +617,12 @@ export async function terminateProcessTree(
     killGroup = (pid, signal) => {
       process.kill(pid, signal);
     },
+    freeze = false,
   }: TerminateTreeOptions = {},
 ): Promise<void> {
   if (!isChildRunning(child)) return;
 
   return supportsProcessGroups(platform)
-    ? terminatePosixTree(child, forceKillTimeoutMs, killGroup, spawnImpl)
+    ? terminatePosixTree(child, forceKillTimeoutMs, killGroup, spawnImpl, freeze)
     : terminateWindowsTree(child, forceKillTimeoutMs, spawnImpl);
 }

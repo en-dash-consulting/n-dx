@@ -2,7 +2,7 @@
 id: "71e44890-a3b3-4a24-aa15-4aefb94c8735"
 level: "task"
 title: "Freeze-verify-kill: make the POSIX tree kill definitive for timeouts"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "cross-os"
@@ -11,6 +11,9 @@ tags:
   - "correctness"
 blockedBy:
   - "58161d5e-ae2a-45aa-9dec-10036b3cf74d"
+startedAt: "2026-08-19T12:57:48.384Z"
+completedAt: "2026-08-19T13:10:41.222Z"
+endedAt: "2026-08-19T13:10:41.222Z"
 acceptanceCriteria:
   - "The timeout path freezes the tree before killing anything, and asserts every member is observably stopped (state 'T') before the first SIGKILL"
   - "The enumeration reaches a fixpoint — a pass that discovers nothing — rather than running a fixed number of rounds"

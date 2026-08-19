@@ -156,9 +156,17 @@ export function exec(
       return;
     }
 
-    /** Stop the command, taking its descendants with it when treeKill is on. */
+    /**
+     * Stop the command, taking its descendants with it when treeKill is on.
+     *
+     * `freeze: true` because this is the timeout/runaway path: on POSIX the tree is
+     * SIGSTOPped and proven stopped before anything is killed, so a descendant
+     * cannot fork its way out from under the kill. That deliberately forfeits a
+     * graceful phase — a stopped process cannot act on SIGTERM — which is the right
+     * trade when the command has already overrun its deadline.
+     */
     const stopChild = async (): Promise<void> => {
-      if (treeKill) await terminateProcessTree(child, { platform: _platform });
+      if (treeKill) await terminateProcessTree(child, { platform: _platform, freeze: true });
       else child.kill("SIGKILL");
     };
 

@@ -100,14 +100,19 @@ describe("terminateProcessTree — POSIX", () => {
    * these tests shell out to the host's real ps, which makes them depend on the
    * machine's actual process table.
    */
-  function fakePs(listing: string) {
+  function fakePs(listing: string | string[]) {
     const calls: string[][] = [];
+    // An array scripts successive passes, so a table that GROWS between reads can
+    // be modelled — that is what proves the loop runs to a fixpoint rather than a
+    // fixed number of rounds. The last entry repeats once exhausted.
+    const listings = Array.isArray(listing) ? listing : [listing];
     const impl = ((command: string, args: string[]) => {
+      const text = listings[Math.min(calls.length, listings.length - 1)]!;
       calls.push([command, ...args]);
       const proc = new EventEmitter() as EventEmitter & { stdout: EventEmitter };
       proc.stdout = new EventEmitter();
       setTimeout(() => {
-        proc.stdout.emit("data", Buffer.from(listing));
+        proc.stdout.emit("data", Buffer.from(text));
         proc.emit("close", 0);
       }, 1);
       return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
@@ -158,7 +163,9 @@ describe("terminateProcessTree — POSIX", () => {
     const ps = fakePs(" 4242     1\n 5000  4242\n 6000  5000\n 7000     1\n");
     await terminateProcessTree(child, { ...posix, killGroup, spawnImpl: ps.impl });
 
-    expect(ps.calls[0]).toEqual(["ps", "-A", "-o", "pid=,ppid="]);
+    // The state column comes from the SAME call as parentage: the freeze path needs
+    // both every pass, and asking twice would double the spawns for nothing.
+    expect(ps.calls[0]).toEqual(["ps", "-A", "-o", "pid=,ppid=,state="]);
     // Leaves before parents, and the unrelated pid 7000 is untouched.
     expect(signalled.map((s) => s.pid)).toEqual([6000, 5000]);
     expect(signalled.every((s) => s.signal === "SIGTERM")).toBe(true);
@@ -246,6 +253,225 @@ describe("terminateProcessTree — POSIX", () => {
 
     expect(group.calls).toEqual([]);
     expect(child.kills).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+});
+
+describe("terminateProcessTree — POSIX freeze-verify-kill", () => {
+  const posix = { platform: "linux" as NodeJS.Platform, forceKillTimeoutMs: 300, freeze: true };
+
+  /** Reuses the POSIX describe's ps stand-in via a local copy of the shape. */
+  function fakePs(listing: string | string[]) {
+    const calls: string[][] = [];
+    const listings = Array.isArray(listing) ? listing : [listing];
+    const impl = ((command: string, args: string[]) => {
+      const text = listings[Math.min(calls.length, listings.length - 1)]!;
+      calls.push([command, ...args]);
+      const proc = new EventEmitter() as EventEmitter & { stdout: EventEmitter };
+      proc.stdout = new EventEmitter();
+      setTimeout(() => {
+        proc.stdout.emit("data", Buffer.from(text));
+        proc.emit("close", 0);
+      }, 1);
+      return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
+    }) as unknown as typeof import("node:child_process").spawn;
+    return { impl, calls };
+  }
+
+  /**
+   * A signaller that records everything and models a table of live processes.
+   * `groupExists` decides whether a negative pid (a process group) is accepted,
+   * which is what selects the fast path.
+   */
+  function recorder({ groupExists }: { groupExists: boolean }) {
+    const sent: { pid: number; signal: NodeJS.Signals | 0 }[] = [];
+    const dead = new Set<number>();
+    return {
+      sent,
+      dead,
+      kill(pid: number, signal: NodeJS.Signals | 0): void {
+        if (pid < 0 && !groupExists) throw new Error("ESRCH");
+        if (signal === 0) {
+          if (dead.has(pid)) throw new Error("ESRCH");
+          return;
+        }
+        sent.push({ pid, signal });
+        if (signal === "SIGKILL") dead.add(pid);
+      },
+    };
+  }
+
+  it("freezes and kills the whole group without enumerating, when a group exists", async () => {
+    const child = fakeChild(4242);
+    const sig = recorder({ groupExists: true });
+    const ps = fakePs(" 4242     1  T\n");
+
+    await terminateProcessTree(child, { ...posix, killGroup: sig.kill, spawnImpl: ps.impl });
+
+    // Group membership is inherited rather than listed, so both signals are atomic
+    // over the tree and no process table needs reading at all.
+    expect(sig.sent).toEqual([
+      { pid: -4242, signal: "SIGSTOP" },
+      { pid: -4242, signal: "SIGKILL" },
+    ]);
+    expect(ps.calls).toHaveLength(0);
+  });
+
+  it("stops the root, then every descendant, before killing anything", async () => {
+    const child = fakeChild(4242);
+    const sig = recorder({ groupExists: false });
+    const ps = fakePs(" 4242     1  T\n 5000  4242  T\n 6000  5000  T\n 7000     1  S\n");
+
+    await terminateProcessTree(child, { ...posix, killGroup: sig.kill, spawnImpl: ps.impl });
+
+    const stops = sig.sent.filter((x) => x.signal === "SIGSTOP").map((x) => x.pid);
+    const kills = sig.sent.filter((x) => x.signal === "SIGKILL").map((x) => x.pid);
+
+    // Root first, then its descendants. 7000 is unrelated and never touched.
+    expect(stops).toEqual([4242, 5000, 6000]);
+    // Leaves before parents.
+    expect(kills).toEqual([6000, 5000, 4242]);
+    // Every stop precedes every kill: nothing is killed while the tree can still fork.
+    const firstKill = sig.sent.findIndex((x) => x.signal === "SIGKILL");
+    const lastStop = sig.sent.map((x) => x.signal).lastIndexOf("SIGSTOP");
+    expect(lastStop).toBeLessThan(firstKill);
+  });
+
+  it("never sends SIGTERM to a frozen tree", async () => {
+    // SIGTERM does not reach a stopped process — it queues until SIGCONT — so
+    // sending it here would be a silent no-op that looks like a graceful attempt.
+    const child = fakeChild(4242);
+    const sig = recorder({ groupExists: false });
+    const ps = fakePs(" 4242     1  T\n 5000  4242  T\n");
+
+    await terminateProcessTree(child, { ...posix, killGroup: sig.kill, spawnImpl: ps.impl });
+
+    expect(sig.sent.some((x) => x.signal === "SIGTERM")).toBe(false);
+  });
+
+  it("keeps enumerating until a pass discovers nothing new", async () => {
+    // The second pass reveals a grandchild the first could not see. A fixed
+    // two-round loop would still catch this one; the point is that the loop is
+    // driven by discovery, so the third pass (which adds nothing) is what ends it.
+    const child = fakeChild(4242);
+    const sig = recorder({ groupExists: false });
+    const ps = fakePs([
+      " 4242     1  T\n 5000  4242  T\n",
+      " 4242     1  T\n 5000  4242  T\n 6000  5000  T\n",
+      " 4242     1  T\n 5000  4242  T\n 6000  5000  T\n",
+    ]);
+
+    await terminateProcessTree(child, { ...posix, killGroup: sig.kill, spawnImpl: ps.impl });
+
+    const stops = sig.sent.filter((x) => x.signal === "SIGSTOP").map((x) => x.pid);
+    expect(stops).toEqual([4242, 5000, 6000]);
+    // Three reads: one that found 5000, one that found 6000, one that found nothing.
+    expect(ps.calls.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("waits for a member that has not stopped yet before killing", async () => {
+    // First read shows the child still running ('S'); the freeze is not yet proven,
+    // so the kill must wait for a later read rather than trust the SIGSTOP call.
+    const child = fakeChild(4242);
+    const sig = recorder({ groupExists: false });
+    const ps = fakePs([
+      " 4242     1  S\n 5000  4242  S\n",
+      " 4242     1  S\n 5000  4242  S\n",
+      " 4242     1  T\n 5000  4242  T\n",
+    ]);
+
+    await terminateProcessTree(child, { ...posix, killGroup: sig.kill, spawnImpl: ps.impl });
+
+    expect(sig.sent.filter((x) => x.signal === "SIGKILL").map((x) => x.pid)).toEqual([5000, 4242]);
+    // It re-read the table rather than killing off the first, unproven snapshot.
+    expect(ps.calls.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("treats a zombie as frozen rather than waiting for it", async () => {
+    // A dead-but-unreaped process cannot execute, so it satisfies what the freeze
+    // is for. Insisting on 'T' would spin until its parent reaps it.
+    const child = fakeChild(4242);
+    const sig = recorder({ groupExists: false });
+    const ps = fakePs(" 4242     1  T\n 5000  4242  Z\n");
+
+    await terminateProcessTree(child, { ...posix, killGroup: sig.kill, spawnImpl: ps.impl });
+
+    expect(sig.sent.filter((x) => x.signal === "SIGKILL")).not.toEqual([]);
+    // Two reads at most: the fixpoint pass, and nothing more — no waiting on 'Z'.
+    expect(ps.calls.length).toBeLessThanOrEqual(3);
+  });
+
+  it("gives up in bounded time when a member refuses to stop", async () => {
+    // Nothing ever reads as stopped. The kill still happens — a bounded best-effort
+    // beats hanging — but this is the case where the guarantee has degraded.
+    const child = fakeChild(4242);
+    const sig = recorder({ groupExists: false });
+    const ps = fakePs(" 4242     1  R\n 5000  4242  R\n");
+
+    const started = Date.now();
+    await terminateProcessTree(child, {
+      ...posix,
+      forceKillTimeoutMs: 150,
+      killGroup: sig.kill,
+      spawnImpl: ps.impl,
+    });
+
+    expect(sig.sent.filter((x) => x.signal === "SIGKILL")).not.toEqual([]);
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+});
+
+describe("freeze and graceful are distinct policies", () => {
+  function fakePs(listing: string) {
+    const impl = ((command: string, args: string[]) => {
+      const proc = new EventEmitter() as EventEmitter & { stdout: EventEmitter };
+      proc.stdout = new EventEmitter();
+      setTimeout(() => {
+        proc.stdout.emit("data", Buffer.from(listing));
+        proc.emit("close", 0);
+      }, 1);
+      return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
+    }) as unknown as typeof import("node:child_process").spawn;
+    return { impl };
+  }
+
+  /** Signals sent for one policy against the same two-process tree. */
+  async function signalsFor(freeze: boolean): Promise<(NodeJS.Signals | 0)[]> {
+    const child = fakeChild(4242);
+    const sent: (NodeJS.Signals | 0)[] = [];
+    const dead = new Set<number>();
+    const killGroup = (pid: number, signal: NodeJS.Signals | 0): void => {
+      if (pid < 0) throw new Error("ESRCH"); // no group either way
+      if (signal === 0) {
+        if (dead.has(pid)) throw new Error("ESRCH");
+        return;
+      }
+      sent.push(signal);
+      if (signal === "SIGKILL") dead.add(pid);
+    };
+
+    await terminateProcessTree(child, {
+      platform: "linux",
+      forceKillTimeoutMs: 150,
+      freeze,
+      killGroup,
+      spawnImpl: fakePs(" 4242     1  T\n 5000  4242  T\n").impl,
+    });
+    return sent;
+  }
+
+  it("freeze uses SIGSTOP then SIGKILL; graceful uses SIGTERM first and never SIGSTOP", async () => {
+    // These two must not converge. Graceful shutdown wants the flush a SIGTERM
+    // handler performs; the freeze path cannot offer one, because a stopped process
+    // does not act on SIGTERM. A future refactor that unified them would break one
+    // or the other silently, so the difference is pinned here.
+    const frozen = await signalsFor(true);
+    const graceful = await signalsFor(false);
+
+    expect(frozen).toContain("SIGSTOP");
+    expect(frozen).not.toContain("SIGTERM");
+
+    expect(graceful).toContain("SIGTERM");
+    expect(graceful).not.toContain("SIGSTOP");
   });
 });
 
