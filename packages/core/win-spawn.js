@@ -19,7 +19,7 @@ import { logCliInvocation } from "./cli-log.js";
 /**
  * Quote a single token for a Windows cmd.exe verbatim command line.
  *
- * TWIN: exact copy of quoteWindowsToken in packages/llm-client/src/exec.ts.
+ * TWIN: same logic as quoteWindowsToken in packages/llm-client/src/exec.ts.
  * See that file for the full rule rationale. Summary:
  * - Every token is quoted unconditionally.
  * - Embedded double quotes are doubled (`"` → `""`).
@@ -58,13 +58,13 @@ export function quoteWindowsToken(token) {
  * A binary token that is a plain bare command name — no spaces, quotes, path
  * separators, or cmd.exe metacharacters, so it needs no quoting.
  *
- * TWIN: exact copy of WINDOWS_BARE_BINARY_RE in packages/llm-client/src/exec.ts.
+ * TWIN: same logic as WINDOWS_BARE_BINARY_RE in packages/llm-client/src/exec.ts.
  */
 const WINDOWS_BARE_BINARY_RE = /^[A-Za-z0-9_.+-]+$/;
 
 /**
  * Build a Windows cmd.exe verbatim command line from a binary path and args.
- * TWIN: exact copy of buildWindowsCliCommandLine in packages/llm-client/src/exec.ts.
+ * TWIN: same logic as buildWindowsCliCommandLine in packages/llm-client/src/exec.ts.
  * Exported for the cross-package parity test.
  *
  * Args are always quoted; a bare command name is left UNQUOTED so cmd.exe still

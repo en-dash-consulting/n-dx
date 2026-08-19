@@ -26,6 +26,36 @@
  * two implementations were in fact identical and only the build was stale.
  * Integration tests that spawn real CLIs have good reason to run against
  * compiled output; a pure-function parity guard does not.
+ *
+ * ## Why the twin still exists — decision, not oversight (task f3f909c2)
+ *
+ * Extracting these functions into a tiny foundation-tier package that both sides
+ * import was evaluated and REJECTED. The evidence:
+ *
+ * - CHURN IS NEARLY ZERO AND CO-CHANGE IS PERFECT. win-spawn.js has been touched
+ *   3 times in its life, and all 3 commits also touched exec.ts. The "update the
+ *   twin" discipline has held 3/3.
+ * - THERE IS NO DRIFT TODAY. A structural diff of the two implementations shows
+ *   identical logic; only three explanatory comments differ.
+ * - THE COST IS PERMANENT AND DISPROPORTIONATE. ~60 lines of pure string logic
+ *   would buy a 7th published package (version bumps, changesets, build and
+ *   exports wiring) plus an allowlist hole in the spawn-only rule. That rule's
+ *   value comes from being near-absolute; one documented exception is a precedent
+ *   the next contributor will cite for something less pure.
+ * - A SECOND TWIN PAIR NOW EXISTS. treeKillCommand / treeKillSpawnOptions are
+ *   duplicated between llm-client's process-tree.ts and core's child-lifecycle.js,
+ *   guarded by tests/unit/tree-kill-parity.test.js. Extracting only the quoting
+ *   pair leaves two inconsistent patterns; extracting both grows the new package
+ *   from "quoting" into "Windows process primitives". Keeping twins keeps ONE
+ *   documented pattern, used twice.
+ *
+ * WHAT WOULD JUSTIFY REVISITING: the churn assumption breaking — a change to
+ * either copy that is NOT mirrored in the same commit, or a third twin pair
+ * appearing. At that point the discipline is no longer carrying the weight and a
+ * shared module earns its cost.
+ *
+ * Because the twin is staying, this guard is deliberately stronger than a sampled
+ * table: see the exhaustive enumeration below.
  */
 import { describe, it, expect } from "vitest";
 import { buildWindowsCliCommandLine as buildLlm } from "../../packages/llm-client/src/exec.ts";
@@ -63,6 +93,57 @@ describe("Windows quoting parity: exec.ts twin === win-spawn.js twin", () => {
       const args = ["--print", "hi"];
       expect(buildWinSpawn(binary, args)).toBe(buildLlm(binary, args));
     }
+  });
+});
+
+/**
+ * The quoting algorithm's state machine only distinguishes three input classes:
+ * a backslash, a double quote, and "anything else". Enumerating every string up
+ * to length 5 over one representative of each — plus a space, since it is what
+ * makes quoting observable — is therefore exhaustive for the logic rather than a
+ * sample of it: 1365 tokens covering every reachable run-length and adjacency.
+ *
+ * This is what makes keeping the twin defensible. A curated table can miss the
+ * one adjacency a future edit gets wrong; this cannot.
+ */
+function enumerateTokens(alphabet, maxLength) {
+  const tokens = [""];
+  let frontier = [""];
+  for (let length = 1; length <= maxLength; length++) {
+    const next = [];
+    for (const prefix of frontier) {
+      for (const ch of alphabet) next.push(prefix + ch);
+    }
+    tokens.push(...next);
+    frontier = next;
+  }
+  return tokens;
+}
+
+describe("Windows quoting parity: exhaustive over the algorithm's input classes", () => {
+  const ALPHABET = ["\\", '"', " ", "a"];
+  const TOKENS = enumerateTokens(ALPHABET, 5);
+
+  it("enumerates every token up to length 5 (sanity check on the generator)", () => {
+    // 1 + 4 + 16 + 64 + 256 + 1024. A silently-empty generator would make the
+    // assertions below pass while testing nothing.
+    expect(TOKENS).toHaveLength(1365);
+    expect(new Set(TOKENS).size).toBe(TOKENS.length);
+  });
+
+  it("both twins agree on every enumerated token as an argument", () => {
+    const binary = "claude";
+    const divergent = TOKENS.filter(
+      (token) => buildWinSpawn(binary, [token]) !== buildLlm(binary, [token]),
+    );
+    expect(divergent).toEqual([]);
+  });
+
+  it("both twins agree on every enumerated token as the binary", () => {
+    const divergent = TOKENS.filter(
+      (token) => buildWinSpawn(token, ["--print"]) !== buildLlm(token, ["--print"]),
+    );
+    expect(divergent).toEqual([]);
   });
 });
 

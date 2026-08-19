@@ -997,11 +997,16 @@ export interface SpawnCliOptions {
 /**
  * Quote a single token for use in a Windows cmd.exe verbatim command line.
  *
- * TWIN: this logic is intentionally duplicated in `packages/core/config.js`
- * (`quoteWindowsToken` / `buildWindowsCliCommandLine`) because the
- * orchestration tier must not import @n-dx/llm-client (spawn-only rule).
+ * TWIN: this logic is intentionally duplicated in `packages/core/win-spawn.js`
+ * (`quoteWindowsToken` / `buildWindowsCliCommandLine`) because the orchestration
+ * tier must not import @n-dx/llm-client (spawn-only rule). `config.js` re-exports
+ * from win-spawn.js, so win-spawn.js — not config.js — is the file to edit.
  * Any change here MUST be mirrored there — the cross-package parity test
  * `tests/unit/windows-quoting-parity.test.js` fails if the two diverge.
+ *
+ * Keeping the twin was a deliberate, recorded decision rather than an oversight;
+ * the reasoning (and what would justify revisiting it) lives in that test's
+ * docblock.
  *
  * Rules:
  * - EVERY token is quoted unconditionally. Always-quoting is safe under
@@ -1067,6 +1072,8 @@ const WINDOWS_BARE_BINARY_RE = /^[A-Za-z0-9_.+-]+$/;
 
 /**
  * Build a Windows cmd.exe verbatim command line from a binary path and args.
+ *
+ * TWIN: mirrored in `packages/core/win-spawn.js`; see quoteWindowsToken above.
  *
  * Pure function — safe to call on any platform; its tests run on every CI.
  * Every ARGUMENT is quoted unconditionally by {@link quoteWindowsToken}.

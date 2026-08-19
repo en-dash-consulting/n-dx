@@ -2,7 +2,7 @@
 id: "f3f909c2-38a4-441b-aa36-962eff326a92"
 level: "task"
 title: "Extract quoteWindowsToken into a zero-dependency shared module (retire the twin)"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "windows"
@@ -14,6 +14,9 @@ tags:
 blockedBy:
   - "01d923cb-e8b0-49d1-bd33-9a57b1d4ec9e"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-19T03:33:35.644Z"
+completedAt: "2026-08-19T03:38:36.543Z"
+endedAt: "2026-08-19T03:38:36.543Z"
 acceptanceCriteria:
   - "An explicit written decision: extract to a shared module, or keep the twin with the source-side parity guard — with the reasoning recorded"
   - "IF EXTRACTED: exactly one copy of quoteWindowsToken/buildWindowsCliCommandLine/WINDOWS_BARE_BINARY_RE exists in the monorepo"

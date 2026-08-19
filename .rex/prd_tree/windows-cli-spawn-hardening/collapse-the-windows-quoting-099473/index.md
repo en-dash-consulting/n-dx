@@ -2,7 +2,7 @@
 id: "0994732e-03c6-4de8-86ef-2f200a2cbe35"
 level: "feature"
 title: "Collapse the Windows quoting twin to a single implementation"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -12,6 +12,9 @@ tags:
   - "llm-client"
   - "core"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-19T03:38:50.189Z"
+completedAt: "2026-08-19T03:38:50.189Z"
+endedAt: "2026-08-19T03:38:50.189Z"
 acceptanceCriteria:
   - "The parity guard cannot fail because of a stale build — only because the two implementations genuinely differ"
   - "A single documented decision on whether the twin stays duplicated or collapses to one shared module"
@@ -24,5 +27,5 @@ description: "`quoteWindowsToken` / `buildWindowsCliCommandLine` exist twice, by
 
 | Title | Status |
 |-------|--------|
-| [Extract quoteWindowsToken into a zero-dependency shared module (retire the twin)](./extract-quotewindowstoken-into-f3f909.md) | pending |
+| [Extract quoteWindowsToken into a zero-dependency shared module (retire the twin)](./extract-quotewindowstoken-into-f3f909.md) | completed |
 | [Repoint the Windows quoting parity test at src/exec.ts instead of dist/public.js](./repoint-the-windows-quoting-01d923.md) | completed |
