@@ -28,7 +28,7 @@ description: "Four verified cases where the suite's result depends on something 
 | [Convert write-path-profile's absolute budgets to scaling assertions](./convert-write-path-profile-s-94e034.md) | completed |
 | [Fake-CLI fixtures write .args into the repo root instead of a temp dir](./fake-cli-fixtures-write-args-76a37b.md) | completed |
 | [Give add-auto-reshape's scaling gate a min-of-N, and fix its shared-tree confound](./give-add-auto-reshape-s-scaling-5980e3.md) | completed |
-| [Make stop-orphan-children's sh dependency explicit instead of failing opaquely](./make-stop-orphan-children-s-sh-be8e19.md) | pending |
+| [Make the tests' sh-on-PATH dependency explicit instead of failing opaquely](./make-the-tests-sh-on-path-be8e19.md) | pending |
 | [Neutralize ambient color env so FORCE_COLOR does not fail 24 tests](./neutralize-ambient-color-env-so-4afde0.md) | completed |
 | [Stabilize rex's load-sensitive performance assertions](./stabilize-rex-s-load-sensitive-676af1.md) | completed |
 | [Triage the 39 hench/web failures now that the run no longer hides them](./triage-the-39-hench-web-741bac.md) | completed |
