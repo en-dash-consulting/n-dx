@@ -47,8 +47,6 @@ Within the web package, four internal zones form a hub topology with `web-viewer
 
 | Convention | Pattern | Notes |
 |-----------|---------|-------|
-| Public API | `src/public.ts` → `exports["."]` in `package.json` | All 5 packages follow this |
-| Test structure | `tests/{unit,integration,e2e}/**/*.test.ts` | Standardized across all packages |
 | Naming | Mixed: `rex`, `sourcevision`, `hench` (unscoped) / `@n-dx/web`, `@n-dx/llm-client` (scoped) | Intentional: CLI tools use short unscoped names for `npx`/`pnpm exec`; internal-only packages use the `@n-dx/` scope |
 | Subpath exports | `"./dist/*": "./dist/*"` | Intentional escape hatch — not public API, no stability guarantee. See `PACKAGE_GUIDELINES.md` for acceptable/prohibited uses |
 
@@ -68,92 +66,15 @@ Re-run `ndx init` to regenerate all instruction files after changes to `packages
 
 ## n-dx Orchestration Commands
 
-```sh
-ndx init [dir]            # sourcevision init → rex init → hench init + LLM model selection
-                          #   --provider=claude|codex  --model=<id>
-                          #   --claude-model=<id>  --codex-model=<id>
-ndx analyze [dir]         # sourcevision analyze (--deep, --full, --lite)
-ndx recommend [dir]       # rex recommend (--accept, --actionable-only, --acknowledge)
-ndx add "description"     # smart-add PRD items from freeform descriptions
-ndx add --file=spec.md    # import ideas from a text file
-ndx plan [dir]            # sourcevision analyze → rex analyze (show proposals)
-ndx plan --accept [dir]   # ...then accept proposals into PRD
-ndx work [dir]            # hench run (pass --task=ID, --auto, --iterations=N, --yes,
-                          #   --permission-mode=<default|acceptEdits|bypassPermissions|plan>, etc.)
-                          # Autonomous runs (--auto/--loop/--epic-by-epic) default to
-                          # acceptEdits so the spawned Claude session won't stall in plan
-                          # mode. Override with --permission-mode or hench.permissionMode.
-                          # The no-plan-mode rule is embedded in the hench system prompt
-                          # for all CLI-provider runs (see /no-plan-mode skill).
-ndx self-heal [N] [dir]   # iterative improvement loop (analyze → recommend → execute; --yes for unattended)
-ndx start [dir]           # start server: dashboard + MCP endpoints (--port=N, --background, stop, status)
-ndx status [dir]          # rex status (pass --format=json)
-ndx usage [dir]           # token usage analytics (--format=json, --group=day|week|month)
-ndx sync [dir]            # sync local PRD with remote adapter (--push, --pull)
-ndx refresh [dir]         # refresh dashboard artifacts (--ui-only, --data-only, --no-build)
-ndx dev [dir]             # start web dev server with live reload
-ndx ci [dir]              # run analysis pipeline and validate PRD health (--format=json)
-ndx config [key] [value]  # view/edit settings (--json, --help)
-ndx export [dir]          # export static deployable dashboard (--out-dir, --deploy=github)
-```
+Run `ndx <command> --help` for full usage, or see `README.md` for the command reference and direct-tool-access aliases (`ndx rex`, `ndx hench`, `ndx sv`, or the standalone binaries).
 
-## Direct Tool Access
-
-```sh
-# Via orchestrator
-ndx rex <command> [args]
-ndx hench <command> [args]
-ndx sourcevision <command> [args]
-ndx sv <command> [args]           # alias for sourcevision
-
-# Standalone binaries (also available after npm link)
-rex <command> [args]
-hench <command> [args]
-sourcevision <command> [args]
-sv <command> [args]               # alias for sourcevision
-```
+**Gotcha:** `ndx work` autonomous runs (`--auto`/`--loop`/`--epic-by-epic`) default `--permission-mode` to `acceptEdits` so the spawned Claude session won't stall in plan mode — override with `--permission-mode` or `hench.permissionMode`. This default is enforced repo-wide via the hench system prompt for all CLI-provider runs (see the `/no-plan-mode` skill).
 
 ## MCP Servers
 
-Rex and sourcevision expose MCP servers for Claude Code and Codex tool use. Two transport options are available: **HTTP** (recommended for Claude) and **stdio** (default for both assistants after `ndx init`).
+Rex and sourcevision expose MCP servers over HTTP (`ndx start`, port 3117 by default) and stdio (auto-registered by `ndx init`). HTTP uses [Streamable HTTP](https://modelcontextprotocol.io/) with session management (`Mcp-Session-Id` header, created automatically on first request). See `README.md` for registration commands.
 
-### HTTP transport (recommended)
-
-Start the unified server, then point your assistant at the HTTP endpoints:
-
-```sh
-# 1. Start the server (dashboard + MCP on one port)
-ndx start .
-
-# 2. Register HTTP MCP servers (Claude example)
-claude mcp add --transport http rex http://localhost:3117/mcp/rex
-claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
-```
-
-Any MCP-compatible assistant can connect to these endpoints. The server runs on port 3117 by default. If you use a custom port (`--port=N` or `web.port` in `.n-dx.json`), update the URLs accordingly.
-
-HTTP transport uses [Streamable HTTP](https://modelcontextprotocol.io/) with session management. Sessions are created automatically on the first request and identified by the `Mcp-Session-Id` header.
-
-### stdio transport
-
-Stdio spawns a separate process per MCP server. No `ndx start` required. `ndx init` auto-registers stdio servers for both Claude Code and Codex.
-
-**Claude Code** (manual registration):
-
-```sh
-claude mcp add rex -- node packages/rex/dist/cli/index.js mcp .
-claude mcp add sourcevision -- node packages/sourcevision/dist/cli/index.js mcp .
-```
-
-**Codex** reads `.codex/config.toml` automatically — no manual registration required.
-
-### Migrating from stdio to HTTP (Claude)
-
-1. Start the server: `ndx start --background .`
-2. Remove old stdio servers: `claude mcp remove rex && claude mcp remove sourcevision`
-3. Add HTTP servers: `claude mcp add --transport http rex http://localhost:3117/mcp/rex && claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision`
-
-Benefits of HTTP over stdio: single process, shared port with the web dashboard, session management, no per-tool process overhead.
+**Migrating from stdio to HTTP (Claude):** start the server (`ndx start --background .`), remove the stdio registrations (`claude mcp remove rex && claude mcp remove sourcevision`), then add the HTTP ones (`claude mcp add --transport http rex http://localhost:3117/mcp/rex`, same for sourcevision).
 
 ### Rex MCP tools
 
@@ -190,17 +111,6 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 - `set_file_archetype` — override archetype classification for a file
 - `get_route_tree` — route structure (pages, API routes, layouts)
 
-## Development Workflow
-
-1. `ndx init .` — set up all tool directories
-2. `ndx start .` — start server (dashboard + MCP endpoints)
-3. `ndx plan .` — analyze codebase, review proposals
-4. `ndx plan --accept .` — accept proposals into PRD
-5. `ndx work .` — execute next task autonomously
-6. `ndx status .` — check progress
-
-Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `ndx start stop .` to stop.
-
 ## Changeset Versioning
 
 - **Always default changeset bumps to `patch`** across all affected packages unless explicitly instructed otherwise by a user.
@@ -209,19 +119,12 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 
 | Path | Purpose |
 |------|---------|
-| `.sourcevision/CONTEXT.md` | AI-readable codebase summary |
-| `.sourcevision/manifest.json` | Analysis metadata and version |
 | `.rex/prd_tree/` | PRD storage root — slug-based folder tree; one directory per item (epic/feature/task) containing `index.md` |
 | `.rex/prd.md` | (Legacy) flat Markdown PRD; migration source for `rex migrate-to-folder-tree`. Absent after migration. |
 | `.rex/prd.json` | (Legacy) JSON PRD; migration source when neither `prd.md` nor the tree exists. |
 | `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
-| `.rex/workflow.md` | Human-readable workflow state |
-| `.rex/config.json` | Rex project configuration |
 | `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
-| `.hench/config.json` | Hench agent configuration (model, max turns) |
-| `.hench/runs/` | Run history and transcripts |
 | `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model) |
-| `.n-dx-web.pid` | Background web server PID file (auto-managed) |
 | `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
 | `tests/e2e/domain-isolation.test.js` | Gateway enforcement, domain layer isolation, foundation tier boundary |
 | `tests/e2e/mcp-transport.test.js` | MCP HTTP transport end-to-end validation (session management, tool calls) |
@@ -230,6 +133,4 @@ Use `ndx start --background .` for daemon mode, `ndx start status .` to check, `
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `OPEN_SOURCE_SCOPE.md` | Licensing boundaries, included/excluded components, and contribution expectations |
 
-> **PRD file layout.** `.rex/prd_tree/` is the sole writable PRD surface. Each item (epic/feature/task) maps to a slug-named directory containing `index.md`; subtasks are encoded as sections within the parent task's `index.md`. No JSON files are written by the rex CLI, MCP tools, or `rex update`. `.rex/prd.md` and branch-scoped `.rex/prd_{branch}_{date}.md` files are legacy migration sources — absent after running `rex migrate-to-folder-tree`. `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running; do not read it from code outside the web server.
-
-> **PRD folder tree schema.** The primary PRD storage format maps each PRD level (epic → feature → task) to a directory containing an `index.md`. Subtasks are encoded as sections within the parent task's `index.md`. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
+> **PRD file layout.** Subtasks are encoded as sections within the parent task's `index.md` (not separate directories). `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running — do not read it from code outside the web server. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.

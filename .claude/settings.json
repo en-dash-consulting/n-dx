@@ -44,6 +44,11 @@
       "mcp__rex__get_capabilities",
       "mcp__rex__facets",
       "mcp__sourcevision__get_route_tree"
+    ],
+    "deny": [
+      "Read(**/dist/**)",
+      "Read(**/node_modules/**)",
+      "Read(pnpm-lock.yaml)"
     ]
   }
 }

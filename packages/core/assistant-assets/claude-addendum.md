@@ -34,26 +34,11 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 
 Rules:
 - **One gateway per source package** — all runtime imports from a given upstream package pass through a single gateway. A consumer may have multiple gateways (e.g. web has separate gateways for rex and sourcevision).
-- **Intra-package gateways** — within the web package, `src/viewer/external.ts` concentrates all viewer-side imports from `src/viewer/messaging/`, `src/shared/`, and `src/schema/`. `RequestDedup` is canonically located in `src/viewer/messaging/request-dedup.ts` and re-exported through `external.ts` for viewer consumers.
 - **Re-export only** — gateways re-export; they contain no logic. Enforced by `domain-isolation.test.js`.
-- **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Exception: web viewer files are exempt because the server/viewer boundary prevents them from reaching the server-side gateway.
-- **Messaging exemption** — `src/viewer/messaging/` files may import directly from `src/shared/` without going through `external.ts`. The shared/ directory is neutral (neither server nor viewer), and messaging utilities access it directly to avoid zone-level dependency inversion. Enforced by `boundary-check.test.ts` (lines 74-80). New files added to `viewer/messaging/` inherit this exemption — review them to ensure they are genuine messaging infrastructure, not general viewer code.
+- **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Package-specific exemptions are documented in path-scoped rules (e.g. `.claude/rules/web-gateway-boundary.md`).
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
-See also: `PACKAGE_GUIDELINES.md` for the full pattern reference.
-
-### Injection seam registry
-
-Some cross-zone dependencies use callback injection rather than gateway imports. These seams are invisible to static analysis tools (boundary-check.test.ts, domain-isolation.test.js) and must be listed explicitly to prevent future contributors from replacing injection with direct imports.
-
-| Injection site | Target module | Injected callbacks | Interface type |
-|----------------|---------------|--------------------|----------------|
-| `web/src/server/start.ts` | `web/src/server/register-scheduler.ts` | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
-
-Rules:
-- **Prefer injection over import** when the target module would otherwise need to import from a higher-tier zone (e.g., scheduler importing from dashboard wiring).
-- **Document the interface type** — every injection seam must have a named TypeScript interface (not inline parameter types) so that refactoring either side triggers a type error.
-- **New seams** require an entry in this table and a named interface type in the target module.
+See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-package gateway, messaging exemption, and injection-seam registry are documented in `.claude/rules/web-gateway-boundary.md` and `.claude/rules/web-injection-seams.md`.
 
 ### Tier boundary crossing: spawn vs gateway
 
