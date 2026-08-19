@@ -40,3 +40,58 @@ describe("ambient color env is neutralized for the test process", () => {
     expect(JSON.parse(out)).toEqual({ f: null, n: "1" });
   });
 });
+
+describe("no test stubs an NDX_* variable onto the shared worker env", () => {
+  /**
+   * Static scan, not a runtime probe, because the leak this guards is CONCURRENT.
+   *
+   * `vi.stubEnv` mutates the vitest worker's real `process.env`, and the comment on
+   * setup-color-env.js above spells out why that reaches further than the stubbing
+   * file: e2e siblings in the same worker spawn CLIs with `{ ...process.env }`, so a
+   * child inherits whatever is set at the moment it spawns. That is how
+   * child-lifecycle.test.js's `NDX_DEBUG_LIFECYCLE` stub made an unrelated e2e file
+   * print `[child-lifecycle] …` — a notice the debug gate existed to suppress.
+   * `vi.unstubAllEnvs()` in afterEach cannot close a window that is open during the
+   * test rather than after it.
+   *
+   * Asserting on live `process.env` would be racy for exactly that reason: whether a
+   * leak is visible depends on which files share a worker and how they interleave. So
+   * this checks the source instead, which is deterministic.
+   *
+   * NDX_* only, deliberately. The point is variables that change how the CLI under
+   * test BEHAVES. Stubbing a third-party API key is a different (and much smaller)
+   * risk, and two such stubs exist in package suites; widening this to all variables
+   * would fail them without having thought that through.
+   */
+  it("uses an injected env argument instead", async () => {
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+
+    const root = join(import.meta.dirname, "..");
+    /** @type {string[]} */
+    const offenders = [];
+
+    /** @param {string} dir */
+    async function scan(dir) {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await scan(full);
+        } else if (entry.name.endsWith(".test.js")) {
+          const src = await readFile(full, "utf-8");
+          // Match the call, not the word: the prose in child-lifecycle.test.js
+          // explains this hazard by name and must not trip its own guard.
+          if (/vi\.stubEnv\(\s*["'`]NDX_/.test(src)) offenders.push(full);
+        }
+      }
+    }
+
+    await scan(root);
+
+    expect(
+      offenders,
+      "these tests stub an NDX_* variable onto the worker env; thread an env argument " +
+      "through to the code under test instead (see isLifecycleDebugEnabled's env param)",
+    ).toEqual([]);
+  });
+});

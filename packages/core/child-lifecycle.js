@@ -163,9 +163,22 @@ async function terminateChildProcess(child, forceKillTimeoutMs) {
   await escalateTermination(childTarget(child), forceKillTimeoutMs);
 }
 
-/** Report which termination strategy ran (opt-in; see isLifecycleDebugEnabled). */
-function traceStrategy(message) {
-  if (isLifecycleDebugEnabled()) {
+/**
+ * Report which termination strategy ran (opt-in; see isLifecycleDebugEnabled).
+ *
+ * `env` is threaded from the caller rather than read from `process.env` here so a
+ * test can enable the notice by passing a plain object. Reading the real env forced
+ * tests to `vi.stubEnv`, which mutates the vitest WORKER's env — and sibling e2e
+ * files in that worker spawn CLIs with `{ ...process.env }`, so a child could
+ * inherit the flag and print a notice the gating existed to suppress. That window
+ * is concurrent, not sequential, so `vi.unstubAllEnvs()` in afterEach does not
+ * close it. Threading removes the channel instead of scheduling around it.
+ *
+ * @param {string} message
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+function traceStrategy(message, env) {
+  if (isLifecycleDebugEnabled(env)) {
     process.stderr.write(`[child-lifecycle] ${message}\n`);
   }
 }
@@ -218,7 +231,7 @@ async function waitForGroupExit(pgid, killGroup, timeoutMs, intervalMs = 25) {
  * Only effective when the child was spawned with `detached: true`, which makes
  * it the leader of a new process group — see {@link treeKillSpawnOptions}.
  */
-async function terminateProcessGroup(child, forceKillTimeoutMs, killGroup) {
+async function terminateProcessGroup(child, forceKillTimeoutMs, killGroup, env) {
   if (!isChildRunning(child)) return;
 
   if (!child.pid) {
@@ -226,7 +239,7 @@ async function terminateProcessGroup(child, forceKillTimeoutMs, killGroup) {
   }
 
   const pgid = -child.pid;
-  traceStrategy(`process group kill ${pgid} (SIGTERM, then SIGKILL)`);
+  traceStrategy(`process group kill ${pgid} (SIGTERM, then SIGKILL)`, env);
 
   if (!groupHasMembers(pgid, killGroup)) {
     // No group of its own (not spawned detached) or already drained — deal with
@@ -336,14 +349,14 @@ async function runWindowsTreeKill(pid, forceKillTimeoutMs, spawnCliImpl) {
   }
 }
 
-async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl) {
+async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl, env) {
   if (!isChildRunning(child)) return;
 
   if (!child.pid) {
     return terminateChildProcess(child, forceKillTimeoutMs);
   }
 
-  traceStrategy(`taskkill /PID ${child.pid} /T /F`);
+  traceStrategy(`taskkill /PID ${child.pid} /T /F`, env);
   await runWindowsTreeKill(child.pid, forceKillTimeoutMs, spawnCliImpl);
 
   await Promise.race([
@@ -392,6 +405,7 @@ export async function terminateTreeByPid(pid, {
   spawnCliImpl = spawnCli,
   killImpl = (targetPid, signal) => process.kill(targetPid, signal),
   pollIntervalMs = 100,
+  env = process.env,
 } = {}) {
   const target = pidTarget(pid, killImpl, pollIntervalMs);
   if (!target.isAlive()) return true;
@@ -402,7 +416,7 @@ export async function terminateTreeByPid(pid, {
     // there is no group (ESRCH), which the escalation below handles.
     const group = pidTarget(-pid, killImpl, pollIntervalMs);
     if (group.isAlive()) {
-      traceStrategy(`process group kill ${-pid} (SIGTERM, then SIGKILL)`);
+      traceStrategy(`process group kill ${-pid} (SIGTERM, then SIGKILL)`, env);
       await escalateTermination(
         { ...group, isAlive: target.isAlive },
         forceKillTimeoutMs,
@@ -412,7 +426,7 @@ export async function terminateTreeByPid(pid, {
     return escalateTermination(target, forceKillTimeoutMs);
   }
 
-  traceStrategy(`taskkill /PID ${pid} /T /F`);
+  traceStrategy(`taskkill /PID ${pid} /T /F`, env);
   await runWindowsTreeKill(pid, forceKillTimeoutMs, spawnCliImpl);
   await target.waitForExit(forceKillTimeoutMs);
   if (!target.isAlive()) return true;
@@ -441,6 +455,9 @@ export async function terminateTreeByPid(pid, {
  *   the Windows branch would ship untested.
  * @param {Function} [options.spawnCliImpl] Injectable spawn (defaults to win-spawn's spawnCli).
  * @param {Function} [options.killGroup] Injectable group signaller (defaults to process.kill).
+ * @param {NodeJS.ProcessEnv} [options.env] Environment consulted for the debug-notice
+ *   gate. Injectable so a test can enable the notice without mutating the worker's
+ *   real env, which sibling e2e files leak into spawned children — see traceStrategy.
  * @returns {Promise<void>}
  */
 export async function terminateTree(child, {
@@ -448,12 +465,13 @@ export async function terminateTree(child, {
   platform = process.platform,
   spawnCliImpl = spawnCli,
   killGroup = (pid, signal) => process.kill(pid, signal),
+  env = process.env,
 } = {}) {
   if (!isChildRunning(child)) return;
 
   return supportsProcessGroups(platform)
-    ? terminateProcessGroup(child, forceKillTimeoutMs, killGroup)
-    : terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl);
+    ? terminateProcessGroup(child, forceKillTimeoutMs, killGroup, env)
+    : terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl, env);
 }
 
 /**
@@ -469,9 +487,10 @@ export async function terminateTree(child, {
 export function createChildProcessTracker({
   forceKillTimeoutMs = DEFAULT_FORCE_KILL_TIMEOUT_MS,
   treeKill = false,
+  env = process.env,
 } = {}) {
   const terminate = treeKill
-    ? (child, timeoutMs) => terminateTree(child, { forceKillTimeoutMs: timeoutMs })
+    ? (child, timeoutMs) => terminateTree(child, { forceKillTimeoutMs: timeoutMs, env })
     : terminateChildProcess;
 
   const children = new Set();

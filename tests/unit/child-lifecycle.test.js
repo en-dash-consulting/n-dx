@@ -9,6 +9,18 @@ import {
   treeKillSpawnOptions,
 } from "../../packages/core/child-lifecycle.js";
 
+/**
+ * A debug-enabled environment, passed to the code under test instead of stubbed
+ * onto the worker.
+ *
+ * `vi.stubEnv` mutates the vitest worker's real `process.env`, and sibling e2e files
+ * in the same worker spawn CLIs with `{ ...process.env }` — so a child could inherit
+ * NDX_DEBUG_LIFECYCLE and print the notice the gate exists to suppress. That window
+ * is concurrent, so `vi.unstubAllEnvs()` in afterEach could not close it. A plain
+ * object shared with nobody removes the channel.
+ */
+const DEBUG_ON = { NDX_DEBUG_LIFECYCLE: "1" };
+
 class FakeChildProcess extends EventEmitter {
   constructor(onKill) {
     super();
@@ -310,16 +322,16 @@ describe("terminateTree — Windows taskkill strategy", () => {
 });
 
 describe("terminateTree — strategy tracing", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
   function captureStderrAsync() {
     const writes = [];
     const originalWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = (chunk, ...rest) => {
+    // Captured, NOT forwarded. Teeing to the real stderr meant every full-suite run
+    // printed the [child-lifecycle] notices these tests deliberately provoke, which
+    // reads as a stray diagnostic escaping the debug gate. The assertions below read
+    // `writes`, so forwarding added nothing but noise.
+    process.stderr.write = (chunk) => {
       writes.push(String(chunk));
-      return originalWrite(chunk, ...rest);
+      return true;
     };
     return {
       writes,
@@ -330,7 +342,6 @@ describe("terminateTree — strategy tracing", () => {
   }
 
   it("names the Windows strategy when NDX_DEBUG_LIFECYCLE is set", async () => {
-    vi.stubEnv("NDX_DEBUG_LIFECYCLE", "1");
     const child = new FakeChildProcess();
     child.pid = 9876;
     setTimeout(() => child.close(1, null), 2);
@@ -341,6 +352,7 @@ describe("terminateTree — strategy tracing", () => {
         forceKillTimeoutMs: 200,
         platform: "win32",
         spawnCliImpl: makeFakeSpawn({ exitCode: 0 }),
+        env: DEBUG_ON,
       });
     } finally {
       cap.restore();
@@ -350,7 +362,6 @@ describe("terminateTree — strategy tracing", () => {
   });
 
   it("names the POSIX strategy when NDX_DEBUG_LIFECYCLE is set", async () => {
-    vi.stubEnv("NDX_DEBUG_LIFECYCLE", "1");
     const child = new FakeChildProcess();
     child.pid = 4321;
 
@@ -360,6 +371,7 @@ describe("terminateTree — strategy tracing", () => {
         forceKillTimeoutMs: 5,
         platform: "linux",
         killGroup: () => {},
+        env: DEBUG_ON,
       });
     } finally {
       cap.restore();
@@ -369,8 +381,6 @@ describe("terminateTree — strategy tracing", () => {
   });
 
   it("stays silent without the debug flag", async () => {
-    vi.stubEnv("NDX_DEBUG_LIFECYCLE", "");
-    vi.stubEnv("NDX_DEBUG", "");
     const child = new FakeChildProcess();
     child.pid = 4321;
 
@@ -431,19 +441,14 @@ describe("createChildProcessTracker — treeKill construction", () => {
     return writes;
   }
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
   it("says nothing at construction time, even with debug enabled", () => {
     // The old construction-time notice claimed Windows was "falling back to
     // direct child kill". That is no longer true — Windows tree-kills via
     // taskkill — and a capability announcement fired on every `ndx` invocation
     // regardless of whether a child was ever spawned. Strategy reporting now
     // happens in terminateTree, at the point a strategy actually runs.
-    vi.stubEnv("NDX_DEBUG_LIFECYCLE", "1");
-
-    const writes = captureStderr(() => createChildProcessTracker({ treeKill: true }));
+    const writes = captureStderr(() =>
+      createChildProcessTracker({ treeKill: true, env: DEBUG_ON }));
 
     expect(writes.join("")).toBe("");
   });

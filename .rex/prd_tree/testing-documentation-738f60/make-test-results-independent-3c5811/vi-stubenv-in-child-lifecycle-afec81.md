@@ -2,7 +2,7 @@
 id: "afec81a3-b1fe-4c5f-82b1-56af060505cc"
 level: "task"
 title: "vi.stubEnv in child-lifecycle.test.js leaks NDX_DEBUG_LIFECYCLE into sibling e2e children"
-status: "pending"
+status: "completed"
 priority: "low"
 tags:
   - "testing"
@@ -10,6 +10,11 @@ tags:
   - "determinism"
   - "core"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-19T18:43:07.159Z"
+completedAt: "2026-08-19T18:52:57.209Z"
+endedAt: "2026-08-19T18:52:57.209Z"
+resolutionType: "code-change"
+resolutionDetail: "Threaded an env option through terminateTree/terminateTreeByPid/createChildProcessTracker to traceStrategy, using isLifecycleDebugEnabled's existing injectable parameter, so the tests pass a plain object instead of vi.stubEnv — all four stubs removed. Also fixed a second cause the filing missed: the test's stderr capture tee'd to the real stderr, so it printed the notices itself (the fake pids 9876/4321 in suite output prove it). A full root run now greps to zero [child-lifecycle] occurrences where every prior run printed two. Debug-branch coverage verified by disabling the gate (exactly the two naming tests fail), and a static guard against vi.stubEnv(\"NDX_*\") added to the env-neutralization test file, itself verified against a throwaway offender."
 acceptanceCriteria:
   - "No unit test mutates shared worker process.env in a way a concurrently-running sibling's spawned child can observe"
   - "The debug-enabled branch of createChildProcessTracker is still covered by a test"
