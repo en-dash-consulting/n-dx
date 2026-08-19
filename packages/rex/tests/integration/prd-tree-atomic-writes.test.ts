@@ -182,43 +182,48 @@ describe("prd_tree atomic writes and crash-safety", () => {
 
   describe("file-locking: concurrent writers are serialized", () => {
     it("second writer waits for first writer to release lock", async () => {
+      // Regression note: this test previously used operations.push("second-start")
+      // logged synchronously at closure-invocation time, and a setTimeout(10) as
+      // a proxy for "the first write has definitely finished by now". Both are
+      // wall-clock assumptions about how fast real filesystem I/O happens to
+      // complete — under CPU contention (e.g. `pnpm validate` running every
+      // package's suite in parallel) the first write can legitimately take
+      // longer than 10ms, so "second-start" got logged before "first-end" even
+      // though the lock itself was never actually violated. Reproduced: 5/20
+      // failures under artificial CPU load vs. 0/15 in isolation.
+      //
+      // Fixed by marking the true critical-section boundary instead: saveDocument()
+      // only ever runs while withLock's callback is executing, i.e. while the
+      // lock is actually held. Ordering here is proven by the in-process mutex
+      // (a deterministic promise queue, not polling), not by timing.
       const operations: string[] = [];
+      const originalSaveDocument = store.saveDocument.bind(store);
+      const saveDocumentSpy = vi
+        .spyOn(store, "saveDocument")
+        .mockImplementation(async (doc) => {
+          operations.push(`save-start:${doc.items.length}`);
+          await originalSaveDocument(doc);
+          operations.push(`save-end:${doc.items.length}`);
+        });
 
-      // Patch the store to track operation timing at lock boundaries
-      const originalAddItem = store.addItem.bind(store);
-      let firstStarted = false;
+      // Calling addItem twice back-to-back without awaiting in between is
+      // itself deterministic: both calls run synchronously up to the point
+      // where they enqueue on the in-process lock queue (a plain Map read/
+      // write, no await in between), so the first call is always queued
+      // ahead of the second regardless of system speed.
+      const firstPromise = store.addItem(makeItem("test-1", "First Item"));
+      const secondPromise = store.addItem(makeItem("test-2", "Second Item"));
 
-      // First writer acquires lock
-      const firstPromise = (async () => {
-        firstStarted = true;
-        operations.push("first-start");
-        const item = makeItem("test-1", "First Item");
-        await originalAddItem(item);
-        operations.push("first-end");
-        // Simulate some work delay to ensure lock is held a bit longer
-        await new Promise((r) => setTimeout(r, 50));
-      })();
-
-      // Give first writer a moment to actually start
-      await new Promise((r) => setTimeout(r, 10));
-      expect(firstStarted).toBe(true);
-
-      // Second writer should wait for lock
-      const secondPromise = (async () => {
-        operations.push("second-start");
-        const item = makeItem("test-2", "Second Item");
-        await originalAddItem(item);
-        operations.push("second-end");
-      })();
-
-      // Wait for both to complete
       await Promise.all([firstPromise, secondPromise]);
+      saveDocumentSpy.mockRestore();
 
-      // Verify serialization: first write must complete before second starts.
-      // With proper locking: ["first-start", "first-end", "second-start", "second-end"]
-      const firstEndIdx = operations.indexOf("first-end");
-      const secondStartIdx = operations.indexOf("second-start");
-      expect(firstEndIdx).toBeLessThan(secondStartIdx);
+      // Verify serialization: the first writer's entire critical section
+      // (including its save) completes before the second writer's begins.
+      const firstSaveEndIdx = operations.indexOf("save-end:1");
+      const secondSaveStartIdx = operations.indexOf("save-start:2");
+      expect(firstSaveEndIdx).toBeGreaterThanOrEqual(0);
+      expect(secondSaveStartIdx).toBeGreaterThanOrEqual(0);
+      expect(firstSaveEndIdx).toBeLessThan(secondSaveStartIdx);
 
       // Verify both items were written
       const doc = await store.loadDocument();
