@@ -71,6 +71,27 @@ function delay(ms) {
 }
 
 /**
+ * Await `promise`, giving up after `timeoutMs`, always clearing the timer.
+ *
+ * `Promise.race([p, delay(ms)])` looks equivalent but leaks: when `p` wins, the
+ * losing timer stays armed, and an armed timer holds the event loop open. A CLI
+ * that finished its work immediately after a kill therefore sat idle for the
+ * whole grace period before exiting — 5s by default.
+ *
+ * Only the RACED waits need this. The polling `delay()` calls below are awaited
+ * directly, so their timer always fires and never outlives its await.
+ */
+function raceWithTimeout(promise, timeoutMs) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise).then(() => undefined),
+    new Promise((resolve) => {
+      timer = setTimeout(resolve, timeoutMs);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+/**
  * The ONE SIGTERM → grace → SIGKILL escalation in this package.
  *
  * Written against three injected capabilities rather than a concrete target, so a
@@ -117,8 +138,7 @@ function childTarget(child) {
       }
     },
     isAlive: () => isChildRunning(child),
-    waitForExit: (timeoutMs) =>
-      Promise.race([waitForChildExit(child), delay(timeoutMs)]).then(() => undefined),
+    waitForExit: (timeoutMs) => raceWithTimeout(waitForChildExit(child), timeoutMs),
   };
 }
 
@@ -337,13 +357,13 @@ async function runWindowsTreeKill(pid, forceKillTimeoutMs, spawnCliImpl) {
     // Any exit code counts as done — a non-zero status usually means
     // "process not found" (128), which during shutdown is a normal race, not
     // an error worth surfacing or throwing on.
-    await Promise.race([
+    await raceWithTimeout(
       new Promise((resolve) => {
         killer.once("close", resolve);
         killer.once("error", resolve);
       }),
-      delay(forceKillTimeoutMs),
-    ]);
+      forceKillTimeoutMs,
+    );
   } catch {
     // taskkill itself could not be spawned — caller falls back to a direct kill.
   }
@@ -359,10 +379,7 @@ async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl, env
   traceStrategy(`taskkill /PID ${child.pid} /T /F`, env);
   await runWindowsTreeKill(child.pid, forceKillTimeoutMs, spawnCliImpl);
 
-  await Promise.race([
-    waitForChildExit(child),
-    delay(forceKillTimeoutMs),
-  ]);
+  await raceWithTimeout(waitForChildExit(child), forceKillTimeoutMs);
 
   if (!isChildRunning(child)) return;
 

@@ -122,6 +122,27 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Await `promise`, giving up after `timeoutMs`, always clearing the timer.
+ *
+ * `Promise.race([p, delay(ms)])` looks equivalent but leaks: when `p` wins, the
+ * losing timer stays armed, and an armed timer holds the event loop open. A CLI
+ * that finished its work immediately after a kill therefore sat idle for the
+ * whole grace period before exiting — 5s by default.
+ *
+ * Only the RACED waits need this. The polling `delay()` calls below are awaited
+ * directly, so their timer always fires and never outlives its await.
+ */
+function raceWithTimeout(promise: Promise<unknown>, timeoutMs: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise.then(() => undefined),
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, timeoutMs);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 function waitForChildExit(child: ChildProcess): Promise<void> {
   if (!isChildRunning(child)) return Promise.resolve();
 
@@ -149,7 +170,7 @@ async function terminateChildProcess(
     return; // already gone
   }
 
-  await Promise.race([waitForChildExit(child), delay(forceKillTimeoutMs)]);
+  await raceWithTimeout(waitForChildExit(child), forceKillTimeoutMs);
   if (!isChildRunning(child)) return;
 
   try {
@@ -158,7 +179,7 @@ async function terminateChildProcess(
     return;
   }
 
-  await Promise.race([waitForChildExit(child), delay(forceKillTimeoutMs)]);
+  await raceWithTimeout(waitForChildExit(child), forceKillTimeoutMs);
 }
 
 /**
@@ -216,9 +237,15 @@ function captureStdout(
   return new Promise((resolve) => {
     let out = "";
     let settled = false;
+    // Held so the deadline can be cleared once the command reports back. Left
+    // armed, it would hold the event loop for the remainder of timeoutMs after
+    // this promise already resolved — `ps` returns in milliseconds while
+    // timeoutMs is the full kill grace period.
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const finish = (): void => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       resolve(out);
     };
 
@@ -232,7 +259,7 @@ function captureStdout(
         out = "";
         finish();
       });
-      setTimeout(finish, timeoutMs);
+      timer = setTimeout(finish, timeoutMs);
     } catch {
       finish();
     }
@@ -436,7 +463,7 @@ async function freezeAndKillPosixTree(
     if (pidIsAlive(pid, killGroup)) trySignal(killGroup, pid, "SIGKILL");
   }
 
-  await Promise.race([waitForChildExit(child), delay(forceKillTimeoutMs)]);
+  await raceWithTimeout(waitForChildExit(child), forceKillTimeoutMs);
 }
 
 /**
@@ -583,18 +610,18 @@ async function terminateWindowsTree(
     // Bounded: a taskkill that never reports back must not wedge the caller. Any
     // exit code counts as done — non-zero usually means "process not found",
     // which during termination is a normal race, not an error worth surfacing.
-    await Promise.race([
+    await raceWithTimeout(
       new Promise<void>((resolve) => {
         killer.once("close", () => resolve());
         killer.once("error", () => resolve());
       }),
-      delay(forceKillTimeoutMs),
-    ]);
+      forceKillTimeoutMs,
+    );
   } catch {
     // taskkill itself could not be spawned — fall through to the direct kill.
   }
 
-  await Promise.race([waitForChildExit(child), delay(forceKillTimeoutMs)]);
+  await raceWithTimeout(waitForChildExit(child), forceKillTimeoutMs);
   if (!isChildRunning(child)) return;
 
   // taskkill did not get it (or never ran): still deal with the direct child.
