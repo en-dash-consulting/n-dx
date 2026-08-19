@@ -24,6 +24,6 @@ description: "n-dx targets macOS, Linux, and Windows, but its initialization and
 
 | Title | Status |
 |-------|--------|
-| [Align OS-specific behavior in init and regular flows](./align-os-specific-behavior-in-00db9d/index.md) | pending |
+| [Align OS-specific behavior in init and regular flows](./align-os-specific-behavior-in-00db9d/index.md) | completed |
 | [Execute the test suite on Windows and macOS in CI](./execute-the-test-suite-on-3181cb/index.md) | pending |
 | [Make the per-package test suites pass on Windows](./make-the-per-package-test-214f56/index.md) | completed |

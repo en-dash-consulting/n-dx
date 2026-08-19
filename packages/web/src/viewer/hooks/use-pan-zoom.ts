@@ -35,6 +35,39 @@ export interface PanZoomState {
 }
 
 /**
+ * Whether a measured box can be divided by.
+ *
+ * Every gesture here converts screen pixels into user-space units by dividing by
+ * the element's width/height, so a zero-sized box makes the scale Infinity — and
+ * NaN wherever the delta is also 0, since 0 * Infinity is NaN. That value lands
+ * straight in the rendered viewBox attribute, so the surface blanks out or freezes
+ * instead of degrading, and the state stays poisoned after the element is sized
+ * again because the bad viewBox has already been stored.
+ *
+ * When does the box measure zero? Not for a display:none element — that cannot
+ * receive the event at all. The realistic cases are a container mid-collapse (this
+ * codebase animates exactly that: the ig-codebase-morph mini/full transition), a
+ * drag that begins while the element is sized and continues after it collapses, and
+ * a first interaction that lands before layout has settled.
+ *
+ * DECISION: RETURN EARLY RATHER THAN CLAMP THE SCALE. Clamping would keep the
+ * gesture alive by inventing a magnitude — panning by a distance derived from an
+ * element size that does not exist. Doing nothing is the honest response: with no
+ * geometry there is no meaningful distance to convert, the viewBox is left exactly
+ * as it was, and the next event once layout settles behaves normally. A dropped
+ * frame of interaction during a collapse animation is a much smaller cost than a
+ * surface that silently moves somewhere arbitrary.
+ *
+ * The wheel guard sits AFTER preventDefault deliberately, so a zero-sized surface
+ * still swallows the wheel rather than suddenly letting it scroll the page
+ * mid-animation. That keeps the change confined to the degenerate case instead of
+ * altering scroll behaviour anywhere the element IS sized.
+ */
+function hasUsableGeometry(rect: { width: number; height: number }): boolean {
+  return rect.width > 0 && rect.height > 0;
+}
+
+/**
  * Hook that manages SVG pan/zoom state and interaction handlers.
  *
  * @param fitVB - The "fit to content" viewBox dimensions
@@ -78,6 +111,10 @@ export function usePanZoom(fitVB: ViewBox): PanZoomState {
     if (!svg) return;
 
     const rect = svg.getBoundingClientRect();
+    // Guards BOTH branches below, each of which divides by the measured box: the
+    // zoom branch for the cursor focal point, the pan branch for the scale. See
+    // hasUsableGeometry for why this returns rather than clamping.
+    if (!hasUsableGeometry(rect)) return;
 
     // ctrlKey = pinch-zoom on trackpad (or ctrl+scroll on mouse) → zoom
     if (e.ctrlKey) {
@@ -118,6 +155,8 @@ export function usePanZoom(fitVB: ViewBox): PanZoomState {
     if (!panning || !panStart.current || !svgRef.current) return;
 
     const rect = svgRef.current.getBoundingClientRect();
+    if (!hasUsableGeometry(rect)) return;
+
     const scaleX = viewBox.w / rect.width;
     const scaleY = viewBox.h / rect.height;
 

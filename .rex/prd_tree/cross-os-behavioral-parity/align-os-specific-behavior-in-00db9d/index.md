@@ -2,7 +2,7 @@
 id: "00db9d79-324d-4b64-acb7-e65deaa43b06"
 level: "feature"
 title: "Align OS-specific behavior in init and regular flows"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -12,6 +12,9 @@ tags:
   - "core"
   - "hench"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-19T15:23:17.498Z"
+completedAt: "2026-08-19T15:23:17.498Z"
+endedAt: "2026-08-19T15:23:17.498Z"
 acceptanceCriteria:
   - "No flow claims a security or lifecycle guarantee it does not deliver on the running OS"
   - "Where a platform-appropriate equivalent exists (ACLs, tree-kill, accurate memory query), it is implemented rather than silently skipped"
@@ -27,7 +30,7 @@ description: "Three verified places where the same n-dx command delivers a diffe
 | [Decide and document the Windows available-memory strategy for hench admission](./decide-and-document-the-windows-cd8060.md) | completed |
 | [Enforce API-key file permissions on Windows via ACLs, or stop claiming they are set](./enforce-api-key-file-01d91d.md) | completed |
 | [Freeze-verify-kill: make the POSIX tree kill definitive for timeouts](./freeze-verify-kill-make-the-71e448.md) | completed |
-| [Guard usePanZoom against a zero-sized element, and give the hook its first test](./guard-usepanzoom-against-a-zero-40eeec.md) | pending |
+| [Guard usePanZoom against a zero-sized element, and give the hook its first test](./guard-usepanzoom-against-a-zero-40eeec.md) | completed |
 | [hench's RunChangeDetector shares the mtime-granularity blind spot](./hench-s-runchangedetector-e560e5.md) | completed |
 | [hench's scoped post-task test run always fails on Windows (backslash paths eaten by sh -c)](./hench-s-scoped-post-task-test-c7f341.md) | completed |
 | [Route ndx start stop through the unified terminateTree contract](./route-ndx-start-stop-through-042a5a.md) | completed |
