@@ -29,7 +29,30 @@ import { exec } from "../../src/exec.js";
  * fix. `sh -c` is also the real production path (hench's execShell), and the same
  * exposure applies to any non-libuv intermediate: cmd, make, pnpm shims.
  */
-describe("exec timeout terminates the whole process tree", () => {
+/**
+ * Both termination policies, run against the same real process tree.
+ *
+ * `freeze: undefined` takes the default — the flag is off unless
+ * NDX_POSIX_FREEZE_KILL is set, so this is the sweep. `freeze: true` opts into the
+ * BETA freeze-verify-kill path explicitly, which is the only way it gets
+ * real-process coverage: its unit tests inject every seam, and shipping it behind a
+ * default-off flag means an ordinary CI run would never enter it. That combination
+ * — a path exercised only through injected seams — is exactly what let the
+ * execFile `detached` defect reach main.
+ *
+ * `freeze` is passed per call rather than via the environment so the two runs stay
+ * independent inside one file, with no process-level state to leak between them.
+ *
+ * On Windows the freeze parameter is inert (no SIGSTOP exists there), so the second
+ * pass asserts that asking for it does not break the Windows path rather than
+ * exercising the freeze itself.
+ */
+const POLICIES = [
+  { name: "default sweep", freeze: undefined },
+  { name: "freeze-verify-kill (BETA)", freeze: true },
+] as const;
+
+describe.each(POLICIES)("exec timeout terminates the whole process tree — $name", ({ freeze }) => {
   let dir: string;
 
   /** Wall-clock room for the grandchild to prove it is still writing. */
@@ -64,7 +87,7 @@ describe("exec timeout terminates the whole process tree", () => {
    * `sh -c` string would have its backslashes eaten as escapes.
    */
   function runTimingOut(timeout = 700) {
-    return exec("sh", ["-c", "node grandchild.js"], { cwd: dir, timeout });
+    return exec("sh", ["-c", "node grandchild.js"], { cwd: dir, timeout, freeze });
   }
 
   afterEach(async () => {
