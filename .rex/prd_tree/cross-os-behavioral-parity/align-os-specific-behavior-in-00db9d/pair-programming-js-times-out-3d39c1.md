@@ -2,7 +2,7 @@
 id: "3d39c1bf-f80e-45d8-b8ea-c7c027e0787b"
 level: "task"
 title: "pair-programming.js times out with bare SIGTERM — three sites, no tree kill, no escalation, no await"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "cross-os"
@@ -10,6 +10,11 @@ tags:
   - "core"
   - "correctness"
 source: "margin-audit-2026-08-19"
+startedAt: "2026-08-19T17:30:46.708Z"
+completedAt: "2026-08-19T17:49:04.216Z"
+endedAt: "2026-08-19T17:49:04.216Z"
+resolutionType: "code-change"
+resolutionDetail: "All three timeout sites now await terminateTree and spawn with treeKillSpawnOptions. Covered by a new real-process e2e test that failed before the fix (child alive when the timeout was reported) and passes after, with vacuity guards so it cannot pass by accident, plus outcome-based escalation coverage via a SIGTERM-ignoring child. Two things beyond the ACs: awaiting the kill introduced a close-fires-first race that would have reported timeouts as ordinary exits, closed with a timedOut flag; and detached: true would have traded the timeout orphan for a Ctrl-C orphan, so cli.js now registers these children with its existing tracker through a new registerChild injection seam, recorded in the seam registry with a named JSDoc callback type."
 acceptanceCriteria:
   - "All three timeout sites (pair-programming.js:366, :425, :594) terminate via the child-lifecycle.js tree-kill contract instead of bare child.kill(\"SIGTERM\")"
   - "Each spawn site passes treeKillSpawnOptions so the POSIX group-signal fast path is available rather than falling back to enumeration"

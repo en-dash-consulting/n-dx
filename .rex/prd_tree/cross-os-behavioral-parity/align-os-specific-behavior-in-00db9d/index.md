@@ -2,7 +2,7 @@
 id: "00db9d79-324d-4b64-acb7-e65deaa43b06"
 level: "feature"
 title: "Align OS-specific behavior in init and regular flows"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -13,7 +13,8 @@ tags:
   - "hench"
 source: "exploration-2026-08-17"
 startedAt: "2026-08-19T15:23:17.498Z"
-endedAt: "2026-08-19T15:23:17.498Z"
+completedAt: "2026-08-19T17:49:07.458Z"
+endedAt: "2026-08-19T17:49:07.458Z"
 acceptanceCriteria:
   - "No flow claims a security or lifecycle guarantee it does not deliver on the running OS"
   - "Where a platform-appropriate equivalent exists (ACLs, tree-kill, accurate memory query), it is implemented rather than silently skipped"
@@ -33,7 +34,7 @@ description: "Three verified places where the same n-dx command delivers a diffe
 | [Guard usePanZoom against a zero-sized element, and give the hook its first test](./guard-usepanzoom-against-a-zero-40eeec.md) | completed |
 | [hench's RunChangeDetector shares the mtime-granularity blind spot](./hench-s-runchangedetector-e560e5.md) | completed |
 | [hench's scoped post-task test run always fails on Windows (backslash paths eaten by sh -c)](./hench-s-scoped-post-task-test-c7f341.md) | completed |
-| [pair-programming.js times out with bare SIGTERM — three sites, no tree kill, no escalation, no await](./pair-programming-js-times-out-3d39c1.md) | pending |
+| [pair-programming.js times out with bare SIGTERM — three sites, no tree kill, no escalation, no await](./pair-programming-js-times-out-3d39c1.md) | completed |
 | [Route ndx start stop through the unified terminateTree contract](./route-ndx-start-stop-through-042a5a.md) | completed |
 | [Spawn exec's children through spawn so POSIX can create a real process group](./spawn-exec-s-children-through-58161d.md) | completed |
 | [Tree-kill on shell-command timeout: a timed-out command keeps running and keeps writing](./tree-kill-on-shell-command-a99519.md) | completed |

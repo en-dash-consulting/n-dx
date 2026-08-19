@@ -2411,6 +2411,11 @@ async function handlePairProgramming(rest) {
         reviewer,
         testCommand,
         contextFiles: contextFilePath ? [contextFilePath] : undefined,
+        // The reviewer CLI and the shell test command are spawned detached so a
+        // timeout can group-signal their descendants; registering them here is what
+        // keeps Ctrl-C working, since a detached child is no longer in this
+        // process's foreground group. See doNotTrack in pair-programming.js.
+        registerChild: childTracker.register,
       });
       process.stdout.write(formatReviewBanner(reviewer, reviewResult) + "\n");
 
@@ -2446,6 +2451,7 @@ async function handlePairProgramming(rest) {
           reviewer,
           testCommand,
           contextFiles: contextFilePath ? [contextFilePath] : undefined,
+          registerChild: childTracker.register,
         });
         process.stdout.write(formatReviewBanner(reviewer, finalResult) + "\n");
       }
