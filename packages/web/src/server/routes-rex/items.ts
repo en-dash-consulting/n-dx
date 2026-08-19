@@ -20,7 +20,9 @@ import { getIndexMarkdown } from "./index-markdown.js";
 import {
   type PRDItem,
   type ItemLevel,
+  type ItemStatus,
   type TreeEntry,
+  computeTimestampUpdates,
   LEVEL_HIERARCHY,
   CHILD_LEVEL,
   isPriority,
@@ -126,6 +128,21 @@ async function handleItemPatch(
     if (!existing) {
       errorResponse(res, 404, `Item "${itemId}" not found`);
       return true;
+    }
+
+    // Validate status if provided (same rule as bulk update)
+    if (updates.status && !API_SETTABLE_STATUSES.has(updates.status as string)) {
+      errorResponse(res, 400, `Invalid status: ${updates.status}`);
+      return true;
+    }
+
+    // Auto-apply timestamp transitions (startedAt/completedAt) on status change,
+    // matching the bulk-update path's updateInTree wrapper.
+    if (updates.status && existing.status !== updates.status) {
+      Object.assign(
+        updates,
+        computeTimestampUpdates(existing.status, updates.status as ItemStatus, existing),
+      );
     }
 
     await store.updateItem(itemId, updates as Partial<import("../rex-gateway.js").PRDItem>);

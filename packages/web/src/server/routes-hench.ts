@@ -1159,7 +1159,7 @@ async function handleExecute(
   // Validate task is actionable
   const status = task.status as string;
   if (!ACTIONABLE_STATUSES.has(status)) {
-    errorResponse(res, 409, `Task is in "${status}" status and cannot be executed. Only pending or blocked tasks can be triggered.`);
+    errorResponse(res, 409, `Task is in "${status}" status and cannot be executed. Only pending, blocked, or deferred tasks can be triggered.`);
     return true;
   }
 

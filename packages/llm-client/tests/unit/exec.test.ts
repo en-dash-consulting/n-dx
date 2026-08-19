@@ -228,6 +228,7 @@ describe("spawnTool", () => {
       cwd: "/project",
       env: undefined,
       stdio: "inherit",
+      windowsHide: false,
     });
   });
 
@@ -263,6 +264,7 @@ describe("spawnTool", () => {
       cwd: undefined,
       env: undefined,
       stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: false,
     });
   });
 
@@ -290,6 +292,7 @@ describe("spawnTool", () => {
       env: undefined,
       stdio: "ignore",
       detached: true,
+      windowsHide: false,
     });
   });
 
@@ -318,6 +321,7 @@ describe("spawnTool", () => {
       cwd: undefined,
       env,
       stdio: "inherit",
+      windowsHide: false,
     });
   });
 });

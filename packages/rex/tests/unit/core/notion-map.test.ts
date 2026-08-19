@@ -1374,7 +1374,7 @@ describe("DATABASE_SCHEMA", () => {
 
   it("includes all status options", () => {
     const options = DATABASE_SCHEMA.Status.options!;
-    expect(options).toHaveLength(7);
+    expect(options).toHaveLength(8);
     const names = options.map((o) => o.name);
     expect(names).toContain("Not started");
     expect(names).toContain("In progress");
@@ -1383,6 +1383,7 @@ describe("DATABASE_SCHEMA", () => {
     expect(names).toContain("Deferred");
     expect(names).toContain("Blocked");
     expect(names).toContain("Deleted");
+    expect(names).toContain("Cancelled");
   });
 
   it("includes all priority options", () => {
