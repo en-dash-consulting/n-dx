@@ -12,7 +12,7 @@ import {ARCHIVE_FILE, loadArchive} from "../../core/archive.js";import {  hashPR
 } from "../../core/pending-cache.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
-import { info, warn, result } from "../output.js";
+import { info, warn, result, startSpinner } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
 import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
@@ -147,6 +147,7 @@ export async function cmdPrune(
     // Also preview consolidation proposals in dry-run
     let consolidationProposals: ReshapeProposal[] = [];
     let consolidationTokenUsage: import("../../schema/index.js").AnalyzeTokenUsage | undefined;
+    let consolidateSpinner: ReturnType<typeof startSpinner> | null = null;
     if (!skipConsolidate && doc.items.length > 0) {
       try {
         const { setLLMConfig, setClaudeConfig, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
@@ -189,15 +190,16 @@ export async function cmdPrune(
 
         const { reasonForReshape, formatReshapeProposal: fmtProposal } = await import("../../analyze/reshape-reason.js");
 
-        if (flags.format !== "json") {
-          info("\nAnalyzing for consolidation opportunities...");
-        }
+        consolidateSpinner = flags.format !== "json"
+          ? startSpinner("Analyzing for consolidation opportunities...")
+          : null;
 
         const consolidateResult = await reasonForReshape(doc.items, {
           dir,
           model: resolvedModel,
           consolidateMode: true,
         });
+        consolidateSpinner?.stop();
         consolidationProposals = consolidateResult.proposals;
         consolidationTokenUsage = consolidateResult.tokenUsage;
 
@@ -216,6 +218,7 @@ export async function cmdPrune(
           }
         }
       } catch (err) {
+        consolidateSpinner?.stop();
         if (err instanceof BudgetExceededError) throw err;
         if (flags.format !== "json") {
           const { getLLMVendor: getDryRunVendor } = await import("../../analyze/reason.js");
@@ -590,7 +593,7 @@ async function smartPrune(
     proposals = cached.proposals;
     tokenUsage = undefined;
   } else {
-    info("Analyzing PRD for pruning opportunities...");
+    const pruneSpinner = startSpinner("Analyzing PRD for pruning opportunities...");
     let reshapeResult: Awaited<ReturnType<typeof reasonForReshape>>;
     try {
       reshapeResult = await reasonForReshape(doc.items, {
@@ -598,7 +601,9 @@ async function smartPrune(
         model: resolvedModel,
         pruneMode: true,
       });
+      pruneSpinner.stop();
     } catch (err) {
+      pruneSpinner.stop();
       const classified = classifyLLMError(err instanceof Error ? err : new Error(String(err)), vendor, "identify prune candidates");
       throw new CLIError(classified.message, classified.suggestion, classified.code);
     }

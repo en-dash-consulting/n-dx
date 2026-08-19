@@ -286,21 +286,28 @@ const ERROR_HINTS = [
 
 /**
  * Format an error for CLI output — user-friendly with optional hint.
- * Never shows stack traces.
+ * Never shows stack traces unless --debug is active (see cliDebug).
  */
 function formatError(err) {
   const message = err instanceof Error ? err.message : String(err);
   const errorLabel = red("Error:");
+  let formatted;
   // If the error already has a suggestion (e.g. from a CLIError-like object), use it
   if (err && err.suggestion) {
-    return `${errorLabel} ${message}\nHint: ${err.suggestion}`;
-  }
-  for (const [pattern, suggestion] of ERROR_HINTS) {
-    if (pattern.test(message)) {
-      return `${errorLabel} ${message}\nHint: ${suggestion}`;
+    formatted = `${errorLabel} ${message}\nHint: ${err.suggestion}`;
+  } else {
+    formatted = `${errorLabel} ${message}`;
+    for (const [pattern, suggestion] of ERROR_HINTS) {
+      if (pattern.test(message)) {
+        formatted = `${errorLabel} ${message}\nHint: ${suggestion}`;
+        break;
+      }
     }
   }
-  return `${errorLabel} ${message}`;
+  if (cliDebug && err instanceof Error && err.stack) {
+    formatted += `\n\n${err.stack}`;
+  }
+  return formatted;
 }
 
 class ExitRequest extends Error {
@@ -321,6 +328,16 @@ let pendingUpdateCheck = null;
 
 /** True when the user passed --quiet / -q — update notice is suppressed. */
 let updateCheckQuiet = false;
+
+/**
+ * True when the user passed --verbose / --debug — enables a periodic
+ * "still running" heartbeat in run() while awaiting a spawned child, so a
+ * hung child can be told apart from a slow one. Set early in main().
+ */
+let cliVerbose = false;
+
+/** True when the user passed --debug — formatError() appends the stack trace. */
+let cliDebug = false;
 
 /**
  * Stale-check result set before command dispatch.
@@ -422,7 +439,21 @@ function run(script, args) {
     const child = spawnTracked(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",
     });
-    child.on("close", (code) => res(code ?? 1));
+
+    let heartbeat = null;
+    if (cliVerbose) {
+      const label = scriptPath.match(/packages[/\\]([^/\\]+)[/\\]/)?.[1] ?? scriptPath;
+      const startedAtMs = Date.now();
+      heartbeat = setInterval(() => {
+        const elapsedSec = Math.round((Date.now() - startedAtMs) / 1000);
+        console.error(dim(`  … waiting on ${label} (pid ${child.pid}, ${elapsedSec}s elapsed)`));
+      }, 30_000);
+    }
+
+    child.on("close", (code) => {
+      if (heartbeat) clearInterval(heartbeat);
+      res(code ?? 1);
+    });
   });
 }
 
@@ -2587,6 +2618,8 @@ async function main() {
   // The check runs as a background Promise concurrently with command
   // execution; flushAndExit() races it against a 500 ms timeout.
   updateCheckQuiet = rest.some((a) => a === "--quiet" || a === "-q");
+  cliVerbose = rest.some((a) => a === "--verbose" || a === "--debug");
+  cliDebug = rest.some((a) => a === "--debug");
   if (!updateCheckQuiet) {
     try {
       const { version: currentVersion } = JSON.parse(

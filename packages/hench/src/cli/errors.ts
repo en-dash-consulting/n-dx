@@ -208,7 +208,15 @@ const CATEGORY_SUGGESTIONS: Partial<Record<FailureCategory, string>> = {
  *    (file system, config, binary lookup).
  * 4. Generic fallback — show the raw message.
  */
-export function formatCLIError(err: unknown): string {
+export function formatCLIError(err: unknown, debug = false): string {
+  const formatted = formatCLIErrorMessage(err);
+  if (debug && err instanceof Error && err.stack) {
+    return `${formatted}\n\n${err.stack}`;
+  }
+  return formatted;
+}
+
+function formatCLIErrorMessage(err: unknown): string {
   // CLIError hierarchy — catches both hench CLIError and TaskNotActionableError
   // (which extends foundation CLIError from @n-dx/llm-client)
   if (err instanceof BaseCLIError) {
@@ -240,16 +248,17 @@ export function formatCLIError(err: unknown): string {
     }
   }
 
-  // Generic fallback — show the message, never the stack
+  // Generic fallback — show the message, never the stack (unless --debug)
   return renderCLIError(CLI_ERROR_CODES.GENERIC, message);
 }
 
 /**
  * Handle a CLI error: print it and exit.
  * Drop-in replacement for catch blocks in CLI entry points.
+ * Pass debug=true (from --debug) to append the stack trace.
  */
-export function handleCLIError(err: unknown): never {
-  console.error(formatCLIError(err));
+export function handleCLIError(err: unknown, debug = false): never {
+  console.error(formatCLIError(err, debug));
   process.exit(1);
 }
 

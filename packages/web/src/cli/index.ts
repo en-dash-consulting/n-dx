@@ -8,7 +8,7 @@
  */
 
 import { resolve } from "node:path";
-import { suppressKnownDeprecations } from "@n-dx/llm-client";
+import { suppressKnownDeprecations, setVerbose, setDebug } from "@n-dx/llm-client";
 import { startServer } from "../server/start.js";
 import type { ViewerScope } from "../shared/view-routing.js";
 
@@ -37,6 +37,9 @@ for (const a of args.slice(1)) {
 
 const targetArg = args.slice(1).find((a) => !a.startsWith("-"));
 
+setVerbose(args.includes("--verbose"));
+setDebug(args.includes("--debug"));
+
 if (command === "serve") {
   const dir = resolve(targetArg || ".");
   const dev = args.includes("--dev");
@@ -51,6 +54,8 @@ Options:
   --port=N                  Port to listen on (default: 3117)
   --scope=<package>         Restrict to a single package (sourcevision, rex, hench)
   --dev                     Enable dev mode (live reload)
+  --verbose                 Show periodic "still serving" heartbeat while running
+  --debug                   Show verbose output plus stack traces on error
 `);
   if (command) {
     console.error(`Unknown command: ${command}`);

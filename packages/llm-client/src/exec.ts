@@ -55,6 +55,12 @@ export interface ExecOptions {
   maxBuffer?: number;
   /** Environment variables for the child process. Defaults to inheriting parent env. */
   env?: NodeJS.ProcessEnv;
+  /**
+   * Optional live-output callback, invoked with each stdout/stderr chunk as
+   * it arrives — in addition to (not instead of) the final buffered result.
+   * Purely additive: omitting it preserves existing buffered-only behavior.
+   */
+  onData?: (stream: "stdout" | "stderr", chunk: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +84,7 @@ export function exec(
   args: string[],
   opts: ExecOptions,
 ): Promise<ExecResult> {
-  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env } = opts;
+  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env, onData } = opts;
 
   return new Promise((resolve) => {
     const child = execFile(cmd, args, { cwd, timeout, maxBuffer, env }, (
@@ -110,6 +116,11 @@ export function exec(
     // child that reads from stdin (e.g. `rex add` calling readStdin() in a
     // non-TTY) hang forever waiting for an EOF that will never arrive.
     child.stdin?.end();
+
+    if (onData) {
+      child.stdout?.on("data", (chunk: Buffer) => onData("stdout", chunk.toString()));
+      child.stderr?.on("data", (chunk: Buffer) => onData("stderr", chunk.toString()));
+    }
   });
 }
 

@@ -28,7 +28,7 @@ import { toolRexAppendLog } from "../../tools/rex.js";
 import {checkTokenBudget} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
-import { section, subsection, stream, info } from "../../types/output.js";
+import { section, subsection, stream, info, withHeartbeat } from "../../types/output.js";
 import { isSpinningRun } from "../analysis/spin.js";
 import {
   loadLLMConfig,
@@ -1371,16 +1371,19 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         attemptAccumulator = useEventPipeline ? new EventAccumulator() : undefined;
 
         // Generic adapter-based spawn — replaces dispatchVendorSpawn
-        result = await spawnWithAdapter({
-          adapter,
-          spawnConfig,
-          cliBinary,
-          cliEnv,
-          cwd: projectDir,
-          tokenMetadata,
-          useEventPipeline,
-          accumulator: attemptAccumulator,
-        });
+        result = await withHeartbeat(
+          `waiting on ${vendor} CLI`,
+          spawnWithAdapter({
+            adapter,
+            spawnConfig,
+            cliBinary,
+            cliEnv,
+            cwd: projectDir,
+            tokenMetadata,
+            useEventPipeline,
+            accumulator: attemptAccumulator,
+          }),
+        );
 
         // Merge per-attempt events into the cross-retry accumulator. Includes
         // events from spawns terminated by plan-mode interception so token

@@ -290,13 +290,19 @@ export {
   mergeWithOverrides,
 } from "./project-config.js";
 
-// CLI output control (quiet mode)
+// CLI output control (quiet/verbose/debug modes)
 export {
   setQuiet,
   isQuiet,
+  setVerbose,
+  isVerbose,
+  setDebug,
+  isDebug,
   info,
   result,
   warn,
+  verbose,
+  debug,
 } from "./output.js";
 
 // Brand and animation

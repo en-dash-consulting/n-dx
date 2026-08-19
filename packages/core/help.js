@@ -1454,6 +1454,8 @@ export function formatMainHelp() {
   // ── Options ──
   lines.push(bold("OPTIONS"));
   lines.push(`  ${formatFlag("--quiet, -q")}           Suppress informational output`);
+  lines.push(`  ${formatFlag("--verbose")}             Show step-level progress; ndx itself shows a heartbeat while a spawned tool runs`);
+  lines.push(`  ${formatFlag("--debug")}               Show verbose output plus stack traces on error`);
   lines.push(`  ${formatFlag("-v, --version")}        Print the installed n-dx version`);
   lines.push("");
 

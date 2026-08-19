@@ -273,6 +273,8 @@ export function usage(): void {
     options: [
       { flag: "--help, -h", description: "Show this help" },
       { flag: "--quiet, -q", description: "Suppress informational output (for scripting)" },
+      { flag: "--verbose", description: "Show step-level progress during long operations (analyze)" },
+      { flag: "--debug", description: "Show verbose output plus stack traces on error" },
     ],
     footer: [
       "Run 'sourcevision <command> --help' for detailed help on any command.",

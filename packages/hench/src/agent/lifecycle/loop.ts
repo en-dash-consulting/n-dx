@@ -6,7 +6,7 @@ import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_GEMINI, dispatchTool } from "../../t
 import type { ToolContext } from "../../tools/contracts.js";
 import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
-import { section, subsection, stream, detail } from "../../types/output.js";
+import { section, subsection, stream, detail, withHeartbeat } from "../../types/output.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import {
   loadClaudeConfig,
@@ -328,11 +328,14 @@ async function executeToolCalls(
     const startMs = Date.now();
     stream("Tool", `${block.name}(${JSON.stringify(block.input).slice(0, 100)})`);
 
-    const output = await dispatchTool(
-      toolCtx,
-      block.name,
-      block.input as Record<string, unknown>,
-      rexToolHandlers,
+    const output = await withHeartbeat(
+      `running tool ${block.name}`,
+      dispatchTool(
+        toolCtx,
+        block.name,
+        block.input as Record<string, unknown>,
+        rexToolHandlers,
+      ),
     );
 
     const durationMs = Date.now() - startMs;
@@ -476,7 +479,10 @@ async function executeGeminiFunctionCalls(
     const startMs = Date.now();
     stream("Tool", `${fc.name}(${JSON.stringify(fc.args).slice(0, 100)})`);
 
-    const output = await dispatchTool(toolCtx, fc.name, fc.args, rexToolHandlers);
+    const output = await withHeartbeat(
+      `running tool ${fc.name}`,
+      dispatchTool(toolCtx, fc.name, fc.args, rexToolHandlers),
+    );
 
     const durationMs = Date.now() - startMs;
 
@@ -618,13 +624,16 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
 
         pruneGeminiContents(contents);
 
-        const result = await provider.generateContentWithTools({
-          model,
-          contents,
-          tools,
-          systemInstruction: systemPrompt,
-          maxOutputTokens: config.maxTokens,
-        });
+        const result = await withHeartbeat(
+          `waiting on google/${model} response`,
+          provider.generateContentWithTools({
+            model,
+            contents,
+            tools,
+            systemInstruction: systemPrompt,
+            maxOutputTokens: config.maxTokens,
+          }),
+        );
 
         recordTurnTokenUsageNormalized(run, result.usage, turn + 1, "google", model);
 
@@ -857,25 +866,28 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       pruneMessages(messages);
 
-      const response = await callWithFailover(
-        client,
-        {
+      const response = await withHeartbeat(
+        `waiting on ${vendor}/${model} response`,
+        callWithFailover(
+          client,
+          {
+            model,
+            max_tokens: config.maxTokens,
+            system: systemPrompt,
+            tools: TOOL_DEFINITIONS,
+            messages,
+          },
+          config,
+          vendor,
           model,
-          max_tokens: config.maxTokens,
-          system: systemPrompt,
-          tools: TOOL_DEFINITIONS,
-          messages,
-        },
-        config,
-        vendor,
-        model,
-        henchDir,
-        llmConfig,
-        projectDir,
-        store,
-        taskId,
-        brief.project.testCommand,
-        startingHead,
+          henchDir,
+          llmConfig,
+          projectDir,
+          store,
+          taskId,
+          brief.project.testCommand,
+          startingHead,
+        ),
       );
 
       // Track token usage for this turn
