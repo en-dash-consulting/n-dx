@@ -20,6 +20,7 @@ export type ItemStatus =
   | "failing"
   | "deferred"
   | "blocked"
+  | "cancelled"
   | "deleted";
 export type Priority = "critical" | "high" | "medium" | "low";
 

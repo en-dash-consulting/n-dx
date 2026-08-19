@@ -636,6 +636,12 @@ export interface SpawnToolOptions {
    */
   timeout?: number;
   /**
+   * Windows-only: when true, suppress the console window that Windows would
+   * otherwise create for console-subsystem executables spawned from a headless
+   * (background/daemon) process.  Ignored on non-Windows platforms.
+   */
+  windowsHide?: boolean;
+  /**
    * Called with each stdout chunk as it arrives. Fires only when `stdio`
    * is `"pipe"`. Lets a long-running child stream progress to the caller —
    * e.g. the web dashboard surfacing live phase output while a job runs —
@@ -698,6 +704,7 @@ export function spawnTool(
       env,
       stdio: "ignore",
       detached: true,
+      windowsHide: opts.windowsHide ?? false,
     });
     child.unref();
     return Promise.resolve({
@@ -714,6 +721,7 @@ export function spawnTool(
       cwd,
       env,
       stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
+      windowsHide: opts.windowsHide ?? false,
     });
 
     let stdout = "";
@@ -794,6 +802,7 @@ export function spawnManaged(
     cwd,
     env,
     stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
+    windowsHide: opts.windowsHide ?? false,
   });
 
   const done = new Promise<SpawnToolResult>((resolve) => {

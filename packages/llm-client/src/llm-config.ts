@@ -8,7 +8,7 @@
 import { join } from "node:path";
 import { access, readFile } from "node:fs/promises";
 import { deepMerge } from "./project-config.js";
-import type { LLMConfig, LLMVendor, CodexConfig, GoogleConfig } from "./llm-types.js";
+import type { LLMConfig, LLMVendor, CodexConfig, GoogleConfig, LocalConfig } from "./llm-types.js";
 import type { ClaudeConfig } from "./types.js";
 import { normalizeCodexModel } from "./config.js";
 
@@ -20,7 +20,21 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 function extractVendor(value: unknown): LLMVendor | undefined {
-  return value === "claude" || value === "codex" || value === "google" ? value : undefined;
+  return value === "claude" || value === "codex" || value === "google" || value === "local"
+    ? value
+    : undefined;
+}
+
+function extractLocalConfig(value: unknown): LocalConfig | undefined {
+  const v = asRecord(value);
+  if (!v) return undefined;
+
+  const cfg: LocalConfig = {};
+  if (typeof v.host === "string" && v.host) cfg.host = v.host;
+  if (typeof v.port === "number" && v.port > 0) cfg.port = v.port;
+  if (typeof v.model === "string" && v.model) cfg.model = v.model;
+  if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = v.lightModel;
+  return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
 function extractGoogleConfig(value: unknown): GoogleConfig | undefined {
@@ -84,6 +98,7 @@ function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
   const llmClaude = extractClaudeConfig(llm?.claude);
   const llmCodex = extractCodexConfig(llm?.codex);
   const llmGoogle = extractGoogleConfig(llm?.google);
+  const llmLocal = extractLocalConfig(llm?.local);
   const legacyClaude = extractClaudeConfig(root.claude);
   const autoFailover =
     typeof llm?.autoFailover === "boolean" ? llm.autoFailover : undefined;
@@ -102,6 +117,7 @@ function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
   if (llmClaude || legacyClaude) config.claude = llmClaude ?? legacyClaude;
   if (llmCodex) config.codex = llmCodex;
   if (llmGoogle) config.google = llmGoogle;
+  if (llmLocal) config.local = llmLocal;
   if (autoFailover !== undefined) config.autoFailover = autoFailover;
   return config;
 }

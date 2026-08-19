@@ -623,7 +623,7 @@ function readLLMVendor(dir) {
   try {
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
     const vendor = data?.llm?.vendor;
-    return vendor === "claude" || vendor === "codex" || vendor === "google" ? vendor : undefined;
+    return vendor === "claude" || vendor === "codex" || vendor === "google" || vendor === "local" ? vendor : undefined;
   } catch {
     return undefined;
   }
@@ -643,6 +643,24 @@ function readLLMModel(dir, vendor) {
     return typeof model === "string" && model.length > 0 ? model : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Read local LLM server host and port from .n-dx.json.
+ * Returns defaults (localhost:1234) when unset or config file is missing/invalid.
+ */
+function readLocalConfig(dir) {
+  const configPath = join(dir, ".n-dx.json");
+  if (!existsSync(configPath)) return { host: "localhost", port: 1234 };
+  try {
+    const data = JSON.parse(readFileSync(configPath, "utf-8"));
+    return {
+      host: data?.llm?.local?.host || "localhost",
+      port: data?.llm?.local?.port || 1234,
+    };
+  } catch {
+    return { host: "localhost", port: 1234 };
   }
 }
 
@@ -941,7 +959,7 @@ function parseInitFlagSet(rest) {
   const googleLightModelFromFlag = extractInitGoogleLightModel(rest);
 
   if (providerFromFlag !== undefined && !SUPPORTED_PROVIDERS.includes(providerFromFlag)) {
-    console.error(`Error: Invalid provider "${providerFromFlag}". Expected one of: codex, claude, google.`);
+    console.error(`Error: Invalid provider "${providerFromFlag}". Expected one of: codex, claude, google, local.`);
     exitWithCleanup(1);
   }
 
@@ -1086,7 +1104,12 @@ async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, qui
 
   if (!process.stdout.isTTY || quiet) showInitBanner();
 
-  const selection = await promptLLMSelection(resolution);
+  // Read local server host/port so the live model fetch uses the right address.
+  const localConfig = readLocalConfig(dir);
+  const selection = await promptLLMSelection(resolution, {
+    localHost: localConfig.host,
+    localPort: localConfig.port,
+  });
   const selectedProvider = selection.provider;
   const llmSkipped = selection.cancelled;
 
@@ -1111,7 +1134,9 @@ async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, qui
   const providerSource = PROVIDER_SOURCE_LABELS[selection.providerSource] ?? "selected";
   const modelSource = MODEL_SOURCE_LABELS[selection.modelSource] ?? "";
 
-  return { selectedProvider, selection, llmSkipped, providerSource, modelSource };
+  // providerSourceKey is the raw resolver value ("flag" | "config" | "prompt").
+  // providerSource is the display label ("from existing config", etc.) for the summary.
+  return { selectedProvider, selection, llmSkipped, providerSource, modelSource, providerSourceKey: selection.providerSource };
 }
 
 /**
@@ -1159,12 +1184,18 @@ async function runSubInitPhase(name, work, detail, quiet) {
  *   selectedModel: string|undefined, claudeModelFromFlag: string|undefined,
  *   codexModelFromFlag: string|undefined, googleModelFromFlag: string|undefined }} opts
  */
-async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag }) {
+async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selectedModel, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag, providerSource }) {
   if (!llmSkipped && selectedProvider) {
     const origLog = console.log;
     console.log = () => {};
     try {
-      await runConfig(["llm.vendor", selectedProvider, dir, "--soft-preflight"]);
+      // Skip the vendor write (and its auth preflight) when the provider
+      // comes from existing config — it's already persisted and re-running
+      // the preflight on every `ndx init` produces noisy auth warnings for
+      // vendors the user hasn't configured yet (e.g. codex without login).
+      if (providerSource !== "config") {
+        await runConfig(["llm.vendor", selectedProvider, dir, "--soft-preflight"]);
+      }
       if (selectedModel) {
         await runConfig([`llm.${selectedProvider}.model`, selectedModel, dir]);
       }
@@ -1186,6 +1217,12 @@ async function persistInitLLMConfig(dir, { llmSkipped, selectedProvider, selecte
       // analysis/classification). Always persisted to llm.google.lightModel.
       if (googleLightModelFromFlag) {
         await runConfig(["llm.google.lightModel", googleLightModelFromFlag, dir]);
+      }
+      // Local and Google vendors use the REST API loop — there is no CLI binary.
+      // Auto-set hench.provider=api so hench doesn't fail at runtime with a
+      // confusing "CLI mode not supported" error.
+      if (selectedProvider === "local" || selectedProvider === "google") {
+        await runConfig(["hench.provider", "api", dir]);
       }
     } finally {
       console.log = origLog;
@@ -1272,12 +1309,12 @@ async function handleInit(rest) {
   const llmResult = await selectInitLLMProvider(dir, effectiveProvider, effectiveModel, quiet, {
     providerFromFlag, claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag,
   });
-  const { selectedProvider, selection, llmSkipped, providerSource, modelSource } = llmResult;
+  const { selectedProvider, selection, llmSkipped, providerSource, modelSource, providerSourceKey } = llmResult;
 
   // When no provider is available and it wasn't a user cancellation (e.g.
   // non-TTY with no flags or config), exit with a clear message.
   if (!selectedProvider && !llmSkipped) {
-    console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex', 'claude', or 'google'.");
+    console.error("Init cancelled: no provider selected. Re-run 'ndx init' and choose 'codex', 'claude', 'google', or 'local'.");
     exitWithCleanup(1);
   }
 
@@ -1302,6 +1339,7 @@ async function handleInit(rest) {
         flags,
         provider: selectedProvider,
         providerSource,
+        providerSourceKey,
         model: selection.model,
         modelSource,
         assistantEnabled,
@@ -1350,6 +1388,7 @@ async function handleInit(rest) {
   await persistInitLLMConfig(dir, {
     llmSkipped, selectedProvider, selectedModel: selection.model,
     claudeModelFromFlag, codexModelFromFlag, googleModelFromFlag, googleLightModelFromFlag,
+    providerSource: providerSourceKey,  // raw key ("flag"|"config"|"prompt"), not display label
   });
 
   try {
@@ -1716,7 +1755,7 @@ async function handleWork(rest) {
     const vendor = readLLMVendor(dir);
     if (!vendor) {
       console.error("Error: No LLM vendor configured for this project.");
-      console.error("Hint: Run 'ndx config llm.vendor claude', 'ndx config llm.vendor codex', or 'ndx config llm.vendor google' to configure a vendor.");
+      console.error("Hint: Run 'ndx config llm.vendor claude', 'ndx config llm.vendor codex', 'ndx config llm.vendor google', or 'ndx config llm.vendor local' to configure a vendor.");
       exitWithCleanup(1);
     }
   }
@@ -1918,7 +1957,7 @@ async function handleSelfHeal(rest) {
   const vendor = readLLMVendor(dir);
   if (!vendor && !captureOnly) {
     console.error("Error: No LLM vendor configured for this project.");
-    console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
+    console.error("Hint: Run 'ndx config llm.vendor claude', 'ndx config llm.vendor codex', or 'ndx config llm.vendor local' to configure a vendor.");
     exitWithCleanup(1);
   }
 
@@ -2298,7 +2337,7 @@ async function handlePairProgramming(rest) {
   const primaryVendor = readLLMVendor(dir);
   if (!isDryRun && !primaryVendor) {
     console.error("Error: No LLM vendor configured for this project.");
-    console.error("Hint: Run 'ndx config llm.vendor claude' or 'ndx config llm.vendor codex' to configure a vendor.");
+    console.error("Hint: Run 'ndx config llm.vendor claude', 'ndx config llm.vendor codex', or 'ndx config llm.vendor local' to configure a vendor.");
     exitWithCleanup(1);
   }
 

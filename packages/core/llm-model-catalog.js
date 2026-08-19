@@ -48,6 +48,10 @@ export const LLM_MODEL_CATALOG = {
     { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", recommended: false },
     { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", recommended: false },
   ],
+  // Local vendor: no static catalog — available models are fetched live from the
+  // running LM Studio / Ollama server at /v1/models during `ndx init`.
+  // If the server is not running at init time the model prompt is skipped gracefully.
+  local: [],
 };
 
 /**

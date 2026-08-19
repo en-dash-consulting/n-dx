@@ -35,6 +35,12 @@ export function isModelCompatibleWithVendor(
     return trimmed.startsWith("gemini-");
   }
 
+  if (vendor === "local") {
+    // Local (LM Studio): any non-empty model string is accepted — the user
+    // knows what is loaded. An empty string means "use whatever is active".
+    return true;
+  }
+
   // Codex: GPT models (gpt-*), O-series (o1, o3, etc), or explicit "codex" brand
   return /^(gpt-|o\d|codex)/i.test(trimmed);
 }

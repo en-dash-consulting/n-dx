@@ -37,6 +37,11 @@ export function resolveVendorAdapter(vendor: LLMVendor): VendorAdapter {
         "Google vendor does not support CLI mode. " +
         "Use provider=api: 'n-dx config hench.provider api'",
       );
+    case "local":
+      throw new Error(
+        "Local vendor does not support CLI mode — it connects to a local REST server. " +
+        "Use provider=api: 'n-dx config hench.provider api'",
+      );
     case "claude":
     default:
       return claudeCliAdapter;

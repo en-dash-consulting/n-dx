@@ -12,6 +12,7 @@ import type { LLMVendor, LLMConfig } from "./llm-types.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
 import { resolveOpenAiApiKey } from "./openai-api-provider.js";
 import { createGoogleApiProvider, resolveGoogleApiKey } from "./google-api-provider.js";
+import { createLocalApiProvider } from "./local-api-provider.js";
 
 /**
  * Vendor-neutral client creation options.
@@ -66,6 +67,11 @@ export function detectLLMAuthMode(options: CreateLLMClientOptions): AuthMode {
     return apiKey ? "api" : "cli";
   }
 
+  if (vendor === "local") {
+    // Local (LM Studio) uses the REST API — no CLI binary involved.
+    return "api";
+  }
+
   const claudeConfig = options.claudeConfig ?? options.llmConfig?.claude ?? {};
   return detectAuthMode({
     claudeConfig,
@@ -97,6 +103,14 @@ export function createLLMClient(options: CreateLLMClientOptions): ClaudeClient {
     });
     // Cast is safe: ClaudeClient is structurally compatible with LLMProvider.complete()
     return googleProvider as unknown as ClaudeClient;
+  }
+
+  if (vendor === "local") {
+    // Local (LM Studio) uses an OpenAI-compatible REST API.
+    const localProvider = createLocalApiProvider({
+      localConfig: options.llmConfig?.local,
+    });
+    return localProvider as unknown as ClaudeClient;
   }
 
   const claudeConfig = options.claudeConfig ?? options.llmConfig?.claude ?? {};

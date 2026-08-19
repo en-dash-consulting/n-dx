@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleHenchRoute, resetHenchRouteStateForTests } from "../../../src/server/routes-hench.js";
+import { handleHenchRoute, resetHenchRouteStateForTests, shutdownActiveExecutions } from "../../../src/server/routes-hench.js";
 import {
   startRouteTestServer,
   closeRouteTestServer,
@@ -61,6 +61,9 @@ describe("POST /api/hench/execute", () => {
     // Await the close before removing the directory: on Windows the still-open
     // server handle is what makes the removal fail, so the order matters.
     await closeRouteTestServer(server);
+    // Terminate any spawned hench processes before removing tmpDir.
+    // On Windows, an active child process holds a CWD lock causing EBUSY.
+    await shutdownActiveExecutions(500).catch(() => {});
     await removeTestDir(tmpDir);
   });
 
@@ -159,7 +162,9 @@ describe("POST /api/hench/execute", () => {
     expect(body.error).toContain("in_progress");
   });
 
-  it("rejects deferred task with 409", async () => {
+  it("accepts deferred task and returns 202", async () => {
+    // Deferred tasks are executable: the route passes --reset-deferred to hench
+    // so the task is reset to pending before the run starts.
     await writeFile(
       join(rexDir, "prd.json"),
       JSON.stringify(makePRD([
@@ -172,7 +177,11 @@ describe("POST /api/hench/execute", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-1" }),
     });
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(202);
+
+    const body = await res.json();
+    expect(body.taskId).toBe("task-1");
+    expect(body.status).toBe("started");
   });
 
   it("finds nested tasks in PRD tree", async () => {

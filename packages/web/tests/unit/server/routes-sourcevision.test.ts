@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm, appendFile, utimes } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFileSync, execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleSourcevisionRoute } from "../../../src/server/routes-sourcevision.js";

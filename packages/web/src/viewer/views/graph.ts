@@ -3,7 +3,7 @@
  */
 
 import { h } from "preact";
-import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { LoadedData, DetailItem, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/index.js";
 import { useGraphArrowNav } from "../hooks/index.js";
@@ -607,7 +607,10 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
     [mode, packageSubgraph, subgraph],
   );
 
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) so the reset completes synchronously
+  // within the render cycle — before vi.waitFor can poll the DOM in tests,
+  // and before any microtask queued by an event handler can read a stale view.
+  useLayoutEffect(() => {
     setDepView({ x: 0, y: 0, k: 1 });
     setDepNodeOffsets({});
   }, [focusFile, focusPackage, mode, streetViewMode]);
@@ -789,9 +792,18 @@ export function Graph({ data, selectedFile, selectedZone, navigateTo }: GraphPro
       const factor = event.deltaY < 0 ? 1.03 : 1 / 1.03;
       updateSurfaceView(surface, (view) => zoomMapToFocal(view, view.k * factor, cx, cy, svg));
     } else {
-      const vb = svg.viewBox.baseVal;
+      // Read viewBox dimensions from the attribute string rather than
+      // svg.viewBox.baseVal: in some environments (e.g. jsdom) the animated
+      // rect property returns zero dimensions even when the attribute is set.
+      // Also try lowercase "viewbox": jsdom (used in unit tests) lowercases SVG
+      // attribute names on retrieval even though getAttribute is case-sensitive
+      // per spec for non-HTML-namespace elements.
+      const vbAttr = svg.getAttribute("viewBox") ?? svg.getAttribute("viewbox") ?? "";
+      const vbParts = vbAttr.split(/\s+/).map(Number);
+      const vbW = Number.isFinite(vbParts[2]) ? vbParts[2] : 0;
+      const vbH = Number.isFinite(vbParts[3]) ? vbParts[3] : 0;
       updateSurfaceView(surface, (view) =>
-        clampMapView(panViewport(view, -event.deltaX, -event.deltaY), vb.width, vb.height),
+        clampMapView(panViewport(view, -event.deltaX, -event.deltaY), vbW, vbH),
       );
     }
   }, [updateSurfaceView]);

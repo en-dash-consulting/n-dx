@@ -164,9 +164,10 @@ describe("Rex API routes", () => {
     const data = await res.json();
     expect(data.ok).toBe(true);
 
-    // Verify the change was persisted
-    const prd = readPRDFromMd(rexDir);
-    const task2 = prd.items[0]!.children![1]!;
+    // Verify the change was persisted. PATCH writes go through the PRDStore
+    // (folder tree), not legacy prd.md, so read back through the API.
+    const after = await fetch(`http://localhost:${port}/api/rex/items/task-2`);
+    const task2 = await after.json();
     expect(task2.status).toBe("in_progress");
     expect(task2.startedAt).toBeDefined();
   });
@@ -179,8 +180,9 @@ describe("Rex API routes", () => {
     });
     expect(res.status).toBe(200);
 
-    const prd = readPRDFromMd(rexDir);
-    const task1 = prd.items[0]!.children![0]!;
+    // PATCH writes go through the PRDStore (folder tree); read back via the API.
+    const after = await fetch(`http://localhost:${port}/api/rex/items/task-1`);
+    const task1 = await after.json();
     expect(task1.status).toBe("completed");
     expect(task1.completedAt).toBeDefined();
   });
