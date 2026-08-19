@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, TurnTokenUsage } from "../../schema/index.js";
 import { GuardRails } from "../../guard/index.js";
-import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_GEMINI, dispatchTool } from "../../tools/dispatch.js";
+import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, dispatchTool } from "../../tools/dispatch.js";
 import type { ToolContext } from "../../tools/contracts.js";
 import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
@@ -14,7 +14,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt } from "../../prd/llm-gateway.js";
+import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -670,14 +670,473 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       if (run.status === "running") {
         run.status = "timeout";
         run.error = `Exceeded max turns (${maxTurns})`;
-        await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+        // Local LLM timeouts are retryable: model may need more context window or turns.
+        // Use "pending" so the task reappears as actionable on the next run.
+        await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
       }
     }
   } catch (err) {
     run.status = "failed";
     run.error = (err as Error).message;
     console.error(`[Error] ${run.error}`);
-    await handleRunFailure(store, taskId, "deferred", "task_failed", run.error);
+    // Infrastructure failures (context window overflow, network errors) are retryable.
+    // Use "pending" so the task reappears as actionable after the user fixes the issue.
+    await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
+  } finally {
+    process.removeListener("SIGINT", handleSignal);
+  }
+
+  heartbeat.stop();
+
+  if (opts.review && run.status === "completed") {
+    await runReviewGate(projectDir, store, taskId, run, {
+      rollbackOnFailure: opts.rollbackOnFailure,
+      yes: opts.yes,
+      autonomous: opts.autonomous,
+      baselineUntracked,
+    });
+  }
+
+  await finalizeRun({
+    run,
+    henchDir,
+    projectDir,
+    config,
+    testCommand,
+    heartbeat,
+    memoryCtx,
+    selfHeal: config.selfHeal,
+    rollbackOnFailure: opts.rollbackOnFailure,
+    yes: opts.yes,
+    autonomous: opts.autonomous,
+    store,
+    autoCommit: config.autoCommit === true,
+    skipFullTestGate: config.skipFullTestGate,
+    baselineUntracked,
+  });
+
+  return { run };
+}
+
+// ---------------------------------------------------------------------------
+// Local (OpenAI-compatible) tool-use loop
+// ---------------------------------------------------------------------------
+
+/** OpenAI-format message in the conversation history. */
+interface OpenAiMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_call_id?: string;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+}
+
+/** Single tool call extracted from an OpenAI chat response. */
+interface OpenAiToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+
+/** Parse token usage from an OpenAI-format usage object. */
+function parseLocalUsage(usage: unknown): { input: number; output: number } {
+  if (!usage || typeof usage !== "object") return { input: 0, output: 0 };
+  const u = usage as Record<string, unknown>;
+  return {
+    input: typeof u["prompt_tokens"] === "number" ? u["prompt_tokens"] : 0,
+    output: typeof u["completion_tokens"] === "number" ? u["completion_tokens"] : 0,
+  };
+}
+
+/**
+ * Dispatch OpenAI-format tool calls through the shared tool dispatcher and
+ * return tool-result messages in OpenAI format.
+ */
+async function executeLocalToolCalls(
+  toolCalls: OpenAiToolCall[],
+  toolCtx: ToolContext,
+  turn: number,
+  run: RunRecord,
+): Promise<OpenAiMessage[]> {
+  const results: OpenAiMessage[] = [];
+
+  for (const tc of toolCalls) {
+    let input: Record<string, unknown> = {};
+    try {
+      input = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+    } catch {
+      input = {};
+    }
+
+    const startMs = Date.now();
+    stream("Tool", `${tc.function.name}(${tc.function.arguments.slice(0, 100)})`);
+
+    const output = await dispatchTool(toolCtx, tc.function.name, input, rexToolHandlers);
+    const durationMs = Date.now() - startMs;
+
+    run.toolCalls.push({
+      turn,
+      tool: tc.function.name,
+      input,
+      output: output.slice(0, MAX_TOOL_OUTPUT_STORED),
+      durationMs,
+    });
+
+    results.push({
+      role: "tool",
+      tool_call_id: tc.id,
+      content: output,
+    });
+
+    stream("Result", `${output.slice(0, 200)}${output.length > 200 ? "..." : ""}`);
+    detail(`${durationMs}ms`);
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Verifier
+// ---------------------------------------------------------------------------
+
+/**
+ * Call a second local model and ask it to review the primary model's solution.
+ *
+ * Returns `{ verdict: "PASS" | "FAIL", reasoning: string }`.
+ * Any network or parse error yields PASS so the run continues normally —
+ * a verifier failure should never block task completion.
+ */
+async function callVerifier(
+  cfg: { host?: string; port?: number; model?: string },
+  briefText: string,
+  primaryFinalMessage: string,
+): Promise<{ verdict: "PASS" | "FAIL"; reasoning: string }> {
+  const host = typeof cfg.host === "string" && cfg.host ? cfg.host : "localhost";
+  const port = typeof cfg.port === "number" && cfg.port > 0 ? cfg.port : 1235;
+  const model = typeof cfg.model === "string" ? cfg.model : "";
+  const baseUrl = `http://${host}:${port}/v1`;
+
+  const systemContent =
+    "You are an independent code reviewer. Your only job is to verify whether a proposed " +
+    "solution correctly and completely addresses the task requirements. Be concise and objective. " +
+    "On the FIRST line of your response write exactly PASS or FAIL (uppercase only, nothing else). " +
+    "Then explain your reasoning on subsequent lines.";
+
+  const userContent =
+    `## Task Requirements\n\n${briefText}\n\n` +
+    `## Agent Solution Summary\n\n${primaryFinalMessage}\n\n` +
+    "Does this solution correctly and completely satisfy the task requirements and acceptance criteria? " +
+    "First line: PASS or FAIL. Then explain.";
+
+  try {
+    const reqBody: Record<string, unknown> = {
+      messages: [
+        { role: "system", content: systemContent },
+        { role: "user", content: userContent },
+      ],
+      max_tokens: 1024,
+      temperature: 0.1,
+    };
+    if (model) reqBody["model"] = model;
+
+    const resp = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reqBody),
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      detail(`[Verifier] Endpoint error ${resp.status}: ${parseLmStudioError(resp.status, body)} — skipping`);
+      return { verdict: "PASS", reasoning: "(Verification skipped — verifier endpoint error)" };
+    }
+
+    const data = await resp.json() as Record<string, unknown>;
+    const choices = (data["choices"] as Array<Record<string, unknown>> | undefined) ?? [];
+    const msg = (choices[0]?.["message"] as Record<string, unknown> | undefined) ?? {};
+    const content = typeof msg["content"] === "string" ? msg["content"] : "";
+
+    // Verdict is on the first non-blank line
+    const firstLine = content.trim().split(/\r?\n/)[0].trim().toUpperCase();
+    const verdict: "PASS" | "FAIL" = firstLine.startsWith("PASS") ? "PASS" : "FAIL";
+
+    return { verdict, reasoning: content.trim() };
+  } catch (err) {
+    detail(`[Verifier] Could not reach ${baseUrl}: ${(err as Error).message} — skipping`);
+    return { verdict: "PASS", reasoning: "(Verification skipped — verifier unreachable)" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Local (OpenAI-compatible) agentic tool-use loop.
+ *
+ * Mirrors the Gemini loop lifecycle but speaks the OpenAI Chat Completions
+ * API format. Used when llm.vendor = "local" (e.g. LM Studio). Supports
+ * function-calling on models that advertise it; degrades gracefully to
+ * single-turn completion otherwise.
+ *
+ * The local server URL comes from llm.local.host / llm.local.port in
+ * `.n-dx.json` (default: localhost:1234).
+ */
+async function runLocalToolLoop(params: {
+  provider: LLMProvider;
+  config: HenchConfig;
+  model: string;
+  systemPrompt: string | undefined;
+  briefText: string;
+  taskTitle: string;
+  testCommand: string | undefined;
+  taskId: string;
+  henchDir: string;
+  projectDir: string;
+  store: PRDStore;
+  maxTurns: number;
+  tokenBudget: number | undefined;
+  startingHead: string | undefined;
+  baselineUntracked: string[];
+  llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>;
+  opts: AgentLoopOptions;
+}): Promise<AgentLoopResult> {
+  const {
+    provider, config, model, systemPrompt, briefText, taskTitle, testCommand,
+    taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead,
+    baselineUntracked, llmConfig, opts,
+  } = params;
+
+  // Resolve the base URL from config
+  const localCfg = (llmConfig as Record<string, unknown>)["local"] as Record<string, unknown> | undefined;
+  const host = typeof localCfg?.["host"] === "string" && localCfg["host"]
+    ? localCfg["host"] : "localhost";
+  const port = typeof localCfg?.["port"] === "number" && localCfg["port"] > 0
+    ? localCfg["port"] : 1234;
+  const baseUrl = `http://${host}:${port}/v1`;
+  // Read the optional maxContextTokens limit from config (set via ndx config llm.local.maxContextTokens=N).
+  const maxContextTokens = typeof localCfg?.["maxContextTokens"] === "number"
+    ? (localCfg["maxContextTokens"] as number)
+    : undefined;
+
+  // Verifier config — second model that reviews the primary's completed solution.
+  const verifierRaw = localCfg?.["verifier"];
+  const verifierCfg = (verifierRaw && typeof verifierRaw === "object")
+    ? verifierRaw as Record<string, unknown>
+    : undefined;
+  const maxVerifierCycles = typeof verifierCfg?.["maxCycles"] === "number"
+    ? (verifierCfg["maxCycles"] as number) : 2;
+  let verifierCycleCount = 0;
+
+  // Compile OpenAI-format tool definitions once
+  const openAiTools = toOpenAiToolDefs([...TOOL_DEFINITIONS_NEUTRAL]);
+
+  const { run, memoryCtx } = await initRunRecord({
+    taskId,
+    taskTitle,
+    model,
+    henchDir,
+    vendor: "local",
+    sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
+    approvals: DEFAULT_EXECUTION_POLICY.approvals,
+    parseMode: "openai-tools",
+    invocationContext: "api",
+  });
+
+  section(
+    opts.runNumber !== undefined
+      ? `Agent Run #${opts.runNumber} (${model}) start`
+      : `Agent Run (${model})`,
+  );
+
+  const heartbeat = startHeartbeat(henchDir, run);
+
+  let cancelled = false;
+  const handleSignal = () => {
+    if (cancelled) process.exit(1);
+    cancelled = true;
+  };
+  process.on("SIGINT", handleSignal);
+
+  const toolCtx = initGoogleApiResources(
+    config, projectDir, store, taskId, testCommand, startingHead,
+  );
+
+  const messages: OpenAiMessage[] = [];
+  if (systemPrompt) {
+    messages.push({ role: "system", content: systemPrompt });
+  }
+  messages.push({ role: "user", content: briefText });
+
+  // Pre-send token check: if maxContextTokens is configured, estimate whether the initial
+  // brief fits before the first request. A rough heuristic (1 token ≈ 3.5 chars) is used
+  // — exact tokenization requires the model's tokenizer. Fails fast with actionable guidance.
+  if (maxContextTokens) {
+    const estimatedTokens = Math.ceil(
+      messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0) / 3.5,
+    );
+    if (estimatedTokens > maxContextTokens) {
+      const est = estimatedTokens.toLocaleString();
+      const limit = maxContextTokens.toLocaleString();
+      throw new Error(
+        `Brief too large for configured context window: ~${est} estimated tokens ` +
+        `vs llm.local.maxContextTokens=${limit}.\n` +
+        `Fix: increase "Context Length" in LM Studio to at least 32 768, then update ` +
+        `'n-dx config llm.local.maxContextTokens 32768'.`,
+      );
+    }
+  }
+
+  try {
+    for (let turn = 0; turn < maxTurns; turn++) {
+      if (cancelled) {
+        run.status = "cancelled";
+        stream("Cancelled", "Run interrupted by user");
+        break;
+      }
+
+      run.turns = turn + 1;
+      subsection(`Turn ${turn + 1}/${maxTurns}`);
+
+      // Prune history to stay within context limits
+      const maxKeep = 1 + MAX_CONTEXT_PAIRS * 2;
+      if (messages.length > maxKeep + 1) {
+        const toRemove = messages.length - maxKeep - 1;
+        const systemEnd = messages[0].role === "system" ? 1 : 0;
+        messages.splice(systemEnd, toRemove);
+        detail(`Pruned ${toRemove} messages to stay within context limit`);
+      }
+
+      const reqBody: Record<string, unknown> = {
+        model: model || undefined,
+        messages,
+        tools: openAiTools,
+        tool_choice: "auto",
+        max_tokens: config.maxTokens,
+      };
+      // LM Studio uses whichever model is loaded when model is omitted
+      if (!model) delete reqBody["model"];
+
+      const t0 = Date.now();
+      let response: Response;
+      try {
+        response = await fetch(`${baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(reqBody),
+          signal: AbortSignal.timeout(5 * 60 * 1000), // 5 min
+        });
+      } catch (err) {
+        throw new Error(
+          `Cannot reach local server at ${baseUrl}: ${(err as Error).message}. ` +
+          "Is LM Studio running?",
+        );
+      }
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        throw new Error(parseLmStudioError(response.status, body));
+      }
+
+      const data = await response.json() as Record<string, unknown>;
+      const latencyMs = Date.now() - t0;
+
+      const choices = (data["choices"] as Array<Record<string, unknown>> | undefined) ?? [];
+      const choice = choices[0] ?? {};
+      const message = (choice["message"] as Record<string, unknown> | undefined) ?? {};
+      const finishReason = choice["finish_reason"] as string | undefined;
+      const assistantContent = typeof message["content"] === "string" ? message["content"] : null;
+      const rawToolCalls = (message["tool_calls"] as OpenAiToolCall[] | undefined) ?? [];
+
+      // Track token usage
+      const usage = parseLocalUsage(data["usage"]);
+      recordTurnTokenUsageNormalized(run, usage, turn + 1, "local", model);
+
+      // Emit tok/s metric for the dashboard
+      if (usage.output > 0 && latencyMs > 0) {
+        const tokPerSec = Math.round((usage.output / latencyMs) * 1000 * 10) / 10;
+        detail(`⚡ ${tokPerSec} tok/s (${latencyMs}ms, ${usage.output} out)`);
+      }
+
+      const budgetCheck = checkTokenBudget(run.tokenUsage, tokenBudget);
+      if (budgetCheck.exceeded) {
+        await handleBudgetExceeded(store, taskId, run, budgetCheck.totalUsed, budgetCheck.budget);
+        break;
+      }
+
+      // Add assistant turn to history
+      const assistantMsg: OpenAiMessage = {
+        role: "assistant",
+        content: assistantContent,
+      };
+      if (rawToolCalls.length > 0) {
+        assistantMsg.tool_calls = rawToolCalls;
+      }
+      messages.push(assistantMsg);
+
+      if (assistantContent) {
+        stream(formatModelLabel(model), assistantContent);
+      }
+
+      // No tool calls → model is done; run verifier if configured
+      if (rawToolCalls.length === 0 || finishReason === "stop" || finishReason === "end_turn") {
+        if (verifierCfg && verifierCycleCount < maxVerifierCycles) {
+          const vHost = typeof verifierCfg["host"] === "string" && verifierCfg["host"]
+            ? verifierCfg["host"] : "localhost";
+          const vPort = typeof verifierCfg["port"] === "number" && (verifierCfg["port"] as number) > 0
+            ? verifierCfg["port"] as number : 1235;
+          section(`Verifier Review (cycle ${verifierCycleCount + 1}/${maxVerifierCycles})`);
+          detail(`[Verifier] Querying ${vHost}:${vPort} …`);
+          const { verdict, reasoning } = await callVerifier(
+            verifierCfg as { host?: string; port?: number; model?: string },
+            briefText,
+            assistantContent ?? "(no summary provided)",
+          );
+          verifierCycleCount++;
+          stream("Verifier", reasoning);
+          if (verdict === "FAIL") {
+            stream("Verifier", "✗ FAIL — requesting revision from primary model");
+            messages.push({
+              role: "user",
+              content:
+                `An independent reviewer checked your solution and flagged issues:\n\n${reasoning}\n\n` +
+                "Please address the issues above and re-submit your completed solution.",
+            });
+            run.lastActivityAt = new Date().toISOString();
+            await saveRun(henchDir, run);
+            continue; // next turn — primary model gets the feedback
+          }
+          stream("Verifier", "✓ PASS — solution accepted");
+        }
+        run.status = "completed";
+        run.summary = assistantContent?.slice(0, MAX_SUMMARY_LENGTH) ?? undefined;
+        break;
+      }
+
+      // Dispatch tool calls and feed responses back
+      const toolResults = await executeLocalToolCalls(rawToolCalls, toolCtx, turn + 1, run);
+      messages.push(...toolResults);
+
+      run.lastActivityAt = new Date().toISOString();
+      await saveRun(henchDir, run);
+    }
+
+    if (run.status === "running") {
+      run.status = "timeout";
+      run.error = `Exceeded max turns (${maxTurns})`;
+      // Local LLM timeouts are retryable: model may need a larger context window or more turns.
+      // Reset to "pending" so the task reappears as actionable after the user adjusts LM Studio config.
+      await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
+    }
+  } catch (err) {
+    run.status = "failed";
+    run.error = (err as Error).message;
+    console.error(`[Error] ${run.error}`);
+    // Infrastructure failures (context window overflow, network errors) are retryable.
+    // Reset to "pending" so the task reappears as actionable after the user fixes the issue.
+    await handleRunFailure(store, taskId, "pending", "task_failed", run.error);
   } finally {
     process.removeListener("SIGINT", handleSignal);
   }
@@ -761,9 +1220,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const effectiveVendor = resolveLLMVendor(llmConfig);
   let provider: LLMProvider;
 
-  if (config.useRegistryProvider || effectiveVendor === "google") {
+  if (config.useRegistryProvider || effectiveVendor === "google" || effectiveVendor === "local") {
     // New path: ProviderRegistry resolution.
-    // Google always uses the registry (it has no legacy API path).
+    // Google and local always use the registry (they have no legacy API path).
     provider = defaultRegistry.getActiveProvider(llmConfig);
   } else {
     // Legacy path: manual vendor check with original error message
@@ -776,12 +1235,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     provider = defaultRegistry.create("claude", llmConfig);
   }
 
-  // Google (Gemini) drives a dedicated agentic tool-use loop. The Gemini REST
-  // API supports function-calling, so we run a multi-turn loop that mirrors the
-  // Claude path below: send `contents` + tool declarations, dispatch any
-  // requested functionCalls through the shared dispatcher, feed results back,
-  // and loop until the model stops calling tools (or limits are hit). If the
-  // provider does not advertise function-calling, it degrades to single-turn.
+  // Google (Gemini) drives a dedicated agentic tool-use loop.
   if (effectiveVendor === "google") {
     return await runGeminiToolLoop({
       provider: provider as GeminiToolProvider,
@@ -799,6 +1253,29 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       tokenBudget,
       startingHead,
       baselineUntracked,
+      opts,
+    });
+  }
+
+  // Local vendor drives an OpenAI-compatible tool-use loop via LM Studio.
+  if (effectiveVendor === "local") {
+    return await runLocalToolLoop({
+      provider,
+      config,
+      model,
+      systemPrompt,
+      briefText,
+      taskTitle: brief.task.title,
+      testCommand: brief.project.testCommand,
+      taskId,
+      henchDir,
+      projectDir,
+      store,
+      maxTurns,
+      tokenBudget,
+      startingHead,
+      baselineUntracked,
+      llmConfig,
       opts,
     });
   }
@@ -866,6 +1343,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       pruneMessages(messages);
 
+      const _t0 = Date.now();
       const response = await withHeartbeat(
         `waiting on ${vendor}/${model} response`,
         callWithFailover(
@@ -889,9 +1367,20 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
           startingHead,
         ),
       );
+      const _latencyMs = Date.now() - _t0;
 
       // Track token usage for this turn
       recordTurnTokenUsage(run, response.usage as unknown as Record<string, unknown>, turn + 1, vendor, model);
+
+      // Emit tok/s metric — parsed by the web server for live dashboard display
+      {
+        const outTokens = (response.usage as unknown as Record<string, unknown>)?.["output_tokens"];
+        const _outTok = typeof outTokens === "number" ? outTokens : 0;
+        if (_outTok > 0 && _latencyMs > 0) {
+          const _tokPerSec = Math.round((_outTok / _latencyMs) * 1000 * 10) / 10;
+          detail(`⚡ ${_tokPerSec} tok/s (${_latencyMs}ms, ${_outTok} out)`);
+        }
+      }
 
       // Shared: check token budget
       const budgetCheck = checkTokenBudget(run.tokenUsage, tokenBudget);
