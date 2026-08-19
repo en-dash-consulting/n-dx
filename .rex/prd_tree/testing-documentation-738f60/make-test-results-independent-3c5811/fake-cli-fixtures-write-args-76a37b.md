@@ -2,7 +2,7 @@
 id: "76a37b38-cf6a-460a-8d88-a31a9c9f6c65"
 level: "task"
 title: "Fake-CLI fixtures write .args into the repo root instead of a temp dir"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "testing"
@@ -10,6 +10,9 @@ tags:
   - "fixtures"
   - "cross-os"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-19T03:49:49.787Z"
+completedAt: "2026-08-19T03:58:26.370Z"
+endedAt: "2026-08-19T03:58:26.370Z"
 acceptanceCriteria:
   - "Fixture argument-capture files are written inside the test's temp directory via an absolute path, not relative to CWD"
   - "Both the cmd and sh shim branches are fixed"

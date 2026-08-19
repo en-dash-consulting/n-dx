@@ -8,6 +8,14 @@ import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 const isWin = process.platform === "win32";
 
 /**
+ * Where a `captureArgs` shim records its argv. Same on every platform — notably
+ * NOT `<shim>.cmd.args` on Windows — so callers need no platform branch.
+ */
+function fakeBinaryArgsPath(filePath) {
+  return `${filePath}.args`;
+}
+
+/**
  * Create a platform-appropriate fake CLI binary.
  * On Unix: shell script with chmod 755.
  * On Windows: .cmd batch file (the path returned includes .cmd).
@@ -15,12 +23,20 @@ const isWin = process.platform === "win32";
  * @param {string} filePath - Base path (without .cmd extension)
  * @param {{ stdout?: string, stderrLine?: string, exitCode?: number, captureArgs?: boolean }} opts
  * @returns {Promise<string>} The actual file path created (may have .cmd appended on Windows)
+ *
+ * When `captureArgs` is set the shim records its argv at `fakeBinaryArgsPath()`,
+ * which is ABSOLUTE and baked into the script. It must not be derived from `$0`
+ * or `%~f0`: neither searches PATH, so a shim invoked by bare name resolved them
+ * against the CWD and dropped a `claude.args` file in the repository root.
+ * `%~f0` is the more surprising of the two — it "fully qualifies" %0 by prefixing
+ * the current directory rather than locating the file.
  */
 async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCode = 0, captureArgs = false } = {}) {
+  const argsPath = fakeBinaryArgsPath(filePath);
   if (isWin) {
     const cmdPath = filePath + ".cmd";
     const lines = ["@echo off"];
-    if (captureArgs) lines.push("echo %* > \"%~f0.args\"");
+    if (captureArgs) lines.push(`echo %* > "${argsPath}"`);
     if (stderrLine) lines.push(`echo ${stderrLine} 1>&2`);
     if (stdout) lines.push(`echo ${stdout}`);
     if (exitCode !== 0) lines.push(`exit /b ${exitCode}`);
@@ -28,7 +44,9 @@ async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCod
     return cmdPath;
   }
   const lines = ["#!/bin/sh"];
-  if (captureArgs) lines.push('echo "$@" > "$0.args"');
+  // Single-quoted so nothing in the path is expanded. mkdtemp paths contain no
+  // single quotes, so this needs no escaping.
+  if (captureArgs) lines.push(`echo "$@" > '${argsPath}'`);
   if (stderrLine) lines.push(`echo '${stderrLine}' 1>&2`);
   if (stdout) lines.push(`echo '${stdout}'`);
   if (exitCode !== 0) lines.push(`exit ${exitCode}`);
@@ -1056,7 +1074,7 @@ describe("n-dx config", () => {
       const output = run(["llm.vendor", "claude", tmpDir]);
       expect(output).toContain("llm.vendor = claude");
 
-      const argsFile = isWin ? `${fakeClaude}.args` : `${basePath}.args`;
+      const argsFile = fakeBinaryArgsPath(basePath);
       const args = await readFile(argsFile, "utf-8");
       expect(args).toContain("-p");
       expect(args).toContain("--output-format");
@@ -1074,7 +1092,7 @@ describe("n-dx config", () => {
       const output = run(["llm.vendor", "codex", tmpDir]);
       expect(output).toContain("llm.vendor = codex");
 
-      const argsFile = isWin ? `${fakeCodex}.args` : `${basePath}.args`;
+      const argsFile = fakeBinaryArgsPath(basePath);
       const args = await readFile(argsFile, "utf-8");
       expect(args).toContain("exec");
       expect(args).toContain("--skip-git-repo-check");
