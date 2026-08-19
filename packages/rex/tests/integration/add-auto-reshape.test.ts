@@ -259,13 +259,24 @@ describe("cmdAdd scoped consolidation pass", () => {
   let tmpDir: string;
   let rexDir: string;
 
+  /**
+   * Extra project dirs created inside a single test, cleaned up alongside tmpDir.
+   * The scaling test needs one store PER sibling count — see it for why sharing a
+   * store invalidates the measurement.
+   */
+  let extraDirs: string[] = [];
+
   beforeEach(async () => {
     const setup = await setupDir();
     tmpDir = setup.tmpDir;
     rexDir = setup.rexDir;
+    extraDirs = [];
   });
 
-  afterEach(async () => { await cleanup(tmpDir); });
+  afterEach(async () => {
+    await cleanup(tmpDir);
+    await Promise.all(extraDirs.map((d) => cleanup(d)));
+  });
 
   it("consolidates hash-suffix duplicate siblings after add", async () => {
     const store = await resolveStore(rexDir);
@@ -466,18 +477,40 @@ describe("cmdAdd scoped consolidation pass", () => {
   // two-point measurement. Note this is a timeout, not the assertion: it guards
   // against a hang, and the pass/fail decision is the ratio below.
   it("scoped pass cost grows sub-quadratically with sibling count", { timeout: 60_000 }, async () => {
-    const store = await resolveStore(rexDir);
-
     /**
-     * Build an epic with `siblings` features, then time the consolidation pass
-     * triggered by one more. Returns the pass duration in ms.
+     * Build an epic with `siblings` features in ITS OWN store, then time the
+     * consolidation pass triggered by one more. Returns the fastest of `runs`.
+     *
+     * OWN STORE, NOT A SHARED ONE. Both sizes used to be built in the same store,
+     * so the 100-sibling pass ran against a tree that already held the 25-sibling
+     * epic while the 25-sibling pass did not. Any part of the pass's cost that
+     * tracks TOTAL tree size rather than sibling count then landed on the large
+     * reading only, inflating the ratio — biased toward false failure, and the
+     * sibling-count claim was never cleanly isolated. One store per size makes
+     * sibling count the only variable.
+     *
+     * FASTEST OF N, NOT ONE SHOT. A single timing per size left this gate as
+     * load-sensitive as the absolute budget it replaced: three runs on an idle
+     * machine produced small readings of 204.7ms, 68.3ms and 59.9ms — a 3.4x
+     * spread — and the cold first reading is the one that flatters the ratio, which
+     * is backwards. The minimum treats load as the noise it is, and it also makes
+     * the first pass double as the warm-up: that pass is reliably the slowest, so
+     * the minimum discards it without needing a separate throwaway.
+     *
+     * The tree is built ONCE and only the pass is repeated. Rebuilding per run
+     * would triple the expensive half: setup is ~14s of addItem calls against
+     * ~190ms of timed work, which is also why this test carries a raised timeout.
      */
-    async function timeScopedPass(epicTitle: string, siblings: number): Promise<number> {
+    async function timeScopedPass(siblings: number, runs = 7): Promise<number> {
+      const own = await setupDir();
+      extraDirs.push(own.tmpDir);
+      const store = await resolveStore(own.rexDir);
+
       const epicId = randomUUID();
-      await store.addItem({ id: epicId, title: epicTitle, level: "epic", status: "pending" });
+      await store.addItem({ id: epicId, title: "Scaling Epic", level: "epic", status: "pending" });
       for (let i = 0; i < siblings; i++) {
         await store.addItem(
-          { id: randomUUID(), title: `${epicTitle} Feature ${i}`, level: "feature", status: "pending" },
+          { id: randomUUID(), title: `Scaling Feature ${i}`, level: "feature", status: "pending" },
           epicId,
         );
       }
@@ -485,33 +518,84 @@ describe("cmdAdd scoped consolidation pass", () => {
       // Added directly, bypassing cmdAdd overhead, so only the pass is timed.
       const newId = randomUUID();
       await store.addItem(
-        { id: newId, title: `${epicTitle} Feature unique`, level: "feature", status: "pending" },
+        { id: newId, title: "Scaling Feature unique", level: "feature", status: "pending" },
         epicId,
       );
 
-      const start = performance.now();
-      await runScopedConsolidationPass(rexDir, store, newId, {});
-      return performance.now() - start;
+      let best = Infinity;
+      for (let i = 0; i < runs; i++) {
+        const start = performance.now();
+        await runScopedConsolidationPass(own.rexDir, store, newId, {});
+        best = Math.min(best, performance.now() - start);
+      }
+
+      // Repeating the pass is only sound because it is a no-op on this fixture:
+      // every sibling title is distinct, so nothing is consolidated and each run
+      // measures the same tree. Asserted rather than assumed — if the pass ever
+      // began merging here, runs 2 and 3 would silently measure a shrinking tree
+      // and the minimum would be meaningless.
+      const doc = await store.loadDocument();
+      const epic = doc.items.find((i) => i.id === epicId);
+      expect(
+        epic?.children?.length,
+        "the timed pass mutated the fixture, so repeated runs did not measure the same work",
+      ).toBe(siblings + 1);
+
+      return best;
     }
 
     const smallSiblings = 25;
     const largeSiblings = 100;
     const sizeRatio = largeSiblings / smallSiblings;
 
-    const smallMs = await timeScopedPass("Small Epic", smallSiblings);
-    const largeMs = await timeScopedPass("Big Epic", largeSiblings);
+    const smallMs = await timeScopedPass(smallSiblings);
+    const largeMs = await timeScopedPass(largeSiblings);
 
-    // MEASURED when written: 4.3x for a 4x increase (25 siblings 35.6ms,
-    // 100 siblings 151.9ms) — the pass is linear in sibling count today. The
-    // bound sits at 3x the size ratio, leaving ~2.8x headroom over that
-    // observation while still tripping on a quadratic regression (~16x).
+    // MEASURED 2026-08-19 (Windows 11, Node v22). Three runs of this test, each
+    // reading already the min of 7 passes against an isolated store:
+    //
+    //   run   25 siblings   100 siblings   ratio
+    //     1        61.4ms        192.0ms    3.13x
+    //     2        64.4ms        199.7ms    3.10x
+    //     3        80.5ms        227.9ms    2.83x
+    //
+    // Sub-linear for a 4x sibling step, because the pass's cost is dominated by
+    // loading the tree (26 vs 101 items) rather than by scanning the cohort.
+    //
+    // MIN-OF-7, NOT 3, AND THAT NUMBER IS MEASURED TOO. With 3 the ratios were
+    // 4.91x / 7.15x / 3.23x — a 2.2x spread that left only 1.68x below the old 12x
+    // bound, barely better than the single-shot version this replaced. At 7 the
+    // spread collapses to 1.11x. It is affordable because the expensive half is
+    // setup, not the passes: going 3 → 7 cost ~1-2s of a ~35s test.
+    //
+    // BOUND TIGHTENED 12x → 8x (2x the size ratio), not raised. It sits 2.6x above
+    // the worst clean reading, and is verified in the other direction as
+    // TESTING.md "Flake Resistance" requires: an artificial term scaling as
+    // (cohort size)² added to runScopedConsolidationPass drove the ratio to 9.4x
+    // (25: 127.8ms, 100: 1200.5ms) and failed this gate. The old 12x bound would
+    // have let that same regression through.
+    //
+    // SENSITIVITY LIMIT, worth knowing before tightening further: because tree
+    // loading dominates, a quadratic term has to be large in absolute terms at 100
+    // siblings (~1s) before it moves this ratio. A smaller one is real but invisible
+    // here — it would need a bigger sibling step to surface, which costs setup time.
     const timeRatio = largeMs / Math.max(smallMs, 0.1);
+
+    // Printed on pass as well as failure: re-deriving this bound after a
+    // deliberate change means reading these off a few runs, and a bound nobody can
+    // see the inputs to is a bound nobody will re-derive.
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n  [scoped pass] ${smallSiblings} siblings ${smallMs.toFixed(1)}ms · ` +
+      `${largeSiblings} siblings ${largeMs.toFixed(1)}ms · ` +
+      `ratio ${timeRatio.toFixed(2)}x for a ${sizeRatio}x size step (bound ${sizeRatio * 2}x)`,
+    );
     expect(
       timeRatio,
       `scoped pass scaled ${timeRatio.toFixed(1)}x for a ${sizeRatio}x sibling increase ` +
       `(${smallSiblings}: ${smallMs.toFixed(1)}ms, ${largeSiblings}: ${largeMs.toFixed(1)}ms). ` +
       `It was linear (~${sizeRatio}x) when this test was written; a quadratic ` +
       `regression would show ~${(sizeRatio * sizeRatio).toFixed(0)}x.`,
-    ).toBeLessThan(sizeRatio * 3);
+    ).toBeLessThan(sizeRatio * 2);
   });
 });

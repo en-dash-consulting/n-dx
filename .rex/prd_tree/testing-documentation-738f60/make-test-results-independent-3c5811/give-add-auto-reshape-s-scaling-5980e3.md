@@ -2,7 +2,7 @@
 id: "5980e3ed-8b85-4500-b6f6-abae8f81cf72"
 level: "task"
 title: "Give add-auto-reshape's scaling gate a min-of-N, and fix its shared-tree confound"
-status: "pending"
+status: "completed"
 priority: "low"
 tags:
   - "testing"
@@ -10,6 +10,11 @@ tags:
   - "performance"
   - "rex"
 source: "margin-audit-2026-08-19"
+startedAt: "2026-08-19T17:53:09.153Z"
+completedAt: "2026-08-19T18:17:35.666Z"
+endedAt: "2026-08-19T18:17:35.666Z"
+resolutionType: "code-change"
+resolutionDetail: "Each sibling count now builds in its own store (removing the shared-tree confound) and each reading is the min of 7 timed passes over a tree built once. Min-of-3 as filed was measured and rejected — it left ratios spanning 4.91x/7.15x/3.23x and only 1.68x of margin, essentially the defect it was meant to fix; min-of-7 collapsed the spread to 1.11x for ~1-2s, since setup dominates and extra passes are nearly free. Bound tightened 12x → 8x (not raised) and verified in both directions: an injected (cohort size)² term fails it at 9.4x, which the old 12x bound would have permitted. Added an idempotence assertion so repeated timing is sound, plus permanent ratio logging and a recorded sensitivity limit. Green across three consecutive full rex-suite runs with the 60s timeout unchanged."
 acceptanceCriteria:
   - "timeScopedPass takes the minimum of at least 3 timed passes per size, with the first serving as warm-up, and does not re-run tree setup per pass"
   - "Each sibling count is measured against a tree where sibling count is the only variable - the 25-sibling epic no longer inflates the 100-sibling reading"
