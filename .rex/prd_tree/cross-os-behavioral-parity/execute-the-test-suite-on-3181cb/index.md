@@ -2,7 +2,7 @@
 id: "3181cbc2-b8b7-45cf-98cc-abccadfe7352"
 level: "feature"
 title: "Execute the test suite on Windows and macOS in CI"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -11,6 +11,9 @@ tags:
   - "windows"
   - "macos"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-19T19:05:28.439Z"
+completedAt: "2026-08-19T19:05:28.439Z"
+endedAt: "2026-08-19T19:05:28.439Z"
 acceptanceCriteria:
   - "Unit, integration, and root e2e suites execute on windows-latest and macos-latest in CI"
   - "A Windows-only regression in a Windows code path fails CI rather than reaching users"
@@ -23,6 +26,6 @@ description: "The root enabler for every other parity item: no automated test ex
 
 | Title | Status |
 |-------|--------|
-| [Confirm on ubuntu CI that the hench/web failures are Windows-specific as predicted](./confirm-on-ubuntu-ci-that-the-4a63ef.md) | blocked |
+| [Confirm on ubuntu CI that the hench/web failures are Windows-specific as predicted](./confirm-on-ubuntu-ci-that-the-4a63ef.md) | completed |
 | [Expand the CI matrix to run unit/integration/e2e suites on windows-latest and macos-latest](./expand-the-ci-matrix-to-run-da8af6.md) | completed |
 | [Triage the first macOS CI run of the root suite](./triage-the-first-macos-ci-run-8b1640.md) | completed |

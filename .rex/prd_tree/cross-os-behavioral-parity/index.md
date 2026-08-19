@@ -2,7 +2,7 @@
 id: "293eea44-9e4c-4927-ab65-1ea484b9084e"
 level: "epic"
 title: "Cross-OS Behavioral Parity"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "cross-os"
@@ -12,6 +12,9 @@ tags:
   - "parity"
   - "reliability"
 source: "exploration-2026-08-17"
+startedAt: "2026-08-19T19:05:31.624Z"
+completedAt: "2026-08-19T19:05:31.624Z"
+endedAt: "2026-08-19T19:05:31.624Z"
 acceptanceCriteria:
   - "The automated test suite executes on Windows and macOS in CI, not ubuntu alone"
   - "No flow silently claims a security or lifecycle guarantee it does not deliver on a given OS"
@@ -25,5 +28,5 @@ description: "n-dx targets macOS, Linux, and Windows, but its initialization and
 | Title | Status |
 |-------|--------|
 | [Align OS-specific behavior in init and regular flows](./align-os-specific-behavior-in-00db9d/index.md) | completed |
-| [Execute the test suite on Windows and macOS in CI](./execute-the-test-suite-on-3181cb/index.md) | pending |
+| [Execute the test suite on Windows and macOS in CI](./execute-the-test-suite-on-3181cb/index.md) | completed |
 | [Make the per-package test suites pass on Windows](./make-the-per-package-test-214f56/index.md) | completed |
