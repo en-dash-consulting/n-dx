@@ -756,7 +756,11 @@ function loadConfiguredModel(projectDir: string): ConfiguredModel {
     const root = JSON.parse(raw) as Record<string, unknown>;
     const llm = root.llm as Record<string, unknown> | undefined;
     const llmVendor = llm?.vendor;
-    const vendor = llmVendor === "codex" ? "codex" : "claude";
+    const vendor =
+      llmVendor === "codex" ? "codex"
+      : llmVendor === "google" ? "google"
+      : llmVendor === "local" ? "local"
+      : "claude";
     const llmVendorCfg = llm?.[vendor] as Record<string, unknown> | undefined;
     const llmVendorModel = llmVendorCfg?.model;
     if (typeof llmVendorModel === "string" && llmVendorModel) {
@@ -765,6 +769,10 @@ function loadConfiguredModel(projectDir: string): ConfiguredModel {
     const legacyClaude = root.claude as Record<string, unknown> | undefined;
     if (vendor === "claude" && typeof legacyClaude?.model === "string" && legacyClaude.model) {
       return { vendor, model: legacyClaude.model };
+    }
+    // Local vendor with no model configured — LM Studio uses whatever is loaded
+    if (vendor === "local") {
+      return { vendor, model: "default (LM Studio)" };
     }
     return { vendor, model: "default" };
   } catch {

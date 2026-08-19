@@ -1140,6 +1140,9 @@ function determineSmartAddModelSource(vendor: LLMVendor, llmConfig: LLMConfig): 
   if (vendor === "google" && llmConfig.google?.model) {
     return "configured";
   }
+  if (vendor === "local" && llmConfig.local?.model) {
+    return "configured";
+  }
   return "default";
 }
 

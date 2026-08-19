@@ -13,14 +13,16 @@ import {
   findItemById, updateInTree,
   appendLog, API_SETTABLE_STATUSES,
 } from "./rex-route-helpers.js";
-import { loadPRDSync, savePRDSync } from "../prd-io.js";
-import { insertChild as rexInsertChild } from "../rex-gateway.js";
+import { loadPRDSync, savePRDSync, refreshPRDCache } from "../prd-io.js";
+import { insertChild as rexInsertChild, resolveStore } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
   type PRDItem,
   type ItemLevel,
+  type ItemStatus,
   type TreeEntry,
+  computeTimestampUpdates,
   LEVEL_HIERARCHY,
   CHILD_LEVEL,
   isPriority,
@@ -115,22 +117,40 @@ async function handleItemPatch(
   itemId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
-
   try {
     const body = await readBody(req);
-    const updates = JSON.parse(body);
+    const updates = JSON.parse(body) as Record<string, unknown>;
 
-    if (!updateInTree(doc.items, itemId, updates)) {
+    // Use the PRDStore so writes go to the correct backend (prd_tree/ or prd.md)
+    // rather than always writing to prd.md via savePRDSync.
+    const store = await resolveStore(ctx.rexDir);
+    const existing = await store.getItem(itemId);
+    if (!existing) {
       errorResponse(res, 404, `Item "${itemId}" not found`);
       return true;
     }
 
-    savePRDSync(ctx.rexDir, doc);
+    // Validate status if provided (same rule as bulk update)
+    if (updates.status && !API_SETTABLE_STATUSES.has(updates.status as string)) {
+      errorResponse(res, 400, `Invalid status: ${updates.status}`);
+      return true;
+    }
+
+    // Auto-apply timestamp transitions (startedAt/completedAt) on status change,
+    // matching the bulk-update path's updateInTree wrapper.
+    if (updates.status && existing.status !== updates.status) {
+      Object.assign(
+        updates,
+        computeTimestampUpdates(existing.status, updates.status as ItemStatus, existing),
+      );
+    }
+
+    await store.updateItem(itemId, updates as Partial<import("../rex-gateway.js").PRDItem>);
+
+    // Refresh the in-process cache immediately so subsequent loadPRDSync calls
+    // see the change before the folder-tree watcher fires.
+    const updatedDoc = await store.loadDocument();
+    refreshPRDCache(ctx.rexDir, updatedDoc);
 
     // Broadcast change to connected WebSocket clients
     if (broadcast) {

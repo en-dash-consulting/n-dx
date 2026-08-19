@@ -20,7 +20,7 @@ import {
   type GitRunner,
   type HenchRunSummary,
 } from "../../../src/server/merge-history.js";
-import { startRouteTestServer } from "../../helpers/server-route-test-support.js";
+import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const FS = "\x1f";
 const RS = "\x1e";
@@ -105,13 +105,13 @@ describe("merge-graph route", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     clearMergeGraphCaches();
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("GET /api/merge-graph returns a graph payload", async () => {
-    const res = await fetch(`http://localhost:${port}/api/merge-graph`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/merge-graph`);
     expect(res.status).toBe(200);
     const body = await res.json();
 
@@ -126,7 +126,7 @@ describe("merge-graph route", () => {
   });
 
   it("GET /api/merge-graph/fingerprint returns just the fingerprint", async () => {
-    const res = await fetch(`http://localhost:${port}/api/merge-graph/fingerprint`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/merge-graph/fingerprint`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.fingerprint).toBeDefined();
@@ -135,7 +135,7 @@ describe("merge-graph route", () => {
   });
 
   it("rejects non-GET methods with 405", async () => {
-    const res = await fetch(`http://localhost:${port}/api/merge-graph`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/merge-graph`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{}",
@@ -144,12 +144,12 @@ describe("merge-graph route", () => {
   });
 
   it("returns 404 for unknown paths under /api/merge-graph", async () => {
-    const res = await fetch(`http://localhost:${port}/api/merge-graph/nope`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/merge-graph/nope`);
     expect(res.status).toBe(404);
   });
 
   it("honors ?max= query parameter for bounded payloads", async () => {
-    const res = await fetch(`http://localhost:${port}/api/merge-graph?max=10`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/merge-graph?max=10`);
     expect(res.status).toBe(200);
   });
 });
@@ -229,7 +229,7 @@ describe("/api/prd-origin route", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     clearMergeGraphCaches();
     clearPrdOriginCache();
     await rm(tmpDir, { recursive: true, force: true });
@@ -255,7 +255,7 @@ describe("/api/prd-origin route", () => {
       `Co-Authored-By: Claude <noreply@anthropic.com>${RS}`;
     await start(makeOriginRunner({ result }));
 
-    const res = await fetch(`http://localhost:${port}/api/prd-origin?path=${encodeURIComponent("epic-one/feature-one")}`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/prd-origin?path=${encodeURIComponent("epic-one/feature-one")}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.origin.shortSha).toBe("f1f1f1f");
@@ -271,7 +271,7 @@ describe("/api/prd-origin route", () => {
   it("returns origin: null when git produces no output", async () => {
     await start(makeOriginRunner({ result: "" }));
 
-    const res = await fetch(`http://localhost:${port}/api/prd-origin?path=foo`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/prd-origin?path=foo`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.origin).toBeNull();
@@ -282,7 +282,7 @@ describe("/api/prd-origin route", () => {
 
     const cases = ["", "/abs", "..", "foo/../bar", "foo\\bar"];
     for (const path of cases) {
-      const res = await fetch(`http://localhost:${port}/api/prd-origin?path=${encodeURIComponent(path)}`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/prd-origin?path=${encodeURIComponent(path)}`);
       expect(res.status, `path=${JSON.stringify(path)} should 400`).toBe(400);
     }
     // 400 short-circuits before invoking git.
@@ -294,7 +294,7 @@ describe("/api/prd-origin route", () => {
       `abc${FS}2026-01-01T00:00:00Z${FS}A${FS}a@x${FS}s${FS}${RS}`;
     await start(makeOriginRunner({ result }));
 
-    const url = `http://localhost:${port}/api/prd-origin?path=foo`;
+    const url = `http://127.0.0.1:${port}/api/prd-origin?path=foo`;
     const r1 = await fetch(url);
     expect(r1.status).toBe(200);
     const r2 = await fetch(url);
@@ -309,7 +309,7 @@ describe("/api/prd-origin route", () => {
   it("rejects non-GET methods with 405", async () => {
     await start(makeOriginRunner());
 
-    const res = await fetch(`http://localhost:${port}/api/prd-origin?path=foo`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/prd-origin?path=foo`, {
       method: "POST",
     });
     expect(res.status).toBe(405);

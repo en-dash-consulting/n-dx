@@ -50,7 +50,7 @@ describe("port utilities", () => {
       // Use port 0 trick: bind to 0 to get an OS-assigned port, close it, then check it
       const tmp = createServer();
       const port = await new Promise<number>((resolve) => {
-        tmp.listen(0, () => {
+        tmp.listen(0, "127.0.0.1", () => {
           const addr = tmp.address();
           resolve(typeof addr === "object" && addr ? addr.port : 0);
         });
@@ -67,7 +67,7 @@ describe("port utilities", () => {
       // Bind a port, then check it
       const tmp = createServer();
       const port = await new Promise<number>((resolve) => {
-        tmp.listen(0, () => {
+        tmp.listen(0, "127.0.0.1", () => {
           const addr = tmp.address();
           resolve(typeof addr === "object" && addr ? addr.port : 0);
         });
@@ -91,7 +91,7 @@ describe("port utilities", () => {
       // Get a free port, close the server, then verify checkPortWithRetry succeeds fast
       const tmp = createServer();
       const port = await new Promise<number>((resolve) => {
-        tmp.listen(0, () => {
+        tmp.listen(0, "127.0.0.1", () => {
           const addr = tmp.address();
           resolve(typeof addr === "object" && addr ? addr.port : 0);
         });
@@ -109,7 +109,7 @@ describe("port utilities", () => {
       // available within the retry window.
       const tmp = createServer();
       const port = await new Promise<number>((resolve) => {
-        tmp.listen(0, () => {
+        tmp.listen(0, "127.0.0.1", () => {
           const addr = tmp.address();
           resolve(typeof addr === "object" && addr ? addr.port : 0);
         });
@@ -132,7 +132,7 @@ describe("port utilities", () => {
     it("returns unavailable after exhausting all retries when port stays occupied", async () => {
       const tmp = createServer();
       const port = await new Promise<number>((resolve) => {
-        tmp.listen(0, () => {
+        tmp.listen(0, "127.0.0.1", () => {
           const addr = tmp.address();
           resolve(typeof addr === "object" && addr ? addr.port : 0);
         });
@@ -154,7 +154,7 @@ describe("port utilities", () => {
     it("respects maxRetries=0 (behaves identically to a single checkPort call)", async () => {
       const tmp = createServer();
       const port = await new Promise<number>((resolve) => {
-        tmp.listen(0, () => {
+        tmp.listen(0, "127.0.0.1", () => {
           const addr = tmp.address();
           resolve(typeof addr === "object" && addr ? addr.port : 0);
         });
@@ -172,7 +172,7 @@ describe("port utilities", () => {
       // Find a free port to use as our "preferred"
       const tmp = createServer();
       const freePort = await new Promise<number>((resolve) => {
-        tmp.listen(0, () => {
+        tmp.listen(0, "127.0.0.1", () => {
           const addr = tmp.address();
           resolve(typeof addr === "object" && addr ? addr.port : 0);
         });
@@ -211,7 +211,7 @@ describe("port utilities", () => {
       // Occupy a small range of ports
       const tmp = createServer();
       const basePort = await new Promise<number>((resolve) => {
-        tmp.listen(0, () => {
+        tmp.listen(0, "127.0.0.1", () => {
           const addr = tmp.address();
           resolve(typeof addr === "object" && addr ? addr.port : 0);
         });
@@ -239,7 +239,7 @@ describe("port utilities", () => {
       // Occupy a port, use it as preferred, ensure it's not double-checked
       const tmp = createServer();
       const port = await new Promise<number>((resolve) => {
-        tmp.listen(0, () => {
+        tmp.listen(0, "127.0.0.1", () => {
           const addr = tmp.address();
           resolve(typeof addr === "object" && addr ? addr.port : 0);
         });
@@ -257,18 +257,18 @@ describe("port utilities", () => {
       // the original port (not a fallback) when retryOpts are supplied.
       const tmp = createServer();
       const port = await new Promise<number>((resolve) => {
-        tmp.listen(0, () => {
+        tmp.listen(0, "127.0.0.1", () => {
           const addr = tmp.address();
           resolve(typeof addr === "object" && addr ? addr.port : 0);
         });
       });
 
-      // Release the port partway through the retry window
-      setTimeout(() => tmp.close(), 80);
+      // Release the port partway through the retry window (shorter timeout for CI)
+      setTimeout(() => tmp.close(), 20);
 
       const result = await findAvailablePort(port, port, port + 10, {
-        maxRetries: 10,
-        retryDelayMs: 30,
+        maxRetries: 20,
+        retryDelayMs: 50,
         backoffFactor: 1,
       });
 
@@ -280,7 +280,7 @@ describe("port utilities", () => {
     it("falls back to range scan after retryOpts exhausted when preferred stays occupied", async () => {
       const tmp = createServer();
       const port = await new Promise<number>((resolve) => {
-        tmp.listen(0, () => {
+        tmp.listen(0, "127.0.0.1", () => {
           const addr = tmp.address();
           resolve(typeof addr === "object" && addr ? addr.port : 0);
         });

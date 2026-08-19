@@ -158,7 +158,21 @@ const COMMAND_REGISTRY = [
     category: "Orchestration",
     summary: "Start dashboard and MCP server",
     keywords: ["server", "web", "dashboard", "MCP", "HTTP", "background", "daemon"],
-    related: ["web", "dev"],
+    related: ["status"],
+  },
+  {
+    name: "install-sample",
+    category: "Orchestration",
+    summary: "Install a safe, easily destroyable sample webapp",
+    keywords: ["sample", "demo", "example", "playground", "install"],
+    related: ["destroy-sample", "start", "work"],
+  },
+  {
+    name: "destroy-sample",
+    category: "Orchestration",
+    summary: "Remove the sample webapp and its PRD items",
+    keywords: ["remove", "delete", "destroy", "sample", "demo", "example"],
+    related: ["install-sample"],
   },
   {
     name: "dev",
@@ -718,11 +732,11 @@ export function formatToolHelp(tool) {
 const ORCHESTRATOR_HELP_DEFS = {
   init: {
     summary: "initialize all tools",
-    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude or codex) unless --provider is given.\nProvisions assistant surfaces for both Claude and Codex unless limited\nby --no-claude, --no-codex, --claude-only, --codex-only, or --assistants=.\n\nThe init summary reports each assistant surface separately, listing the\nspecific artifacts (instruction files, skills, permissions, MCP servers)\nthat were provisioned for the repo.",
+    description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude, codex, google, or local) unless --provider is given.\nProvisions assistant surfaces for both Claude and Codex unless limited\nby --no-claude, --no-codex, --claude-only, --codex-only, or --assistants=.\n\nThe init summary reports each assistant surface separately, listing the\nspecific artifacts (instruction files, skills, permissions, MCP servers)\nthat were provisioned for the repo.",
     usage: "ndx init [options] [dir]",
     options: [
       { flag: "--project=<name>", description: "Project name for config (default: directory basename)" },
-      { flag: "--provider=<vendor>", description: "LLM vendor to configure: claude or codex (skips interactive prompt)" },
+      { flag: "--provider=<vendor>", description: "LLM vendor to configure: claude, codex, google, or local (skips interactive prompt)" },
       { flag: "--model=<id>", description: "Model ID to persist (used with --provider)" },
       { flag: "--claude-model=<id>", description: "Claude model ID (implies --provider=claude)" },
       { flag: "--codex-model=<id>", description: "Codex model ID (implies --provider=codex)" },
@@ -842,6 +856,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--pr-markdown", description: "Regenerate .sourcevision/pr-markdown.md only (skip analyze/build)" },
       { flag: "--no-build", description: "Skip UI build step after data refresh" },
       { flag: "--fast", description: "Structural-only analysis — skip LLM archetype/zone enrichment (much faster)" },
+      { flag: "--live-server", description: "Dashboard-triggered mode: keep the running server alive (requires --data-only, --no-build, or --pr-markdown)" },
       { flag: "--quiet, -q", description: "Suppress informational output from delegated tools" },
     ],
     examples: [
@@ -854,7 +869,7 @@ const ORCHESTRATOR_HELP_DEFS = {
   },
   work: {
     summary: "execute the next task autonomously",
-    description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.\nRequires explicit vendor config: run 'ndx config llm.vendor claude'\nor 'ndx config llm.vendor codex' before using this command.",
+    description: "Picks the next actionable task from the PRD and runs an autonomous\nagent (hench) to implement it. Delegates to 'hench run'.\nRequires explicit vendor config: run 'ndx config llm.vendor claude',\n'ndx config llm.vendor codex', or 'ndx config llm.vendor local' before using this command.",
     usage: "ndx work [options] [dir]",
     options: [
       { flag: "--task=<id>", description: "Target a specific Rex task ID" },
@@ -1402,6 +1417,8 @@ export function formatMainHelp() {
     ["init [dir]", "Initialize project"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],
+    ["install-sample [dir]", "Install a safe, destroyable sample webapp"],
+    ["destroy-sample [dir]", "Remove the sample webapp and its PRD items"],
   ], pad);
 
   section("ANALYZE", [

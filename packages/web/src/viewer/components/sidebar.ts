@@ -13,7 +13,8 @@ import {
   HenchActivityIndicator,
 } from "../api.js";
 import { ConfigFooter } from "./config-footer.js";
-import { useProjectMetadata, useFeatureToggle } from "../api.js";
+import { useProjectMetadata, useFeatureToggle, useCliName } from "../api.js";
+import { resolveCliLabel } from "../hooks/index.js";
 import { SOURCEVISION_TABS } from "../api.js";
 
 const STORAGE_KEY = "sidebar-expanded-section";
@@ -45,23 +46,29 @@ const NAV_ENTRIES: NavEntry[] = [
   { type: "section", label: "REX", product: "rex" },
   { type: "item", id: "rex-dashboard", icon: "\u25A8", label: "Dashboard", minPass: 0 },
   { type: "item", id: "prd", icon: "\u2611", label: "Tasks", minPass: 0 },
+  { type: "item", id: "analysis", icon: "\u2317", label: "Analyze & Import", minPass: 0 },
   { type: "item", id: "merge-graph", icon: "\u29c9", label: "Context Graph", minPass: 0 },
   { type: "item", id: "validation", icon: "\u2714", label: "Validation", minPass: 0 },
+  { type: "item", id: "requirements", icon: "\u2696", label: "Requirements", minPass: 0 },
+  { type: "item", id: "activity", icon: "\u231A", label: "Activity", minPass: 0 },
   { type: "item", id: "integrations", icon: "\u{1F517}", label: "Integrations", minPass: 0, featureGate: "rex.integrations" },
   { type: "section", label: "HENCH", product: "hench" },
   { type: "item", id: "hench-runs", icon: "\u25B6", label: "Runs", minPass: 0 },
   { type: "item", id: "hench-audit", icon: "\u2638", label: "Audit", minPass: 0 },
   { type: "item", id: "hench-templates", icon: "\u25A6", label: "Templates", minPass: 0 },
   { type: "item", id: "hench-optimization", icon: "\u26A1", label: "Optimization", minPass: 0 },
+  { type: "item", id: "hench-adaptive", icon: "\u267B", label: "Adaptive", minPass: 0 },
+  { type: "section", label: "COMMANDS" },
+  { type: "item", id: "command-reference", icon: "\u2318", label: "All Commands", minPass: 0 },
   { type: "section", label: "TOKEN USAGE" },
   { type: "item", id: "token-usage", icon: "\u229A", label: "Token Usage", minPass: 0 },
   { type: "section", label: "SETTINGS" },
   // Workflow order: General → ndx analyze/plan → ndx work → ndx sync → ndx export
   { type: "item", id: "llm-provider", icon: "\u{1F9E0}", label: "General", minPass: 0 },
-  { type: "item", id: "project-settings", icon: "\u25A3", label: "ndx analyze / plan", minPass: 0 },
-  { type: "item", id: "hench-config", icon: "\u25B6", label: "ndx work", minPass: 0 },
-  { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "ndx sync", minPass: 0, featureGate: "rex.notionSync" },
-  { type: "item", id: "commands", icon: "\u{1F4E4}", label: "ndx export", minPass: 0 },
+  { type: "item", id: "project-settings", icon: "\u25A3", label: "{cli} analyze / plan", minPass: 0 },
+  { type: "item", id: "hench-config", icon: "\u25B6", label: "{cli} work", minPass: 0 },
+  { type: "item", id: "notion-config", icon: "\u{1F50C}", label: "{cli} sync", minPass: 0, featureGate: "rex.notionSync" },
+  { type: "item", id: "commands", icon: "\u{1F4E4}", label: "{cli} export / refresh", minPass: 0 },
   // Cross-cutting settings (affect multiple commands)
   { type: "item", id: "feature-toggles", icon: "\u{1F4CC}", label: "Feature Flags", minPass: 0 },
   { type: "item", id: "cli-timeouts", icon: "\u23F1", label: "CLI Timeouts", minPass: 0 },
@@ -112,6 +119,7 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   const [mobileOpen, setMobileOpen] = useState(false);
   const projectStatus = useProjectStatus();
   const projectMeta = useProjectMetadata();
+  const cliName = useCliName();
 
   // Feature-gated nav items: subscribe to toggle state
   const notionSyncEnabled = useFeatureToggle("rex.notionSync", false);
@@ -130,15 +138,18 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
     const scopeFiltered = scope && scope !== "all"
       ? SECTIONS.filter((s) => s.product === scope || !s.product)
       : SECTIONS;
-    // Filter out feature-gated items that are disabled
+    // Filter out feature-gated items that are disabled, then resolve the
+    // {cli} placeholder in command-reference labels.
     return scopeFiltered.map((s) => ({
       ...s,
-      items: s.items.filter((item) => {
-        if (!item.featureGate) return true;
-        return enabledGates.get(item.featureGate) ?? false;
-      }),
+      items: s.items
+        .filter((item) => {
+          if (!item.featureGate) return true;
+          return enabledGates.get(item.featureGate) ?? false;
+        })
+        .map((item) => ({ ...item, label: resolveCliLabel(item.label, cliName) })),
     }));
-  }, [scope, enabledGates]);
+  }, [scope, enabledGates, cliName]);
 
   const [expandedSection, setExpandedSection] = useState<string>(() =>
     scope ? (visibleSections[0]?.label ?? getInitialExpanded(view)) : getInitialExpanded(view)
@@ -163,10 +174,10 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   const activeLabel = useMemo(() => {
     for (const section of SECTIONS) {
       const found = section.items.find((item) => item.id === view);
-      if (found) return found.label;
+      if (found) return resolveCliLabel(found.label, cliName);
     }
     return null;
-  }, [view]);
+  }, [view, cliName]);
 
   const handleNav = useCallback((id: ViewId) => {
     onNavigate(id);
@@ -348,13 +359,17 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
           },
             section.items.map((entry) => {
               const locked = entry.minPass > 0 && enrichmentPass < entry.minPass;
+              // Locked views stay navigable — they render an EnrichmentGate
+              // page offering to run the analysis passes they need.
               return h("button", {
                 key: entry.id,
                 type: "button",
                 class: `nav-item ${view === entry.id ? "active" : ""} ${locked ? "locked" : ""}`,
-                onClick: locked ? undefined : () => handleNav(entry.id),
-                disabled: locked ? true : undefined,
-                tabIndex: !locked && !isExpanded ? -1 : undefined,
+                onClick: () => handleNav(entry.id),
+                tabIndex: !isExpanded ? -1 : undefined,
+                title: locked
+                  ? `Requires enrichment pass ${entry.minPass} — open to run the analysis`
+                  : undefined,
                 "aria-current": view === entry.id ? "page" : undefined,
               },
                 h("span", { class: "nav-icon", "aria-hidden": "true" }, entry.icon),

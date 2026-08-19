@@ -432,6 +432,19 @@ export interface SpawnToolOptions {
    * 0 or undefined = no timeout (wait indefinitely).
    */
   timeout?: number;
+  /**
+   * Windows-only: when true, suppress the console window that Windows would
+   * otherwise create for console-subsystem executables spawned from a headless
+   * (background/daemon) process.  Ignored on non-Windows platforms.
+   */
+  windowsHide?: boolean;
+  /**
+   * Called with each stdout chunk as it arrives. Fires only when `stdio`
+   * is `"pipe"`. Lets a long-running child stream progress to the caller —
+   * e.g. the web dashboard surfacing live phase output while a job runs —
+   * while the result still carries the full accumulated text on exit.
+   */
+  onStdout?: (chunk: string) => void;
 }
 
 /** Result from {@link spawnTool}. */
@@ -488,6 +501,7 @@ export function spawnTool(
       env,
       stdio: "ignore",
       detached: true,
+      windowsHide: opts.windowsHide ?? false,
     });
     child.unref();
     return Promise.resolve({
@@ -504,6 +518,7 @@ export function spawnTool(
       cwd,
       env,
       stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
+      windowsHide: opts.windowsHide ?? false,
     });
 
     let stdout = "";
@@ -538,7 +553,9 @@ export function spawnTool(
 
     if (stdio === "pipe") {
       child.stdout!.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString();
+        const text = chunk.toString();
+        stdout += text;
+        opts.onStdout?.(text);
       });
       child.stderr!.on("data", (chunk: Buffer) => {
         stderr += chunk.toString();
@@ -582,6 +599,7 @@ export function spawnManaged(
     cwd,
     env,
     stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
+    windowsHide: opts.windowsHide ?? false,
   });
 
   const done = new Promise<SpawnToolResult>((resolve) => {
@@ -617,7 +635,9 @@ export function spawnManaged(
 
     if (stdio === "pipe") {
       child.stdout!.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString();
+        const text = chunk.toString();
+        stdout += text;
+        opts.onStdout?.(text);
       });
       child.stderr!.on("data", (chunk: Buffer) => {
         stderr += chunk.toString();

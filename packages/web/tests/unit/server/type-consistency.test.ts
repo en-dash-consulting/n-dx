@@ -122,9 +122,9 @@ describe("Viewer type mirrors match canonical definitions", () => {
     }
   });
 
-  it("ItemStatus covers exactly 7 values", () => {
-    const statuses: ItemStatus[] = ["pending", "in_progress", "completed", "failing", "deferred", "blocked", "deleted"];
-    expect(CANONICAL_VALID_STATUSES.size).toBe(7);
+  it("ItemStatus covers exactly 8 values", () => {
+    const statuses: ItemStatus[] = ["pending", "in_progress", "completed", "failing", "deferred", "blocked", "deleted", "cancelled"];
+    expect(CANONICAL_VALID_STATUSES.size).toBe(8);
     for (const status of statuses) {
       expect(CANONICAL_VALID_STATUSES.has(status)).toBe(true);
     }
@@ -205,7 +205,7 @@ describe("Viewer type mirrors match canonical definitions", () => {
   it("viewer type mirrors have expected shape (compile-time reminder)", () => {
     // packages/web/src/viewer/components/prd-tree/types.ts mirrors:
     //   ItemLevel = "epic" | "feature" | "task" | "subtask"
-    //   ItemStatus = "pending" | "in_progress" | "completed" | "deferred" | "blocked" | "deleted"
+    //   ItemStatus = "pending" | "in_progress" | "completed" | "deferred" | "blocked" | "deleted" | "cancelled"
     //   Priority = "critical" | "high" | "medium" | "low"
     //   RequirementCategory = "technical" | "performance" | "security" | "accessibility" | "compatibility" | "quality"
     //   RequirementValidationType = "automated" | "manual" | "metric"
@@ -214,13 +214,13 @@ describe("Viewer type mirrors match canonical definitions", () => {
     // This test serves as a reminder: if canonical definitions change,
     // update the viewer mirrors in types.ts.
     const levels: ItemLevel[] = ["epic", "feature", "task", "subtask"];
-    const statuses: ItemStatus[] = ["pending", "in_progress", "completed", "failing", "deferred", "blocked", "deleted"];
+    const statuses: ItemStatus[] = ["pending", "in_progress", "completed", "failing", "deferred", "blocked", "deleted", "cancelled"];
     const priorities: Priority[] = ["critical", "high", "medium", "low"];
     const categories: RequirementCategory[] = ["technical", "performance", "security", "accessibility", "compatibility", "quality"];
     const validationTypes: RequirementValidationType[] = ["automated", "manual", "metric"];
 
     expect(levels).toHaveLength(4);
-    expect(statuses).toHaveLength(7);
+    expect(statuses).toHaveLength(8);
     expect(priorities).toHaveLength(4);
     expect(categories).toHaveLength(6);
     expect(validationTypes).toHaveLength(3);

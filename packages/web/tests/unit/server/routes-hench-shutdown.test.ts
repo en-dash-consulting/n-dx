@@ -7,32 +7,35 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
 
 // ── Mock @n-dx/llm-client ─────────────────────────────────────────────────
 // Replace spawnManaged with a controlled factory so tests can inspect kill()
 // calls without spawning real processes.
 
-interface MockHandle {
+type MockKill = ManagedChild["kill"] & ReturnType<typeof vi.fn>;
+
+interface MockHandle extends ManagedChild {
   pid: number;
-  kill: ReturnType<typeof vi.fn>;
-  done: Promise<{ exitCode: number | null; stdout: string; stderr: string }>;
+  kill: MockKill;
+  done: Promise<SpawnToolResult>;
   /** Manually resolve the done promise (simulate natural process exit). */
   exit(): void;
 }
 
 function createMockHandle(pid = 99999): MockHandle {
-  let resolveDone!: (v: { exitCode: number | null; stdout: string; stderr: string }) => void;
-  const done = new Promise<{ exitCode: number | null; stdout: string; stderr: string }>((r) => {
+  let resolveDone!: (v: SpawnToolResult) => void;
+  const done = new Promise<SpawnToolResult>((r) => {
     resolveDone = r;
   });
   const handle: MockHandle = {
     pid,
     done,
-    kill: vi.fn().mockImplementation(() => {
+    kill: vi.fn((_signal?: NodeJS.Signals) => {
       // Simulate graceful exit in response to a signal
       resolveDone({ exitCode: null, stdout: "", stderr: "" });
       return true;
-    }),
+    }) as unknown as MockKill,
     exit() {
       resolveDone({ exitCode: 0, stdout: "", stderr: "" });
     },
@@ -60,6 +63,7 @@ import {
 } from "../../../src/server/routes-hench.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { createServer, type Server } from "node:http";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -74,7 +78,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
         res.writeHead(404); res.end("Not found");
       }
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -147,7 +151,7 @@ describe("shutdownActiveExecutions — with active executions", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     // Clean up any stale executions left by the test
     await shutdownActiveExecutions(200).catch(() => {});
     await rm(tmpDir, { recursive: true, force: true });
@@ -155,7 +159,7 @@ describe("shutdownActiveExecutions — with active executions", () => {
 
   it("sends SIGTERM to a running child process", async () => {
     // Trigger execution (uses mocked spawnManaged)
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-1" }),
@@ -176,7 +180,7 @@ describe("shutdownActiveExecutions — with active executions", () => {
   });
 
   it("returns { terminated: 1, failed: 0 } after cleanly terminating one execution", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-1" }),
@@ -189,7 +193,7 @@ describe("shutdownActiveExecutions — with active executions", () => {
   });
 
   it("executions map is empty after shutdown", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-1" }),
@@ -200,7 +204,7 @@ describe("shutdownActiveExecutions — with active executions", () => {
     await shutdownActiveExecutions(2_000);
 
     // The status endpoint should report no active executions
-    const statusRes = await fetch(`http://localhost:${port}/api/hench/execute/status`);
+    const statusRes = await fetch(`http://127.0.0.1:${port}/api/hench/execute/status`);
     const body = await statusRes.json() as { executions: unknown[] };
     expect(body.executions).toHaveLength(0);
   });
@@ -227,12 +231,12 @@ describe("shutdownActiveExecutions — with active executions", () => {
     });
 
     // Trigger two executions
-    await fetch(`http://localhost:${port}/api/hench/execute`, {
+    await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-a" }),
     });
-    await fetch(`http://localhost:${port}/api/hench/execute`, {
+    await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-b" }),
@@ -249,7 +253,7 @@ describe("shutdownActiveExecutions — with active executions", () => {
     }
 
     // Map is cleared
-    const statusRes = await fetch(`http://localhost:${port}/api/hench/execute/status`);
+    const statusRes = await fetch(`http://127.0.0.1:${port}/api/hench/execute/status`);
     const body = await statusRes.json() as { executions: unknown[] };
     expect(body.executions).toHaveLength(0);
   });
@@ -292,7 +296,7 @@ describe("shutdownActiveExecutions — logging", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await shutdownActiveExecutions(200).catch(() => {});
     await rm(tmpDir, { recursive: true, force: true });
   });
@@ -305,7 +309,7 @@ describe("shutdownActiveExecutions — logging", () => {
 
     try {
       // Start an execution
-      const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ taskId: "task-log-1" }),
@@ -349,12 +353,12 @@ describe("shutdownActiveExecutions — logging", () => {
     });
 
     try {
-      await fetch(`http://localhost:${port}/api/hench/execute`, {
+      await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ taskId: "task-log-a" }),
       });
-      await fetch(`http://localhost:${port}/api/hench/execute`, {
+      await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ taskId: "task-log-b" }),
@@ -389,7 +393,7 @@ describe("shutdownActiveExecutions — logging", () => {
     });
 
     try {
-      const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ taskId: "task-log-1" }),
@@ -406,7 +410,7 @@ describe("shutdownActiveExecutions — logging", () => {
   });
 
   it("returns { terminated, failed } counts for verification", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-log-1" }),

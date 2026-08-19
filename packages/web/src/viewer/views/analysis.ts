@@ -68,10 +68,10 @@ export function AnalysisView() {
     { class: "rex-analysis-view" },
 
     // View header
-    h("div", { class: "rex-analysis-view-header" },
+    h("div", { class: "rex-analysis-view-header view-header" },
       h(BrandedHeader, { product: "rex", title: "Rex", class: "branded-header-rex" }),
-      h("h2", null, "Analysis"),
-      h("p", { class: "rex-analysis-view-subtitle" },
+      h("h2", { class: "view-title" }, "Analysis"),
+      h("p", { class: "section-sub rex-analysis-view-subtitle" },
         "Add items with natural language or scan the project to discover new work items.",
       ),
     ),

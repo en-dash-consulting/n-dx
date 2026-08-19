@@ -12,6 +12,7 @@ export type FixItemStatus =
   | "failing"
   | "deferred"
   | "blocked"
+  | "cancelled"
   | "deleted";
 
 export interface FixItem {

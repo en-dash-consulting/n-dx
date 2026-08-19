@@ -16,6 +16,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtemp, rm, writeFile, chmod } from "node:fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 import {
   getMcpServers,
   getSkillNames,
@@ -62,7 +63,7 @@ async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCod
 function run(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, ...args], {
     encoding: "utf-8",
-    timeout: 20000,
+    timeout: DEFAULT_TIMEOUT,
     stdio: "pipe",
     ...opts,
   });

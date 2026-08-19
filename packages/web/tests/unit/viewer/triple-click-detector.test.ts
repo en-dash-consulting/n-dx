@@ -22,10 +22,10 @@ function stubTimes(...times: number[]) {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("createTripleClickDetector", () => {
-  let onTrigger: ReturnType<typeof vi.fn>;
+  let onTrigger: () => void;
 
   beforeEach(() => {
-    onTrigger = vi.fn();
+    onTrigger = vi.fn(() => undefined) as () => void;
   });
 
   afterEach(() => {

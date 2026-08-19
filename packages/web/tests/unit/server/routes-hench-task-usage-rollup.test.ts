@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
@@ -28,7 +29,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
         res.end("Not found");
       }
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -94,13 +95,13 @@ describe("GET /api/hench/task-usage — rollup", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("returns an empty rollup when the PRD is missing", async () => {
     await writeRun(runsDir, "run-1.json", "task-a", { input: 100, output: 50 });
-    const res = await fetch(`http://localhost:${port}/api/hench/task-usage`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/task-usage`);
     const data = await res.json();
     expect(data).toHaveProperty("taskUsage");
     expect(data).toHaveProperty("rollup");
@@ -130,7 +131,7 @@ describe("GET /api/hench/task-usage — rollup", () => {
     await writeRun(runsDir, "run-2.json", "task-a", { input: 50, output: 25 });
     await writeRun(runsDir, "run-3.json", "task-b", { input: 300, output: 100 });
 
-    const res = await fetch(`http://localhost:${port}/api/hench/task-usage`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/task-usage`);
     const data = await res.json();
 
     // Leaves carry only self attribution. Duration is zero because none of
@@ -183,7 +184,7 @@ describe("GET /api/hench/task-usage — rollup", () => {
     await writeRun(runsDir, "f-run.json", "feature", { input: 10, output: 10 });
     await writeRun(runsDir, "x-run.json", "task-x", { input: 30, output: 20 });
 
-    const res = await fetch(`http://localhost:${port}/api/hench/task-usage`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/task-usage`);
     const data = await res.json();
 
     expect(data.rollup["feature"]).toEqual({
@@ -198,7 +199,7 @@ describe("GET /api/hench/task-usage — rollup", () => {
     await writePRD(ctx.rexDir, [
       { id: "lonely", title: "L", level: "task", status: "pending" },
     ]);
-    const res = await fetch(`http://localhost:${port}/api/hench/task-usage`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/task-usage`);
     const data = await res.json();
     expect(data.rollup["lonely"]).toEqual({
       self: { totalTokens: 0, runCount: 0 },
@@ -237,7 +238,7 @@ describe("GET /api/hench/task-usage — rollup", () => {
       },
     ]);
 
-    const res = await fetch(`http://localhost:${port}/api/hench/task-usage`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/task-usage`);
     const data = await res.json();
 
     expect(data.rollup["task-a"].duration).toEqual({
@@ -278,7 +279,7 @@ describe("GET /api/hench/task-usage — rollup", () => {
       },
     ]);
 
-    const res = await fetch(`http://localhost:${port}/api/hench/task-usage`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/task-usage`);
     const data = await res.json();
 
     expect(data.rollup["task-b"].duration.isRunning).toBe(true);

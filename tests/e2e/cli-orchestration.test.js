@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
+import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 
@@ -14,7 +15,7 @@ function runResult(args) {
   try {
     const stdout = execFileSync("node", [CLI_PATH, ...args], {
       encoding: "utf-8",
-      timeout: 15000,
+      timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
     });
     return { stdout, stderr: "", code: 0 };

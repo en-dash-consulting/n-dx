@@ -71,9 +71,9 @@ export function resolveVendorCliPath(llmConfig: LLMConfig, henchConfig?: HenchCo
   if (vendor === "codex") {
     return llmConfig.codex?.cli_path ?? "codex";
   }
-  // Google uses the REST API — no CLI binary. Return empty string so callers
-  // that check cli availability will surface a clear "vendor has no CLI" error.
-  if (vendor === "google") {
+  // Google and local use the REST API — no CLI binary. Return empty string so
+  // callers that check cli availability will surface a clear "vendor has no CLI" error.
+  if (vendor === "google" || vendor === "local") {
     return "";
   }
   const configured = sharedResolveCliPath(llmConfig.claude ?? {});
@@ -109,6 +109,9 @@ export function resolveVendorCliEnv(llmConfig: LLMConfig): NodeJS.ProcessEnv {
       const apiKeyEnvVar = llmConfig.google?.apiKeyEnv ?? "GEMINI_API_KEY";
       return { ...baseEnv, [apiKeyEnvVar]: apiKey };
     }
+  } else if (vendor === "local") {
+    // Local server uses an optional bearer token injected directly by the
+    // local-api-provider; no env-variable injection needed here.
   } else {
     const apiKey = llmConfig.claude?.api_key;
     if (apiKey) {

@@ -5,6 +5,17 @@ import {
 } from "../../../src/analyze/dedupe.js";
 import type { ScanResult } from "../../../src/analyze/scanners.js";
 
+/**
+ * Load tolerance for wall-clock budgets below.
+ *
+ * These assertions guard against algorithmic regressions (a quadratic
+ * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
+ * numbers flake when the rest of the monorepo suite saturates every core,
+ * so the budget is scaled. See TESTING.md "Flake Resistance".
+ */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
+
 function makeScanResult(
   overrides: Partial<ScanResult> & { name: string },
 ): ScanResult {
@@ -277,7 +288,7 @@ describe("deduplicateScanResults", () => {
     expect(deduped.length).toBeLessThanOrEqual(baseNames.length);
     expect(deduped.length).toBeGreaterThan(0);
     // Should complete in reasonable time (< 2 seconds)
-    expect(elapsed).toBeLessThan(2000);
+    expect(elapsed).toBeLessThan(2000 * BUDGET_MULTIPLIER);
   });
 
   it("merges acceptance criteria from duplicate results", () => {

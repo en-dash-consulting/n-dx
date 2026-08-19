@@ -56,6 +56,7 @@ const STATUS_OPTIONS: Array<{ value: ItemStatus; label: string; icon: string }> 
   { value: "failing", label: "Failing", icon: "⚠" },
   { value: "blocked", label: "Blocked", icon: "⊘" },
   { value: "deferred", label: "Deferred", icon: "◌" },
+  { value: "cancelled", label: "Cancelled", icon: "⊗" },
   { value: "deleted", label: "Deleted", icon: "✕" },
 ];
 
@@ -1005,7 +1006,7 @@ function RequirementsList({
 }
 
 /** Statuses that allow triggering Hench execution. */
-const TRIGGERABLE_STATUSES: Set<ItemStatus> = new Set(["pending", "blocked"]);
+const TRIGGERABLE_STATUSES: Set<ItemStatus> = new Set(["pending", "blocked", "deferred"]);
 
 /** Execution progress state received from WebSocket. */
 interface ExecProgress {
@@ -1168,7 +1169,9 @@ function ExecuteTaskButton({
     };
   }, []);
 
-  if (!onExecute || !isTaskLevel) return null;
+  // Hide the button entirely for tasks that can't be triggered and aren't currently executing.
+  // This prevents showing a permanently-disabled button for completed/cancelled tasks.
+  if (!onExecute || !isTaskLevel || (!isTriggerable && !executing)) return null;
 
   const handleClick = useCallback(async () => {
     if (executing || !isTriggerable) return;
@@ -1225,6 +1228,25 @@ function ExecuteTaskButton({
             resultMessage.startsWith("Execution completed") ? " success" : " error"
           }`,
         }, resultMessage)
+      : null,
+
+    // Stop button (shown while execution is active)
+    isActive
+      ? h("button", {
+          class: "task-execute-stop-btn",
+          title: "Cancel this execution",
+          "aria-label": "Stop execution",
+          onClick: async () => {
+            try {
+              await fetch(`/api/hench/execute/${item.id}/terminate`, { method: "POST" });
+            } catch {
+              // ignore \u2014 server will clean up
+            }
+          },
+        },
+          h("span", null, "\u23f9"),
+          " Stop",
+        )
       : null,
 
     // Live progress indicator (shown during execution)

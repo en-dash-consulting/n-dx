@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:net";
+import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 const LOOPBACK_HOST = "127.0.0.1";
@@ -12,7 +13,7 @@ function runResult(args) {
   try {
     const stdout = execFileSync("node", [CLI_PATH, "web", ...args], {
       encoding: "utf-8",
-      timeout: 10000,
+      timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
     });
     return { stdout, stderr: "", code: 0 };
@@ -88,20 +89,37 @@ function findAvailablePort() {
 }
 
 /**
- * Block a port by holding a server on it.
- * Returns { server, port, close() }.
+ * Block a port by holding a server on it from a disposable child process.
+ * The start command force-kills whatever process occupies its port, so the
+ * blocker must not live in this (vitest worker) process.
+ * Returns { port, close() }.
  */
 function blockPort(port) {
-  return new Promise((resolve, reject) => {
-    const srv = createServer();
-    srv.listen(port, LOOPBACK_HOST, () => {
-      resolve({
-        server: srv,
-        port,
-        close: () => new Promise((r) => srv.close(r)),
-      });
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(process.execPath, ["-e", [
+      `const srv = require("node:net").createServer();`,
+      `srv.listen(${port}, ${JSON.stringify(LOOPBACK_HOST)}, () => process.stdout.write("ready\\n"));`,
+      `srv.on("error", (err) => { console.error(err.message); process.exit(1); });`,
+    ].join("\n")], { stdio: ["ignore", "pipe", "pipe"] });
+    let settled = false;
+    child.stdout.on("data", (data) => {
+      if (!settled && String(data).includes("ready")) {
+        settled = true;
+        resolvePromise({
+          port,
+          close: () => {
+            try { child.kill("SIGKILL"); } catch {}
+            return Promise.resolve();
+          },
+        });
+      }
     });
-    srv.on("error", reject);
+    child.on("exit", (code) => {
+      if (!settled) { settled = true; reject(new Error(`port blocker exited with code ${code}`)); }
+    });
+    child.on("error", (err) => {
+      if (!settled) { settled = true; reject(err); }
+    });
   });
 }
 
@@ -166,7 +184,7 @@ describe("n-dx web", { timeout: 120_000 }, () => {
   // ── Port conflict (dynamic fallback) ─────────────────────────────────
 
   describe("port conflict detection", () => {
-    it("falls back to another port when requested port is in use", async () => {
+    it("clears the occupant and claims the requested port when in use", async () => {
       if (!canBindPorts) return;
       const port = await findAvailablePort();
       const blocker = await blockPort(port);
@@ -275,7 +293,7 @@ describe("n-dx web", { timeout: 120_000 }, () => {
       try { process.kill(pidData.pid, "SIGTERM"); } catch {}
     });
 
-    it("prevents starting a second background server", async () => {
+    it("restarts the previous background server instead of erroring", async () => {
       if (!canBindPorts) return;
       const port = await findAvailablePort();
       // Start first
@@ -284,11 +302,11 @@ describe("n-dx web", { timeout: 120_000 }, () => {
       // Wait a moment for PID file to be written
       await new Promise((r) => setTimeout(r, 200));
 
-      // Try to start second
+      // Starting again is idempotent: the previous server is stopped first
       const port2 = await findAvailablePort();
-      const { stderr, code } = runResult([`--port=${port2}`, "--background", tmpDir]);
-      expect(code).toBe(1);
-      expect(stderr).toContain("already running");
+      const { stdout, code } = runResult([`--port=${port2}`, "--background", tmpDir]);
+      expect(code).toBe(0);
+      expect(stdout).toContain("Stopping previous");
 
       // Clean up
       const pidPath = join(tmpDir, ".n-dx-web.pid");
@@ -336,7 +354,7 @@ describe("n-dx web", { timeout: 120_000 }, () => {
     it("shows start/dashboard in the main help output", () => {
       const output = execFileSync("node", [CLI_PATH], {
         encoding: "utf-8",
-        timeout: 10000,
+        timeout: DEFAULT_TIMEOUT,
         stdio: "pipe",
       });
       expect(output).toContain("start");

@@ -56,6 +56,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--only=<module>", description: "Run only a named module: inventory, imports, zones, components" },
       { flag: "--fast", description: "Skip AI zone-name enrichment (algorithmic names only)" },
       { flag: "--full", description: "Run all 4 enrichment passes in sequence" },
+      { flag: "--target-pass=<N>", description: "Run enrichment passes up to pass N (2–4)" },
       { flag: "--deep", description: "Re-analyze sub-packages before root analysis" },
       { flag: "--per-zone", description: "Per-zone enrichment (smaller context, parallelizable)" },
       { flag: "--quiet, -q", description: "Suppress informational output" },

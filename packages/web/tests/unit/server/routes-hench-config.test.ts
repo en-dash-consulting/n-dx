@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal hench config for testing. */
 function makeConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -48,7 +49,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -88,14 +89,14 @@ describe("Hench Config API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   // ── GET /api/hench/config ──────────────────────────────────────────
 
   it("GET /api/hench/config returns config and field metadata", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -109,7 +110,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("GET /api/hench/config returns field metadata with impact", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`);
     const body = await res.json();
 
     const providerField = body.fields.find((f: { path: string }) => f.path === "provider");
@@ -130,7 +131,7 @@ describe("Hench Config API routes", () => {
       JSON.stringify(makeConfig({ model: "opus" }), null, 2) + "\n",
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/config`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`);
     const body = await res.json();
 
     const modelField = body.fields.find((f: { path: string }) => f.path === "model");
@@ -142,12 +143,12 @@ describe("Hench Config API routes", () => {
     // Remove config
     await rm(join(henchDir, "config.json"));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/config`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`);
     expect(res.status).toBe(404);
   });
 
   it("GET /api/hench/config includes nested field values", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`);
     const body = await res.json();
 
     const retryField = body.fields.find((f: { path: string }) => f.path === "retry.maxRetries");
@@ -159,7 +160,7 @@ describe("Hench Config API routes", () => {
   // ── PUT /api/hench/config ──────────────────────────────────────────
 
   it("PUT /api/hench/config updates a single field", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ changes: { model: "opus" } }),
@@ -180,7 +181,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("PUT /api/hench/config updates multiple fields", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -196,7 +197,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("PUT /api/hench/config updates nested fields", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -210,7 +211,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("PUT /api/hench/config rejects unknown fields", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ changes: { nonexistent: "foo" } }),
@@ -222,7 +223,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("PUT /api/hench/config rejects invalid number values", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ changes: { maxTurns: "not-a-number" } }),
@@ -231,7 +232,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("PUT /api/hench/config rejects negative numbers", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ changes: { maxTurns: -1 } }),
@@ -240,7 +241,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("PUT /api/hench/config rejects invalid enum values", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ changes: { provider: "invalid" } }),
@@ -249,7 +250,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("PUT /api/hench/config rejects missing changes object", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: "opus" }),
@@ -258,7 +259,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("PUT /api/hench/config rejects invalid JSON", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: "not-json",
@@ -267,7 +268,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("PUT /api/hench/config returns impact descriptions", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ changes: { provider: "api" } }),
@@ -279,7 +280,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("PUT /api/hench/config validates array fields", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -293,7 +294,7 @@ describe("Hench Config API routes", () => {
   });
 
   it("PUT /api/hench/config rejects non-array for array fields", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -4,6 +4,7 @@ import { mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir, homedir } from "node:os";
+import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const isWin = process.platform === "win32";
 const PATH_SEP = isWin ? ";" : ":";
@@ -38,7 +39,7 @@ const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 function run(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, ...args], {
     encoding: "utf-8",
-    timeout: 20000,
+    timeout: DEFAULT_TIMEOUT,
     stdio: "pipe",
     ...opts,
   });
@@ -66,7 +67,7 @@ function runFail(args, opts = {}) {
 function runCapture(args, opts = {}) {
   const res = spawnSync("node", [CLI_PATH, ...args], {
     encoding: "utf-8",
-    timeout: 20000,
+    timeout: DEFAULT_TIMEOUT,
     stdio: "pipe",
     ...opts,
   });

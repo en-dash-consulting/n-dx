@@ -43,6 +43,7 @@ export { updateFavicon, resetFavicon, FAVICON_PNGS, VIEW_TO_PRODUCT } from "./fa
 export { SidebarThemeToggle, initTheme } from "./theme-toggle.js";
 export { SidebarDensitySelector, initDensity } from "./density-selector.js";
 export { NdxLogoPng, ProductLogoPng, BrandedHeader } from "./logos.js";
+export { EnrichmentGate } from "./enrichment-gate.js";
 export { PollingSuspensionIndicator } from "./polling-suspension-indicator.js";
 export { RefreshQueueStatus } from "./refresh-queue-status.js";
 

@@ -52,8 +52,8 @@ describe("resolveInitLLMSelection", () => {
 
   // ── Existing config skips prompting ──────────────────────────────────────
 
-  describe("existing config skips prompting when both vendor and model are set", () => {
-    it("uses existing vendor and model without prompting", () => {
+  describe("existing config: re-prompts for both provider and model on TTY", () => {
+    it("shows both provider and model prompts so user can confirm/change", () => {
       const result = resolveInitLLMSelection({
         flags: {},
         existingConfig: { vendor: "claude", model: "claude-sonnet-4-6" },
@@ -63,11 +63,11 @@ describe("resolveInitLLMSelection", () => {
       expect(result.providerSource).toBe("config");
       expect(result.model).toBe("claude-sonnet-4-6");
       expect(result.modelSource).toBe("config");
-      expect(result.needsProviderPrompt).toBe(false);
-      expect(result.needsModelPrompt).toBe(false);
+      expect(result.needsProviderPrompt).toBe(true);   // re-prompt on TTY
+      expect(result.needsModelPrompt).toBe(true);      // re-prompt on TTY
     });
 
-    it("uses existing codex vendor and model without prompting", () => {
+    it("shows both prompts for codex", () => {
       const result = resolveInitLLMSelection({
         flags: {},
         existingConfig: { vendor: "codex", model: "gpt-5.5" },
@@ -77,6 +77,46 @@ describe("resolveInitLLMSelection", () => {
       expect(result.providerSource).toBe("config");
       expect(result.model).toBe("gpt-5.5");
       expect(result.modelSource).toBe("config");
+      expect(result.needsProviderPrompt).toBe(true);
+      expect(result.needsModelPrompt).toBe(true);
+    });
+
+    it("suppresses provider re-prompt when --provider flag is given", () => {
+      const result = resolveInitLLMSelection({
+        flags: { provider: "codex" },
+        existingConfig: { vendor: "codex", model: "gpt-5.5" },
+        isTTY: true,
+      });
+      expect(result.needsProviderPrompt).toBe(false);
+      expect(result.needsModelPrompt).toBe(true);   // model still re-prompted
+    });
+
+    it("suppresses model re-prompt when --model flag is given", () => {
+      const result = resolveInitLLMSelection({
+        flags: { model: "claude-opus-4-20250514" },
+        existingConfig: { vendor: "claude", model: "claude-sonnet-4-6" },
+        isTTY: true,
+      });
+      expect(result.needsProviderPrompt).toBe(true);   // provider still re-prompted
+      expect(result.needsModelPrompt).toBe(false);
+    });
+
+    it("suppresses both prompts when both flags are given", () => {
+      const result = resolveInitLLMSelection({
+        flags: { provider: "codex", model: "gpt-5.5" },
+        existingConfig: { vendor: "codex", model: "gpt-5.5" },
+        isTTY: true,
+      });
+      expect(result.needsProviderPrompt).toBe(false);
+      expect(result.needsModelPrompt).toBe(false);
+    });
+
+    it("skips all re-prompts in non-TTY (existing values used as-is)", () => {
+      const result = resolveInitLLMSelection({
+        flags: {},
+        existingConfig: { vendor: "codex", model: "gpt-5.5" },
+        isTTY: false,
+      });
       expect(result.needsProviderPrompt).toBe(false);
       expect(result.needsModelPrompt).toBe(false);
     });
@@ -84,8 +124,8 @@ describe("resolveInitLLMSelection", () => {
 
   // ── Missing model triggers model-only prompt ─────────────────────────────
 
-  describe("missing model triggers model-only prompt when vendor is already set", () => {
-    it("needs model prompt when vendor exists but model is absent", () => {
+  describe("missing model: both provider and model prompts shown on TTY", () => {
+    it("shows both prompts when vendor exists but model is absent", () => {
       const result = resolveInitLLMSelection({
         flags: {},
         existingConfig: { vendor: "claude" },
@@ -94,11 +134,11 @@ describe("resolveInitLLMSelection", () => {
       expect(result.provider).toBe("claude");
       expect(result.providerSource).toBe("config");
       expect(result.model).toBeUndefined();
-      expect(result.needsProviderPrompt).toBe(false);
+      expect(result.needsProviderPrompt).toBe(true);
       expect(result.needsModelPrompt).toBe(true);
     });
 
-    it("needs model prompt when vendor exists but model is undefined", () => {
+    it("shows both prompts when vendor exists but model is undefined", () => {
       const result = resolveInitLLMSelection({
         flags: {},
         existingConfig: { vendor: "codex", model: undefined },
@@ -106,11 +146,11 @@ describe("resolveInitLLMSelection", () => {
       });
       expect(result.provider).toBe("codex");
       expect(result.providerSource).toBe("config");
-      expect(result.needsProviderPrompt).toBe(false);
+      expect(result.needsProviderPrompt).toBe(true);
       expect(result.needsModelPrompt).toBe(true);
     });
 
-    it("does not need model prompt when flag provides model for existing vendor", () => {
+    it("skips model prompt but still shows provider prompt when --model flag is given", () => {
       const result = resolveInitLLMSelection({
         flags: { model: "claude-opus-4-20250514" },
         existingConfig: { vendor: "claude" },
@@ -120,7 +160,7 @@ describe("resolveInitLLMSelection", () => {
       expect(result.providerSource).toBe("config");
       expect(result.model).toBe("claude-opus-4-20250514");
       expect(result.modelSource).toBe("flag");
-      expect(result.needsProviderPrompt).toBe(false);
+      expect(result.needsProviderPrompt).toBe(true);   // --model flag doesn't suppress provider
       expect(result.needsModelPrompt).toBe(false);
     });
   });
@@ -463,6 +503,85 @@ describe("promptLLMSelection", () => {
       expect(result.cancelled).toBe(true);
     });
 
+    it("keeps existing provider and does NOT cancel when Esc pressed on provider re-prompt", async () => {
+      const resolution = {
+        provider: "codex",
+        model: "gpt-5.5",
+        providerSource: "config",
+        modelSource: "config",
+        needsProviderPrompt: true,
+        needsModelPrompt: true,
+      };
+      const modelPrompt = vi.fn();
+      const result = await promptLLMSelection(resolution, {
+        promptProvider: async () => undefined,  // simulate Esc
+        promptModel: modelPrompt,
+      });
+      expect(result.cancelled).toBe(false);
+      expect(result.provider).toBe("codex");
+      expect(result.providerSource).toBe("config");
+      // model prompt should still run after provider is kept
+      expect(modelPrompt).toHaveBeenCalled();
+    });
+
+    it("resets model when user switches to a different vendor", async () => {
+      const resolution = {
+        provider: "codex",
+        model: "gpt-5.5",
+        providerSource: "config",
+        modelSource: "config",
+        needsProviderPrompt: true,
+        needsModelPrompt: true,
+      };
+      let receivedModelDefault;
+      await promptLLMSelection(resolution, {
+        promptProvider: async () => "claude",   // switch vendor
+        promptModel: async (provider, existing) => {
+          receivedModelDefault = existing;
+          return "claude-sonnet-5";
+        },
+      });
+      // After switching from codex to claude, old gpt-5.5 model should be cleared
+      expect(receivedModelDefault).toBeUndefined();
+    });
+
+    it("keeps existing config model and does NOT cancel when Esc pressed on re-prompt", async () => {
+      // When model was already in config, Esc/Ctrl+C means "keep what I had".
+      const resolution = {
+        provider: "claude",
+        model: "claude-sonnet-4-6",
+        providerSource: "config",
+        modelSource: "config",
+        needsProviderPrompt: false,
+        needsModelPrompt: true,
+      };
+      const result = await promptLLMSelection(resolution, {
+        promptModel: async () => undefined,  // simulate Esc
+      });
+      expect(result.cancelled).toBe(false);
+      expect(result.model).toBe("claude-sonnet-4-6");
+      expect(result.modelSource).toBe("config");
+    });
+
+    it("passes existing model to promptModel so it can be pre-selected", async () => {
+      const resolution = {
+        provider: "codex",
+        model: "gpt-5.5",
+        providerSource: "config",
+        modelSource: "config",
+        needsProviderPrompt: false,
+        needsModelPrompt: true,
+      };
+      let receivedExisting;
+      await promptLLMSelection(resolution, {
+        promptModel: async (provider, existing) => {
+          receivedExisting = existing;
+          return existing;
+        },
+      });
+      expect(receivedExisting).toBe("gpt-5.5");
+    });
+
     it("sets cancelled to false when no prompts are needed", async () => {
       const resolution = {
         provider: "claude",
@@ -697,14 +816,16 @@ describe("LLM_MODEL_CATALOG", () => {
     expect(LLM_MODEL_CATALOG).toHaveProperty("claude");
   });
 
-  it("each vendor has at least one model", () => {
+  it("each vendor has at least one model (local is exempt — model list is fetched live from server)", () => {
     for (const [vendor, models] of Object.entries(LLM_MODEL_CATALOG)) {
+      if (vendor === "local") continue; // local: no static catalog; list fetched from /v1/models at init time
       expect(models.length, `${vendor} should have at least one model`).toBeGreaterThanOrEqual(1);
     }
   });
 
-  it("each vendor has exactly one recommended model", () => {
+  it("each vendor has exactly one recommended model (local is exempt)", () => {
     for (const [vendor, models] of Object.entries(LLM_MODEL_CATALOG)) {
+      if (vendor === "local") continue;
       const recommended = models.filter((m) => m.recommended);
       expect(
         recommended.length,
@@ -1103,7 +1224,7 @@ describe("google provider", () => {
     expect(recommended.id).toBe("gemini-2.5-pro");
   });
 
-  it("resolveInitLLMSelection carries over existing google config", () => {
+  it("resolveInitLLMSelection re-prompts both provider and model for existing google config on TTY", () => {
     const result = resolveInitLLMSelection({
       flags: {},
       existingConfig: { vendor: "google", model: "gemini-2.5-pro" },
@@ -1112,8 +1233,8 @@ describe("google provider", () => {
     expect(result.provider).toBe("google");
     expect(result.providerSource).toBe("config");
     expect(result.model).toBe("gemini-2.5-pro");
-    expect(result.needsProviderPrompt).toBe(false);
-    expect(result.needsModelPrompt).toBe(false);
+    expect(result.needsProviderPrompt).toBe(true);
+    expect(result.needsModelPrompt).toBe(true);
   });
 
   it("promptLLMSelection works end-to-end for google", async () => {
@@ -1148,5 +1269,127 @@ describe("google provider", () => {
     const result = await promptLLMSelection(resolution);
     expect(result.model).toBe("gemini-2.5-pro");
     expect(result.modelSource).toBe("prompt");
+  });
+});
+
+// ─── local provider model prompt ─────────────────────────────────────────────
+
+describe("local provider model prompt", () => {
+  describe("resolveInitLLMSelection: local always prompts on TTY", () => {
+    it("sets needsModelPrompt=true even when model is already in config", () => {
+      const result = resolveInitLLMSelection({
+        flags: {},
+        existingConfig: { vendor: "local", model: "qwen2.5-coder-32b" },
+        isTTY: true,
+      });
+      expect(result.provider).toBe("local");
+      expect(result.model).toBe("qwen2.5-coder-32b");
+      expect(result.modelSource).toBe("config");
+      expect(result.needsModelPrompt).toBe(true);
+    });
+
+    it("sets needsModelPrompt=true when model is not set", () => {
+      const result = resolveInitLLMSelection({
+        flags: {},
+        existingConfig: { vendor: "local" },
+        isTTY: true,
+      });
+      expect(result.provider).toBe("local");
+      expect(result.needsModelPrompt).toBe(true);
+    });
+
+    it("suppresses model prompt when --model flag is given", () => {
+      const result = resolveInitLLMSelection({
+        flags: { model: "llama-3.1-8b-instruct" },
+        existingConfig: { vendor: "local", model: "qwen2.5-coder-32b" },
+        isTTY: true,
+      });
+      expect(result.model).toBe("llama-3.1-8b-instruct");
+      expect(result.modelSource).toBe("flag");
+      expect(result.needsModelPrompt).toBe(false);
+    });
+
+    it("does not set needsModelPrompt for local in non-TTY", () => {
+      const result = resolveInitLLMSelection({
+        flags: {},
+        existingConfig: { vendor: "local", model: "qwen2.5-coder-32b" },
+        isTTY: false,
+      });
+      expect(result.needsModelPrompt).toBe(false);
+    });
+  });
+
+  describe("promptLLMSelection: local uses promptLocalModel injection (live fetch in production)", () => {
+    it("calls injected promptLocalModel instead of promptModel for local provider", async () => {
+      const resolution = {
+        provider: "local",
+        model: undefined,
+        providerSource: "flag",
+        modelSource: undefined,
+        needsProviderPrompt: false,
+        needsModelPrompt: true,
+      };
+      const modelPrompt = vi.fn();
+      const localModelPrompt = vi.fn().mockResolvedValue("qwen2.5-coder-32b");
+      await promptLLMSelection(resolution, {
+        promptModel: modelPrompt,
+        promptLocalModel: localModelPrompt,
+      });
+      expect(modelPrompt).not.toHaveBeenCalled();
+      expect(localModelPrompt).toHaveBeenCalledWith(undefined);
+    });
+
+    it("passes existing model as default to promptLocalModel", async () => {
+      const resolution = {
+        provider: "local",
+        model: "qwen2.5-coder-32b",
+        providerSource: "config",
+        modelSource: "config",
+        needsProviderPrompt: false,
+        needsModelPrompt: true,
+      };
+      let receivedExisting;
+      await promptLLMSelection(resolution, {
+        promptLocalModel: async (existing) => {
+          receivedExisting = existing;
+          return existing;
+        },
+      });
+      expect(receivedExisting).toBe("qwen2.5-coder-32b");
+    });
+
+    it("sets model and modelSource when local prompt returns a name", async () => {
+      const resolution = {
+        provider: "local",
+        model: undefined,
+        providerSource: "prompt",
+        modelSource: undefined,
+        needsProviderPrompt: false,
+        needsModelPrompt: true,
+      };
+      const result = await promptLLMSelection(resolution, {
+        promptLocalModel: async () => "llama-3.1-8b-instruct",
+      });
+      expect(result.model).toBe("llama-3.1-8b-instruct");
+      expect(result.modelSource).toBe("prompt");
+      expect(result.cancelled).toBe(false);
+    });
+
+    it("does NOT set cancelled when local prompt returns undefined (blank = optional)", async () => {
+      const resolution = {
+        provider: "local",
+        model: "qwen2.5-coder-32b",
+        providerSource: "config",
+        modelSource: "config",
+        needsProviderPrompt: false,
+        needsModelPrompt: true,
+      };
+      const result = await promptLLMSelection(resolution, {
+        promptLocalModel: async () => undefined,
+      });
+      expect(result.cancelled).toBe(false);
+      expect(result.model).toBeUndefined();
+      expect(result.modelSource).toBeUndefined();
+    });
   });
 });

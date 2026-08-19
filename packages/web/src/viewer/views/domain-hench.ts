@@ -12,3 +12,4 @@
 export { HenchRunsView } from "./hench-runs.js";
 export { HenchConfigView } from "./hench-config.js";
 export { HenchTemplatesView } from "./hench-templates.js";
+export { AdaptiveOptimizationView } from "./adaptive-optimization.js";

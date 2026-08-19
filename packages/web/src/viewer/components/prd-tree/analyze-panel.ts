@@ -193,7 +193,7 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
         " Skip LLM refinement (faster, less refined)",
       ),
       h("button", {
-        class: "rex-analyze-btn rex-analyze-btn-run",
+        class: "cmd-btn cmd-btn-primary rex-analyze-btn-run",
         onClick: handleAnalyze,
         disabled: state === "running",
       }, state === "running" ? "Analyzing..." : "Run Analysis"),
@@ -228,11 +228,11 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
               `${selectedIndices.size} of ${proposals.length} selected`,
             ),
             h("button", {
-              class: "rex-analyze-select-btn",
+              class: "link-btn rex-analyze-select-btn",
               onClick: selectAll,
             }, "Select All"),
             h("button", {
-              class: "rex-analyze-select-btn",
+              class: "link-btn rex-analyze-select-btn",
               onClick: selectNone,
             }, "Select None"),
           ),
@@ -253,12 +253,12 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
           // Accept bar with Review & Edit and Accept buttons
           h("div", { class: "rex-analyze-accept-bar" },
             h("button", {
-              class: "rex-analyze-btn rex-analyze-btn-review",
+              class: "cmd-btn cmd-btn-secondary rex-analyze-btn-review",
               onClick: () => setEditing(true),
               disabled: accepting,
             }, "\u270E Review & Edit"),
             h("button", {
-              class: "rex-analyze-btn rex-analyze-btn-accept",
+              class: "cmd-btn cmd-btn-primary rex-analyze-btn-accept",
               onClick: handleAccept,
               disabled: accepting || selectedIndices.size === 0,
             }, accepting

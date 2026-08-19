@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
@@ -20,7 +21,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
         res.end("Not found");
       }
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -48,12 +49,12 @@ describe("Hench runs health endpoint", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("returns empty health when no runs exist", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/runs/health`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs/health`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.activeRuns).toBe(0);
@@ -77,7 +78,7 @@ describe("Hench runs health endpoint", () => {
     };
     await writeFile(join(runsDir, "run-1.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/runs/health`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs/health`);
     const data = await res.json();
     expect(data.activeRuns).toBe(1);
     expect(data.staleRuns).toBe(1);
@@ -100,7 +101,7 @@ describe("Hench runs health endpoint", () => {
     };
     await writeFile(join(runsDir, "run-2.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/runs/health`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs/health`);
     const data = await res.json();
     expect(data.activeRuns).toBe(1);
     expect(data.staleRuns).toBe(0);
@@ -123,7 +124,7 @@ describe("Hench runs health endpoint", () => {
     };
     await writeFile(join(runsDir, "run-3.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/runs/health`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs/health`);
     const data = await res.json();
     expect(data.activeRuns).toBe(0);
     expect(data.runs).toEqual([]);
@@ -144,7 +145,7 @@ describe("Hench runs health endpoint", () => {
     };
     await writeFile(join(runsDir, "run-4.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/runs/health`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs/health`);
     const data = await res.json();
     expect(data.staleRuns).toBe(1);
     expect(data.runs[0].stale).toBe(true);
@@ -172,7 +173,7 @@ describe("Hench mark-stuck endpoint", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -191,7 +192,7 @@ describe("Hench mark-stuck endpoint", () => {
     };
     await writeFile(join(runsDir, "stuck-1.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/runs/stuck-1/mark-stuck`, { method: "POST" });
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs/stuck-1/mark-stuck`, { method: "POST" });
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.status).toBe("failed");
@@ -219,12 +220,12 @@ describe("Hench mark-stuck endpoint", () => {
     };
     await writeFile(join(runsDir, "done-1.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/runs/done-1/mark-stuck`, { method: "POST" });
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs/done-1/mark-stuck`, { method: "POST" });
     expect(res.status).toBe(409);
   });
 
   it("returns 404 for nonexistent run", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/runs/nonexistent/mark-stuck`, { method: "POST" });
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs/nonexistent/mark-stuck`, { method: "POST" });
     expect(res.status).toBe(404);
   });
 });

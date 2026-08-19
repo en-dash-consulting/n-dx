@@ -40,6 +40,16 @@
 
 export { createSourcevisionMcpServer } from "./cli/mcp.js";
 
+// ---- Dashboard-facing analysis functions -------------------------------------
+//
+// Consumed by the web dashboard through its sourcevision gateway
+// (`packages/web/src/server/domain-gateway.ts`): next-step derivation for the
+// Overview panel and archetype override persistence for the Files tab.
+
+export { deriveNextSteps } from "./analyzers/next-steps.js";
+export { setArchetypeOverride } from "./util/archetype-overrides.js";
+// NextStep type is already exported in the schema-types block below.
+
 // ---- Schema constants -------------------------------------------------------
 
 export { SCHEMA_VERSION as SV_SCHEMA_VERSION } from "./schema/v1.js";

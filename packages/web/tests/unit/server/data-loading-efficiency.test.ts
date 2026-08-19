@@ -17,6 +17,7 @@ import type { ServerContext } from "../../../src/server/types.js";
 import { createDataWatcher, handleDataRoute } from "../../../src/server/routes-data.js";
 import { handleSourcevisionRoute } from "../../../src/server/routes-sourcevision.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -33,7 +34,7 @@ function startDataServer(
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -51,7 +52,7 @@ function startSvServer(
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -78,7 +79,7 @@ function startHenchServer(
         res.end("Not found");
       }
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -133,12 +134,12 @@ describe("Data routes — streaming file responses", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("streams inventory.json with correct Content-Length header", async () => {
-    const res = await fetch(`http://localhost:${port}/data/inventory.json`);
+    const res = await fetch(`http://127.0.0.1:${port}/data/inventory.json`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-length")).toBeTruthy();
     const data = await res.json();
@@ -146,7 +147,7 @@ describe("Data routes — streaming file responses", () => {
   });
 
   it("streams prd.json with correct Content-Length header", async () => {
-    const res = await fetch(`http://localhost:${port}/data/prd.json`);
+    const res = await fetch(`http://127.0.0.1:${port}/data/prd.json`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-length")).toBeTruthy();
     const data = await res.json();
@@ -154,7 +155,7 @@ describe("Data routes — streaming file responses", () => {
   });
 
   it("returns 404 for missing files", async () => {
-    const res = await fetch(`http://localhost:${port}/data/nonexistent.json`);
+    const res = await fetch(`http://127.0.0.1:${port}/data/nonexistent.json`);
     expect(res.status).toBe(404);
   });
 });
@@ -204,12 +205,12 @@ describe("Sourcevision inventory — pagination", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("returns full inventory when no pagination params", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/inventory`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/inventory`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.files).toHaveLength(fileCount);
@@ -217,7 +218,7 @@ describe("Sourcevision inventory — pagination", () => {
   });
 
   it("paginates with ?limit=N", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/inventory?limit=50`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/inventory?limit=50`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.files).toHaveLength(50);
@@ -227,7 +228,7 @@ describe("Sourcevision inventory — pagination", () => {
   });
 
   it("paginates with ?offset=N&limit=N", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/inventory?offset=100&limit=25`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/inventory?offset=100&limit=25`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.files).toHaveLength(25);
@@ -236,7 +237,7 @@ describe("Sourcevision inventory — pagination", () => {
   });
 
   it("handles offset beyond file count", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/inventory?offset=999&limit=10`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/inventory?offset=999&limit=10`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.files).toHaveLength(0);
@@ -244,7 +245,7 @@ describe("Sourcevision inventory — pagination", () => {
   });
 
   it("returns remaining files when offset without limit", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/inventory?offset=190`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/inventory?offset=190`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.files).toHaveLength(10); // 200 - 190
@@ -253,7 +254,7 @@ describe("Sourcevision inventory — pagination", () => {
   });
 
   it("preserves summary in paginated responses", async () => {
-    const res = await fetch(`http://localhost:${port}/api/sv/inventory?limit=10`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/sv/inventory?limit=10`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.summary.totalFiles).toBe(fileCount);
@@ -318,12 +319,12 @@ describe("Hench runs — pagination with offset", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("returns all runs with total count", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/runs`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.runs).toHaveLength(runCount);
@@ -331,7 +332,7 @@ describe("Hench runs — pagination with offset", () => {
   });
 
   it("limits results with ?limit=N", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/runs?limit=5`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs?limit=5`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.runs).toHaveLength(5);
@@ -339,7 +340,7 @@ describe("Hench runs — pagination with offset", () => {
   });
 
   it("paginates with ?offset=N&limit=N", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/runs?offset=10&limit=5`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs?offset=10&limit=5`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.runs).toHaveLength(5);
@@ -348,7 +349,7 @@ describe("Hench runs — pagination with offset", () => {
 
   it("returns empty array with total when no runs directory", async () => {
     await rm(runsDir, { recursive: true, force: true });
-    const res = await fetch(`http://localhost:${port}/api/hench/runs`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/runs`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.runs).toHaveLength(0);

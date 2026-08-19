@@ -8,6 +8,7 @@ import {
   handleStatusRoute,
   clearStatusCache,
 } from "../../../src/server/routes-status.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Start a test server that only runs status routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
@@ -18,7 +19,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -45,12 +46,12 @@ describe("Status API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("GET /api/status returns project status", async () => {
-    const res = await fetch(`http://localhost:${port}/api/status`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/status`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
 
@@ -61,18 +62,18 @@ describe("Status API routes", () => {
   });
 
   it("returns 404 for non-status routes", async () => {
-    const res = await fetch(`http://localhost:${port}/api/other`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/other`);
     expect(res.status).toBe(404);
   });
 
   it("returns 404 for POST to /api/status", async () => {
-    const res = await fetch(`http://localhost:${port}/api/status`, { method: "POST" });
+    const res = await fetch(`http://127.0.0.1:${port}/api/status`, { method: "POST" });
     expect(res.status).toBe(404);
   });
 
   describe("SourceVision status", () => {
     it("reports unavailable when no manifest exists", async () => {
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.sv.freshness).toBe("unavailable");
       expect(data.sv.analyzedAt).toBeNull();
@@ -97,7 +98,7 @@ describe("Status API routes", () => {
       await writeFile(join(ctx.svDir, "manifest.json"), JSON.stringify(manifest));
 
       clearStatusCache();
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.sv.freshness).toBe("fresh");
       expect(data.sv.analyzedAt).toBeTruthy();
@@ -123,7 +124,7 @@ describe("Status API routes", () => {
       await writeFile(join(ctx.svDir, "manifest.json"), JSON.stringify(manifest));
 
       clearStatusCache();
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.sv.freshness).toBe("stale");
       expect(data.sv.minutesAgo).toBeGreaterThan(24 * 60);
@@ -133,7 +134,7 @@ describe("Status API routes", () => {
 
   describe("Rex status", () => {
     it("reports no PRD when prd.json does not exist", async () => {
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.rex.exists).toBe(false);
       expect(data.rex.percentComplete).toBe(0);
@@ -164,7 +165,7 @@ describe("Status API routes", () => {
       await writeFile(join(ctx.rexDir, "prd.json"), JSON.stringify(prd));
 
       clearStatusCache();
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.rex.exists).toBe(true);
       expect(data.rex.stats).not.toBeNull();
@@ -198,7 +199,7 @@ describe("Status API routes", () => {
       await writeFile(join(ctx.rexDir, "prd.json"), JSON.stringify(prd));
 
       clearStatusCache();
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.rex.percentComplete).toBe(100);
       expect(data.rex.hasPending).toBe(false);
@@ -207,7 +208,7 @@ describe("Status API routes", () => {
 
     describe("item attribution", () => {
       it("returns empty items array when no PRD exists", async () => {
-        const res = await fetch(`http://localhost:${port}/api/status`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/status`);
         const data = await res.json();
         expect(data.rex.items).toEqual([]);
       });
@@ -232,7 +233,7 @@ describe("Status API routes", () => {
         await writeFile(join(ctx.rexDir, "prd.json"), JSON.stringify(prd));
 
         clearStatusCache();
-        const res = await fetch(`http://localhost:${port}/api/status`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/status`);
         const data = await res.json();
 
         expect(data.rex.items).toHaveLength(2);
@@ -272,7 +273,7 @@ describe("Status API routes", () => {
         await writeFile(join(ctx.rexDir, "prd.json"), JSON.stringify(prd));
 
         clearStatusCache();
-        const res = await fetch(`http://localhost:${port}/api/status`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/status`);
         const data = await res.json();
 
         const byId = Object.fromEntries(
@@ -290,7 +291,7 @@ describe("Status API routes", () => {
 
   describe("Hench status", () => {
     it("reports not configured when no hench dir", async () => {
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.hench.configured).toBe(false);
       expect(data.hench.totalRuns).toBe(0);
@@ -302,7 +303,7 @@ describe("Status API routes", () => {
       await writeFile(join(henchDir, "config.json"), JSON.stringify({ model: "test" }));
 
       clearStatusCache();
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.hench.configured).toBe(true);
     });
@@ -327,7 +328,7 @@ describe("Status API routes", () => {
       await writeFile(join(join(tmpDir, ".hench"), "config.json"), "{}");
 
       clearStatusCache();
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.hench.totalRuns).toBe(2);
     });
@@ -362,7 +363,7 @@ describe("Status API routes", () => {
       await writeFile(join(runsDir, "empty.json"), "{}");
 
       clearStatusCache();
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       // Only the valid run should be counted — matches GET /api/hench/runs behavior
       expect(data.hench.totalRuns).toBe(1);
@@ -394,7 +395,7 @@ describe("Status API routes", () => {
       await writeFile(join(runsDir, "done-run-1.json"), JSON.stringify(completedRun));
 
       clearStatusCache();
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.hench.totalRuns).toBe(2);
       expect(data.hench.activeRuns).toBe(1);
@@ -418,7 +419,7 @@ describe("Status API routes", () => {
       await writeFile(join(runsDir, "fresh-run-1.json"), JSON.stringify(freshRun));
 
       clearStatusCache();
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.hench.activeRuns).toBe(1);
       expect(data.hench.staleRuns).toBe(0);
@@ -439,7 +440,7 @@ describe("Status API routes", () => {
       await writeFile(join(runsDir, "legacy-run-1.json"), JSON.stringify(legacyRun));
 
       clearStatusCache();
-      const res = await fetch(`http://localhost:${port}/api/status`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data = await res.json();
       expect(data.hench.staleRuns).toBe(1);
     });
@@ -454,7 +455,7 @@ describe("Status API routes", () => {
       };
       await writeFile(join(ctx.svDir, "manifest.json"), JSON.stringify(manifest));
 
-      const res1 = await fetch(`http://localhost:${port}/api/status`);
+      const res1 = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data1 = await res1.json();
       expect(data1.sv.modulesComplete).toBe(1);
 
@@ -469,7 +470,7 @@ describe("Status API routes", () => {
       };
       await writeFile(join(ctx.svDir, "manifest.json"), JSON.stringify(manifest2));
 
-      const res2 = await fetch(`http://localhost:${port}/api/status`);
+      const res2 = await fetch(`http://127.0.0.1:${port}/api/status`);
       const data2 = await res2.json();
       // Should still be cached (5s TTL)
       expect(data2.sv.modulesComplete).toBe(1);

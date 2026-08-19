@@ -199,7 +199,133 @@ export function routeProposals(
     return handleBatchImport(req, res, ctx, broadcast);
   }
 
+  // POST /api/rex/capture-next-steps — capture sourcevision next-step
+  // recommendations as PRD items (Overview panel action)
+  if (path === "capture-next-steps" && method === "POST") {
+    return handleCaptureNextSteps(req, res, ctx, broadcast);
+  }
+
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// Next-steps capture
+// ---------------------------------------------------------------------------
+
+/** Title of the epic that collects captured sourcevision next steps. */
+const CAPTURE_EPIC_TITLE = "SourceVision Next Steps";
+
+/** Normalize a title for duplicate comparison. */
+function normalizeTitle(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Collect normalized titles of every item in the tree. */
+function collectNormalizedTitles(items: PRDItem[], into: Set<string>): Set<string> {
+  for (const item of items) {
+    into.add(normalizeTitle(item.title));
+    if (item.children) collectNormalizedTitles(item.children, into);
+  }
+  return into;
+}
+
+/**
+ * Handle POST /api/rex/capture-next-steps — create PRD features from the
+ * Overview panel's next-step recommendations. Steps are deduplicated by
+ * normalized title against the whole tree (and within the request) and
+ * placed under a find-or-create "SourceVision Next Steps" epic, written
+ * through the rex store like proposal acceptance.
+ */
+async function handleCaptureNextSteps(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  try {
+    const body = await readBody(req);
+    const input = JSON.parse(body) as {
+      steps?: Array<{ title?: string; description?: string; priority?: string; category?: string }>;
+    };
+
+    if (!Array.isArray(input.steps) || input.steps.length === 0) {
+      errorResponse(res, 400, "Missing required field: steps (non-empty array)");
+      return true;
+    }
+    if (input.steps.some((s) => !s.title || s.title.trim().length === 0)) {
+      errorResponse(res, 400, "Every step requires a title");
+      return true;
+    }
+
+    const store = await resolveStore(ctx.rexDir);
+    const doc = await store.loadDocument();
+    const existingTitles = collectNormalizedTitles(doc.items, new Set<string>());
+
+    let created = 0;
+    let skipped = 0;
+    let epic = doc.items.find((i) => i.level === "epic" && i.title === CAPTURE_EPIC_TITLE);
+    let epicId = epic?.id;
+
+    for (const step of input.steps) {
+      const normalized = normalizeTitle(step.title!);
+      if (existingTitles.has(normalized)) {
+        skipped++;
+        continue;
+      }
+      existingTitles.add(normalized);
+
+      if (!epicId) {
+        epicId = randomUUID();
+        const epicItem: PRDItem = {
+          id: epicId,
+          title: CAPTURE_EPIC_TITLE,
+          level: "epic",
+          status: "pending",
+          source: "sv-next-steps",
+          description: "Findings captured from the SourceVision Overview Next Steps panel.",
+          tags: ["sourcevision", "next-steps"],
+        };
+        await store.addItem(epicItem);
+      }
+
+      const tags = ["sourcevision", "next-steps"];
+      if (step.category && !tags.includes(step.category)) tags.push(step.category);
+      const item: PRDItem = {
+        id: randomUUID(),
+        title: step.title!.trim(),
+        level: "feature",
+        status: "pending",
+        source: "sv-next-steps",
+        tags,
+      };
+      if (step.description) item.description = step.description;
+      if (step.priority && isPriority(step.priority)) item.priority = step.priority;
+      await store.addItem(item, epicId);
+      created++;
+    }
+
+    // Refresh the cache from the store so the dashboard sees the new items
+    // immediately (same pattern as proposal acceptance).
+    refreshPRDCache(ctx.rexDir, await store.loadDocument());
+
+    appendLog(ctx, {
+      timestamp: new Date().toISOString(),
+      event: "sv_next_steps_capture",
+      detail: `Captured ${created} next step${created === 1 ? "" : "s"} to PRD (${skipped} duplicate${skipped === 1 ? "" : "s"} skipped) via web`,
+    });
+
+    if (created > 0 && broadcast) {
+      broadcast({
+        type: "rex:prd-changed",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    jsonResponse(res, 200, { ok: true, created, skipped, epicId: created > 0 ? epicId : undefined });
+  } catch (err) {
+    errorResponse(res, 400, String(err));
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------

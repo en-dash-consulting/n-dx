@@ -7,6 +7,7 @@ import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import { parseDocument, serializeDocument } from "@n-dx/rex";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function readPRDFromMd(rexDir: string) {
   const raw = readFileSync(join(rexDir, "prd.md"), "utf-8");
@@ -82,7 +83,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -112,14 +113,14 @@ describe("Requirements API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   // ── GET requirements ──────────────────────────────────────────
 
   it("GET /api/rex/items/:id/requirements returns own + inherited requirements", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-1/requirements`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-1/requirements`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -135,7 +136,7 @@ describe("Requirements API routes", () => {
   });
 
   it("GET /api/rex/items/:id/requirements returns only inherited for items without own", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-2/requirements`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-2/requirements`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -145,14 +146,14 @@ describe("Requirements API routes", () => {
   });
 
   it("GET /api/rex/items/:id/requirements returns 404 for unknown item", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/nonexistent/requirements`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/nonexistent/requirements`);
     expect(res.status).toBe(404);
   });
 
   // ── POST add requirement ──────────────────────────────────────
 
   it("POST /api/rex/items/:id/requirements adds a new requirement", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-2/requirements`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-2/requirements`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -172,13 +173,13 @@ describe("Requirements API routes", () => {
 
     // Verify persisted
     const prd = readPRDFromMd(rexDir);
-    const task2 = prd.items[0].children[1];
+    const task2 = prd.items[0]!.children![1]!;
     expect(task2.requirements).toHaveLength(1);
-    expect(task2.requirements[0].title).toBe("Accessibility compliance");
+    expect(task2.requirements![0]!.title).toBe("Accessibility compliance");
   });
 
   it("POST /api/rex/items/:id/requirements validates required fields", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-2/requirements`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-2/requirements`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category: "security", validationType: "manual" }),
@@ -189,7 +190,7 @@ describe("Requirements API routes", () => {
   });
 
   it("POST /api/rex/items/:id/requirements rejects invalid category", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-2/requirements`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-2/requirements`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -204,7 +205,7 @@ describe("Requirements API routes", () => {
   });
 
   it("POST /api/rex/items/:id/requirements rejects invalid validationType", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-2/requirements`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-2/requirements`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -221,7 +222,7 @@ describe("Requirements API routes", () => {
   // ── PATCH update requirement ──────────────────────────────────
 
   it("PATCH /api/rex/items/:id/requirements/:reqId updates a requirement", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-1/requirements/req-2`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-1/requirements/req-2`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -238,12 +239,12 @@ describe("Requirements API routes", () => {
 
     // Verify persisted
     const prd = readPRDFromMd(rexDir);
-    const task1 = prd.items[0].children[0];
-    expect(task1.requirements[0].title).toBe("Updated coverage requirement");
+    const task1 = prd.items[0]!.children![0]!;
+    expect(task1.requirements![0]!.title).toBe("Updated coverage requirement");
   });
 
   it("PATCH /api/rex/items/:id/requirements/:reqId rejects invalid category", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-1/requirements/req-2`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-1/requirements/req-2`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category: "invalid" }),
@@ -252,7 +253,7 @@ describe("Requirements API routes", () => {
   });
 
   it("PATCH /api/rex/items/:id/requirements/:reqId returns 404 for unknown requirement", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-1/requirements/nonexistent`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-1/requirements/nonexistent`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "Updated" }),
@@ -263,7 +264,7 @@ describe("Requirements API routes", () => {
   // ── DELETE requirement ────────────────────────────────────────
 
   it("DELETE /api/rex/items/:id/requirements/:reqId removes a requirement", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-1/requirements/req-2`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-1/requirements/req-2`, {
       method: "DELETE",
     });
     expect(res.status).toBe(200);
@@ -272,12 +273,12 @@ describe("Requirements API routes", () => {
 
     // Verify removed from disk
     const prd = readPRDFromMd(rexDir);
-    const task1 = prd.items[0].children[0];
+    const task1 = prd.items[0]!.children![0]!;
     expect(task1.requirements).toBeUndefined();
   });
 
   it("DELETE /api/rex/items/:id/requirements/:reqId returns 404 for unknown requirement", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/items/task-1/requirements/nonexistent`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/task-1/requirements/nonexistent`, {
       method: "DELETE",
     });
     expect(res.status).toBe(404);
@@ -286,7 +287,7 @@ describe("Requirements API routes", () => {
   // ── Coverage endpoint ─────────────────────────────────────────
 
   it("GET /api/rex/requirements/coverage returns coverage stats", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/requirements/coverage`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/requirements/coverage`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -305,7 +306,7 @@ describe("Requirements API routes", () => {
   // ── Traceability endpoint ─────────────────────────────────────
 
   it("GET /api/rex/requirements/traceability returns traceability matrix", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/requirements/traceability`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/requirements/traceability`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -328,7 +329,7 @@ describe("Requirements API routes", () => {
   // ── Dashboard requirements summary ────────────────────────────
 
   it("GET /api/rex/dashboard includes requirements summary", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/dashboard`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/dashboard`);
     expect(res.status).toBe(200);
     const data = await res.json();
 

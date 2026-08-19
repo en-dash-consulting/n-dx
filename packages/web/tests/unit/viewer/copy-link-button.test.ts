@@ -12,7 +12,7 @@ function renderToDiv(vnode: ReturnType<typeof h>) {
 // ── buildShareableUrl ───────────────────────────────────────────────
 
 describe("buildShareableUrl", () => {
-  // jsdom origin includes port: http://localhost:3000
+  // jsdom origin includes port: http://127.0.0.1:3000
   const origin = window.location.origin;
 
   it("builds full URL from path with current origin", () => {

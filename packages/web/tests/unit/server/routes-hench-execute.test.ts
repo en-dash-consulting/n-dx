@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleHenchRoute } from "../../../src/server/routes-hench.js";
-import { startRouteTestServer } from "../../helpers/server-route-test-support.js";
+import { handleHenchRoute, resetHenchRouteStateForTests, shutdownActiveExecutions } from "../../../src/server/routes-hench.js";
+import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal PRD document for testing. */
 function makePRD(items: Array<Record<string, unknown>> = []): Record<string, unknown> {
@@ -33,6 +33,7 @@ describe("POST /api/hench/execute", () => {
   let port: number;
 
   beforeEach(async () => {
+    resetHenchRouteStateForTests();
     tmpDir = await mkdtemp(join(tmpdir(), "hench-execute-api-"));
     rexDir = join(tmpDir, ".rex");
     henchDir = join(tmpDir, ".hench");
@@ -53,12 +54,15 @@ describe("POST /api/hench/execute", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
+    // Terminate any spawned hench processes before removing tmpDir.
+    // On Windows, an active child process holds a CWD lock causing EBUSY.
+    await shutdownActiveExecutions(500).catch(() => {});
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("rejects request without taskId", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -70,7 +74,7 @@ describe("POST /api/hench/execute", () => {
   });
 
   it("rejects invalid JSON", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "not-json",
@@ -83,7 +87,7 @@ describe("POST /api/hench/execute", () => {
 
   it("returns 404 when PRD not found", async () => {
     // No PRD file exists
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "nonexistent" }),
@@ -102,7 +106,7 @@ describe("POST /api/hench/execute", () => {
       ]), null, 2),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "nonexistent-id" }),
@@ -121,7 +125,7 @@ describe("POST /api/hench/execute", () => {
       ]), null, 2),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-1" }),
@@ -141,7 +145,7 @@ describe("POST /api/hench/execute", () => {
       ]), null, 2),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-1" }),
@@ -152,7 +156,9 @@ describe("POST /api/hench/execute", () => {
     expect(body.error).toContain("in_progress");
   });
 
-  it("rejects deferred task with 409", async () => {
+  it("accepts deferred task and returns 202", async () => {
+    // Deferred tasks are executable: the route passes --reset-deferred to hench
+    // so the task is reset to pending before the run starts.
     await writeFile(
       join(rexDir, "prd.json"),
       JSON.stringify(makePRD([
@@ -160,12 +166,16 @@ describe("POST /api/hench/execute", () => {
       ]), null, 2),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-1" }),
     });
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(202);
+
+    const body = await res.json();
+    expect(body.taskId).toBe("task-1");
+    expect(body.status).toBe("started");
   });
 
   it("finds nested tasks in PRD tree", async () => {
@@ -193,7 +203,7 @@ describe("POST /api/hench/execute", () => {
     );
 
     // Task should be found but rejected because it's completed
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-deep" }),
@@ -214,7 +224,7 @@ describe("POST /api/hench/execute", () => {
       ]), null, 2),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-1" }),
@@ -236,7 +246,7 @@ describe("POST /api/hench/execute", () => {
       ]), null, 2),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-blocked" }),
@@ -258,6 +268,7 @@ describe("GET /api/hench/execute/status", () => {
   let port: number;
 
   beforeEach(async () => {
+    resetHenchRouteStateForTests();
     tmpDir = await mkdtemp(join(tmpdir(), "hench-exec-status-"));
     rexDir = join(tmpDir, ".rex");
     henchDir = join(tmpDir, ".hench");
@@ -278,12 +289,12 @@ describe("GET /api/hench/execute/status", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("returns null execution for unknown task", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/execute/status/unknown-task`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute/status/unknown-task`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -291,7 +302,7 @@ describe("GET /api/hench/execute/status", () => {
   });
 
   it("returns 200 for status list endpoint", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/execute/status`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute/status`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -310,6 +321,7 @@ describe("broadcast on execute", () => {
   let broadcastFn: (data: unknown) => void;
 
   beforeEach(async () => {
+    resetHenchRouteStateForTests();
     tmpDir = await mkdtemp(join(tmpdir(), "hench-exec-broadcast-"));
     rexDir = join(tmpDir, ".rex");
     henchDir = join(tmpDir, ".hench");
@@ -335,7 +347,7 @@ describe("broadcast on execute", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -347,7 +359,7 @@ describe("broadcast on execute", () => {
       ]), null, 2),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/execute`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId: "task-bc" }),

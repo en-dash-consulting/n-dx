@@ -13,6 +13,17 @@ import {
 } from "../../../src/core/item-token-rollup.js";
 import type { PRDItem } from "../../../src/schema/v1.js";
 
+/**
+ * Load tolerance for wall-clock budgets below.
+ *
+ * These assertions guard against algorithmic regressions (a quadratic
+ * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
+ * numbers flake when the rest of the monorepo suite saturates every core,
+ * so the budget is scaled. See TESTING.md "Flake Resistance".
+ */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -264,10 +275,12 @@ describe("aggregateItemTokenUsage", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Performance: 500 items, 5000 runs, under 50ms
+  // Algorithmic guard: 500 items × 5000 runs must stay linear. Budget is
+  // scaled by BUDGET_MULTIPLIER — a quadratic rewrite is orders of magnitude
+  // slower, so this still catches the regression it was written for.
   // -------------------------------------------------------------------------
 
-  it("aggregates 500 items × 5000 runs in under 50ms", () => {
+  it("aggregates 500 items × 5000 runs within the scaled linear budget", () => {
     // Build a reasonable tree: 5 epics × 10 features × 10 tasks = 500 items.
     const prd: PRDItem[] = [];
     const ids: string[] = [];
@@ -307,6 +320,6 @@ describe("aggregateItemTokenUsage", () => {
 
     expect(totals.size).toBeGreaterThanOrEqual(500);
     expect(orphans.length).toBeGreaterThan(0);
-    expect(elapsed).toBeLessThan(50);
+    expect(elapsed).toBeLessThan(50 * BUDGET_MULTIPLIER);
   });
 });

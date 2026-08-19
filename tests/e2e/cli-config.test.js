@@ -3,6 +3,7 @@ import { mkdtemp, rm, readFile, writeFile, mkdir, chmod, stat } from "node:fs/pr
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
+import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const isWin = process.platform === "win32";
 
@@ -43,7 +44,7 @@ const LOCAL_CONFIG_PATH = (dir) => join(dir, ".n-dx.local.json");
 function run(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, "config", ...args], {
     encoding: "utf-8",
-    timeout: 10000,
+    timeout: DEFAULT_TIMEOUT,
     ...opts,
   });
 }
@@ -52,7 +53,7 @@ function runFail(args) {
   try {
     execFileSync("node", [CLI_PATH, "config", ...args], {
       encoding: "utf-8",
-      timeout: 10000,
+      timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
     });
     throw new Error("Expected command to fail");
@@ -1059,7 +1060,7 @@ describe("n-dx config", () => {
     function runCapture(args, env) {
       const res = spawnSync("node", [CLI_PATH, "config", ...args], {
         encoding: "utf-8",
-        timeout: 10000,
+        timeout: DEFAULT_TIMEOUT,
         env: env ?? process.env,
       });
       return { stdout: res.stdout ?? "", stderr: res.stderr ?? "", status: res.status };
@@ -1361,7 +1362,7 @@ describe("n-dx config", () => {
       try {
         execFileSync("node", [CLI_PATH, "config", "llm.vendor", vendor, dir], {
           encoding: "utf-8",
-          timeout: 15000,
+          timeout: DEFAULT_TIMEOUT,
           stdio: "pipe",
           env: { ...process.env, ...env },
         });

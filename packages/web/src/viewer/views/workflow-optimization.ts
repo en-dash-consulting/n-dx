@@ -11,6 +11,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
+import { useCliName } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -113,31 +114,31 @@ function StatsOverview({ stats, totalRuns, timeRange }: {
   timeRange: { earliest: string; latest: string } | null;
 }) {
   return h("div", { class: "wf-stats" },
-    h("div", { class: "wf-stats-grid" },
-      h("div", { class: "wf-stat-card" },
-        h("div", { class: "wf-stat-value" }, String(totalRuns)),
-        h("div", { class: "wf-stat-label" }, "Total Runs"),
+    h("div", { class: "stat-grid wf-stats-grid" },
+      h("div", { class: "stat-card" },
+        h("div", { class: "value" }, String(totalRuns)),
+        h("div", { class: "label" }, "Total Runs"),
       ),
-      h("div", { class: `wf-stat-card${stats.successRate < 0.5 ? " wf-stat-warn" : ""}` },
-        h("div", { class: "wf-stat-value" }, formatPercent(stats.successRate)),
-        h("div", { class: "wf-stat-label" }, "Success Rate"),
+      h("div", { class: `stat-card${stats.successRate < 0.5 ? " wf-stat-warn" : ""}` },
+        h("div", { class: "value" }, formatPercent(stats.successRate)),
+        h("div", { class: "label" }, "Success Rate"),
       ),
-      h("div", { class: "wf-stat-card" },
-        h("div", { class: "wf-stat-value" }, stats.avgTurns.toFixed(1)),
-        h("div", { class: "wf-stat-label" }, "Avg Turns"),
+      h("div", { class: "stat-card" },
+        h("div", { class: "value" }, stats.avgTurns.toFixed(1)),
+        h("div", { class: "label" }, "Avg Turns"),
       ),
-      h("div", { class: "wf-stat-card" },
-        h("div", { class: "wf-stat-value" }, formatNumber(stats.avgTokensPerRun)),
-        h("div", { class: "wf-stat-label" }, "Avg Tokens/Run"),
+      h("div", { class: "stat-card" },
+        h("div", { class: "value" }, formatNumber(stats.avgTokensPerRun)),
+        h("div", { class: "label" }, "Avg Tokens/Run"),
       ),
-      h("div", { class: "wf-stat-card" },
-        h("div", { class: "wf-stat-value" }, formatDuration(stats.avgDurationMs)),
-        h("div", { class: "wf-stat-label" }, "Avg Duration"),
+      h("div", { class: "stat-card" },
+        h("div", { class: "value" }, formatDuration(stats.avgDurationMs)),
+        h("div", { class: "label" }, "Avg Duration"),
       ),
       stats.turnLimitHits > 0
-        ? h("div", { class: "wf-stat-card wf-stat-warn" },
-            h("div", { class: "wf-stat-value" }, String(stats.turnLimitHits)),
-            h("div", { class: "wf-stat-label" }, "Turn Limit Hits"),
+        ? h("div", { class: "stat-card wf-stat-warn" },
+            h("div", { class: "value" }, String(stats.turnLimitHits)),
+            h("div", { class: "label" }, "Turn Limit Hits"),
           )
         : null,
     ),
@@ -177,7 +178,7 @@ function PreviewPanel({ diff, onApply, onCancel, applying }: {
 }) {
   return h("div", { class: "wf-preview-panel" },
     h("h4", null, "Preview Changes"),
-    h("table", { class: "wf-preview-table" },
+    h("table", { class: "data-table wf-preview-table" },
       h("thead", null,
         h("tr", null,
           h("th", null, "Setting"),
@@ -195,14 +196,14 @@ function PreviewPanel({ diff, onApply, onCancel, applying }: {
         ),
       ),
     ),
-    h("div", { class: "wf-preview-actions" },
+    h("div", { class: "wf-preview-actions cmd-panel-actions" },
       h("button", {
-        class: "wf-btn wf-btn-primary",
+        class: "cmd-btn cmd-btn-primary",
         onClick: onApply,
         disabled: applying,
       }, applying ? "Applying..." : "Apply Changes"),
       h("button", {
-        class: "wf-btn wf-btn-secondary",
+        class: "cmd-btn cmd-btn-secondary",
         onClick: onCancel,
         disabled: applying,
       }, "Cancel"),
@@ -280,23 +281,23 @@ function SuggestionCard({ suggestion, onPreview, onDecision, decidingId }: {
 
     h("div", { class: "wf-suggestion-actions" },
       h("button", {
-        class: "wf-btn wf-btn-expand",
+        class: "link-btn wf-btn-expand",
         onClick: () => setExpanded(!expanded),
       }, expanded ? "Less" : "Details"),
       suggestion.autoApplicable
         ? h("button", {
-            class: "wf-btn wf-btn-primary",
+            class: "cmd-btn cmd-btn-primary",
             onClick: () => onPreview(suggestion),
             disabled: isDeciding,
           }, "Preview & Apply")
         : null,
       h("button", {
-        class: "wf-btn wf-btn-secondary",
+        class: "cmd-btn cmd-btn-secondary",
         onClick: () => onDecision(suggestion.id, "deferred", suggestion),
         disabled: isDeciding,
       }, "Defer"),
       h("button", {
-        class: "wf-btn wf-btn-reject",
+        class: "cmd-btn cmd-btn-danger wf-btn-reject",
         onClick: () => onDecision(suggestion.id, "rejected", suggestion),
         disabled: isDeciding,
       }, "Dismiss"),
@@ -328,6 +329,7 @@ function DecisionHistoryBar({ history }: {
 // ── Main view ────────────────────────────────────────────────────────
 
 export function WorkflowOptimizationView() {
+  const cliName = useCliName();
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -509,7 +511,7 @@ export function WorkflowOptimizationView() {
         h("p", null, "No run data available for analysis."),
         h("p", { class: "wf-empty-hint" },
           "Execute some tasks with ",
-          h("code", null, "ndx work"),
+          h("code", null, `${cliName} work`),
           " to generate workflow data.",
         ),
       ),
@@ -517,9 +519,9 @@ export function WorkflowOptimizationView() {
   }
 
   return h("div", { class: "wf-container" },
-    h("div", { class: "wf-header" },
+    h("div", { class: "wf-header view-header" },
       h(BrandedHeader, { product: "hench", title: "Workflow Optimization" }),
-      h("p", { class: "wf-subtitle" },
+      h("p", { class: "section-sub wf-subtitle" },
         "Analyzes your agent execution history to identify bottlenecks and suggest optimizations.",
       ),
     ),
@@ -542,7 +544,7 @@ export function WorkflowOptimizationView() {
         ),
         categories.length > 1
           ? h("select", {
-              class: "wf-category-filter",
+              class: "filter-select wf-category-filter",
               value: filterCategory,
               onChange: (e: Event) => setFilterCategory((e.target as HTMLSelectElement).value),
             },

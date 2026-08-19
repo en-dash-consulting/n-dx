@@ -580,6 +580,39 @@ async function runGoogleApiPreflight(llmConfig) {
 }
 
 /**
+ * Check reachability of a local LM Studio (or compatible) server.
+ */
+async function runLocalApiPreflight(llmConfig) {
+  const host = llmConfig?.local?.host || "localhost";
+  const port = llmConfig?.local?.port || 1234;
+  const baseUrl = `http://${host}:${port}/v1`;
+
+  try {
+    const resp = await fetch(`${baseUrl}/models`, {
+      method: "GET",
+      signal: AbortSignal.timeout(5000),
+    });
+    if (resp.ok) {
+      return { ok: true, vendor: "local" };
+    }
+    return {
+      ok: false,
+      vendor: "local",
+      detail: `Local server at ${baseUrl} returned HTTP ${resp.status}. Ensure LM Studio (or your local server) is running.`,
+      errorCode: "NDX_LOCAL_PREFLIGHT_HTTP_ERROR",
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      vendor: "local",
+      detail: `Cannot connect to local server at ${baseUrl}. ` +
+        `Start LM Studio and enable "Local Server" in the Developer tab, then try again.`,
+      errorCode: "NDX_LOCAL_PREFLIGHT_CONNECT_ERROR",
+    };
+  }
+}
+
+/**
  * Validate claude.api_endpoint: check the URL is well-formed.
  * Throws with a helpful message on failure.
  */
@@ -756,9 +789,9 @@ const CLAUDE_VALIDATORS = {
  * Validate llm.vendor.
  */
 function validateLLMVendor(value) {
-  if (value !== "claude" && value !== "codex" && value !== "google") {
+  if (value !== "claude" && value !== "codex" && value !== "google" && value !== "local") {
     throw new Error(
-      `Invalid vendor "${value}". Expected one of: claude, codex, google.`,
+      `Invalid vendor "${value}". Expected one of: claude, codex, google, local.`,
     );
   }
 }
@@ -791,6 +824,20 @@ const LLM_VALIDATORS = {
   "google.model": validateGoogleModel,
   "google.lightModel": validateGoogleLightModel,
   "google.apiKeyEnv": validateGoogleApiKeyEnv,
+  // local — LM Studio / OpenAI-compatible local server
+  "local.host": (v) => {
+    if (typeof v !== "string" || !v.trim()) {
+      throw new Error(`Invalid local.host "${v}". Expected a non-empty hostname.`);
+    }
+  },
+  "local.port": (v) => {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 1 || n > 65535) {
+      throw new Error(`Invalid local.port "${v}". Expected an integer between 1 and 65535.`);
+    }
+  },
+  "local.model": validateModel,
+  "local.lightModel": validateModel,
   autoFailover: validateAutoFailover,
 };
 
@@ -827,6 +874,10 @@ function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
 async function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
   if (vendor === "google") {
     return runGoogleApiPreflight(llmConfig);
+  }
+
+  if (vendor === "local") {
+    return runLocalApiPreflight(llmConfig);
   }
 
   const { binary, args } = getVendorAuthPreflightCommand(
@@ -1043,6 +1094,21 @@ async function printVendorPreflightFailure(
     return;
   }
 
+  // Local vendor: server connectivity failure — guide user to start their
+  // local server rather than suggesting a login command.
+  if (vendor === "local") {
+    const host = llmConfig?.local?.host || "localhost";
+    const port = llmConfig?.local?.port || 1234;
+    console.error(red(`✗ Cannot reach local LLM server at http://${host}:${port}.`));
+    if (preflight.detail && !looksLikeJson(preflight.detail)) {
+      console.error(`  ${preflight.detail}`);
+    }
+    console.error(yellow("  Start LM Studio (or Ollama) and enable its local server, then retry."));
+    console.error(yellow(`  LM Studio: Developer tab → "Start Server". Ollama: 'ollama serve'.`));
+    console.error(yellow(`  Configure host/port: ndx config llm.local.host <host> / ndx config llm.local.port <port>`));
+    return;
+  }
+
   if (vendor !== "claude") {
     // codex (or other CLI vendor) non-auth launch failure.
     const loginCommand = getVendorLoginCommand(
@@ -1216,7 +1282,7 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     Example: claude-haiku-4-5
 
 LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendor setup):
-  llm.vendor               string    Active LLM vendor: "claude", "codex", or "google"
+  llm.vendor               string    Active LLM vendor: "claude", "codex", "google", or "local"
                                     Required for multi-vendor workflows.
   llm.claude.cli_path      string    Claude CLI path (optional; validated executable)
                                     Stored in .n-dx.local.json.
@@ -1250,10 +1316,20 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     Known models: gemini-2.0-flash (light),
                                     gemini-2.5-flash (standard), gemini-2.5-pro (heavy)
                                     Validation: rejects non-Gemini model IDs (e.g. "gpt-4o")
+  llm.local.host           string    Hostname of the local LM Studio server (default: localhost)
+  llm.local.port           number    Port of the local LM Studio server (default: 1234)
+  llm.local.model          string    Model ID to request from the local server (optional)
+                                    Leave unset to use whichever model is currently loaded
+                                    in LM Studio.
+  llm.local.lightModel     string    Local model for light-weight tasks (optional)
   llm.autoFailover         boolean   Enable automatic model/vendor failover on errors (default: false)
                                     When true, hench retries failed runs on fallback models
                                     before surfacing the original error. Disabled by default
                                     to preserve existing behavior.
+
+Local server preflight error codes:
+  NDX_LOCAL_PREFLIGHT_HTTP_ERROR     Server is reachable but returned a non-200 response
+  NDX_LOCAL_PREFLIGHT_CONNECT_ERROR  Cannot connect to the local server
 
 Claude preflight error codes:
   NDX_CLAUDE_PREFLIGHT_NOT_INSTALLED  Claude CLI is not installed; install it before retrying
@@ -1287,6 +1363,14 @@ Sourcevision zone overrides (.n-dx.json):
                            number    Min zone size for small-zone merge (default: 3)
 
 CLI settings (.n-dx.json):
+  cli.name                 string    The project's installed CLI command name.
+                                     Auto-detected from the package.json bin field
+                                     by ndx init (first bin key, or the package name
+                                     for a string bin). Defaults to "n-dx" when no
+                                     bin field exists. Set manually to override
+                                     detection — a set value is never overwritten
+                                     by ndx init.
+                                     Example: n-dx config cli.name myapp
   cli.claudePath           string    Path to the Claude Code CLI binary (optional).
                                      Overrides all discovery heuristics (PATH, nvm,
                                      Homebrew, etc.). Set this when claude is installed
@@ -1397,6 +1481,10 @@ Examples:
   n-dx config llm.vendor claude                Set active LLM vendor to Claude
   n-dx config llm.vendor codex                 Set active LLM vendor to Codex
   n-dx config llm.vendor google                Set active LLM vendor to Google (Gemini)
+  n-dx config llm.vendor local                 Set active LLM vendor to local (LM Studio)
+  n-dx config llm.local.host 192.168.1.10      Set local server host (default: localhost)
+  n-dx config llm.local.port 1234             Set local server port (default: 1234)
+  n-dx config llm.local.model qwen2.5-14b     Set local model ID (optional)
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
   n-dx config llm.claude.model claude-opus-4-20250514
                                                Set Claude model (llm namespace)
@@ -1625,6 +1713,19 @@ async function runLLMVendorPreflight(coerced, configs, soft = false) {
       ? configs.claude
       : undefined;
 
+  // Local vendor requires a running HTTP server. During soft-preflight (used
+  // by `ndx init` and `ndx config llm.vendor local`), skip the connectivity
+  // check — the server doesn't need to be running at config time, only at
+  // execution time. Print an info line reminding the user to start it before
+  // `ndx work`.
+  if (coerced === "local" && soft) {
+    const { dim } = await import("./cli-brand.js");
+    const host = llmForPreflight?.local?.host || "localhost";
+    const port = llmForPreflight?.local?.port || 1234;
+    console.error(dim(`  Local vendor configured. Start your local server at http://${host}:${port} before running 'ndx work'.`));
+    return;
+  }
+
   const preflight = await runVendorAuthPreflight(
     coerced,
     llmForPreflight,
@@ -1746,6 +1847,25 @@ async function handleSetProjectSection(
   // Print warnings for cleared models
   for (const warning of warningMessages) {
     console.log(`  ⚠ ${warning.split("\n").join("\n  ")}`);
+  }
+
+  // Cascade: local and google vendors require API mode — no CLI binary exists.
+  // Automatically persist hench.provider=api so `ndx work` never emits the
+  // "vendor=local requires API mode — To persist: ndx config hench.provider api" hint.
+  if (pkg === "llm" && settingPath === "vendor" && (coerced === "local" || coerced === "google")) {
+    const henchConfigPath = join(dir, ".hench", "config.json");
+    try {
+      if (await fileExists(henchConfigPath)) {
+        const henchConfig = await loadJSON(henchConfigPath);
+        if (henchConfig.provider !== "api") {
+          henchConfig.provider = "api";
+          await saveJSON(henchConfigPath, henchConfig);
+          console.log(`  → hench.provider = "api"  (${coerced} vendor requires API mode)`);
+        }
+      }
+    } catch {
+      // Best-effort — don't block the vendor write if hench config is missing or invalid.
+    }
   }
 }
 

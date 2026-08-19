@@ -20,6 +20,7 @@ import {
   DATA_FILES,
   generateContext,
   deriveNextSteps,
+  setArchetypeOverride,
   SV_DIR,
   TOOL_VERSION,
 } from "./sourcevision-core.js";
@@ -129,28 +130,6 @@ function createMcpContext(targetDir: string): McpContext {
       cachedMtime = 0;
     },
   };
-}
-
-function setArchetypeOverride(absDir: string, path: string, archetype: string): void {
-  const configPath = join(absDir, ".n-dx.json");
-  let config: Record<string, unknown> = {};
-  if (existsSync(configPath)) {
-    try {
-      config = JSON.parse(readFileSync(configPath, "utf-8"));
-    } catch {
-      // Start fresh if corrupted
-    }
-  }
-
-  if (!config.sourcevision) config.sourcevision = {};
-  const sv = config.sourcevision as Record<string, unknown>;
-  if (!sv.archetypes) sv.archetypes = {};
-  const archetypes = sv.archetypes as Record<string, unknown>;
-  if (!archetypes.overrides) archetypes.overrides = {};
-  const overrides = archetypes.overrides as Record<string, string>;
-  overrides[path] = archetype;
-
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 }
 
 // ── Tool registration groups ─────────────────────────────────────────

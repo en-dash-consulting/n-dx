@@ -78,7 +78,7 @@ export function assertSchemaVersion(doc: { schema?: string }): void {
 
 export type ItemLevel = "epic" | "feature" | "task" | "subtask";
 
-export type ItemStatus = "pending" | "in_progress" | "completed" | "failing" | "deferred" | "blocked" | "deleted";
+export type ItemStatus = "pending" | "in_progress" | "completed" | "failing" | "deferred" | "blocked" | "cancelled" | "deleted";
 
 export type Priority = "critical" | "high" | "medium" | "low";
 
@@ -520,6 +520,7 @@ export const VALID_STATUSES = new Set<ItemStatus>([
   "failing",
   "deferred",
   "blocked",
+  "cancelled",
   "deleted",
 ]);
 

@@ -20,15 +20,14 @@ import {
   removeTmpDir,
   setupRexDir,
   setupSourcevisionDir,
-  CLI_PATH,
-} from "./e2e-helpers.js";
+  CLI_PATH, DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 /** Run an ndx command and return { stdout, stderr, code }. */
 function runResult(args, opts = {}) {
   try {
     const stdout = execFileSync("node", [CLI_PATH, ...args], {
       encoding: "utf-8",
-      timeout: 15000,
+      timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
       ...opts,
     });

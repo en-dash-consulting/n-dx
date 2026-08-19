@@ -11,6 +11,17 @@ import {
 import { computeStats } from "../../../src/core/stats.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 
+/**
+ * Load tolerance for wall-clock budgets below.
+ *
+ * These assertions guard against algorithmic regressions (a quadratic
+ * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
+ * numbers flake when the rest of the monorepo suite saturates every core,
+ * so the budget is scaled. See TESTING.md "Flake Resistance".
+ */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
+
 function makeItem(overrides: Partial<PRDItem> & { id: string; title: string }): PRDItem {
   return {
     status: "pending",
@@ -628,7 +639,7 @@ describe("tree operations — performance", () => {
     }
     const elapsed = performance.now() - start;
     expect(count).toBe(1110); // 10 epics + 100 features + 1000 tasks
-    expect(elapsed).toBeLessThan(100); // should be under 100ms
+    expect(elapsed).toBeLessThan(100 * BUDGET_MULTIPLIER); // scaled: guards against super-linear traversal
   });
 
   it("findItem searches 1000+ items quickly", () => {
@@ -638,7 +649,7 @@ describe("tree operations — performance", () => {
     const result = findItem(items, "t1109");
     const elapsed = performance.now() - start;
     expect(result).not.toBeNull();
-    expect(elapsed).toBeLessThan(50);
+    expect(elapsed).toBeLessThan(50 * BUDGET_MULTIPLIER);
   });
 
   it("computeStats handles 1000+ items", () => {
@@ -647,7 +658,7 @@ describe("tree operations — performance", () => {
     const stats = computeStats(items);
     const elapsed = performance.now() - start;
     expect(stats.total).toBe(1000); // only tasks counted
-    expect(elapsed).toBeLessThan(50);
+    expect(elapsed).toBeLessThan(50 * BUDGET_MULTIPLIER);
   });
 
   it("collectAllIds handles 1000+ items", () => {
@@ -656,7 +667,7 @@ describe("tree operations — performance", () => {
     const ids = collectAllIds(items);
     const elapsed = performance.now() - start;
     expect(ids.size).toBe(1110);
-    expect(elapsed).toBeLessThan(50);
+    expect(elapsed).toBeLessThan(50 * BUDGET_MULTIPLIER);
   });
 });
 

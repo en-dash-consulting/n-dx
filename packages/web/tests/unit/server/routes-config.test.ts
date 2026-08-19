@@ -8,6 +8,7 @@ import {
   handleConfigRoute,
   clearConfigCaches,
 } from "../../../src/server/routes-config.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Start a test server that only runs config routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
@@ -18,7 +19,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -49,7 +50,7 @@ describe("Config API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(parentDir, { recursive: true, force: true });
   });
 
@@ -57,7 +58,7 @@ describe("Config API routes", () => {
 
   describe("GET /api/ndx-config", () => {
     it("returns default config when no config files exist", async () => {
-      const res = await fetch(`http://localhost:${port}/api/ndx-config`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toContain("application/json");
 
@@ -79,7 +80,7 @@ describe("Config API routes", () => {
       );
 
       clearConfigCaches();
-      const res = await fetch(`http://localhost:${port}/api/ndx-config`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
       const data = await res.json();
 
       expect(data.model).toBe("sonnet");
@@ -102,7 +103,7 @@ describe("Config API routes", () => {
       );
 
       clearConfigCaches();
-      const res = await fetch(`http://localhost:${port}/api/ndx-config`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
       const data = await res.json();
 
       expect(data.model).toBe("claude-opus-4-20250514");
@@ -115,7 +116,7 @@ describe("Config API routes", () => {
       );
 
       clearConfigCaches();
-      const res = await fetch(`http://localhost:${port}/api/ndx-config`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
       const data = await res.json();
 
       expect(data.authMethod).toBe("api-key");
@@ -130,7 +131,7 @@ describe("Config API routes", () => {
       );
 
       clearConfigCaches();
-      const res = await fetch(`http://localhost:${port}/api/ndx-config`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
       const data = await res.json();
 
       expect(data.authMethod).toBe("cli");
@@ -143,7 +144,7 @@ describe("Config API routes", () => {
       );
 
       clearConfigCaches();
-      const res = await fetch(`http://localhost:${port}/api/ndx-config`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
       const data = await res.json();
 
       expect(data.authMethod).toBe("cli");
@@ -156,18 +157,18 @@ describe("Config API routes", () => {
       );
 
       clearConfigCaches();
-      const res = await fetch(`http://localhost:${port}/api/ndx-config`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
       const data = await res.json();
 
       expect(data.projectName).toBe("my-project");
     });
 
     it("uses caching", async () => {
-      const res1 = await fetch(`http://localhost:${port}/api/ndx-config`);
+      const res1 = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
       expect(res1.status).toBe(200);
 
       // Second request should use cache (no need to clear)
-      const res2 = await fetch(`http://localhost:${port}/api/ndx-config`);
+      const res2 = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
       expect(res2.status).toBe(200);
     });
   });
@@ -176,7 +177,7 @@ describe("Config API routes", () => {
 
   describe("GET /api/projects", () => {
     it("returns the active project", async () => {
-      const res = await fetch(`http://localhost:${port}/api/projects`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/projects`);
       expect(res.status).toBe(200);
 
       const data = await res.json();
@@ -202,7 +203,7 @@ describe("Config API routes", () => {
 
       try {
         clearConfigCaches();
-        const res = await fetch(`http://localhost:${port}/api/projects`);
+        const res = await fetch(`http://127.0.0.1:${port}/api/projects`);
         const data = await res.json();
 
         const sibling = data.find((p: { name: string }) => p.name === "sibling-project");
@@ -215,7 +216,7 @@ describe("Config API routes", () => {
     });
 
     it("active project is always first", async () => {
-      const res = await fetch(`http://localhost:${port}/api/projects`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/projects`);
       const data = await res.json();
 
       if (data.length > 0) {
@@ -227,12 +228,12 @@ describe("Config API routes", () => {
   // ── Non-matching routes ──────────────────────────────────────────────
 
   it("returns 404 for unrelated routes", async () => {
-    const res = await fetch(`http://localhost:${port}/api/other`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/other`);
     expect(res.status).toBe(404);
   });
 
   it("returns 404 for POST to /api/ndx-config", async () => {
-    const res = await fetch(`http://localhost:${port}/api/ndx-config`, { method: "POST" });
+    const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`, { method: "POST" });
     expect(res.status).toBe(404);
   });
 });

@@ -1069,6 +1069,7 @@ describe("assembleTaskBrief — context assembly", () => {
       name: "test-project",
       validateCommand: "npm run typecheck",
       testCommand: "npm test",
+      cliName: "n-dx",
     });
   });
 

@@ -128,3 +128,29 @@ describe("classifyPrMarkdownError", () => {
     expect(result).toContain("sourcevision analyze");
   });
 });
+
+// ── --target-pass parsing ─────────────────────────────────────────────
+
+import { parseTargetPass } from "../../../src/cli/commands/analyze.js";
+import { CLIError } from "../../../src/cli/errors.js";
+
+describe("parseTargetPass", () => {
+  it("returns undefined when the flag is absent", () => {
+    expect(parseTargetPass([])).toBeUndefined();
+    expect(parseTargetPass(["--full", "--fast"])).toBeUndefined();
+  });
+
+  it("parses valid targets 2 through 4", () => {
+    expect(parseTargetPass(["--target-pass=2"])).toBe(2);
+    expect(parseTargetPass(["--target-pass=3"])).toBe(3);
+    expect(parseTargetPass(["--target-pass=4"])).toBe(4);
+  });
+
+  it("rejects out-of-range and non-integer values", () => {
+    expect(() => parseTargetPass(["--target-pass=1"])).toThrow(CLIError);
+    expect(() => parseTargetPass(["--target-pass=5"])).toThrow(CLIError);
+    expect(() => parseTargetPass(["--target-pass=2.5"])).toThrow(CLIError);
+    expect(() => parseTargetPass(["--target-pass=abc"])).toThrow(CLIError);
+    expect(() => parseTargetPass(["--target-pass="])).toThrow(CLIError);
+  });
+});
