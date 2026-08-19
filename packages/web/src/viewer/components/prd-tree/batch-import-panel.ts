@@ -358,13 +358,13 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
       // Action buttons
       h("div", { class: "smart-add-actions" },
         h("button", {
-          class: "smart-add-btn smart-add-btn-review",
+          class: "cmd-btn cmd-btn-secondary smart-add-btn-review",
           onClick: () => setEditing(true),
           disabled: accepting,
           type: "button",
         }, "\u270E Review & Edit"),
         h("button", {
-          class: "smart-add-btn smart-add-btn-accept",
+          class: "cmd-btn cmd-btn-primary smart-add-btn-accept",
           onClick: handleAccept,
           disabled: accepting,
           type: "button",
@@ -373,7 +373,7 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
           : `Accept All (${proposals.length + featureCount + taskCount} items)`,
         ),
         h("button", {
-          class: "smart-add-btn smart-add-btn-review",
+          class: "cmd-btn cmd-btn-secondary smart-add-btn-review",
           onClick: () => {
             setProposals([]);
             setConfidence(0);
@@ -524,7 +524,7 @@ export function BatchImportPanel({ onPrdChanged }: BatchImportPanelProps) {
     validCount > 0 && state !== "processing"
       ? h("div", { class: "batch-import-process" },
           h("button", {
-            class: "smart-add-btn smart-add-btn-accept batch-import-process-btn",
+            class: "cmd-btn cmd-btn-primary smart-add-btn-accept batch-import-process-btn",
             onClick: processItems,
             type: "button",
           }, `Process ${validCount} Item${validCount !== 1 ? "s" : ""}`),

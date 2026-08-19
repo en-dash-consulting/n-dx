@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { invalidateAuthCheckCache } from "./routes-commands.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -509,6 +510,9 @@ export async function handleLlmRoute(
       }
 
       writeNdxConfig(ctx.projectDir, config);
+      // The credential check's answer depends on this config — drop the
+      // cached result so the auth chip re-verifies against the new settings.
+      invalidateAuthCheckCache();
       jsonResponse(res, 200, { applied, config: extractLlmConfig(ctx.projectDir) });
       return true;
     } catch (err) {

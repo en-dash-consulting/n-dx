@@ -82,8 +82,8 @@ describe("token usage sidebar navigation", () => {
     expect(tokenUsageItem?.classList.contains("active")).toBe(true);
     expect(tokenUsageItem?.getAttribute("aria-current")).toBe("page");
     expect(settingsItem?.classList.contains("active")).toBe(false);
-    expect(sectionHeaders[3].getAttribute("aria-expanded")).toBe("true");
-    expect(sectionHeaders[4].getAttribute("aria-expanded")).toBe("false");
+    expect(sectionHeaders[4].getAttribute("aria-expanded")).toBe("true"); // TOKEN USAGE
+    expect(sectionHeaders[5].getAttribute("aria-expanded")).toBe("false"); // SETTINGS
   });
 
   it("keeps Token Usage highlighted after in-app navigation from Settings", () => {
@@ -117,7 +117,7 @@ describe("token usage sidebar navigation", () => {
     const sectionHeaders = root.querySelectorAll<HTMLElement>(".nav-section-header");
     expect(tokenUsageItem?.classList.contains("active")).toBe(true);
     expect(settingsItem?.classList.contains("active")).toBe(false);
-    expect(sectionHeaders[3].getAttribute("aria-expanded")).toBe("true");
-    expect(sectionHeaders[4].getAttribute("aria-expanded")).toBe("false");
+    expect(sectionHeaders[4].getAttribute("aria-expanded")).toBe("true"); // TOKEN USAGE
+    expect(sectionHeaders[5].getAttribute("aria-expanded")).toBe("false"); // SETTINGS
   });
 });

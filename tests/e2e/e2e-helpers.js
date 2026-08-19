@@ -22,8 +22,19 @@ import { tmpdir } from "node:os";
 /** Path to the main n-dx CLI entry point. */
 export const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 
-/** Default timeout for CLI commands (ms). */
-export const DEFAULT_TIMEOUT = 10000;
+/**
+ * Default timeout for CLI commands (ms).
+ *
+ * This is a hang guardrail, not an assertion surface: every command here is
+ * expected to finish. The budget must cover a cold Node start plus the
+ * sub-CLIs an orchestration command spawns (`n-dx ci` runs sourcevision
+ * analyze and rex validate), and it has to hold while the rest of the
+ * monorepo suite saturates the machine. At 10s it did not — spawns were
+ * SIGTERMed and the assertion then compared exit code 143 against the real
+ * expectation, which looked like a product failure. Override with
+ * NDX_E2E_TIMEOUT_MS on unusually slow hardware.
+ */
+export const DEFAULT_TIMEOUT = Number(process.env["NDX_E2E_TIMEOUT_MS"] ?? 45000);
 
 // ---------------------------------------------------------------------------
 // CLI execution helpers

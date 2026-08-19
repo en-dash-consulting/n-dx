@@ -33,6 +33,7 @@ import {
   runCallGraphPhase,
   PhasePrerequsiteError,
   PhaseError,
+  MAX_ENRICHMENT_PASS,
 } from "./analyze-phases.js";
 import type { AnalyzeContext } from "./analyze-phases.js";
 import { generatePrMarkdownFile } from "./pr-markdown.js";
@@ -42,6 +43,25 @@ type PhaseFilter =
   | { type: "all" }
   | { type: "phase"; phase: number }
   | { type: "only"; module: string };
+
+/**
+ * Parse `--target-pass=<N>` from CLI args. Returns undefined when absent.
+ * A plain analyze run already reaches pass 1 and `--full` runs to pass
+ * MAX_ENRICHMENT_PASS, so only 2–MAX_ENRICHMENT_PASS are meaningful targets.
+ */
+export function parseTargetPass(extraArgs: string[]): number | undefined {
+  const arg = extraArgs.find((a) => a.startsWith("--target-pass="));
+  if (!arg) return undefined;
+  const raw = arg.slice("--target-pass=".length);
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 2 || value > MAX_ENRICHMENT_PASS) {
+    throw new CLIError(
+      `Invalid --target-pass value: ${raw}`,
+      `Use an integer between 2 and ${MAX_ENRICHMENT_PASS} (a plain analyze run reaches pass 1; --full runs to pass ${MAX_ENRICHMENT_PASS}).`,
+    );
+  }
+  return value;
+}
 
 const UNKNOWN_PROVIDER_METADATA = "unknown";
 
@@ -232,6 +252,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
     svDir,
     fullMode: extraArgs.includes("--full"),
     fastMode: extraArgs.includes("--fast"),
+    targetPass: parseTargetPass(extraArgs),
     tokenUsage: emptyAnalyzeTokenUsage(),
     inventoryResult: null,
   };

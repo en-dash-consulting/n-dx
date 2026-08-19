@@ -18,6 +18,7 @@ import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
+import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 
@@ -51,7 +52,7 @@ function runTool(toolPath, args) {
   try {
     const stdout = execFileSync("node", [toolPath, ...args], {
       encoding: "utf-8",
-      timeout: 10000,
+      timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
     });
     return { stdout, stderr: "", code: 0 };

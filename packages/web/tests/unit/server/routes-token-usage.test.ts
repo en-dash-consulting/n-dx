@@ -6,6 +6,7 @@ import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleTokenUsageRoute, resetAggregationCache } from "../../../src/server/routes-token-usage.js";
 import { readRunTokensFromHench } from "@n-dx/rex";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Create a hench run record with token usage. */
 function makeRun(
@@ -67,7 +68,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -147,13 +148,13 @@ describe("Token Usage API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     resetAggregationCache();
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("GET /api/token/summary returns aggregate usage with cost", async () => {
-    const res = await fetch(`http://localhost:${port}/api/token/summary`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/summary`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -173,7 +174,7 @@ describe("Token Usage API routes", () => {
 
   it("GET /api/token/summary respects since/until filters", async () => {
     const since = "2026-02-03T00:00:00.000Z";
-    const res = await fetch(`http://localhost:${port}/api/token/summary?since=${since}`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/summary?since=${since}`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -185,7 +186,7 @@ describe("Token Usage API routes", () => {
   });
 
   it("GET /api/token/events returns all events sorted by time", async () => {
-    const res = await fetch(`http://localhost:${port}/api/token/events`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/events`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -198,7 +199,7 @@ describe("Token Usage API routes", () => {
   });
 
   it("GET /api/token/events filters by package", async () => {
-    const res = await fetch(`http://localhost:${port}/api/token/events?package=hench`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/events?package=hench`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -207,7 +208,7 @@ describe("Token Usage API routes", () => {
   });
 
   it("GET /api/token/by-command returns command breakdown", async () => {
-    const res = await fetch(`http://localhost:${port}/api/token/by-command`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/by-command`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -230,7 +231,7 @@ describe("Token Usage API routes", () => {
   });
 
   it("GET /api/token/by-period groups by day", async () => {
-    const res = await fetch(`http://localhost:${port}/api/token/by-period?period=day`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/by-period?period=day`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -251,13 +252,13 @@ describe("Token Usage API routes", () => {
   });
 
   it("GET /api/token/by-period supports week and month groupings", async () => {
-    const weekRes = await fetch(`http://localhost:${port}/api/token/by-period?period=week`);
+    const weekRes = await fetch(`http://127.0.0.1:${port}/api/token/by-period?period=week`);
     expect(weekRes.status).toBe(200);
     const weekData = await weekRes.json();
     expect(weekData.period).toBe("week");
     expect(weekData.buckets.length).toBeGreaterThan(0);
 
-    const monthRes = await fetch(`http://localhost:${port}/api/token/by-period?period=month`);
+    const monthRes = await fetch(`http://127.0.0.1:${port}/api/token/by-period?period=month`);
     expect(monthRes.status).toBe(200);
     const monthData = await monthRes.json();
     expect(monthData.period).toBe("month");
@@ -266,14 +267,14 @@ describe("Token Usage API routes", () => {
   });
 
   it("GET /api/token/by-period rejects invalid period", async () => {
-    const res = await fetch(`http://localhost:${port}/api/token/by-period?period=quarter`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/by-period?period=quarter`);
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toContain("Invalid period");
   });
 
   it("GET /api/token/budget returns ok when no budget configured", async () => {
-    const res = await fetch(`http://localhost:${port}/api/token/budget`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/budget`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -289,7 +290,7 @@ describe("Token Usage API routes", () => {
       JSON.stringify({ budget: { tokens: 100, warnAt: 80 } }),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/token/budget`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/budget`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -307,7 +308,7 @@ describe("Token Usage API routes", () => {
       JSON.stringify({ budget: { tokens: 25000, warnAt: 80 } }),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/token/budget`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/budget`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -327,7 +328,7 @@ describe("Token Usage API routes", () => {
       }),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/token/utilization?period=day&since=2026-02-03T00:00:00.000Z`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/utilization?period=day&since=2026-02-03T00:00:00.000Z`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -380,7 +381,7 @@ describe("Token Usage API routes", () => {
       }),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/token/utilization?since=2026-02-03T00:00:00.000Z`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/utilization?since=2026-02-03T00:00:00.000Z`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -423,7 +424,7 @@ describe("Token Usage API routes", () => {
       }),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/token/utilization`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/utilization`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -459,7 +460,7 @@ describe("Token Usage API routes", () => {
       }),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/token/utilization`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/utilization`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -520,7 +521,7 @@ describe("Token Usage API routes", () => {
       }),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/token/utilization`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/utilization`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -553,7 +554,7 @@ describe("Token Usage API routes", () => {
       }),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/token/events?package=sv`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/events?package=sv`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -572,7 +573,7 @@ describe("Token Usage API routes", () => {
       })),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/token/summary`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/summary`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -596,7 +597,7 @@ describe("Token Usage API routes", () => {
       })),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/token/summary`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/summary`);
     const data = await res.json();
 
     // Per-turn cache sums across turns: 500+0=500 creation, 1000+1000=2000 read.
@@ -617,7 +618,7 @@ describe("Token Usage API routes", () => {
       })),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/token/summary`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/summary`);
     const data = await res.json();
 
     // Run-level cache should appear exactly once (not doubled across turns).
@@ -625,7 +626,7 @@ describe("Token Usage API routes", () => {
     expect(data.usage.packages.hench.cacheReadTokens).toBeGreaterThanOrEqual(80000);
 
     // Verify no double-count: check events endpoint
-    const evRes = await fetch(`http://localhost:${port}/api/token/events?package=hench`);
+    const evRes = await fetch(`http://127.0.0.1:${port}/api/token/events?package=hench`);
     const evData = await evRes.json();
     const cacheCreationSum = evData.events.reduce(
       (s: number, e: { cacheCreationTokens: number }) => s + e.cacheCreationTokens, 0,
@@ -685,7 +686,7 @@ describe("Token Usage API routes", () => {
     await mkdir(isoCtx.rexDir, { recursive: true });
     const isoServer = await startTestServer(isoCtx);
     try {
-      const res = await fetch(`http://localhost:${isoServer.port}/api/token/summary`);
+      const res = await fetch(`http://127.0.0.1:${isoServer.port}/api/token/summary`);
       const data = await res.json();
       const hench = data.usage.packages.hench;
 
@@ -697,13 +698,13 @@ describe("Token Usage API routes", () => {
       expect(hench.inputTokens + hench.outputTokens + hench.cacheCreationTokens + hench.cacheReadTokens)
         .toBe(rollupTotal.total);
     } finally {
-      isoServer.server.close();
+      await closeRouteTestServer(isoServer.server);
       await rm(isoDir, { recursive: true, force: true });
     }
   });
 
   it("returns false for non-token routes", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/stats`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/stats`);
     expect(res.status).toBe(404); // Falls through to 404 since only token routes are registered
   });
 
@@ -725,7 +726,7 @@ describe("Token Usage API routes", () => {
     const emptyServer = await startTestServer(emptyCtx);
 
     try {
-      const res = await fetch(`http://localhost:${emptyServer.port}/api/token/summary`);
+      const res = await fetch(`http://127.0.0.1:${emptyServer.port}/api/token/summary`);
       expect(res.status).toBe(200);
       const data = await res.json();
 
@@ -734,7 +735,7 @@ describe("Token Usage API routes", () => {
       expect(data.usage.totalCalls).toBe(0);
       expect(data.eventCount).toBe(0);
     } finally {
-      emptyServer.server.close();
+      await closeRouteTestServer(emptyServer.server);
       await rm(emptyDir, { recursive: true, force: true });
     }
   });

@@ -4,7 +4,7 @@ import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import type { Finding } from "../external.js";
 import { FindingsList, BarChart } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
-import { BrandedHeader } from "../components/index.js";
+import { BrandedHeader, EnrichmentGate } from "../components/index.js";
 
 interface ArchitectureProps {
   data: LoadedData;
@@ -17,14 +17,11 @@ export function ArchitectureView({ data, onSelect, navigateTo }: ArchitecturePro
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
   if (enrichmentPass < ENRICHMENT_THRESHOLDS.architecture) {
-    return h("div", { class: "locked-view" },
-      h("div", { class: "locked-icon", "aria-hidden": "true" }, "\u{1F512}"),
-      h("h2", null, "Architecture"),
-      h("p", null, "Requires enrichment pass 2 (current: ", enrichmentPass, ")"),
-      h("p", { class: "locked-hint" },
-        "Run ", h("code", null, "sourcevision analyze"), " again to unlock."
-      )
-    );
+    return h(EnrichmentGate, {
+      title: "Architecture",
+      requiredPass: ENRICHMENT_THRESHOLDS.architecture,
+      currentPass: enrichmentPass,
+    });
   }
 
   const findings = (zones?.findings ?? []).filter(

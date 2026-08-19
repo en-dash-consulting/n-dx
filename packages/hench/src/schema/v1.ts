@@ -842,6 +842,12 @@ export interface TaskBriefProject {
   name: string;
   validateCommand?: string;
   testCommand?: string;
+  /**
+   * The project's resolved CLI command name (`cli.name` from `.n-dx.json`,
+   * default "n-dx"). Injected into system prompts and task briefs so agents
+   * reference the correct command in generated code, docs, and instructions.
+   */
+  cliName?: string;
 }
 
 export interface TaskBriefLogEntry {

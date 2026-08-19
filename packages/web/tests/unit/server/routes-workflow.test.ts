@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleWorkflowRoute } from "../../../src/server/routes-workflow.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal hench config for testing. */
 function makeConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -70,7 +71,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -111,14 +112,14 @@ describe("Workflow Optimization API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   // ── GET /api/hench/workflow/analysis ──────────────────────────────
 
   it("returns empty analysis when no runs exist", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/analysis`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/analysis`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -143,7 +144,7 @@ describe("Workflow Optimization API routes", () => {
       );
     }
 
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/analysis`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/analysis`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -167,7 +168,7 @@ describe("Workflow Optimization API routes", () => {
       );
     }
 
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/analysis`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/analysis`);
     const body = await res.json();
     const timeoutSuggestion = body.suggestions.find(
       (s: { category: string; title: string }) =>
@@ -179,7 +180,7 @@ describe("Workflow Optimization API routes", () => {
   // ── POST /api/hench/workflow/suggestions/:id ─────────────────────
 
   it("records a suggestion decision", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/suggestions/test-1`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/suggestions/test-1`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -203,7 +204,7 @@ describe("Workflow Optimization API routes", () => {
   });
 
   it("rejects invalid decision values", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/suggestions/test-1`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/suggestions/test-1`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decision: "invalid" }),
@@ -212,7 +213,7 @@ describe("Workflow Optimization API routes", () => {
   });
 
   it("accepts deferred decisions", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/suggestions/test-2`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/suggestions/test-2`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -229,7 +230,7 @@ describe("Workflow Optimization API routes", () => {
   // ── POST /api/hench/workflow/apply ────────────────────────────────
 
   it("previews config changes without applying", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/apply`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/apply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -255,7 +256,7 @@ describe("Workflow Optimization API routes", () => {
   });
 
   it("applies config changes and records acceptance", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/apply`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/apply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -287,7 +288,7 @@ describe("Workflow Optimization API routes", () => {
   });
 
   it("applies nested config changes", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/apply`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/apply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -303,7 +304,7 @@ describe("Workflow Optimization API routes", () => {
   });
 
   it("rejects empty changes", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/apply`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/apply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ changes: {} }),
@@ -314,7 +315,7 @@ describe("Workflow Optimization API routes", () => {
   // ── GET /api/hench/workflow/history ───────────────────────────────
 
   it("returns empty history initially", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/history`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/history`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -325,18 +326,18 @@ describe("Workflow Optimization API routes", () => {
 
   it("returns history with stats after decisions", async () => {
     // Record some decisions
-    await fetch(`http://localhost:${port}/api/hench/workflow/suggestions/s1`, {
+    await fetch(`http://127.0.0.1:${port}/api/hench/workflow/suggestions/s1`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decision: "accepted", title: "A", category: "token-efficiency" }),
     });
-    await fetch(`http://localhost:${port}/api/hench/workflow/suggestions/s2`, {
+    await fetch(`http://127.0.0.1:${port}/api/hench/workflow/suggestions/s2`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decision: "rejected", title: "B", category: "failure-prevention" }),
     });
 
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/history`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/history`);
     const body = await res.json();
 
     expect(body.records).toHaveLength(2);
@@ -350,7 +351,7 @@ describe("Workflow Optimization API routes", () => {
   // ── Unmatched routes ──────────────────────────────────────────────
 
   it("returns 404 for unknown workflow paths", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/workflow/unknown`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/unknown`);
     expect(res.status).toBe(404);
   });
 });

@@ -37,7 +37,7 @@ export {
 } from "./route-state.js";
 
 // --- Hooks consumed by sibling zones (e.g. viewer-ui-hub/sidebar) ---
-export { useProjectMetadata } from "./hooks/index.js";
+export { useProjectMetadata, useCliName } from "./hooks/index.js";
 export { useFeatureToggle } from "./hooks/index.js";
 export { useProjectStatus } from "./hooks/index.js";
 

@@ -66,4 +66,43 @@ describe("buildRefreshPlan", () => {
       expect(err.suggestion).toContain("Choose one scope flag");
     }
   });
+
+  describe("--live-server (dashboard-triggered refresh)", () => {
+    it("accepts --live-server with --data-only and marks the plan live", () => {
+      const plan = buildRefreshPlan(["--data-only", "--live-server"]);
+      expect(plan.liveServer).toBe(true);
+      expect(plan.steps).toEqual([
+        { kind: "sourcevision-analyze" },
+        { kind: "sourcevision-dashboard-artifacts" },
+      ]);
+      expect(plan.skippedSteps).toEqual([{ kind: "web-build", reason: "--data-only" }]);
+    });
+
+    it("accepts --live-server with --no-build", () => {
+      const plan = buildRefreshPlan(["--no-build", "--live-server"]);
+      expect(plan.liveServer).toBe(true);
+      expect(plan.steps.map((s) => s.kind)).not.toContain("web-build");
+    });
+
+    it("accepts --live-server with --pr-markdown", () => {
+      const plan = buildRefreshPlan(["--pr-markdown", "--live-server"]);
+      expect(plan.liveServer).toBe(true);
+      expect(plan.steps).toEqual([{ kind: "sourcevision-pr-markdown" }]);
+    });
+
+    it("rejects --live-server when the plan would rebuild the UI", () => {
+      try {
+        buildRefreshPlan(["--live-server"]);
+        throw new Error("Expected buildRefreshPlan to throw");
+      } catch (err) {
+        expect(err).toBeInstanceOf(RefreshPlanError);
+        expect(err.message).toContain("--live-server");
+        expect(err.suggestion).toMatch(/--data-only|--no-build|--pr-markdown/);
+      }
+    });
+
+    it("plans without --live-server are not live", () => {
+      expect(buildRefreshPlan(["--data-only"]).liveServer).toBe(false);
+    });
+  });
 });

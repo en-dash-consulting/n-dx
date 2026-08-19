@@ -353,3 +353,5 @@ function initLanding(): void {
 }
 
 initLanding();
+
+export {};

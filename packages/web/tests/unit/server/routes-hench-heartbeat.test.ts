@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
@@ -20,7 +21,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
         res.end("Not found");
       }
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -48,7 +49,7 @@ describe("Heartbeat data in audit endpoint", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -68,7 +69,7 @@ describe("Heartbeat data in audit endpoint", () => {
     };
     await writeFile(join(runsDir, "run-hb-1.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/audit`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/audit`);
     const data = await res.json();
     expect(data.entries).toHaveLength(1);
 
@@ -94,7 +95,7 @@ describe("Heartbeat data in audit endpoint", () => {
     };
     await writeFile(join(runsDir, "run-hb-2.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/audit`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/audit`);
     const data = await res.json();
     expect(data.entries).toHaveLength(1);
 
@@ -120,7 +121,7 @@ describe("Heartbeat data in audit endpoint", () => {
     };
     await writeFile(join(runsDir, "run-hb-3.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/audit`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/audit`);
     const data = await res.json();
     expect(data.entries).toHaveLength(1);
 
@@ -144,7 +145,7 @@ describe("Heartbeat data in audit endpoint", () => {
     };
     await writeFile(join(runsDir, "run-hb-4.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/audit`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/audit`);
     const data = await res.json();
     expect(data.entries).toHaveLength(1);
 
@@ -170,7 +171,7 @@ describe("Heartbeat data in audit endpoint", () => {
     };
     await writeFile(join(runsDir, "run-hb-5.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/audit`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/audit`);
     const data = await res.json();
     expect(data.entries).toHaveLength(1);
 
@@ -194,7 +195,7 @@ describe("Heartbeat data in audit endpoint", () => {
     };
     await writeFile(join(runsDir, "run-hb-6.json"), JSON.stringify(run));
 
-    const res = await fetch(`http://localhost:${port}/api/hench/audit`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/audit`);
     const data = await res.json();
     const entry = data.entries[0];
 

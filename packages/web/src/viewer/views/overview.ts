@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { useState, useCallback, useMemo } from "preact/hooks";
+import { useState, useCallback, useEffect, useMemo } from "preact/hooks";
 import type { LoadedData, NavigateTo, DetailItem } from "../types.js";
 import {
   BarChart,
@@ -11,11 +11,60 @@ import {
 import { basename } from "../utils.js";
 import { BrandedHeader } from "../components/index.js";
 
-function ReanalyzeButton() {
-  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
-  const [error, setError] = useState<string | null>(null);
+interface SvAnalyzeStatusData {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  recentOutput: string;
+  error: string | null;
+}
 
-  const handleClick = useCallback(async () => {
+/**
+ * Quick and full analysis triggers for the SourceVision section.
+ *
+ * Quick re-analyze is a synchronous structural refresh. Full analysis runs
+ * all four enrichment passes (unlocking the Architecture, Problems, and
+ * Suggestions tabs) as a background job \u2014 202 + status polling \u2014 because the
+ * LLM passes can take many minutes. Tab data repopulates automatically via
+ * the viewer's data polling once new files land.
+ */
+export function AnalyzeControls() {
+  const [state, setState] = useState<"idle" | "running" | "running-full" | "done" | "done-full" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
+
+  // Poll full-analysis status while running
+  useEffect(() => {
+    if (state !== "running-full") return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/commands/sv-analyze/status");
+        if (!res.ok) return;
+        const data = await res.json() as SvAnalyzeStatusData;
+        const lastLine = data.recentOutput.split("\n").filter(Boolean).pop();
+        if (lastLine) setProgress(lastLine.slice(0, 120));
+        if (!data.running && data.finishedAt) {
+          clearInterval(interval);
+          if (data.error) {
+            setError(data.error);
+            setState("error");
+            setTimeout(() => setState("idle"), 10000);
+          } else {
+            setProgress(null);
+            setState("done-full");
+            setTimeout(() => setState("idle"), 8000);
+          }
+        }
+      } catch {
+        // Ignore transient fetch errors
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [state]);
+
+  const handleQuick = useCallback(async () => {
     setState("running");
     setError(null);
     try {
@@ -37,11 +86,39 @@ function ReanalyzeButton() {
     }
   }, []);
 
-  return h("div", { class: "overview-reanalyze" },
+  const handleFull = useCallback(async () => {
+    setState("running-full");
+    setError(null);
+    setProgress(null);
+    try {
+      const res = await fetch("/api/commands/sv-analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ full: true }),
+      });
+      if (res.status === 409) {
+        // Already running \u2014 the polling loop will track it
+        return;
+      }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: "Full analysis failed to start" })) as { error?: string };
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      // 202 accepted \u2014 polling loop handles the rest
+    } catch (err) {
+      setError(String(err));
+      setState("error");
+      setTimeout(() => setState("idle"), 10000);
+    }
+  }, []);
+
+  const busy = state === "running" || state === "running-full";
+
+  return h("div", { class: "overview-reanalyze cmd-panel-actions" },
     h("button", {
-      class: "cmd-inline-trigger",
-      onClick: handleClick,
-      disabled: state === "running",
+      class: "cmd-btn cmd-btn-primary",
+      onClick: handleQuick,
+      disabled: busy,
       "aria-busy": state === "running",
       title: "Re-run sourcevision analyze to refresh all data",
     },
@@ -50,12 +127,209 @@ function ReanalyzeButton() {
         : h("span", { "aria-hidden": "true" }, "\u{1F504}"),
       state === "running" ? "Analyzing..." : "Re-analyze",
     ),
+    h("button", {
+      class: "cmd-btn cmd-btn-secondary",
+      onClick: handleFull,
+      disabled: busy,
+      "aria-busy": state === "running-full",
+      title: "Run all four enrichment passes \u2014 unlocks the Architecture, Problems, and Suggestions tabs. Takes several minutes.",
+    },
+      state === "running-full"
+        ? h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" })
+        : h("span", { "aria-hidden": "true" }, "\u2728"),
+      state === "running-full" ? "Running full analysis..." : "Full analysis",
+    ),
     h("span", { role: "status", "aria-live": "polite" },
+      state === "running-full" && progress
+        ? h("span", { class: "cmd-inline-progress" }, progress)
+        : null,
       state === "done"
         ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, "\u2713 Done")
         : null,
-      state === "error"
-        ? h("span", { class: "cmd-inline-result cmd-inline-result-err" }, error || "Failed")
+      state === "done-full"
+        ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" },
+            "\u2713 Full analysis complete \u2014 tabs unlock as data refreshes")
+        : null,
+    ),
+    state === "error" && error
+      ? h("span", { class: "cmd-inline-result cmd-inline-result-err", role: "alert" }, error)
+      : null,
+  );
+}
+
+interface NextStep {
+  priority: string;
+  title: string;
+  description: string;
+  category: string;
+}
+
+/** Copy text to the clipboard with a legacy execCommand fallback. */
+function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const input = document.createElement("textarea");
+      input.value = text;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      resolve();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+/** Format the full step list as a numbered markdown list. */
+function stepsToMarkdown(steps: NextStep[]): string {
+  return steps
+    .map((s, i) => `${i + 1}. **[${s.priority}]** ${s.title} — ${s.description}`)
+    .join("\n");
+}
+
+/**
+ * Prioritized next-step recommendations — the UI twin of the sourcevision
+ * MCP `get_next_steps` tool. Rendered on the Overview so recommendations are
+ * visible at any enrichment pass (the Suggestions tab requires pass ≥ 4).
+ * Renders nothing while loading and when no steps are available — the same
+ * convention as the other data-driven Overview sections.
+ *
+ * Each step can be copied individually, the whole list can be copied as
+ * markdown, and the panel footer offers a confirm-guarded "Capture to PRD"
+ * action that files the findings via POST /api/rex/capture-next-steps.
+ */
+export function NextStepsPanel() {
+  const [steps, setSteps] = useState<NextStep[] | null>(null);
+  const [copied, setCopied] = useState<number | "all" | null>(null);
+  const [capture, setCapture] = useState<"idle" | "confirm" | "capturing" | "done" | "error">("idle");
+  const [captureMsg, setCaptureMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/sv/next-steps?limit=5");
+        if (!res.ok) return;
+        const body = await res.json() as { steps?: NextStep[] };
+        if (!cancelled && body.steps && body.steps.length > 0) setSteps(body.steps);
+      } catch {
+        // Panel is best-effort — stay hidden on failure
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleCopy = useCallback((text: string, which: number | "all") => {
+    copyText(text).then(() => {
+      setCopied(which);
+      setTimeout(() => setCopied((c) => (c === which ? null : c)), 2000);
+    }).catch(() => {
+      // Silent fail — button feedback simply doesn't appear
+    });
+  }, []);
+
+  const handleCapture = useCallback(async () => {
+    if (!steps) return;
+    setCapture("capturing");
+    setCaptureMsg(null);
+    try {
+      const res = await fetch("/api/rex/capture-next-steps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ steps }),
+      });
+      const body = await res.json().catch(() => ({})) as { created?: number; skipped?: number; error?: string };
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      const created = body.created ?? 0;
+      const skipped = body.skipped ?? 0;
+      setCaptureMsg(
+        `✓ Captured ${created} to PRD` +
+        (skipped > 0 ? ` (${skipped} duplicate${skipped === 1 ? "" : "s"} skipped)` : ""),
+      );
+      setCapture("done");
+    } catch (err) {
+      setCaptureMsg(String(err instanceof Error ? err.message : err));
+      setCapture("error");
+    }
+  }, [steps]);
+
+  if (!steps) return null;
+
+  return h("div", { class: "overview-section overview-next-steps" },
+    h("div", { class: "section-header-row" },
+      h("h3", null, "Next Steps"),
+      h("button", {
+        class: "link-btn next-steps-copy-all",
+        onClick: () => handleCopy(stepsToMarkdown(steps), "all"),
+        title: "Copy all recommendations as a markdown list",
+        "aria-label": "Copy all next steps as markdown",
+        type: "button",
+      }, copied === "all" ? "✓ Copied" : "Copy all"),
+    ),
+    h("ol", { class: "next-steps-list" },
+      steps.map((s, i) =>
+        h("li", { key: i, class: "next-step-item" },
+          h("div", { class: "next-step-row" },
+            h("span", { class: `next-step-priority next-step-priority-${s.priority}` }, s.priority),
+            h("span", { class: "next-step-title" }, s.title),
+            h("button", {
+              class: "next-step-copy",
+              onClick: () => handleCopy(`${s.title} — ${s.description}`, i),
+              title: "Copy this recommendation",
+              "aria-label": `Copy "${s.title}"`,
+              type: "button",
+            }, copied === i ? "✓" : "⎘"),
+          ),
+          h("div", { class: "next-step-desc" }, s.description),
+        ),
+      ),
+    ),
+    h("div", { class: "next-steps-footer" },
+      capture === "idle" || capture === "done" || capture === "error"
+        ? h("button", {
+            class: "cmd-inline-trigger next-steps-capture-btn",
+            onClick: () => { setCapture("confirm"); setCaptureMsg(null); },
+            title: "File these recommendations as PRD items so they can be worked on",
+            type: "button",
+          },
+            h("span", { "aria-hidden": "true" }, "\u{1F4CB}"),
+            "Capture to PRD",
+          )
+        : null,
+      capture === "confirm"
+        ? h("span", { class: "next-steps-confirm" },
+            `Capture ${steps.length} finding${steps.length === 1 ? "" : "s"} into the PRD?`,
+            h("button", {
+              class: "cmd-inline-trigger next-steps-confirm-btn",
+              onClick: handleCapture,
+              type: "button",
+            }, "Confirm"),
+            h("button", {
+              class: "cmd-inline-trigger next-steps-cancel-btn",
+              onClick: () => setCapture("idle"),
+              type: "button",
+            }, "Cancel"),
+          )
+        : null,
+      capture === "capturing"
+        ? h("span", { class: "next-steps-confirm", "aria-busy": "true" },
+            h("span", { class: "cmd-inline-spinner", "aria-hidden": "true" }),
+            "Capturing...",
+          )
+        : null,
+      h("span", { role: "status", "aria-live": "polite" },
+        capture === "done" && captureMsg
+          ? h("span", { class: "cmd-inline-result cmd-inline-result-ok" }, captureMsg)
+          : null,
+      ),
+      capture === "error" && captureMsg
+        ? h("span", { class: "cmd-inline-result cmd-inline-result-err", role: "alert" }, captureMsg)
         : null,
     ),
   );
@@ -205,7 +479,10 @@ export function Overview({ data, navigateTo, onSelect }: OverviewProps) {
       : null,
 
     // Re-analyze trigger
-    h(ReanalyzeButton, null),
+    h(AnalyzeControls, null),
+
+    // Prioritized recommendations (hidden until analysis data exists)
+    h(NextStepsPanel, null),
 
     // Main metrics row
     h("div", { class: "overview-metrics" },

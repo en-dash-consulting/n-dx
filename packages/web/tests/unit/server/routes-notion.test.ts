@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleNotionRoute } from "../../../src/server/routes-notion.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Start a test server routing through handleNotionRoute. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
@@ -20,7 +21,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -53,21 +54,21 @@ describe("Notion config API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   // ── Basic routing ────────────────────────────────────────────────────
 
   it("returns false for non-notion routes", async () => {
-    const res = await fetch(`http://localhost:${port}/api/other`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/other`);
     expect(res.status).toBe(404);
   });
 
   it("returns 404 when .rex/ does not exist", async () => {
     await rm(rexDir, { recursive: true, force: true });
 
-    const res = await fetch(`http://localhost:${port}/api/notion/config`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/notion/config`);
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toContain(".rex/");
@@ -76,7 +77,7 @@ describe("Notion config API routes", () => {
   // ── GET /api/notion/config ─────────────────────────────────────────
 
   it("GET /api/notion/config returns unconfigured state when no adapter config", async () => {
-    const res = await fetch(`http://localhost:${port}/api/notion/config`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/notion/config`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.configured).toBe(false);
@@ -87,7 +88,7 @@ describe("Notion config API routes", () => {
   // ── PUT /api/notion/config ─────────────────────────────────────────
 
   it("PUT /api/notion/config rejects invalid token format", async () => {
-    const res = await fetch(`http://localhost:${port}/api/notion/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/notion/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: "bad-token" }),
@@ -98,7 +99,7 @@ describe("Notion config API routes", () => {
   });
 
   it("PUT /api/notion/config rejects invalid database ID", async () => {
-    const res = await fetch(`http://localhost:${port}/api/notion/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/notion/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ databaseId: "not-a-uuid" }),
@@ -109,7 +110,7 @@ describe("Notion config API routes", () => {
   });
 
   it("PUT /api/notion/config rejects empty payload", async () => {
-    const res = await fetch(`http://localhost:${port}/api/notion/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/notion/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -120,7 +121,7 @@ describe("Notion config API routes", () => {
   });
 
   it("PUT /api/notion/config saves valid config", async () => {
-    const res = await fetch(`http://localhost:${port}/api/notion/config`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/notion/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -135,7 +136,7 @@ describe("Notion config API routes", () => {
     expect(body.databaseId).toBe("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4");
 
     // Verify it's now configured
-    const getRes = await fetch(`http://localhost:${port}/api/notion/config`);
+    const getRes = await fetch(`http://127.0.0.1:${port}/api/notion/config`);
     const getBody = await getRes.json();
     expect(getBody.configured).toBe(true);
     expect(getBody.databaseId).toBe("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4");
@@ -145,7 +146,7 @@ describe("Notion config API routes", () => {
 
   it("DELETE /api/notion/config removes config", async () => {
     // First save
-    await fetch(`http://localhost:${port}/api/notion/config`, {
+    await fetch(`http://127.0.0.1:${port}/api/notion/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -155,7 +156,7 @@ describe("Notion config API routes", () => {
     });
 
     // Then delete
-    const delRes = await fetch(`http://localhost:${port}/api/notion/config`, {
+    const delRes = await fetch(`http://127.0.0.1:${port}/api/notion/config`, {
       method: "DELETE",
     });
     expect(delRes.status).toBe(200);
@@ -163,7 +164,7 @@ describe("Notion config API routes", () => {
     expect(delBody.removed).toBe(true);
 
     // Verify removed
-    const getRes = await fetch(`http://localhost:${port}/api/notion/config`);
+    const getRes = await fetch(`http://127.0.0.1:${port}/api/notion/config`);
     const getBody = await getRes.json();
     expect(getBody.configured).toBe(false);
   });
@@ -171,7 +172,7 @@ describe("Notion config API routes", () => {
   // ── POST /api/notion/test ──────────────────────────────────────────
 
   it("POST /api/notion/test returns red when no credentials", async () => {
-    const res = await fetch(`http://localhost:${port}/api/notion/test`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/notion/test`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -185,7 +186,7 @@ describe("Notion config API routes", () => {
   // ── POST /api/notion/schema ────────────────────────────────────────
 
   it("POST /api/notion/schema returns error when no credentials", async () => {
-    const res = await fetch(`http://localhost:${port}/api/notion/schema`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/notion/schema`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -200,7 +201,7 @@ describe("Notion config API routes", () => {
 
   it("POST /api/notion/schema/fix rejects empty properties list", async () => {
     // Save config first
-    await fetch(`http://localhost:${port}/api/notion/config`, {
+    await fetch(`http://127.0.0.1:${port}/api/notion/config`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -209,7 +210,7 @@ describe("Notion config API routes", () => {
       }),
     });
 
-    const res = await fetch(`http://localhost:${port}/api/notion/schema/fix`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/notion/schema/fix`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ properties: [] }),
@@ -220,7 +221,7 @@ describe("Notion config API routes", () => {
   });
 
   it("POST /api/notion/schema/fix returns 400 when no credentials", async () => {
-    const res = await fetch(`http://localhost:${port}/api/notion/schema/fix`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/notion/schema/fix`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ properties: ["Description"] }),

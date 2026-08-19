@@ -182,47 +182,30 @@ describe("prd_tree atomic writes and crash-safety", () => {
 
   describe("file-locking: concurrent writers are serialized", () => {
     it("second writer waits for first writer to release lock", async () => {
-      const operations: string[] = [];
+      // Hold the store's lock directly (as a first writer would), so the
+      // blocked/unblocked states are observable without timing assumptions.
+      const release = await acquireLock(join(rexDir, "prd.lock"));
 
-      // Patch the store to track operation timing at lock boundaries
-      const originalAddItem = store.addItem.bind(store);
-      let firstStarted = false;
+      let secondCompleted = false;
+      const secondPromise = store
+        .addItem(makeItem("test-2", "Second Item"))
+        .then(() => {
+          secondCompleted = true;
+        });
 
-      // First writer acquires lock
-      const firstPromise = (async () => {
-        firstStarted = true;
-        operations.push("first-start");
-        const item = makeItem("test-1", "First Item");
-        await originalAddItem(item);
-        operations.push("first-end");
-        // Simulate some work delay to ensure lock is held a bit longer
-        await new Promise((r) => setTimeout(r, 50));
-      })();
+      // While the lock is held, the second writer must not complete —
+      // locking makes this impossible, so the wait only guards scheduling.
+      await new Promise((r) => setTimeout(r, 100));
+      expect(secondCompleted).toBe(false);
 
-      // Give first writer a moment to actually start
-      await new Promise((r) => setTimeout(r, 10));
-      expect(firstStarted).toBe(true);
+      await release();
+      await secondPromise;
+      expect(secondCompleted).toBe(true);
 
-      // Second writer should wait for lock
-      const secondPromise = (async () => {
-        operations.push("second-start");
-        const item = makeItem("test-2", "Second Item");
-        await originalAddItem(item);
-        operations.push("second-end");
-      })();
-
-      // Wait for both to complete
-      await Promise.all([firstPromise, secondPromise]);
-
-      // Verify serialization: first write must complete before second starts.
-      // With proper locking: ["first-start", "first-end", "second-start", "second-end"]
-      const firstEndIdx = operations.indexOf("first-end");
-      const secondStartIdx = operations.indexOf("second-start");
-      expect(firstEndIdx).toBeLessThan(secondStartIdx);
-
-      // Verify both items were written
+      // Verify the blocked write landed after the lock was released
       const doc = await store.loadDocument();
-      expect(doc.items).toHaveLength(2);
+      expect(doc.items).toHaveLength(1);
+      expect(doc.items[0].id).toBe("test-2");
     });
 
     it("lock timeout prevents indefinite waiting", async () => {

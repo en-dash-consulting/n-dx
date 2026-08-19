@@ -22,6 +22,7 @@ import type { DegradableFeature } from "../performance/index.js";
 import {
   Overview,
   Graph,
+  ZonesView,
   FilesView,
   ArchitectureView,
   ProblemsView,
@@ -32,9 +33,12 @@ import {
 
 import {
   PRDView,
+  AnalysisView,
   RexDashboard,
   TokenUsageView,
   ValidationView,
+  RequirementsView,
+  ActivityView,
   TaskAuditView,
   WorkflowOptimizationView,
   MergeGraphView,
@@ -44,6 +48,7 @@ import {
   HenchRunsView,
   HenchConfigView,
   HenchTemplatesView,
+  AdaptiveOptimizationView,
 } from "./domain-hench.js";
 
 import {
@@ -52,6 +57,7 @@ import {
   FeatureTogglesView,
   CliTimeoutsView,
   CommandsView,
+  CommandReferenceView,
   LlmProviderView,
   ProjectSettingsView,
 } from "./domain-settings.js";
@@ -84,6 +90,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "graph": ({ data, setDetail, selectedFile, selectedZone, navigateTo }) =>
     h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo }),
 
+  "zones": ({ data, setDetail, navigateTo }) =>
+    h(ZonesView, { data, onSelect: setDetail, navigateTo }),
+
   "files": ({ data, setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo }) =>
     h(FilesView, { data, onSelect: setDetail, selectedFile, setSelectedFile, selectedZone, navigateTo }),
 
@@ -108,6 +117,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "prd": ({ setDetail, setPrdDetailContent, selectedTaskId, navigateTo }) =>
     h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent, initialTaskId: selectedTaskId, navigateTo }),
 
+  "analysis": () =>
+    h(AnalysisView, null),
+
   "merge-graph": ({ navigateTo }) =>
     h(MergeGraphView, { navigateTo }),
 
@@ -116,6 +128,12 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "validation": ({ navigateTo }) =>
     h(ValidationView, { navigateTo }),
+
+  "requirements": () =>
+    h(RequirementsView, null),
+
+  "activity": () =>
+    h(ActivityView, null),
 
   "notion-config": () =>
     h(NotionConfigView, null),
@@ -138,6 +156,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "hench-optimization": () =>
     h(WorkflowOptimizationView, null),
 
+  "hench-adaptive": () =>
+    h(AdaptiveOptimizationView, null),
+
   "feature-toggles": () =>
     h(FeatureTogglesView, null),
 
@@ -146,6 +167,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "commands": () =>
     h(CommandsView, null),
+
+  "command-reference": () =>
+    h(CommandReferenceView, null),
 
   "llm-provider": () =>
     h(LlmProviderView, null),

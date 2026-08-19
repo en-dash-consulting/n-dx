@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createServer, type Server } from "node:http";
 import { connect, type Socket } from "node:net";
 import { createWebSocketManager, PING_INTERVAL_MS } from "../../../src/server/websocket.js";
+import { closeRouteTestServer, TEST_HOST } from "../../helpers/server-route-test-support.js";
 
 /**
  * Connect a raw TCP socket to the server and perform the WebSocket handshake.
@@ -9,14 +10,14 @@ import { createWebSocketManager, PING_INTERVAL_MS } from "../../../src/server/we
  */
 function connectRaw(port: number): Promise<{ socket: Socket; leftover: Buffer }> {
   return new Promise((resolve, reject) => {
-    const socket = connect({ host: "localhost", port }, () => {
+    const socket = connect({ host: TEST_HOST, port }, () => {
       const keyBytes = Buffer.alloc(16);
       for (let i = 0; i < 16; i++) keyBytes[i] = Math.floor(Math.random() * 256);
       const key = keyBytes.toString("base64");
 
       socket.write(
         `GET / HTTP/1.1\r\n` +
-        `Host: localhost:${port}\r\n` +
+        `Host: ${TEST_HOST}:${port}\r\n` +
         `Upgrade: websocket\r\n` +
         `Connection: Upgrade\r\n` +
         `Sec-WebSocket-Key: ${key}\r\n` +
@@ -124,7 +125,7 @@ describe("WebSocket manager", () => {
         res.end("ok");
       });
       server.on("upgrade", ws.handleUpgrade);
-      server.listen(0, () => {
+      server.listen(0, TEST_HOST, () => {
         const addr = server.address();
         port = typeof addr === "object" && addr ? addr.port : 0;
         resolve();
@@ -132,9 +133,9 @@ describe("WebSocket manager", () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     ws.shutdown();
-    server.close();
+    await closeRouteTestServer(server);
   });
 
   it("completes WebSocket handshake and tracks client", async () => {

@@ -1,24 +1,186 @@
 /**
  * Commands view — trigger CLI operations from the dashboard.
  *
- * Provides action panels for: export static dashboard, self-heal loop.
+ * Provides action panels for: refresh data (live server), export static
+ * dashboard, self-heal loop.
  */
 
 import { h, Fragment } from "preact";
 import { useState, useCallback, useEffect } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
+import { useCliName } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 type OpState = "idle" | "running" | "done" | "error";
 
+// ── Sample App Panel ───────────────────────────────────────────────────
+
+function InstallSamplePanel() {
+  const cliName = useCliName();
+  const [state, setState] = useState<OpState>("idle");
+  const [output, setOutput] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [stepMessage, setStepMessage] = useState<string>("");
+  const [activeAction, setActiveAction] = useState<"install" | "destroy" | null>(null);
+  const [isInstalled, setIsInstalled] = useState<boolean | null>(null);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/commands/sample-status");
+      const data = await res.json() as { isInstalled: boolean };
+      if (res.ok) {
+        setIsInstalled(data.isInstalled);
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
+  const handleAction = useCallback(async (action: "install" | "destroy") => {
+    setState("running");
+    setActiveAction(action);
+    setError(null);
+    setOutput(null);
+
+    // Progressive UI feedback steps
+    const steps = action === "install"
+      ? ["Initializing sandbox...", "Creating webapp files...", "Generating sample PRD trees...", "Finalizing setup..."]
+      : ["Cleaning up source files...", "Pruning PRD trees...", "Removing sandbox environment..."];
+
+    let stepIndex = 0;
+    setStepMessage(steps[0]);
+
+    const stepInterval = setInterval(() => {
+      stepIndex++;
+      if (stepIndex < steps.length) {
+        setStepMessage(steps[stepIndex]);
+      }
+    }, 600); // 600ms per step to make the loading indicator noticeable
+
+    try {
+      // Intentionally slowing down the fetch slightly to let the animation play out
+      const [res] = await Promise.all([
+        fetch(`/api/commands/${action}-sample`, { method: "POST" }),
+        new Promise(resolve => setTimeout(resolve, steps.length * 600))
+      ]);
+
+      clearInterval(stepInterval);
+      const data = await res.json() as Record<string, unknown>;
+
+      if (!res.ok) {
+        throw new Error((data.error as string) || `HTTP ${res.status}`);
+      }
+
+      setOutput((data.output as string) || `${action === "install" ? "Install" : "Destroy"} complete.`);
+      setState("done");
+      fetchStatus();
+    } catch (err) {
+      clearInterval(stepInterval);
+      setError(String(err));
+      setState("error");
+    } finally {
+      setActiveAction(null);
+    }
+  }, [fetchStatus]);
+
+  return h("div", { class: "cmd-panel" },
+    h("div", { class: "cmd-panel-header" },
+      h("h3", { class: "cmd-panel-title" }, "✨ Sample App"),
+      h("p", { class: "cmd-panel-desc" },
+        "Install a safe, easily destroyable sample web application to quickly explore and understand how n-dx manages PRDs and codebase analysis."
+      ),
+      isInstalled !== null
+        ? h("div", { 
+            style: `display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; font-size: 0.85em; font-weight: 500; margin-top: 12px; background: ${isInstalled ? "var(--color-bg-success)" : "var(--color-bg-subtle)"}; color: ${isInstalled ? "var(--color-text-success)" : "var(--color-text-muted)"}; border: 1px solid ${isInstalled ? "var(--color-border-success)" : "var(--color-border)"}` 
+          },
+            h("span", { style: "font-size: 1.2em;" }, isInstalled ? "✓" : "○"),
+            isInstalled ? "Sample App is installed" : "Sample App is not installed"
+          )
+        : null
+    ),
+
+    h("div", { class: "cmd-panel-actions" },
+      h("button", {
+        class: "cmd-btn cmd-btn-primary",
+        onClick: () => handleAction("install"),
+        disabled: state === "running" || isInstalled === true,
+      }, state === "running" && activeAction === "install" ? "Installing..." : "Install Sample App"),
+      h("button", {
+        class: "cmd-btn cmd-btn-danger",
+        onClick: () => handleAction("destroy"),
+        disabled: state === "running" || isInstalled === false,
+        style: "margin-left: 12px",
+      }, state === "running" && activeAction === "destroy" ? "Destroying..." : "Destroy Sample App"),
+    ),
+
+    isInstalled === true && h("div", { 
+      style: "margin-top: 16px; padding: 14px; background: var(--color-bg-subtle); border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.9em;"
+    },
+      h("h4", { style: "margin: 0 0 8px 0; color: var(--color-text); font-size: 1.05em; display: flex; align-items: center; gap: 6px;" }, "🚀 Next Steps"),
+      h("p", { style: "margin: 0 0 12px 0; color: var(--color-text-muted);" }, "The sample app has been generated in a new `sample-app/` directory along with a dummy PRD! Open your terminal and run the following commands to see n-dx in action:"),
+      h("pre", { style: "margin: 0; padding: 10px; background: var(--color-bg-code); border-radius: 6px; color: var(--color-text-code); font-family: monospace; white-space: pre-wrap; font-size: 0.95em;" },
+        `${cliName} status\n` +
+        `${cliName} work --auto`
+      )
+    ),
+
+    state === "running"
+      ? h("div", { class: "cmd-progress", role: "status", "aria-live": "polite" },
+          h("div", { class: "cmd-spinner", "aria-hidden": "true" }),
+          h("div", { style: "display: flex; flex-direction: column; gap: 4px;" },
+            h("span", { style: "font-weight: 500;" }, stepMessage),
+            h("span", { style: "font-size: 0.85em; opacity: 0.7;" }, "Please wait, this will only take a moment...")
+          )
+        )
+      : null,
+
+    state === "done" && output
+      ? h("div", { class: "cmd-result-success", role: "status", style: "animation: fadeIn 0.3s ease-in;" },
+          h("span", { class: "cmd-result-icon" }, "✓"),
+          h("pre", { class: "cmd-result-output" }, output),
+        )
+      : null,
+
+    error
+      ? h("div", { class: "cmd-result-error", role: "alert", style: "animation: fadeIn 0.3s ease-in;" }, error)
+      : null,
+  );
+}
+
 // ── Export Panel ─────────────────────────────────────────────────────
 
 function ExportPanel() {
+  const cliName = useCliName();
   const [state, setState] = useState<OpState>("idle");
   const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [outDir, setOutDir] = useState("");
+  const [pdfState, setPdfState] = useState<OpState>("idle");
+  const [pdfOutput, setPdfOutput] = useState<string | null>(null);
+
+  /**
+   * Generate the sourcevision PDF report. Reports the written path: the viewer
+   * sandbox blocks downloads the page initiates, so the path is the result.
+   */
+  const handleExportPdf = useCallback(async () => {
+    setPdfState("running");
+    setPdfOutput(null);
+    try {
+      const res = await fetch("/api/commands/export-pdf", { method: "POST" });
+      const body = await res.json() as { ok?: boolean; error?: string; output?: string };
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setPdfOutput(body.output ?? "PDF written.");
+      setPdfState("done");
+    } catch (err) {
+      setPdfOutput(err instanceof Error ? err.message : String(err));
+      setPdfState("error");
+    }
+  }, []);
 
   const handleExport = useCallback(async () => {
     setState("running");
@@ -50,7 +212,7 @@ function ExportPanel() {
     h("div", { class: "cmd-panel-header" },
       h("h3", { class: "cmd-panel-title" }, "\u{1F4E4} Export Dashboard"),
       h("p", { class: "cmd-panel-desc" },
-        "Generate a static, deployable version of this dashboard. Equivalent to ", h("code", null, "ndx export"), "."
+        "Generate a static, deployable version of this dashboard. Equivalent to ", h("code", null, `${cliName} export`), "."
       ),
     ),
 
@@ -72,7 +234,20 @@ function ExportPanel() {
         onClick: handleExport,
         disabled: state === "running",
       }, state === "running" ? "Exporting..." : "Export Dashboard"),
+      h("button", {
+        class: "cmd-btn cmd-btn-secondary",
+        onClick: handleExportPdf,
+        disabled: pdfState === "running",
+        title: `Generate a PDF analysis report (${cliName} sourcevision export-pdf)`,
+      }, pdfState === "running" ? "Generating PDF\u2026" : "Export PDF report"),
     ),
+
+    pdfOutput
+      ? h("pre", {
+          class: `cmd-result-output${pdfState === "error" ? " cmd-inline-result-err" : ""}`,
+          role: pdfState === "error" ? "alert" : "status",
+        }, pdfOutput)
+      : null,
 
     state === "running"
       ? h("div", { class: "cmd-progress", role: "status", "aria-live": "polite" },
@@ -103,9 +278,32 @@ interface SelfHealStatusData {
   iterations: number;
   output: string;
   error: string | null;
+  /** True when the run ended because an operator pressed Stop. */
+  stopped?: boolean;
 }
 
-function SelfHealPanel() {
+/**
+ * Pull the newest iteration and phase markers out of the loop's output.
+ *
+ * `ndx self-heal` prints its progress as it goes; the status endpoint returns
+ * the tail of that output, so the freshest matching lines describe where the
+ * loop currently is.
+ */
+function parseSelfHealProgress(output: string): { iteration: string | null; phase: string | null } {
+  const lines = output.split("\n").map((l) => l.trim()).filter(Boolean);
+  let iteration: string | null = null;
+  let phase: string | null = null;
+  for (const line of lines) {
+    const iter = /iteration\s+(\d+\s*(?:\/|of)\s*\d+)/i.exec(line);
+    if (iter) iteration = `iteration ${iter[1].replace(/\s*of\s*/i, "/")}`;
+    const ph = /\b(analyz\w*|recommend\w*|execut\w*)\b/i.exec(line);
+    if (ph) phase = ph[1].toLowerCase();
+  }
+  return { iteration, phase };
+}
+
+export function SelfHealPanel() {
+  const cliName = useCliName();
   const [state, setState] = useState<OpState>("idle");
   const [confirmed, setConfirmed] = useState(false);
   const [iterations, setIterations] = useState(3);
@@ -124,7 +322,8 @@ function SelfHealPanel() {
         setStatusData(data);
         if (!data.running && data.finishedAt) {
           clearInterval(interval);
-          if (data.error) {
+          // A stop the operator asked for is a normal outcome, not a failure.
+          if (data.error && !data.stopped) {
             setError(data.error);
             setState("error");
           } else {
@@ -170,6 +369,20 @@ function SelfHealPanel() {
     }
   }, [iterations]);
 
+  const handleStop = useCallback(async () => {
+    try {
+      const res = await fetch("/api/commands/self-heal/stop", { method: "POST" });
+      if (!res.ok && res.status !== 409) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      // The polling loop picks up running=false / stopped=true.
+    } catch (err) {
+      setError(String(err));
+      setState("error");
+    }
+  }, []);
+
   const handleReset = useCallback(() => {
     setState("idle");
     setConfirmed(false);
@@ -184,7 +397,7 @@ function SelfHealPanel() {
         h("p", { class: "cmd-panel-desc" },
           "Run an iterative improvement loop: analyze \u2192 recommend \u2192 execute. " +
           "This is a long-running operation that will make changes to your PRD. " +
-          "Equivalent to ", h("code", null, "ndx self-heal [N]"), "."
+          "Equivalent to ", h("code", null, `${cliName} self-heal [N]`), "."
         ),
       ),
 
@@ -253,6 +466,23 @@ function SelfHealPanel() {
                 "Started: ", new Date(statusData.startedAt).toLocaleTimeString(),
               )
             : null,
+          (() => {
+            const progress = statusData ? parseSelfHealProgress(statusData.output) : null;
+            return progress && (progress.iteration || progress.phase)
+              ? h("p", { class: "cmd-phase-item", role: "status", "aria-live": "polite" },
+                  progress.iteration ?? "",
+                  progress.iteration && progress.phase ? " \u00b7 " : "",
+                  progress.phase ? `phase: ${progress.phase}` : "",
+                )
+              : null;
+          })(),
+          h("div", { class: "cmd-panel-actions" },
+            h("button", {
+              class: "cmd-btn cmd-btn-danger",
+              onClick: handleStop,
+              title: "Stop the loop after the current step",
+            }, "Stop"),
+          ),
           h("p", { class: "cmd-panel-hint" }, "Poll rate: 2 seconds. This may take several minutes."),
         )
       : null,
@@ -260,8 +490,10 @@ function SelfHealPanel() {
     state === "done"
       ? h("div", null,
           h("div", { class: "cmd-result-success", role: "status" },
-            h("span", { class: "cmd-result-icon" }, "\u2713"),
-            h("span", null, "Self-heal complete."),
+            h("span", { class: "cmd-result-icon" }, statusData?.stopped ? "\u25A0" : "\u2713"),
+            h("span", null, statusData?.stopped
+              ? "Self-heal stopped by request."
+              : "Self-heal complete."),
           ),
           statusData?.output
             ? h("pre", { class: "cmd-result-output" }, statusData.output)
@@ -291,6 +523,137 @@ function SelfHealPanel() {
   );
 }
 
+// ── Refresh Panel ────────────────────────────────────────────────────
+
+interface RefreshStatusData {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  fast: boolean;
+  phases: string[];
+  output: string;
+  error: string | null;
+}
+
+export function RefreshPanel() {
+  const cliName = useCliName();
+  const [state, setState] = useState<OpState>("idle");
+  const [fast, setFast] = useState(false);
+  const [statusData, setStatusData] = useState<RefreshStatusData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Poll refresh status while running
+  useEffect(() => {
+    if (state !== "running") return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/commands/refresh/status");
+        if (!res.ok) return;
+        const data = await res.json() as RefreshStatusData;
+        setStatusData(data);
+        if (!data.running && data.finishedAt) {
+          clearInterval(interval);
+          if (data.error) {
+            setError(data.error);
+            setState("error");
+          } else {
+            setState("done");
+          }
+        }
+      } catch {
+        // Ignore transient fetch errors
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [state]);
+
+  const handleStart = useCallback(async () => {
+    setState("running");
+    setError(null);
+    setStatusData(null);
+
+    try {
+      const res = await fetch("/api/commands/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fast }),
+      });
+
+      const data = await res.json() as Record<string, unknown>;
+
+      if (res.status === 409) {
+        // Already running — the polling loop will pick up its status
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error((data.error as string) || `HTTP ${res.status}`);
+      }
+
+      // 202 accepted — polling loop handles the rest
+    } catch (err) {
+      setError(String(err));
+      setState("error");
+    }
+  }, [fast]);
+
+  return h("div", { class: "cmd-panel" },
+    h("div", { class: "cmd-panel-header" },
+      h("h3", { class: "cmd-panel-title" }, "\u{1F504} Refresh Data"),
+      h("p", { class: "cmd-panel-desc" },
+        "Re-run SourceVision analysis and regenerate dashboard data without restarting the server. Equivalent to ",
+        h("code", null, `${cliName} refresh --data-only`), ".",
+      ),
+    ),
+
+    h("div", { class: "cmd-panel-form" },
+      h("label", { class: "cmd-panel-label cmd-panel-label-inline" },
+        h("input", {
+          type: "checkbox",
+          checked: fast,
+          onInput: (e: Event) => setFast((e.target as HTMLInputElement).checked),
+          disabled: state === "running",
+        }),
+        " Fast mode (structural only — skip LLM enrichment)",
+      ),
+    ),
+
+    h("div", { class: "cmd-panel-actions" },
+      h("button", {
+        class: "cmd-btn cmd-btn-primary",
+        onClick: handleStart,
+        disabled: state === "running",
+      }, state === "running" ? "Refreshing..." : "Refresh Data"),
+    ),
+
+    state === "running"
+      ? h("div", { class: "cmd-progress", role: "status", "aria-live": "polite" },
+          h("div", { class: "cmd-spinner", "aria-hidden": "true" }),
+          h("span", null, "Refreshing SourceVision data..."),
+        )
+      : null,
+
+    statusData && statusData.phases.length > 0
+      ? h("ul", { class: "cmd-phase-list" },
+          statusData.phases.map((phase, i) =>
+            h("li", { key: i, class: "cmd-phase-item" }, phase)),
+        )
+      : null,
+
+    state === "done"
+      ? h("div", { class: "cmd-result cmd-result-ok", role: "status" },
+          "Refresh complete — data views will update automatically.",
+        )
+      : null,
+
+    state === "error" && error
+      ? h("div", { class: "cmd-result cmd-result-error", role: "alert" }, error)
+      : null,
+  );
+}
+
 // ── Main view ────────────────────────────────────────────────────────
 
 export function CommandsView() {
@@ -304,6 +667,8 @@ export function CommandsView() {
     ),
 
     h("div", { class: "cmd-panels" },
+      h(RefreshPanel, null),
+      h(InstallSamplePanel, null),
       h(ExportPanel, null),
       h(SelfHealPanel, null),
     ),

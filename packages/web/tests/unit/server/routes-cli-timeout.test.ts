@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleCliTimeoutRoute } from "../../../src/server/routes-cli-timeout.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Start a test server that only runs CLI timeout routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
@@ -14,7 +15,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -40,7 +41,7 @@ describe("CLI timeout API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -48,7 +49,7 @@ describe("CLI timeout API routes", () => {
 
   describe("GET /api/cli/timeouts", () => {
     it("returns default response when no .n-dx.json exists", async () => {
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toContain("application/json");
 
@@ -67,7 +68,7 @@ describe("CLI timeout API routes", () => {
         "utf-8",
       );
 
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`);
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.timeoutMs).toBe(60_000);
@@ -80,7 +81,7 @@ describe("CLI timeout API routes", () => {
         "utf-8",
       );
 
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`);
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.timeouts.analyze).toBe(120_000);
@@ -88,7 +89,7 @@ describe("CLI timeout API routes", () => {
     });
 
     it("returns 404 for unknown paths", async () => {
-      const res = await fetch(`http://localhost:${port}/api/cli/unknown`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/unknown`);
       expect(res.status).toBe(404);
     });
   });
@@ -97,7 +98,7 @@ describe("CLI timeout API routes", () => {
 
   describe("PUT /api/cli/timeouts", () => {
     it("saves global timeoutMs to .n-dx.json", async () => {
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timeoutMs: 90_000 }),
@@ -107,20 +108,20 @@ describe("CLI timeout API routes", () => {
       expect(data.applied).toContainEqual({ field: "timeoutMs", value: 90_000 });
 
       // Verify it was persisted
-      const readRes = await fetch(`http://localhost:${port}/api/cli/timeouts`);
+      const readRes = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`);
       const readData = await readRes.json();
       expect(readData.timeoutMs).toBe(90_000);
     });
 
     it("saves per-command overrides to .n-dx.json", async () => {
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timeouts: { analyze: 300_000, work: 0 } }),
       });
       expect(res.status).toBe(200);
 
-      const readRes = await fetch(`http://localhost:${port}/api/cli/timeouts`);
+      const readRes = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`);
       const readData = await readRes.json();
       expect(readData.timeouts.analyze).toBe(300_000);
       expect(readData.timeouts.work).toBe(0);
@@ -133,14 +134,14 @@ describe("CLI timeout API routes", () => {
         "utf-8",
       );
 
-      await fetch(`http://localhost:${port}/api/cli/timeouts`, {
+      await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timeouts: { analyze: 120_000 } }),
       });
 
       // llm.vendor should still be there
-      const readRes = await fetch(`http://localhost:${port}/api/cli/timeouts`);
+      const readRes = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`);
       const readData = await readRes.json();
       // timeoutMs was in the original file; should still be present
       expect(readData.timeoutMs).toBe(60_000);
@@ -153,14 +154,14 @@ describe("CLI timeout API routes", () => {
         "utf-8",
       );
 
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timeoutMs: null }),
       });
       expect(res.status).toBe(200);
 
-      const readRes = await fetch(`http://localhost:${port}/api/cli/timeouts`);
+      const readRes = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`);
       const readData = await readRes.json();
       expect(readData.timeoutMs).toBeNull();
     });
@@ -172,19 +173,19 @@ describe("CLI timeout API routes", () => {
         "utf-8",
       );
 
-      await fetch(`http://localhost:${port}/api/cli/timeouts`, {
+      await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timeouts: { analyze: null } }),
       });
 
-      const readRes = await fetch(`http://localhost:${port}/api/cli/timeouts`);
+      const readRes = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`);
       const readData = await readRes.json();
       expect(readData.timeouts.analyze).toBeUndefined();
     });
 
     it("rejects negative timeoutMs with 400", async () => {
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timeoutMs: -1000 }),
@@ -193,7 +194,7 @@ describe("CLI timeout API routes", () => {
     });
 
     it("rejects non-numeric timeoutMs with 400", async () => {
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timeoutMs: "fast" }),
@@ -202,7 +203,7 @@ describe("CLI timeout API routes", () => {
     });
 
     it("rejects negative per-command timeout with 400", async () => {
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timeouts: { analyze: -500 } }),
@@ -211,7 +212,7 @@ describe("CLI timeout API routes", () => {
     });
 
     it("rejects invalid command name with 400", async () => {
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timeouts: { "INVALID NAME": 5000 } }),
@@ -220,7 +221,7 @@ describe("CLI timeout API routes", () => {
     });
 
     it("rejects invalid JSON body with 400", async () => {
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: "not-json",
@@ -229,14 +230,14 @@ describe("CLI timeout API routes", () => {
     });
 
     it("accepts zero as a valid timeout (disables the timeout)", async () => {
-      const res = await fetch(`http://localhost:${port}/api/cli/timeouts`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timeoutMs: 0 }),
       });
       expect(res.status).toBe(200);
 
-      const readRes = await fetch(`http://localhost:${port}/api/cli/timeouts`);
+      const readRes = await fetch(`http://127.0.0.1:${port}/api/cli/timeouts`);
       const readData = await readRes.json();
       expect(readData.timeoutMs).toBe(0);
     });

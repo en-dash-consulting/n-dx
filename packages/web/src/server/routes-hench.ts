@@ -1983,6 +1983,25 @@ const throttleState: ThrottleState = {
 };
 
 /**
+ * Reset this module's process-wide mutable state (exposed for testing).
+ *
+ * Vitest runs multiple test *files* in one worker process, so these
+ * module-level singletons persist across files: a leaked `activeExecutions`
+ * entry or a `paused` throttle from one file changes another file's route
+ * responses, and which files share a worker depends on machine load. Call
+ * this in `beforeEach` so every route test starts from a known state.
+ */
+export function resetHenchRouteStateForTests(): void {
+  activeExecutions.clear();
+  aggregatorCache.clear();
+  throttleState.paused = false;
+  throttleState.pausedAt = null;
+  throttleState.concurrencyOverride = null;
+  throttleState.lastEmergencyStopAt = null;
+  throttleState.lastEmergencyStopCount = 0;
+}
+
+/**
  * Get the effective max concurrent processes, respecting the runtime
  * override when set.
  */

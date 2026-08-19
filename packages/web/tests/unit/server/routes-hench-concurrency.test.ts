@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
@@ -20,7 +21,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
         res.end("Not found");
       }
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -53,12 +54,12 @@ describe("GET /api/hench/concurrency", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   it("returns default concurrency status with no active processes", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/concurrency`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/concurrency`);
     expect(res.status).toBe(200);
     const data = await res.json();
 
@@ -85,7 +86,7 @@ describe("GET /api/hench/concurrency", () => {
       JSON.stringify(config),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/concurrency`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/concurrency`);
     const data = await res.json();
     expect(data.maxConcurrent).toBe(5);
     expect(data.slotsAvailable).toBe(5);
@@ -103,7 +104,7 @@ describe("GET /api/hench/concurrency", () => {
       JSON.stringify(lock),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/concurrency`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/concurrency`);
     const data = await res.json();
     expect(data.processCount).toBe(1);
     expect(data.slotsAvailable).toBe(2); // 3 - 1
@@ -126,7 +127,7 @@ describe("GET /api/hench/concurrency", () => {
       JSON.stringify(lock),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/concurrency`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/concurrency`);
     const data = await res.json();
     expect(data.processCount).toBe(0);
     expect(data.locks).toEqual([]);
@@ -150,7 +151,7 @@ describe("GET /api/hench/concurrency", () => {
       JSON.stringify(run),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/concurrency`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/concurrency`);
     const data = await res.json();
     expect(data.totalRunning).toBe(1);
     expect(data.diskRunning).toBe(1);
@@ -174,7 +175,7 @@ describe("GET /api/hench/concurrency", () => {
       JSON.stringify(run),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/concurrency`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/concurrency`);
     const data = await res.json();
     expect(data.totalRunning).toBe(0);
     expect(data.diskRunning).toBe(0);
@@ -202,7 +203,7 @@ describe("GET /api/hench/concurrency", () => {
       JSON.stringify(prd),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/concurrency`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/concurrency`);
     const data = await res.json();
     expect(data.pendingTasks).toBe(2); // task-1 (pending) + task-2 (blocked)
   });
@@ -226,7 +227,7 @@ describe("GET /api/hench/concurrency", () => {
       JSON.stringify(lock),
     );
 
-    const res = await fetch(`http://localhost:${port}/api/hench/concurrency`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/concurrency`);
     const data = await res.json();
     // 1/3 ≈ 33% → "moderate" (between 0 and 67%)
     expect(data.level).toBe("moderate");
@@ -237,7 +238,7 @@ describe("GET /api/hench/concurrency", () => {
     // Remove the locks directory
     await rm(join(tmpDir, ".hench", "locks"), { recursive: true });
 
-    const res = await fetch(`http://localhost:${port}/api/hench/concurrency`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/concurrency`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.processCount).toBe(0);
@@ -246,7 +247,7 @@ describe("GET /api/hench/concurrency", () => {
 
   it("handles missing hench config gracefully", async () => {
     // No config.json → uses default maxConcurrent=3
-    const res = await fetch(`http://localhost:${port}/api/hench/concurrency`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/concurrency`);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.maxConcurrent).toBe(3);

@@ -266,7 +266,7 @@ describe("PRDTree", () => {
     const root = renderToDiv(h(PRDTree, {
       document: doc,
       defaultExpandDepth: 1,
-      activeStatuses: new Set(["completed", "in_progress", "pending"]),
+      activeStatuses: new Set(["completed", "in_progress", "pending"] as const),
     }));
     expect(root.querySelector(".prd-duration-cell")).toBeNull();
     expect(root.querySelector(".prd-duration-cell-empty")).toBeNull();

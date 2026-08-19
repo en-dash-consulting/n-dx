@@ -357,6 +357,30 @@ describe("spawnManaged", () => {
     expect(result.stderr).toBe("warning\n");
   });
 
+  it("streams stdout chunks through onStdout as they arrive", async () => {
+    const child = createMockChild({ pipe: true });
+    mockSpawn.mockReturnValue(child as never);
+
+    const chunks: string[] = [];
+    const handle = spawnManaged("node", ["script.js"], {
+      stdio: "pipe",
+      onStdout: (chunk) => chunks.push(chunk),
+    });
+
+    child.stdout!.emit("data", Buffer.from("phase 1\n"));
+    // Each chunk must be delivered while the child is still running —
+    // this is what lets a dashboard show live progress.
+    expect(chunks).toEqual(["phase 1\n"]);
+
+    child.stdout!.emit("data", Buffer.from("phase 2\n"));
+    child.emit("close", 0);
+
+    const result = await handle.done;
+    expect(chunks).toEqual(["phase 1\n", "phase 2\n"]);
+    // The result still carries the full accumulated text.
+    expect(result.stdout).toBe("phase 1\nphase 2\n");
+  });
+
   it("kill sends signal to child process", async () => {
     const child = createMockChild() as ReturnType<typeof createMockChild> & {
       kill: ReturnType<typeof vi.fn>;

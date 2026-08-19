@@ -19,6 +19,7 @@
  */
 
 import { h, Fragment, Component } from "preact";
+import type { ComponentType } from "preact";
 import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, PRDDocumentData, ItemStatus, ItemLevel, Priority, TaskUsageSummary, WeeklyBudgetResolution, ItemUsageRollup } from "./types.js";
 import { computeBranchStats, completionRatio, formatTimestamp } from "./compute.js";
@@ -1084,7 +1085,7 @@ export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget
         const rowTickMs = item.status === "in_progress" ? liveTickMs : null;
 
         return h(Fragment, { key: item.id },
-          h(NodeRow, {
+          h(NodeRow as ComponentType<NodeRowProps>, {
             item,
             taskUsage: taskUsageById?.[item.id],
             usageRollup: rollupById?.[item.id],

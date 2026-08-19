@@ -65,6 +65,9 @@
 
 /* Dark theme (default) */
 [data-theme="dark"] {
+  /* Tell the browser so native form chrome (select popups, number
+     spinners, scrollbars, autofill) renders in the matching scheme */
+  color-scheme: dark;
   --bg: #0c0e1a;
   --bg-surface: #151829;
   --bg-hover: #1e2240;
@@ -89,6 +92,7 @@
 
 /* Light theme */
 [data-theme="light"] {
+  color-scheme: light;
   --bg: #f5f6fa;
   --bg-surface: #ffffff;
   --bg-hover: #eef0f6;

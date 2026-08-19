@@ -25,6 +25,13 @@
   color: var(--color-text-primary);
 }
 
+.llm-header-subtitle {
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
 /* ── Vendor selector (segmented control) ────────────────────────── */
 
 .llm-vendor-selector {

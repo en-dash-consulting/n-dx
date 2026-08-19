@@ -388,7 +388,7 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
       ),
       // Generate button — sole trigger for proposal generation
       h("button", {
-        class: "smart-add-btn smart-add-btn-generate",
+        class: "cmd-btn cmd-btn-primary smart-add-btn-generate",
         type: "button",
         disabled: trimmedLength < MIN_INPUT_LENGTH || state === "loading",
         onClick: handleSubmit,
@@ -467,13 +467,13 @@ export function SmartAddInput({ onPrdChanged, compact }: SmartAddInputProps) {
           // Action buttons
           h("div", { class: "smart-add-actions" },
             h("button", {
-              class: "smart-add-btn smart-add-btn-review",
+              class: "cmd-btn cmd-btn-secondary smart-add-btn-review",
               onClick: () => setEditing(true),
               disabled: accepting,
               type: "button",
             }, "\u270E Review & Edit"),
             h("button", {
-              class: "smart-add-btn smart-add-btn-accept",
+              class: "cmd-btn cmd-btn-primary smart-add-btn-accept",
               onClick: handleAccept,
               disabled: accepting,
               type: "button",

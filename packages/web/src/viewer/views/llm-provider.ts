@@ -10,6 +10,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { NdxLogoPng } from "../components/index.js";
+import { useCliName } from "../hooks/index.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ function VendorSelector({
   onChange: (v: string | null) => void;
   localStatus: LocalStatusResponse | null;
 }) {
+  const cliName = useCliName();
   return h("div", { class: "llm-vendor-selector" },
     h("div", { class: "llm-vendor-tabs" },
       VENDORS.map((v) => {
@@ -109,8 +111,8 @@ function VendorSelector({
     ),
     h("p", { class: "llm-vendor-hint" },
       vendor
-        ? `Using ${VENDORS.find((v) => v.id === vendor)?.subtitle ?? vendor} for all ndx commands.`
-        : "No vendor selected — ndx commands will fall back to defaults.",
+        ? `Using ${VENDORS.find((v) => v.id === vendor)?.subtitle ?? vendor} for all ${cliName} commands.`
+        : `No vendor selected — ${cliName} commands will fall back to defaults.`,
     ),
   );
 }
@@ -254,6 +256,7 @@ function VendorSection({
   onChange: (key: string, v: string) => void;
   dirtyKeys: Set<string>;
 }) {
+  const cliName = useCliName();
   const suggestions = MODEL_SUGGESTIONS[vendorId] ?? [];
   const modelKey = `${vendorId}.model`;
   const lightKey = `${vendorId}.lightModel`;
@@ -262,7 +265,7 @@ function VendorSection({
     h(ModelField, {
       fieldKey: modelKey,
       label: "Primary model",
-      description: "Used for agentic tasks (ndx work, ndx plan). Leave blank for the CLI default.",
+      description: `Used for agentic tasks (${cliName} work, ${cliName} plan). Leave blank for the CLI default.`,
       value: editValues[modelKey] ?? config.model ?? "",
       suggestions,
       onChange,
@@ -650,6 +653,58 @@ function LocalSection({
 
 // ── Toast ─────────────────────────────────────────────────────────────
 
+/**
+ * Credential status for the configured provider.
+ *
+ * Runs the same check as `<cli> auth`, so a missing or invalid key is visible
+ * here rather than only when an agent command fails later.
+ */
+export function AuthStatusChip() {
+  const cliName = useCliName();
+  const [state, setState] = useState<"checking" | "ok" | "bad">("checking");
+  const [detail, setDetail] = useState<string | null>(null);
+
+  const check = useCallback(async (force = false) => {
+    setState("checking");
+    setDetail(null);
+    try {
+      // Force bypasses the server's cached result; the plain form is served
+      // from cache, so navigating to this page doesn't spawn a subprocess.
+      const res = await fetch(force ? "/api/commands/auth?refresh=true" : "/api/commands/auth");
+      const body = await res.json() as { ok?: boolean; error?: string | null; output?: string };
+      if (body.ok) {
+        setState("ok");
+        setDetail(body.output?.split("\n").filter(Boolean).pop() ?? null);
+      } else {
+        setState("bad");
+        setDetail(body.error ?? "Credential check failed");
+      }
+    } catch (err) {
+      setState("bad");
+      setDetail(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  useEffect(() => { check(); }, [check]);
+
+  return h("div", { class: `auth-chip auth-chip-${state}`, role: "status", "aria-live": "polite" },
+    h("span", { class: "auth-chip-dot", "aria-hidden": "true" }),
+    h("span", { class: "auth-chip-label" },
+      state === "checking" ? "Checking credentials…"
+        : state === "ok" ? "Credentials OK"
+        : "Credentials not usable",
+    ),
+    detail ? h("span", { class: "auth-chip-detail" }, detail) : null,
+    h("button", {
+      class: "cmd-btn cmd-btn-small",
+      // Not `onClick: check` — that would pass the MouseEvent as `force`.
+      onClick: () => check(true),
+      disabled: state === "checking",
+      title: `Re-run ${cliName} auth`,
+    }, "Re-check"),
+  );
+}
+
 function SaveToast({ message }: { message: string | null }) {
   if (!message) return null;
   return h("div", { class: "llm-toast", role: "status", "aria-live": "polite" },
@@ -661,6 +716,7 @@ function SaveToast({ message }: { message: string | null }) {
 // ── Main view ─────────────────────────────────────────────────────────
 
 export function LlmProviderView() {
+  const cliName = useCliName();
   const [data, setData] = useState<LlmConfigResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -796,9 +852,27 @@ export function LlmProviderView() {
         h(NdxLogoPng, { size: 16, class: "llm-header-logo" }),
         h("span", { class: "llm-header-title" }, "LLM Provider"),
       ),
+      h("p", { class: "llm-header-subtitle" },
+        "General settings used by all LLM commands (",
+        h("code", null, `${cliName} work`),
+        ", ",
+        h("code", null, `${cliName} plan`),
+        ", ",
+        h("code", null, `${cliName} recommend`),
+        "). Select the active vendor and configure model IDs. ",
+        "Changes are saved to ",
+        h("code", null, ".n-dx.json"),
+        " and take effect on the next run.",
+      ),
     ),
 
-    error ? h("div", { class: "llm-error-banner" }, error) : null,
+    // ── Credential status for the configured provider
+    h(AuthStatusChip, null),
+
+    // ── Error banner
+    error
+      ? h("div", { class: "llm-error-banner" }, error)
+      : null,
 
     h(VendorSelector, {
       vendor: effectiveVendor,
@@ -872,12 +946,12 @@ export function LlmProviderView() {
             `${changeCount} unsaved change${changeCount === 1 ? "" : "s"}`,
           ),
           h("button", {
-            class: "llm-btn llm-btn-secondary",
+            class: "cmd-btn cmd-btn-secondary",
             onClick: handleDiscard,
             disabled: saving,
           }, "Discard"),
           h("button", {
-            class: "llm-btn llm-btn-primary",
+            class: "cmd-btn cmd-btn-primary",
             onClick: handleSave,
             disabled: saving,
           }, saving ? "Saving…" : "Save"),
