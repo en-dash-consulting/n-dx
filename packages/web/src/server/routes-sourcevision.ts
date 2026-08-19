@@ -19,8 +19,10 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
+import { deriveNextSteps, setArchetypeOverride } from "./domain-gateway.js";
+import type { NextStep } from "./domain-gateway.js";
 import {
   classifyPRMarkdownRefreshFailureCode,
 } from "./pr-markdown-refresh-diagnostics.js";
@@ -348,6 +350,61 @@ function getPRMarkdownState(
 }
 
 /** Handle sourcevision API requests. Returns true if the request was handled. */
+/**
+ * POST /api/sv/archetype — override a file's archetype classification.
+ * Mirrors the MCP `set_file_archetype` tool: validates the file against the
+ * inventory and the archetype against known classifications, then persists
+ * the override to `.n-dx.json` (applied on the next analyze run).
+ */
+async function handleArchetypeOverride(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+): Promise<void> {
+  let path = "";
+  let archetype = "";
+  try {
+    const body = await readBody(req);
+    const input = JSON.parse(body || "{}") as { path?: string; archetype?: string };
+    path = String(input.path ?? "");
+    archetype = String(input.archetype ?? "");
+  } catch {
+    errorResponse(res, 400, "Invalid JSON body");
+    return;
+  }
+  if (!path || !archetype) {
+    errorResponse(res, 400, "Both 'path' and 'archetype' are required");
+    return;
+  }
+
+  const inventory = loadDataFile(ctx, DATA_FILES.inventory) as { files?: Array<{ path: string }> } | null;
+  if (!inventory?.files?.some((f) => f.path === path)) {
+    errorResponse(res, 404, `File "${path}" not found in inventory.`);
+    return;
+  }
+
+  const classifications = loadDataFile(ctx, "classifications.json") as { archetypes?: Array<{ id: string }> } | null;
+  const validArchetypes = classifications?.archetypes?.map((a) => a.id) ?? [];
+  if (validArchetypes.length > 0 && !validArchetypes.includes(archetype)) {
+    errorResponse(res, 400, `Unknown archetype "${archetype}". Valid archetypes: ${validArchetypes.join(", ")}`);
+    return;
+  }
+
+  try {
+    setArchetypeOverride(ctx.projectDir, path, archetype);
+  } catch (err) {
+    errorResponse(res, 500, `Failed to persist override: ${err instanceof Error ? err.message : String(err)}`);
+    return;
+  }
+
+  jsonResponse(res, 200, {
+    ok: true,
+    path,
+    archetype,
+    message: `Archetype override saved. Run analyze to apply.`,
+  });
+}
+
 export function handleSourcevisionRoute(
   req: IncomingMessage,
   res: ServerResponse,
@@ -364,7 +421,46 @@ export function handleSourcevisionRoute(
   const path = routePath.slice(SV_PREFIX.length);
   const params = new URLSearchParams(query);
 
+  // POST /api/sv/archetype — persist an archetype override (async body read;
+  // the dispatcher stays synchronous, the handler completes the response).
+  if (path === "archetype" && method === "POST") {
+    void handleArchetypeOverride(req, res, ctx);
+    return true;
+  }
+
   if (method !== "GET") return false;
+
+  // GET /api/sv/next-steps — prioritized recommendations derived from zone
+  // findings (UI twin of the MCP get_next_steps tool).
+  if (path === "next-steps") {
+    const zones = loadDataFile(ctx, DATA_FILES.zones);
+    if (!zones) {
+      errorResponse(res, 404, "No zones data. Run 'sourcevision analyze' first.");
+      return true;
+    }
+    try {
+      let steps: NextStep[] = deriveNextSteps(zones as Parameters<typeof deriveNextSteps>[0]);
+      const priority = params.get("priority");
+      if (priority) steps = steps.filter((s) => s.priority === priority);
+      const limit = Math.max(0, parseInt(params.get("limit") ?? "", 10) || 10);
+      steps = steps.slice(0, limit);
+      jsonResponse(res, 200, { steps, total: steps.length });
+    } catch (err) {
+      errorResponse(res, 500, `Failed to derive next steps: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return true;
+  }
+
+  // GET /api/sv/classifications — file archetype classifications
+  if (path === "classifications") {
+    const data = loadDataFile(ctx, "classifications.json");
+    if (!data) {
+      errorResponse(res, 404, "No classifications data. Run 'sourcevision analyze' first.");
+      return true;
+    }
+    jsonResponse(res, 200, data);
+    return true;
+  }
 
   // GET /api/sv/manifest
   if (path === "manifest") {

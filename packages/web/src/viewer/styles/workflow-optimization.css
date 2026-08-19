@@ -1,0 +1,333 @@
+/* ── Workflow Optimization view (Hench → Optimization) ─────────────────
+   Buttons, stats, tables, and selects come from the shared systems
+   (cmd-btn, stat-card, data-table, filter-select); this file styles only
+   the page-specific structures. */
+
+.wf-container {
+  max-width: 900px;
+}
+
+.wf-header {
+  margin-bottom: 20px;
+}
+
+/* ── Stats ─────────────────────────────────────────────────────────── */
+
+.wf-stat-warn {
+  border-color: color-mix(in srgb, var(--orange) 50%, var(--border));
+}
+
+.wf-stat-warn .value {
+  color: var(--orange);
+}
+
+.wf-stats-time-range {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  margin-bottom: var(--space-4);
+}
+
+.wf-failure-breakdown h4 {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-2);
+}
+
+.wf-failure-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.wf-failure-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+  color: var(--orange);
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+}
+
+.wf-failure-chip-count {
+  font-weight: var(--weight-bold);
+}
+
+/* ── Decision history bar ──────────────────────────────────────────── */
+
+.wf-history-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  margin-bottom: var(--space-4);
+}
+
+.wf-history-label {
+  color: var(--text-dim);
+}
+
+.wf-history-accepted { color: var(--green); }
+.wf-history-rejected { color: var(--red); }
+.wf-history-deferred { color: var(--text-dim); }
+
+/* ── Suggestions ───────────────────────────────────────────────────── */
+
+.wf-suggestions-section {
+  margin-top: var(--space-4);
+}
+
+.wf-suggestions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.wf-suggestions-header h2 {
+  font-size: var(--font-lg);
+  font-weight: var(--weight-semibold);
+  margin: 0;
+}
+
+.wf-suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.wf-suggestion-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.wf-suggestion-card.wf-priority-high { border-left-color: var(--red); }
+.wf-suggestion-card.wf-priority-medium { border-left-color: var(--orange); }
+.wf-suggestion-card.wf-priority-low { border-left-color: var(--border-strong); }
+
+.wf-suggestion-header {
+  cursor: pointer;
+}
+
+.wf-suggestion-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wf-suggestion-icon {
+  color: var(--text-dim);
+}
+
+.wf-suggestion-title {
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+  margin: 0;
+  flex: 1;
+}
+
+.wf-suggestion-priority-badge {
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  color: var(--text-dim);
+}
+
+.wf-suggestion-priority-badge.wf-priority-high {
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+  color: var(--red);
+}
+
+.wf-suggestion-priority-badge.wf-priority-medium {
+  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  color: var(--orange);
+}
+
+.wf-suggestion-category {
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+}
+
+.wf-suggestion-description {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin: var(--space-2) 0 0;
+}
+
+.wf-suggestion-detail {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.wf-suggestion-detail-section {
+  margin-bottom: var(--space-3);
+}
+
+.wf-suggestion-detail-section h4 {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  margin-bottom: var(--space-1);
+}
+
+.wf-suggestion-detail-section p {
+  font-size: var(--font-sm);
+  line-height: 1.5;
+}
+
+.wf-config-changes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-sm);
+}
+
+.wf-config-change-row code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  font-size: var(--font-xs);
+}
+
+.wf-config-new-value {
+  color: var(--accent);
+}
+
+.wf-affected-tasks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.wf-task-id {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+}
+
+.wf-suggestion-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.wf-suggestion-actions .link-btn {
+  margin-right: auto;
+}
+
+.wf-no-suggestions,
+.wf-empty,
+.wf-error {
+  padding: var(--space-6);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+}
+
+.wf-error {
+  border-left: 3px solid var(--red);
+}
+
+.wf-error-hint,
+.wf-empty-hint {
+  margin-top: var(--space-2);
+}
+
+.wf-error code,
+.wf-empty code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+}
+
+/* ── Preview overlay ───────────────────────────────────────────────── */
+
+.wf-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 900;
+}
+
+.wf-preview-container {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  max-width: 560px;
+  width: calc(100% - 48px);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.wf-preview-container h3 {
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-3);
+}
+
+.wf-preview-panel h4 {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-2);
+}
+
+.wf-preview-table {
+  margin-bottom: var(--space-4);
+}
+
+.wf-preview-old {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.wf-preview-new {
+  color: var(--accent);
+  font-weight: var(--weight-medium);
+}
+
+/* ── Toast ─────────────────────────────────────────────────────────── */
+
+.wf-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--green);
+  color: var(--bg);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}

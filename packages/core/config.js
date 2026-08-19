@@ -1287,6 +1287,14 @@ Sourcevision zone overrides (.n-dx.json):
                            number    Min zone size for small-zone merge (default: 3)
 
 CLI settings (.n-dx.json):
+  cli.name                 string    The project's installed CLI command name.
+                                     Auto-detected from the package.json bin field
+                                     by ndx init (first bin key, or the package name
+                                     for a string bin). Defaults to "n-dx" when no
+                                     bin field exists. Set manually to override
+                                     detection — a set value is never overwritten
+                                     by ndx init.
+                                     Example: n-dx config cli.name myapp
   cli.claudePath           string    Path to the Claude Code CLI binary (optional).
                                      Overrides all discovery heuristics (PATH, nvm,
                                      Homebrew, etc.). Set this when claude is installed

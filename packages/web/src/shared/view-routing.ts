@@ -5,12 +5,13 @@ export type ViewerScope = "sourcevision" | "rex" | "hench";
 
 export type SourcevisionScopeViewId = Extract<
   ViewId,
-  "overview" | "graph" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "pr-markdown"
+  "overview" | "graph" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "pr-markdown"
 >;
 
 export const SOURCEVISION_SCOPE_VIEWS: readonly SourcevisionScopeViewId[] = [
   "overview",
   "graph",
+  "zones",
   "files",
   "routes",
   "architecture",
@@ -22,8 +23,11 @@ export const SOURCEVISION_SCOPE_VIEWS: readonly SourcevisionScopeViewId[] = [
 export const REX_SCOPE_VIEWS: readonly ViewId[] = [
   "rex-dashboard",
   "prd",
+  "analysis",
   "merge-graph",
   "validation",
+  "requirements",
+  "activity",
   "notion-config",
   "integrations",
 ];
@@ -34,12 +38,14 @@ export const HENCH_SCOPE_VIEWS: readonly ViewId[] = [
   "hench-config",
   "hench-templates",
   "hench-optimization",
+  "hench-adaptive",
 ];
 
 export const CROSS_CUTTING_VIEWS: readonly ViewId[] = [
   "token-usage",
   "feature-toggles",
   "cli-timeouts",
+  "command-reference",
 ];
 
 export const VIEWS_BY_SCOPE: Readonly<Record<ViewerScope, readonly ViewId[]>> = {

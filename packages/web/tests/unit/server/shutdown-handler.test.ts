@@ -67,15 +67,21 @@ function createMockWs() {
   return { shutdown: vi.fn() };
 }
 
+type ExitMock = ((code: number) => void) & ReturnType<typeof vi.fn>;
+
+function createExitMock(): ExitMock {
+  return vi.fn((_code: number) => undefined) as unknown as ExitMock;
+}
+
 // ── Suite ─────────────────────────────────────────────────────────────────
 
 describe("registerShutdownHandlers", () => {
   let tmpDir: string;
   let portFilePath: string;
-  let mockExit: ReturnType<typeof vi.fn>;
+  let mockExit: ExitMock;
 
   beforeEach(async () => {
-    mockExit = vi.fn();
+    mockExit = createExitMock();
 
     vi.mocked(shutdownActiveExecutions).mockReset();
     // Default: completes quickly with no failures

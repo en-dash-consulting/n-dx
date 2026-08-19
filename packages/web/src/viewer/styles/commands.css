@@ -4,6 +4,16 @@
   max-width: 800px;
 }
 
+.cmdref-run-note {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.cmdref-run-error {
+  color: var(--red);
+}
+
 /* ── Panels ─────────────────────────────────────────────────────────── */
 
 .cmd-panels {
@@ -350,4 +360,240 @@
   font-size: var(--font-base);
   color: var(--red);
   margin-top: var(--space-3);
+}
+
+/* ── Command reference (All Commands view) ─────────────────────────── */
+
+.cmdref-container {
+  max-width: 960px;
+}
+
+.cmdref-group {
+  margin-top: var(--space-4);
+}
+
+.cmdref-table td {
+  vertical-align: top;
+}
+
+.cmdref-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-sm);
+  white-space: nowrap;
+}
+
+.cmdref-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.cmdref-status-available .cmdref-status-dot { background: var(--green); }
+.cmdref-status-needs-init .cmdref-status-dot { background: var(--yellow); }
+.cmdref-status-needs-llm .cmdref-status-dot { background: var(--purple); }
+
+/* ── Inline progress + phase list (Refresh / full-analysis panels) ── */
+
+.cmd-inline-progress {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+.cmd-phase-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+}
+
+.cmd-phase-item {
+  padding: 2px 0;
+  font-family: var(--mono);
+}
+
+/* ── Adaptive optimization view ────────────────────────────────────── */
+
+.adaptive-container section {
+  margin-top: var(--space-4);
+}
+
+.adaptive-rationale {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  margin: var(--space-2) 0;
+}
+
+.adaptive-change code {
+  padding: 1px 4px;
+}
+
+.adaptive-key-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+
+.adaptive-key-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px 0;
+}
+
+.adaptive-priority-high { color: var(--red); }
+.adaptive-priority-medium { color: var(--yellow); }
+.adaptive-priority-low { color: var(--text-muted); }
+
+.adaptive-decision-applied { color: var(--green); }
+.adaptive-decision-dismissed { color: var(--text-muted); }
+.adaptive-decision-overridden { color: var(--purple); }
+
+.cmd-btn-small {
+  font-size: var(--font-sm);
+  padding: 2px 8px;
+}
+
+/* ── Requirements view ─────────────────────────────────────────────── */
+
+.req-container section {
+  margin-top: var(--space-4);
+}
+
+.req-breakdowns {
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.req-breakdown-label {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  margin: 0 0 4px;
+}
+
+.req-breakdown-list,
+.req-criteria-list,
+.req-applies-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.req-breakdown-item,
+.req-applies-item {
+  padding: 2px 0;
+  font-size: var(--font-sm);
+}
+
+.req-level {
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+}
+
+.req-detail-row td {
+  background: var(--bg-subtle, var(--bg-hover));
+}
+
+.req-detail-heading {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  margin: var(--space-2) 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.req-criteria-list li {
+  padding: 2px 0 2px 14px;
+  position: relative;
+}
+
+.req-criteria-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--green);
+}
+
+.req-status-completed { color: var(--green); }
+.req-status-pending { color: var(--text-muted); }
+.req-status-in_progress { color: var(--yellow); }
+.req-status-blocked { color: var(--red); }
+
+/* ── Validation actions (fix / CI / reshape) ───────────────────────── */
+
+.validation-actions {
+  margin-top: var(--space-5);
+}
+
+.validation-action-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+
+.validation-action .cmd-panel-title {
+  font-size: var(--font-base);
+  margin: 0 0 4px;
+}
+
+.validation-ci-results,
+.validation-reshape-proposals {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  font-size: var(--font-sm);
+}
+
+.validation-ci-results li,
+.validation-reshape-proposals li {
+  padding: 2px 0;
+  word-break: break-word;
+}
+
+/* ── Tier 3 surfaces: auth chip, activity log ─────────────────────── */
+
+.auth-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  margin: var(--space-3) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+}
+
+.auth-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.auth-chip-ok .auth-chip-dot { background: var(--green); }
+.auth-chip-bad .auth-chip-dot { background: var(--red); }
+
+.auth-chip-label { font-weight: var(--weight-semibold); }
+.auth-chip-bad .auth-chip-label { color: var(--red); }
+.auth-chip-detail { color: var(--text-muted); }
+
+.activity-container { max-width: 1100px; }
+
+.activity-when { white-space: nowrap; color: var(--text-muted); }
+
+.activity-detail { word-break: break-word; }
+
+.hench-validate-tokens {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }

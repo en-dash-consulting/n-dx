@@ -54,16 +54,16 @@ function installBrowserStubs(reducedMotion = false): void {
   });
 
   // IntersectionObserver — must behave as a constructor (called with `new`)
-  window.IntersectionObserver = vi.fn().mockImplementation(function (
-    this: IntersectionObserver,
-  ) {
-    this.observe = vi.fn();
-    this.unobserve = vi.fn();
-    this.disconnect = vi.fn();
-    this.takeRecords = vi.fn().mockReturnValue([]);
-    this.root = null;
-    this.rootMargin = "";
-    this.thresholds = [];
+  window.IntersectionObserver = vi.fn().mockImplementation(function () {
+    return {
+      observe: vi.fn(),
+      unobserve: vi.fn(),
+      disconnect: vi.fn(),
+      takeRecords: vi.fn().mockReturnValue([]),
+      root: null,
+      rootMargin: "",
+      thresholds: [],
+    } satisfies IntersectionObserver;
   }) as unknown as typeof IntersectionObserver;
 }
 

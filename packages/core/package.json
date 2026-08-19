@@ -46,6 +46,7 @@
     "bin/",
     "cli.js",
     "cli-brand.js",
+    "cli-identity.js",
     "cli-ink.js",
     "config.js",
     "ci.js",

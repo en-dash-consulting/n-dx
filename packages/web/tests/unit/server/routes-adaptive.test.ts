@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleAdaptiveRoute } from "../../../src/server/routes-adaptive.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal hench config for testing. */
 function makeConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -70,7 +71,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -111,14 +112,14 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   });
 
   afterEach(async () => {
-    server.close();
+    await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
 
   // ── GET /api/hench/adaptive/analysis ──────────────────────────────
 
   it("returns empty analysis when no runs exist", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/analysis`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/analysis`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -144,7 +145,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
       );
     }
 
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/analysis`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/analysis`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -169,7 +170,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
       );
     }
 
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/analysis`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/analysis`);
     const body = await res.json();
     // Should have at least one adjustment (complexity scaling for maxTurns)
     expect(body.adjustments.length).toBeGreaterThan(0);
@@ -179,7 +180,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   // ── GET /api/hench/adaptive/settings ──────────────────────────────
 
   it("returns default settings when no state exists", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/settings`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/settings`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -193,7 +194,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   // ── POST /api/hench/adaptive/settings ─────────────────────────────
 
   it("updates settings", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/settings`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/settings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled: false, windowSize: 30 }),
@@ -214,7 +215,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   });
 
   it("rejects invalid window size", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/settings`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/settings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ windowSize: 3 }), // below minimum of 5
@@ -229,7 +230,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   // ── POST /api/hench/adaptive/apply ────────────────────────────────
 
   it("applies an adjustment to config", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/apply`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/apply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -263,7 +264,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   });
 
   it("rejects apply without required fields", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/apply`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/apply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ configKey: "maxTurns" }), // missing newValue
@@ -274,7 +275,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   // ── POST /api/hench/adaptive/dismiss/:id ──────────────────────────
 
   it("dismisses a recommended adjustment", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/dismiss/adj-1`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/dismiss/adj-1`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -300,7 +301,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   // ── POST /api/hench/adaptive/lock/:key ────────────────────────────
 
   it("locks a config key from auto-adjustment", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/lock/maxTurns`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/lock/maxTurns`, {
       method: "POST",
     });
     expect(res.status).toBe(200);
@@ -311,10 +312,10 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   });
 
   it("does not duplicate locked keys", async () => {
-    await fetch(`http://localhost:${port}/api/hench/adaptive/lock/maxTurns`, { method: "POST" });
-    await fetch(`http://localhost:${port}/api/hench/adaptive/lock/maxTurns`, { method: "POST" });
+    await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/lock/maxTurns`, { method: "POST" });
+    await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/lock/maxTurns`, { method: "POST" });
 
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/settings`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/settings`);
     const body = await res.json();
     const count = body.settings.lockedKeys.filter((k: string) => k === "maxTurns").length;
     expect(count).toBe(1);
@@ -324,10 +325,10 @@ describe("Adaptive Workflow Adjustment API routes", () => {
 
   it("unlocks a config key for auto-adjustment", async () => {
     // First lock it
-    await fetch(`http://localhost:${port}/api/hench/adaptive/lock/maxTurns`, { method: "POST" });
+    await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/lock/maxTurns`, { method: "POST" });
 
     // Then unlock
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/unlock/maxTurns`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/unlock/maxTurns`, {
       method: "POST",
     });
     expect(res.status).toBe(200);
@@ -340,7 +341,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   // ── POST /api/hench/adaptive/override ─────────────────────────────
 
   it("sets a manual override and locks the key", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/override`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/override`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key: "maxTurns", value: 100 }),
@@ -360,7 +361,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   });
 
   it("rejects override without required fields", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/override`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/override`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key: "maxTurns" }), // missing value
@@ -372,14 +373,14 @@ describe("Adaptive Workflow Adjustment API routes", () => {
 
   it("removes a manual override and unlocks the key", async () => {
     // Set an override first
-    await fetch(`http://localhost:${port}/api/hench/adaptive/override`, {
+    await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/override`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key: "maxTurns", value: 100 }),
     });
 
     // Remove it
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/override/maxTurns`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/override/maxTurns`, {
       method: "DELETE",
     });
     expect(res.status).toBe(200);
@@ -392,7 +393,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   // ── GET /api/hench/adaptive/history ───────────────────────────────
 
   it("returns empty history initially", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/history`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/history`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -402,7 +403,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
 
   it("returns history with stats after adjustments", async () => {
     // Apply an adjustment
-    await fetch(`http://localhost:${port}/api/hench/adaptive/apply`, {
+    await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/apply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -416,7 +417,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
     });
 
     // Dismiss another
-    await fetch(`http://localhost:${port}/api/hench/adaptive/dismiss/adj-2`, {
+    await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/dismiss/adj-2`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -426,7 +427,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
       }),
     });
 
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/history`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/history`);
     const body = await res.json();
 
     expect(body.records).toHaveLength(2);
@@ -440,7 +441,7 @@ describe("Adaptive Workflow Adjustment API routes", () => {
   // ── Unmatched routes ──────────────────────────────────────────────
 
   it("returns 404 for unknown adaptive paths", async () => {
-    const res = await fetch(`http://localhost:${port}/api/hench/adaptive/unknown`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/unknown`);
     expect(res.status).toBe(404);
   });
 });

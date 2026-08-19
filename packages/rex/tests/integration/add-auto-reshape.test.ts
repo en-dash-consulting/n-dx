@@ -28,6 +28,17 @@ import {
 import { loadArchive, ARCHIVE_FILE } from "../../src/core/archive.js";
 import type { PRDItem } from "../../src/schema/index.js";
 
+/**
+ * Load tolerance for wall-clock budgets below.
+ *
+ * These assertions guard against algorithmic regressions (a quadratic
+ * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
+ * numbers flake when the rest of the monorepo suite saturates every core,
+ * so the budget is scaled. See TESTING.md "Flake Resistance".
+ */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function setupDir(): Promise<{ tmpDir: string; rexDir: string }> {
@@ -462,6 +473,6 @@ describe("cmdAdd scoped consolidation pass", () => {
     await runScopedConsolidationPass(rexDir, store, newId, {});
     const elapsed = Date.now() - start;
 
-    expect(elapsed).toBeLessThan(500);
+    expect(elapsed).toBeLessThan(500 * BUDGET_MULTIPLIER);
   });
 });

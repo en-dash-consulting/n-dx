@@ -8,6 +8,7 @@ import {
   isWorkItem,
 } from "../../prd/rex-gateway.js";
 import type { PRDStore, PRDItem, TreeEntry } from "../../prd/rex-gateway.js";
+import { resolveProjectCliName, DEFAULT_CLI_NAME } from "./cli-identity.js";
 import type {
   TaskBrief,
   TaskBriefTask,
@@ -27,6 +28,12 @@ export interface AssembleBriefOptions {
   epicId?: string;
   /** Only select tasks with at least one of these tags. */
   tags?: string[];
+  /**
+   * Project root directory — used to resolve the project's CLI command name
+   * (`cli.name` in `.n-dx.json`) for prompt/brief injection. Defaults to
+   * "n-dx" when omitted.
+   */
+  projectDir?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,11 +94,11 @@ export class TaskNotActionableError extends CLIError {
   }
 }
 
-function buildSuggestion(status: string, taskId: string): string {
+function buildSuggestion(status: string, taskId: string, cliName = DEFAULT_CLI_NAME): string {
   if (status === "completed") {
     return (
-      "This task is already complete. Run 'n-dx status' to see remaining work,\n" +
-      "or pick a different task with 'n-dx work --task=<ID>'."
+      `This task is already complete. Run '${cliName} status' to see remaining work,\n` +
+      `or pick a different task with '${cliName} work --task=<ID>'.`
     );
   }
   if (status === "blocked") {
@@ -99,14 +106,14 @@ function buildSuggestion(status: string, taskId: string): string {
       `This task is blocked and cannot proceed until its dependencies are resolved.\n` +
       `To unblock it, run:\n` +
       `  rex update ${taskId} --status=pending\n` +
-      "Then run 'n-dx work' again."
+      `Then run '${cliName} work' again.`
     );
   }
   // deferred
   return (
     `This task has been deferred. To reactivate it, run:\n` +
     `  rex update ${taskId} --status=pending\n` +
-    "Then run 'n-dx work' again."
+    `Then run '${cliName} work' again.`
   );
 }
 
@@ -157,6 +164,9 @@ export async function assembleTaskBrief(
   const config = await store.loadConfig();
   const excludeIds = options?.excludeTaskIds;
   const tags = options?.tags?.length ? options.tags : undefined;
+  const cliName = options?.projectDir
+    ? resolveProjectCliName(options.projectDir)
+    : DEFAULT_CLI_NAME;
 
   let entry: TreeEntry | null;
 
@@ -170,7 +180,7 @@ export async function assembleTaskBrief(
       throw new TaskNotActionableError(
         taskId,
         "completed",
-        buildSuggestion("completed", taskId),
+        buildSuggestion("completed", taskId, cliName),
         entry.item.title,
       );
     }
@@ -179,7 +189,7 @@ export async function assembleTaskBrief(
       throw new TaskNotActionableError(
         taskId,
         entry.item.status,
-        buildSuggestion(entry.item.status, taskId),
+        buildSuggestion(entry.item.status, taskId, cliName),
         entry.item.title,
       );
     }
@@ -230,6 +240,7 @@ export async function assembleTaskBrief(
     name: config.project,
     validateCommand: config.validate,
     testCommand: config.test,
+    cliName,
   };
 
   // Collect requirements (own + inherited from parent chain)
@@ -376,6 +387,7 @@ export function formatTaskBrief(brief: TaskBrief): string {
   // Project
   sections.push("\n## Project");
   sections.push(`Name: ${brief.project.name}`);
+  sections.push(`CLI: \`${brief.project.cliName ?? DEFAULT_CLI_NAME}\``);
   if (brief.project.validateCommand) {
     sections.push(`Validate: \`${brief.project.validateCommand}\``);
   }

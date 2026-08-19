@@ -421,6 +421,13 @@ export interface SpawnToolOptions {
    * 0 or undefined = no timeout (wait indefinitely).
    */
   timeout?: number;
+  /**
+   * Called with each stdout chunk as it arrives. Fires only when `stdio`
+   * is `"pipe"`. Lets a long-running child stream progress to the caller —
+   * e.g. the web dashboard surfacing live phase output while a job runs —
+   * while the result still carries the full accumulated text on exit.
+   */
+  onStdout?: (chunk: string) => void;
 }
 
 /** Result from {@link spawnTool}. */
@@ -527,7 +534,9 @@ export function spawnTool(
 
     if (stdio === "pipe") {
       child.stdout!.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString();
+        const text = chunk.toString();
+        stdout += text;
+        opts.onStdout?.(text);
       });
       child.stderr!.on("data", (chunk: Buffer) => {
         stderr += chunk.toString();
@@ -606,7 +615,9 @@ export function spawnManaged(
 
     if (stdio === "pipe") {
       child.stdout!.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString();
+        const text = chunk.toString();
+        stdout += text;
+        opts.onStdout?.(text);
       });
       child.stderr!.on("data", (chunk: Buffer) => {
         stderr += chunk.toString();

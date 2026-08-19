@@ -13,6 +13,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useMemo, useRef } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
+import { useCliName } from "../hooks/index.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -460,6 +461,7 @@ function SaveToast({ changes }: { changes: AppliedChange[] }) {
 // ── Main view ────────────────────────────────────────────────────────
 
 export function HenchConfigView() {
+  const cliName = useCliName();
   const [data, setData] = useState<ConfigResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -607,7 +609,7 @@ export function HenchConfigView() {
 
   if (error && !data) {
     return h("div", { class: "hench-config-container" },
-      h(BrandedHeader, { product: "hench", title: "ndx work — Workflow Configuration" }),
+      h(BrandedHeader, { product: "hench", title: `${cliName} work — Workflow Configuration` }),
       h("div", { class: "hench-config-error-state" },
         h("p", null, error),
         h("p", { class: "hench-config-error-hint" },
@@ -636,7 +638,7 @@ export function HenchConfigView() {
 
   return h("div", { class: "hench-config-container" },
     h("div", { class: "hench-config-header" },
-      h(BrandedHeader, { product: "hench", title: "ndx work — Workflow Configuration" }),
+      h(BrandedHeader, { product: "hench", title: `${cliName} work — Workflow Configuration` }),
       modifiedCount > 0
         ? h("span", { class: "hench-config-modified-count" },
             `${modifiedCount} field${modifiedCount > 1 ? "s differ" : " differs"} from defaults`,

@@ -1,4 +1,4 @@
-const ALLOWED_REFRESH_FLAGS = new Set(["--ui-only", "--data-only", "--pr-markdown", "--no-build", "--quiet", "-q", "--fast"]);
+const ALLOWED_REFRESH_FLAGS = new Set(["--ui-only", "--data-only", "--pr-markdown", "--no-build", "--quiet", "-q", "--fast", "--live-server"]);
 
 export class RefreshPlanError extends Error {
   constructor(message, suggestion) {
@@ -26,6 +26,10 @@ export function buildRefreshPlan(flags) {
   const noBuild = flags.includes("--no-build");
   const quietFlags = flags.filter((f) => f === "--quiet" || f === "-q");
   const fast = flags.includes("--fast");
+  // --live-server: refresh triggered from the running dashboard. The caller
+  // must not stop the server, and the plan must not rebuild the UI assets
+  // the server is actively serving.
+  const liveServer = flags.includes("--live-server");
   // Flags forwarded to `sourcevision analyze`: quiet flags plus optional --fast
   // (structural-only, skips LLM archetype/zone enrichment). Not forwarded to the
   // pr-markdown step, which has no such mode.
@@ -56,7 +60,7 @@ export function buildRefreshPlan(flags) {
     skippedSteps.push({ kind: "sourcevision-dashboard-artifacts", reason: "--pr-markdown" });
     skippedSteps.push({ kind: "web-build", reason: "--pr-markdown" });
     notes.push("Refresh plan: running PR markdown refresh only; skipping data analysis and UI build.");
-    return { steps, skippedSteps, quietFlags, analyzeFlags, notes, needsSourcevisionDir };
+    return { steps, skippedSteps, quietFlags, analyzeFlags, notes, needsSourcevisionDir, liveServer };
   }
 
   if (!uiOnly) {
@@ -80,5 +84,12 @@ export function buildRefreshPlan(flags) {
     steps.push({ kind: "web-build" });
   }
 
-  return { steps, skippedSteps, quietFlags, analyzeFlags, notes, needsSourcevisionDir };
+  if (liveServer && steps.some((s) => s.kind === "web-build")) {
+    throw new RefreshPlanError(
+      "--live-server cannot rebuild UI assets while the dashboard is serving them.",
+      "Combine --live-server with --data-only, --no-build, or --pr-markdown.",
+    );
+  }
+
+  return { steps, skippedSteps, quietFlags, analyzeFlags, notes, needsSourcevisionDir, liveServer };
 }

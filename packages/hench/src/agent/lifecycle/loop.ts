@@ -718,7 +718,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Shared: assemble brief, format, build system prompt, display task info
   const { brief, taskId, briefText, systemPrompt } = await prepareBrief(
     store, config, opts.taskId,
-    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags },
+    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, projectDir },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
     opts.extraContext,
   );

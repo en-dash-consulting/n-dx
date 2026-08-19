@@ -188,6 +188,115 @@
   border-radius: 6px;
 }
 
+/* Analyze trigger row */
+.overview-reanalyze {
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.overview-reanalyze .cmd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Next Steps panel */
+.next-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: next-step;
+}
+
+.next-step-item {
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 8px;
+}
+
+.next-step-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.next-step-priority {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.next-step-priority-critical {
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+  color: var(--red);
+}
+
+.next-step-priority-high {
+  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  color: var(--orange);
+}
+
+/* medium keeps the default accent styling */
+
+.next-step-priority-low {
+  background: color-mix(in srgb, var(--text-dim) 15%, transparent);
+  color: var(--text-dim);
+}
+
+.next-step-title {
+  font-weight: 500;
+  font-size: 13px;
+  flex: 1;
+}
+
+.next-step-copy {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.next-step-copy:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.next-step-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.next-steps-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.next-steps-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 /* Attention list */
 .attention-list {
   display: flex;

@@ -66,6 +66,28 @@ describe("Graph (Import Graph view)", () => {
     return root;
   }
 
+  /**
+   * Click a dependency-preview history button once it is actually enabled.
+   *
+   * `canGoBack`/`canGoForward` come from focus-history state pushed by a
+   * chained effect, so the button can still be `disabled` at the moment the
+   * focus detail first shows the new file. Clicking a disabled button is a
+   * silent no-op that never re-renders — the test then waits out its full
+   * timeout. Re-querying (rather than caching the node list) also survives
+   * Preact replacing the element. Both make the click deterministic instead
+   * of dependent on how fast effects flush on a loaded machine.
+   */
+  async function clickHistoryButton(root: HTMLElement, label: "Back" | "Forward"): Promise<void> {
+    let button: HTMLButtonElement | undefined;
+    await vi.waitFor(() => {
+      button = ([...root.querySelectorAll(".ig-preview-history-btn")] as HTMLButtonElement[])
+        .find((b) => b.textContent?.trim() === label);
+      expect(button, `${label} button should be present`).toBeTruthy();
+      expect(button!.disabled, `${label} button should be enabled`).toBe(false);
+    }, { timeout: 3000 });
+    button!.click();
+  }
+
   afterEach(() => {
     for (const root of roots) {
       render(null, root);
@@ -188,14 +210,17 @@ describe("Graph (Import Graph view)", () => {
     root.dispatchEvent(new Event("scroll"));
     expect(root.querySelector(".ig-codebase-morph")?.className).toContain("ig-codebase-morph-mini");
     root.scrollTop = 0;
-    root.querySelector(".ig-page")?.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -20 }));
+    // Re-dispatch inside the wait: the wheel listener is attached by an effect,
+    // so an event sent before it lands is simply lost. Repeating an
+    // already-satisfied intent is a no-op, so retrying converges.
     await vi.waitFor(() => {
+      root.querySelector(".ig-page")?.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -20 }));
       expect(root.querySelector(".ig-codebase-morph")?.className).toContain("ig-codebase-morph-full");
       // Zone name lives in the atlas hero now, not the in-panel header.
       expect(root.querySelector(".ig-atlas-hero")?.textContent).toContain("Zone A");
     });
-    root.querySelector(".ig-page")?.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 20 }));
     await vi.waitFor(() => {
+      root.querySelector(".ig-page")?.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 20 }));
       expect(root.querySelector(".ig-codebase-morph")?.className).toContain("ig-codebase-morph-mini");
     });
   });
@@ -208,9 +233,19 @@ describe("Graph (Import Graph view)", () => {
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-focus-chip")?.textContent).toBeTruthy();
     });
-    svg.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 40 }));
+    // Retry the gesture, not just the assertion. A view-reset effect fires when
+    // the auto-selected focus file lands; a wheel dispatched in the window
+    // before it runs is wiped back to the identity transform. Re-dispatching
+    // converges. Each event pans a further 40 units, so assert a positive
+    // multiple of 40 — that still pins deltaY→translation while tolerating the
+    // retries.
     await vi.waitFor(() => {
-      expect(root.querySelector(".ig-graph-column .ig-svg-wrap svg > g[transform]")?.getAttribute("transform")).toContain("translate(0 -40)");
+      svg.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 40 }));
+      const transform = root.querySelector(".ig-graph-column .ig-svg-wrap svg > g[transform]")?.getAttribute("transform") ?? "";
+      const panned = /^translate\(0 -(\d+)\)/.exec(transform);
+      expect(panned, `expected a vertical pan, got "${transform}"`).toBeTruthy();
+      expect(Number(panned![1]) % 40, `pan should be a multiple of 40, got "${transform}"`).toBe(0);
+      expect(Number(panned![1])).toBeGreaterThan(0);
     }, { timeout: 3000 });
     const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone B"));
     expect(zoneBtn).toBeTruthy();
@@ -223,6 +258,14 @@ describe("Graph (Import Graph view)", () => {
   it("supports back and forward through clicked dependency preview nodes", async () => {
     const root = newRoot();
     render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
+    // Wait for the initial auto-focus (src/b.ts — the most-imported file) to
+    // land before navigating. Going Back requires a previous entry: clicking
+    // a.ts before anything is focused correctly leaves Back disabled, so
+    // asserting "Back returns to b.ts" without establishing that focus first
+    // is a race, not a product bug.
+    await vi.waitFor(() => {
+      expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/b.ts");
+    });
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-node-file[title='src/a.ts']")).not.toBeNull();
     });
@@ -230,12 +273,11 @@ describe("Graph (Import Graph view)", () => {
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/a.ts");
     });
-    const buttons = [...root.querySelectorAll(".ig-preview-history-btn")] as HTMLButtonElement[];
-    buttons[0].click();
+    await clickHistoryButton(root, "Back");
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/b.ts");
     }, { timeout: 3000 });
-    buttons[1].click();
+    await clickHistoryButton(root, "Forward");
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/a.ts");
     }, { timeout: 3000 });

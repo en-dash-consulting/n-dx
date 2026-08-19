@@ -81,6 +81,7 @@ import {
 } from "./help.js";
 import { setupAssistantIntegrations, formatInitReport, checkSkillTracking, formatSkillTrackingHints } from "./assistant-integration.js";
 import { ensureGitattributesRules } from "./gitattributes-pins.js";
+import { recordCliName } from "./cli-identity.js";
 import { generateTargetReadme } from "./readme-generator.js";
 import {
   runGitPreflight,
@@ -121,6 +122,13 @@ import {
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
+
+// Advertise this CLI's own path to every child process. The web server's
+// command triggers (refresh, ci, auth, self-heal, export) re-invoke ndx and
+// need a path that works on analyzed projects that aren't this monorepo —
+// the server cannot resolve @n-dx/core from its own module graph (core
+// depends on web, so the reverse edge would be a cycle).
+process.env.N_DX_CLI_PATH = fileURLToPath(import.meta.url);
 
 /** Map monorepo directory names to npm package names. */
 const PKG_NAMES = {
@@ -1298,6 +1306,7 @@ async function handleInit(rest) {
         const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
         recordInitVersion(dir, version);
       } catch { /* non-fatal */ }
+      recordCliName(dir);
       exitWithCleanup(0);
     }
   }
@@ -1329,6 +1338,7 @@ async function handleInit(rest) {
     const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
     recordInitVersion(dir, version);
   } catch { /* non-fatal */ }
+  recordCliName(dir);
 
   // Generate a target-repo README before assistant artifacts so the user's
   // project documentation reflects only their own manifest/structure — not
@@ -1460,21 +1470,7 @@ async function handleRefresh(rest) {
   const absDir = resolve(dir);
   const flags = extractFlags(rest);
 
-  // Pre-refresh: detect and stop any conflicting dashboard process so the
-  // refresh does not race against a running server rebuilding its own assets.
-  const conflict = await detectAndCleanConflictingDashboard(absDir);
-  if (conflict.status === "stopped") {
-    console.log(
-      `Pre-refresh: detected running dashboard (PID ${conflict.pid}, port ${conflict.port}); stopped.`,
-    );
-  } else if (conflict.status === "stop-failed") {
-    console.error(
-      `Error: Dashboard server (PID ${conflict.pid}) is running and could not be stopped automatically.`,
-    );
-    console.error(`Stop it manually: ndx start stop "${absDir}"`);
-    exitWithCleanup(1);
-  }
-
+  // Plan first so flag errors surface before any process is touched.
   let plan;
   try {
     plan = buildRefreshPlan(flags);
@@ -1485,6 +1481,25 @@ async function handleRefresh(rest) {
       exitWithCleanup(1);
     }
     throw err;
+  }
+
+  // Pre-refresh: detect and stop any conflicting dashboard process so the
+  // refresh does not race against a running server rebuilding its own assets.
+  // Skipped for --live-server: the refresh was triggered BY the running
+  // dashboard, and the plan is guaranteed not to contain a web-build step.
+  if (!plan.liveServer) {
+    const conflict = await detectAndCleanConflictingDashboard(absDir);
+    if (conflict.status === "stopped") {
+      console.log(
+        `Pre-refresh: detected running dashboard (PID ${conflict.pid}, port ${conflict.port}); stopped.`,
+      );
+    } else if (conflict.status === "stop-failed") {
+      console.error(
+        `Error: Dashboard server (PID ${conflict.pid}) is running and could not be stopped automatically.`,
+      );
+      console.error(`Stop it manually: ndx start stop "${absDir}"`);
+      exitWithCleanup(1);
+    }
   }
 
   if (plan.needsSourcevisionDir) {

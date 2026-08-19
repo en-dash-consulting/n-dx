@@ -14,6 +14,7 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { NdxLogoPng } from "../components/index.js";
+import { useCliName } from "../hooks/index.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -180,6 +181,7 @@ function PinEditor({
 // ── Main view ─────────────────────────────────────────────────────────
 
 export function ProjectSettingsView() {
+  const cliName = useCliName();
   const [data, setData] = useState<ProjectSettingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -377,9 +379,9 @@ export function ProjectSettingsView() {
         "Project-level configuration stored in ",
         h("code", null, ".n-dx.json"),
         ". Controls language detection (all commands), zone analysis (",
-        h("code", null, "ndx analyze / plan"),
+        h("code", null, `${cliName} analyze / plan`),
         "), and dashboard port (",
-        h("code", null, "ndx start"),
+        h("code", null, `${cliName} start`),
         ").",
       ),
     ),
@@ -401,7 +403,7 @@ export function ProjectSettingsView() {
         ),
         h("p", { class: "ps-field-desc" },
           "Override the auto-detected project language. Used by sourcevision analysis, ",
-          "hench guard defaults, and ndx init. Leave as Auto-detect for most projects.",
+          `hench guard defaults, and ${cliName} init. Leave as Auto-detect for most projects.`,
         ),
         h("select", {
           id: "ps-language",
@@ -420,13 +422,13 @@ export function ProjectSettingsView() {
     h("section", { class: "ps-section" },
       h("h3", { class: "ps-section-title" },
         h("span", { class: "ps-section-icon" }, "\u25A3"),
-        "ndx analyze / plan",
+        `${cliName} analyze / plan`,
       ),
       h("p", { class: "ps-section-desc" },
         "Zone detection settings for ",
-        h("code", null, "ndx analyze"),
+        h("code", null, `${cliName} analyze`),
         " and ",
-        h("code", null, "ndx plan"),
+        h("code", null, `${cliName} plan`),
         ".",
       ),
       h("div", { class: "ps-field" },
@@ -476,7 +478,7 @@ export function ProjectSettingsView() {
     h("section", { class: "ps-section" },
       h("h3", { class: "ps-section-title" },
         h("span", { class: "ps-section-icon" }, "\uD83C\uDF10"),
-        "ndx start",
+        `${cliName} start`,
       ),
       h("div", { class: "ps-field" },
         h("label", { class: "ps-field-label", htmlFor: "ps-port" },
@@ -486,7 +488,7 @@ export function ProjectSettingsView() {
         h("p", { class: "ps-field-desc" },
           `Port the web dashboard listens on. Default: ${DEFAULT_PORT}. `,
           "Change takes effect after restarting the server (",
-          h("code", null, "ndx start stop && ndx start"),
+          h("code", null, `${cliName} start stop && ${cliName} start`),
           ").",
         ),
         h("div", { class: "ps-field-row" },
@@ -517,12 +519,12 @@ export function ProjectSettingsView() {
             hasErrors ? "Fix errors before saving" : "You have unsaved changes",
           ),
           h("button", {
-            class: "ps-btn ps-btn-secondary",
+            class: "cmd-btn cmd-btn-secondary",
             onClick: handleDiscard,
             disabled: saving,
           }, "Discard"),
           h("button", {
-            class: `ps-btn ps-btn-primary${hasErrors ? " ps-btn-disabled" : ""}`,
+            class: "cmd-btn cmd-btn-primary",
             onClick: handleSave,
             disabled: saving || hasErrors,
           }, saving ? "Saving\u2026" : "Save changes"),

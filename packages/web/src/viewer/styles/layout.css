@@ -289,15 +289,14 @@
 
 .nav-icon { width: 16px; text-align: center; font-size: var(--font-md); }
 
-/* Sidebar locked nav items */
+/* Sidebar locked nav items — still navigable (they open an unlock page),
+   dimmed to signal missing data */
 .nav-item.locked {
   opacity: 0.55;
-  cursor: default;
 }
 
 .nav-item.locked:hover {
-  background: transparent;
-  color: var(--text-dim);
+  opacity: 0.8;
 }
 
 .nav-badge {

@@ -179,6 +179,101 @@ bound that matches the failure mode:
   helper polling with a fixed deadline. Those suites are already fail-fast and
   should not accumulate redundant timeout layers without a new hang mode.
 
+## Flake Resistance
+
+A test that passes alone but fails inside the full suite is a defect in the
+test, not noise to be retried. Two failure families produced every such flake
+observed so far; both have a standing rule.
+
+### Family 1 — Foreign responses in HTTP route tests
+
+**Symptom:** a route test receives a status the route group cannot emit (a
+`401` from the hench routes, a `200` where the handler only returns `404`).
+
+**Cause:** the response came from a *different* server. Three habits combine to
+allow it — `server.close()` was not awaited (it resolves only once sockets
+drain, so the ephemeral port can be handed to the next listener while a request
+is in flight), the client fetched `localhost` while the server bound the
+wildcard address (on dual-stack machines those can be different interfaces),
+and a full `pnpm -r test` run has many packages binding ephemeral ports
+concurrently.
+
+**Rules:**
+
+- Start servers through `startRouteTestServer` (web) and close them with the
+  returned `close()` or `closeRouteTestServer(server)` — **always awaited**.
+- Bind and fetch the same literal: `127.0.0.1`, never `localhost`.
+- Reset process-wide module state between tests. Vitest shares one worker
+  process across test *files*, so module-level singletons leak across files and
+  which files share a worker depends on machine load. Route modules that hold
+  such state export a reset hook for this (for example
+  `resetHenchRouteStateForTests()`).
+
+### Family 3 — Subprocess guardrails too tight for a loaded machine
+
+**Symptom:** an e2e CLI test asserts an exit code and receives `143`
+(`128 + SIGTERM`), or a suite reports "test timed out" while the command it
+spawned was still doing real work.
+
+**Cause:** the spawn guardrail was sized for an idle machine. A root e2e
+command such as `n-dx ci` starts Node and then spawns sourcevision and rex in
+turn; while the rest of the monorepo suite saturates every core, that can
+exceed a 10s budget. The command is then killed and the assertion compares the
+signal exit code against the expected one, which reads as a product failure.
+
+**Rules:**
+
+- Size spawn guardrails for the loaded case, and keep `testTimeout` **above**
+  the spawn guardrail so a genuine hang surfaces as a precise spawn timeout
+  instead of an opaque test timeout.
+- Raising a guardrail is legitimate only when the product path actually runs
+  and merely needs wall clock (see Timeout Guardrails). It is never the answer
+  to a deterministic assertion failure.
+- Assert on exit codes you expect, and treat `143`/`137` as evidence of a
+  killed process rather than a product result.
+
+### Family 2 — Wall-clock and render-order assumptions
+
+**Symptom:** a timing ratio or `waitFor` that passes on an idle machine and
+fails under load (a linear-scaling check measuring 43× against a 30× ceiling; a
+history-navigation test timing out at 3000 ms).
+
+**Cause:** the assertion measured elapsed time, or assumed effects had already
+flushed when a DOM query first succeeded.
+
+**Rules:**
+
+- **Never assert on elapsed-time ratios.** Count work instead — traversal
+  steps, call counts, rendered node counts. `countDOMNodes`' complexity test
+  counts `firstChild`/`nextSibling`/`parentNode` accesses, which is exact on
+  every machine. Absolute time budgets remain acceptable as generous
+  hang guardrails (see Timeout Guardrails), but never as ratios.
+- **Scale absolute budgets through `BUDGET_MULTIPLIER`.** Every package that
+  asserts on elapsed time declares
+  `const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20)`
+  and multiplies its budget by it. These assertions exist to catch algorithmic
+  regressions, not to enforce latency: a 50 ms budget for 2.5 M operations
+  cannot hold while the rest of the suite saturates every core, whereas a
+  quadratic rewrite is orders of magnitude slower and still fails at 20×.
+  Name such a test for the property it guards ("within the scaled linear
+  budget"), never for a millisecond figure the assertion no longer uses.
+- **Never click a control whose enabled state depends on a pending effect.**
+  Wait for the control to be present *and* enabled, re-querying it each attempt
+  — clicking a disabled or replaced element is a silent no-op that then waits
+  out the full timeout.
+- **Retry the action, not just the assertion**, when the listener is attached
+  by an effect (`addEventListener` on a ref) or when a settle effect can undo
+  the result. A `wheel` dispatched before its listener attaches is simply lost,
+  and a pan applied just before a view-reset effect fires is wiped. Dispatch
+  *inside* the `waitFor` body so each poll re-sends the gesture. Only do this
+  for intents that tolerate repetition: a toggle that is already in the target
+  state, or a cumulative action whose assertion accepts any converged value
+  (assert "a positive multiple of 40", not "exactly 40").
+- **Prefer fixing the product when the race is reachable by a user.** The
+  focus-history seeding in `graph.ts` was rewritten because a click landing
+  before its seeding effect left Back permanently disabled — a real
+  slow-first-paint bug that the loaded test machine merely exposed first.
+
 ### Integration Test Growth Policy
 
 The integration test count should grow proportionally with cross-package

@@ -7,6 +7,17 @@ import { createCliClient } from "../../src/cli-provider.js";
 import { ClaudeClientError } from "../../src/types.js";
 import type { LLMProvider } from "../../src/provider-interface.js";
 
+/**
+ * Load tolerance for wall-clock budgets below.
+ *
+ * These assertions guard against algorithmic regressions (a quadratic
+ * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
+ * numbers flake when the rest of the monorepo suite saturates every core,
+ * so the budget is scaled. See TESTING.md "Flake Resistance".
+ */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
+
 describe("createCliClient", () => {
   it("creates a client with CLI mode", () => {
     const client = createCliClient({
@@ -68,7 +79,7 @@ describe("createCliClient", () => {
     const elapsed = Date.now() - start;
 
     // Should fail immediately, not wait for retries
-    expect(elapsed).toBeLessThan(2000);
+    expect(elapsed).toBeLessThan(2000 * BUDGET_MULTIPLIER);
   });
 });
 

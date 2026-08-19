@@ -11,6 +11,7 @@ import { mkdtemp, rm, writeFile, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
+import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const isWin = process.platform === "win32";
 
@@ -43,7 +44,7 @@ const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 function runNdx(args) {
   const res = spawnSync("node", [CLI_PATH, ...args], {
     encoding: "utf-8",
-    timeout: 15000,
+    timeout: DEFAULT_TIMEOUT,
   });
   return { stdout: res.stdout ?? "", stderr: res.stderr ?? "", status: res.status };
 }
@@ -52,7 +53,7 @@ function runNdx(args) {
 function setConfig(key, value, dir) {
   execFileSync("node", [CLI_PATH, "config", key, value, dir], {
     encoding: "utf-8",
-    timeout: 10000,
+    timeout: DEFAULT_TIMEOUT,
   });
 }
 

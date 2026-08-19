@@ -5,6 +5,17 @@ import { tmpdir } from "node:os";
 import { initConfig } from "../../../../src/store/config.js";
 
 /**
+ * Load tolerance for wall-clock budgets below.
+ *
+ * These assertions guard against algorithmic regressions (a quadratic
+ * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
+ * numbers flake when the rest of the monorepo suite saturates every core,
+ * so the budget is scaled. See TESTING.md "Flake Resistance".
+ */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
+
+/**
  * Tests for the --loop continuous execution mode.
  *
  * These tests exercise the loop control flow in cmdRun by mocking
@@ -71,7 +82,7 @@ describe("loop mode helpers", () => {
       const start = Date.now();
       await loopPause(0);
       const elapsed = Date.now() - start;
-      expect(elapsed).toBeLessThan(50);
+      expect(elapsed).toBeLessThan(50 * BUDGET_MULTIPLIER);
     });
 
     it("can be aborted via AbortSignal", async () => {
@@ -85,7 +96,7 @@ describe("loop mode helpers", () => {
       const start = Date.now();
       await promise;
       const elapsed = Date.now() - start;
-      expect(elapsed).toBeLessThan(200);
+      expect(elapsed).toBeLessThan(200 * BUDGET_MULTIPLIER);
     });
   });
 });

@@ -15,6 +15,7 @@ Top-level layout:
 - `.changeset/`
 - `.github/`
 - `.local_testing/`
+- `.profile-tests-tmp/`
 - `.run-logs/`
 - `docs/`
 - `documentation/`

@@ -6,12 +6,16 @@ import {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
+function mockEventListener(): EventListener {
+  return vi.fn((_event: Event) => undefined) as EventListener;
+}
+
 describe("ListenerLifecycleManager", () => {
   describe("addListener()", () => {
     it("adds an event listener to the target", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
-      const handler = vi.fn();
+      const handler = mockEventListener();
 
       manager.addListener("node-1", el, "click", handler);
       el.dispatchEvent(new Event("click"));
@@ -24,7 +28,7 @@ describe("ListenerLifecycleManager", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
 
-      manager.addListener("node-1", el, "click", vi.fn());
+      manager.addListener("node-1", el, "click", mockEventListener());
 
       expect(manager.hasScope("node-1")).toBe(true);
       expect(manager.getState().totalListeners).toBe(1);
@@ -36,8 +40,8 @@ describe("ListenerLifecycleManager", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
 
-      manager.addListener("node-1", el, "click", vi.fn());
-      manager.addListener("node-1", el, "keydown", vi.fn());
+      manager.addListener("node-1", el, "click", mockEventListener());
+      manager.addListener("node-1", el, "keydown", mockEventListener());
 
       expect(manager.getState().totalListeners).toBe(2);
       expect(manager.getState().activeScopeCount).toBe(1);
@@ -49,8 +53,8 @@ describe("ListenerLifecycleManager", () => {
       const el1 = document.createElement("div");
       const el2 = document.createElement("div");
 
-      manager.addListener("node-1", el1, "click", vi.fn());
-      manager.addListener("node-2", el2, "click", vi.fn());
+      manager.addListener("node-1", el1, "click", mockEventListener());
+      manager.addListener("node-2", el2, "click", mockEventListener());
 
       expect(manager.getState().totalListeners).toBe(2);
       expect(manager.getState().activeScopeCount).toBe(2);
@@ -60,7 +64,7 @@ describe("ListenerLifecycleManager", () => {
     it("returns a cleanup function that removes the listener", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
-      const handler = vi.fn();
+      const handler = mockEventListener();
 
       const cleanup = manager.addListener("node-1", el, "click", handler);
       cleanup();
@@ -74,7 +78,7 @@ describe("ListenerLifecycleManager", () => {
     it("cleanup is idempotent — safe to call multiple times", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
-      const handler = vi.fn();
+      const handler = mockEventListener();
 
       const cleanup = manager.addListener("node-1", el, "click", handler);
       cleanup();
@@ -87,8 +91,8 @@ describe("ListenerLifecycleManager", () => {
     it("cleanup only removes the specific listener, not the whole scope", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
-      const handler1 = vi.fn();
-      const handler2 = vi.fn();
+      const handler1 = mockEventListener();
+      const handler2 = mockEventListener();
 
       const cleanup1 = manager.addListener("node-1", el, "click", handler1);
       manager.addListener("node-1", el, "keydown", handler2);
@@ -112,7 +116,7 @@ describe("ListenerLifecycleManager", () => {
       manager.dispose();
 
       const el = document.createElement("div");
-      const handler = vi.fn();
+      const handler = mockEventListener();
       const cleanup = manager.addListener("node-1", el, "click", handler);
 
       expect(typeof cleanup).toBe("function");
@@ -126,7 +130,7 @@ describe("ListenerLifecycleManager", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
       const addSpy = vi.spyOn(el, "addEventListener");
-      const handler = vi.fn();
+      const handler = mockEventListener();
 
       manager.addListener("node-1", el, "click", handler, { capture: true, passive: true });
 
@@ -139,8 +143,8 @@ describe("ListenerLifecycleManager", () => {
     it("removes all listeners for a scope", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
-      const handler1 = vi.fn();
-      const handler2 = vi.fn();
+      const handler1 = mockEventListener();
+      const handler2 = mockEventListener();
 
       manager.addListener("node-1", el, "click", handler1);
       manager.addListener("node-1", el, "keydown", handler2);
@@ -160,8 +164,8 @@ describe("ListenerLifecycleManager", () => {
       const manager = new ListenerLifecycleManager();
       const el1 = document.createElement("div");
       const el2 = document.createElement("div");
-      const handler1 = vi.fn();
-      const handler2 = vi.fn();
+      const handler1 = mockEventListener();
+      const handler2 = mockEventListener();
 
       manager.addListener("node-1", el1, "click", handler1);
       manager.addListener("node-2", el2, "click", handler2);
@@ -187,7 +191,7 @@ describe("ListenerLifecycleManager", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
 
-      manager.addListener("node-1", el, "click", vi.fn());
+      manager.addListener("node-1", el, "click", mockEventListener());
       manager.cleanupScope("node-1");
       manager.cleanupScope("node-1"); // second call — should not throw
 
@@ -205,7 +209,7 @@ describe("ListenerLifecycleManager", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
 
-      manager.addListener("node-1", el, "click", vi.fn());
+      manager.addListener("node-1", el, "click", mockEventListener());
       expect(manager.hasScope("node-1")).toBe(true);
 
       manager.dispose();
@@ -215,7 +219,7 @@ describe("ListenerLifecycleManager", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
 
-      manager.addListener("node-1", el, "click", vi.fn());
+      manager.addListener("node-1", el, "click", mockEventListener());
       manager.cleanupScope("node-1");
 
       expect(manager.hasScope("node-1")).toBe(false);
@@ -227,8 +231,8 @@ describe("ListenerLifecycleManager", () => {
       const manager = new ListenerLifecycleManager();
       const el1 = document.createElement("div");
       const el2 = document.createElement("div");
-      const handler1 = vi.fn();
-      const handler2 = vi.fn();
+      const handler1 = mockEventListener();
+      const handler2 = mockEventListener();
 
       manager.addListener("node-1", el1, "click", handler1);
       manager.addListener("node-2", el2, "click", handler2);
@@ -254,8 +258,8 @@ describe("ListenerLifecycleManager", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
 
-      manager.addListener("node-1", el, "click", vi.fn());
-      manager.addListener("node-2", el, "keydown", vi.fn());
+      manager.addListener("node-1", el, "click", mockEventListener());
+      manager.addListener("node-2", el, "keydown", mockEventListener());
 
       manager.dispose();
 
@@ -273,7 +277,7 @@ describe("ListenerLifecycleManager", () => {
     it("individual cleanups are safe after dispose", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
-      const cleanup = manager.addListener("node-1", el, "click", vi.fn());
+      const cleanup = manager.addListener("node-1", el, "click", mockEventListener());
 
       manager.dispose();
       cleanup(); // should not throw
@@ -294,9 +298,9 @@ describe("ListenerLifecycleManager", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
 
-      manager.addListener("node-1", el, "click", vi.fn());
-      manager.addListener("node-1", el, "keydown", vi.fn());
-      manager.addListener("node-2", el, "click", vi.fn());
+      manager.addListener("node-1", el, "click", mockEventListener());
+      manager.addListener("node-1", el, "keydown", mockEventListener());
+      manager.addListener("node-2", el, "click", mockEventListener());
 
       expect(manager.getState()).toEqual({
         totalListeners: 3,
@@ -311,9 +315,9 @@ describe("ListenerLifecycleManager", () => {
       const manager = new ListenerLifecycleManager();
       const el = document.createElement("div");
 
-      manager.addListener("node-1", el, "click", vi.fn());
-      manager.addListener("node-2", el, "click", vi.fn());
-      manager.addListener("node-3", el, "click", vi.fn());
+      manager.addListener("node-1", el, "click", mockEventListener());
+      manager.addListener("node-2", el, "click", mockEventListener());
+      manager.addListener("node-3", el, "click", mockEventListener());
 
       manager.cleanupScope("node-2");
 
@@ -341,8 +345,8 @@ describe("ListenerLifecycleManager", () => {
       // Simulate 100 nodes each with 2 listeners
       for (let i = 0; i < 100; i++) {
         const el = document.createElement("div");
-        manager.addListener(`node-${i}`, el, "click", vi.fn());
-        manager.addListener(`node-${i}`, el, "keydown", vi.fn());
+        manager.addListener(`node-${i}`, el, "click", mockEventListener());
+        manager.addListener(`node-${i}`, el, "keydown", mockEventListener());
       }
 
       expect(manager.getState().totalListeners).toBe(200);
@@ -357,7 +361,7 @@ describe("ListenerLifecycleManager", () => {
       // Create 50 nodes
       for (let i = 0; i < 50; i++) {
         const el = document.createElement("div");
-        manager.addListener(`node-${i}`, el, "click", vi.fn());
+        manager.addListener(`node-${i}`, el, "click", mockEventListener());
       }
 
       expect(manager.getState().totalListeners).toBe(50);
@@ -381,7 +385,7 @@ describe("ListenerLifecycleManager", () => {
       for (let i = 0; i < 20; i++) {
         const el = document.createElement("div");
         elements.set(`node-${i}`, el);
-        manager.addListener(`node-${i}`, el, "click", vi.fn());
+        manager.addListener(`node-${i}`, el, "click", mockEventListener());
       }
 
       expect(manager.getState().totalListeners).toBe(20);
@@ -393,7 +397,7 @@ describe("ListenerLifecycleManager", () => {
       for (let i = 20; i < 30; i++) {
         const el = document.createElement("div");
         elements.set(`node-${i}`, el);
-        manager.addListener(`node-${i}`, el, "click", vi.fn());
+        manager.addListener(`node-${i}`, el, "click", mockEventListener());
       }
 
       // Should still be 20 (10 removed, 10 added)
@@ -405,7 +409,7 @@ describe("ListenerLifecycleManager", () => {
       }
       for (let i = 0; i < 10; i++) {
         const el = elements.get(`node-${i}`)!;
-        manager.addListener(`node-${i}`, el, "click", vi.fn());
+        manager.addListener(`node-${i}`, el, "click", mockEventListener());
       }
 
       // Should still be 20

@@ -74,4 +74,5 @@ export { collectBranchWork } from "../analyzers/branch-work-collector.js";
 export type { BranchWorkResult } from "../analyzers/branch-work-collector.js";
 export { classifyItems } from "../analyzers/branch-work-classifier.js";
 export { deriveNextSteps } from "../analyzers/next-steps.js";
+export { setArchetypeOverride } from "../util/archetype-overrides.js";
 export { renderPRMarkdownFromRecord } from "../generators/pr-markdown-template.js";

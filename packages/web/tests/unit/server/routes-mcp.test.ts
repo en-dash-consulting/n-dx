@@ -21,6 +21,7 @@ import {
   initMcpRoutes,
   reloadMcpFactories,
 } from "../../../src/server/routes-mcp.js";
+import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal MCP server with a single no-op tool — enough to complete MCP init. */
 function createMockMcpServer(): McpServer {
@@ -52,7 +53,7 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
       res.writeHead(404);
       res.end("Not found");
     });
-    server.listen(0, () => {
+    server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       resolve({ server, port });
@@ -80,16 +81,16 @@ describe("MCP routes", () => {
 
   afterEach(async () => {
     await closeAllMcpSessions();
-    server.close();
+    await closeRouteTestServer(server);
   });
 
   it("returns false for non-MCP paths", async () => {
-    const res = await fetch(`http://localhost:${port}/api/rex/prd`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/prd`);
     expect(res.status).toBe(404);
   });
 
   it("CORS preflight includes MCP-related headers", async () => {
-    const res = await fetch(`http://localhost:${port}/mcp/rex`, {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp/rex`, {
       method: "OPTIONS",
     });
     expect(res.status).toBe(204);
@@ -99,7 +100,7 @@ describe("MCP routes", () => {
   });
 
   it("GET without session returns 400", async () => {
-    const res = await fetch(`http://localhost:${port}/mcp/rex`, {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp/rex`, {
       method: "GET",
     });
     expect(res.status).toBe(400);
@@ -108,7 +109,7 @@ describe("MCP routes", () => {
   });
 
   it("unsupported method returns 405", async () => {
-    const res = await fetch(`http://localhost:${port}/mcp/rex`, {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp/rex`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: "{}",
@@ -119,7 +120,7 @@ describe("MCP routes", () => {
   it("MCP client can connect to /mcp/rex and list tools", async () => {
     const client = new Client({ name: "test-client", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(
-      new URL(`http://localhost:${port}/mcp/rex`),
+      new URL(`http://127.0.0.1:${port}/mcp/rex`),
     );
 
     await client.connect(transport);
@@ -133,7 +134,7 @@ describe("MCP routes", () => {
   it("MCP client can connect to /mcp/sourcevision and list tools", async () => {
     const client = new Client({ name: "test-client", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(
-      new URL(`http://localhost:${port}/mcp/sourcevision`),
+      new URL(`http://127.0.0.1:${port}/mcp/sourcevision`),
     );
 
     await client.connect(transport);
@@ -156,7 +157,7 @@ describe("MCP routes", () => {
 
     const client = new Client({ name: "test-reload", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(
-      new URL(`http://localhost:${port}/mcp/rex`),
+      new URL(`http://127.0.0.1:${port}/mcp/rex`),
     );
     await client.connect(transport);
 
@@ -178,7 +179,7 @@ describe("MCP routes", () => {
     // sv factory should still return the original "ping" tool
     const client = new Client({ name: "test-sv-unchanged", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(
-      new URL(`http://localhost:${port}/mcp/sourcevision`),
+      new URL(`http://127.0.0.1:${port}/mcp/sourcevision`),
     );
     await client.connect(transport);
 
@@ -203,7 +204,7 @@ describe("MCP routes", () => {
 
     const client = new Client({ name: "test-cleanup", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(
-      new URL(`http://localhost:${port}/mcp/rex`),
+      new URL(`http://127.0.0.1:${port}/mcp/rex`),
     );
     await client.connect(transport);
     await client.listTools(); // ensure session is registered
@@ -217,12 +218,12 @@ describe("MCP routes", () => {
   it("multiple concurrent MCP sessions work independently", async () => {
     const client1 = new Client({ name: "client-1", version: "1.0.0" });
     const transport1 = new StreamableHTTPClientTransport(
-      new URL(`http://localhost:${port}/mcp/rex`),
+      new URL(`http://127.0.0.1:${port}/mcp/rex`),
     );
 
     const client2 = new Client({ name: "client-2", version: "1.0.0" });
     const transport2 = new StreamableHTTPClientTransport(
-      new URL(`http://localhost:${port}/mcp/rex`),
+      new URL(`http://127.0.0.1:${port}/mcp/rex`),
     );
 
     await Promise.all([client1.connect(transport1), client2.connect(transport2)]);

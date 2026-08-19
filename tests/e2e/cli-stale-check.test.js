@@ -4,6 +4,7 @@ import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 /**
  * Integration tests for stale-setup notice detection.
@@ -26,7 +27,7 @@ function runWithOutput(args, cwd, opts = {}) {
     const argString = args.map((a) => JSON.stringify(a)).join(" ");
     const output = execSync(`node ${CLI_PATH} ${argString} 2>&1`, {
       encoding: "utf-8",
-      timeout: 20000,
+      timeout: DEFAULT_TIMEOUT,
       cwd,
       ...opts,
     });

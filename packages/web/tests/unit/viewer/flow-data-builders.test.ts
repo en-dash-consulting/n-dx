@@ -39,8 +39,8 @@ describe("buildCallFlowEdges", () => {
       ["src/b.ts", { id: "zone-b", name: "Zone B", color: "#111" }],
     ]);
     const callEdges: CallEdge[] = [
-      { callerFile: "src/a.ts", caller: "fnA", calleeFile: "src/b.ts", callee: "fnB" },
-      { callerFile: "src/a.ts", caller: "fnA2", calleeFile: "src/a.ts", callee: "fnA3" }, // same zone
+      { callerFile: "src/a.ts", caller: "fnA", calleeFile: "src/b.ts", callee: "fnB", type: "direct", line: 1, column: 1 },
+      { callerFile: "src/a.ts", caller: "fnA2", calleeFile: "src/a.ts", callee: "fnA3", type: "direct", line: 2, column: 1 }, // same zone
     ];
 
     const edges = buildCallFlowEdges(callEdges, fileToZoneMap);
@@ -54,7 +54,7 @@ describe("buildCallFlowEdges", () => {
       ["src/a.ts", { id: "zone-a", name: "Zone A", color: "#000" }],
     ]);
     const callEdges: CallEdge[] = [
-      { callerFile: "src/a.ts", caller: "fnA", calleeFile: "", callee: "fnB" },
+      { callerFile: "src/a.ts", caller: "fnA", calleeFile: "", callee: "fnB", type: "direct", line: 1, column: 1 },
     ];
 
     const edges = buildCallFlowEdges(callEdges, fileToZoneMap);

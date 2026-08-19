@@ -19,6 +19,12 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     lookFor: "Hub files, unexpected cross-zone imports, and external zones that cluster around many files.",
     actions: "Select a zone, hover files to preview routes, and click files to open the dependency street view.",
   },
+  zones: {
+    title: "Zones",
+    description: "Interactive diagram of architectural zones with expandable file lists, cross-zone connection bars, and flow edges between zones.",
+    lookFor: "Zones with many outbound connections (high coupling). Files whose connection bars span several target zones. Unexpected flow edges between zones that should be independent.",
+    actions: "Expand a zone to see its files ordered by cross-zone traffic. Hover or select a file row to highlight its connections. Click through to the file detail for import specifics.",
+  },
   files: {
     title: "Files",
     description: "Sortable, filterable table of all project files with language, role, size, and category information.",
@@ -67,6 +73,36 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     description: "Interactive PRD tree showing the full hierarchy: epics → features → tasks → subtasks. Each item shows its status, priority, and tags. Supports multi-select for bulk operations.",
     lookFor: "Tasks stuck in 'in_progress' for too long. Blocked items with unresolved dependencies. Orphaned subtasks without clear parent context. Items missing acceptance criteria.",
     actions: "Click items to view details in the side panel. Use bulk actions to update multiple items at once. Merge duplicate tasks. Add new items at any level of the hierarchy.",
+  },
+  analysis: {
+    title: "Analyze & Import",
+    description: "Rex analysis workspace: run project analysis, add items from natural language, batch-import ideas from files or text, and review pending proposals before accepting them into the PRD.",
+    lookFor: "Pending proposals awaiting review. Analysis history events showing what recent runs produced. Duplicate proposals that should be rejected rather than accepted.",
+    actions: "Use Smart Add to draft items from a description. Run a project scan to generate proposals, then accept or reject each one. Batch-import a spec file to seed the PRD.",
+  },
+  activity: {
+    title: "Activity",
+    description: "The append-only PRD execution log: status changes, item mutations, syncs, reorganizes, and agent work-log entries.",
+    lookFor: "Unexpected status flips, bursts of automated changes, and gaps where work happened without being logged.",
+    actions: "Filter by event to isolate one kind of change, or search a detail string or item id to trace a single item's history.",
+  },
+  requirements: {
+    title: "Requirements",
+    description: "Requirement coverage and the traceability matrix: every requirement, the item it is defined on, the descendants it applies to, and how it is validated.",
+    lookFor: "Low coverage percentages. Items without any applicable requirements. Requirements with manual validation that could be automated.",
+    actions: "Expand a requirement to see its acceptance criteria and the status of every item it applies to. Add or edit requirements from the item detail panel in the Tasks view.",
+  },
+  "hench-adaptive": {
+    title: "Adaptive Optimization",
+    description: "Monitors run history and proposes workflow-parameter adjustments (turn limits, token budgets, retry settings) as the project evolves. Adjustments can be applied, dismissed, or auto-applied when adaptive mode is on.",
+    lookFor: "High-priority adjustments with strong rationale. Trends moving the wrong way (falling success rate, rising token usage). Config keys you never want auto-tuned.",
+    actions: "Apply or dismiss each recommendation. Lock keys you manage manually. Enable adaptive mode to auto-apply safe adjustments; review the history to audit past changes.",
+  },
+  "command-reference": {
+    title: "All Commands",
+    description: "Server-driven reference of every CLI command for this project, grouped by workflow stage, with the project's resolved CLI name and per-command availability.",
+    lookFor: "Commands marked 'needs init' or 'needs LLM' — they indicate setup steps still required before that part of the workflow is usable.",
+    actions: "Copy an invocation to run it in your terminal. Configure an LLM provider in Settings → General to unlock agent commands.",
   },
   "token-usage": {
     title: "Token Usage",
