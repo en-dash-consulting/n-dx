@@ -17,11 +17,12 @@
  *   ndx start status [dir]           Check if server is running
  */
 
-import { spawn, execSync } from "child_process";
+import { spawn } from "child_process";
 import { createConnection } from "net";
 import { readFile, writeFile, unlink, access } from "fs/promises";
 import { join, resolve } from "path";
 import { terminateTreeByPid } from "./child-lifecycle.js";
+import { execFileSyncCli } from "./win-spawn.js";
 
 const DEFAULT_PORT = 3117;
 const PID_FILE = ".n-dx-web.pid";
@@ -91,7 +92,7 @@ async function killPortOccupant(port) {
     let pid = null;
     if (process.platform === "win32") {
       // netstat -ano lists TCP listeners; grep for ":PORT " at the local address
-      const out = execSync(`netstat -ano`, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
+      const out = execFileSyncCli("netstat", ["-ano"], { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
       for (const line of out.split("\n")) {
         // Look for lines like "  TCP    127.0.0.1:3117    0.0.0.0:0    LISTENING    12345"
         const m = line.match(/TCP\s+[\d.]+:(\d+)\s+[\d.:]+\s+LISTENING\s+(\d+)/i);
@@ -101,14 +102,15 @@ async function killPortOccupant(port) {
         }
       }
       if (pid) {
-        execSync(`taskkill /F /PID ${pid}`, { stdio: "ignore" });
+        execFileSyncCli("taskkill", ["/F", "/PID", String(pid)], { stdio: "ignore" });
       }
     } else {
       // lsof is available on macOS and most Linux distros
-      const out = execSync(`lsof -ti tcp:${port}`, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] }).trim();
+      const out = execFileSyncCli("lsof", ["-ti", `tcp:${port}`], { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] }).trim();
       if (out) {
         pid = parseInt(out.split("\n")[0], 10);
-        execSync(`kill -9 ${pid}`, { stdio: "ignore" });
+        // SIGKILL direct, rather than spawning /bin/kill for a number we already have.
+        process.kill(pid, "SIGKILL");
       }
     }
     if (!pid) return false;
