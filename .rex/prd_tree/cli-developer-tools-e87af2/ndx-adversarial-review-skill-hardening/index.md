@@ -20,7 +20,7 @@ description: "Defects found by running `/ndx-adversarial-review` against its own
 
 | Title | Status |
 |-------|--------|
-| [/ndx-adversarial-review hardcodes `main` as the branch-diff base](./ndx-adversarial-review-262f34.md) | pending |
+| [/ndx-adversarial-review hardcodes `main` as the branch-diff base](./ndx-adversarial-review-262f34.md) | completed |
 | [/ndx-adversarial-review does not map findings onto add_item's level, priority, and acceptanceCriteria fields](./ndx-adversarial-review-does-not-13e505.md) | completed |
 | [/ndx-adversarial-review records tokens without --startedAt, so the first record claims the whole session](./ndx-adversarial-review-records-08ceeb.md) | completed |
 | [/ndx-adversarial-review Step 1 executes the test suite via verify_criteria's default runTests: true](./ndx-adversarial-review-step-1-9c9ea0.md) | pending |

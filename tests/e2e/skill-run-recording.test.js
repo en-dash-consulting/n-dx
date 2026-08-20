@@ -53,22 +53,6 @@ describe("skills that record runs pass --startedAt", () => {
   }
 });
 
-// ── Platform neutrality of the timestamp instruction ─────────────────────────
-
-describe("timestamp instructions are platform-neutral", () => {
-  for (const name of getSkillNames()) {
-    it(`${name}: does not prescribe a POSIX-only timestamp command`, () => {
-      const body = getSkillBody(name);
-      if (!body.includes("date -Is")) return; // nothing to check
-
-      // `date -Is` does not exist in PowerShell. Naming it is fine as one
-      // example among several; naming it alone strands Windows users.
-      expect(
-        body,
-        `${name} prescribes 'date -Is', which does not exist in PowerShell, ` +
-          `without offering a non-POSIX alternative. Name it as one example ` +
-          `alongside 'Get-Date -Format o' rather than as the instruction.`,
-      ).toMatch(/Get-Date/);
-    });
-  }
-});
+// Platform neutrality of the timestamp instruction is asserted in
+// tests/e2e/skill-portability.test.js, alongside the other "does this skill
+// assume one environment?" guards. This file covers recording discipline only.

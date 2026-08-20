@@ -15,7 +15,7 @@ The necessity pass is not optional and is not a formality. A review that lists t
 
 Then read the argument, if any:
 
-- **No argument → diff mode.** Review the working diff: `git status --porcelain`, then `git diff` plus `git diff --cached` and the contents of any untracked files. If the working tree is clean, fall back to the branch diff (`git diff main...HEAD`) and say which one you are reviewing.
+- **No argument → diff mode.** Review the working diff: `git status --porcelain`, then `git diff` plus `git diff --cached` and the contents of any untracked files. If the working tree is clean, fall back to the branch diff — but **resolve the default branch, never assume it**. Run `git symbolic-ref --short refs/remotes/origin/HEAD`, which returns an already-remote-qualified ref like `origin/main`, and diff against that: `git diff <that ref>...HEAD`. It is a local lookup with no network call. In a fresh or `--single-branch` clone `origin/HEAD` is often unset and the command fails; when it does, ask the user which branch to compare against rather than guessing. (`git remote show origin` also reports the default branch, but it contacts the remote, so it is a poor silent fallback.) Say which diff you ended up reviewing.
 - **Argument is an item ID or slug → claim mode.** Call `get_item` (rex MCP).
 - **Argument is a name or topic → clarify first, then resolve.** Do not guess. Search the PRD for candidates (`get_item` on likely slugs, or read `.rex/prd_tree/`), present the matches you found with their ID, title, status, and parent, and ask which one is meant. If nothing matches, say so and offer diff mode scoped to the files the topic touches. Only after the user picks an item do you continue in claim mode.
 

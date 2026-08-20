@@ -42,3 +42,9 @@ Captured items are filed against `add_item`'s real parameters rather than
 described in prose, so acceptance criteria reach the `acceptanceCriteria` array
 where `verify_criteria` and the dashboard can read them, and severity maps
 one-to-one onto `priority` instead of being buried in the description.
+
+Diff mode resolves the default branch with
+`git symbolic-ref --short refs/remotes/origin/HEAD` rather than assuming `main`,
+and asks which branch to compare against when `origin/HEAD` is unset — so the
+skill's primary entry mode works in a repo on `master` or `develop` instead of
+failing with "fatal: ambiguous argument".
