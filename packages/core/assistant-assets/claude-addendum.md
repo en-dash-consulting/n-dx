@@ -38,7 +38,7 @@ Rules:
 - **Type imports through gateway** — `import type` must also flow through gateways to prevent type-import promotion erosion (a type import can be silently promoted to a runtime import during refactoring). Package-specific exemptions are documented in path-scoped rules (e.g. `.claude/rules/web-gateway-boundary.md`).
 - **New cross-package imports** require a deliberate edit to the gateway, not a casual import in a leaf file.
 
-See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-package gateway, messaging exemption, and injection-seam registry are documented in `.claude/rules/web-gateway-boundary.md` and `.claude/rules/web-injection-seams.md`.
+See also: `PACKAGE_GUIDELINES.md` for the full pattern reference. Web's intra-package gateway, messaging exemption, and injection-seam registry are documented in `.claude/rules/web-gateway-boundary.md` and `.claude/rules/web-injection-seams.md`; core's injection-seam registry (the `cli.js` → `pair-programming.js` `registerChild` seam) is in `.claude/rules/core-injection-seams.md`.
 
 ### Tier boundary crossing: spawn vs gateway
 

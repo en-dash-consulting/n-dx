@@ -43,17 +43,18 @@ describe("registerMcpServers idempotent removal pattern (source)", () => {
   });
 
   it("calls mcp remove with --scope flag", () => {
-    expect(SRC).toMatch(/" mcp remove --scope/);
+    // argv form, not a command string: the arguments are filesystem paths and
+    // hand-building a cmd.exe line around them broke on trailing backslashes.
+    expect(SRC).toMatch(/\["mcp",\s*"remove",\s*"--scope"/);
   });
 
-  it("execSync add call appears after execSync remove call in registerMcpServers", () => {
-    // Extract the function body and match execSync calls specifically
-    // (not comments which also mention the command strings).
+  it("mcp add call appears after mcp remove call in registerMcpServers", () => {
+    // Extract the function body and match the invocations specifically
+    // (not comments which also mention the subcommands).
     const fnStart = SRC.indexOf("function registerMcpServers");
     const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
-    // Match the actual execSync invocations, not comment references
-    const removeMatch = fnBody.match(/execSync\(\s*`"\$\{claudeCmd\}" mcp remove/);
-    const addMatch = fnBody.match(/execSync\(\s*\n?\s*`"\$\{claudeCmd\}" mcp add/);
+    const removeMatch = fnBody.match(/execFileSyncCli\(\s*claudeCmd,\s*\["mcp",\s*"remove"/);
+    const addMatch = fnBody.match(/execFileSyncCli\(\s*claudeCmd,\s*\["mcp",\s*"add"/);
     expect(removeMatch).not.toBeNull();
     expect(addMatch).not.toBeNull();
     expect(addMatch.index).toBeGreaterThan(removeMatch.index);
@@ -349,13 +350,22 @@ describe("registerMcpServers uses the discovered claude path, not a bare literal
   });
 
   it("mcp remove invokes the discovered path, not a bare 'claude' literal", () => {
-    expect(fnBody).toMatch(/execSync\(\s*`"\$\{claudeCmd\}" mcp remove --scope/);
-    expect(fnBody).not.toMatch(/execSync\(\s*`claude mcp remove/);
+    expect(fnBody).toMatch(/execFileSyncCli\(\s*claudeCmd,\s*\["mcp",\s*"remove",\s*"--scope"/);
+    expect(fnBody).not.toMatch(/execFileSyncCli\(\s*"claude",\s*\["mcp",\s*"remove"/);
   });
 
   it("mcp add invokes the discovered path, not a bare 'claude' literal", () => {
-    expect(fnBody).toMatch(/`"\$\{claudeCmd\}" mcp add /);
-    expect(fnBody).not.toMatch(/execSync\(\s*\n?\s*`claude mcp add/);
+    expect(fnBody).toMatch(/execFileSyncCli\(\s*claudeCmd,\s*\["mcp",\s*"add"/);
+    expect(fnBody).not.toMatch(/execFileSyncCli\(\s*"claude",\s*\["mcp",\s*"add"/);
+  });
+
+  it("passes the project dir and entrypoint as argv, never interpolated into a command string", () => {
+    // The original defect: `"${claudeCmd}" mcp add ${name} -- node "${bin}" … "${absDir}"`.
+    // A project path ending in a backslash escaped its own closing quote, so
+    // argument parsing corrupted from that point on — and could still exit 0.
+    expect(fnBody).toMatch(/\["mcp",\s*"add",\s*name,\s*"--",\s*"node",\s*bin,/);
+    expect(fnBody).not.toMatch(/`[^`]*\$\{absDir\}[^`]*`/);
+    expect(fnBody).not.toMatch(/`[^`]*\$\{bin\}[^`]*`/);
   });
 });
 

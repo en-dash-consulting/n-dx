@@ -14,11 +14,12 @@
  */
 
 import { execFileSync, spawn } from "node:child_process";
+import { logCliInvocation } from "./cli-log.js";
 
 /**
  * Quote a single token for a Windows cmd.exe verbatim command line.
  *
- * TWIN: exact copy of quoteWindowsToken in packages/llm-client/src/exec.ts.
+ * TWIN: same logic as quoteWindowsToken in packages/llm-client/src/exec.ts.
  * See that file for the full rule rationale. Summary:
  * - Every token is quoted unconditionally.
  * - Embedded double quotes are doubled (`"` → `""`).
@@ -57,13 +58,13 @@ export function quoteWindowsToken(token) {
  * A binary token that is a plain bare command name — no spaces, quotes, path
  * separators, or cmd.exe metacharacters, so it needs no quoting.
  *
- * TWIN: exact copy of WINDOWS_BARE_BINARY_RE in packages/llm-client/src/exec.ts.
+ * TWIN: same logic as WINDOWS_BARE_BINARY_RE in packages/llm-client/src/exec.ts.
  */
 const WINDOWS_BARE_BINARY_RE = /^[A-Za-z0-9_.+-]+$/;
 
 /**
  * Build a Windows cmd.exe verbatim command line from a binary path and args.
- * TWIN: exact copy of buildWindowsCliCommandLine in packages/llm-client/src/exec.ts.
+ * TWIN: same logic as buildWindowsCliCommandLine in packages/llm-client/src/exec.ts.
  * Exported for the cross-package parity test.
  *
  * Args are always quoted; a bare command name is left UNQUOTED so cmd.exe still
@@ -97,6 +98,7 @@ export function buildWindowsCliCommandLine(binary, args) {
 export function execFileSyncCli(binary, args, options) {
   if (process.platform === "win32") {
     const cmdLine = buildWindowsCliCommandLine(binary, args);
+    logCliInvocation({ binary, args, cwd: options?.cwd, via: "execFileSyncCli", commandLine: cmdLine });
     // Outer quote pair: cmd.exe /s strips only the outermost quotes, keeping
     // per-token inner quotes (spaced paths) intact.
     return execFileSync("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
@@ -104,6 +106,7 @@ export function execFileSyncCli(binary, args, options) {
       windowsVerbatimArguments: true,
     });
   }
+  logCliInvocation({ binary, args, cwd: options?.cwd, via: "execFileSyncCli" });
   return execFileSync(binary, args, options);
 }
 
@@ -122,10 +125,12 @@ export function execFileSyncCli(binary, args, options) {
 export function spawnCli(binary, args, options = {}) {
   if (process.platform === "win32") {
     const cmdLine = buildWindowsCliCommandLine(binary, args);
+    logCliInvocation({ binary, args, cwd: options.cwd, via: "spawnCli", commandLine: cmdLine });
     return spawn("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
       ...options,
       windowsVerbatimArguments: true,
     });
   }
+  logCliInvocation({ binary, args, cwd: options.cwd, via: "spawnCli" });
   return spawn(binary, args, options);
 }

@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { rm } from "node:fs/promises";
 
 type RouteHandler = (
   req: IncomingMessage,
@@ -81,4 +82,22 @@ export function startRouteTestServer(
       });
     });
   });
+}
+
+/**
+ * Removes a route test's temp directory, waiting out a process that is still
+ * holding it.
+ *
+ * Route handlers that spawn a child (hench execute, for one) return before that
+ * child has exited, and on Windows a directory cannot be removed while any
+ * process holds a handle inside it — typically as its cwd. The child normally
+ * exits within a few hundred milliseconds, which is why this surfaced as an
+ * intermittent EBUSY rather than a consistent one. Node backs off linearly, so
+ * maxRetries * retryDelay below gives a window of roughly 5.5s.
+ *
+ * Errors propagate: a temp directory that cannot be removed is a leak worth
+ * seeing, and the retry means a transient lock no longer reaches the caller.
+ */
+export async function removeTestDir(dir: string): Promise<void> {
+  await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }

@@ -1,5 +1,5 @@
 import { stat } from "node:fs/promises";
-import { dirname, join, basename, extname, normalize } from "node:path";
+import { dirname, join, basename, extname, normalize, sep } from "node:path";
 
 /**
  * Automatic test runner — identifies and runs relevant tests after task completion.
@@ -208,6 +208,29 @@ export function detectRunner(testCommand: string): string | undefined {
 }
 
 /**
+ * Convert a filesystem path into a form safe to embed in a shell command string.
+ *
+ * findRelevantTests correctly returns OS-native paths — it stat()s them, and
+ * Windows accepts backslashes. But those values then become part of a COMMAND
+ * STRING, and runPostTaskTests runs that through execShellCmd, which is
+ * `exec("sh", ["-c", cmd])` on every platform. A POSIX shell reads each
+ * backslash as an escape, so "src\agent\loop.test.ts" arrives as
+ * "srcagentloop.test.ts", the runner's filter matches nothing, and vitest exits
+ * 1 — making every scoped post-task run on Windows report failure regardless of
+ * the code.
+ *
+ * Forward slashes survive sh untouched and are accepted as filters by vitest,
+ * jest and mocha, and are the required form for Go package patterns.
+ *
+ * Uses `sep` rather than replacing all backslashes: on POSIX `sep` is "/", so
+ * this is the identity there and a literal backslash in a (legal, if unusual)
+ * POSIX filename is left intact.
+ */
+function toCommandPath(filePath: string): string {
+  return filePath.split(sep).join("/");
+}
+
+/**
  * Build a scoped test command targeting specific files.
  * Returns undefined if the runner doesn't support file scoping.
  *
@@ -219,15 +242,20 @@ export function buildScopedCommand(
   runner: string,
   testFiles: string[],
 ): string | undefined {
+  // Normalized once here — the boundary where these stop being filesystem paths
+  // and become shell-command text. Deliberately NOT done in findRelevantTests,
+  // whose callers stat() the values and need them OS-native.
+  const commandFiles = testFiles.map(toCommandPath);
+
   // Go uses package-path scoping (replaces targets, doesn't append file paths)
   if (runner === GO_TEST_RUNNER) {
-    return buildGoScopedCommand(testCommand, testFiles);
+    return buildGoScopedCommand(testCommand, commandFiles);
   }
 
   const scopeFn = SCOPEABLE_RUNNERS[runner];
   if (!scopeFn) return undefined;
 
-  const scopeArgs = scopeFn(testFiles);
+  const scopeArgs = scopeFn(commandFiles);
 
   const parts = testCommand.trim().split(/\s+/);
   const runnerIdx = parts.findIndex((p) => basename(p) === runner);
@@ -249,7 +277,7 @@ export function buildScopedCommand(
   }
 
   // Package manager wrapper (e.g. "pnpm test") — append with --
-  return `${testCommand} -- ${testFiles.join(" ")}`;
+  return `${testCommand} -- ${commandFiles.join(" ")}`;
 }
 
 /**

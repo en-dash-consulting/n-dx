@@ -40,7 +40,7 @@ import { createRequire } from "module";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig } from "./config.js";
+import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv } from "./config.js";
 import {
   parseRecommendationsJson,
   formatQueuedTaskSummary,
@@ -56,7 +56,6 @@ import {
   readPidFile,
   removePidFile,
   removePortFile,
-  waitForProcessExit,
 } from "./web.js";
 import { buildRefreshPlan, RefreshPlanError } from "./refresh-plan.js";
 import { refreshSourcevisionDashboardArtifacts } from "./refresh-artifacts.js";
@@ -110,6 +109,8 @@ import {
 import {
   createChildProcessTracker,
   installTrackedChildProcessHandlers,
+  treeKillSpawnOptions,
+  terminateTreeByPid,
 } from "./child-lifecycle.js";
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
@@ -329,7 +330,7 @@ class ExitRequest extends Error {
   }
 }
 
-const childTracker = createChildProcessTracker({ processGroups: true });
+const childTracker = createChildProcessTracker({ treeKill: true });
 let exitPromise = null;
 
 /**
@@ -365,13 +366,12 @@ let staleCheckResult = null;
 const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "auth"]);
 
 /**
- * On POSIX systems, spawn each child with `detached: true` so it becomes the
- * leader of a new process group.  This lets the process-group-aware tracker
- * kill grandchildren (spawned by the child) by signalling `-pgid` instead of
- * only the direct child PID.  On Windows the flag is omitted — process groups
- * are not supported and detached mode has different semantics there.
+ * Spawn options that make each child tree-killable by the tracker. Owned by
+ * child-lifecycle.js so this file does not test `process.platform` itself — the
+ * platform difference (POSIX needs `detached: true` for a process group;
+ * Windows needs nothing) is the termination layer's business, not the CLI's.
  */
-const SPAWN_DETACHED = process.platform !== "win32" ? { detached: true } : {};
+const SPAWN_DETACHED = treeKillSpawnOptions();
 
 function spawnTracked(command, args, options) {
   return childTracker.register(spawn(command, args, { ...SPAWN_DETACHED, ...options }));
@@ -450,6 +450,7 @@ function run(script, args) {
   return new Promise((res) => {
     const child = spawnTracked(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",
+      env: childEnv(),
     });
 
     let heartbeat = null;
@@ -468,6 +469,23 @@ function run(script, args) {
     });
   });
 }
+
+/**
+ * Environment for spawned sub-CLIs: the ambient environment plus any BETA
+ * experimental flags the project has enabled.
+ *
+ * The decision itself lives in config.js's `experimentalEnv` so it is pure and
+ * testable; this only applies it. Resolved once per run rather than per spawn,
+ * because `run()` is called for every sub-CLI and the value cannot change mid-run.
+ */
+function childEnv() {
+  return Object.keys(experimentalEnvFragment).length > 0
+    ? { ...process.env, ...experimentalEnvFragment }
+    : process.env;
+}
+
+/** BETA experimental flags to forward to children. Empty unless opted in. */
+let experimentalEnvFragment = {};
 
 async function runOrDie(script, args) {
   const code = await run(script, args);
@@ -777,33 +795,31 @@ async function detectAndCleanConflictingDashboard(absDir) {
   // Live process — terminate gracefully.
   const gracePeriodMs = Number(process.env.N_DX_STOP_GRACE_MS ?? 2_000);
 
+  // Probe with signal 0 before delegating. The shared primitive reports a boolean,
+  // but "not permitted" is a different user-facing outcome from "stopped", so the
+  // distinction has to be drawn here where the status is decided.
   try {
-    process.kill(info.pid, "SIGTERM");
+    process.kill(info.pid, 0);
   } catch (err) {
     if (err?.code === "EPERM") {
-      // No permission to signal the process.
+      // Process exists but is not ours to signal.
       return { status: "stop-failed", pid: info.pid, port: info.port };
     }
-    // ESRCH: process exited between the running-check and the kill — treat as stopped.
+    // ESRCH: exited between the running-check and here — treat as stopped.
     await removePidFile(absDir);
     await removePortFile(absDir);
     return { status: "stopped", pid: info.pid, port: info.port };
   }
 
-  // Wait for graceful exit up to the grace period.
-  await waitForProcessExit(info.pid, gracePeriodMs);
-
-  // Escalate to SIGKILL regardless of whether waitForProcessExit timed out.
-  // kill(pid, 0) returns success for zombie processes (exited but not yet reaped
-  // by their parent), so waitForProcessExit may report a timeout even when the
-  // process has effectively exited.  After SIGKILL, a short settle is sufficient —
-  // we do not poll again because SIGKILL is unblockable and zombies are already done.
-  try {
-    process.kill(info.pid, "SIGKILL");
-  } catch {
-    // Ignore: process is already gone or is a zombie — both are effectively stopped.
-  }
-  await new Promise((r) => setTimeout(r, 100));
+  // Terminate the server AND its children through the shared contract, so this is
+  // not a third copy of the SIGTERM → grace → SIGKILL sequence. On Windows this is
+  // what stops `rex analyze` / `hench run` children being orphaned by a stop.
+  //
+  // The result is deliberately not consulted: `kill(pid, 0)` succeeds for a zombie
+  // (exited, not yet reaped), so "still signallable" does not mean "still running",
+  // and reporting stop-failed on that basis would be wrong. SIGKILL is unblockable,
+  // so by this point the process is done in every sense the caller cares about.
+  await terminateTreeByPid(info.pid, { forceKillTimeoutMs: gracePeriodMs });
 
   await removePidFile(absDir);
   await removePortFile(absDir);
@@ -2508,6 +2524,11 @@ async function handlePairProgramming(rest) {
         reviewer,
         testCommand,
         contextFiles: contextFilePath ? [contextFilePath] : undefined,
+        // The reviewer CLI and the shell test command are spawned detached so a
+        // timeout can group-signal their descendants; registering them here is what
+        // keeps Ctrl-C working, since a detached child is no longer in this
+        // process's foreground group. See doNotTrack in pair-programming.js.
+        registerChild: childTracker.register,
       });
       process.stdout.write(formatReviewBanner(reviewer, reviewResult) + "\n");
 
@@ -2543,6 +2564,7 @@ async function handlePairProgramming(rest) {
           reviewer,
           testCommand,
           contextFiles: contextFilePath ? [contextFilePath] : undefined,
+          registerChild: childTracker.register,
         });
         process.stdout.write(formatReviewBanner(reviewer, finalResult) + "\n");
       }
@@ -2754,6 +2776,10 @@ async function main() {
   const dir = resolveProjectDirForPreDispatch(rest);
   const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
   const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
+
+  // Resolve BETA experimental flags from the same config read, so childEnv() can
+  // forward them to sub-CLIs without a second filesystem hit.
+  experimentalEnvFragment = experimentalEnv(projectConfig);
 
   // ── Stale-project detection (synchronous) ───────────────────────────────
   // Run before command dispatch so the notice can be shown after output.

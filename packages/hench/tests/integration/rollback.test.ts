@@ -7,6 +7,7 @@ import { exec as execCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
+import { initGitFixtureRepo } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -20,12 +21,6 @@ const execAsync = promisify(execCb);
  * or the rollbackOnFailure flag. The interactive confirm/decline behavior is
  * covered in rollback-prompt.test.ts and sigint-prompt.test.ts.
  */
-
-async function setupGitRepo(dir: string): Promise<void> {
-  await execAsync("git init", { cwd: dir });
-  await execAsync("git config user.email test@test.com", { cwd: dir });
-  await execAsync("git config user.name Test", { cwd: dir });
-}
 
 async function makeInitialCommit(dir: string, file: string, content: string): Promise<void> {
   await writeFile(join(dir, file), content, "utf-8");
@@ -62,7 +57,7 @@ describe("finalizeRun git rollback (prompt-only, non-interactive path)", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await setupGitRepo(projectDir);
+    await initGitFixtureRepo(projectDir);
 
     // Guard the invariant these tests rely on: stdin is not a TTY, so every
     // finalizeRun below exercises the non-interactive (never-revert) path.

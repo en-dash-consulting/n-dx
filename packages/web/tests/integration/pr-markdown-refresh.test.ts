@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
@@ -118,7 +118,7 @@ describe("PR markdown integration", () => {
     initRepo(tmpDir, "main");
     await writeFile(join(tmpDir, "feature.txt"), "feature\n");
     execSync("git add feature.txt", { cwd: tmpDir, stdio: "ignore" });
-    execSync("git commit -m 'base'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "base"], { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(svDir, "pr-markdown.md"), "## Snapshot v1\n\n- `feature.txt`");
 
     await bindServerFetch(tmpDir);
@@ -139,7 +139,7 @@ describe("PR markdown integration", () => {
     initRepo(tmpDir, "main");
     await writeFile(join(tmpDir, "tracked.txt"), "tracked\n");
     execSync("git add tracked.txt", { cwd: tmpDir, stdio: "ignore" });
-    execSync("git commit -m 'base'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "base"], { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(svDir, "pr-markdown.md"), "## Cached Summary\n\n- Content");
 
     await bindServerFetch(tmpDir);
@@ -153,7 +153,7 @@ describe("PR markdown integration", () => {
     initRepo(tmpDir, "main");
     await writeFile(join(tmpDir, "tracked.txt"), "tracked\n");
     execSync("git add tracked.txt", { cwd: tmpDir, stdio: "ignore" });
-    execSync("git commit -m 'base'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "base"], { cwd: tmpDir, stdio: "ignore" });
 
     await bindServerFetch(tmpDir);
     await renderAndWait(root);
@@ -166,7 +166,7 @@ describe("PR markdown integration", () => {
     initRepo(tmpDir, "main");
     await writeFile(join(tmpDir, "tracked.txt"), "tracked\n");
     execSync("git add tracked.txt", { cwd: tmpDir, stdio: "ignore" });
-    execSync("git commit -m 'base'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "base"], { cwd: tmpDir, stdio: "ignore" });
 
     await bindServerFetch(tmpDir);
 

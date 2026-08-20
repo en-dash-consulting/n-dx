@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { initGitFixtureRepoSync } from "../helpers/index.js";
 
 describe("Full Test Suite Gate Blocking Integration", () => {
   let projectDir: string;
@@ -37,11 +38,13 @@ describe("Full Test Suite Gate Blocking Integration", () => {
     );
 
     // Initialize git repository
-    await import("node:child_process").then(({ execSync }) => {
+    await import("node:child_process").then(({ execFileSync }) => {
       try {
-        execSync("git init", { cwd: projectDir });
-        execSync("git config user.email 'test@example.com'", { cwd: projectDir });
-        execSync("git config user.name 'Test User'", { cwd: projectDir });
+        // The helper uses argv, not a shell string: cmd.exe does not strip single
+        // quotes, so "user.name 'Test User'" would store the quotes literally and
+        // a value containing a space splits into two arguments. The surrounding
+        // catch would have hidden either outcome.
+        initGitFixtureRepoSync(projectDir);
       } catch {
         // Git might not be available in test environment
       }

@@ -7,6 +7,7 @@ import type { RunRecord } from "../../src/schema/v1.js";
 import { initConfig } from "../../src/store/config.js";
 import { saveRun, listRuns } from "../../src/store/runs.js";
 import { parseDocument, serializeDocument } from "@n-dx/rex";
+import { cliSpawnsOnly } from "../helpers/index.js";
 
 function mockCliProcess(opts: { stdout?: string; stderr?: string; code: number }) {
   const proc = new EventEmitter() as EventEmitter & {
@@ -120,7 +121,7 @@ describe("codex token accounting integration", () => {
       const actual = await importOriginal<typeof import("node:child_process")>();
       return {
         ...actual,
-        spawn: mockSpawn,
+        spawn: cliSpawnsOnly(mockSpawn),
       };
     });
 
@@ -190,7 +191,7 @@ describe("codex token accounting integration", () => {
       const actual = await importOriginal<typeof import("node:child_process")>();
       return {
         ...actual,
-        spawn: mockSpawn,
+        spawn: cliSpawnsOnly(mockSpawn),
       };
     });
 
@@ -241,7 +242,7 @@ Tokens used: 8,542 in, 2,130 out
       const actual = await importOriginal<typeof import("node:child_process")>();
       return {
         ...actual,
-        spawn: mockSpawn,
+        spawn: cliSpawnsOnly(mockSpawn),
       };
     });
 
@@ -287,7 +288,7 @@ Tokens used: 8,542 in, 2,130 out
       const actual = await importOriginal<typeof import("node:child_process")>();
       return {
         ...actual,
-        spawn: mockSpawn,
+        spawn: cliSpawnsOnly(mockSpawn),
       };
     });
 
@@ -332,7 +333,7 @@ Tokens used: 8,542 in, 2,130 out
       const actual = await importOriginal<typeof import("node:child_process")>();
       return {
         ...actual,
-        spawn: mockSpawn,
+        spawn: cliSpawnsOnly(mockSpawn),
       };
     });
 
@@ -381,7 +382,7 @@ tokens used
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     mockSpawn
@@ -436,7 +437,7 @@ tokens used
     const mockSpawn = vi.fn();
     vi.doMock("node:child_process", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:child_process")>();
-      return { ...actual, spawn: mockSpawn };
+      return { ...actual, spawn: cliSpawnsOnly(mockSpawn) };
     });
 
     mockSpawn.mockImplementationOnce(() =>
@@ -475,7 +476,7 @@ tokens used
       const actual = await importOriginal<typeof import("node:child_process")>();
       return {
         ...actual,
-        spawn: mockSpawn,
+        spawn: cliSpawnsOnly(mockSpawn),
       };
     });
 

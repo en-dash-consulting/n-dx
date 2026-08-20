@@ -45,3 +45,16 @@ scripts/HENCH_CALLGRAPH_FINDINGS.md
 
 # macOS
 .DS_Store
+
+# Vendor CLI invocation log (packages/*/cli-log.*) and its rotated generation.
+# Local operational history — never committed.
+claude_commands.log
+claude_commands.log.1
+
+# NOTE: `claude.args` / `codex.args` were ignored here until the e2e fake-CLI
+# shims were given an absolute capture path (task 76a37b38). They wrote via
+# `$0.args` / `%~f0.args`, neither of which searches PATH, so a shim invoked by
+# bare name wrote into the CWD — the repository root. Ignoring them hid the
+# regression twice: the files were deleted once as "unreferenced fixtures" and
+# simply came back. Deliberately NOT re-added: if an .args file ever appears here
+# again it should show up in `git status`.

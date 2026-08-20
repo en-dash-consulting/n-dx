@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
+import { initGitFixtureRepo } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -35,9 +36,7 @@ describe("Timer-expiry auto-commit in --yes mode", () => {
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-stall-test-"));
     // Set up a minimal git repo
-    await execAsync("git init", { cwd: projectDir });
-    await execAsync("git config user.email test@test.com", { cwd: projectDir });
-    await execAsync("git config user.name Test", { cwd: projectDir });
+    await initGitFixtureRepo(projectDir);
     // Initial commit so HEAD exists
     await writeFile(join(projectDir, "file.txt"), "initial\n", "utf-8");
     await execAsync("git add .", { cwd: projectDir });

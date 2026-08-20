@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:net";
+import { existsSync } from "node:fs";
 import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
@@ -127,6 +128,16 @@ function isListenPermissionError(error) {
   return Boolean(error && typeof error === "object" && error.code === "EPERM");
 }
 
+/** Signal 0 delivers nothing; it just runs the kernel's existence check. */
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe("n-dx start", { timeout: 120_000 }, () => {
   let tmpDir;
   let canBindPorts = true;
@@ -238,8 +249,14 @@ describe("n-dx start", { timeout: 120_000 }, () => {
       expect(pidData).toHaveProperty("port", port);
       expect(pidData).toHaveProperty("startedAt");
 
-      // Clean up
-      try { process.kill(pidData.pid, "SIGTERM"); } catch {}
+      // Stop through the COMMAND, not a raw signal: `ndx start stop` now routes
+      // through child-lifecycle's shared primitive, and this is what pins that the
+      // command path actually reaches it and leaves nothing behind. The orphaned-
+      // children property itself is covered in stop-orphan-children.test.js.
+      const stop = runResult(["stop", tmpDir]);
+      expect(stop.code).toBe(0);
+      expect(existsSync(pidPath)).toBe(false);
+      expect(isProcessAlive(pidData.pid)).toBe(false);
     });
 
     it("restarts the previous background server instead of erroring", async () => {

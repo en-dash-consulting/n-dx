@@ -181,53 +181,60 @@ describe("prd_tree atomic writes and crash-safety", () => {
   // ── Concurrency tests ──────────────────────────────────────────────────
 
   describe("file-locking: concurrent writers are serialized", () => {
-    it("second writer waits for first writer to release lock", async () => {
-      // Regression note: this test previously used operations.push("second-start")
-      // logged synchronously at closure-invocation time, and a setTimeout(10) as
-      // a proxy for "the first write has definitely finished by now". Both are
-      // wall-clock assumptions about how fast real filesystem I/O happens to
-      // complete — under CPU contention (e.g. `pnpm validate` running every
-      // package's suite in parallel) the first write can legitimately take
-      // longer than 10ms, so "second-start" got logged before "first-end" even
-      // though the lock itself was never actually violated. Reproduced: 5/20
-      // failures under artificial CPU load vs. 0/15 in isolation.
-      //
-      // Fixed by marking the true critical-section boundary instead: saveDocument()
-      // only ever runs while withLock's callback is executing, i.e. while the
-      // lock is actually held. Ordering here is proven by the in-process mutex
-      // (a deterministic promise queue, not polling), not by timing.
-      const operations: string[] = [];
-      const originalSaveDocument = store.saveDocument.bind(store);
-      const saveDocumentSpy = vi
-        .spyOn(store, "saveDocument")
-        .mockImplementation(async (doc) => {
-          operations.push(`save-start:${doc.items.length}`);
-          await originalSaveDocument(doc);
-          operations.push(`save-end:${doc.items.length}`);
-        });
+    /**
+     * This replaced an ordering assertion that could not have tested locking.
+     *
+     * The old version pushed "second-start" synchronously at the top of the second
+     * writer's async IIFE — i.e. BEFORE that writer ever asked for the lock — and
+     * started it after a fixed 10ms sleep. So `firstEndIdx < secondStartIdx` was
+     * really asserting "the first addItem finishes within 10ms", which says nothing
+     * about serialization. Under load addItem takes longer than that and the
+     * assertion failed with `expected 2 to be less than 1`, having never exercised
+     * the lock at all.
+     *
+     * Asserted here instead, at the lock itself and without any timing assumption:
+     * a lock that is held cannot be granted to anyone else. A slower machine makes
+     * this MORE certainly true, not less — the failure direction is safe.
+     */
+    it("does not grant the lock to a second writer while the first holds it", async () => {
+      const lockPath = join(rexDir, "prd.lock");
 
-      // Calling addItem twice back-to-back without awaiting in between is
-      // itself deterministic: both calls run synchronously up to the point
-      // where they enqueue on the in-process lock queue (a plain Map read/
-      // write, no await in between), so the first call is always queued
-      // ahead of the second regardless of system speed.
-      const firstPromise = store.addItem(makeItem("test-1", "First Item"));
-      const secondPromise = store.addItem(makeItem("test-2", "Second Item"));
+      const releaseFirst = await acquireLock(lockPath);
 
-      await Promise.all([firstPromise, secondPromise]);
-      saveDocumentSpy.mockRestore();
+      let secondAcquired = false;
+      const secondAcquisition = acquireLock(lockPath).then((release) => {
+        secondAcquired = true;
+        return release;
+      });
 
-      // Verify serialization: the first writer's entire critical section
-      // (including its save) completes before the second writer's begins.
-      const firstSaveEndIdx = operations.indexOf("save-end:1");
-      const secondSaveStartIdx = operations.indexOf("save-start:2");
-      expect(firstSaveEndIdx).toBeGreaterThanOrEqual(0);
-      expect(secondSaveStartIdx).toBeGreaterThanOrEqual(0);
-      expect(firstSaveEndIdx).toBeLessThan(secondSaveStartIdx);
+      // Drain timers and microtasks several times over. The point is not "wait
+      // long enough" — it is that no amount of event-loop progress may hand out a
+      // lock that is still held.
+      for (let i = 0; i < 5; i++) {
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      expect(secondAcquired).toBe(false);
 
-      // Verify both items were written
+      await releaseFirst();
+
+      // Now it must be grantable. If the lock were never released this would hang
+      // until acquireLock's own timeout, failing loudly rather than silently.
+      const releaseSecond = await secondAcquisition;
+      expect(secondAcquired).toBe(true);
+      await releaseSecond();
+    });
+
+    it("serializes concurrent addItem calls without losing either write", async () => {
+      // The load-independent half of the original test: whatever order the two
+      // writers interleave in, neither may clobber the other.
+      await Promise.all([
+        store.addItem(makeItem("test-1", "First Item")),
+        store.addItem(makeItem("test-2", "Second Item")),
+      ]);
+
       const doc = await store.loadDocument();
       expect(doc.items).toHaveLength(2);
+      expect(doc.items.map((i) => i.id).sort()).toEqual(["test-1", "test-2"]);
     });
 
     it("lock timeout prevents indefinite waiting", async () => {

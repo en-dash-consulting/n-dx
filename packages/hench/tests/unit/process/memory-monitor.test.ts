@@ -146,6 +146,41 @@ describe("SystemMemoryMonitor", () => {
       expect(snap.availableBytes).toBe(snap.freeBytes);
     });
 
+    it("reads Windows availability without consulting a platform reader", async () => {
+      // Pins a measured decision, not an accident. os.freemem() on Windows already
+      // reports standby-inclusive availability — measured at -0.08 percentage points
+      // against `\Memory\Available MBytes` on a quiet 31.5 GiB box — so no separate
+      // reader is warranted. The cost of getting this wrong is specific:
+      // checkBeforeSpawn() runs on every process-spawning tool call, so a reader
+      // that shells out would add a child process per tool call. If this test starts
+      // failing because a Windows reader was added, the module docblock explains what
+      // measurement to bring first.
+      let linuxReads = 0;
+      let darwinReads = 0;
+      const monitor = new SystemMemoryMonitor(undefined, {
+        platform: "win32",
+        totalmem: () => 16 * GB,
+        freemem: () => 4 * GB,
+        readLinuxAvailable: async () => {
+          linuxReads += 1;
+          return 8 * GB;
+        },
+        readDarwinAvailable: async () => {
+          darwinReads += 1;
+          return 8 * GB;
+        },
+      });
+
+      const snap = await monitor.snapshot();
+
+      expect(linuxReads).toBe(0);
+      expect(darwinReads).toBe(0);
+      // Availability comes straight from freemem, so usagePercent follows it: had a
+      // reader been consulted, 8 GiB available would have read as 50% instead.
+      expect(snap.availableBytes).toBe(4 * GB);
+      expect(snap.usagePercent).toBeCloseTo(75, 0);
+    });
+
     it("handles zero total memory gracefully", async () => {
       const monitor = new SystemMemoryMonitor(undefined, {
         platform: "darwin",

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { h, render } from "preact";
+import { act } from "preact/test-utils";
 import type { LoadedData } from "../../../src/viewer/types.js";
 import { Graph } from "../../../src/viewer/views/graph.js";
 
@@ -227,25 +228,39 @@ describe("Graph (Import Graph view)", () => {
 
   it("recenters the file street view when the focused graph changes", async () => {
     const root = newRoot();
-    render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
+    // act() so the mount's deferred effect chain settles BEFORE the pan.
+    //
+    // Graph picks a default focus file in an effect, and a second effect resets
+    // the dependency viewport whenever focusFile changes. Preact runs useEffect
+    // after paint, so there is a window where the DOM already shows the
+    // auto-selected file while that reset has not run yet. Panning inside that
+    // window applied correctly and was then wiped — traced as
+    // reset(null) -> pan(0 -> -40) -> reset("src/b.ts"). Waiting on a DOM signal
+    // cannot close the window, because the DOM is what updates first.
+    act(() => {
+      render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
+    });
     const svg = root.querySelector(".ig-graph-column .ig-svg-wrap svg") as SVGSVGElement;
     expect(svg).toBeTruthy();
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-focus-chip")?.textContent).toBeTruthy();
     });
-    // Retry the gesture, not just the assertion. A view-reset effect fires when
-    // the auto-selected focus file lands; a wheel dispatched in the window
-    // before it runs is wiped back to the identity transform. Re-dispatching
-    // converges. Each event pans a further 40 units, so assert a positive
-    // multiple of 40 — that still pins deltaY→translation while tolerating the
-    // retries.
-    await vi.waitFor(() => {
+    // One gesture, exact assertion — no retry loop. The act() around the render
+    // above already flushed the view-reset effect, so the window this test used to
+    // race against is closed rather than tolerated. Retrying the wheel would still
+    // pass, but it can only assert "some positive multiple of 40", which no longer
+    // distinguishes one correct pan from three.
+    //
+    // The pan is deltaY 40 against a viewBox of "0 0 778 460": panViewport adds
+    // -deltaY, and clampMapView's y bounds are [h*0.2 - k*h, h*0.8] = [-368, 368]
+    // at k=1, so -40 passes through unclamped and the transform is exactly -40.
+    act(() => {
       svg.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 40 }));
+    });
+    await vi.waitFor(() => {
       const transform = root.querySelector(".ig-graph-column .ig-svg-wrap svg > g[transform]")?.getAttribute("transform") ?? "";
-      const panned = /^translate\(0 -(\d+)\)/.exec(transform);
-      expect(panned, `expected a vertical pan, got "${transform}"`).toBeTruthy();
-      expect(Number(panned![1]) % 40, `pan should be a multiple of 40, got "${transform}"`).toBe(0);
-      expect(Number(panned![1])).toBeGreaterThan(0);
+      expect(transform, `expected an exact -40 vertical pan, got "${transform}"`)
+        .toMatch(/^translate\(0 -40\)/);
     }, { timeout: 3000 });
     const zoneBtn = [...root.querySelectorAll(".ig-zone-map-node")].find((b) => b.textContent?.includes("Zone B"));
     expect(zoneBtn).toBeTruthy();
@@ -257,22 +272,35 @@ describe("Graph (Import Graph view)", () => {
 
   it("supports back and forward through clicked dependency preview nodes", async () => {
     const root = newRoot();
-    render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
-    // Wait for the initial auto-focus (src/b.ts — the most-imported file) to
-    // land before navigating. Going Back requires a previous entry: clicking
-    // a.ts before anything is focused correctly leaves Back disabled, so
-    // asserting "Back returns to b.ts" without establishing that focus first
-    // is a race, not a product bug.
+    // Same deferred-effect hazard as the recenter test above, with a different
+    // symptom: focus history is seeded in an effect, so until it flushes the Back
+    // button is still rendered `disabled` and clicking it silently does nothing —
+    // leaving a.ts selected and failing on the missing src/b.ts.
+    act(() => {
+      render(h(Graph, { data: makeLoadedData(), onSelect: vi.fn() }), root);
+    });
+    // Then wait for the initial auto-focus (src/b.ts — the most-imported file) to
+    // land before navigating. Going Back requires a previous entry: clicking a.ts
+    // before anything is focused correctly leaves Back disabled, so asserting
+    // "Back returns to b.ts" without establishing that focus first is a race, not
+    // a product bug. act() flushes the effects; this pins the state they produced.
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/b.ts");
     });
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-node-file[title='src/a.ts']")).not.toBeNull();
     });
-    (root.querySelector(".ig-node-file[title='src/a.ts']") as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    act(() => {
+      (root.querySelector(".ig-node-file[title='src/a.ts']") as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/a.ts");
     });
+    // clickHistoryButton rather than indexing the button list: it selects by label,
+    // waits for the button to be enabled before clicking, and re-queries so it
+    // survives Preact replacing the node. All three matter here — a disabled
+    // button's click is a silent no-op, and index 0/1 is the fragile part of the
+    // assertion, not the part being tested.
     await clickHistoryButton(root, "Back");
     await vi.waitFor(() => {
       expect(root.querySelector(".ig-focus-detail")?.textContent).toContain("src/b.ts");

@@ -26,7 +26,7 @@ import {
   readdirSync,
   statSync,
 } from "fs";
-import { join, resolve, dirname } from "path";
+import { join, resolve, dirname, basename } from "path";
 import { tmpdir } from "os";
 import { pathToFileURL } from "url";
 
@@ -90,10 +90,16 @@ function packAndExtract(pkgDir) {
 
   const extractDir = join(tmpRoot, "extracted");
   mkdirSync(extractDir);
+  // Run from tmpRoot and pass RELATIVE paths so no drive letter reaches tar.
+  // GNU tar — first on PATH wherever Git for Windows is installed — parses a
+  // `C:\...` argument as a remote `host:path` spec and dies with
+  // "tar (child): Cannot connect to C: resolve failed". `--force-local` fixes
+  // GNU tar but the bsdtar shipped in Windows System32 rejects the unknown
+  // option, so relative paths are the only form both accept.
   execFileSync(
     "tar",
-    ["-xzf", tgzPath, "-C", extractDir, "--strip-components=1"],
-    { stdio: "ignore" },
+    ["-xzf", basename(tgzPath), "-C", "extracted", "--strip-components=1"],
+    { cwd: tmpRoot, stdio: "ignore" },
   );
 
   // Symlink the source package's node_modules so deps resolve during load.

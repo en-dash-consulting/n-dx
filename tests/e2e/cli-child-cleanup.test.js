@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
-import { platform, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 const PRELOAD_PATH = join(
@@ -53,7 +54,15 @@ async function readPidRecord(pidFile, timeoutMs = 2_000) {
 }
 
 function withImportedNodeOptions(preloadPath) {
-  const segments = [process.env.NODE_OPTIONS, `--import=${preloadPath}`].filter(Boolean);
+  // `--import` needs a file:// URL, not a bare path: on Windows Node rejects
+  // `--import=C:\...` with ERR_UNSUPPORTED_ESM_URL_SCHEME ("Received
+  // protocol 'c:'"), so the preload never loads, `spawn` is never patched, the
+  // child double is never substituted, and every test here times out waiting
+  // for a PID record that is never written. POSIX accepts the file:// form too,
+  // so this is unconditional. The URL form also encodes spaces, which a bare
+  // path in NODE_OPTIONS could not survive.
+  const specifier = pathToFileURL(preloadPath).href;
+  const segments = [process.env.NODE_OPTIONS, `--import=${specifier}`].filter(Boolean);
   return segments.join(" ");
 }
 
@@ -92,7 +101,12 @@ function spawnAnalyze(tmpDir, mode) {
   };
 }
 
-describe.skipIf(platform() === "win32")("n-dx child-process cleanup regression coverage", () => {
+// Runs on Windows as well as POSIX. Caveat for the two SIGINT cases: on Windows
+// `process.kill(pid, "SIGINT")` is TerminateProcess, so the CLI's signal handler
+// never runs (exit code 1, not the handler's 128+2) and the child dies because
+// the host's Job Object reaps the tree — not because tracker cleanup ran. See
+// the header of cli-orphan-cleanup.test.js for the full explanation.
+describe("n-dx child-process cleanup regression coverage", () => {
   let tmpDir;
 
   beforeEach(async () => {
@@ -101,7 +115,12 @@ describe.skipIf(platform() === "win32")("n-dx child-process cleanup regression c
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    // maxRetries/retryDelay: the CLI child is spawned with cwd: tmpDir, so on
+    // Windows the directory can still be handle-locked when teardown runs and
+    // rmdir fails with EBUSY. Under full-suite load this is the difference
+    // between green and an intermittent red that has nothing to do with the
+    // assertion under test.
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("terminates the SourceVision child after a successful run", async () => {

@@ -6,7 +6,8 @@
  *   - Parser emits structured warnings for missing/malformed index.md
  *   - Parse order is deterministic (alphabetical by folder name)
  *   - Parser reconstructs parent-child relationships from directory depth
- *   - Parsing a 200-item tree completes in < 500 ms
+ *   - Parse cost scales sub-quadratically with tree size (complexity gate, not a
+ *     wall-clock budget — see the performance describe block for why)
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -16,15 +17,11 @@ import { tmpdir } from "node:os";
 import { parseFolderTree } from "../../../src/store/folder-tree-parser.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 
-/**
- * Load tolerance for wall-clock budgets below.
- *
- * These assertions guard against algorithmic regressions (a quadratic
- * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
- * numbers flake when the rest of the monorepo suite saturates every core,
- * so the budget is scaled. See TESTING.md "Flake Resistance".
- */
-const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+// No BUDGET_MULTIPLIER here. The perf assertion below guards complexity, and it
+// now says so directly by comparing growth between two tree sizes rather than
+// scaling an absolute wall-clock budget. See that test for the reasoning, and
+// TESTING.md "Flake Resistance" for where scaled absolute budgets are still the
+// right tool (genuine latency budgets, not complexity claims).
 
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -935,24 +932,76 @@ describe("parseFolderTree: single-child optimization", () => {
   });
 });
 
-// ── Performance: 200-item tree < 500 ms ──────────────────────────────────────
+// ── Performance: parse cost scales sub-quadratically ─────────────────────────
+
+/**
+ * Fastest of `runs` timings, in ms.
+ *
+ * Min rather than mean or median: the thing being measured is how long the work
+ * takes, and a slower reading only ever means the machine was busy. Taking the
+ * minimum treats load as the noise it is, and a transient spike has to land on
+ * every single run to skew the result.
+ */
+async function fastestMs(fn: () => Promise<unknown>, runs = 3): Promise<number> {
+  let best = Infinity;
+  for (let i = 0; i < runs; i++) {
+    const start = performance.now();
+    await fn();
+    best = Math.min(best, performance.now() - start);
+  }
+  return best;
+}
 
 describe("parseFolderTree: performance", () => {
-  it("parses a 200-item tree within the scaled parse budget", async () => {
-    // 5 epics × 5 features × 4 tasks × 2 subtasks = 5+25+100+200 = 330 items
-    // Use: 4 epics × 5 features × 5 tasks × 2 subtasks = 4+20+100+200 = 324 items
-    // Simpler: 4 epics × 5 features × 5 tasks = 4+20+100 = 124 items (no subtasks for speed)
-    // The AC says "200-item PRD tree" — include subtasks.
-    // 5 epics × 4 features × 5 tasks × 2 subtasks = 5+20+100+200 = 325 total, 200+ items
-    const epics = buildTree(5, 4, 5, 2);
-    await buildFolderTree(testDir, epics);
+  /**
+   * This replaced an absolute `expect(elapsed).toBeLessThan(500)` on a 325-item
+   * tree. That budget measured the MACHINE, not the code: it passed in isolation
+   * and failed constantly under full-suite load, where it was observed at 991ms,
+   * 6162ms, 7481ms and 10975ms — up to 20x over — while the parser itself was
+   * unchanged. Every one of those reds was noise, and reds that are usually noise
+   * teach people to stop reading them.
+   *
+   * What the budget was actually guarding is complexity: parseFolderTree walks
+   * the tree and must not degrade to O(n²). So assert THAT, by comparing two
+   * sizes measured back-to-back in the same process. Ambient load scales both
+   * readings together, so the ratio survives a busy machine while still catching
+   * a genuine complexity regression.
+   */
+  it("parse time scales sub-quadratically with tree size", async () => {
+    // 2+4+8+16 = 30 items vs 4+16+64+256 = 340 items — a ~11x size step, big
+    // enough that per-item cost dominates fixed overhead at the large end.
+    const smallDir = join(testDir, "perf-small");
+    const largeDir = join(testDir, "perf-large");
+    await buildFolderTree(smallDir, buildTree(2, 2, 2, 2));
+    await buildFolderTree(largeDir, buildTree(4, 4, 4, 4));
 
-    const start = performance.now();
-    const result = await parseFolderTree(testDir);
-    const elapsed = performance.now() - start;
+    const smallCount = 30;
+    const largeCount = 340;
+    const sizeRatio = largeCount / smallCount;
 
+    // Warm the filesystem cache for both so the comparison is library cost, not
+    // cold-read cost, which would otherwise inflate whichever ran first.
+    await parseFolderTree(smallDir);
+    await parseFolderTree(largeDir);
+
+    const smallMs = await fastestMs(() => parseFolderTree(smallDir));
+    const largeMs = await fastestMs(() => parseFolderTree(largeDir));
+
+    const result = await parseFolderTree(largeDir);
     expect(result.warnings).toHaveLength(0);
-    expect(elapsed).toBeLessThan(500 * BUDGET_MULTIPLIER);
+    expect(result.items).toHaveLength(4);
+
+    // Linear parsing gives timeRatio ≈ sizeRatio (~11). Quadratic gives
+    // ≈ sizeRatio² (~128). The 4x headroom absorbs fixed per-parse overhead,
+    // which inflates the small reading and therefore only ever makes this
+    // assertion more forgiving — never falsely strict.
+    const timeRatio = largeMs / Math.max(smallMs, 0.1);
+    expect(
+      timeRatio,
+      `parse scaled ${timeRatio.toFixed(1)}x for a ${sizeRatio.toFixed(1)}x size increase ` +
+      `(${smallCount} items: ${smallMs.toFixed(1)}ms, ${largeCount} items: ${largeMs.toFixed(1)}ms). ` +
+      `Linear would be ~${sizeRatio.toFixed(0)}x; this suggests a complexity regression.`,
+    ).toBeLessThan(sizeRatio * 4);
   });
 
   function buildTree(

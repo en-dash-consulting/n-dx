@@ -9,7 +9,7 @@
  * - Stale entry pruning for deleted PRD tasks
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, writeFile, mkdir, rm, unlink, utimes } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, rm, unlink, utimes, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { IncrementalTaskUsageAggregator } from "../../../src/server/task-usage/incremental-task-usage.js";
@@ -199,6 +199,47 @@ describe("IncrementalTaskUsageAggregator", () => {
 
       // Re-write the same file but with a different taskId
       await writeRun("run-1.json", "task-b", { input: 100, output: 50 });
+
+      const usage = await aggregator.getTaskUsage();
+      expect(usage["task-a"]).toBeUndefined();
+      expect(usage["task-b"]).toEqual({ totalTokens: 150, runCount: 1 });
+    });
+
+    it("detects a same-size rewrite whose mtime did not advance", async () => {
+      // The hazard the test above hits by accident on Windows, made
+      // deterministic. Windows advances file timestamps in ticks — measured gaps
+      // between consecutive distinct mtimes ran up to 10ms, and 163 of 200
+      // back-to-back same-size rewrites produced an identical mtimeMs. Under
+      // mtime+size detection that rewrite is invisible.
+      //
+      // utimes pins the mtime back to its earlier value, reproducing the
+      // collision exactly and on every platform, so this asserts the contract
+      // rather than the host's timer resolution. Both payloads are the same
+      // length by construction (taskId and the ISO timestamp are fixed width),
+      // which is the point — a size change would mask the problem.
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+      const runFile = join(runsDir, "run-1.json");
+
+      // Pin BEFORE the first read as well as after the rewrite. A fresh write
+      // leaves a fractional mtimeMs (…915.4949) while utimes stores whole
+      // milliseconds (…915), so pinning only the second write still leaves the
+      // two snapshots different and the change gets detected for the wrong
+      // reason — this test passed against the unfixed code until both were
+      // pinned.
+      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      await utimes(runFile, pinned, pinned);
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      expect((await aggregator.getTaskUsage())["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+
+      const before = await stat(runFile);
+      await writeRun("run-1.json", "task-b", { input: 100, output: 50 });
+      await utimes(runFile, pinned, pinned);
+      const after = await stat(runFile);
+
+      // The precondition IS the hazard: byte-identical length, identical mtime.
+      expect(after.size).toBe(before.size);
+      expect(after.mtimeMs).toBe(before.mtimeMs);
 
       const usage = await aggregator.getTaskUsage();
       expect(usage["task-a"]).toBeUndefined();

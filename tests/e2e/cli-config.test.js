@@ -8,6 +8,14 @@ import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 const isWin = process.platform === "win32";
 
 /**
+ * Where a `captureArgs` shim records its argv. Same on every platform — notably
+ * NOT `<shim>.cmd.args` on Windows — so callers need no platform branch.
+ */
+function fakeBinaryArgsPath(filePath) {
+  return `${filePath}.args`;
+}
+
+/**
  * Create a platform-appropriate fake CLI binary.
  * On Unix: shell script with chmod 755.
  * On Windows: .cmd batch file (the path returned includes .cmd).
@@ -15,12 +23,20 @@ const isWin = process.platform === "win32";
  * @param {string} filePath - Base path (without .cmd extension)
  * @param {{ stdout?: string, stderrLine?: string, exitCode?: number, captureArgs?: boolean }} opts
  * @returns {Promise<string>} The actual file path created (may have .cmd appended on Windows)
+ *
+ * When `captureArgs` is set the shim records its argv at `fakeBinaryArgsPath()`,
+ * which is ABSOLUTE and baked into the script. It must not be derived from `$0`
+ * or `%~f0`: neither searches PATH, so a shim invoked by bare name resolved them
+ * against the CWD and dropped a `claude.args` file in the repository root.
+ * `%~f0` is the more surprising of the two — it "fully qualifies" %0 by prefixing
+ * the current directory rather than locating the file.
  */
 async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCode = 0, captureArgs = false } = {}) {
+  const argsPath = fakeBinaryArgsPath(filePath);
   if (isWin) {
     const cmdPath = filePath + ".cmd";
     const lines = ["@echo off"];
-    if (captureArgs) lines.push("echo %* > \"%~f0.args\"");
+    if (captureArgs) lines.push(`echo %* > "${argsPath}"`);
     if (stderrLine) lines.push(`echo ${stderrLine} 1>&2`);
     if (stdout) lines.push(`echo ${stdout}`);
     if (exitCode !== 0) lines.push(`exit /b ${exitCode}`);
@@ -28,7 +44,9 @@ async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCod
     return cmdPath;
   }
   const lines = ["#!/bin/sh"];
-  if (captureArgs) lines.push('echo "$@" > "$0.args"');
+  // Single-quoted so nothing in the path is expanded. mkdtemp paths contain no
+  // single quotes, so this needs no escaping.
+  if (captureArgs) lines.push(`echo "$@" > '${argsPath}'`);
   if (stderrLine) lines.push(`echo '${stderrLine}' 1>&2`);
   if (stdout) lines.push(`echo '${stdout}'`);
   if (exitCode !== 0) lines.push(`exit ${exitCode}`);
@@ -710,10 +728,22 @@ describe("n-dx config", () => {
         expect(stderr).toContain("/nonexistent/path/to/claude");
       });
 
-      it.skipIf(process.platform === "win32")("rejects cli_path when file is not executable", async () => {
+      it("rejects cli_path when file is not executable (POSIX only)", async () => {
         const nonExecPath = join(tmpDir, "not-executable");
         await writeFile(nonExecPath, "#!/bin/sh\necho hi\n");
         await chmod(nonExecPath, 0o644); // readable but not executable
+
+        if (isWin) {
+          // SKIPPED BY DESIGN, asserted rather than silently skipped: NTFS has
+          // no executable bit and Node's X_OK degrades to F_OK on Windows, so
+          // an existing file is always accepted. Rejecting on a PATHEXT
+          // extension instead would refuse the extensionless POSIX scripts that
+          // pnpm/npm global installs place beside their .CMD shims. See
+          // executableBitIsMeaningful() in packages/core/config.js.
+          const output = run(["claude.cli_path", nonExecPath, tmpDir]);
+          expect(output).toContain(`claude.cli_path = ${nonExecPath}`);
+          return;
+        }
 
         const stderr = runFail(["claude.cli_path", nonExecPath, tmpDir]);
         expect(stderr).toContain("not executable");
@@ -798,11 +828,12 @@ describe("n-dx config", () => {
       expect(stderr).toContain("No Claude configuration set");
     });
 
-    it.skipIf(process.platform === "win32")("tests cli_path with configured binary", async () => {
-      // Create a fake claude binary that outputs a version
-      const fakeClaude = join(tmpDir, "fake-claude");
-      await writeFile(fakeClaude, "#!/bin/sh\necho '1.0.0-test'\n");
-      await chmod(fakeClaude, 0o755);
+    it("tests cli_path with configured binary", async () => {
+      // writeFakeBinary emits a .cmd on Windows and a chmod 755 sh script on
+      // POSIX, so this no longer needs a platform skip.
+      const fakeClaude = await writeFakeBinary(join(tmpDir, "fake-claude"), {
+        stdout: "1.0.0-test",
+      });
 
       run(["claude.cli_path", fakeClaude, tmpDir]);
       const output = run(["--test-connection", tmpDir]);
@@ -934,42 +965,98 @@ describe("n-dx config", () => {
   // ── Secure file permissions ──────────────────────────────────────────────
 
   describe("secure file permissions", () => {
-    it.skipIf(process.platform === "win32")("sets .n-dx.json to 0600 when api_key is present", async () => {
+    /**
+     * Assert a file is readable only by its owner, in whatever terms the
+     * platform actually enforces.
+     *
+     * POSIX: mode 0600. Windows: NTFS has no POSIX mode — `chmod(path, 0o600)`
+     * leaves the DACL untouched and the mode still reads back 0666 — so the
+     * check has to be the DACL itself: no inherited `(I)` entries (inheritance
+     * broken) and no principal other than the current user.
+     */
+    async function expectOwnerOnly(path) {
+      if (!isWin) {
+        const { mode } = await stat(path);
+        expect(mode & 0o777).toBe(0o600);
+        return;
+      }
+
+      const acl = execFileSync("icacls", [path], { encoding: "utf-8" });
+      const aces = acl
+        .split(/\r?\n/)
+        .map((l) => l.replace(path, "").trim())
+        .filter((l) => /^.*?:(\([^)]*\))+$/.test(l));
+
+      expect(aces.length).toBeGreaterThan(0);
+      expect(aces.filter((a) => a.includes("(I)"))).toEqual([]);
+      const me = process.env.USERNAME.toLowerCase();
+      for (const ace of aces) {
+        const identity = ace.slice(0, ace.indexOf(":(")).toLowerCase();
+        expect(identity.split("\\").pop()).toBe(me);
+      }
+    }
+
+    /** Assert a file was NOT locked down to its owner. */
+    async function expectNotOwnerOnly(path) {
+      if (!isWin) {
+        const { mode } = await stat(path);
+        expect(mode & 0o777).not.toBe(0o600);
+        return;
+      }
+      // Untouched files keep whatever ACL their directory produced. That is
+      // usually inherited `(I)` entries, but not always: on GitHub-hosted
+      // Windows runners, files under %TEMP% get EXPLICIT ACEs for SYSTEM,
+      // Administrators, and the user. So assert the semantic negation of
+      // owner-only — inheritance still in effect, or some principal other
+      // than the current user holds access — rather than the `(I)` marker.
+      const acl = execFileSync("icacls", [path], { encoding: "utf-8" });
+      const aces = acl
+        .split(/\r?\n/)
+        .map((l) => l.replace(path, "").trim())
+        .filter((l) => /^.*?:(\([^)]*\))+$/.test(l));
+
+      expect(aces.length).toBeGreaterThan(0);
+      const me = process.env.USERNAME.toLowerCase();
+      const inherited = aces.some((a) => a.includes("(I)"));
+      const foreign = aces.some((a) => {
+        const identity = a.slice(0, a.indexOf(":(")).toLowerCase();
+        return identity.split("\\").pop() !== me;
+      });
+      expect(inherited || foreign).toBe(true);
+    }
+
+    it("restricts .n-dx.json to the owner when api_key is present", async () => {
       run(["claude.api_key", "sk-ant-test-key-123", tmpDir]);
 
-      const fileStat = await stat(join(tmpDir, ".n-dx.json"));
-      // 0o600 = owner read/write only (decimal 384)
-      const mode = fileStat.mode & 0o777;
-      expect(mode).toBe(0o600);
+      await expectOwnerOnly(join(tmpDir, ".n-dx.json"));
     });
 
     it("does not restrict permissions when no api_key present", async () => {
       // claude.model is not machine-local, writes to .n-dx.json
       run(["claude.model", "claude-sonnet-4-6", tmpDir]);
 
-      const fileStat = await stat(join(tmpDir, ".n-dx.json"));
-      const mode = fileStat.mode & 0o777;
-      // Should not be 0o600 — default file permissions apply
-      expect(mode).not.toBe(0o600);
+      await expectNotOwnerOnly(join(tmpDir, ".n-dx.json"));
     });
 
-    it.skipIf(process.platform === "win32")("restricts permissions when api_key is added to existing config", async () => {
+    it("restricts permissions when api_key is added to existing config", async () => {
       // First set a non-sensitive value
       run(["claude.cli_path", "/some/path", "--force", tmpDir]);
-      const beforeStat = await stat(LOCAL_CONFIG_PATH(tmpDir));
-      const beforeMode = beforeStat.mode & 0o777;
-      expect(beforeMode).not.toBe(0o600);
+      await expectNotOwnerOnly(LOCAL_CONFIG_PATH(tmpDir));
 
       // Now add an API key
       run(["claude.api_key", "sk-ant-secure-key", tmpDir]);
-      const afterStat = await stat(SHARED_CONFIG_PATH(tmpDir));
-      const afterMode = afterStat.mode & 0o777;
-      expect(afterMode).toBe(0o600);
+      await expectOwnerOnly(SHARED_CONFIG_PATH(tmpDir));
     });
 
-    it("mentions 0600 permissions in help text", () => {
+    it("describes the actual protection for this platform in help text", () => {
       const output = run(["--help"]);
-      expect(output).toContain("0600");
+      // Claiming 0600 on Windows would be false: chmod cannot set it there.
+      if (isWin) {
+        expect(output).toContain("ACL restricted to your user account");
+        expect(output).not.toContain("0600");
+      } else {
+        expect(output).toContain("0600");
+      }
     });
   });
 
@@ -987,7 +1074,7 @@ describe("n-dx config", () => {
       const output = run(["llm.vendor", "claude", tmpDir]);
       expect(output).toContain("llm.vendor = claude");
 
-      const argsFile = isWin ? `${fakeClaude}.args` : `${basePath}.args`;
+      const argsFile = fakeBinaryArgsPath(basePath);
       const args = await readFile(argsFile, "utf-8");
       expect(args).toContain("-p");
       expect(args).toContain("--output-format");
@@ -1005,7 +1092,7 @@ describe("n-dx config", () => {
       const output = run(["llm.vendor", "codex", tmpDir]);
       expect(output).toContain("llm.vendor = codex");
 
-      const argsFile = isWin ? `${fakeCodex}.args` : `${basePath}.args`;
+      const argsFile = fakeBinaryArgsPath(basePath);
       const args = await readFile(argsFile, "utf-8");
       expect(args).toContain("exec");
       expect(args).toContain("--skip-git-repo-check");
