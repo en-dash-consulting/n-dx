@@ -172,6 +172,7 @@ sv <command> [args]               # alias for sourcevision
 | `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
 | `.hench/config.json` | Hench agent configuration (model, max turns) |
 | `.hench/runs/` | Run history and transcripts |
+| `.hench/usage-cursors/` | Per-session watermarks recording how far through a Claude Code transcript `hench record` has already attributed tokens (machine-local; safe to delete) |
 | `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model) |
 | `.n-dx-web.pid` | Background web server PID file (auto-managed) |
 | `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |

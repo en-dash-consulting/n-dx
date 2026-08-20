@@ -103,7 +103,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `hench config` | full | medium | ndx work settings view (GET/PUT `/api/hench/config`) |
 | `hench template` | full | medium | Templates view: gallery, apply, save, delete |
 | `hench validate-tokens` | **full** | low | "Validate token reporting" trigger in the Runs view, beside the per-run token diagnostics |
-| `hench record` | n/a | — | Plumbing for the /ndx-work assisted-run skill |
+| `hench record` | n/a | — | Plumbing for the assisted-run skills (`/ndx-work`, `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-config`); reads its token usage from the Claude Code session transcript |
 | `hench init` | n/a | — | Covered by `ndx init` |
 
 ## Rex MCP tools (17)
@@ -211,6 +211,6 @@ The SourceVision tabs are gated by `zones.enrichmentPass` (Architecture ≥ 2, P
 | `sourcevision git-credential-helper` | Interactive terminal flow |
 | `rex migrate-*` / `backfill-commit-attribution` | One-time migrations |
 | `rex mcp` / `sourcevision mcp` | Transport plumbing; HTTP MCP is served by the dashboard |
-| `hench record` | Skill-integration plumbing |
+| `hench record` | Skill-integration plumbing (writes the run record, and the tokens the skill spent) |
 | MCP `get_capabilities` | Protocol handshake |
 | `/api/sv/*` read endpoints | External/MCP-facing API by design; viewer reads `/data/*.json` |

@@ -31,6 +31,25 @@ The table below is derived from [`packages/core/assistant-assets/manifest.json`]
 
 ---
 
+## What every state-mutating skill does at the end
+
+The per-skill step lists below are summaries. Any skill that changes project
+state — `/ndx-work`, `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-config` —
+finishes with two steps they all share:
+
+1. **Commit**, using `git status --porcelain` first. This matters because rex MCP
+   writes are side effects: `add_item` and `edit_item` write to
+   `.rex/prd_tree/<slug>/index.md` even when no file was edited directly, so a
+   skill that only called MCP tools still has changes to commit.
+2. **Record the run** with `ndx hench record`, so skill-driven work is auditable
+   next to `ndx work` runs. Token usage comes from the Claude Code session
+   transcript, counting only the spend since the previous record — so several
+   skill runs in one session each get their own slice rather than all claiming
+   the session total. Skills whose work spans many PRD items (`/ndx-plan`,
+   `/ndx-reshape`, `/ndx-config`) record against `skill:<name>`, which
+   `get_token_usage` reports in its `orphans` bucket: work that produced many
+   items should not be charged to one of them.
+
 ## Skill Details
 
 ### no-plan-mode
@@ -127,6 +146,10 @@ The table below is derived from [`packages/core/assistant-assets/manifest.json`]
 4. Presents a work plan for user approval
 5. Marks task `in_progress`, implements, runs tests, commits, marks `completed`
 6. Calls `append_log` with decisions and outcomes
+7. Records the run with `ndx hench record`, so skill-driven work appears in run
+   history alongside `ndx work` runs — with its token usage read from the Claude
+   Code session transcript, so `ndx usage` and the dashboard's per-item rollup
+   account for it
 
 **Customization:** The execution workflow is defined in `.rex/workflow.md` (project-specific) rather than in the skill itself — edit that file to change the discipline applied to every task.
 
