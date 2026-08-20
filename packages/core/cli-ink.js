@@ -20,6 +20,8 @@ import {
   BODY,
   LEGS,
   INIT_PHASES,
+  createLineSplitter,
+  throttleDebugLines,
 } from "./cli-brand.js";
 import {
   formatGitWarningLines,
@@ -116,8 +118,13 @@ function PhaseRow({ name, status, detail }) {
   if (!phase || status === "pending") return null;
 
   if (status === "active") {
-    return html`<${Box} gap=${1} paddingLeft=${2}>
-      <${Spinner} /><${Text}> ${phase.spinner}<//>
+    return html`<${Box} flexDirection="column">
+      <${Box} gap=${1} paddingLeft=${2}>
+        <${Spinner} /><${Text}> ${phase.spinner}<//>
+      <//>
+      ${detail && html`<${Box} paddingLeft=${4}>
+        <${Text} dimColor>${detail}<//>
+      <//>`}
     <//>`;
   }
   if (status === "done") {
@@ -236,10 +243,36 @@ function InitApp({
       // sourcevision init + fast analysis (no LLM enrichment)
       setPhase("sourcevision", "active");
 
-      const sv = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
+      // Under --verbose/--debug, surface sourcevision's own per-phase progress
+      // (e.g. "[phase 1] Inventory...") as a live detail line beneath the
+      // spinner instead of silently discarding it — otherwise a slow analyze
+      // run on a large codebase is indistinguishable from a hung one. Routed
+      // through setPhase (React state) rather than direct stdout writes,
+      // since interleaving raw writes with Ink's render loop corrupts it.
+      //
+      // setPhase is throttled for debug()'s high-volume timestamped lines
+      // only (not info()'s phase transitions or verbose()'s coarser ticks,
+      // which stay unthrottled — this IS the only display path in this
+      // effect, so throttling everything would silently drop the rare,
+      // important checkpoints along with the firehose). Each setPhase call
+      // triggers a full Ink re-render; since the child now writes to its
+      // stdio pipes synchronously (see @n-dx/llm-client's verbose()/debug()),
+      // a parent slow enough to fall behind (e.g. many rapid re-renders)
+      // causes the OS pipe buffer to fill, which then blocks the child's
+      // writes on backpressure — turning "the UI update slower than it
+      // could be" into "the child process itself hangs." Measured directly:
+      // an unthrottled sink processing ~10k lines with a ~20ms per-line
+      // cost didn't finish in 2 minutes; throttled to one update per 100ms,
+      // the same volume drains in milliseconds.
+      const svVerbose = flags.includes("--verbose") || flags.includes("--debug");
+      const onSvData = svVerbose
+        ? createLineSplitter(throttleDebugLines((line) => setPhase("sourcevision", "active", line), 100))
+        : undefined;
+
+      const sv = await runInitCapture(tools.sourcevision, ["init", ...flags, dir], onSvData);
       if (sv.code !== 0) { setPhase("sourcevision", "failed"); onComplete(1, sv.stderr || sv.stdout); return; }
       // Run the programmatic analysis pipeline (inventory, imports, zones, components)
-      const svAnalyze = await runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir]);
+      const svAnalyze = await runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir], onSvData);
       if (svAnalyze.code !== 0) { setPhase("sourcevision", "failed"); onComplete(1, svAnalyze.stderr || svAnalyze.stdout); return; }
       setPhase("sourcevision", "done", svExists ? "reused — .sourcevision/ already present" : undefined);
 

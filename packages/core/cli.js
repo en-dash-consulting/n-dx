@@ -95,6 +95,8 @@ import {
   formatInitBanner,
   formatRecap,
   createSpinner,
+  createLineSplitter,
+  throttleDebugLines,
   INIT_PHASES,
   dim,
 } from "./cli-brand.js";
@@ -939,8 +941,15 @@ function handleVersion(rest) {
 /**
  * Run a sub-package init command, capturing output instead of streaming it.
  * Returns { code, stdout, stderr }.
+ *
+ * @param {string} toolPath
+ * @param {string[]} args
+ * @param {(chunk: string) => void} [onData]  Optional sink fed every raw
+ *   stdout/stderr chunk as it arrives — lets callers surface the child's own
+ *   progress messages live (under --verbose/--debug) without changing the
+ *   buffered return contract used for error reporting.
  */
-function runInitCapture(toolPath, args) {
+function runInitCapture(toolPath, args, onData) {
   return new Promise((resolve) => {
     const child = spawnTracked(process.execPath, [toolPath, ...args], {
       cwd: process.cwd(),
@@ -949,8 +958,8 @@ function runInitCapture(toolPath, args) {
     });
     let stdout = "";
     let stderr = "";
-    child.stdout.on("data", (d) => { stdout += d; });
-    child.stderr.on("data", (d) => { stderr += d; });
+    child.stdout.on("data", (d) => { stdout += d; onData?.(d.toString()); });
+    child.stderr.on("data", (d) => { stderr += d; onData?.(d.toString()); });
     child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
   });
 }
@@ -1159,7 +1168,9 @@ async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, qui
  * Exits with code 1 on failure.
  *
  * @param {string} name  Phase key (matched against INIT_PHASES for spinner config)
- * @param {() => Promise<{code: number, stdout: string, stderr: string}>} work
+ * @param {(spinner: ReturnType<typeof createSpinner>|null) => Promise<{code: number, stdout: string, stderr: string}>} work
+ *   Receives the active spinner (or null when quiet) so long-running phases
+ *   can surface live progress via spinner.update(...).
  * @param {string|undefined} detail  Optional text appended to the success spinner
  * @param {boolean} quiet
  */
@@ -1168,7 +1179,7 @@ async function runSubInitPhase(name, work, detail, quiet) {
   if (!quiet && phase) {
     const spinner = createSpinner(phase.spinner);
     spinner.start();
-    const result = await work();
+    const result = await work(spinner);
     if (result.code !== 0) {
       spinner.fail(`${name} failed`);
       console.error(result.stderr || result.stdout);
@@ -1176,7 +1187,7 @@ async function runSubInitPhase(name, work, detail, quiet) {
     }
     spinner.success(phase.success, detail);
   } else {
-    const result = await work();
+    const result = await work(null);
     if (result.code !== 0) {
       console.error(result.stderr || result.stdout);
       exitWithCleanup(1);
@@ -1384,10 +1395,21 @@ async function handleInit(rest) {
 
   // ── Static fallback (non-TTY, --quiet, or Ink unavailable) ────────
   await runSubInitPhase("sourcevision",
-    async () => {
-      const initResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
+    async (spinner) => {
+      // Under --verbose/--debug, forward sourcevision's own per-phase
+      // progress (e.g. "[phase 1] Inventory...") into the spinner label
+      // instead of silently discarding it — otherwise a slow analyze run
+      // is indistinguishable from a hung one. Only debug()'s high-volume
+      // timestamped lines are throttled (not the coarser info()/verbose()
+      // checkpoints, which stay unthrottled) — a --debug firehose of
+      // thousands of lines/sec would otherwise turn "redraw the spinner"
+      // into the bottleneck that stalls draining the child's output pipe.
+      const onData = cliVerbose && spinner
+        ? createLineSplitter(throttleDebugLines((line) => spinner.update(`${INIT_PHASES.sourcevision.spinner} ${dim(line)}`), 100))
+        : undefined;
+      const initResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir], onData);
       if (initResult.code !== 0) return initResult;
-      return runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir]);
+      return runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir], onData);
     },
     svExists ? "reused — .sourcevision/ already present" : undefined,
     quiet);

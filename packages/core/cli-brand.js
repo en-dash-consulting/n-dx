@@ -220,21 +220,34 @@ const TICK_MS = 80;
 export function createSpinner(text) {
   let timer = null;
   let frame = 0;
+  let currentText = text;
 
   return {
     start() {
       if (!isTTY()) {
-        console.log(`  ${dim("▸")} ${text}`);
+        console.log(`  ${dim("▸")} ${currentText}`);
         return this;
       }
-      process.stdout.write(`  ${cyan(SPINNER_FRAMES[0])} ${text}`);
+      process.stdout.write(`  ${cyan(SPINNER_FRAMES[0])} ${currentText}`);
       timer = setInterval(() => {
         frame = (frame + 1) % SPINNER_FRAMES.length;
         process.stdout.write(
-          `\r\x1b[K  ${cyan(SPINNER_FRAMES[frame])} ${text}`,
+          `\r\x1b[K  ${cyan(SPINNER_FRAMES[frame])} ${currentText}`,
         );
       }, TICK_MS);
       return this;
+    },
+    /**
+     * Update the spinner's label while it runs. In a TTY the next animation
+     * tick redraws with the new text; in a non-TTY fallback (no in-place
+     * redraw available) each update is logged as its own dim line, mirroring
+     * the --verbose heartbeat convention used elsewhere for spawned children.
+     */
+    update(newText) {
+      currentText = newText;
+      if (!isTTY()) {
+        console.log(`  ${dim("▸")} ${currentText}`);
+      }
     },
     success(msg, detail) {
       if (timer) {
@@ -260,6 +273,89 @@ export function createSpinner(text) {
       }
       if (isTTY()) process.stdout.write("\r\x1b[K");
     },
+  };
+}
+
+/**
+ * Wrap a per-line callback into a raw-chunk callback, buffering partial
+ * lines across chunk boundaries (child process stdout/stderr data events
+ * don't align to line breaks). Blank lines are skipped.
+ *
+ * Used to surface a spawned tool's own progress messages (which `ndx`
+ * would otherwise capture and discard silently) under --verbose/--debug.
+ */
+export function createLineSplitter(onLine) {
+  let buf = "";
+  return (chunk) => {
+    buf += chunk;
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed) onLine(trimmed);
+    }
+  };
+}
+
+/**
+ * Wrap a callback so it fires at most once per `intervalMs`, always using
+ * the most recent call's arguments; calls arriving inside the window are
+ * dropped rather than queued.
+ *
+ * Critical for the live progress feed under --debug: a spawned tool can
+ * emit thousands of lines per second (one per file/operation), and if the
+ * downstream sink is a full UI re-render (Ink's spinner detail line) that
+ * costs even ~20ms per call, the *rendering* cost — not the tool's own
+ * work — becomes the bottleneck. Because the child now writes
+ * synchronously (see @n-dx/llm-client's verbose()/debug()), an OS pipe
+ * buffer that fills faster than a slow parent-side callback drains it
+ * makes the child's writes themselves block on backpressure — turning a
+ * merely slow UI into a genuinely hung child process. Throttling the
+ * expensive sink (not the cheap line-splitting that feeds it) keeps the
+ * parent draining the pipe quickly regardless of line volume.
+ */
+export function throttle(fn, intervalMs) {
+  let last = 0;
+  return (...args) => {
+    const now = Date.now();
+    if (now - last >= intervalMs) {
+      last = now;
+      fn(...args);
+    }
+  };
+}
+
+/**
+ * Matches @n-dx/llm-client's debug() line format —
+ * "[2026-08-20T17:54:12.413Z]     → label" — the ISO-8601 timestamp
+ * prefix debug() (and only debug()) adds. This is the one output tier
+ * that's genuinely high-volume (one pair of lines per file per
+ * sub-step); info()'s phase transitions and verbose()'s already
+ * internally-2s-throttled ticks are comparatively rare.
+ */
+const DEBUG_LINE_RE = /^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/;
+
+/**
+ * Like throttle(), but only throttles lines in debug()'s timestamped
+ * format — everything else (info()'s phase transitions, verbose()'s
+ * coarse ticks) passes through immediately.
+ *
+ * In the static-fallback init path, a spinner's live text IS the only
+ * way any child output becomes visible on success (the full captured
+ * buffer is discarded unless the phase fails) — so throttling every
+ * line uniformly, as a plain throttle() would, silently drops the rare,
+ * important phase-transition messages along with the firehose. Gating
+ * on the debug-format prefix throttles only the tier that actually
+ * needs it.
+ */
+export function throttleDebugLines(onLine, intervalMs) {
+  const throttled = throttle(onLine, intervalMs);
+  return (line) => {
+    if (DEBUG_LINE_RE.test(line)) {
+      throttled(line);
+    } else {
+      onLine(line);
+    }
   };
 }
 

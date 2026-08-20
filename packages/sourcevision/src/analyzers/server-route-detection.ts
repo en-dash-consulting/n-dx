@@ -20,6 +20,8 @@ import type {
 } from "../schema/index.js";
 import { buildClassificationMap } from "./classify.js";
 import { detectGoServerRoutes } from "./go-route-detection.js";
+import { isVerbose, verbose } from "@n-dx/llm-client";
+import { debugTimed, debugTimedAsync, checkpoint } from "../util/debug-timing.js";
 
 const VALID_METHODS = new Set<string>(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
 const PARSEABLE = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".go"]);
@@ -200,11 +202,24 @@ export async function detectServerRoutes(
     return PARSEABLE.has(ext) && isLikelyRouteFile(f.path, f.role, archetypeMap);
   });
 
-  for (const file of candidates) {
+  const verboseScan = isVerbose();
+  if (verboseScan) {
+    verbose(`  … scanning ${candidates.length} candidate file(s) for server routes`);
+  }
+  checkpoint(`scanning ${candidates.length} candidate file(s)`);
+  let lastTickMs = Date.now();
+
+  for (let i = 0; i < candidates.length; i++) {
+    const file = candidates[i];
+    if (verboseScan && Date.now() - lastTickMs >= 2000) {
+      verbose(`  … server routes (${i}/${candidates.length}) — ${file.path}`);
+      lastTickMs = Date.now();
+    }
+
     const fullPath = join(targetDir, file.path);
     let sourceText: string;
     try {
-      sourceText = await readFile(fullPath, "utf-8");
+      sourceText = await debugTimedAsync(`read ${file.path}`, () => readFile(fullPath, "utf-8"));
     } catch {
       continue;
     }
@@ -213,17 +228,20 @@ export async function detectServerRoutes(
 
     // Dispatch Go files to the dedicated Go detector
     if (ext === ".go") {
-      const goGroups = detectGoServerRoutes(sourceText, file.path);
+      const goGroups = debugTimed(`go route scan ${file.path} (${sourceText.length} bytes)`,
+        () => detectGoServerRoutes(sourceText, file.path));
       groups.push(...goGroups);
       continue;
     }
 
     // JS/TS path: JSDoc extraction + framework pattern detection
     // Try JSDoc extraction first (most reliable for well-documented APIs)
-    let routes = extractRoutesFromComments(sourceText, file.path);
+    let routes = debugTimed(`JSDoc scan ${file.path} (${sourceText.length} bytes)`,
+      () => extractRoutesFromComments(sourceText, file.path));
 
     // Also try framework pattern detection
-    const frameworkRoutes = extractRoutesFromFrameworkCalls(sourceText, file.path);
+    const frameworkRoutes = debugTimed(`framework AST scan ${file.path} (${sourceText.length} bytes)`,
+      () => extractRoutesFromFrameworkCalls(sourceText, file.path));
 
     // Merge: JSDoc routes are authoritative, framework routes fill gaps
     const seen = new Set(routes.map(r => `${r.method} ${r.path}`));
@@ -237,8 +255,19 @@ export async function detectServerRoutes(
 
     if (routes.length === 0) continue;
 
-    const prefix = detectRoutePrefix(sourceText) ?? inferPrefix(routes);
-    const handler = detectHandlerName(sourceText) ?? undefined;
+    // Split into two separately-timed calls (rather than one `??`
+    // expression) so a slow run pinpoints which specific function is
+    // responsible, rather than attributing time to "prefix scan" as a
+    // whole. inferPrefix's label includes the route count — a sudden,
+    // unexpectedly large count here (e.g. a frontend API-client file
+    // mismatched for a server route file, where every client.get()/.post()
+    // call gets misread as a route) would explain slowness on its own.
+    const explicitPrefix = debugTimed(`prefix scan (regex) ${file.path} (${sourceText.length} bytes)`,
+      () => detectRoutePrefix(sourceText));
+    const prefix = explicitPrefix ?? debugTimed(`prefix scan (infer, ${routes.length} routes) ${file.path}`,
+      () => inferPrefix(routes));
+    const handler = debugTimed(`handler name scan ${file.path} (${sourceText.length} bytes)`,
+      () => detectHandlerName(sourceText) ?? undefined);
 
     groups.push({
       file: file.path,
