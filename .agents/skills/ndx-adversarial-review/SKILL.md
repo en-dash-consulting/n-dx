@@ -139,7 +139,19 @@ In claim mode, if the review disproved a completion claim, also call `update_tas
 
 Then close out the run:
 
-1. **Commit.** `add_item`, `edit_item`, and `update_task_status` write to `.rex/prd_tree/<slug>/index.md` even though you edited no file directly, so there are changes to commit. Run `git status --porcelain`; if it is empty, print "Working tree clean — nothing to commit." and stop; otherwise `git add -A` and `git commit -m "ndx-adversarial-review: capture <n> findings from <target>"`.
+1. **Commit.** `add_item`, `edit_item`, and `update_task_status` write to `.rex/prd_tree/<slug>/index.md` even though you edited no file directly, so there are changes to commit. Run `git status --porcelain` against the project root; if it is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage all changes with `git add -A` and commit with the n-dx authorship + model audit trailer block via a HEREDOC:
+
+   ```sh
+   git commit -m "$(cat <<'EOF'
+   ndx-adversarial-review: capture <n> findings from <target>
+
+   N-DX: skill/ndx-adversarial-review
+   Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
+   EOF
+   )"
+   ```
+
+   Substitute `<n>` with the number of items created and `<target>` with what was reviewed. Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
 2. **Record.** Run `ndx hench record --task=skill:ndx-adversarial-review --status=completed --startedAt=<the time from Step 1> --title="Adversarial review: <target>" --summary="<n findings, m captured>"`. The `skill:` form puts the cost in the orphans bucket of `get_token_usage`, which is right for a review that produced several items rather than advancing one. `--startedAt` is not optional: without it the first record in a session has no watermark to work back from, so it claims everything the session spent before the review started.
 3. **Summarize.** Account for every finding: created as a new item, added to an item that already tracked it, skipped because the PRD already said everything, declined by the user, or dropped as not-worth-fixing. A finding that vanishes without one of those labels is a review that hid its own result.
 

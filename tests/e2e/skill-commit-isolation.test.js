@@ -17,15 +17,28 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { getSkillBody } from "../../packages/core/assistant-assets.js";
+import {
+  getSkillBody,
+  getSkillNames,
+  getManifest,
+} from "../../packages/core/assistant-assets.js";
+import { CO_AUTHORED_BY_TRAILER } from "../../packages/core/commit-trailers.js";
 
 const ROOT = join(import.meta.dirname, "../..");
 
-// Skills that modify files and must include a commit step.
-const FILE_MODIFYING_SKILLS = ["ndx-config", "ndx-capture", "ndx-plan", "ndx-reshape"];
+// Both lists come from the manifest's `commits` flag rather than from scanning
+// the bodies for "git commit". Deriving them from body content would make the
+// read-only assertion tautological — it would assert exactly the criterion that
+// selected the skill, and pass forever without checking anything. Reading the
+// declared intent instead means a skill that commits without declaring it fails
+// the read-only assertion, which is the case worth catching.
+const SKILL_META = getManifest().skills;
 
-// Skills that are read-only and must NOT include git commit instructions.
-const READ_ONLY_SKILLS = ["ndx-status", "ndx-zone", "ndx-feedback", "no-plan-mode", "ndx-work"];
+/** Skills that declare they commit, and must include a commit step. */
+const FILE_MODIFYING_SKILLS = getSkillNames().filter((n) => SKILL_META[n].commits === true);
+
+/** Skills that declare no commit, and must NOT include git commit instructions. */
+const READ_ONLY_SKILLS = getSkillNames().filter((n) => SKILL_META[n].commits !== true);
 
 // ── File-modifying skill commit step format ──────────────────────────────────
 
@@ -77,12 +90,52 @@ describe("file-modifying skills: commit step presence", () => {
 // ── Read-only skills must not commit ────────────────────────────────────────
 
 describe("read-only skills: no commit step", () => {
+  it("both classifications are non-empty (guards against a vacuous suite)", () => {
+    expect(FILE_MODIFYING_SKILLS.length).toBeGreaterThan(0);
+    expect(READ_ONLY_SKILLS.length).toBeGreaterThan(0);
+  });
+
   for (const skill of READ_ONLY_SKILLS) {
     it(`${skill}: does not contain git commit instructions`, () => {
       const body = getSkillBody(skill);
-      expect(body).not.toContain("git commit");
+      expect(
+        body,
+        `${skill} contains git commit instructions but does not declare ` +
+          `"commits": true in packages/core/assistant-assets/manifest.json. ` +
+          `Either declare it — and then it must carry the full commit step with ` +
+          `both trailers — or remove the commit instructions.`,
+      ).not.toContain("git commit");
     });
   }
+});
+
+// ── Trailer string parity across the tier boundary ───────────────────────────
+
+describe("co-authorship trailer: core and hench copies agree", () => {
+  // core is the orchestration tier and must not import from packages, so the
+  // trailer string is necessarily duplicated. This asserts the copies are
+  // byte-identical, so the duplication cannot drift silently — a commit written
+  // with a mismatched trailer would still succeed and just never be attributed.
+  it("core's CO_AUTHORED_BY_TRAILER matches hench's buildCoAuthoredByTrailerLine()", () => {
+    const henchSrc = readFileSync(
+      join(ROOT, "packages/hench/src/agent/lifecycle/shared.ts"),
+      "utf-8",
+    );
+    expect(
+      henchSrc,
+      `hench's trailer literal no longer matches core's CO_AUTHORED_BY_TRAILER ` +
+        `("${CO_AUTHORED_BY_TRAILER}"). Update packages/core/commit-trailers.js ` +
+        `and hench's buildCoAuthoredByTrailerLine() together.`,
+    ).toContain(`return "${CO_AUTHORED_BY_TRAILER}";`);
+  });
+
+  it("every skill that commits uses the same trailer string", () => {
+    for (const skill of FILE_MODIFYING_SKILLS) {
+      expect(getSkillBody(skill), `${skill} uses a different trailer string`).toContain(
+        CO_AUTHORED_BY_TRAILER,
+      );
+    }
+  });
 });
 
 // ── Hench run-loop isolation ─────────────────────────────────────────────────

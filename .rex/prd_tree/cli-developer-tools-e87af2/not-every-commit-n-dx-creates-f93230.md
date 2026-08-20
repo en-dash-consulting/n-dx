@@ -2,7 +2,7 @@
 id: "f93230bc-2cf5-4b56-90f1-6ded82314f20"
 level: "task"
 title: "Not every commit n-dx creates carries the Co-Authored-By trailer"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "cli"
@@ -10,6 +10,11 @@ tags:
   - "attribution"
   - "severity:medium"
 source: "ndx-adversarial-review"
+startedAt: "2026-08-20T19:41:42.362Z"
+completedAt: "2026-08-20T19:48:33.801Z"
+endedAt: "2026-08-20T19:48:33.801Z"
+resolutionType: "code-change"
+resolutionDetail: "All three untrailed commit sources now carry Co-Authored-By and N-DX trailers via the new packages/core/commit-trailers.js; SKILLS.md rule 2 documents the trailer-bearing template and the N-DX namespace decision; skill-commit-isolation.test.js classifies on a manifest \"commits\" flag with a cross-tier trailer-parity assertion. Full root e2e green (1227 passed)."
 acceptanceCriteria:
   - "`/ndx-adversarial-review`'s commit step emits `Co-Authored-By: En Dash's n-dx <n-dx@endash.us>` and an `N-DX:` trailer, matching the HEREDOC form used by the other file-modifying skills"
   - "`packages/core/export.js` dashboard-deploy commit carries the trailer"

@@ -4,14 +4,16 @@
       "description": "Prevent plan-mode stalls in autonomous hench agent runs"
     },
     "ndx-plan": {
-      "description": "Analyze the codebase and propose PRD updates"
+      "description": "Analyze the codebase and propose PRD updates",
+      "commits": true
     },
     "ndx-status": {
       "description": "Show comprehensive project status combining PRD progress and codebase health"
     },
     "ndx-capture": {
       "description": "Capture a requirement, feature idea, or task from conversation context",
-      "argumentHint": "[description]"
+      "argumentHint": "[description]",
+      "commits": true
     },
     "ndx-zone": {
       "description": "Deep-dive into an architectural zone's structure and health",
@@ -23,10 +25,12 @@
     },
     "ndx-config": {
       "description": "View or change n-dx configuration with guided assistance",
-      "argumentHint": "[key] [value]"
+      "argumentHint": "[key] [value]",
+      "commits": true
     },
     "ndx-reshape": {
-      "description": "Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps, create new containers"
+      "description": "Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps, create new containers",
+      "commits": true
     },
     "ndx-feedback": {
       "description": "Submit feedback, bug reports, or feature requests for n-dx",
@@ -34,7 +38,8 @@
     },
     "ndx-adversarial-review": {
       "description": "Attack a change or a completion claim, triage what breaks, and capture only what the user approves",
-      "argumentHint": "[task-id | name | topic]"
+      "argumentHint": "[task-id | name | topic]",
+      "commits": true
     }
   },
 
