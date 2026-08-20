@@ -1,0 +1,19 @@
+---
+id: "f050baf6-8be1-4db5-b65e-fe9a903fbb4c"
+level: "task"
+title: "Skills that record runs omit --startedAt, so each one's first record claims the whole session"
+status: "pending"
+priority: "high"
+tags:
+  - "skills"
+  - "token-usage"
+  - "assistant-assets"
+  - "severity:high"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "`ndx-capture.md`, `ndx-plan.md`, `ndx-reshape.md`, and `ndx-config.md` each instruct capturing the current time in ISO-8601 before work begins"
+  - "Each of those four passes `--startedAt=<captured time>` in its `ndx hench record` invocation"
+  - "No skill body prescribes `date -Is` or any other POSIX-only command for the timestamp"
+  - "Regenerated `.claude/` and `.agents/` copies match the canonical sources (tests/e2e/assistant-body-drift.test.js green)"
+description: "**Severity:** high — **Verdict:** must-fix\n\nSibling of task `08ceeb30` (the same defect in `/ndx-adversarial-review`). This item covers the other four recording skills; fix them together.\n\n**Failure scenario.** Every skill that ends with `ndx hench record` inherits the same gap: none of them notes the time before work begins, so none can pass `--startedAt`. In `packages/hench/src/cli/commands/record.ts:208`, `readUsageDelta(transcript.text, cursor, flags.since || flags.startedAt)` then receives `undefined`, and with no watermark yet for the session the window opens at the top of the transcript. The first record in any session claims everything the session spent beforehand.\n\n**Observed, not theorized.** The `/ndx-capture` run that filed this item recorded **21,343,032 tokens across 171 messages** — the entire session, including all the unrelated authoring that preceded the capture.\n\n**Evidence.** Measured across the canonical skill bodies in `packages/core/assistant-assets/skills/`:\n\n| Skill | `--startedAt` occurrences |\n|---|---|\n| `ndx-work.md` | 2 |\n| `ndx-capture.md` | 0 |\n| `ndx-plan.md` | 0 |\n| `ndx-reshape.md` | 0 |\n| `ndx-config.md` | 0 |\n| `ndx-adversarial-review.md` | 0 (tracked separately as `08ceeb30`) |\n\nOnly `/ndx-work` does it right, at its step 7. The mechanism and its rationale are documented in `packages/hench/src/store/session-usage.ts:99-112`.\n\n**Reachability.** Every first invocation of any of these four skills in a session — the common case.\n\n**Possible solutions.**\n1. *Recommended.* Add the capture-then-pass pattern to all four bodies, mirroring `/ndx-work`: note the current time in ISO-8601 before the work starts, pass it as `--startedAt=<time>` in the record step. Express it platform-neutrally — `/ndx-work` prescribes `date -Is`, which does not exist in PowerShell, so copying it verbatim would propagate a second defect. Consider fixing `/ndx-work`'s wording in the same pass.\n2. Change the default in `record.ts` so a missing `--startedAt` means \"since the last record only, never the whole transcript\". Fixes all callers at once including third-party ones, but changes documented CLI behavior and would need its own regression tests — larger blast radius than the prose fix.\n\nRelated: feature `5f775d38` (Token Event Attribution Accuracy) covers the same defect class from the vendor-metadata angle."
+---

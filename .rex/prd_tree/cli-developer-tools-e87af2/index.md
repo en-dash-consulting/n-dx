@@ -19,3 +19,4 @@ endedAt: "2026-06-03T00:46:42.124Z"
 | [Target-Repo README Content Template with Required Sections](./target-repo-readme-content-2fa57d/index.md) | completed |
 | [Target-Repo README Generation on ndx init](./target-repo-readme-generation-406b4b/index.md) | completed |
 | [Diagnose why the auto-commit step does not fire after MCP-driven PRD mutations in Claude Code skills](./diagnose-why-the-auto-commit-66437f.md) | completed |
+| [Skills that record runs omit --startedAt, so each one's first record claims the whole session](./skills-that-record-runs-omit-f050ba.md) | pending |
