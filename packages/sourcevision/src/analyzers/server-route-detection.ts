@@ -26,6 +26,11 @@ import { debugTimed, debugTimedAsync, checkpoint } from "../util/debug-timing.js
 const VALID_METHODS = new Set<string>(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
 const PARSEABLE = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".go"]);
 
+// Directory segments that strongly indicate client-side code — under
+// these, an "api/" directory almost always means "code that calls an
+// API" rather than "code that defines one."
+const CLIENT_SIDE_DIR_RE = /(?:^|\/)(?:frontend|client|web|ui|browser)\//;
+
 // HTTP method names used in framework-style chaining: app.get(), router.post(), etc.
 const FRAMEWORK_METHOD_NAMES = new Set(["get", "post", "put", "patch", "delete", "options", "head"]);
 
@@ -176,11 +181,20 @@ function isLikelyRouteFile(filePath: string, role: string, archetypeMap?: Map<st
     return false;
   }
 
-  // File named routes-*.ts or routes/*.ts or router.ts
+  // File named routes-*.ts or routes/*.ts or router.ts — an unambiguous
+  // signal regardless of where the file lives.
   if (/(?:^|\/)routes?[-./]/.test(lower)) return true;
   if (/(?:^|\/)router\.[tj]sx?$/.test(lower)) return true;
-  // File in a "routes" or "api" directory
-  if (/(?:^|\/)(?:routes|api)\//.test(lower)) return true;
+  // A bare "api/" directory is a weaker signal: on the client side it
+  // almost always means "code that calls an API" (axios/fetch-style HTTP
+  // client calls), not "code that defines one" — and extractRoutesFromFrameworkCalls
+  // can't tell app.get() (an Express route) from apiClient.get() (an HTTP
+  // GET call); both have the same call-expression shape. Trust a bare
+  // "api/" directory only outside client-side directories, to avoid
+  // scanning client API-caller files for "server routes" that don't exist.
+  // (An explicit "routes" file/dir already matched unconditionally above —
+  // this only narrows the weaker, directory-name-only "api/" signal.)
+  if (/(?:^|\/)api\//.test(lower) && !CLIENT_SIDE_DIR_RE.test(lower)) return true;
   return false;
 }
 
@@ -283,15 +297,32 @@ export async function detectServerRoutes(
   return groups.sort((a, b) => a.file.localeCompare(b.file));
 }
 
+/** A real URL path is never this long — past it, a "route" is almost certainly a misextracted string literal, not a path. */
+const MAX_SANE_ROUTE_PATH_LENGTH = 500;
+
 /** Infer a common prefix from a set of routes. */
 function inferPrefix(routes: ServerRoute[]): string {
   if (routes.length === 0) return "/";
   const paths = routes.map(r => r.path);
+  // Guard against a misextracted "path" that isn't really a URL — e.g. a
+  // large string literal captured from an unrelated, similarly-named call
+  // (extractRoutesFromFrameworkCalls can't distinguish app.get() from an
+  // unrelated object's .get() method) that happens to start with "/".
+  if (paths.some((p) => p.length > MAX_SANE_ROUTE_PATH_LENGTH)) return "/";
   // Find longest common prefix
   let prefix = paths[0];
   for (let i = 1; i < paths.length; i++) {
     while (!paths[i].startsWith(prefix)) {
-      const lastSlash = prefix.lastIndexOf("/");
+      // Search *before* a trailing "/" rather than at the very end: once
+      // prefix has been shrunk down to end in "/", lastIndexOf("/") would
+      // otherwise keep re-finding that same trailing slash, and slicing
+      // at that position reproduces the identical string — an infinite
+      // loop (confirmed live via a CPU sample: 100% of time in
+      // String.prototype.lastIndexOf, looping forever on e.g. "/users/:id"
+      // vs "/orders", an entirely ordinary pair of routes with no error
+      // or pathological input involved).
+      const searchFrom = prefix.endsWith("/") ? prefix.length - 2 : prefix.length - 1;
+      const lastSlash = prefix.lastIndexOf("/", searchFrom);
       if (lastSlash <= 0) return "/";
       prefix = prefix.slice(0, lastSlash + 1);
     }
