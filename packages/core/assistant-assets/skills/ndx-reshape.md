@@ -2,6 +2,8 @@ Restructure the PRD hierarchy to keep it organized as a coherent product spec.
 
 Use this when the PRD has grown organically and needs cleanup: too many top-level epics, features that should be tasks, overlapping areas that should be merged, or items that belong under different parents.
 
+**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Is` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
+
 ## Process
 
 1. Call `get_prd_status` (rex MCP) to see the full epic/feature structure and item counts
@@ -61,7 +63,7 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
 After committing, record this run so both the work and the tokens it spent are auditable alongside `ndx work` runs:
 
 ```sh
-ndx hench record --task=<id> --status=completed   --title="ndx-reshape: <what was restructured>"   --summary="<one-line summary>"
+ndx hench record --task=<id> --status=completed --startedAt=<the time you noted>   --title="ndx-reshape: <what was restructured>"   --summary="<one-line summary>"
 ```
 
 Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. Use `--task=skill:ndx-reshape`. Restructuring spans many items, so it is recorded against a synthetic id that `get_token_usage` reports in its `orphans` bucket rather than charging a single item.

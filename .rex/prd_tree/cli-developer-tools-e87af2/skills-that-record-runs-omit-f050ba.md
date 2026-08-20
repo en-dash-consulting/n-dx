@@ -2,7 +2,7 @@
 id: "f050baf6-8be1-4db5-b65e-fe9a903fbb4c"
 level: "task"
 title: "Skills that record runs omit --startedAt, so each one's first record claims the whole session"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "skills"
@@ -10,6 +10,11 @@ tags:
   - "assistant-assets"
   - "severity:high"
 source: "ndx-adversarial-review"
+startedAt: "2026-08-20T18:04:23.294Z"
+completedAt: "2026-08-20T18:08:09.071Z"
+endedAt: "2026-08-20T18:08:09.071Z"
+resolutionType: "code-change"
+resolutionDetail: "Four skills now capture an ISO-8601 timestamp and pass --startedAt; ndx-work's date -Is prescription made platform-neutral; tests/e2e/skill-run-recording.test.js derives its list from the manifest so future skills are guarded automatically. Full root e2e suite green (1208 passed)."
 acceptanceCriteria:
   - "`ndx-capture.md`, `ndx-plan.md`, `ndx-reshape.md`, and `ndx-config.md` each instruct capturing the current time in ISO-8601 before work begins"
   - "Each of those four passes `--startedAt=<captured time>` in its `ndx hench record` invocation"

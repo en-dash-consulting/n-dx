@@ -6,6 +6,8 @@ argument-hint: "[key] [value]"
 
 View or change n-dx configuration with guided assistance.
 
+**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Is` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
+
 Available configuration areas:
 - LLM settings: vendor (claude/codex), model, API keys, CLI paths
 - Rex settings: budget thresholds, level-of-effort params, adapter
@@ -43,7 +45,7 @@ After applying any configuration change, commit the modified files:
 After committing, record this run so both the work and the tokens it spent are auditable alongside `ndx work` runs:
 
 ```sh
-ndx hench record --task=<id> --status=completed   --title="ndx-config: set <key>"   --summary="<one-line summary>"
+ndx hench record --task=<id> --status=completed --startedAt=<the time you noted>   --title="ndx-config: set <key>"   --summary="<one-line summary>"
 ```
 
 Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. Use `--task=skill:ndx-config`. A config change belongs to no PRD item, so it is recorded against a synthetic id that `get_token_usage` reports in its `orphans` bucket.

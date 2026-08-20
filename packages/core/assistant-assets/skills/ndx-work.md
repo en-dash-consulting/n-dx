@@ -6,7 +6,7 @@ Pick up a task from the PRD and begin working on it.
 4. For files mentioned in the task, use `get_file_info` and `get_imports` (sourcevision MCP) to understand current state
 5. Use `get_zone` (sourcevision MCP) for the relevant architectural zone
 6. Present a work plan: what needs to change, which files, what tests
-7. After user approves the plan, call `update_task_status` (rex MCP) to mark as `in_progress`, and note the current time (`date -Is`) — step 12 passes it as `--startedAt` so the run claims only the tokens spent from here on, not whatever the session spent before this task
+7. After user approves the plan, call `update_task_status` (rex MCP) to mark as `in_progress`, and note the current time in ISO-8601 — `date -Is` on POSIX shells, `Get-Date -Format o` in PowerShell, or whatever else your shell provides. Step 12 passes it as `--startedAt` so the run claims only the tokens spent from here on, not whatever the session spent before this task
 8. Implement the changes following the workflow discipline
 9. Run validation and tests as specified in the workflow
 10. Call `append_log` (rex MCP) with what was done, decisions made, and issues encountered

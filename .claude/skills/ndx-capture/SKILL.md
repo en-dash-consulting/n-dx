@@ -6,6 +6,8 @@ argument-hint: "[description]"
 
 Capture a requirement, feature idea, or task from conversation context.
 
+**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Is` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
+
 1. If a description is provided, use it. Otherwise, review recent conversation for feature requests, requirements, or product decisions
 2. Call `get_prd_status` (rex MCP) to understand current PRD structure
 3. Determine the appropriate level:
@@ -42,7 +44,7 @@ Capture a requirement, feature idea, or task from conversation context.
 After committing, record this run so both the work and the tokens it spent are auditable alongside `ndx work` runs:
 
 ```sh
-ndx hench record --task=<id> --status=completed   --title="ndx-capture: <captured item title>"   --summary="<one-line summary>"
+ndx hench record --task=<id> --status=completed --startedAt=<the time you noted>   --title="ndx-capture: <captured item title>"   --summary="<one-line summary>"
 ```
 
 Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. `<id>` is the id of the item you just created, so the cost of capturing it lands on that item in the PRD rollup.
