@@ -32,3 +32,8 @@ candidate solutions, and failing acceptance criteria.
 
 The skill never edits source or applies a fix. Fixing an approved item is a
 separate `/ndx-work` run.
+
+The run it records is scoped to itself: Step 1 notes an ISO-8601 timestamp
+before reading anything and Step 7 passes it as `--startedAt`, so a review
+invoked partway through a long session claims only what the review spent rather
+than everything that came before it.
