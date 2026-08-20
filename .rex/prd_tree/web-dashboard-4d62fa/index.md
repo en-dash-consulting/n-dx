@@ -2,9 +2,8 @@
 id: "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7"
 level: "epic"
 title: "Web Dashboard"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-24T05:27:03.754Z"
-completedAt: "2026-08-18T22:54:59.323Z"
 endedAt: "2026-08-18T22:54:59.323Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
 ---
@@ -36,4 +35,6 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-5dd63e.md) | completed |
 | [Match settings-page text boxes to the Analyze & Import input style and fix dark-mode native form chrome](./match-settings-page-text-boxes-136a8c.md) | completed |
 | [Overview Next Steps panel: consistent formatting, copyable items, and capture-to-PRD action](./overview-next-steps-panel-acebe9.md) | completed |
+| [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-377aa1.md) | pending |
+| [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-9c9ae5.md) | pending |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-a58edb.md) | completed |
