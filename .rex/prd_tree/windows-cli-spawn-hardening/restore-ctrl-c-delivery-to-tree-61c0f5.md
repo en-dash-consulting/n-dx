@@ -2,7 +2,7 @@
 id: "61c0f531-14ce-4572-94ab-f53b15031a48"
 level: "task"
 title: "Restore Ctrl-C delivery to tree-killable children in exec()"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "pr-329-followup"
@@ -10,6 +10,11 @@ tags:
   - "process-lifecycle"
   - "posix"
 source: "PR #329 review comment 3816985307 (ryrykeith)"
+startedAt: "2026-08-20T12:44:12.236Z"
+completedAt: "2026-08-20T12:59:23.812Z"
+endedAt: "2026-08-20T12:59:23.812Z"
+resolutionType: "code-change"
+resolutionDetail: "exec() now forwards SIGINT to a detached child's process group via a new interrupt-forwarding module: one shared listener, released when the last child settles, standing down and re-raising when nothing else listens so a CLI never ignores Ctrl-C. Windows unchanged. 15 unit tests plus a root-suite real-process test; the POSIX assertions run on macOS CI (per-package suites are Windows-only)."
 acceptanceCriteria:
   - "A Ctrl-C (SIGINT) at the terminal terminates a child spawned by exec() with treeKill enabled, including its descendants, on POSIX"
   - "detached: true is retained on POSIX so process.kill(-pgid) still reaches grandchildren"
