@@ -1,0 +1,21 @@
+---
+id: "f93230bc-2cf5-4b56-90f1-6ded82314f20"
+level: "task"
+title: "Not every commit n-dx creates carries the Co-Authored-By trailer"
+status: "pending"
+priority: "medium"
+tags:
+  - "cli"
+  - "skills"
+  - "attribution"
+  - "severity:medium"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "`/ndx-adversarial-review`'s commit step emits `Co-Authored-By: En Dash's n-dx <n-dx@endash.us>` and an `N-DX:` trailer, matching the HEREDOC form used by the other file-modifying skills"
+  - "`packages/core/export.js` dashboard-deploy commit carries the trailer"
+  - "`packages/core/git-preflight.js` initial `chore: n-dx init` commit carries the trailer"
+  - "`tests/e2e/skill-commit-isolation.test.js` derives its skill list from the manifest rather than a hardcoded array, so every skill containing `git commit` is asserted automatically"
+  - "SKILLS.md rule 2 shows the trailer-bearing HEREDOC form as the canonical commit template"
+  - "A decision is recorded on whether `N-DX:`, `N-DX-Item:`, and `N-DX-Status` are one trailer namespace or three"
+description: "**Severity:** medium — **Verdict:** should-fix\n\nEvery commit n-dx creates should be attributable to the n-dx identity via `Co-Authored-By: En Dash's n-dx <n-dx@endash.us>`. Three surfaces omit it.\n\n**Audit of commit-creating surfaces** (measured, not assumed):\n\n| Surface | Location | `Co-Authored-By` |\n|---|---|---|\n| hench agent lifecycle | `packages/hench/src/agent/lifecycle/shared.ts:1649` via `buildCoAuthoredByTrailerLine()` | present |\n| `ndx-capture`, `ndx-plan`, `ndx-reshape`, `ndx-config` | canonical skill bodies | present |\n| `ndx-adversarial-review` | `packages/core/assistant-assets/skills/ndx-adversarial-review.md`, final step | **missing** |\n| Dashboard deploy | `packages/core/export.js:532` — `git commit -m \"Deploy dashboard (<timestamp>)\"` | **missing** |\n| `ndx init` initial commit | `packages/core/git-preflight.js:215` — `git commit -m \"chore: n-dx init\"` | **missing** |\n\n**Why it matters.** `packages/web/src/server/merge-history.ts:724` parses `Co-Authored-By:` trailers (`COAUTHOR_RE`) to attribute commits in the dashboard's merge graph. A commit without the trailer is invisible to n-dx's own attribution view and drops out of GitHub's co-authorship graph — silently, since nothing fails.\n\n**How the gap arose.** `/ndx-adversarial-review` was authored against SKILLS.md rule 2, whose commit template shows the bare `git commit -m \"<skill-name>: <description>\"` form with no trailer. The four older file-modifying skills use a richer HEREDOC form carrying both `N-DX:` and `Co-Authored-By:`. The documented rule and the actual convention have drifted apart, so the next skill author will reproduce the same gap.\n\n**Not covered by tests.** `tests/e2e/skill-commit-isolation.test.js` asserts the trailer for `FILE_MODIFYING_SKILLS = [\"ndx-config\", \"ndx-capture\", \"ndx-plan\", \"ndx-reshape\"]` — a hardcoded list. `ndx-adversarial-review` appears in neither that list nor `READ_ONLY_SKILLS`, so its commit step is unverified in both directions.\n\n**Secondary observation — the `N-DX*` trailer family has three shapes**, which should be reconciled or documented as deliberate: skills emit `N-DX: skill/<name>`, hench emits `N-DX-Item: <url>`, and `packages/rex/src/cli/commands/backfill-commit-attribution.ts` walks the log for `N-DX-Status`. Decide whether these are one namespace or three.\n\n**Possible solutions.**\n1. *Recommended.* Add the trailer at each missing site, then close the hole that let it happen: update SKILLS.md rule 2 to show the HEREDOC form with both trailers as the canonical template, and change `skill-commit-isolation.test.js` to derive its skill list from the manifest instead of hardcoding, so any skill containing `git commit` is checked automatically. Mechanical, and the derived list prevents recurrence.\n2. Centralize: export the trailer builder from a shared module and have `export.js` and `git-preflight.js` call it rather than hand-writing the string. Removes drift between the source-level call sites, but skills are prose and cannot import anything, so it only half-solves the problem.\n3. Trailer-only fix at the three sites, no test or docs change. Cheapest, leaves the next author to reproduce it."
+---
