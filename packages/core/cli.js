@@ -636,7 +636,7 @@ function readLLMVendor(dir) {
   try {
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
     const vendor = data?.llm?.vendor;
-    return vendor === "claude" || vendor === "codex" || vendor === "google" || vendor === "local" ? vendor : undefined;
+    return typeof vendor === "string" && SUPPORTED_PROVIDERS.includes(vendor) ? vendor : undefined;
   } catch {
     return undefined;
   }

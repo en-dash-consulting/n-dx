@@ -12,7 +12,7 @@
  * config files, and spot unexpected model changes between runs.
  */
 
-import type { LLMVendor, LLMConfig, TaskWeight } from "./llm-types.js";
+import { LLM_VENDOR, type LLMVendor, type LLMConfig, type TaskWeight } from "./llm-types.js";
 import { resolveVendorModel, resolveModel } from "./config.js";
 import { info, warn } from "./output.js";
 import { yellow } from "./help-format.js";
@@ -77,13 +77,13 @@ export function printVendorModelHeader(
   // Identify which config slot supplied the model so we can annotate the
   // header with the exact source path. Top-level `llm.model` wins over
   // vendor-pinned `llm.{vendor}.model` (matches resolveVendorModel).
-  const vendorPinnedModel = vendor === "claude"
+  const vendorPinnedModel = vendor === LLM_VENDOR.CLAUDE
     ? config?.claude?.model
-    : vendor === "codex"
+    : vendor === LLM_VENDOR.CODEX
       ? config?.codex?.model
-      : vendor === "google"
+      : vendor === LLM_VENDOR.GOOGLE
         ? config?.google?.model
-        : vendor === "local"
+        : vendor === LLM_VENDOR.LOCAL
           ? config?.local?.model
           : undefined;
   const configuredFrom: "top-level" | "vendor-pinned" | undefined = config?.model

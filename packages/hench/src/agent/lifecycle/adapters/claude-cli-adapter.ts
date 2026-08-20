@@ -34,6 +34,7 @@ import type {
   LLMVendor,
 } from "../../../prd/llm-gateway.js";
 import {
+  LLM_VENDOR,
   assemblePrompt,
   classifyVendorError,
 } from "../../../prd/llm-gateway.js";
@@ -156,7 +157,7 @@ function parseStreamLine(
 
   const type = event.type as string | undefined;
   const timestamp = new Date().toISOString();
-  const vendor: LLMVendor = "claude";
+  const vendor: LLMVendor = LLM_VENDOR.CLAUDE;
 
   switch (type) {
     case "assistant": {
@@ -343,7 +344,7 @@ function extractToolUseBlocks(
  * Thread-safe — no mutable state.
  */
 export const claudeCliAdapter: VendorAdapter = {
-  vendor: "claude" as LLMVendor,
+  vendor: LLM_VENDOR.CLAUDE,
   parseMode: "stream-json",
 
   buildSpawnConfig(

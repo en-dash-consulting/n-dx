@@ -95,6 +95,12 @@ export type {
   StreamChunk,
   LLMProvider,
 } from "./provider-interface.js";
+export {
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  LLM_VENDORS,
+  isLLMVendor,
+} from "./provider-interface.js";
 
 // Provider registry and selection
 export type { ProviderFactory } from "./provider-registry.js";

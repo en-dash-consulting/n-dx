@@ -13,8 +13,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, dirname, basename, resolve } from "node:path";
+import { LLM_VENDOR } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
-import {jsonResponse} from "./response-utils.js";// ---------------------------------------------------------------------------
+import {jsonResponse} from "./response-utils.js";
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -136,7 +139,7 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
   // For local vendor: query LM Studio for the currently loaded model.
   // If the live model differs from the stored config, write it back to .n-dx.json
   // so the displayed name stays in sync without requiring ndx init.
-  if (vendor === "local" && llmConfig) {
+  if (vendor === LLM_VENDOR.LOCAL && llmConfig) {
     const localCfg = llmConfig.local && typeof llmConfig.local === "object"
       ? llmConfig.local as Record<string, unknown>
       : {};
@@ -159,7 +162,7 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
           try {
             const updated: Record<string, unknown> = ndxConfig ? { ...ndxConfig } : {};
             if (!updated.llm || typeof updated.llm !== "object") {
-              updated.llm = { vendor: "local" };
+              updated.llm = { vendor: LLM_VENDOR.LOCAL };
             }
             const llm = updated.llm as Record<string, unknown>;
             if (!llm.local || typeof llm.local !== "object") {
@@ -202,7 +205,7 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
     authMethod = "api-key";
   } else if (provider === "cli" || hasCliPath) {
     authMethod = "cli";
-  } else if (vendor === "local" || vendor === "google") {
+  } else if (vendor === LLM_VENDOR.LOCAL || vendor === LLM_VENDOR.GOOGLE) {
     // Local (LM Studio/Ollama) and Google use a REST API — no CLI or API key needed.
     // Treat as "api-key" so the footer shows ✓ rather than ⚠.
     authMethod = "api-key";

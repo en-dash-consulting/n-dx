@@ -14,7 +14,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -236,7 +236,7 @@ async function initApiResources(
   // The API loop currently requires the raw Anthropic SDK for multi-turn
   // tool-use. Non-Claude providers will be supported when the loop is
   // refactored to use LLMProvider.complete() with tool schemas.
-  if (vendor !== "claude") {
+  if (vendor !== LLM_VENDOR.CLAUDE) {
     throw new Error(
       `Hench API loop requires a Claude-compatible provider (got "${vendor}"). ` +
       "Non-Claude API providers are not yet supported. Use provider=cli for non-Claude vendors.",
@@ -568,7 +568,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     taskTitle,
     model,
     henchDir,
-    vendor: "google",
+    vendor: LLM_VENDOR.GOOGLE,
     sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
     approvals: DEFAULT_EXECUTION_POLICY.approvals,
     parseMode: hasToolCalling ? "gemini-tools" : "provider-api",
@@ -938,7 +938,7 @@ async function runLocalToolLoop(params: {
     taskTitle,
     model,
     henchDir,
-    vendor: "local",
+    vendor: LLM_VENDOR.LOCAL,
     sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
     approvals: DEFAULT_EXECUTION_POLICY.approvals,
     parseMode: "openai-tools",

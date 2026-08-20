@@ -38,7 +38,7 @@ import {
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
-import { resolveVendorModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveVendorModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -192,7 +192,7 @@ export function formatCloseError(opts: {
 }): string {
   const { code, stderr, vendor, cliBinary } = opts;
   const detail = stderr.trim() || `${vendor} exited with code ${code}`;
-  const configKey = vendor === "codex" ? "llm.codex.cli_path" : "llm.claude.cli_path";
+  const configKey = vendor === LLM_VENDOR.CODEX ? "llm.codex.cli_path" : "llm.claude.cli_path";
   return diagnoseCliNotFound(detail, cliBinary, configKey) ?? detail;
 }
 
@@ -588,7 +588,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
 
     const vendorLabel = formatModelLabel(
       tokenMetadata.model,
-      adapter.vendor === "codex" ? "Codex" : "Agent",
+      adapter.vendor === LLM_VENDOR.CODEX ? "Codex" : "Agent",
     );
 
     proc.stdout!.on("data", (chunk: Buffer) => {
@@ -619,11 +619,11 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         // append the cross-platform diagnoseCliInvocation detail, which
         // distinguishes "on PATH but not directly invokable" (.cmd shim /
         // path with spaces) from "not on PATH at all".
-        const base = adapter.vendor === "codex"
+        const base = adapter.vendor === LLM_VENDOR.CODEX
           ? "Codex CLI not found. Configure with: n-dx config llm.codex.cli_path /path/to/codex"
           : "Claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code\n" +
             "Or switch to the API provider: n-dx config hench.provider api";
-        const configKey = adapter.vendor === "codex" ? "llm.codex.cli_path" : "llm.claude.cli_path";
+        const configKey = adapter.vendor === LLM_VENDOR.CODEX ? "llm.codex.cli_path" : "llm.claude.cli_path";
         const diagnosis = diagnoseCliInvocation(cliBinary, configKey);
         // Only append the diagnosis when it adds information beyond the vendor
         // install hint already in `base`: the on-PATH-but-failed case or an
@@ -654,7 +654,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
           }
 
           // Codex-specific: extract token usage from raw stdout
-          if (adapter.vendor === "codex") {
+          if (adapter.vendor === LLM_VENDOR.CODEX) {
             try {
               const raw = JSON.parse(fullStdout);
               const codexMapping = mapCodexUsageToTokenUsage(raw);
@@ -686,7 +686,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
 
         // Codex token usage fallback: structured events parsed but no usage
         if (eventCount > 0 && accumulator.tokenUsage.total.input === 0 && accumulator.tokenUsage.total.output === 0) {
-          if (adapter.vendor === "codex") {
+          if (adapter.vendor === LLM_VENDOR.CODEX) {
             try {
               const raw = JSON.parse(fullStdout);
               const codexMapping = mapCodexUsageToTokenUsage(raw);
@@ -757,7 +757,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
           }
 
           // Codex-specific: extract token usage from raw stdout via heuristic mapping
-          if (adapter.vendor === "codex") {
+          if (adapter.vendor === LLM_VENDOR.CODEX) {
             try {
               const raw = JSON.parse(fullStdout);
               const codexMapping = mapCodexUsageToTokenUsage(raw);
@@ -809,7 +809,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         // returned "unavailable").  Always emits one turnTokenUsage entry per
         // attempt — zeros when no usage data is available — so callers can
         // account for every attempt regardless of stdout output.
-        if (adapter.vendor === "codex" && result.turnTokenUsage.length === 0) {
+        if (adapter.vendor === LLM_VENDOR.CODEX && result.turnTokenUsage.length === 0) {
           if (fullStdout.trim()) {
             try {
               const raw = JSON.parse(fullStdout);

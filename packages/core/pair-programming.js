@@ -175,8 +175,13 @@ export function readRexTestCommand(dir) {
  * @param {"claude" | "codex"} primaryVendor
  * @returns {"claude" | "codex"}
  */
+const REVIEWER_VENDOR = {
+  CLAUDE: "claude",
+  CODEX: "codex",
+};
+
 export function resolveReviewerVendor(primaryVendor) {
-  return primaryVendor === "claude" ? "codex" : "claude";
+  return primaryVendor === REVIEWER_VENDOR.CLAUDE ? REVIEWER_VENDOR.CODEX : REVIEWER_VENDOR.CLAUDE;
 }
 
 /**
@@ -198,7 +203,7 @@ export function resolveVendorCliPath(dir, vendor) {
         return configured.trim();
       }
       // Legacy claude.cli_path key
-      if (vendor === "claude") {
+      if (vendor === REVIEWER_VENDOR.CLAUDE) {
         const legacy = data?.claude?.cli_path;
         if (typeof legacy === "string" && legacy.trim().length > 0) {
           return legacy.trim();
@@ -348,7 +353,7 @@ export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_0
       // Deliver the prompt via stdin to avoid newline injection on Windows cmd.exe.
       // claude: `-p -` reads the full prompt from stdin.
       // codex:  `exec -` reads the prompt from stdin (matches codex-cli-adapter).
-      const args = reviewer === "codex" ? ["exec", "-"] : ["-p", "-"];
+      const args = reviewer === REVIEWER_VENDOR.CODEX ? ["exec", "-"] : ["-p", "-"];
       child = spawnCli(cliPath, args, {
         cwd: dir,
         stdio: ["pipe", "inherit", "inherit"],
@@ -397,7 +402,7 @@ export function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeou
     let child;
     try {
       // Deliver the prompt via stdin — same rationale as runReviewerLlm.
-      const args = reviewer === "codex" ? ["exec", "-"] : ["-p", "-"];
+      const args = reviewer === REVIEWER_VENDOR.CODEX ? ["exec", "-"] : ["-p", "-"];
       child = spawnCli(cliPath, args, {
         cwd: dir,
         stdio: ["pipe", "pipe", "pipe"],

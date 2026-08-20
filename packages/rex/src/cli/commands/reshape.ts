@@ -12,7 +12,7 @@ import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
 import { migrateToFolderPerTask } from "../../core/folder-per-task-migration.js";
 import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
-import { printVendorModelHeader } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
 import { REX_DIR } from "./constants.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";
@@ -110,7 +110,7 @@ async function _cmdReshapeCore(
 
   // Resolve model: explicit flag > vendor config > default
   const resolvedModel = resolveConfiguredModel(flags.model);
-  const vendor = getLLMVendor() ?? "claude";
+  const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
   const modelSource = flags.model
     ? "cli-override" as const
     : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model

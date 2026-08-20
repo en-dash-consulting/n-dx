@@ -35,6 +35,7 @@ import type {
   LLMVendor,
 } from "../../../prd/llm-gateway.js";
 import {
+  LLM_VENDOR,
   assemblePrompt,
   compileCodexPolicyFlags,
   classifyVendorError,
@@ -332,7 +333,7 @@ function parseCodexJsonLine(
   if (!type) return null;
 
   const timestamp = new Date().toISOString();
-  const vendor: LLMVendor = "codex";
+  const vendor: LLMVendor = LLM_VENDOR.CODEX;
 
   switch (type) {
     case "item.started": {
@@ -579,7 +580,7 @@ function parseHeuristicFallback(
   const normalized = normalizeCodexResponse(line);
 
   const timestamp = new Date().toISOString();
-  const vendor: LLMVendor = "codex";
+  const vendor: LLMVendor = LLM_VENDOR.CODEX;
 
   // If the heuristic found tool events, return the first as a tool_use
   if (normalized.toolEvents.length > 0) {
@@ -634,7 +635,7 @@ function parseHeuristicFallback(
  * Thread-safe — no mutable state.
  */
 export const codexCliAdapter: VendorAdapter = {
-  vendor: "codex" as LLMVendor,
+  vendor: LLM_VENDOR.CODEX,
   parseMode: "json",
 
   buildSpawnConfig(

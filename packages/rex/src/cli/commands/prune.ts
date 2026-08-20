@@ -16,7 +16,7 @@ import { info, warn, result, startSpinner } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
 import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
-import { printVendorModelHeader } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
@@ -159,7 +159,7 @@ export async function cmdPrune(
 
         // Resolve model: explicit flag > vendor config > default
         const resolvedModel = resolveConfiguredModel(flags.model);
-        const dryRunVendor = getLLMVendor() ?? "claude";
+        const dryRunVendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
         const dryRunModelSource = flags.model
           ? "cli-override" as const
           : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
@@ -222,7 +222,7 @@ export async function cmdPrune(
         if (err instanceof BudgetExceededError) throw err;
         if (flags.format !== "json") {
           const { getLLMVendor: getDryRunVendor } = await import("../../analyze/reason.js");
-          const errVendor = getDryRunVendor() ?? "claude";
+          const errVendor = getDryRunVendor() ?? DEFAULT_LLM_VENDOR;
           const classified = classifyLLMError(
             err instanceof Error ? err : new Error(String(err)),
             errVendor,
@@ -384,7 +384,7 @@ async function consolidateAfterPrune(
 
     // Resolve model: explicit flag > vendor config > default
     const resolvedModel = resolveConfiguredModel(flags.model);
-    const vendor = getLLMVendor() ?? "claude";
+    const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
     const modelSource = flags.model
       ? "cli-override" as const
       : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
@@ -506,7 +506,7 @@ async function consolidateAfterPrune(
   } catch (err) {
     if (err instanceof BudgetExceededError) throw err;
     const { getLLMVendor: getVendor } = await import("../../analyze/reason.js");
-    const errVendor = getVendor() ?? "claude";
+    const errVendor = getVendor() ?? DEFAULT_LLM_VENDOR;
     const classified = classifyLLMError(
       err instanceof Error ? err : new Error(String(err)),
       errVendor,
@@ -548,7 +548,7 @@ async function smartPrune(
 
   // Resolve model: explicit flag > vendor config > default
   const resolvedModel = resolveConfiguredModel(flags.model);
-  const vendor = getLLMVendor() ?? "claude";
+  const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
   const modelSource = flags.model
     ? "cli-override" as const
     : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model

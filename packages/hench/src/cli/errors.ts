@@ -21,6 +21,7 @@ import {
   CLIError as BaseCLIError,
   ClaudeClientError,
   type CLIErrorCode,
+  LLM_VENDOR,
   PROJECT_DIRS,
   isExecutableOnPath,
   classifyVendorError,
@@ -29,6 +30,7 @@ import {
 import type { FailureCategory } from "@n-dx/llm-client";
 
 const HENCH_DIR = PROJECT_DIRS.HENCH;
+type CliLLMVendor = typeof LLM_VENDOR.CLAUDE | typeof LLM_VENDOR.CODEX;
 
 /**
  * Hench CLI error — extends the foundation CLIError.
@@ -269,16 +271,16 @@ export function handleCLIError(err: unknown, debug = false): never {
  * Throws a CLIError with install instructions and API-provider fallback if missing.
  */
 export function requireClaudeCLI(customPath?: string): void {
-  requireLLMCLI("claude", customPath);
+  requireLLMCLI(LLM_VENDOR.CLAUDE, customPath);
 }
 
 /**
  * Check that the selected vendor CLI binary is available.
  * If a custom path is provided, checks that path; otherwise checks PATH.
  */
-export function requireLLMCLI(vendor: "claude" | "codex", customPath?: string): void {
-  const binary = vendor === "codex" ? "codex" : "claude";
-  const installHint = vendor === "codex"
+export function requireLLMCLI(vendor: CliLLMVendor, customPath?: string): void {
+  const binary = vendor === LLM_VENDOR.CODEX ? "codex" : "claude";
+  const installHint = vendor === LLM_VENDOR.CODEX
     ? "Install Codex CLI and/or set a custom path: n-dx config llm.codex.cli_path /path/to/codex"
     : "Install it with: npm install -g @anthropic-ai/claude-code\n" +
       "  Set a custom path: n-dx config claude.cli_path /path/to/claude\n" +
@@ -296,7 +298,7 @@ export function requireLLMCLI(vendor: "claude" | "codex", customPath?: string): 
     const exists = looksLikePath ? existsSync(customPath) : isExecutableOnPath(customPath);
     if (!exists) {
       throw new CLIError(
-        `${vendor === "codex" ? "Codex" : "Claude"} CLI not found at configured path: ${customPath}`,
+        `${vendor === LLM_VENDOR.CODEX ? "Codex" : "Claude"} CLI not found at configured path: ${customPath}`,
         installHint,
         CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
       );
@@ -306,7 +308,7 @@ export function requireLLMCLI(vendor: "claude" | "codex", customPath?: string): 
 
   if (!isExecutableOnPath(binary)) {
     throw new CLIError(
-      `${vendor === "codex" ? "Codex" : "Claude"} CLI not found.`,
+      `${vendor === LLM_VENDOR.CODEX ? "Codex" : "Claude"} CLI not found.`,
       installHint,
       CLI_ERROR_CODES.LLM_CLI_NOT_FOUND,
     );

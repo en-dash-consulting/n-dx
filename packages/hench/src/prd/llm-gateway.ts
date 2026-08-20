@@ -46,7 +46,13 @@ export {
 } from "@n-dx/llm-client";
 
 // ---- Shared constants -------------------------------------------------------
-export { PROJECT_DIRS } from "@n-dx/llm-client";
+export {
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  LLM_VENDORS,
+  PROJECT_DIRS,
+  isLLMVendor,
+} from "@n-dx/llm-client";
 
 // ---- Canonical JSON ---------------------------------------------------------
 export { toCanonicalJSON } from "@n-dx/llm-client";
