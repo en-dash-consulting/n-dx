@@ -20,4 +20,5 @@ endedAt: "2026-06-03T00:46:42.124Z"
 | [Target-Repo README Generation on ndx init](./target-repo-readme-generation-406b4b/index.md) | completed |
 | [Diagnose why the auto-commit step does not fire after MCP-driven PRD mutations in Claude Code skills](./diagnose-why-the-auto-commit-66437f.md) | completed |
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-f93230.md) | pending |
+| [Skills that call add_item describe item content in prose instead of naming its parameters](./skills-that-call-add-item-08c198.md) | pending |
 | [Skills that record runs omit --startedAt, so each one's first record claims the whole session](./skills-that-record-runs-omit-f050ba.md) | completed |
