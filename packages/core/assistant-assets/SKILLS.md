@@ -15,6 +15,7 @@ Reference for skill authors: every skill is classified by mutation footprint. Fi
 | `ndx-status` | `skills/ndx-status.md` | read-only | — | — | No |
 | `ndx-zone` | `skills/ndx-zone.md` | read-only | — | — | No |
 | `ndx-feedback` | `skills/ndx-feedback.md` | read-only† | — | — | No |
+| `ndx-adversarial-review` | `skills/ndx-adversarial-review.md` | read-only until authorized¶ | `.rex/prd_tree/` (via `add_item`/`edit_item`/`update_task_status` MCP) | ✓ | No |
 | `no-plan-mode` | `skills/no-plan-mode.md` | read-only (rule) | — | — | ⚠ applies to hench |
 | `ndx-work` | `skills/ndx-work.md` | **out-of-scope** | via hench lifecycle | via hench | ⚠ IS the loop |
 | `dev-link` | `.claude/skills/dev-link/SKILL.md` | file-modifying‡ | global pnpm links | — | No |
@@ -27,6 +28,8 @@ Reference for skill authors: every skill is classified by mutation footprint. Fi
 **‡dev-link** — modifies global pnpm package symlinks, not project files. Changes are outside the repo working tree. No commit step is applicable; the effect is tooling-level, not source-level.
 
 **§triage** — dry-run by default. Can close GitHub issues and update project board fields when the user explicitly authorizes it. All mutations are external (GitHub API); no local files are touched. No commit warranted.
+
+**¶ndx-adversarial-review** — writes nothing during the review itself (Steps 1–6, including the duplicate check). It becomes file-modifying only after the user explicitly approves findings in Step 5, and then only through rex MCP writes to `.rex/prd_tree/` — a new item, or an `edit_item` addition to one that already tracks the finding. It never edits source and never applies a fix — fixing an approved item is a separate `/ndx-work` run. Because the approved path does write local files, the commit step in rule 2 applies and is present in Step 7.
 
 **no-plan-mode** — the rule text in `no-plan-mode.md` describes behavior enforced inside the hench system prompt (`packages/hench/src/agent/planning/prompt.ts`). The skill file exists as documentation for Claude Code users, not as a behavior injected at invocation time. Never add a commit step here.
 

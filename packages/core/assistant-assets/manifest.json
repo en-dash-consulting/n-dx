@@ -31,6 +31,10 @@
     "ndx-feedback": {
       "description": "Submit feedback, bug reports, or feature requests for n-dx",
       "argumentHint": "[description]"
+    },
+    "ndx-adversarial-review": {
+      "description": "Attack a change or a completion claim, triage what breaks, and capture only what the user approves",
+      "argumentHint": "[task-id | name | topic]"
     }
   },
 

@@ -28,14 +28,16 @@ The table below is derived from [`packages/core/assistant-assets/manifest.json`]
 | [`ndx-config`](#ndx-config) | View or change n-dx configuration with guided assistance | `/ndx-config [key] [value]` |
 | [`ndx-reshape`](#ndx-reshape) | Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps | `/ndx-reshape` |
 | [`ndx-feedback`](#ndx-feedback) | Submit feedback, bug reports, or feature requests for n-dx | `/ndx-feedback [description]` |
+| [`ndx-adversarial-review`](#ndx-adversarial-review) | Attack a change or a completion claim, triage what breaks, capture what the user approves | `/ndx-adversarial-review [task-id \| name \| topic]` |
 
 ---
 
 ## What every state-mutating skill does at the end
 
 The per-skill step lists below are summaries. Any skill that changes project
-state — `/ndx-work`, `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-config` —
-finishes with two steps they all share:
+state — `/ndx-work`, `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-config`,
+and `/ndx-adversarial-review` once you approve its findings — finishes with two steps
+they all share:
 
 1. **Commit**, using `git status --porcelain` first. This matters because rex MCP
    writes are side effects: `add_item` and `edit_item` write to
@@ -46,9 +48,9 @@ finishes with two steps they all share:
    transcript, counting only the spend since the previous record — so several
    skill runs in one session each get their own slice rather than all claiming
    the session total. Skills whose work spans many PRD items (`/ndx-plan`,
-   `/ndx-reshape`, `/ndx-config`) record against `skill:<name>`, which
-   `get_token_usage` reports in its `orphans` bucket: work that produced many
-   items should not be charged to one of them.
+   `/ndx-reshape`, `/ndx-config`, `/ndx-adversarial-review`) record against
+   `skill:<name>`, which `get_token_usage` reports in its `orphans` bucket: work
+   that produced many items should not be charged to one of them.
 
 ## Skill Details
 
@@ -198,6 +200,27 @@ finishes with two steps they all share:
 5. Presents the draft for review, then creates via `gh issue create`
 
 **Customization:** Update the GitHub repo target in the skill body if you have a fork; add fields to the template for your internal triage process.
+
+---
+
+### ndx-adversarial-review
+
+**Purpose:** Review by attack rather than by inspection. Try to break a change — or to disprove the claim that a task is done — then triage each finding for validity and necessity before anything is recorded as work.
+
+**When it triggers:** Invoke with `/ndx-adversarial-review` for the current diff, `/ndx-adversarial-review <task-id>` to attack a completion claim against its acceptance criteria, or `/ndx-adversarial-review <name or topic>` to have the skill find the matching PRD item and confirm it with you first.
+
+**What it does:**
+1. Resolves the target — working diff, branch diff, or a PRD item (clarifying with you when given a name or topic rather than an ID)
+2. Builds ground truth: reads changed files in full, maps callers via sourcevision, then **discovers and runs the project's own checks** — typecheck, tests, lint — from `.rex/workflow.md`, the manifest scripts, or CI config
+3. **Pass 1 — attack.** Works a fixed rubric (unimagined inputs, failure paths, concurrency, platform, contract drift, test quality, the claim itself). Every finding needs a constructed trigger and a genuine attempt to refute it, or it is dropped
+4. **Pass 2 — necessity.** Judges each survivor on reachability, existing coverage, fix cost, and scope, landing on must-fix / should-fix / not-worth-fixing / out-of-scope
+5. Reports findings with severity, verdict, and proposed solutions — then **stops and asks** which to capture
+6. **Checks what the PRD already tracks** by enumerating `.rex/prd_tree/`, matching on the defect rather than the wording. An already-tracked finding is never re-added: if the review has something new to say about it, the skill offers to extend the existing item via `edit_item`; if it does not, it says so and skips
+7. Creates one PRD item per genuinely new approved finding, carrying the failure scenario, the candidate solutions, and acceptance criteria that fail today
+
+**What it will not do:** edit source, apply a fix, or write a PRD item you did not approve. Steps 1–5 write nothing at all. A green test suite bounds the review but never ends it — "checks pass, no findings" is treated as a review that was not performed.
+
+**Customization:** The Pass 1 rubric is a floor, not a ceiling — add dimensions that matter for your stack. The severity table is tuned for projects where corrupting PRD state is the worst outcome; adjust it if your project's critical failure is something else.
 
 ---
 
