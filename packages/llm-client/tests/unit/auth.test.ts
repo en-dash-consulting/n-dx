@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ClaudeClientError } from "../../src/types.js";
 
-// Mock child_process.execFile before importing the module under test
+// Mock child_process before importing the module under test. detectCliAvailability
+// goes through exec, which SPAWNS rather than execFile'ing — execFile cannot make
+// a child a process-group leader because it drops the `detached` option.
 vi.mock("node:child_process", () => ({
   execFile: vi.fn(),
+  spawn: vi.fn(),
 }));
 
 // Track the mock create function so tests can configure it
@@ -21,7 +24,8 @@ vi.mock("@anthropic-ai/sdk", () => {
   };
 });
 
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { fakeSpawn } from "../helpers/fake-spawn.js";
 import Anthropic from "@anthropic-ai/sdk";
 import {
   detectCliAvailability,
@@ -36,70 +40,51 @@ describe("detectCliAvailability", () => {
   beforeEach(() => {
     mockCreate = vi.fn();
     vi.mocked(execFile).mockReset();
+    vi.mocked(spawn).mockReset();
   });
 
   it("returns true when CLI responds successfully", async () => {
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        cb(null);
-      },
-    );
+    const spawned = fakeSpawn({ code: 0 });
+    vi.mocked(spawn).mockImplementation(spawned.impl);
 
     const result = await detectCliAvailability({ claudeConfig: {} });
     expect(result).toBe(true);
-    expect(mockExecFile).toHaveBeenCalledWith(
-      "claude",
-      ["--version"],
-      expect.objectContaining({ timeout: 5000 }),
-      expect.any(Function),
-    );
+    // The 5s bound is still requested, but it is no longer visible here: exec
+    // keeps the timer itself so a timeout can kill the command's whole tree
+    // rather than just the process it spawned. The bound is covered in
+    // exec.test.ts ("gives up on its own timer...").
+    expect(spawned.calls[0]!.cmd).toBe("claude");
+    expect(spawned.calls[0]!.args).toEqual(["--version"]);
   });
 
   it("returns false when CLI is not found", async () => {
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        const err = new Error("ENOENT") as NodeJS.ErrnoException;
-        err.code = "ENOENT";
-        cb(err);
-      },
-    );
+    // A missing binary surfaces as spawn's `error` event, not a non-zero exit.
+    const enoent = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    vi.mocked(spawn).mockImplementation(fakeSpawn({ spawnError: enoent }).impl);
 
     const result = await detectCliAvailability({ claudeConfig: {} });
     expect(result).toBe(false);
   });
 
   it("returns false when CLI exits with error", async () => {
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        cb(new Error("exit code 1"));
-      },
-    );
+    const spawned = fakeSpawn({ code: 1 });
+    vi.mocked(spawn).mockImplementation(spawned.impl);
 
     const result = await detectCliAvailability({ claudeConfig: {} });
     expect(result).toBe(false);
   });
 
   it("uses custom CLI path from config", async () => {
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        cb(null);
-      },
-    );
+    const spawned = fakeSpawn({ code: 0 });
+    vi.mocked(spawn).mockImplementation(spawned.impl);
 
     await detectCliAvailability({
       claudeConfig: { cli_path: "/opt/claude" },
     });
 
-    expect(mockExecFile).toHaveBeenCalledWith(
-      "/opt/claude",
-      ["--version"],
-      expect.any(Object),
-      expect.any(Function),
-    );
+    expect(spawned.calls[0]!.cmd).toBe("/opt/claude");
+    expect(spawned.calls[0]!.args).toEqual(["--version"]);
   });
 });
 
@@ -111,6 +96,7 @@ describe("validateApiKey", () => {
   beforeEach(() => {
     mockCreate = vi.fn();
     vi.mocked(execFile).mockReset();
+    vi.mocked(spawn).mockReset();
     process.env = { ...originalEnv };
     delete process.env.ANTHROPIC_API_KEY;
   });
@@ -232,6 +218,7 @@ describe("detectAvailableAuth", () => {
   beforeEach(() => {
     mockCreate = vi.fn();
     vi.mocked(execFile).mockReset();
+    vi.mocked(spawn).mockReset();
     process.env = { ...originalEnv };
     delete process.env.ANTHROPIC_API_KEY;
   });
@@ -250,12 +237,8 @@ describe("detectAvailableAuth", () => {
   });
 
   it("returns cli mode when no API key but CLI is available", async () => {
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        cb(null);
-      },
-    );
+    const spawned = fakeSpawn({ code: 0 });
+    vi.mocked(spawn).mockImplementation(spawned.impl);
 
     const result = await detectAvailableAuth({ claudeConfig: {} });
 
@@ -265,14 +248,10 @@ describe("detectAvailableAuth", () => {
   });
 
   it("throws ClaudeClientError when neither method is available", async () => {
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        const err = new Error("ENOENT") as NodeJS.ErrnoException;
-        err.code = "ENOENT";
-        cb(err);
-      },
-    );
+    // A missing binary surfaces as spawn's `error` event, not a non-zero exit.
+    const enoent = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    vi.mocked(spawn).mockImplementation(fakeSpawn({ spawnError: enoent }).impl);
 
     await expect(
       detectAvailableAuth({ claudeConfig: {} }),
@@ -293,12 +272,8 @@ describe("detectAvailableAuth", () => {
 
   it("prefers API key over CLI when both are available", async () => {
     // Mock CLI to be available — shouldn't matter
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        cb(null);
-      },
-    );
+    const spawned = fakeSpawn({ code: 0 });
+    vi.mocked(spawn).mockImplementation(spawned.impl);
 
     const result = await detectAvailableAuth({
       claudeConfig: { api_key: "sk-ant-test" },
@@ -307,7 +282,7 @@ describe("detectAvailableAuth", () => {
     expect(result.mode).toBe("api");
     expect(result.apiKeyAvailable).toBe(true);
     // CLI check should not even happen when API key is available
-    expect(mockExecFile).not.toHaveBeenCalled();
+    expect(spawned.calls).toHaveLength(0);
   });
 
   it("detects API key from env var", async () => {
@@ -328,6 +303,7 @@ describe("diagnoseAuth", () => {
   beforeEach(() => {
     mockCreate = vi.fn();
     vi.mocked(execFile).mockReset();
+    vi.mocked(spawn).mockReset();
     process.env = { ...originalEnv };
     delete process.env.ANTHROPIC_API_KEY;
   });
@@ -337,12 +313,8 @@ describe("diagnoseAuth", () => {
   });
 
   it("reports api key from config", async () => {
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        cb(null);
-      },
-    );
+    const spawned = fakeSpawn({ code: 0 });
+    vi.mocked(spawn).mockImplementation(spawned.impl);
 
     const result = await diagnoseAuth({
       claudeConfig: { api_key: "sk-ant-test" },
@@ -359,12 +331,8 @@ describe("diagnoseAuth", () => {
 
   it("reports api key from env", async () => {
     process.env.ANTHROPIC_API_KEY = "sk-ant-env";
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        cb(null);
-      },
-    );
+    const spawned = fakeSpawn({ code: 0 });
+    vi.mocked(spawn).mockImplementation(spawned.impl);
 
     const result = await diagnoseAuth({ claudeConfig: {} });
 
@@ -378,12 +346,8 @@ describe("diagnoseAuth", () => {
   });
 
   it("reports no api key and CLI available", async () => {
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        cb(null);
-      },
-    );
+    const spawned = fakeSpawn({ code: 0 });
+    vi.mocked(spawn).mockImplementation(spawned.impl);
 
     const result = await diagnoseAuth({ claudeConfig: {} });
 
@@ -399,14 +363,10 @@ describe("diagnoseAuth", () => {
   });
 
   it("reports no auth method available", async () => {
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        const err = new Error("ENOENT") as NodeJS.ErrnoException;
-        err.code = "ENOENT";
-        cb(err);
-      },
-    );
+    // A missing binary surfaces as spawn's `error` event, not a non-zero exit.
+    const enoent = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    vi.mocked(spawn).mockImplementation(fakeSpawn({ spawnError: enoent }).impl);
 
     const result = await diagnoseAuth({ claudeConfig: {} });
 
@@ -426,12 +386,8 @@ describe("diagnoseAuth", () => {
       usage: { input_tokens: 1, output_tokens: 1 },
     });
 
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        cb(null);
-      },
-    );
+    const spawned = fakeSpawn({ code: 0 });
+    vi.mocked(spawn).mockImplementation(spawned.impl);
 
     const result = await diagnoseAuth({
       claudeConfig: { api_key: "sk-ant-test" },
@@ -451,12 +407,8 @@ describe("diagnoseAuth", () => {
       Object.assign(new Error("Unauthorized"), { status: 401 }),
     );
 
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        cb(null);
-      },
-    );
+    const spawned = fakeSpawn({ code: 0 });
+    vi.mocked(spawn).mockImplementation(spawned.impl);
 
     const result = await diagnoseAuth({
       claudeConfig: { api_key: "sk-ant-bad" },
@@ -473,12 +425,8 @@ describe("diagnoseAuth", () => {
   });
 
   it("skips API key validation when validateKey is false", async () => {
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        cb(null);
-      },
-    );
+    const spawned = fakeSpawn({ code: 0 });
+    vi.mocked(spawn).mockImplementation(spawned.impl);
 
     const result = await diagnoseAuth({
       claudeConfig: { api_key: "sk-ant-test" },
@@ -489,14 +437,10 @@ describe("diagnoseAuth", () => {
   });
 
   it("uses custom CLI path in diagnostic message", async () => {
-    const mockExecFile = execFile as unknown as ReturnType<typeof vi.fn>;
-    mockExecFile.mockImplementation(
-      (_bin: string, _args: string[], _opts: unknown, cb: (err: Error | null) => void) => {
-        const err = new Error("ENOENT") as NodeJS.ErrnoException;
-        err.code = "ENOENT";
-        cb(err);
-      },
-    );
+    // A missing binary surfaces as spawn's `error` event, not a non-zero exit.
+    const enoent = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    vi.mocked(spawn).mockImplementation(fakeSpawn({ spawnError: enoent }).impl);
 
     const result = await diagnoseAuth({
       claudeConfig: { api_key: "sk-ant-test", cli_path: "/custom/claude" },

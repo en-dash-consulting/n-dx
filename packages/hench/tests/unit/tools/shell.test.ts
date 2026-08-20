@@ -1,20 +1,33 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { GuardRails } from "../../../src/guard/index.js";
 import { toolRunCommand } from "../../../src/tools/shell.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
+import { cleanupProjectDir } from "../../helpers/index.js";
 
 /**
- * Load tolerance for wall-clock budgets below.
+ * How long a deliberately-timed-out command would keep running if nothing stopped
+ * it — far longer than teardown would ever wait.
  *
- * These assertions guard against algorithmic regressions (a quadratic
- * rewrite is orders of magnitude slower), not latency SLAs. Idle-machine
- * numbers flake when the rest of the monorepo suite saturates every core,
- * so the budget is scaled. See TESTING.md "Flake Resistance".
+ * This used to have to stay short. A timeout terminated the spawned `sh` and not
+ * the `node` that sh started, so that `node` outlived the call still holding
+ * projectDir as its cwd, and on Windows a held cwd blocks rmdir. Bounding its
+ * lifetime was a test-side accommodation for that.
+ *
+ * The accommodation is gone: exec now kills the whole process tree on timeout
+ * (a9951988), so a minute-long command leaves nothing behind and this value is no
+ * longer load-bearing. Restoring the long duration is deliberate — it is what
+ * would fail if the tree kill regressed.
  */
-const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+const TIMEOUT_COMMAND_LIFETIME_MS = 60_000;
+
+// No BUDGET_MULTIPLIER in this file. Its one timing assertion is expressed as a
+// fraction of TIMEOUT_COMMAND_LIFETIME_MS above, because that assertion's job is
+// to sit BELOW the command's own lifetime — scaling it independently would lift it
+// toward that lifetime and make it vacuous. See the assertion for the reasoning,
+// and TESTING.md "Flake Resistance" for budgets that genuinely should be scaled.
 
 
 describe("toolRunCommand", () => {
@@ -27,7 +40,7 @@ describe("toolRunCommand", () => {
   });
 
   afterEach(async () => {
-    await rm(projectDir, { recursive: true, force: true });
+    await cleanupProjectDir(projectDir);
   });
 
   describe("allowed commands", () => {
@@ -213,9 +226,13 @@ describe("toolRunCommand", () => {
   });
 
   describe("timeout handling", () => {
+    // The commands below run far longer than their timeout, so the timeout is
+    // certainly what ends the call — and the tree kill is what makes that safe:
+    // `sh` is the process that gets signalled, and the `node` it started is the
+    // one that used to survive holding projectDir as its cwd.
     it("handles command timeout", async () => {
       const result = await toolRunCommand(guard, projectDir, {
-        command: "node -e \"setTimeout(() => {}, 60000)\"",
+        command: `node -e "setTimeout(() => {}, ${TIMEOUT_COMMAND_LIFETIME_MS})"`,
         timeout: 500,
       });
       expect(result).toContain("timed out");
@@ -232,14 +249,24 @@ describe("toolRunCommand", () => {
     it("respects custom timeout parameter", async () => {
       const start = Date.now();
       const result = await toolRunCommand(guard, projectDir, {
-        command: "node -e \"setTimeout(() => {}, 10000)\"",
+        command: `node -e "setTimeout(() => {}, ${TIMEOUT_COMMAND_LIFETIME_MS})"`,
         timeout: 200,
       });
       const elapsed = Date.now() - start;
 
       expect(result).toContain("timed out");
-      // Should timeout in roughly 200ms, not 10s
-      expect(elapsed).toBeLessThan(2000 * BUDGET_MULTIPLIER);
+      // Must return on the timeout, not on the command finishing. The bound is
+      // derived from the command's own lifetime rather than hardcoded: what
+      // matters is "far sooner than 60s", not any particular millisecond count.
+      // A fixed 2000ms was cutting it close — the tree kill spawns taskkill on
+      // Windows, which took ~660ms of that budget on a loaded dev machine and
+      // would take longer on a 2-core runner.
+      //
+      // This is also why the bound must not be scaled through BUDGET_MULTIPLIER:
+      // its whole job is to sit between the two outcomes (~200ms vs ~60s), so it
+      // has to move with the lifetime it discriminates against. Scaling it
+      // independently lifts it past that lifetime and the assertion tests nothing.
+      expect(elapsed).toBeLessThan(TIMEOUT_COMMAND_LIFETIME_MS / 4);
     });
   });
 

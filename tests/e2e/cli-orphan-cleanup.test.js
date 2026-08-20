@@ -15,10 +15,22 @@
  * child becomes the leader of a new process group.  The tracker's cleanup
  * path sends SIGTERM / SIGKILL to the entire group (-pgid), which reaches the
  * grandchild even though the grandchild was never registered with the tracker
- * directly.
+ * directly.  On POSIX, a pass here genuinely exercises that path.
  *
- * On Windows this test is skipped — process groups are not supported there and
- * the orphan-cleanup layer degrades gracefully to direct-child kill.
+ * WINDOWS: this runs but proves LESS than it appears to, so do not read a green
+ * Windows result as "ndx reaps grandchildren on Windows":
+ *   - `process.kill(pid, "SIGINT")` is TerminateProcess on Windows, so the
+ *     CLI's SIGINT handler never executes — the parent dies with exit code 1
+ *     rather than the handler's 128+2=130, and tracker cleanup never runs.
+ *   - The tree nonetheless dies, because Windows hosts commonly place spawned
+ *     processes in a Job Object whose children inherit kill-on-close. Verified
+ *     independently of ndx: killing a middle process reaps a plain
+ *     non-detached grandchild with no n-dx code in the picture.
+ * So on Windows the assertion is satisfied by the OS/host, not by
+ * child-lifecycle.js. It is still worth running — it would catch ndx actively
+ * keeping a process alive — but the real Windows tree-kill contract needs a
+ * different probe (assert the chosen termination strategy was invoked), and a
+ * host without Job Object containment may legitimately show this red.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -26,6 +38,7 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 const PRELOAD_PATH = join(
@@ -89,7 +102,15 @@ async function readPidRecord(pidFile, timeoutMs = 3_000) {
 }
 
 function withImportedNodeOptions(preloadPath) {
-  const segments = [process.env.NODE_OPTIONS, `--import=${preloadPath}`].filter(Boolean);
+  // `--import` needs a file:// URL, not a bare path: on Windows Node rejects
+  // `--import=C:\...` with ERR_UNSUPPORTED_ESM_URL_SCHEME ("Received
+  // protocol 'c:'"), so the preload never loads, `spawn` is never patched, the
+  // child double is never substituted, and every test here times out waiting
+  // for a PID record that is never written. POSIX accepts the file:// form too,
+  // so this is unconditional. The URL form also encodes spaces, which a bare
+  // path in NODE_OPTIONS could not survive.
+  const specifier = pathToFileURL(preloadPath).href;
+  const segments = [process.env.NODE_OPTIONS, `--import=${specifier}`].filter(Boolean);
   return segments.join(" ");
 }
 
@@ -122,7 +143,7 @@ function spawnAnalyze(tmpDir) {
   };
 }
 
-describe.skipIf(process.platform === "win32")(
+describe(
   "n-dx orphan process cleanup (process-group-aware)",
   () => {
     let tmpDir;
@@ -133,7 +154,12 @@ describe.skipIf(process.platform === "win32")(
     });
 
     afterEach(async () => {
-      await rm(tmpDir, { recursive: true, force: true });
+      // maxRetries/retryDelay: the CLI child is spawned with cwd: tmpDir, so on
+      // Windows the directory can still be handle-locked when teardown runs and
+      // rmdir fails with EBUSY. Under full-suite load this is the difference
+      // between green and an intermittent red that has nothing to do with the
+      // assertion under test.
+      await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     });
 
     it(

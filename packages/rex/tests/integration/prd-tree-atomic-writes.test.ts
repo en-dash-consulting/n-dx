@@ -181,31 +181,60 @@ describe("prd_tree atomic writes and crash-safety", () => {
   // ── Concurrency tests ──────────────────────────────────────────────────
 
   describe("file-locking: concurrent writers are serialized", () => {
-    it("second writer waits for first writer to release lock", async () => {
-      // Hold the store's lock directly (as a first writer would), so the
-      // blocked/unblocked states are observable without timing assumptions.
-      const release = await acquireLock(join(rexDir, "prd.lock"));
+    /**
+     * This replaced an ordering assertion that could not have tested locking.
+     *
+     * The old version pushed "second-start" synchronously at the top of the second
+     * writer's async IIFE — i.e. BEFORE that writer ever asked for the lock — and
+     * started it after a fixed 10ms sleep. So `firstEndIdx < secondStartIdx` was
+     * really asserting "the first addItem finishes within 10ms", which says nothing
+     * about serialization. Under load addItem takes longer than that and the
+     * assertion failed with `expected 2 to be less than 1`, having never exercised
+     * the lock at all.
+     *
+     * Asserted here instead, at the lock itself and without any timing assumption:
+     * a lock that is held cannot be granted to anyone else. A slower machine makes
+     * this MORE certainly true, not less — the failure direction is safe.
+     */
+    it("does not grant the lock to a second writer while the first holds it", async () => {
+      const lockPath = join(rexDir, "prd.lock");
 
-      let secondCompleted = false;
-      const secondPromise = store
-        .addItem(makeItem("test-2", "Second Item"))
-        .then(() => {
-          secondCompleted = true;
-        });
+      const releaseFirst = await acquireLock(lockPath);
 
-      // While the lock is held, the second writer must not complete —
-      // locking makes this impossible, so the wait only guards scheduling.
-      await new Promise((r) => setTimeout(r, 100));
-      expect(secondCompleted).toBe(false);
+      let secondAcquired = false;
+      const secondAcquisition = acquireLock(lockPath).then((release) => {
+        secondAcquired = true;
+        return release;
+      });
 
-      await release();
-      await secondPromise;
-      expect(secondCompleted).toBe(true);
+      // Drain timers and microtasks several times over. The point is not "wait
+      // long enough" — it is that no amount of event-loop progress may hand out a
+      // lock that is still held.
+      for (let i = 0; i < 5; i++) {
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      expect(secondAcquired).toBe(false);
 
-      // Verify the blocked write landed after the lock was released
+      await releaseFirst();
+
+      // Now it must be grantable. If the lock were never released this would hang
+      // until acquireLock's own timeout, failing loudly rather than silently.
+      const releaseSecond = await secondAcquisition;
+      expect(secondAcquired).toBe(true);
+      await releaseSecond();
+    });
+
+    it("serializes concurrent addItem calls without losing either write", async () => {
+      // The load-independent half of the original test: whatever order the two
+      // writers interleave in, neither may clobber the other.
+      await Promise.all([
+        store.addItem(makeItem("test-1", "First Item")),
+        store.addItem(makeItem("test-2", "Second Item")),
+      ]);
+
       const doc = await store.loadDocument();
-      expect(doc.items).toHaveLength(1);
-      expect(doc.items[0].id).toBe("test-2");
+      expect(doc.items).toHaveLength(2);
+      expect(doc.items.map((i) => i.id).sort()).toEqual(["test-1", "test-2"]);
     });
 
     it("lock timeout prevents indefinite waiting", async () => {

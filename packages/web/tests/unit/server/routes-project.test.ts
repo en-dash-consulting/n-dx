@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import {
@@ -130,7 +130,8 @@ describe("extractProjectMetadata", () => {
     execSync("git config user.email test@test.com", { cwd: tmpDir, stdio: "ignore" });
     execSync("git config user.name Test", { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(tmpDir, "README.md"), "# Test");
-    execSync("git add . && git commit -m 'init'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir, stdio: "ignore" });
 
     const meta = await extractProjectMetadata(tmpDir);
     expect(meta.git).not.toBeNull();
@@ -146,7 +147,8 @@ describe("extractProjectMetadata", () => {
     execSync("git config user.email test@test.com", { cwd: tmpDir, stdio: "ignore" });
     execSync("git config user.name Test", { cwd: tmpDir, stdio: "ignore" });
     await writeFile(join(tmpDir, "README.md"), "# Test");
-    execSync("git add . && git commit -m 'init'", { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir, stdio: "ignore" });
     execSync("git remote add origin https://github.com/user/test-repo.git", {
       cwd: tmpDir,
       stdio: "ignore",

@@ -20,6 +20,7 @@
 
 import { spawn, execFileSync } from "node:child_process";
 import { execFileSyncCli, spawnCli } from "./win-spawn.js";
+import { terminateTree, treeKillSpawnOptions } from "./child-lifecycle.js";
 import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -328,6 +329,81 @@ After reviewing, output a brief summary. State PASS if everything looks correct 
 // ---------------------------------------------------------------------------
 
 /**
+ * Terminate a timed-out child and everything beneath it.
+ *
+ * WHY A TREE KILL AND NOT `child.kill("SIGTERM")`. Every spawn in this file starts
+ * a process that starts others: the vendor CLIs fan out, and `runShellTestCommand`
+ * uses `shell: true`, so the child being held is the SHELL rather than the test
+ * command. Signalling it left the real work running with its output pipe already
+ * abandoned — a timed-out `npm test` kept building, holding the workspace and any
+ * port it had bound. `terminateTree` signals the process group on POSIX and runs
+ * `taskkill /T` on Windows, and escalates to SIGKILL when SIGTERM is ignored,
+ * which a bare kill never did.
+ *
+ * WHY THE TIMEOUT PATH AND NOT GRACEFUL SHUTDOWN. These are timeout/runaway paths,
+ * and the campaign keeps the two policies distinct: graceful shutdown (Ctrl-C on
+ * `ndx start`) keeps SIGTERM-then-grace because it wants the child's flush, while a
+ * runaway has already forfeited that. See the task recorded on
+ * `terminateTree`/71e44890 for why freezing and graceful shutdown are mutually
+ * exclusive. Do not "unify" these by giving shutdown a hard kill.
+ *
+ * Never throws: the timeout is reported whether or not termination reported success,
+ * because a caller that asked for a timeout must get an answer either way. A failure
+ * here means the tree outlived its kill, which the diagnostics in child-lifecycle
+ * surface under NDX_DEBUG_LIFECYCLE.
+ *
+ * @param {import("child_process").ChildProcess} child
+ * @returns {Promise<void>}
+ */
+async function terminateTimedOutTree(child) {
+  try {
+    await terminateTree(child);
+  } catch {
+    // Best effort — see above.
+  }
+}
+
+/**
+ * Registers a spawned child with the caller's lifecycle tracker and returns it
+ * unchanged, so it can wrap a `spawn(...)` expression in place.
+ *
+ * Named rather than an inline parameter type because the injection-seam registry in
+ * CLAUDE.md requires it: a named type means refactoring either side of the seam is a
+ * visible change. This module is plain JS, so it is a JSDoc callback rather than a
+ * TypeScript interface — same purpose, checked by `tsc` through the JSDoc.
+ *
+ * @callback RegisterChild
+ * @param {import("child_process").ChildProcess} child
+ * @returns {import("child_process").ChildProcess}
+ */
+
+/**
+ * Default for the `registerChild` seam: track nothing.
+ *
+ * WHY THIS SEAM EXISTS — it is the other half of `treeKillSpawnOptions`, and
+ * omitting it would trade one orphan for another. On POSIX `detached: true` makes
+ * the child its own process-group leader, which is what lets a timeout signal the
+ * group; but it also removes the child from this process's foreground group, so a
+ * Ctrl-C typed at the terminal no longer reaches it. Before that flag, SIGINT was
+ * delivered to the whole foreground group and the reviewer CLI died for free.
+ *
+ * cli.js already owns the answer: a module-level tracker created with
+ * `treeKill: true`, terminated from its SIGINT/SIGTERM/SIGHUP handlers. Its own
+ * spawn helper both detaches and registers, and these spawns simply were not
+ * participating. Injected rather than imported because cli.js imports this module,
+ * so the dependency can only run one way — see the injection seam registry in
+ * CLAUDE.md.
+ *
+ * Defaulting to a no-op keeps every existing caller and test working, at the cost
+ * of silently opting out of Ctrl-C cleanup; only cli.js has a tracker to pass.
+ *
+ * @template T
+ * @param {T} child
+ * @returns {T}
+ */
+const doNotTrack = (child) => child;
+
+/**
  * Invoke the reviewer vendor CLI with the given prompt.
  * Inherits the current process's stdio so the user can observe the review
  * in real time. Returns the process exit code and whether it timed out.
@@ -341,7 +417,7 @@ After reviewing, output a brief summary. State PASS if everything looks correct 
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; spawnError?: string }>}
  */
-export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000 }) {
+export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
   return new Promise((resolve) => {
     let child;
     try {
@@ -349,10 +425,15 @@ export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_0
       // claude: `-p -` reads the full prompt from stdin.
       // codex:  `exec -` reads the prompt from stdin (matches codex-cli-adapter).
       const args = reviewer === "codex" ? ["exec", "-"] : ["-p", "-"];
-      child = spawnCli(cliPath, args, {
+      child = registerChild(spawnCli(cliPath, args, {
         cwd: dir,
         stdio: ["pipe", "inherit", "inherit"],
-      });
+        // POSIX: makes the CLI a process-group leader so the timeout can signal the
+        // group and reach its descendants. No-op on Windows, where taskkill walks
+        // the tree by pid. Paired with registerChild — see doNotTrack for why one
+        // without the other moves the orphan rather than removing it.
+        ...treeKillSpawnOptions(),
+      }));
     } catch (err) {
       resolve({ exitCode: 1, timedOut: false, spawnError: err.message });
       return;
@@ -362,18 +443,27 @@ export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_0
     child.stdin.write(prompt);
     child.stdin.end();
 
-    const timer = setTimeout(() => {
-      child.kill("SIGTERM");
+    // Claimed by whichever path gets there first. Awaiting termination below means
+    // `close` now fires BEFORE the timeout path resolves, so without this flag a
+    // timeout would be reported as an ordinary exit with a signal code — the very
+    // outcome the caller checks `timedOut` to distinguish.
+    let timedOut = false;
+
+    const timer = setTimeout(async () => {
+      timedOut = true;
+      await terminateTimedOutTree(child);
       resolve({ exitCode: 1, timedOut: true });
     }, timeout);
 
     child.on("close", (code) => {
       clearTimeout(timer);
+      if (timedOut) return;
       resolve({ exitCode: code ?? 1, timedOut: false });
     });
 
     child.on("error", (err) => {
       clearTimeout(timer);
+      if (timedOut) return;
       resolve({ exitCode: 1, timedOut: false, spawnError: err.message });
     });
   });
@@ -392,16 +482,18 @@ export function runReviewerLlm({ cliPath, prompt, dir, reviewer, timeout = 300_0
  * }} options
  * @returns {Promise<{ exitCode: number; timedOut: boolean; output: string; spawnError?: string }>}
  */
-export function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000 }) {
+export function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout = 300_000, registerChild = doNotTrack }) {
   return new Promise((resolve) => {
     let child;
     try {
       // Deliver the prompt via stdin — same rationale as runReviewerLlm.
       const args = reviewer === "codex" ? ["exec", "-"] : ["-p", "-"];
-      child = spawnCli(cliPath, args, {
+      child = registerChild(spawnCli(cliPath, args, {
         cwd: dir,
         stdio: ["pipe", "pipe", "pipe"],
-      });
+        // Process-group leader on POSIX; see runReviewerLlm.
+        ...treeKillSpawnOptions(),
+      }));
     } catch (err) {
       resolve({ exitCode: 1, timedOut: false, spawnError: err.message, output: "" });
       return;
@@ -421,18 +513,24 @@ export function runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeou
       process.stderr.write(chunk);
     });
 
-    const timer = setTimeout(() => {
-      child.kill("SIGTERM");
+    // See runReviewerLlm for why the flag is required once termination is awaited.
+    let timedOut = false;
+
+    const timer = setTimeout(async () => {
+      timedOut = true;
+      await terminateTimedOutTree(child);
       resolve({ exitCode: 1, timedOut: true, output });
     }, timeout);
 
     child.on("close", (code) => {
       clearTimeout(timer);
+      if (timedOut) return;
       resolve({ exitCode: code ?? 1, timedOut: false, output });
     });
 
     child.on("error", (err) => {
       clearTimeout(timer);
+      if (timedOut) return;
       resolve({ exitCode: 1, timedOut: false, spawnError: err.message, output });
     });
   });
@@ -578,30 +676,40 @@ export function buildRemediationContext(feedback, description, priorContext) {
  * @param {number} [timeout=120000]  Max run time in ms.
  * @returns {Promise<{ exitCode: number; output: string }>}
  */
-export function runShellTestCommand(testCommand, dir, timeout = 120_000) {
+export function runShellTestCommand(testCommand, dir, timeout = 120_000, registerChild = doNotTrack) {
   return new Promise((resolve) => {
-    const child = spawn(testCommand, [], {
+    const child = registerChild(spawn(testCommand, [], {
       cwd: dir,
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
-    });
+      // Load-bearing here more than anywhere else in this file: with `shell: true`
+      // the child IS the shell, so the test command is already a generation below it
+      // and only a group signal reaches it on POSIX.
+      ...treeKillSpawnOptions(),
+    }));
 
     let output = "";
     child.stdout.on("data", (chunk) => { output += chunk; });
     child.stderr.on("data", (chunk) => { output += chunk; });
 
-    const timer = setTimeout(() => {
-      child.kill("SIGTERM");
+    // See runReviewerLlm for why the flag is required once termination is awaited.
+    let timedOut = false;
+
+    const timer = setTimeout(async () => {
+      timedOut = true;
+      await terminateTimedOutTree(child);
       resolve({ exitCode: 1, output: output + "\n[pair-programming review: test command timed out]" });
     }, timeout);
 
     child.on("close", (code) => {
       clearTimeout(timer);
+      if (timedOut) return;
       resolve({ exitCode: code ?? 1, output });
     });
 
     child.on("error", (err) => {
       clearTimeout(timer);
+      if (timedOut) return;
       resolve({ exitCode: 1, output: `[pair-programming review: could not start test command — ${err.message}]` });
     });
   });
@@ -645,7 +753,7 @@ export function runShellTestCommand(testCommand, dir, timeout = 120_000) {
  * }} options
  * @returns {Promise<ReviewResult>}
  */
-export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout, contextFiles }) {
+export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout, contextFiles, registerChild = doNotTrack }) {
   const cliPath = resolveVendorCliPath(dir, reviewer);
   const { available } = checkReviewerAvailability(cliPath);
 
@@ -664,12 +772,12 @@ export async function runCrossVendorReview({ dir, reviewer, testCommand, timeout
   const prompt = buildReviewerPrompt({ changedFiles, testCommand });
   const llmTimeout = timeout ?? 300_000;
 
-  const llmResult = await runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout: llmTimeout });
+  const llmResult = await runReviewerLlmCapturing({ cliPath, prompt, dir, reviewer, timeout: llmTimeout, registerChild });
 
   if (llmResult.spawnError) {
     // LLM failed to start — fall back to shell tests when a test command is available
     if (testCommand) {
-      const { exitCode, output } = await runShellTestCommand(testCommand, dir, 120_000);
+      const { exitCode, output } = await runShellTestCommand(testCommand, dir, 120_000, registerChild);
       return {
         mode: "shell-test-only",
         skipped: false,

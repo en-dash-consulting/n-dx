@@ -5,9 +5,14 @@
 
 import { vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { tmpdir } from "node:os";
+import { execFile, execFileSync } from "node:child_process";
+import { EventEmitter } from "node:events";
+import { appendFileSync } from "node:fs";
+import { promisify } from "node:util";
 import type { PRDStore, PRDItem } from "@n-dx/rex";
+import { WINDOWS_STDIN_PROMPT_SEPARATOR } from "../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
 import type { CliRunResult } from "../../src/agent/lifecycle/event-accumulator.js";
 import type { RunRecord } from "../../src/schema/v1.js";
 import type { PromptEnvelope } from "../../src/schema/v1.js";
@@ -254,6 +259,141 @@ export async function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Retry settings for removing a temp directory that a child process may still be
+ * holding. Node's fs.rm retries only the codes that signal exactly this — EBUSY,
+ * EPERM, ENOTEMPTY, EMFILE, ENFILE — so a real error (a bad path, a permission
+ * problem that will not clear) still fails immediately rather than stalling for
+ * the whole window.
+ *
+ * Node backs off linearly, so the window is retryDelay * n(n+1)/2 — roughly 5.5s
+ * here. That is sized to outlast a child that exits on its own within a few
+ * seconds while still failing in bounded time when a lock will never clear.
+ *
+ * Spread this into an fs.rm call when the directory is not a setupProjectDir
+ * project; use cleanupProjectDir when it is.
+ */
+export const RM_RETRY = { maxRetries: 10, retryDelay: 100 } as const;
+
+// ── Spawn mocks ───────────────────────────────────────────────────────────────
+
+/**
+ * Commands that a run pipeline spawns incidentally, alongside the vendor CLI.
+ *
+ * `exec` spawns rather than calling execFile (execFile drops the `detached`
+ * option, so it cannot make a child a process-group leader), which means
+ * `exec("git", ["status", …])` now shows up at the same mocked `spawn` as the CLI.
+ * `ps` and `taskkill` appear too, from the tree kill on timeout.
+ */
+const ANCILLARY_SPAWNS = new Set(["git", "ps", "taskkill"]);
+
+function isAncillarySpawn(command: string, args: string[] = []): boolean {
+  const base = command.replace(/^.*[\\/]/, "").replace(/\.exe$/i, "");
+  if (ANCILLARY_SPAWNS.has(base)) return true;
+
+  // Shell-wrapped form: execShellCmd runs `sh -c "git diff --name-only HEAD"`, so
+  // the command is `sh` and only the script names git. Missing this is what kept
+  // retry counts one too high after exec started spawning.
+  if ((base === "sh" || base === "bash") && args[0] === "-c") {
+    const first = (args[1] ?? "").trimStart().split(/\s+/)[0] ?? "";
+    if (ANCILLARY_SPAWNS.has(first.replace(/^.*[\\/]/, ""))) return true;
+  }
+
+  // A `--version` probe runs the vendor binary but is not a run turn:
+  // detectCliAvailability reaches it through exec, which spawns now.
+  return args.length === 1 && args[0] === "--version";
+}
+
+/** A child process that produces no output and exits 0. */
+function benignChild(): EventEmitter {
+  const proc = new EventEmitter() as EventEmitter & Record<string, unknown>;
+  Object.assign(proc, {
+    pid: undefined,
+    exitCode: null,
+    signalCode: null,
+    stdout: new EventEmitter(),
+    stderr: new EventEmitter(),
+    stdin: { end: () => {} },
+    kill: () => true,
+  });
+  queueMicrotask(() => proc.emit("close", 0, null));
+  return proc;
+}
+
+/**
+ * Route incidental spawns away from a scripted CLI queue.
+ *
+ * Tests script the vendor CLI with `mockImplementationOnce` chains, which are
+ * order-based: one unrelated spawn shifts every subsequent response and the
+ * failures look like broken token accounting rather than a desynchronized mock.
+ * Wrap the mock with this so only CLI invocations consume the queue.
+ *
+ * @example
+ *   vi.doMock("node:child_process", async (importOriginal) => ({
+ *     ...(await importOriginal()),
+ *     spawn: cliSpawnsOnly(mockSpawn),
+ *   }));
+ */
+export function cliSpawnsOnly(
+  cliMock: (command: string, args?: string[], opts?: unknown) => unknown,
+): (command: string, args?: string[], opts?: unknown) => unknown {
+  return (command: string, args?: string[], opts?: unknown) =>
+    isAncillarySpawn(command, args) ? benignChild() : cliMock(command, args, opts);
+}
+
+// ── Git fixture repos ─────────────────────────────────────────────────────────
+
+/**
+ * Config every fixture repo needs, as argv for `git config`.
+ *
+ * The identity settings are there so commits can be made at all. The line-ending
+ * settings are there so the repo does not inherit the machine's:
+ * `core.autocrlf=true` is the Git-for-Windows installer default and lands in
+ * SYSTEM config, so it applies even to a developer who has never set it and
+ * cannot be cleared by their own global config. Under it, a test writes LF, git
+ * checks the file back out as CRLF, and a byte-exact content assertion fails —
+ * git behaving exactly as configured, while looking like a rollback defect.
+ *
+ * Pinning it per-repo keeps those assertions byte-exact, which is the point:
+ * normalizing line endings in the comparison instead would let a rollback that
+ * subtly corrupted a file still pass. This mirrors what .gitattributes already
+ * does for n-dx's own written files.
+ */
+const GIT_FIXTURE_CONFIG: readonly string[][] = [
+  ["user.email", "test@test.com"],
+  ["user.name", "Test"],
+  ["core.autocrlf", "false"],
+  ["core.eol", "lf"],
+];
+
+/**
+ * Initialize a temp directory as a git repo suitable for fixtures.
+ *
+ * Use this rather than hand-rolling `git init` + config: 14 test files create
+ * fixture repos, and a repo that misses the line-ending config fails only on
+ * Windows and only in byte-exact assertions.
+ *
+ * Argv form throughout — a `git config user.name 'Test User'` shell string would
+ * keep its single quotes on Windows, since cmd.exe does not strip them.
+ *
+ * @see initGitFixtureRepoSync for fixtures whose setup is synchronous.
+ */
+export async function initGitFixtureRepo(dir: string): Promise<void> {
+  const run = promisify(execFile);
+  await run("git", ["init"], { cwd: dir });
+  for (const args of GIT_FIXTURE_CONFIG) {
+    await run("git", ["config", ...args], { cwd: dir });
+  }
+}
+
+/** Synchronous {@link initGitFixtureRepo}, for fixtures that set up in a sync beforeEach. */
+export function initGitFixtureRepoSync(dir: string): void {
+  execFileSync("git", ["init"], { cwd: dir, stdio: "ignore" });
+  for (const args of GIT_FIXTURE_CONFIG) {
+    execFileSync("git", ["config", ...args], { cwd: dir, stdio: "ignore" });
+  }
+}
+
+/**
  * Sets up a temporary project directory with hench and rex configuration.
  * Returns the paths to the project, hench, and rex directories.
  * Remember to clean up with `rm(projectDir, { recursive: true })`.
@@ -287,11 +427,115 @@ export async function setupProjectDir(prefix: string = "hench-test-"): Promise<{
 
 /**
  * Cleans up a test project directory created by setupProjectDir.
+ *
+ * Retries rather than giving up. On Windows a directory cannot be removed while
+ * any process holds a handle inside it — most often as its current working
+ * directory — and a child that has just been signalled has not necessarily let go
+ * by the time teardown runs. POSIX allows unlinking an open file, so the retry
+ * only ever engages on Windows.
+ *
+ * Failures propagate deliberately. Swallowing them turns a leaked temp directory
+ * into an invisible problem, and the retry means a transient lock no longer
+ * reaches the caller as an error in the first place.
  */
 export async function cleanupProjectDir(projectDir: string): Promise<void> {
-  try {
-    await rm(projectDir, { recursive: true, force: true });
-  } catch {
-    // Ignore cleanup errors
+  await rm(projectDir, { recursive: true, force: true, ...RM_RETRY });
+}
+
+// ── Path expectations ─────────────────────────────────────────────────────────
+
+/**
+ * Convert a POSIX-style path literal into this platform's separator.
+ *
+ * Production helpers such as candidateTestPaths build paths with path.join, so
+ * they emit "src\agent\loop.test.ts" on Windows and "src/agent/loop.test.ts" on
+ * POSIX. Test expectations are written with forward slashes because that reads
+ * better, so they need converting rather than the assertion being loosened —
+ * `expect(paths).toContain(osPath("src/agent/loop.test.ts"))` stays an exact
+ * match on both platforms.
+ *
+ * Use this for RELATIVE paths. For an absolute path that production produces via
+ * path.resolve, build the expectation with resolve() against the same root so the
+ * drive letter matches too (see tests/unit/guard/paths.test.ts).
+ */
+export function osPath(posixPath: string): string {
+  return join(...posixPath.split("/"));
+}
+
+/**
+ * A directory prefix with this platform's separator, e.g. "tests/" -> "tests\".
+ *
+ * Needed because osPath() cannot express a trailing separator: join() drops the
+ * empty final segment. Without this, `p.startsWith("tests/")` is VACUOUSLY FALSE
+ * on Windows, so a "does not generate mirror paths" assertion would pass without
+ * checking anything.
+ */
+export function osPrefix(posixPrefix: string): string {
+  return osPath(posixPrefix.replace(/\/$/, "")) + sep;
+}
+
+// ── Claude CLI delivery decoding ──────────────────────────────────────────────
+
+/**
+ * What the Claude CLI session will actually receive, independent of which channel
+ * carried it.
+ *
+ * buildClaudeCliArgs delivers the same three things two different ways:
+ *
+ *   POSIX    system prompt in `--system-prompt <value>`, task prompt on stdin,
+ *            each allowed-tool as its own argv entry.
+ *   Windows  `--system-prompt` omitted and BOTH prompts on stdin separated by
+ *            `\n\n---\n\n`, allowed-tools collapsed into one comma-joined argv
+ *            entry — because cmd.exe cannot carry a multi-line argument safely.
+ *
+ * Tests that assert argv POSITIONS therefore encode one platform's shape and fail
+ * on the other. Decoding first lets them assert the property they actually care
+ * about — that the model receives this system prompt, this task prompt and these
+ * tools — with exact equality rather than a loosened substring match.
+ *
+ * The shape is detected from the presence of `--system-prompt`, which is not a
+ * heuristic: Windows always omits that flag and POSIX always includes it, so the
+ * signal is exact.
+ */
+export function decodeClaudeDelivery(
+  args: readonly string[],
+  stdinContent: string,
+): { systemPrompt: string; taskPrompt: string; allowedTools: string[]; shape: "posix" | "windows" } {
+  const sysIdx = args.indexOf("--system-prompt");
+  const isPosixShape = sysIdx > -1;
+
+  const toolsIdx = args.indexOf("--allowed-tools");
+  if (toolsIdx === -1) {
+    throw new Error("decodeClaudeDelivery: --allowed-tools missing from args");
   }
+  // Tool entries run until the next flag (or the end of argv).
+  const afterFlag = args.slice(toolsIdx + 1);
+  const nextFlag = afterFlag.findIndex((a) => a.startsWith("--"));
+  const toolTokens = nextFlag === -1 ? afterFlag : afterFlag.slice(0, nextFlag);
+  const allowedTools = isPosixShape
+    ? [...toolTokens]
+    : (toolTokens[0] ?? "").split(",").filter(Boolean);
+
+  if (isPosixShape) {
+    return {
+      systemPrompt: args[sysIdx + 1]!,
+      taskPrompt: stdinContent,
+      allowedTools,
+      shape: "posix",
+    };
+  }
+
+  const at = stdinContent.indexOf(WINDOWS_STDIN_PROMPT_SEPARATOR);
+  if (at === -1) {
+    throw new Error(
+      "decodeClaudeDelivery: no --system-prompt flag and no stdin separator — " +
+      "the system prompt is not being delivered by either channel",
+    );
+  }
+  return {
+    systemPrompt: stdinContent.slice(0, at),
+    taskPrompt: stdinContent.slice(at + WINDOWS_STDIN_PROMPT_SEPARATOR.length),
+    allowedTools,
+    shape: "windows",
+  };
 }

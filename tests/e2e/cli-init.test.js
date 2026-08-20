@@ -12,12 +12,21 @@ const PATH_SEP = isWin ? ";" : ":";
 /**
  * Create a platform-appropriate fake CLI binary on PATH.
  * On Unix: shell script. On Windows: .cmd batch file.
+ *
+ * When `captureArgs` is set the shim records its argv at `fakeBinaryArgsPath()`,
+ * which is ABSOLUTE and baked into the script. It must not be derived from `$0`
+ * or `%~f0`: neither searches PATH, so a shim invoked by bare name (which is how
+ * `ndx init` calls `claude`/`codex`) resolved them against the CWD and dropped a
+ * `claude.args` file in the repository root. `%~f0` is the more surprising of the
+ * two — it "fully qualifies" %0 by prefixing the current directory rather than
+ * locating the file.
  */
 async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCode = 0, captureArgs = false } = {}) {
+  const argsPath = fakeBinaryArgsPath(filePath);
   if (isWin) {
     const cmdPath = filePath + ".cmd";
     const lines = ["@echo off"];
-    if (captureArgs) lines.push("echo %* > \"%~f0.args\"");
+    if (captureArgs) lines.push(`echo %* > "${argsPath}"`);
     if (stderrLine) lines.push(`echo ${stderrLine} 1>&2`);
     if (stdout) lines.push(`echo ${stdout}`);
     if (exitCode !== 0) lines.push(`exit /b ${exitCode}`);
@@ -25,13 +34,23 @@ async function writeFakeBinary(filePath, { stdout = "", stderrLine = "", exitCod
     return cmdPath;
   }
   const lines = ["#!/bin/sh"];
-  if (captureArgs) lines.push('echo "$@" > "$0.args"');
+  // Single-quoted so nothing in the path is expanded. mkdtemp paths contain no
+  // single quotes, so this needs no escaping.
+  if (captureArgs) lines.push(`echo "$@" > '${argsPath}'`);
   if (stderrLine) lines.push(`echo '${stderrLine}' 1>&2`);
   if (stdout) lines.push(`echo '${stdout}'`);
   if (exitCode !== 0) lines.push(`exit ${exitCode}`);
   await writeFile(filePath, lines.join("\n") + "\n");
   await chmod(filePath, 0o755);
   return filePath;
+}
+
+/**
+ * Where a `captureArgs` shim records its argv. Same on every platform — notably
+ * NOT `<shim>.cmd.args` on Windows — so callers need no platform branch.
+ */
+function fakeBinaryArgsPath(filePath) {
+  return `${filePath}.args`;
 }
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
@@ -73,6 +92,49 @@ function runCapture(args, opts = {}) {
   });
   return { stdout: res.stdout ?? "", stderr: res.stderr ?? "", status: res.status };
 }
+
+describe("fake-CLI fixture hygiene", () => {
+  // The defect this pins: the shims captured argv via `$0.args` / `%~f0.args`.
+  // Neither searches PATH — `%~f0` "fully qualifies" %0 by prefixing the CURRENT
+  // DIRECTORY rather than locating the file — so a shim invoked by bare name (how
+  // `ndx init` calls claude/codex) wrote its capture into the CWD. In practice
+  // that was the repository root, and a .gitignore entry hid it for months.
+  //
+  // Every other test here invokes shims by absolute path, where the old form
+  // happened to work. Only a bare-name invocation reproduces it, so without this
+  // test nothing does.
+  it("captures argv to an absolute path even when the shim is invoked by bare name", async () => {
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-args-bin-"));
+    const cwdDir = await mkdtemp(join(tmpdir(), "ndx-args-cwd-"));
+    try {
+      const base = join(binDir, "fakecli");
+      await writeFakeBinary(base, { stdout: "ok", captureArgs: true });
+
+      // Bare name, resolved through PATH, with the CWD somewhere else entirely —
+      // cwdDir stands in for the repository root.
+      const res = spawnSync(
+        isWin ? "cmd.exe" : "sh",
+        isWin ? ["/d", "/s", "/c", "fakecli hello"] : ["-c", "fakecli hello"],
+        {
+          cwd: cwdDir,
+          encoding: "utf-8",
+          env: { ...process.env, PATH: `${binDir}${PATH_SEP}${process.env.PATH ?? ""}` },
+        },
+      );
+      expect(res.status).toBe(0);
+
+      // Landed next to the shim...
+      expect(existsSync(fakeBinaryArgsPath(base))).toBe(true);
+      // ...and nothing was written into the working directory. Both spellings the
+      // old code could have produced are checked, since %0 carries no extension.
+      expect(existsSync(join(cwdDir, "fakecli.args"))).toBe(false);
+      expect(existsSync(join(cwdDir, "fakecli.cmd.args"))).toBe(false);
+    } finally {
+      await rm(binDir, { recursive: true, force: true });
+      await rm(cwdDir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("n-dx init provider selection", () => {
   let tmpDir;

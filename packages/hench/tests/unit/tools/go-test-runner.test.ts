@@ -9,6 +9,7 @@ import {
   detectRunner,
   buildScopedCommand,
 } from "../../../src/tools/test-runner.js";
+import { osPath } from "../../helpers/index.js";
 
 // ---------------------------------------------------------------------------
 // isTestFile — Go patterns
@@ -87,13 +88,13 @@ describe("candidateTestPaths — Go", () => {
   // Regression: JS/TS candidate generation unchanged
   it("still generates .test/.spec variants for .ts files", () => {
     const paths = candidateTestPaths("src/agent/loop.ts");
-    expect(paths).toContain("src/agent/loop.test.ts");
-    expect(paths).toContain("src/agent/loop.spec.ts");
+    expect(paths).toContain(osPath("src/agent/loop.test.ts"));
+    expect(paths).toContain(osPath("src/agent/loop.spec.ts"));
   });
 
   it("still generates mirror paths for src/ JS/TS files", () => {
     const paths = candidateTestPaths("src/agent/loop.ts");
-    expect(paths).toContain(join("tests/agent/loop.test.ts"));
+    expect(paths).toContain(osPath("tests/agent/loop.test.ts"));
   });
 });
 

@@ -272,6 +272,7 @@ export {
   diagnoseCliInvocation,
   isCliNotFoundError,
   diagnoseCliNotFound,
+  isPosixFreezeKillEnabled,
 } from "./exec.js";
 
 export type {
@@ -283,6 +284,14 @@ export type {
   SpawnCliOptions,
   CliInvocationDiagnosis,
 } from "./exec.js";
+
+// Process-tree termination — a kill that reaches descendants, not just the child.
+export {
+  terminateProcessTree,
+  treeKillSpawnOptions,
+  treeKillCommand,
+} from "./process-tree.js";
+export type { TerminateTreeOptions } from "./process-tree.js";
 
 // Project directory constants
 export { PROJECT_DIRS } from "./project-dirs.js";

@@ -960,8 +960,10 @@ const CHILD_PROCESS_ALLOWED = new Set([
   // Web server routes
   "packages/web/src/server/routes-hench.ts",
   "packages/web/src/server/routes-sourcevision.ts",
-  // Claude Code integration
-  "claude-integration.js",
+  // NOTE: claude-integration.js was listed here for its `claude mcp add`
+  // execSync calls. It now routes through win-spawn.js and imports no
+  // child_process API directly, so the permission was removed rather than
+  // left permitted-but-unused.
 ]);
 
 /**

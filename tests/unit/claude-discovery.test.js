@@ -1,7 +1,7 @@
 /**
  * Unit tests for discoverClaudeCli().
  *
- * Stubs existsSync, readFileSync, readdirSync, and execSync so no real
+ * Stubs existsSync, readFileSync, readdirSync, and the win-spawn CLI runner so no real
  * files or processes are accessed. Each describe block exercises one step
  * of the ordered discovery chain.
  */
@@ -26,26 +26,29 @@ vi.mock("fs", async (importOriginal) => {
     writeFileSync: vi.fn(),
   };
 });
-vi.mock("child_process", async (importOriginal) => {
+// claude-integration.js invokes the claude CLI through win-spawn.js
+// (execFileSyncCli), not child_process.execSync — mocking child_process here
+// would no longer intercept anything. Mock the boundary it actually imports.
+vi.mock("../../packages/core/win-spawn.js", async (importOriginal) => {
   const original = await importOriginal();
-  return { ...original, execSync: vi.fn() };
+  return { ...original, execFileSyncCli: vi.fn() };
 });
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
-import { execSync } from "child_process";
+import { execFileSyncCli } from "../../packages/core/win-spawn.js";
 import { discoverClaudeCli } from "../../packages/core/claude-integration.js";
 
 const HOME = homedir();
 
 function setupPathOk() {
-  execSync.mockImplementation(() => {}); // all exec succeeds by default
+  execFileSyncCli.mockImplementation(() => {}); // all exec succeeds by default
 }
 
 function setupPathFail() {
   // PATH lookup fails, subsequent exec calls succeed
   let callCount = 0;
-  execSync.mockImplementation((cmd) => {
-    if (cmd === "claude --version" && callCount === 0) {
+  execFileSyncCli.mockImplementation((binary) => {
+    if (binary === "claude" && callCount === 0) {
       callCount++;
       throw new Error("not found");
     }
@@ -59,7 +62,7 @@ describe("discoverClaudeCli — step 1: CLAUDE_CLI_PATH env var", () => {
   it("returns the env-var path when file exists and runs", () => {
     process.env.CLAUDE_CLI_PATH = "/custom/claude";
     existsSync.mockImplementation((p) => p === "/custom/claude");
-    execSync.mockImplementation(() => {});
+    execFileSyncCli.mockImplementation(() => {});
     expect(discoverClaudeCli()).toEqual({ found: true, path: "/custom/claude" });
   });
 
@@ -75,7 +78,7 @@ describe("discoverClaudeCli — step 1: CLAUDE_CLI_PATH env var", () => {
   it("returns not-found when env-var file exists but is not executable", () => {
     process.env.CLAUDE_CLI_PATH = "/custom/claude";
     existsSync.mockImplementation((p) => p === "/custom/claude");
-    execSync.mockImplementation(() => { throw new Error("permission denied"); });
+    execFileSyncCli.mockImplementation(() => { throw new Error("permission denied"); });
     expect(discoverClaudeCli()).toEqual({ found: false, searched: ["/custom/claude (CLAUDE_CLI_PATH)"] });
   });
 });
@@ -84,7 +87,7 @@ describe("discoverClaudeCli — step 2: cli.claudePath from .n-dx.json", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.CLAUDE_CLI_PATH;
-    execSync.mockImplementation(() => {});
+    execFileSyncCli.mockImplementation(() => {});
   });
 
   it("returns configured path when file exists and runs", () => {
@@ -116,8 +119,8 @@ describe("discoverClaudeCli — step 2: cli.claudePath from .n-dx.json", () => {
       throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
     });
     existsSync.mockImplementation((p) => p === join(dir, ".n-dx.json"));
-    // execSync for PATH check succeeds
-    execSync.mockImplementation(() => {});
+    // PATH check succeeds
+    execFileSyncCli.mockImplementation(() => {});
     expect(discoverClaudeCli(dir)).toEqual({ found: true, path: "claude" });
   });
 });
@@ -131,15 +134,15 @@ describe("discoverClaudeCli — step 3: system PATH", () => {
   });
 
   it("returns 'claude' when found on PATH", () => {
-    execSync.mockImplementation(() => {});
+    execFileSyncCli.mockImplementation(() => {});
     expect(discoverClaudeCli()).toEqual({ found: true, path: "claude" });
-    expect(execSync).toHaveBeenCalledWith("claude --version", expect.objectContaining({ timeout: 5000 }));
+    expect(execFileSyncCli).toHaveBeenCalledWith("claude", ["--version"], expect.objectContaining({ timeout: 5000 }));
   });
 
   it("falls through to well-known locations when PATH check fails", () => {
     let first = true;
-    execSync.mockImplementation((cmd) => {
-      if (cmd === "claude --version" && first) { first = false; throw new Error("not found"); }
+    execFileSyncCli.mockImplementation((binary) => {
+      if (binary === "claude" && first) { first = false; throw new Error("not found"); }
     });
     const claudeLocal = process.platform === "win32"
       ? join(process.env.APPDATA ?? join(HOME, "AppData", "Roaming"), "npm", "claude.cmd")
@@ -158,8 +161,8 @@ describe("discoverClaudeCli — step 4: well-known install locations", () => {
     readFileSync.mockImplementation(() => { throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); });
     existsSync.mockReturnValue(false);
     // PATH always fails
-    execSync.mockImplementation((cmd) => {
-      if (cmd === "claude --version") throw new Error("not found");
+    execFileSyncCli.mockImplementation((binary) => {
+      if (binary === "claude") throw new Error("not found");
     });
   });
 
@@ -167,9 +170,9 @@ describe("discoverClaudeCli — step 4: well-known install locations", () => {
     if (process.platform === "win32") return;
     const target = join(HOME, ".claude", "local", "claude");
     existsSync.mockImplementation((p) => p === target);
-    execSync.mockImplementation((cmd) => {
-      if (cmd === "claude --version") throw new Error("not found");
-      // all quoted-path exec calls succeed
+    execFileSyncCli.mockImplementation((binary) => {
+      if (binary === "claude") throw new Error("not found");
+      // all absolute-path probes succeed
     });
     const r = discoverClaudeCli();
     expect(r.found).toBe(true);
@@ -182,9 +185,9 @@ describe("discoverClaudeCli — step 4: well-known install locations", () => {
     const target = join(nvmDir, "v20.0.0", "bin", "claude");
     existsSync.mockImplementation((p) => p === nvmDir || p === target);
     readdirSync.mockImplementation((p) => (p === nvmDir ? ["v20.0.0", "v18.0.0"] : []));
-    execSync.mockImplementation((cmd) => {
-      if (cmd === "claude --version") throw new Error("not found");
-      // all quoted-path exec calls succeed
+    execFileSyncCli.mockImplementation((binary) => {
+      if (binary === "claude") throw new Error("not found");
+      // all absolute-path probes succeed
     });
     const r = discoverClaudeCli();
     expect(r.found).toBe(true);
@@ -192,7 +195,7 @@ describe("discoverClaudeCli — step 4: well-known install locations", () => {
   });
 
   it("returns not-found with full searched list when nothing works", () => {
-    execSync.mockImplementation(() => { throw new Error("not found"); });
+    execFileSyncCli.mockImplementation(() => { throw new Error("not found"); });
     existsSync.mockReturnValue(false);
     const r = discoverClaudeCli();
     expect(r.found).toBe(false);
@@ -205,8 +208,8 @@ describe("discoverClaudeCli — step 4: well-known install locations", () => {
     const appData = process.env.APPDATA ?? join(HOME, "AppData", "Roaming");
     const target = join(appData, "npm", "claude.cmd");
     existsSync.mockImplementation((p) => p === target);
-    execSync.mockImplementation((cmd) => {
-      if (cmd === "claude --version") throw new Error("not found");
+    execFileSyncCli.mockImplementation((binary) => {
+      if (binary === "claude") throw new Error("not found");
     });
     const r = discoverClaudeCli();
     expect(r.found).toBe(true);
@@ -229,7 +232,7 @@ describe("discoverClaudeCli — persistence to .hench/config.json", () => {
       if (p === join(dir, ".hench", "config.json")) return JSON.stringify(henchConfig);
       throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
     });
-    execSync.mockImplementation(() => {}); // PATH check succeeds
+    execFileSyncCli.mockImplementation(() => {}); // PATH check succeeds
 
     discoverClaudeCli(dir);
 
@@ -243,7 +246,7 @@ describe("discoverClaudeCli — persistence to .hench/config.json", () => {
   it("does not write .hench/config.json when env var is used (user-configured)", () => {
     process.env.CLAUDE_CLI_PATH = "/env/claude";
     existsSync.mockImplementation((p) => p === "/env/claude");
-    execSync.mockImplementation(() => {});
+    execFileSyncCli.mockImplementation(() => {});
     discoverClaudeCli("/tmp/some-dir");
     expect(writeFileSync).not.toHaveBeenCalled();
   });

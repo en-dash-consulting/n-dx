@@ -19,7 +19,13 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmdirSync, unlinkSync, readdirSync } from "fs";
 import { createRequire } from "module";
 import { join, resolve } from "path";
-import { execSync } from "child_process";
+// execFileSyncCli, not execSync: every argument here is a filesystem path
+// (the claude binary, the resolved MCP entrypoint, the project dir). Building a
+// cmd.exe command line by hand around those broke on `&`, `^`, `(`, `)`, `!` and
+// on a trailing backslash — and worst of all could exit 0 having registered a
+// truncated command. win-spawn.js applies quoteWindowsToken/ArgvQuote rules and
+// logs each invocation itself.
+import { execFileSyncCli } from "./win-spawn.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import {
@@ -158,7 +164,7 @@ function writeClaudeMd(dir) {
 // ── MCP registration ──────────────────────────────────────────────────────────
 
 /**
- * Extract a concise, human-readable error message from an execSync failure.
+ * Extract a concise, human-readable error message from a failed CLI invocation.
  *
  * Prefers stderr (the most informative source for CLI failures), then falls
  * back to the first line of the exception message.
@@ -198,14 +204,18 @@ function registerMcpServers(dir) {
     // `claude mcp add` fails if the server already exists in any scope.
     for (const scope of ["local", "project", "user"]) {
       try {
-        execSync(`"${claudeCmd}" mcp remove --scope ${scope} ${name}`, { stdio: "ignore", timeout: 5_000 });
+        execFileSyncCli(claudeCmd, ["mcp", "remove", "--scope", scope, name], {
+          stdio: "ignore",
+          timeout: 5_000,
+        });
       } catch {
         // Server may not exist in this scope — continue cleanup.
       }
     }
     try {
-      execSync(
-        `"${claudeCmd}" mcp add ${name} -- node "${bin}" ${descriptor.mcpCommand} "${absDir}"`,
+      execFileSyncCli(
+        claudeCmd,
+        ["mcp", "add", name, "--", "node", bin, descriptor.mcpCommand, absDir],
         { stdio: "pipe", timeout: 10_000 },
       );
       results.push({ name, transport: "stdio", ok: true });
@@ -312,7 +322,7 @@ export function discoverClaudeCli(dir = null) {
     searched.push(`${envPath} (CLAUDE_CLI_PATH)`);
     if (existsSync(envPath)) {
       try {
-        execSync(`"${envPath}" --version`, { stdio: "ignore", timeout: 5_000 });
+        execFileSyncCli(envPath, ["--version"], { stdio: "ignore", timeout: 5_000 });
         return { found: true, path: envPath };
       } catch { /* not executable */ }
     }
@@ -325,7 +335,7 @@ export function discoverClaudeCli(dir = null) {
     searched.push(`${configPath} (cli.claudePath)`);
     if (existsSync(configPath)) {
       try {
-        execSync(`"${configPath}" --version`, { stdio: "ignore", timeout: 5_000 });
+        execFileSyncCli(configPath, ["--version"], { stdio: "ignore", timeout: 5_000 });
         return { found: true, path: configPath };
       } catch { /* not executable */ }
     }
@@ -335,7 +345,7 @@ export function discoverClaudeCli(dir = null) {
   // 3. System PATH
   searched.push("claude (PATH)");
   try {
-    execSync("claude --version", { stdio: "ignore", timeout: 5_000 });
+    execFileSyncCli("claude", ["--version"], { stdio: "ignore", timeout: 5_000 });
     persistDiscoveredClaudePath(dir, "claude");
     return { found: true, path: "claude" };
   } catch { /* not in PATH */ }
@@ -345,7 +355,7 @@ export function discoverClaudeCli(dir = null) {
     searched.push(p);
     if (existsSync(p)) {
       try {
-        execSync(`"${p}" --version`, { stdio: "ignore", timeout: 5_000 });
+        execFileSyncCli(p, ["--version"], { stdio: "ignore", timeout: 5_000 });
         persistDiscoveredClaudePath(dir, p);
         return { found: true, path: p };
       } catch { /* not executable */ }

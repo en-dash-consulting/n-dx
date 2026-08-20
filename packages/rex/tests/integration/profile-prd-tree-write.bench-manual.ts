@@ -343,6 +343,29 @@ function getBottleneckNotes(operation: string): string {
 // Tests
 // ──────────────────────────────────────────────────────────────────────────────
 
+/**
+ * BENCHMARK — deliberately NOT part of the pass/fail suite.
+ *
+ * Renamed from `.test.ts` to `.bench-manual.ts` so rex's vitest `include`
+ * (`tests/**\/*.test.ts`) no longer picks it up. Run it on demand with:
+ *
+ *     pnpm --filter @n-dx/rex bench
+ *
+ * WHY IT WAS REMOVED FROM THE GATE. Every assertion in this file is
+ * `expect(timing.totalMs).toBeGreaterThan(0)` — it cannot fail for any reason
+ * related to performance, so it was never a regression gate. Its actual purpose
+ * is the console output: parse/serialize/addItem timings across 20-, 200- and
+ * 1000-item fixtures. Meanwhile its beforeAll builds all three fixtures, which
+ * under full-suite load exceeded the 10s hook timeout and produced a red suite
+ * that told nobody anything.
+ *
+ * The real regression gates for this code live in:
+ *   - tests/unit/store/write-path-profile.test.ts   (catastrophic-budget check)
+ *   - tests/unit/store/folder-tree-parser.test.ts   (parse complexity ratio)
+ *
+ * `--fileParallelism=false` in the bench script keeps the timings meaningful by
+ * not competing with other files for CPU.
+ */
 describe("Profile: PRD folder-tree write path", () => {
   const fixtures: ProfileFixture[] = [
     { name: "small", itemCount: 20, items: [] },

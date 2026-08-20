@@ -14,6 +14,7 @@ import { mkdtemp, rm, writeFile, mkdir, readFile, unlink } from "node:fs/promise
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
+import { initGitFixtureRepoSync } from "../helpers/index.js";
 import {
   captureCommitChanges,
   captureMultiCommitChanges,
@@ -26,16 +27,7 @@ describe("Changed files capture integration", () => {
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-integration-"));
-    // Initialize git repo
-    execSync("git init", { cwd: projectDir, stdio: "ignore" });
-    execSync('git config user.email "test@example.com"', {
-      cwd: projectDir,
-      stdio: "ignore",
-    });
-    execSync('git config user.name "Test User"', {
-      cwd: projectDir,
-      stdio: "ignore",
-    });
+    initGitFixtureRepoSync(projectDir);
   });
 
   afterEach(async () => {

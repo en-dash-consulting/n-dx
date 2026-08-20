@@ -31,6 +31,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "bench": "vitest run --config vitest.bench.config.ts",
     "validate": "tsc --noEmit && vitest run",
     "prepare": "pnpm run build"
   },

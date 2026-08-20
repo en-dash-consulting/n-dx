@@ -16,15 +16,61 @@
  * in a separate location — this keeps the aggregation state co-located with
  * the data it describes and simplifies cleanup.
  *
+ * ## Why mtime + size alone is not sufficient
+ *
+ * On Windows, file timestamps advance in ticks rather than continuously, so a
+ * rewrite of the same LENGTH inside one tick leaves both mtime and size unchanged
+ * and is therefore invisible. A run record rewritten in place with an equal-length
+ * edit — a taskId or status swap — would keep its stale contribution until some
+ * later change to that file forced a re-read.
+ *
+ * So mtime is trusted only once it is older than {@link MTIME_GRANULARITY_MS}. In
+ * the window where it cannot be trusted, the snapshot also carries a hash of the
+ * file's bytes and detection compares that. The hash is dropped as soon as the
+ * mtime ages out, so the steady state remains stat-only.
+ *
+ * ## TWIN of web's IncrementalTaskUsageAggregator — deliberately NOT shared
+ *
+ * `packages/web/src/server/task-usage/incremental-task-usage.ts` implements the
+ * same rule, and a shared helper was considered and rejected:
+ *
+ * - THERE IS NO APPROPRIATE HOME. hench is execution tier and web imports the
+ *   domain packages, so the only module both can import is @n-dx/llm-client — the
+ *   vendor-neutral LLM foundation, which has no business owning a filesystem
+ *   change detector. The alternative is a new package for ~40 lines, the same cost
+ *   rejected for the quoting twin (see tests/unit/windows-quoting-parity.test.js).
+ * - MORE IMPORTANTLY, THESE TWO NEVER NEED TO AGREE WITH EACH OTHER. Unlike the
+ *   quoting twin — where both copies must produce byte-identical command lines for
+ *   the same input, hence a parity test — these detectors never interact and
+ *   compare nothing across the boundary. The risk is not divergence but regression
+ *   on one side, which a parity test cannot catch and a per-side test can. Each
+ *   side therefore carries its own utimes-pinned test for this hazard.
+ *
+ * If a THIRD copy of this rule ever appears, revisit: at that point the shared
+ * module earns its cost.
+ *
  * @module hench/store/run-change-detector
  */
 
 import { join } from "node:path";
 import { readFile, writeFile, readdir, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/**
+ * How far apart two writes must be before the filesystem is guaranteed to give
+ * them different mtimes.
+ *
+ * Windows advances file timestamps in ticks rather than continuously: measured on
+ * NTFS, 163 of 200 back-to-back same-size rewrites produced a byte-identical
+ * mtimeMs, and gaps between consecutive distinct mtimes ran up to 10ms. 16ms is
+ * the documented system-timer tick and covers the measured worst case with margin.
+ * ext4 records nanoseconds, so on Linux this bound is simply never reached.
+ */
+const MTIME_GRANULARITY_MS = 16;
 
 /** Filesystem snapshot of a single file. */
 export interface FileSnapshot {
@@ -32,6 +78,26 @@ export interface FileSnapshot {
   mtimeMs: number;
   /** File size in bytes. */
   size: number;
+  /**
+   * True when this snapshot was taken so soon after the file's own mtime that a
+   * later write could reuse that same mtime, making an unchanged (mtime, size)
+   * pair prove nothing. See {@link MTIME_GRANULARITY_MS}.
+   *
+   * Optional because checkpoints are persisted: one written before this existed
+   * carries neither this nor `contentHash`, and its mtime is old by definition, so
+   * absence correctly means "trustworthy".
+   */
+  mtimeMayBeShared?: boolean;
+  /**
+   * Digest of the file's bytes, carried only while `mtimeMayBeShared` holds — the
+   * one window where mtime cannot settle the question. It is what makes an
+   * equal-length, equal-mtime rewrite visible.
+   *
+   * Dropped once the mtime is old enough to trust, so the steady state stays
+   * stat-only: a file is hashed for the scan or two after its last write and never
+   * again.
+   */
+  contentHash?: string | null;
 }
 
 /**
@@ -131,8 +197,9 @@ export class RunChangeDetector {
     const previous = await this.loadCheckpoint();
     const previousFiles = previous?.files ?? {};
 
-    // Scan current filesystem state
-    const currentFiles = await this.scanRunFiles();
+    // Scan current filesystem state. The previous snapshots are passed in so the
+    // scan knows which files still need a content hash — see scanRunFiles.
+    const { files: currentFiles, hashes: currentHashes } = await this.scanRunFiles(previousFiles);
 
     const changes: RunFileChange[] = [];
 
@@ -142,6 +209,15 @@ export class RunChangeDetector {
       if (!prev) {
         changes.push({ file, type: "added" });
       } else if (prev.mtimeMs !== snapshot.mtimeMs || prev.size !== snapshot.size) {
+        changes.push({ file, type: "modified" });
+      } else if (
+        typeof prev.contentHash === "string" &&
+        prev.contentHash !== currentHashes[file]
+      ) {
+        // Same mtime and size, different bytes: the rewrite landed inside one
+        // timestamp tick at the same length. Only reachable while the previous
+        // snapshot was inside the granularity window, which is the only time a hash
+        // is carried.
         changes.push({ file, type: "modified" });
       }
     }
@@ -195,15 +271,21 @@ export class RunChangeDetector {
   /**
    * Read the runs directory and build a snapshot map of all run files
    * (`.json` and `.json.gz`), excluding the checkpoint file itself.
+   *
+   * `previousFiles` decides which files still need hashing: one inside the
+   * granularity window, and one whose previous snapshot carried a hash (so this
+   * pass has something to compare against). Everything else is stat-only.
    */
-  private async scanRunFiles(): Promise<Record<string, FileSnapshot>> {
+  private async scanRunFiles(
+    previousFiles: Record<string, FileSnapshot> = {},
+  ): Promise<{ files: Record<string, FileSnapshot>; hashes: Record<string, string | null> }> {
     const snapshots: Record<string, FileSnapshot> = {};
 
     let files: string[];
     try {
       files = await readdir(this.runsDir);
     } catch {
-      return snapshots;
+      return { files: snapshots, hashes: {} };
     }
 
     const runFiles = files.filter(
@@ -213,12 +295,27 @@ export class RunChangeDetector {
         !f.startsWith("."),
     );
 
+    // Taken before the stats so a file written during the scan counts as fresh
+    // rather than trusted.
+    const scanStartedMs = Date.now();
+
     // Stat files in parallel for performance
     const entries = await Promise.all(
       runFiles.map(async (file) => {
         try {
           const st = await stat(join(this.runsDir, file));
-          return { file, snapshot: { mtimeMs: st.mtimeMs, size: st.size } };
+          const mtimeMayBeShared = st.mtimeMs >= scanStartedMs - MTIME_GRANULARITY_MS;
+          const needsHash =
+            mtimeMayBeShared || typeof previousFiles[file]?.contentHash === "string";
+          const hash = needsHash ? await this.hashFile(file) : null;
+          const snapshot: FileSnapshot = { mtimeMs: st.mtimeMs, size: st.size };
+          // Only carry the hash forward while the mtime is still untrustworthy;
+          // otherwise the next scan would keep hashing this file forever.
+          if (mtimeMayBeShared) {
+            snapshot.mtimeMayBeShared = true;
+            snapshot.contentHash = hash;
+          }
+          return { file, snapshot, hash };
         } catch {
           // File disappeared between readdir and stat — skip
           return null;
@@ -226,12 +323,28 @@ export class RunChangeDetector {
       }),
     );
 
+    const hashes: Record<string, string | null> = {};
     for (const entry of entries) {
       if (entry) {
         snapshots[entry.file] = entry.snapshot;
+        hashes[entry.file] = entry.hash;
       }
     }
 
-    return snapshots;
+    return { files: snapshots, hashes };
+  }
+
+  /**
+   * Digest a run file's raw bytes. Gzipped files are hashed compressed — the
+   * question is only "did these bytes change" — and a read failure yields null,
+   * which the caller treats as "no usable hash" rather than as a change.
+   */
+  private async hashFile(file: string): Promise<string | null> {
+    try {
+      const raw = await readFile(join(this.runsDir, file));
+      return createHash("sha1").update(raw).digest("hex");
+    } catch {
+      return null;
+    }
   }
 }

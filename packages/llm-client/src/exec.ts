@@ -31,6 +31,8 @@ import { execFile, execFileSync, spawn } from "node:child_process";
 import type { ChildProcess, StdioOptions } from "node:child_process";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
+import { logCliInvocation } from "./cli-log.js";
+import { terminateProcessTree, treeKillSpawnOptions } from "./process-tree.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,6 +57,47 @@ export interface ExecOptions {
   maxBuffer?: number;
   /** Environment variables for the child process. Defaults to inheriting parent env. */
   env?: NodeJS.ProcessEnv;
+  /**
+   * On timeout, terminate the command's whole process tree rather than only the
+   * process that was spawned. Defaults to true.
+   *
+   * Opt out only when the child must stay in this process's own process group —
+   * e.g. it needs to receive the terminal's Ctrl-C alongside the parent. Opting
+   * out means a timeout may leave descendants running.
+   */
+  treeKill?: boolean;
+  /**
+   * BETA, default OFF. On timeout, freeze the process tree with SIGSTOP and prove
+   * it is stopped before killing it, instead of signalling and sweeping. POSIX
+   * only; no effect on Windows, which has no pure-JS pause.
+   *
+   * Defaults to {@link isPosixFreezeKillEnabled}, i.e. the NDX_POSIX_FREEZE_KILL
+   * environment flag, so it stays off unless explicitly enabled. It is gated
+   * because the sweep it replaces has been exercised far more: the freeze path's
+   * unit coverage injects its seams, and its real-process behaviour on POSIX is
+   * not yet proven in CI. Pass explicitly to override the flag either way.
+   */
+  freeze?: boolean;
+  /**
+   * @internal Override platform detection — for unit tests only.
+   * Production callers must never pass this.
+   */
+  _platform?: NodeJS.Platform;
+}
+
+/**
+ * Whether the BETA freeze-verify-kill timeout path is enabled.
+ *
+ * Off unless `NDX_POSIX_FREEZE_KILL` is 1/true/yes. Follows the opt-in shape
+ * already used by NDX_DEBUG and core's isLifecycleDebugEnabled, so an operator can
+ * enable it for a single run without touching config; `ndx work` also sets it from
+ * the `experimental.posixFreezeTreeKill` project setting.
+ *
+ * Exported so the flag has exactly one definition and can be asserted directly.
+ */
+export function isPosixFreezeKillEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const value = env.NDX_POSIX_FREEZE_KILL;
+  return value === "1" || value === "true" || value === "yes";
 }
 
 // ---------------------------------------------------------------------------
@@ -72,45 +115,216 @@ const DEFAULT_MAX_BUFFER = 1024 * 1024; // 1 MiB
  *
  * This is the primary abstraction — all other helpers build on it.
  * Resolves (never rejects) so callers can inspect exitCode/error directly.
+ *
+ * ## Timeout semantics
+ *
+ * A reported timeout means the command has actually stopped, descendants
+ * included. That requires owning both halves: the timer (execFile's own `timeout`
+ * signals the spawned process only, so anything it started kept running while the
+ * caller had already been told the command was done) and the spawn (execFile
+ * cannot make the child a process-group leader, because it drops the `detached`
+ * option). Hence spawn plus manual buffering here. See {@link terminateProcessTree};
+ * opt out with `treeKill: false`.
+ *
+ * `exitCode: null` remains the timeout signal.
  */
 export function exec(
   cmd: string,
   args: string[],
   opts: ExecOptions,
 ): Promise<ExecResult> {
-  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env } = opts;
+  const {
+    cwd,
+    timeout,
+    maxBuffer = DEFAULT_MAX_BUFFER,
+    env,
+    treeKill = true,
+    freeze = isPosixFreezeKillEnabled(env ?? process.env),
+    _platform = process.platform as NodeJS.Platform,
+  } = opts;
+
+  const display = [cmd, ...args].join(" ");
 
   return new Promise((resolve) => {
-    const child = execFile(cmd, args, { cwd, timeout, maxBuffer, env }, (
-      error,
-      stdout,
-      stderr,
-    ) => {
-      const isTimeout = error
-        ? (error as NodeJS.ErrnoException & { code?: number | string }).code === "ETIMEDOUT" ||
-          (error as { killed?: boolean }).killed === true
-        : false;
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+    let overflowed: "stdout" | "stderr" | null = null;
+    let timedOut = false;
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-      resolve({
-        stdout: (stdout ?? "").toString(),
-        stderr: (stderr ?? "").toString(),
-        exitCode:
-          error
-            ? (isTimeout
-              ? null
-              : typeof (error as { code?: number }).code === "number"
-                ? ((error as { code?: number }).code ?? 1)
-                : 1)
-            : 0,
-        error: error as Error | null,
+    const finish = (result: ExecResult): void => {
+      if (timer) clearTimeout(timer);
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    const text = (chunks: Buffer[]): string => Buffer.concat(chunks).toString("utf-8");
+
+    let child: ChildProcess;
+    try {
+      child = spawn(cmd, args, {
+        cwd,
+        env,
+        stdio: ["pipe", "pipe", "pipe"],
+        // This is the reason exec spawns rather than execFile'ing. execFile builds
+        // its own options object for spawn and silently drops anything outside its
+        // curated set, `detached` included — so on POSIX the child was never a
+        // process-group leader, kill(-pid) failed with ESRCH, and only the direct
+        // child died while its descendants kept running. Here the option actually
+        // arrives.
+        ...(treeKill ? treeKillSpawnOptions(_platform) : {}),
+      });
+    } catch (error) {
+      // spawn throws synchronously for invalid arguments (bad cwd type, etc.).
+      finish({ stdout: "", stderr: "", exitCode: 1, error: error as Error });
+      return;
+    }
+
+    /**
+     * Stop the command, taking its descendants with it when treeKill is on.
+     *
+     * `freeze` is the BETA path and defaults OFF: when enabled, POSIX SIGSTOPs the
+     * tree and proves it stopped before killing, so a descendant cannot fork its way
+     * out from under the kill. That deliberately forfeits a graceful phase — a
+     * stopped process cannot act on SIGTERM — which is the right trade once a
+     * command has overrun its deadline, but it is newer than the sweep it replaces,
+     * so it is opt-in until CI has exercised it against real POSIX processes.
+     */
+    const stopChild = async (): Promise<void> => {
+      if (treeKill) await terminateProcessTree(child, { platform: _platform, freeze });
+      else child.kill("SIGKILL");
+    };
+
+    // maxBuffer is a ceiling, not a suggestion: past it, stop the command rather
+    // than accumulate without bound. Counted in bytes, and chunks are concatenated
+    // as Buffers rather than decoded per chunk so a multi-byte character split
+    // across two reads cannot be mangled.
+    const collect = (chunks: Buffer[], stream: "stdout" | "stderr") => (chunk: Buffer): void => {
+      const total = stream === "stdout" ? (stdoutBytes += chunk.length) : (stderrBytes += chunk.length);
+      if (total > maxBuffer) {
+        if (!overflowed) {
+          overflowed = stream;
+          void stopChild();
+        }
+        return;
+      }
+      chunks.push(chunk);
+    };
+
+    child.stdout?.on("data", collect(stdoutChunks, "stdout"));
+    child.stderr?.on("data", collect(stderrChunks, "stderr"));
+
+    child.once("error", (error: Error) => {
+      // Spawn failure (ENOENT and friends). execFile surfaced these as a non-null
+      // error with a non-numeric code, which mapped to exitCode 1.
+      finish({ stdout: text(stdoutChunks), stderr: text(stderrChunks), exitCode: 1, error });
+    });
+
+    child.once("close", (code: number | null, signal: NodeJS.Signals | null) => {
+      const stdout = text(stdoutChunks);
+      const stderr = text(stderrChunks);
+
+      if (overflowed) {
+        finish({
+          stdout,
+          stderr,
+          exitCode: null,
+          error: Object.assign(new Error(`${overflowed} maxBuffer length exceeded`), {
+            code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+            killed: true,
+          }),
+        });
+        return;
+      }
+
+      // `exitCode: null` means "killed", per ExecResult. Our own timer is one way
+      // that happens; a signal from outside this process is another, and it
+      // reports the same way it always did.
+      //
+      // When OUR timer fired, resolution belongs to the timeout path, which settles
+      // only after stopChild() has finished. Resolving here instead would settle as
+      // soon as the direct child's pipes closed — and with `shell: true` that is the
+      // moment the SHELL dies, while a grandchild may still be alive holding the cwd
+      // and any port it bound. The caller then proceeds against a live tree: on
+      // Windows that surfaced as `EBUSY: rmdir` when a test tore its workspace down
+      // (hench tests/unit/tools/shell.test.ts), and silently as a leaked process
+      // everywhere else. An externally delivered signal is not ours to wait on, so
+      // it still reports immediately.
+      if (timedOut) return;
+      if (signal !== null) {
+        finish({ stdout, stderr, exitCode: null, error: killedError(display, timeout, false, signal) });
+        return;
+      }
+
+      const exitCode = code ?? 1;
+      finish({
+        stdout,
+        stderr,
+        exitCode,
+        error:
+          exitCode === 0
+            ? null
+            : Object.assign(new Error(`Command failed: ${display}\n${stderr}`), { code: exitCode }),
       });
     });
-    // Close the child's stdin immediately. `execFile` pipes stdio by default
-    // but the parent never writes anything — leaving stdin open makes any
+
+    if (timeout > 0) {
+      timer = setTimeout(() => {
+        timedOut = true;
+        // This is the ONLY path that resolves a timeout — the "close" handler now
+        // defers to it (see there for why). So it must always settle, including when
+        // the kill itself fails: a rejected stopChild used to leave nothing to
+        // resolve the promise, which only went unnoticed because "close" was
+        // finishing first. Report the timeout regardless of how the kill went; a
+        // tree that outlived its kill is surfaced by child-lifecycle's diagnostics,
+        // not by hanging the caller.
+        void stopChild()
+          .catch(() => { /* best effort — see above */ })
+          .then(() => {
+            finish({
+              stdout: text(stdoutChunks),
+              stderr: text(stderrChunks),
+              exitCode: null,
+              error: killedError(display, timeout, true, null),
+            });
+          });
+      }, timeout);
+    }
+
+    // Close the child's stdin immediately. stdio is piped so callers get buffered
+    // output, but the parent never writes anything — leaving stdin open makes any
     // child that reads from stdin (e.g. `rex add` calling readStdin() in a
     // non-TTY) hang forever waiting for an EOF that will never arrive.
     child.stdin?.end();
   });
+}
+
+/**
+ * The error that accompanies `exitCode: null`.
+ *
+ * execFile always populated `error` when a process was killed — ETIMEDOUT for its
+ * own timeout, a `killed: true` error for an outside signal — and callers may
+ * branch on it, so the shape is preserved rather than left null.
+ */
+function killedError(
+  display: string,
+  timeout: number,
+  timedOut: boolean,
+  signal: NodeJS.Signals | null,
+): Error {
+  return timedOut
+    ? Object.assign(new Error(`Command timed out after ${timeout}ms: ${display}`), {
+        code: "ETIMEDOUT",
+        killed: true,
+      })
+    : Object.assign(new Error(`Command was killed with ${signal}: ${display}`), {
+        killed: true,
+        signal,
+      });
 }
 
 /**
@@ -845,11 +1059,16 @@ export interface SpawnCliOptions {
 /**
  * Quote a single token for use in a Windows cmd.exe verbatim command line.
  *
- * TWIN: this logic is intentionally duplicated in `packages/core/config.js`
- * (`quoteWindowsToken` / `buildWindowsCliCommandLine`) because the
- * orchestration tier must not import @n-dx/llm-client (spawn-only rule).
+ * TWIN: this logic is intentionally duplicated in `packages/core/win-spawn.js`
+ * (`quoteWindowsToken` / `buildWindowsCliCommandLine`) because the orchestration
+ * tier must not import @n-dx/llm-client (spawn-only rule). `config.js` re-exports
+ * from win-spawn.js, so win-spawn.js — not config.js — is the file to edit.
  * Any change here MUST be mirrored there — the cross-package parity test
  * `tests/unit/windows-quoting-parity.test.js` fails if the two diverge.
+ *
+ * Keeping the twin was a deliberate, recorded decision rather than an oversight;
+ * the reasoning (and what would justify revisiting it) lives in that test's
+ * docblock.
  *
  * Rules:
  * - EVERY token is quoted unconditionally. Always-quoting is safe under
@@ -916,6 +1135,8 @@ const WINDOWS_BARE_BINARY_RE = /^[A-Za-z0-9_.+-]+$/;
 /**
  * Build a Windows cmd.exe verbatim command line from a binary path and args.
  *
+ * TWIN: mirrored in `packages/core/win-spawn.js`; see quoteWindowsToken above.
+ *
  * Pure function — safe to call on any platform; its tests run on every CI.
  * Every ARGUMENT is quoted unconditionally by {@link quoteWindowsToken}.
  *
@@ -975,6 +1196,7 @@ export function spawnCli(
 
   if (_platform === "win32") {
     const cmdLine = buildWindowsCliCommandLine(cliBinary, args);
+    logCliInvocation({ binary: cliBinary, args, cwd, via: "spawnCli", platform: _platform, commandLine: cmdLine });
     // Wrap the whole command line in an extra pair of quotes: `cmd.exe /s`
     // strips only the outermost quote pair, leaving the inner per-token quotes
     // (e.g. around a path containing spaces) intact. Without this wrapper, /s
@@ -985,5 +1207,6 @@ export function spawnCli(
     });
   }
 
+  logCliInvocation({ binary: cliBinary, args, cwd, via: "spawnCli", platform: _platform });
   return spawn(cliBinary, args, baseOpts);
 }
