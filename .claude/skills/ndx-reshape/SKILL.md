@@ -60,3 +60,15 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
 - `edit_item` — change level, rename, update descriptions
 - `merge_items` — consolidate overlapping items
 - `reorganize` — verify structural health after changes
+
+## Record the run and its token cost
+
+After committing, record this run so both the work and the tokens it spent are auditable alongside `ndx work` runs:
+
+```sh
+ndx hench record --task=<id> --status=completed   --title="ndx-reshape: <what was restructured>"   --summary="<one-line summary>"
+```
+
+Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. Use `--task=skill:ndx-reshape`. Restructuring spans many items, so it is recorded against a synthetic id that `get_token_usage` reports in its `orphans` bucket rather than charging a single item.
+
+Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.

@@ -37,3 +37,15 @@ After applying any configuration change, commit the modified files:
    ```
 
    Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
+
+## Record the run and its token cost
+
+After committing, record this run so both the work and the tokens it spent are auditable alongside `ndx work` runs:
+
+```sh
+ndx hench record --task=<id> --status=completed   --title="ndx-config: set <key>"   --summary="<one-line summary>"
+```
+
+Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. Use `--task=skill:ndx-config`. A config change belongs to no PRD item, so it is recorded against a synthetic id that `get_token_usage` reports in its `orphans` bucket.
+
+Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.

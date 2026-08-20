@@ -36,3 +36,15 @@ Capture a requirement, feature idea, or task from conversation context.
 - **Place under a parent** — never leave items at root level. Match to the closest existing epic/feature.
 - **Set dependencies** — if multiple items are being captured, or if existing pending items have ordering relationships, wire `blockedBy` edges.
 - **Set priority** — infer from context (urgency, blocking status, user language like "critical", "should", "nice to have").
+
+## Record the run and its token cost
+
+After committing, record this run so both the work and the tokens it spent are auditable alongside `ndx work` runs:
+
+```sh
+ndx hench record --task=<id> --status=completed   --title="ndx-capture: <captured item title>"   --summary="<one-line summary>"
+```
+
+Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. `<id>` is the id of the item you just created, so the cost of capturing it lands on that item in the PRD rollup.
+
+Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.

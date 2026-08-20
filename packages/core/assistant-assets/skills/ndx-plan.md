@@ -21,3 +21,15 @@ Analyze the codebase and propose PRD updates.
    ```
 
    Replace `<N>` with the count of items created. Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
+
+## Record the run and its token cost
+
+After committing, record this run so both the work and the tokens it spent are auditable alongside `ndx work` runs:
+
+```sh
+ndx hench record --task=<id> --status=completed   --title="ndx-plan: accepted <N> proposals"   --summary="<one-line summary>"
+```
+
+Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. Use `--task=skill:ndx-plan`. Planning produces many items, so charging one of them for work that created all of them would misattribute it; `get_token_usage` surfaces ids that match no item in its `orphans` bucket, which is the honest place for planning overhead.
+
+Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.
