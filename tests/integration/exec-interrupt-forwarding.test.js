@@ -31,16 +31,17 @@
  * @see packages/llm-client/src/interrupt-forwarding.ts
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, readdir } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
+import { describeNeedsPosixShell } from "../helpers/posix-shell.js";
 
 const isWindows = process.platform === "win32";
 
-describe("exec forwards interrupts to detached children", () => {
+describeNeedsPosixShell("exec forwards interrupts to detached children", () => {
   let dir;
   let exec;
   let InterruptForwarder;

@@ -2,7 +2,7 @@
 id: "be8e19c3-4241-441b-ab1e-1bf25837e8ff"
 level: "task"
 title: "Make the tests' sh-on-PATH dependency explicit instead of failing opaquely"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "testing"
@@ -11,6 +11,11 @@ tags:
   - "determinism"
   - "developer-experience"
 source: "conversation-2026-08-19"
+startedAt: "2026-08-20T13:30:25.763Z"
+completedAt: "2026-08-20T13:35:03.198Z"
+endedAt: "2026-08-20T13:35:03.198Z"
+resolutionType: "code-change"
+resolutionDetail: "Audited every shell-spawning test (found 28 cases in 5 files, not the 5 in 2 the task assumed — including 5 that passed vacuously) and guarded each via one helper per suite boundary, all delegating to the production isExecutableOnPath probe. Skips name the missing shell; hench's skip states which product capability went unverified, since it spawns sh -c on every platform. Orphan test no longer discards its spawn error. Verified from both PowerShell (0 failures) and Git Bash (0 skips, no coverage lost); inventory in tests/shell-spawn-inventory.md."
 acceptanceCriteria:
   - "An audit lists every test that spawns `sh` (or another shell) and states, per site, whether it is guarded — the two known files were found incidentally, so the true count is unverified"
   - "When `sh` cannot be resolved, each affected test reports that fact directly — the failure or skip message names the missing shell, rather than surfacing a bare `expected false to be true` or an unexplained tree-kill failure"

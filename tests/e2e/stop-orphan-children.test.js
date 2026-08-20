@@ -27,6 +27,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { terminateTreeByPid } from "../../packages/core/child-lifecycle.js";
+import {
+  itNeedsPosixShell,
+  describeShellStartupFailure,
+} from "../helpers/posix-shell.js";
 
 describe("stopping a detached server takes its children with it", () => {
   let dir;
@@ -62,11 +66,22 @@ describe("stopping a detached server takes its children with it", () => {
     // the first version of this test managed to be vacuous. The real server reaches
     // its CLIs through cmd.exe (spawnCli) or `sh -c`, and neither is libuv-managed,
     // so their children escape the job and survive. That is the tree worth testing.
+    // `stdio: 'ignore'` is right for the child's OUTPUT but must not extend to the
+    // spawn's own failure: with the error discarded, an unresolvable `sh` looked
+    // identical to a surviving orphan — the grandchild simply never appeared, and
+    // the wait below expired into `expected false to be true`. The error is
+    // recorded to a file because this runs in another process, and the assertion
+    // reads it back to say which of the two happened.
     await writeFile(
       join(dir, "server.js"),
       [
+        "const fs = require('fs');",
+        "const path = require('path');",
         "const { spawn } = require('child_process');",
-        "spawn('sh', ['-c', 'node child.js'], { cwd: __dirname, stdio: 'ignore' });",
+        "const child = spawn('sh', ['-c', 'node child.js'], { cwd: __dirname, stdio: 'ignore' });",
+        "child.on('error', (err) => {",
+        "  fs.writeFileSync(path.join(__dirname, 'spawn-error.txt'), String(err && err.message || err));",
+        "});",
         "setTimeout(() => {}, 60000);",
       ].join("\n"),
       "utf-8",
@@ -86,6 +101,15 @@ describe("stopping a detached server takes its children with it", () => {
     server = null;
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
+
+  /** Whatever the stand-in server recorded about its own failed spawn, if any. */
+  function readSpawnError() {
+    try {
+      return readFileSync(join(dir, "spawn-error.txt"), "utf-8").trim() || null;
+    } catch {
+      return null;
+    }
+  }
 
   function readChildPid() {
     try {
@@ -119,7 +143,7 @@ describe("stopping a detached server takes its children with it", () => {
     return false;
   }
 
-  it("kills the child, not just the recorded server pid", async () => {
+  itNeedsPosixShell("kills the child, not just the recorded server pid", async () => {
     // `detached: true` mirrors how web.js starts the background server — which is
     // precisely what makes the children unreachable by default on Windows.
     server = spawn(process.execPath, [join(dir, "server.js")], {
@@ -129,8 +153,16 @@ describe("stopping a detached server takes its children with it", () => {
     });
 
     // Wait until the child is genuinely up and working, so a pass cannot mean
-    // "nothing was ever running".
-    expect(await waitFor(async () => readChildPid() !== null && (await tickCount()) > 0)).toBe(true);
+    // "nothing was ever running". On expiry, say WHY nothing came up: a shell that
+    // failed to launch is not the orphaned grandchild this test is looking for.
+    if (!(await waitFor(async () => readChildPid() !== null && (await tickCount()) > 0))) {
+      throw new Error(
+        describeShellStartupFailure({
+          what: "The stand-in server's grandchild",
+          recordedError: readSpawnError(),
+        }),
+      );
+    }
     const childPid = readChildPid();
     expect(childPid).not.toBe(null);
     expect(isAlive(childPid)).toBe(true);
