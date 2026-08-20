@@ -37,3 +37,8 @@ The run it records is scoped to itself: Step 1 notes an ISO-8601 timestamp
 before reading anything and Step 7 passes it as `--startedAt`, so a review
 invoked partway through a long session claims only what the review spent rather
 than everything that came before it.
+
+Captured items are filed against `add_item`'s real parameters rather than
+described in prose, so acceptance criteria reach the `acceptanceCriteria` array
+where `verify_criteria` and the dashboard can read them, and severity maps
+one-to-one onto `priority` instead of being buried in the description.

@@ -120,14 +120,20 @@ If you find that the PRD already holds two or more items for the same defect, sa
 
 ## Step 7 — Create only what is new and approved
 
-For each finding that survived Step 6 as genuinely new, create one PRD item with `add_item` (rex MCP) — one item per finding, never bundled:
+For each finding that survived Step 6 as genuinely new, create one PRD item with `add_item` (rex MCP) — one item per finding, never bundled. Fill its parameters as follows; the mapping is deliberate, because content written into the wrong field is content the rest of the toolchain cannot see:
 
-- **Title** — the defect, not the activity ("`record` attributes tokens twice when two runs share a session", not "improve record").
-- **Description** — the failure scenario from Pass 1 (inputs or state → wrong result), the `file:line` evidence, and the reachability answer from Pass 2.
-- **Possible solutions** — the options from Step 5, carried over with their costs, risks, and your recommendation, so whoever picks the item up inherits the analysis instead of redoing it.
-- **Acceptance criteria** — written so they fail today and pass once fixed. Include the test that does not exist yet.
-- **Severity and verdict** — carried into the item, for the same reason.
-- **Parent** — must-fix and should-fix findings attach under the feature or epic that owns the changed code; out-of-scope findings go under the area they actually belong to, never under the current change. Confirm the parent with `get_item`, and ask if the right one is ambiguous.
+| Parameter | What goes in it |
+|-----------|-----------------|
+| `title` | The defect, not the activity — "`record` attributes tokens twice when two runs share a session", not "improve record". |
+| `level` | `task`. Use `feature` only when the finding genuinely needs several tasks under it, and then create those tasks too. This parameter is required — do not leave it to chance, or repeated reviews will file the same class of finding at different levels. |
+| `parentId` | The feature or epic that owns the changed code, for must-fix and should-fix. Out-of-scope findings go under the area they actually belong to, never under the change that revealed them. Confirm the parent with `get_item`, and ask when the right one is ambiguous. |
+| `description` | The failure scenario from Pass 1 (inputs or state → wrong result), the `file:line` evidence, the reachability answer from Pass 2, and the solution options from Step 5 with their costs, risks, and your recommendation — so whoever picks the item up inherits the analysis instead of redoing it. |
+| `priority` | The severity, directly. The enum is `critical`, `high`, `medium`, `low` — the same four words as the severity scale in Step 3, so map it one-to-one. Do not write the severity into prose and leave `priority` unset. |
+| `acceptanceCriteria` | The array, one criterion per entry, each written so it fails today and passes once fixed. Include the test that does not exist yet. Put them here and not in `description`: `verify_criteria` (rex MCP) and the dashboard's requirements view read this field, so criteria buried in prose cannot be checked by the next review — which is exactly how a claim becomes unverifiable. |
+| `tags` | `ndx-adversarial-review`, plus `severity:<level>` so findings stay filterable by how bad they are. |
+| `source` | `ndx-adversarial-review`, so the provenance of the item survives longer than this conversation. |
+
+Carry the verdict from Step 4 into the description alongside the severity. `priority` records how bad the defect is; only the description can record that you judged it worth fixing, and why.
 
 In claim mode, if the review disproved a completion claim, also call `update_task_status` (rex MCP) to move the item off `completed`, and `append_log` with what was disproved and why.
 

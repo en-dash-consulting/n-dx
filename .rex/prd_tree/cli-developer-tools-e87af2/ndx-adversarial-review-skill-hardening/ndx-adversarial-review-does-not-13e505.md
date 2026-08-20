@@ -2,12 +2,17 @@
 id: "13e50500-d6d2-48ba-8f56-56c53f553419"
 level: "task"
 title: "/ndx-adversarial-review does not map findings onto add_item's level, priority, and acceptanceCriteria fields"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "skills"
   - "severity:medium"
 source: "ndx-adversarial-review"
+startedAt: "2026-08-20T19:17:04.599Z"
+completedAt: "2026-08-20T19:18:25.094Z"
+endedAt: "2026-08-20T19:18:25.094Z"
+resolutionType: "code-change"
+resolutionDetail: "Step 7 now maps findings onto add_item's real parameters via an explicit table: level defaults to task, severity maps 1:1 onto priority, criteria go to the acceptanceCriteria array with the reason why, and source/tags carry provenance. 224 skill e2e tests green."
 acceptanceCriteria:
   - "The capture step names `add_item`'s real parameters: `title`, `level`, `parentId`, `description`, `priority`, `acceptanceCriteria`, `tags`, `source`"
   - "The severity-to-`priority` mapping is stated explicitly, noting the enums are identical"
