@@ -265,7 +265,32 @@ export class IncrementalTaskUsageAggregator {
       }
     }
 
-    // Short-circuit: no changes after initial scan
+    // Re-snapshot EVERY surviving file, not just the ones that changed. An
+    // unchanged file still needs its freshness re-evaluated: once its mtime ages
+    // past the granularity window the hash is dropped and it returns to the
+    // stat-only path. Keeping the old snapshot would pin it as forever-fresh and
+    // hash it on every scan.
+    //
+    // Placement is the whole point, and it is bounded on both sides. It must come
+    // AFTER categorisation, which compares the new snapshots against the previous
+    // ones — overwriting them first would compare each file with itself and no
+    // change would ever be detected. And it must come BEFORE the short-circuit
+    // below, because the scans it needs to run on are precisely the quiet ones.
+    // It sat after that early return, so on the common path it never ran: a file
+    // first observed inside the window kept its hash for the life of the process
+    // and was re-read on every poll, which is the steady-state cost this design
+    // exists to avoid.
+    for (const [file, snapshot] of currentFiles) {
+      this.fileSnapshots.set(file, {
+        ...snapshot,
+        contentHash: snapshot.mtimeMayBeShared ? snapshot.contentHash : null,
+      });
+    }
+
+    // Short-circuit: no changes after initial scan. Below this line is only the
+    // contribution work — subtract, re-read, re-add — which a quiet poll must
+    // still skip. Re-snapshotting above is about what the cache RETAINS; it does
+    // not make a quiet poll redo the aggregation.
     if (this.initialized && added.length === 0 && modified.length === 0 && deleted.length === 0) {
       return;
     }
@@ -291,18 +316,6 @@ export class IncrementalTaskUsageAggregator {
       if (contribution) {
         this.applyContribution(file, contribution);
       }
-    }
-
-    // Re-snapshot EVERY surviving file, not just the ones that changed. An
-    // unchanged file still needs its freshness re-evaluated: once its mtime ages
-    // past the granularity window the hash is dropped and it returns to the
-    // stat-only path. Keeping the old snapshot would pin it as forever-fresh and
-    // hash it on every scan.
-    for (const [file, snapshot] of currentFiles) {
-      this.fileSnapshots.set(file, {
-        ...snapshot,
-        contentHash: snapshot.mtimeMayBeShared ? snapshot.contentHash : null,
-      });
     }
 
     this.initialized = true;

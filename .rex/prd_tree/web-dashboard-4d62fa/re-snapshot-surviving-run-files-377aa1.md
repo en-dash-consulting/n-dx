@@ -2,7 +2,7 @@
 id: "377aa1d0-06cb-4fa1-82e9-86dccfeca2a4"
 level: "task"
 title: "Re-snapshot surviving run files before the no-change short-circuit"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "pr-329-followup"
@@ -10,6 +10,11 @@ tags:
   - "task-usage"
   - "performance"
 source: "PR #329 review comment 3816985312 (ryrykeith)"
+startedAt: "2026-08-20T13:51:57.195Z"
+completedAt: "2026-08-20T13:52:22.200Z"
+endedAt: "2026-08-20T13:52:22.200Z"
+resolutionType: "code-change"
+resolutionDetail: "Re-snapshot loop moved above the no-change short-circuit, so a file observed inside the mtime-granularity window drops its carried hash once the mtime ages out instead of being re-hashed on every poll forever. Short-circuit still guards the contribution work. 3 tests added (private snapshot state + hashFile call count + a guard that quiet polls do no re-read), with a precondition assertion so they cannot pass vacuously. hench twin verified structurally immune."
 acceptanceCriteria:
   - "The re-snapshot loop runs on every scan, including scans with no added/modified/deleted files"
   - "A file first observed inside the mtime-granularity window drops its contentHash once its mtime ages past the window, returning to the stat-only path"

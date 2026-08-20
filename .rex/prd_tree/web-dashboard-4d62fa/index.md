@@ -35,6 +35,6 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-5dd63e.md) | completed |
 | [Match settings-page text boxes to the Analyze & Import input style and fix dark-mode native form chrome](./match-settings-page-text-boxes-136a8c.md) | completed |
 | [Overview Next Steps panel: consistent formatting, copyable items, and capture-to-PRD action](./overview-next-steps-panel-acebe9.md) | completed |
-| [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-377aa1.md) | pending |
+| [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-377aa1.md) | completed |
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-9c9ae5.md) | pending |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-a58edb.md) | completed |
