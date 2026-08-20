@@ -2,7 +2,7 @@
 id: "6f4360a7-c982-41c6-a46c-329115e8aab6"
 level: "epic"
 title: "Windows CLI Spawn Hardening"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -13,7 +13,8 @@ tags:
   - "gh:69"
 source: "github-issue-37"
 startedAt: "2026-07-13T15:42:48.255Z"
-endedAt: "2026-08-19T03:38:59.153Z"
+completedAt: "2026-08-20T14:00:35.283Z"
+endedAt: "2026-08-20T14:00:35.283Z"
 description: "Combined fix for GitHub issues #37 (P0), #68, #69 — all one root cause: n-dx invokes CLI binaries (claude/codex) on Windows via the fragile `shell: process.platform === \"win32\"` pattern at three spawn sites (llm-client cli-provider.ts, llm-client codex-cli-provider.ts, hench cli-loop.ts). That workaround mitigates EINVAL but (a) triggers Node's [DEP0190] deprecation for shell:true+args (#69) and (b) fails to quote binary paths containing spaces (#68). Replace all three fragile guards with one centralized Windows-safe spawn helper that invokes .cmd shims via cmd.exe with a self-quoted verbatim command line. Tracked by GH #37; PR will close #37/#68/#69. Advances #42; rolls up under #92."
 ---
 
@@ -36,4 +37,4 @@ description: "Combined fix for GitHub issues #37 (P0), #68, #69 — all one root
 | [Restore Ctrl-C delivery to tree-killable children in exec()](./restore-ctrl-c-delivery-to-tree-61c0f5.md) | completed |
 | [Route remaining in-scope spawn sites: pair-programming.js and sourcevision rex spawns](./route-remaining-in-scope-spawn-ab2081.md) | completed |
 | [Route the four CLI spawn sites through spawnCli](./route-the-four-cli-spawn-sites-a585ca.md) | completed |
-| [Stop web.js reporting "did not exit" from a kill result cli.js deems unknowable](./stop-web-js-reporting-did-not-2df9f0.md) | pending |
+| [Stop web.js reporting "did not exit" from a kill result cli.js deems unknowable](./stop-web-js-reporting-did-not-2df9f0.md) | completed |

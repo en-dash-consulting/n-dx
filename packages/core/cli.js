@@ -761,10 +761,10 @@ async function detectAndCleanConflictingDashboard(absDir) {
   // not a third copy of the SIGTERM → grace → SIGKILL sequence. On Windows this is
   // what stops `rex analyze` / `hench run` children being orphaned by a stop.
   //
-  // The result is deliberately not consulted: `kill(pid, 0)` succeeds for a zombie
-  // (exited, not yet reaped), so "still signallable" does not mean "still running",
-  // and reporting stop-failed on that basis would be wrong. SIGKILL is unblockable,
-  // so by this point the process is done in every sense the caller cares about.
+  // The result is deliberately not consulted — see the contract on
+  // terminateTreeByPid. Reporting stop-failed on a signallable pid would be
+  // wrong; the EPERM probe above is where a real failure is detected, and it runs
+  // BEFORE the kill for exactly that reason.
   await terminateTreeByPid(info.pid, { forceKillTimeoutMs: gracePeriodMs });
 
   await removePidFile(absDir);
