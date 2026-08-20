@@ -413,6 +413,45 @@ describe("IncrementalTaskUsageAggregator", () => {
       expect(hashSpy).not.toHaveBeenCalled();
     });
 
+    it("keeps a file's tokens when its bytes cannot be read", async () => {
+      // `hashFile` returns null when the read fails, and its docblock says the
+      // caller treats that as "no usable hash" rather than as a change. The
+      // caller did the opposite: the comparison guarded the PREVIOUS hash against
+      // null but not the new one, so `"abc" !== null` reported the file modified.
+      //
+      // Here that is worse than a spurious change flag. Being modified means
+      // subtract-then-re-read, and if the re-read fails too the contribution is
+      // simply gone — the file's tokens vanish from the aggregate until something
+      // else touches it. Absence of evidence became a silent deletion.
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+      const runFile = join(runsDir, "run-1.json");
+      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      await utimes(runFile, pinned, pinned);
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      expect((await aggregator.getTaskUsage())["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+
+      // Precondition: a hash really is being carried, so this exercises the
+      // branch it is meant to rather than passing vacuously.
+      expect(snapshotOf(aggregator, "run-1.json")?.contentHash).not.toBe(null);
+
+      // Read fails while stat still succeeds: a locked file, a permissions change,
+      // an I/O error. Injected because reproducing it from the filesystem is
+      // platform-specific while the branch under test is not.
+      const internals = aggregator as unknown as {
+        hashFile: (file: string) => Promise<string | null>;
+        readFileContribution: (file: string) => Promise<unknown>;
+      };
+      internals.hashFile = async () => null;
+      const readSpy = vi.spyOn(internals, "readFileContribution");
+
+      const usage = await aggregator.getTaskUsage();
+
+      // The tokens are still there, and no re-read was attempted at all.
+      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(readSpy).not.toHaveBeenCalled();
+    });
+
     it("still skips the subtract/re-read work when nothing changed", async () => {
       await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
 

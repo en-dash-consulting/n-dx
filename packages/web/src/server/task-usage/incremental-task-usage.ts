@@ -250,11 +250,25 @@ export class IncrementalTaskUsageAggregator {
         added.push(file);
       } else if (prev.mtimeMs !== snapshot.mtimeMs || prev.size !== snapshot.size) {
         modified.push(file);
-      } else if (prev.contentHash !== null && prev.contentHash !== snapshot.contentHash) {
+      } else if (
+        prev.contentHash !== null &&
+        snapshot.contentHash !== null &&
+        prev.contentHash !== snapshot.contentHash
+      ) {
         // Same mtime and size, different bytes: the rewrite landed inside one
         // timestamp tick at the same length. Only reachable while the previous
         // snapshot was within the granularity window, which is the only time a
         // hash is carried.
+        //
+        // BOTH hashes have to be usable for a difference to mean anything. A null
+        // on the new side is a failed read, not a changed file — and this guard
+        // used to cover only the previous side, so `"abc" !== null` reported the
+        // file modified. That is the expensive direction to get wrong: modified
+        // means subtract-then-re-read, and when the re-read failed too the
+        // contribution was dropped outright, so a momentarily unreadable file
+        // silently lost its tokens from the aggregate until something else
+        // touched it. mtime and size agree here, so nothing suggests a rewrite —
+        // only that this scan could not check.
         modified.push(file);
       }
     }
@@ -354,8 +368,13 @@ export class IncrementalTaskUsageAggregator {
   /**
    * Digest a run file's raw bytes. Gzipped files are hashed compressed — the
    * question is only "did these bytes change", so there is no reason to inflate.
-   * Returns null when the file cannot be read, which the caller treats as
-   * "no usable hash" rather than as a change.
+   *
+   * Returns null when the file cannot be read, which the caller treats as "no
+   * usable hash" rather than as a change — see the comparison in `refresh`, which
+   * requires both sides to be non-null before a difference counts. That was once
+   * only a claim this docblock made and the caller contradicted; it is now
+   * enforced there and covered by "keeps a file's tokens when its bytes cannot be
+   * read".
    */
   private async hashFile(file: string): Promise<string | null> {
     try {

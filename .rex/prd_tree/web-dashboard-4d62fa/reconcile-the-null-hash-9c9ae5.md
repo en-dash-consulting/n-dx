@@ -2,7 +2,7 @@
 id: "9c9ae59f-4cf3-4e05-80c9-761c6ec80fdf"
 level: "task"
 title: "Reconcile the null-hash contract in both run-file change detectors"
-status: "pending"
+status: "completed"
 priority: "low"
 tags:
   - "pr-329-followup"
@@ -13,6 +13,11 @@ tags:
 blockedBy:
   - "377aa1d0-06cb-4fa1-82e9-86dccfeca2a4"
 source: "PR #329 review comments 3816985317, 3816985328 (ryrykeith)"
+startedAt: "2026-08-20T14:42:17.005Z"
+completedAt: "2026-08-20T14:46:27.084Z"
+endedAt: "2026-08-20T14:46:27.084Z"
+resolutionType: "code-change"
+resolutionDetail: "Both detectors now require both hashes to be usable before a difference counts, so a read failure is no evidence of change rather than a reported modification — which in the web aggregator had been silently dropping the file's tokens via subtract-then-failed-re-read. Fixed the code rather than the docs, since the documented contract was the correct one. Both docblocks now cite the enforcing comparison and its covering test. AC3's premise was false: no twin parity test exists between these two, by documented design."
 acceptanceCriteria:
   - "The documented null-hash contract matches actual caller behavior in both incremental-task-usage.ts and run-change-detector.ts"
   - "A read failure on a previously-hashed run file does not silently drop that file's tokens from the web aggregate"
