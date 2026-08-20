@@ -481,6 +481,27 @@ function resolveDir(args) {
   return process.cwd();
 }
 
+/**
+ * Resolve the project directory for cross-cutting pre-dispatch concerns
+ * (command-timeout config, the stale-project check) — not for use inside
+ * a command handler, which each already knows its own positional-arg shape.
+ *
+ * resolveDir() blindly returns the last non-flag arg, which is correct for
+ * commands whose only positional arg is a target directory (analyze, work,
+ * ...). But `config`'s positional args are a key/value/dir triple — for
+ * `ndx config llm`, resolveDir(["llm"]) returns the literal string "llm",
+ * and since no such directory exists, the pre-dispatch stale check and
+ * timeout-config load silently ran against a directory that was never
+ * meant to be one, misreporting a fully-initialized project as
+ * uninitialized. Falls back to cwd whenever the naively-resolved candidate
+ * doesn't actually exist on disk, matching config.js's own
+ * resolvePositionalArgs()/fileExists() precedent for this exact ambiguity.
+ */
+function resolveProjectDirForPreDispatch(rest) {
+  const candidate = resolveDir(rest);
+  return existsSync(candidate) ? candidate : process.cwd();
+}
+
 function extractFlags(args) {
   return args.filter((a) => a.startsWith("-"));
 }
@@ -2730,7 +2751,7 @@ async function main() {
   // ── Resolve command timeout from project config ─────────────────────────
   // Load project config from the directory inferred from args (best-effort:
   // failure is silently ignored so a missing .n-dx.json never blocks startup).
-  const dir = resolveDir(rest);
+  const dir = resolveProjectDirForPreDispatch(rest);
   const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
   const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
 
