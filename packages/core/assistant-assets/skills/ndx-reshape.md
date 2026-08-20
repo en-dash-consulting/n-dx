@@ -20,7 +20,7 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
    - Suggest level changes (epic->feature, feature->task, etc.)
    - Suggest merges for overlapping items
 4. After user approval, execute the restructuring:
-   - Create new parent epics/features with `add_item` (rex MCP)
+   - Create new parent epics/features with `add_item` (rex MCP). Set `level` explicitly (`epic` or `feature` — it is required and has no default) and `parentId` for anything that is not a new top-level epic, so a new container never lands at root by accident. A container usually needs no acceptance criteria; when one does have a testable outcome of its own, put them in the `acceptanceCriteria` array rather than in `description`, since that is the field `verify_criteria` and the dashboard's requirements view read
    - Reparent items with `move_item` (rex MCP)
    - Change levels with `edit_item` (rex MCP) using the `level` field
    - Merge overlapping items with `merge_items` (rex MCP)

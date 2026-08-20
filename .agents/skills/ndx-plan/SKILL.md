@@ -13,7 +13,14 @@ Analyze the codebase and propose PRD updates.
 4. Call `get_next_steps` (sourcevision MCP) for prioritized recommendations
 5. Based on findings, existing gaps, and any user-described goals, propose new epics/features/tasks
 6. Present proposals to the user for review
-7. For each approved proposal, use `add_item` (rex MCP) to create it with appropriate descriptions, acceptance criteria, and parent placement
+7. For each approved proposal, use `add_item` (rex MCP) to create it. Fill the parameters explicitly — content written into the wrong field is content the rest of the toolchain cannot see:
+   - `title` — what the work is, specific enough to be recognized later
+   - `level` — `epic`, `feature`, or `task`, matching where the proposal sits in the tree you are building. Required, with no default: leave it unstated and repeated planning runs file the same kind of proposal at different levels
+   - `parentId` — the epic or feature this belongs under. Never leave a proposal at root level
+   - `description` — the rationale, including the finding or gap that motivated it
+   - `acceptanceCriteria` — the array, one criterion per entry. Put them here rather than in `description`: `verify_criteria` (rex MCP) and the dashboard's requirements view read this field, so criteria written as prose can never be mapped to tests or checked later
+   - `priority` — `critical`, `high`, `medium`, or `low`, inferred from the finding's severity and what it blocks
+   - `source` — `ndx-plan`, so it stays clear which analysis produced the item
 8. Show the updated PRD tree via `get_prd_status`
 9. **Commit**: run `git status --porcelain` against the project root — this picks up every MCP write under `.rex/prd_tree/` (each `add_item` call produces a new `<slug>/index.md`). If the output is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage all changes with `git add -A` and commit with the n-dx authorship + model audit trailer block via a HEREDOC:
 

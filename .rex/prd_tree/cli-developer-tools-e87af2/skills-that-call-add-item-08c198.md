@@ -2,7 +2,7 @@
 id: "08c19879-81a5-4257-b5f6-1cbcaba29f05"
 level: "task"
 title: "Skills that call add_item describe item content in prose instead of naming its parameters"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "skills"
@@ -10,6 +10,11 @@ tags:
   - "prd-quality"
   - "severity:medium"
 source: "ndx-adversarial-review"
+startedAt: "2026-08-20T19:26:45.063Z"
+completedAt: "2026-08-20T19:29:34.001Z"
+endedAt: "2026-08-20T19:29:34.001Z"
+resolutionType: "code-change"
+resolutionDetail: "ndx-plan, ndx-capture and ndx-reshape now name add_item's parameters where they create items, each getting the mapping it lacked. tests/e2e/skill-item-fields.test.js derives its list from the manifest so future skills are guarded. Full root e2e green (1217 passed)."
 acceptanceCriteria:
   - "`ndx-capture.md`, `ndx-plan.md`, and `ndx-reshape.md` each name `add_item`'s parameters explicitly where they create items, including `acceptanceCriteria` and `parentId`"
   - "Each states that acceptance criteria belong in the `acceptanceCriteria` array rather than in `description` prose, and why"
