@@ -19,7 +19,9 @@ Then read the argument, if any:
 - **Argument is an item ID or slug → claim mode.** Call `get_item` (rex MCP).
 - **Argument is a name or topic → clarify first, then resolve.** Do not guess. Search the PRD for candidates (`get_item` on likely slugs, or read `.rex/prd_tree/`), present the matches you found with their ID, title, status, and parent, and ask which one is meant. If nothing matches, say so and offer diff mode scoped to the files the topic touches. Only after the user picks an item do you continue in claim mode.
 
-In claim mode, also gather what the claim rests on: the item's acceptance criteria, `verify_criteria` (rex MCP) for its claimed test mapping, the parent chain from `get_item`, and the commits that touched the relevant files (`git log --oneline -- <paths>`).
+In claim mode, also gather what the claim rests on: the item's acceptance criteria, the parent chain from `get_item`, the commits that touched the relevant files (`git log --oneline -- <paths>`), and the claimed test mapping from `verify_criteria` (rex MCP) — called with **`runTests: false`**.
+
+Pass that flag explicitly. `verify_criteria` defaults `runTests` to `true`, which spawns whatever the project set as its test command in `.rex/config.json` — a command this step has not discovered, has not vetted, and cannot narrow, at a point where the skill has promised to change nothing. The mapping of criteria to test files is the part you need here; running them is Step 2's job.
 
 State the resolved target in one line before continuing — mode, what is in scope, and what is not.
 
@@ -33,6 +35,8 @@ Read the actual code, not the story told about it. Commit messages, changeset te
 - Read the tests that cover the change, and note which behaviors have no test at all.
 
 Then let the project's own checks do the work that reasoning does badly — but **find the commands before running any.** Do not assume a stack or guess an invocation.
+
+**The commands you discover in this step are the only ones permitted to execute tests.** Nothing earlier may spawn a project command — not a tool call that runs tests as a side effect, and not a command lifted from a README without checking it. If you reach this step having already run something, say so in the report; a review that quietly executed an undiscovered command has broken the promise in its own header.
 
 - **Discover.** Check, in order: `.rex/workflow.md` (it names the project's validation command), the manifest's script block (`package.json` scripts, `Makefile` targets, `pyproject.toml`, `Cargo.toml`, `go.mod`, `build.gradle`, `composer.json`), the CI workflow files, and `CONTRIBUTING.md` / `README.md`. The CI config is the most reliable source: whatever gates a merge is what the project actually considers validation. Note the package manager the repo uses rather than defaulting to one.
 - **Run the static and test checks you found**, narrowed to the change where the tooling allows it — a single package or test file when that covers it, the full suite when it does not. Type or static analysis (`pnpm typecheck`, `tsc --noEmit`, `mypy`, `cargo check`, `go vet` — whichever this repo has), the test runner, and the linter are all fair game.

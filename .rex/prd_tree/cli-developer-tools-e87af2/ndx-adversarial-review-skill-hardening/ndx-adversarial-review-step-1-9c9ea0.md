@@ -2,12 +2,17 @@
 id: "9c9ea0ac-94f1-4f57-8cd1-64cf248fcdb2"
 level: "task"
 title: "/ndx-adversarial-review Step 1 executes the test suite via verify_criteria's default runTests: true"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "skills"
   - "severity:medium"
 source: "ndx-adversarial-review"
+startedAt: "2026-08-21T14:05:14.248Z"
+completedAt: "2026-08-21T14:07:53.370Z"
+endedAt: "2026-08-21T14:07:53.370Z"
+resolutionType: "code-change"
+resolutionDetail: "Claim mode passes runTests: false so verify_criteria maps criteria without spawning the project's test command; Step 2 declares its discovered commands the only ones permitted to execute tests. AC3 verified by auditing every command Step 1 can issue. Full root e2e green (1238 passed)."
 acceptanceCriteria:
   - "Step 1's claim-mode `verify_criteria` call passes `runTests: false`"
   - "The skill states explicitly that Step 2's discovered command is the only thing permitted to execute tests"

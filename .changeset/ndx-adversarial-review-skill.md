@@ -43,6 +43,12 @@ described in prose, so acceptance criteria reach the `acceptanceCriteria` array
 where `verify_criteria` and the dashboard can read them, and severity maps
 one-to-one onto `priority` instead of being buried in the description.
 
+Claim mode calls `verify_criteria` with `runTests: false`, so resolving the
+target reads the criteria-to-test mapping without spawning the project's
+configured test command — a command that step has not discovered or vetted. The
+checks discovered in Step 2 are stated to be the only ones permitted to execute
+tests.
+
 Diff mode resolves the default branch with
 `git symbolic-ref --short refs/remotes/origin/HEAD` rather than assuming `main`,
 and asks which branch to compare against when `origin/HEAD` is unset — so the
