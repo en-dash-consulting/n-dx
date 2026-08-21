@@ -28,6 +28,7 @@ import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
 import { PRD_TREE_DIRNAME } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
+import { stampModified } from "../core/sync.js";
 
 // ---------------------------------------------------------------------------
 // FolderTreeStore
@@ -89,12 +90,13 @@ export class FolderTreeStore implements PRDStore {
     const lockPath = this.path("prd.lock");
     await withLock(lockPath, async () => {
       const doc = await this.loadDocument();
+      const stamped = stampModified(item);
       if (parentId) {
-        if (!insertChild(doc.items, parentId, item)) {
+        if (!insertChild(doc.items, parentId, stamped)) {
           throw new Error(`Parent "${parentId}" not found`);
         }
       } else {
-        doc.items.push(item);
+        doc.items.push(stamped);
       }
       // The serializer always writes the canonical shape: a leaf subtask
       // gaining its first child is naturally promoted from `<slug>.md` to
@@ -107,7 +109,14 @@ export class FolderTreeStore implements PRDStore {
     const lockPath = this.path("prd.lock");
     await withLock(lockPath, async () => {
       const doc = await this.loadDocument();
-      if (!updateInTree(doc.items, id, updates)) {
+      const entry = findItem(doc.items, id);
+      if (!entry) {
+        throw new Error(`Item "${id}" not found`);
+      }
+      // Merge updates onto the current item before stamping so `lastModified`
+      // always reflects this write, even when `updates` omits it.
+      const merged = stampModified({ ...entry.item, ...updates } as PRDItem);
+      if (!updateInTree(doc.items, id, merged)) {
         throw new Error(`Item "${id}" not found`);
       }
       await this.saveDocument(doc);
@@ -118,8 +127,22 @@ export class FolderTreeStore implements PRDStore {
     const lockPath = this.path("prd.lock");
     await withLock(lockPath, async () => {
       const doc = await this.loadDocument();
+      const entry = findItem(doc.items, id);
+      if (!entry) {
+        throw new Error(`Item "${id}" not found`);
+      }
       if (!removeFromTree(doc.items, id)) {
         throw new Error(`Item "${id}" not found`);
+      }
+      // Removing a child mutates its parent's on-disk content (children
+      // list changes), so the parent needs a fresh stamp too — otherwise a
+      // parent whose only observable change was a child's removal would
+      // never be detected as modified by the sync engine. `parent` is a
+      // live reference into `doc.items` (walkTree does not clone), so
+      // mutating it in place is sufficient — no re-lookup needed.
+      const parent = entry.parents[entry.parents.length - 1];
+      if (parent) {
+        Object.assign(parent, stampModified(parent));
       }
       await this.saveDocument(doc);
     });

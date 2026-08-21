@@ -14,4 +14,4 @@ description: "Discovery Option 3 (+ the sync-engine fix). Every local PRD mutati
 |-------|--------|
 | [Actor attribution on hench RunRecord](./actor-attribution-on-hench-runrecord.md) | pending |
 | [Actor resolution and lastModifiedBy in rex](./actor-resolution-and-3bb125.md) | pending |
-| [Stamp lastModified on FolderTreeStore writes](./stamp-lastmodified-on-3cd289.md) | pending |
+| [Stamp lastModified on FolderTreeStore writes](./stamp-lastmodified-on-3cd289.md) | completed |
