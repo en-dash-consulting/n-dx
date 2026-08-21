@@ -112,6 +112,7 @@ import {
 } from "./child-lifecycle.js";
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
+import { resolveExistingDir } from "./resolve-existing-dir.js";
 import {
   readRexTestCommand,
   resolveReviewerVendor,
@@ -2697,7 +2698,14 @@ async function main() {
   // ── Resolve command timeout from project config ─────────────────────────
   // Load project config from the directory inferred from args (best-effort:
   // failure is silently ignored so a missing .n-dx.json never blocks startup).
-  const dir = resolveDir(rest);
+  //
+  // resolveExistingDir, not resolveDir: `rest` still holds the subcommand for a
+  // tool-delegation call, so the last-positional rule would resolve
+  // `ndx hench record --task=X` to ./record and read config from a path that
+  // does not exist. This dir only says where to LOOK — it is never an operation
+  // target — so requiring the positional to be a real directory is safe here
+  // and wrong for the handler call sites.
+  const dir = resolveExistingDir(rest);
   const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
   const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
 
