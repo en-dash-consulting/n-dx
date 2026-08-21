@@ -181,9 +181,11 @@ bound that matches the failure mode:
 
 ## Flake Resistance
 
-A test that passes alone but fails inside the full suite is a defect in the
-test, not noise to be retried. Two failure families produced every such flake
-observed so far; both have a standing rule.
+A test that passes alone but fails inside the full suite — or on one developer's
+machine but not in CI — is a defect in the test, not noise to be retried. Four
+failure families have produced every such flake observed so far; each has a
+standing rule. (The headings below run 1, 3, 2, 4: they were written in the
+order the families were found, and renumbering them would break inbound links.)
 
 ### Family 1 — Foreign responses in HTTP route tests
 
@@ -325,6 +327,52 @@ than the one below it.
   focus-history seeding in `graph.ts` was rewritten because a click landing
   before its seeding effect left Back permanently disabled — a real
   slow-first-paint bug that the loaded test machine merely exposed first.
+
+### Family 4 — Ambient environment leaking into the suite
+
+**Symptom:** a suite that is green in CI and red on a developer's machine, with
+failures that look like real contract regressions:
+
+```
+expected 'See also: [36mndx plan[39m…' to be 'See also: ndx plan, ndx work'
+expected false to be true                       # after a 5s wait, no mention of a shell
+expected 'claude-opus-5' to be 'claude-sonnet-4-6'
+```
+
+**Cause:** production code is *right* to consult the environment, and the test
+inherited whatever the developer's shell happened to export. Three instances so
+far, each found the hard way:
+
+| Variable | Read by | What it did to the suite |
+|---|---|---|
+| `FORCE_COLOR` | `supportsColor()` in `cli.js` / `help.js` | 24 failures across 8 files when set to `3`; ANSI codes in output compared against plain strings |
+| `PATH` (whether `sh` resolves) | tests spawning `sh -c`, and hench's `execShell` on every platform | 21 failures across 5 files from PowerShell, **and 5 vacuous passes** — assertions like "nothing was written after the timeout" hold trivially when nothing ever ran |
+| `CLAUDE_CODE_SESSION_ID` | `hench record`, to read the session's own token usage | Claude Code exports it to `pnpm test` too, so the suite read a live, growing transcript and asserted against numbers that change between runs |
+
+CI set none of them, so CI stayed green in all three cases and only humans — or
+an agent running the suite inside Claude Code — ever saw the failure.
+
+**Rules:**
+
+- **Pin the variable in a setupFile, not in each test.** `setupFiles` run inside
+  every worker before it loads any test module, which is early enough to beat
+  memoised reads. `tests/setup-color-env.js` and `tests/setup-session-env.js` do
+  this, and every package's `vitest.config.ts` registers both. `globalSetup` is
+  the wrong hook — it runs in another process and does not affect the workers.
+- **Guard, do not remove, a genuine environment dependency.** `sh -c` in the
+  process-tree tests is load-bearing: libuv puts every non-detached child it
+  spawns on Windows into a global job object, so spawning `node` directly reaps
+  the tree for free and the test proves nothing. Those tests skip with the missing
+  shell **named** rather than failing opaquely — see
+  `tests/shell-spawn-inventory.md` for every such site and its guard.
+- **Assume the vacuous pass is there too.** An ambient dependency that breaks
+  assertions usually also satisfies some of them for the wrong reason. When
+  auditing one, check which assertions would still pass with the dependency
+  *absent*: of the 26 shell-dependent cases found, 5 were passing green on
+  machines where the behaviour was never exercised.
+- **State the precondition the test needs.** A case that depends on landing
+  inside a 16 ms window, or on a hash being carried, asserts that precondition
+  explicitly — otherwise it reports success from a state it never reached.
 
 ### Integration Test Growth Policy
 

@@ -222,6 +222,32 @@ describe("CLI stale-setup notice", () => {
       const output = result.stdout + result.stderr;
       expect(output).not.toContain("Project setup incomplete");
     });
+
+    // A tool-delegation call still carries its subcommand in the args main()
+    // resolves the project directory from. Taking the last positional resolved
+    // `ndx rex status --format=json` to ./status, so the stale check looked for
+    // the tool directories under a path that does not exist and reported an
+    // initialized project as incomplete. resolveExistingDir requires the
+    // positional to be a real directory, which drops the subcommand.
+    // Only commands that exit 0 in this fixture are useful here: the notice is
+    // printed conditionally on a zero exit code, so a failing command would
+    // pass this assertion without proving anything. Both below were confirmed
+    // to fail when main() uses the last-positional rule.
+    for (const args of [
+      ["rex", "status", "--format=json"],
+      ["hench", "status", "--format=json"],
+    ]) {
+      it(`does not emit notice for "${args.join(" ")}" (subcommand is not a directory)`, async () => {
+        const result = runWithOutput(args, tmpDir);
+        const output = result.stdout + result.stderr;
+        expect(
+          output,
+          `The stale-setup notice appeared for a tool-delegation call in an ` +
+            `initialized project. main() likely resolved the project directory ` +
+            `to the subcommand "${args[1]}" instead of the cwd.`,
+        ).not.toContain("Project setup incomplete");
+      });
+    }
   });
 
   describe("CLI integration smoke tests", () => {

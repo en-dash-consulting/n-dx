@@ -30,7 +30,7 @@ export default defineConfig({
     include: [
       "tests/**/*.test.ts",
     ],
-    setupFiles: ["tests/setup/local-storage.ts", "../../tests/setup-color-env.js"],
+    setupFiles: ["tests/setup/local-storage.ts", "../../tests/setup-color-env.js", "../../tests/setup-session-env.js"],
     exclude: sandboxBlocksNetwork
       ? [
           "tests/unit/server/**/*.test.ts",

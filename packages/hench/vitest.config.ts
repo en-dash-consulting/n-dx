@@ -23,7 +23,7 @@ export default defineConfig({
   test: {
     // Shared: pin color detection so an ambient FORCE_COLOR in the developer's
     // shell cannot change test verdicts. See tests/setup-color-env.js.
-    setupFiles: ["../../tests/setup-color-env.js"],
+    setupFiles: ["../../tests/setup-color-env.js", "../../tests/setup-session-env.js"],
     include: ["tests/**/*.test.ts"],
     // Raised from 5000ms: integration tests that spawn mocked CLIs, do dynamic
     // imports of @anthropic-ai/sdk, or call vi.resetModules() take 2-4 seconds

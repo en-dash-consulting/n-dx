@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, readdir } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { exec } from "../../src/exec.js";
+import { describeEachNeedsPosixShell } from "../helpers/posix-shell.js";
 
 /**
  * A timeout must actually stop the command.
@@ -52,7 +53,10 @@ const POLICIES = [
   { name: "freeze-verify-kill (BETA)", freeze: true },
 ] as const;
 
-describe.each(POLICIES)("exec timeout terminates the whole process tree — $name", ({ freeze }) => {
+// Guarded on `sh`: without it the grandchild never starts, and two of these
+// cases assert that nothing was written after the timeout — which a tree that
+// never ran satisfies trivially. Silent false passes, not just false failures.
+describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process tree — $name", ({ freeze }) => {
   let dir: string;
 
   /** Wall-clock room for the grandchild to prove it is still writing. */

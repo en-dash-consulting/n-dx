@@ -19,6 +19,8 @@
 # Agent runs, locks, and session state
 .hench/runs/
 .hench/locks/
+# Per-session token-usage watermarks written by `hench record`
+.hench/usage-cursors/
 .hench-commit-msg.txt
 
 # Rex ephemeral state

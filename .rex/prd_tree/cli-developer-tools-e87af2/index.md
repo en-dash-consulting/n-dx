@@ -5,8 +5,8 @@ title: "CLI & Developer Tools"
 status: "completed"
 source: "smart-add"
 startedAt: "2026-05-13T20:29:02.773Z"
-completedAt: "2026-06-03T00:46:42.124Z"
-endedAt: "2026-06-03T00:46:42.124Z"
+completedAt: "2026-08-21T14:12:26.848Z"
+endedAt: "2026-08-21T14:12:26.848Z"
 ---
 
 ## Children
@@ -15,7 +15,11 @@ endedAt: "2026-06-03T00:46:42.124Z"
 |-------|--------|
 | [Auto-Commit on Completion for File-Modifying Claude Code Skills](./auto-commit-on-completion-for-efac37/index.md) | completed |
 | [Git Repository Detection and Init Prompt in ndx init](./git-repository-detection-and-ba9504/index.md) | completed |
+| [/ndx-adversarial-review skill hardening](./ndx-adversarial-review-skill-hardening/index.md) | completed |
 | [Plan-Mode Prevention Skill for LLM Agents](./plan-mode-prevention-skill-for-fe61c7/index.md) | completed |
 | [Target-Repo README Content Template with Required Sections](./target-repo-readme-content-2fa57d/index.md) | completed |
 | [Target-Repo README Generation on ndx init](./target-repo-readme-generation-406b4b/index.md) | completed |
 | [Diagnose why the auto-commit step does not fire after MCP-driven PRD mutations in Claude Code skills](./diagnose-why-the-auto-commit-66437f.md) | completed |
+| [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-f93230.md) | completed |
+| [Skills that call add_item describe item content in prose instead of naming its parameters](./skills-that-call-add-item-08c198.md) | completed |
+| [Skills that record runs omit --startedAt, so each one's first record claims the whole session](./skills-that-record-runs-omit-f050ba.md) | completed |

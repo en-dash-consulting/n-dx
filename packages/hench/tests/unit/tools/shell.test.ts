@@ -6,6 +6,9 @@ import { GuardRails } from "../../../src/guard/index.js";
 import { toolRunCommand } from "../../../src/tools/shell.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
 import { cleanupProjectDir } from "../../helpers/index.js";
+// Cases that reach a real `sh` are guarded; cases the guard rails reject before
+// any spawn are not, and keep running everywhere.
+import { describeNeedsPosixShell, itNeedsPosixShell } from "../../helpers/posix-shell.js";
 
 /**
  * How long a deliberately-timed-out command would keep running if nothing stopped
@@ -43,7 +46,7 @@ describe("toolRunCommand", () => {
     await cleanupProjectDir(projectDir);
   });
 
-  describe("allowed commands", () => {
+  describeNeedsPosixShell("allowed commands", () => {
     it("runs allowed commands", async () => {
       const result = await toolRunCommand(guard, projectDir, {
         command: "node -e \"console.log('hello')\"",
@@ -225,7 +228,7 @@ describe("toolRunCommand", () => {
     });
   });
 
-  describe("timeout handling", () => {
+  describeNeedsPosixShell("timeout handling", () => {
     // The commands below run far longer than their timeout, so the timeout is
     // certainly what ends the call — and the tree kill is what makes that safe:
     // `sh` is the process that gets signalled, and the `node` it started is the
@@ -270,7 +273,10 @@ describe("toolRunCommand", () => {
     });
   });
 
-  describe("output handling", () => {
+  // Guarded whole, including "reports exit code on failure without output": with
+  // no `sh` the spawn fails, hench reports a non-zero exit, and that case's
+  // assertion is satisfied for entirely the wrong reason.
+  describeNeedsPosixShell("output handling", () => {
     it("captures stdout", async () => {
       const result = await toolRunCommand(guard, projectDir, {
         command: "node -e \"console.log('stdout message')\"",
@@ -313,14 +319,16 @@ describe("toolRunCommand", () => {
   });
 
   describe("working directory handling", () => {
-    it("uses projectDir as default cwd", async () => {
+    // Only the two cases that actually run a command need the shell; the
+    // out-of-project rejection below is refused by the guard before any spawn.
+    itNeedsPosixShell("uses projectDir as default cwd", async () => {
       const result = await toolRunCommand(guard, projectDir, {
         command: "node -e \"console.log(process.cwd())\"",
       });
       expect(result).toContain(projectDir);
     });
 
-    it("respects custom cwd within project", async () => {
+    itNeedsPosixShell("respects custom cwd within project", async () => {
       const subdir = join(projectDir, "subdir");
       await mkdir(subdir);
 
@@ -341,7 +349,7 @@ describe("toolRunCommand", () => {
     });
   });
 
-  describe("path security", () => {
+  describeNeedsPosixShell("path security", () => {
     it("allows commands with full path to allowed executables", async () => {
       // This should work because "node" is in the allowlist
       // We verify the guard allows full paths (path extraction happens in validateCommand)

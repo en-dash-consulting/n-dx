@@ -84,22 +84,42 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "write an assisted run record to .hench/runs/",
     usage: "hench record --task=<id> [options] [dir]",
     description:
-      "Writes a lightweight run record for work performed through the /ndx-work\n" +
-      "skill (Claude Code) rather than a spawned hench agent, so it appears in\n" +
-      "run history and is auditable. The record is marked assisted with empty\n" +
-      "token usage — Claude Code does not expose its own token consumption to\n" +
-      "the running skill, so there is no usage to attribute.",
+      "Writes a lightweight run record for work performed through a skill\n" +
+      "(Claude Code) rather than a spawned hench agent, so it appears in run\n" +
+      "history and is auditable. The record is marked assisted.\n" +
+      "\n" +
+      "Token usage is read from the current Claude Code session's transcript,\n" +
+      "which is where Claude Code records the API's own usage numbers; the\n" +
+      "session is located via CLAUDE_CODE_SESSION_ID. Only the spend since the\n" +
+      "previous record for that session is claimed, so several tasks completed\n" +
+      "in one session each get their own slice rather than all claiming the\n" +
+      "session total. The watermark lives in .hench/usage-cursors/.\n" +
+      "\n" +
+      "Precedence: explicit --*-tokens flags, then the transcript, then zeros.\n" +
+      "A missing transcript never fails the record — an unrecorded run is worse\n" +
+      "than one missing its tokens.",
     options: [
       { flag: "--task=<id>", description: "Rex task ID the work addressed (required)" },
       { flag: "--title=<title>", description: "Task title (defaults to the task ID)" },
       { flag: "--status=<status>", description: "Run status: completed (default) | failed | cancelled | ..." },
       { flag: "--summary=<text>", description: "Short description of what was done" },
-      { flag: "--turns=<n>", description: "Number of agent turns to record (default: 0)" },
-      { flag: "--format=json", description: "Output the new run ID as JSON" },
+      { flag: "--turns=<n>", description: "Agent turns (default: the transcript's message count)" },
+      { flag: "--no-tokens", description: "Record without token usage" },
+      { flag: "--startedAt=<iso>", description: "When the work began; also the earliest spend this run may claim" },
+      { flag: "--since=<iso>", description: "Claim spend from this time only (overrides --startedAt)" },
+      { flag: "--session=<id>", description: "Session to read (default: $CLAUDE_CODE_SESSION_ID)" },
+      { flag: "--transcript=<path>", description: "Read this transcript instead of searching by session" },
+      { flag: "--input-tokens=<n>", description: "Set input tokens by hand (overrides the transcript)" },
+      { flag: "--output-tokens=<n>", description: "Set output tokens by hand" },
+      { flag: "--cache-creation-tokens=<n>", description: "Set cache-creation tokens by hand" },
+      { flag: "--cache-read-tokens=<n>", description: "Set cache-read tokens by hand" },
+      { flag: "--model=<id>", description: "Model to record (default: the transcript's, else config)" },
+      { flag: "--format=json", description: "Output the new run ID and usage as JSON" },
     ],
     examples: [
-      { command: "hench record --task=abc123 --status=completed", description: "Record a completed assisted run" },
+      { command: "hench record --task=abc123 --status=completed", description: "Record a completed assisted run, with usage from this session" },
       { command: "hench record --task=abc123 --title=\"Add auth\" --summary=\"Implemented login\"", description: "Record with title and summary" },
+      { command: "hench record --task=abc123 --no-tokens", description: "Record without attributing any token usage" },
     ],
     related: ["run", "status", "show"],
   },
