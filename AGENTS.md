@@ -93,9 +93,7 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `OPEN_SOURCE_SCOPE.md` | Licensing boundaries, included/excluded components, and contribution expectations |
 
-> **PRD file layout.** Subtasks are encoded as sections within the parent task's `index.md` (not separate directories). `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running — do not read it from code outside the web server.
-
-> **PRD folder tree schema.** The primary PRD storage format maps each PRD level (epic → feature → task) to a directory containing an `index.md`. Subtasks are encoded as sections within the parent task's `index.md`. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
+> **PRD file layout.** Subtasks are encoded as sections within the parent task's `index.md` (not separate directories). `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running — do not read it from code outside the web server. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
 
 ## Workflow
 
@@ -182,7 +180,7 @@ Two MCP servers provide structured access to project data. They are configured i
 - Log what you did (`append_log`)
 - Check overall project progress (`get_prd_status`)
 
-**SourceVision** — Codebase analysis. Use sourcevision tools when you need to:
+**Sourcevision** — Codebase analysis. Use sourcevision tools when you need to:
 
 - Understand a file's role and dependencies (`get_file_info`, `get_imports`)
 - Find files related to a feature or module (`search_files`)

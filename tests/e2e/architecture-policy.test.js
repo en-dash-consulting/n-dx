@@ -100,6 +100,13 @@ const SKIP_DIRS = new Set([
   ".hench",
   ".rex",
   ".sourcevision",
+  // Gitignored, developer-local tooling scratch space (worktrees created by
+  // agent sessions, etc.) — never part of the committed source tree this
+  // policy audits. Without this, a stray worktree checkout on someone's
+  // machine re-surfaces every allowlisted file under a `.claude/worktrees/
+  // <name>/` prefix the ALLOWED list doesn't recognize, and reports it as
+  // a violation of a rule the real, committed file already satisfies.
+  ".claude",
 ]);
 
 function walk(dir, files = []) {

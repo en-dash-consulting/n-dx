@@ -123,6 +123,7 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 HTTP-request concurrency notes for the web server live in `packages/web/CLAUDE.md`.
 
+
 ### Package conventions
 
 | Convention | Pattern | Notes |

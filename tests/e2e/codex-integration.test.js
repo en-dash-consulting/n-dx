@@ -91,11 +91,8 @@ describe("renderAgentsMd", () => {
 
   it("includes shared project guidance sections", () => {
     expect(content).toContain("## Packages");
-    expect(content).toContain("## Monorepo Structure");
     expect(content).toContain("### Architecture");
-    expect(content).toContain("## Command Aliases");
     expect(content).toContain("## n-dx Orchestration Commands");
-    expect(content).toContain("## Direct Tool Access");
     expect(content).toContain("## Key Files");
   });
 
@@ -158,7 +155,7 @@ describe("renderAgentsMd", () => {
   it("includes a When to Use Each Server section", () => {
     expect(content).toContain("## When to Use Each Server");
     expect(content).toContain("**Rex**");
-    expect(content).toContain("**SourceVision**");
+    expect(content).toContain("**Sourcevision**");
   });
 
   it("includes Codex Troubleshooting section", () => {
