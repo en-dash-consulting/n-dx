@@ -235,6 +235,8 @@ export const RunRecordSchema = z.object({
   memoryStats: RunMemoryStatsSchema.optional(),
   diagnostics: RunDiagnosticsSchema.optional(),
   events: z.array(PersistedRuntimeEventSchema).optional(),
+  actor: z.string().optional(),
+  host: z.string().optional(),
 });
 
 export function validateConfig(

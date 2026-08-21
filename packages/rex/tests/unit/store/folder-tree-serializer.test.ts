@@ -754,6 +754,28 @@ describe("serializeFolderTree: round-trip with parseFolderTree", () => {
     expect(content).toContain('"custom-value"');
   });
 
+  it("round-trips the lastModified stamp through serialize -> parse", async () => {
+    // FolderTreeStore stamps `lastModified` on every mutation (see
+    // folder-tree-store.ts); this proves the stamp survives a full
+    // serialize/parse cycle just like any other passthrough frontmatter field.
+    const stamp = "2026-08-20T12:34:56.789Z";
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Stamped Task", {
+      lastModified: stamp,
+    } as Partial<PRDItem>);
+
+    await serializeFolderTree([task], testDir);
+    const content = await readFile(
+      join(testDir, `${slugify(task.title, task.id)}.md`),
+      "utf8",
+    );
+    expect(content).toContain("lastModified");
+    expect(content).toContain(stamp);
+
+    const { items, warnings } = await parseFolderTree(testDir);
+    expect(warnings).toEqual([]);
+    expect((items[0] as Record<string, unknown>).lastModified).toBe(stamp);
+  });
+
   it("round-trips work-item links (linkage model visibility)", async () => {
     // Criterion 2: a PRD item's links to downstream work items survive
     // serialize → parse, so they are visible whenever the PRD is loaded.
