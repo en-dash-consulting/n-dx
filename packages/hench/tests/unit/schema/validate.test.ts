@@ -580,6 +580,33 @@ describe("validateRunRecord", () => {
       expect(result.data.lastActivityAt).toBeUndefined();
     }
   });
+
+  describe("actor/host attribution", () => {
+    it("accepts a run record with actor and host", () => {
+      const run = { ...validRun, actor: "Ada Lovelace <ada@example.com>", host: "build-agent-7" };
+      const result = validateRunRecord(run);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.actor).toBe("Ada Lovelace <ada@example.com>");
+        expect(result.data.host).toBe("build-agent-7");
+      }
+    });
+
+    it("accepts a run record without actor/host (backward compat with pre-attribution runs)", () => {
+      const result = validateRunRecord(validRun);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.actor).toBeUndefined();
+        expect(result.data.host).toBeUndefined();
+      }
+    });
+
+    it("rejects a non-string actor", () => {
+      const run = { ...validRun, actor: 42 };
+      const result = validateRunRecord(run);
+      expect(result.ok).toBe(false);
+    });
+  });
 });
 
 describe("formatValidationErrors", () => {

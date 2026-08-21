@@ -1253,6 +1253,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     taskTitle: brief.task.title,
     model,
     henchDir,
+    projectDir,
     vendor,
     sandbox: policy.sandbox,
     approvals: policy.approvals,

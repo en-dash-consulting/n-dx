@@ -783,6 +783,7 @@ async function runOne(
   output(`Run ID: ${run.id}`);
   output(`Task: ${colorPink(run.taskTitle)}`);
   output(`Status: ${colorStatus(run.status)}`);
+  if (run.actor) output(`Actor: ${run.actor}${run.host ? ` @ ${run.host}` : ""}`);
 
   // Invocation context
   if (run.invocationContext) {

@@ -23,6 +23,7 @@ import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { getCurrentHead, execShellCmd, execStdout } from "../../process/exec.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
+import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
@@ -329,6 +330,11 @@ export interface InitRunOptions {
   taskTitle: string;
   model: string;
   henchDir: string;
+  /**
+   * Project directory to resolve actor identity from (git `user.name`/
+   * `user.email` config). Defaults to the process cwd when omitted.
+   */
+  projectDir?: string;
   /** LLM vendor for this run (e.g. "claude", "codex"). Captured in diagnostics and run.vendor. */
   vendor?: string;
   /** Sandbox mode in effect (e.g. "workspace-write"). Captured in diagnostics. */
@@ -372,6 +378,8 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     invocationContext: opts.invocationContext,
     vendor: opts.vendor,
     weight: opts.weight ?? "standard",
+    actor: await resolveActor(opts.projectDir ?? "."),
+    host: resolveHost(),
   };
 
   // Emit invocation context to the output stream for CLI and dashboard visibility

@@ -44,6 +44,7 @@ export async function cmdShow(
   result(`Task: ${taskLine}`);
   info(`Model: ${run.model}`);
   result(`Status: ${colorStatus(run.status)}`);
+  if (run.actor) info(`Actor: ${run.actor}${run.host ? ` @ ${run.host}` : ""}`);
   info(`Started: ${run.startedAt}`);
   if (run.finishedAt) info(`Finished: ${run.finishedAt}`);
   info(`Turns: ${run.turns}`);

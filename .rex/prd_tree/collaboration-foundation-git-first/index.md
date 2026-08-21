@@ -12,4 +12,4 @@ description: "Make n-dx safe and useful for multi-person teams with git as the d
 | Title | Status |
 |-------|--------|
 | [Git-safe PRD tree merges](./git-safe-prd-tree-merges/index.md) | pending |
-| [PRD write attribution and change stamps](./prd-write-attribution-and-change-stamps/index.md) | pending |
+| [PRD write attribution and change stamps](./prd-write-attribution-and-change-stamps/index.md) | completed |
