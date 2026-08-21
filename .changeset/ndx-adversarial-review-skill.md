@@ -6,7 +6,10 @@ Add the `/ndx-adversarial-review` skill: review by attack rather than by inspect
 
 Invoked bare it attacks the working or branch diff; given a task ID it attacks
 the claim that the task is done, criterion by criterion; given a name or topic it
-finds the matching PRD item and confirms it with the user before starting.
+finds the matching PRD item and confirms it with the user before starting. Since
+rex exposes no search tool, that resolution enumerates `.rex/prd_tree/` — whose
+directory names are the item slugs — rather than guessing IDs, the same technique
+the duplicate check uses.
 
 The skill runs two passes. Pass 1 works a fixed rubric — unimagined inputs,
 failure paths, concurrency, platform, contract drift, test quality, the

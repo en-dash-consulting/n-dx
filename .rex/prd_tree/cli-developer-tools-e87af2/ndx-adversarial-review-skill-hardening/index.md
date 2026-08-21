@@ -2,13 +2,16 @@
 id: "75bd9dee-f2ad-414f-9ca4-45d9f5f0c910"
 level: "feature"
 title: "/ndx-adversarial-review skill hardening"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "skills"
   - "assistant-assets"
   - "adversarial-review"
 source: "ndx-adversarial-review"
+startedAt: "2026-08-21T14:12:23.178Z"
+completedAt: "2026-08-21T14:12:23.178Z"
+endedAt: "2026-08-21T14:12:23.178Z"
 acceptanceCriteria:
   - "All five child tasks are completed"
   - "`packages/core/assistant-assets/skills/ndx-adversarial-review.md` contains no hardcoded `main` branch name and no instruction to guess PRD slugs"
@@ -24,4 +27,4 @@ description: "Defects found by running `/ndx-adversarial-review` against its own
 | [/ndx-adversarial-review does not map findings onto add_item's level, priority, and acceptanceCriteria fields](./ndx-adversarial-review-does-not-13e505.md) | completed |
 | [/ndx-adversarial-review records tokens without --startedAt, so the first record claims the whole session](./ndx-adversarial-review-records-08ceeb.md) | completed |
 | [/ndx-adversarial-review Step 1 executes the test suite via verify_criteria's default runTests: true](./ndx-adversarial-review-step-1-9c9ea0.md) | completed |
-| [/ndx-adversarial-review topic mode guesses slugs against get_item, which has no search](./ndx-adversarial-review-topic-581715.md) | pending |
+| [/ndx-adversarial-review topic mode guesses slugs against get_item, which has no search](./ndx-adversarial-review-topic-581715.md) | completed |

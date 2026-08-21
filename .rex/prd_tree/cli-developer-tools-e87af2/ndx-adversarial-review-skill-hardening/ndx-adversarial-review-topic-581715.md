@@ -2,12 +2,17 @@
 id: "58171595-a659-490f-9c23-51044bfeb502"
 level: "task"
 title: "/ndx-adversarial-review topic mode guesses slugs against get_item, which has no search"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "skills"
   - "severity:medium"
 source: "ndx-adversarial-review"
+startedAt: "2026-08-21T14:10:12.574Z"
+completedAt: "2026-08-21T14:12:18.027Z"
+endedAt: "2026-08-21T14:12:18.027Z"
+resolutionType: "code-change"
+resolutionDetail: "Topic mode now enumerates .rex/prd_tree/ using the same phrasing as the duplicate-check step, names get_prd_status for epic-level shape, and reframes get_item as fetch-by-known-ID. Guess-a-slug instruction removed. Full root e2e green (1238 passed)."
 acceptanceCriteria:
   - "Step 1's topic mode names enumerating `.rex/prd_tree/` as the primary resolution method"
   - "The instruction to call `get_item` on guessed slugs is removed"
