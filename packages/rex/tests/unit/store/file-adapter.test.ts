@@ -1,4 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+vi.mock("../../../src/core/identity.js", () => ({
+  resolveActor: vi.fn().mockResolvedValue("Test Actor <test@example.com>"),
+}));
+
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -204,6 +209,18 @@ describe("FileStore", () => {
         'Parent "nope" not found',
       );
     });
+
+    it("stamps lastModified and lastModifiedBy on the new item", async () => {
+      await store.addItem({
+        id: "e1",
+        title: "Epic",
+        status: "pending",
+        level: "epic",
+      });
+      const item = await store.getItem("e1");
+      expect(item!.lastModified).toBeTruthy();
+      expect(item!.lastModifiedBy).toBe("Test Actor <test@example.com>");
+    });
   });
 
   describe("updateItem", () => {
@@ -224,9 +241,66 @@ describe("FileStore", () => {
         store.updateItem("nope", { status: "completed" }),
       ).rejects.toThrow('Item "nope" not found');
     });
+
+    it("stamps lastModified and lastModifiedBy on update", async () => {
+      await store.addItem({
+        id: "t1",
+        title: "Task",
+        status: "pending",
+        level: "task",
+      });
+      await store.updateItem("t1", { status: "completed" });
+      const item = await store.getItem("t1");
+      expect(item!.lastModified).toBeTruthy();
+      expect(item!.lastModifiedBy).toBe("Test Actor <test@example.com>");
+    });
+  });
+
+  describe("removeItem", () => {
+    it("re-stamps the parent's lastModified/lastModifiedBy when a child is removed", async () => {
+      await store.addItem({
+        id: "e1",
+        title: "Epic",
+        status: "pending",
+        level: "epic",
+      });
+      await store.addItem(
+        { id: "f1", title: "Feature", status: "pending", level: "feature" },
+        "e1",
+      );
+      const parentBefore = await store.getItem("e1");
+      const stampBefore = parentBefore!.lastModified as string;
+
+      // Ensure the clock advances so a later stamp is observably different.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await store.removeItem("f1");
+
+      const parentAfter = await store.getItem("e1");
+      expect(parentAfter!.lastModifiedBy).toBe("Test Actor <test@example.com>");
+      expect((parentAfter!.lastModified as string) > stampBefore).toBe(true);
+    });
   });
 
   describe("appendLog / readLog", () => {
+    it("stamps actor on appended log entries", async () => {
+      await store.appendLog({
+        timestamp: "2024-01-01T00:00:00Z",
+        event: "test",
+      });
+      const entries = await store.readLog();
+      expect(entries[0].actor).toBe("Test Actor <test@example.com>");
+    });
+
+    it("does not override an explicit actor on the entry", async () => {
+      await store.appendLog({
+        timestamp: "2024-01-01T00:00:00Z",
+        event: "test",
+        actor: "someone-else",
+      });
+      const entries = await store.readLog();
+      expect(entries[0].actor).toBe("someone-else");
+    });
+
     it("appends and reads log entries", async () => {
       await store.appendLog({
         timestamp: "2024-01-01T00:00:00Z",

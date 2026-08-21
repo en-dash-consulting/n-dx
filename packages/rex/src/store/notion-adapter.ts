@@ -24,6 +24,7 @@ import type { NotionStatusGroup } from "./notion-map.js";
 import {
   stampModified,
   stampSynced,
+  stampActor,
   extractSyncMeta,
 } from "../core/sync.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
@@ -172,7 +173,7 @@ export class NotionStore implements PRDStore {
     }
 
     const parent = resolveParentPage(item, this.databaseId, idMap, parentId);
-    const stamped = stampModified(item);
+    const stamped = await stampModified(item);
     const { properties, children } = mapItemToNotion(stamped);
 
     await this.client.createPage({
@@ -197,7 +198,7 @@ export class NotionStore implements PRDStore {
     }
 
     const merged = { ...entry.item, ...updates } as PRDItem;
-    const stamped = stampModified(merged);
+    const stamped = await stampModified(merged);
     const { properties } = mapItemToNotion(stamped);
 
     await this.client.updatePage(notionId, properties);
@@ -233,13 +234,14 @@ export class NotionStore implements PRDStore {
   }
 
   async appendLog(entry: LogEntry): Promise<void> {
-    const result = validateLogEntry(entry);
+    const stamped = await stampActor(entry);
+    const result = validateLogEntry(stamped);
     if (!result.ok) {
       throw new Error(`Invalid log entry: ${result.errors.message}`);
     }
     await appendFile(
       this.path("execution-log.jsonl"),
-      JSON.stringify(entry) + "\n",
+      JSON.stringify(stamped) + "\n",
       "utf-8",
     );
   }

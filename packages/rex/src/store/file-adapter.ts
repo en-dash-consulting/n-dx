@@ -5,6 +5,7 @@ import { validateDocument, validateConfig, validateLogEntry } from "../schema/va
 import { SCHEMA_VERSION } from "../schema/index.js";
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, walkTree, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
+import { stampModified, stampModifiedFields, stampActor } from "../core/sync.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import { atomicWrite } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
@@ -527,6 +528,7 @@ export class FileStore implements PRDStore {
     // Self-heal tagging runs on creation only so that self-heal runs never
     // rewrite tags on previously-authored items (see updateItem).
     const tagged = withSelfHealTag(item);
+    const stamped = await stampModified(tagged);
 
     if (parentId) {
       let owner: string;
@@ -535,7 +537,7 @@ export class FileStore implements PRDStore {
       } catch {
         throw new Error(`Parent "${parentId}" not found`);
       }
-      const attributedItem = this.applyWriteAttribution(tagged, owner, options);
+      const attributedItem = this.applyWriteAttribution(stamped, owner, options);
       await this.withFileTransaction(owner, async (doc) => {
         if (!insertChild(doc.items, parentId, attributedItem)) {
           throw new Error(`Parent "${parentId}" not found`);
@@ -546,7 +548,7 @@ export class FileStore implements PRDStore {
       return;
     }
 
-    const attributedItem = this.applyWriteAttribution(tagged, this.currentBranchFile, options);
+    const attributedItem = this.applyWriteAttribution(stamped, this.currentBranchFile, options);
     await this.withFileTransaction(this.currentBranchFile, async (doc) => {
       doc.items.push(attributedItem);
     });
@@ -557,8 +559,15 @@ export class FileStore implements PRDStore {
   async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
     const owner = await this.resolveOwnerFile(id);
     const attributedUpdates = this.applyWriteAttribution(updates, owner, options);
+    // Merge in lastModified/lastModifiedBy directly (rather than building a
+    // full merged item via `stampModified`) since `updateInTree` applies a
+    // partial `Object.assign` onto the existing item.
+    const stampedUpdates: Partial<PRDItem> = {
+      ...attributedUpdates,
+      ...(await stampModifiedFields()),
+    };
     await this.withFileTransaction(owner, async (doc) => {
-      if (!updateInTree(doc.items, id, attributedUpdates)) {
+      if (!updateInTree(doc.items, id, stampedUpdates)) {
         throw new Error(`Item "${id}" not found`);
       }
     });
@@ -567,9 +576,20 @@ export class FileStore implements PRDStore {
   async removeItem(id: string): Promise<void> {
     const owner = await this.resolveOwnerFile(id);
     await this.withFileTransaction(owner, async (doc) => {
+      const entry = findItem(doc.items, id);
+      if (!entry) {
+        throw new Error(`Item "${id}" not found`);
+      }
       const removed = removeFromTree(doc.items, id);
       if (!removed) {
         throw new Error(`Item "${id}" not found`);
+      }
+      // Removing a child mutates its parent's stored content (children list
+      // changes) — re-stamp the parent so this is detected as a local
+      // modification, mirroring FolderTreeStore.removeItem.
+      const parent = entry.parents[entry.parents.length - 1];
+      if (parent) {
+        Object.assign(parent, await stampModified(parent));
       }
     });
     this.itemToFile.delete(id);
@@ -593,16 +613,17 @@ export class FileStore implements PRDStore {
   }
 
   async appendLog(entry: LogEntry): Promise<void> {
-    const result = validateLogEntry(entry);
+    const stampedEntry = await stampActor(entry);
+    const result = validateLogEntry(stampedEntry);
     if (!result.ok) {
       throw new Error(`Invalid log entry: ${result.errors.message}`);
     }
     // Truncate detail to prevent huge log entries
     const MAX_DETAIL_LENGTH = 2000;
     const sanitizedEntry =
-      entry.detail && entry.detail.length > MAX_DETAIL_LENGTH
-        ? { ...entry, detail: entry.detail.slice(0, MAX_DETAIL_LENGTH) + "..." }
-        : entry;
+      stampedEntry.detail && stampedEntry.detail.length > MAX_DETAIL_LENGTH
+        ? { ...stampedEntry, detail: stampedEntry.detail.slice(0, MAX_DETAIL_LENGTH) + "..." }
+        : stampedEntry;
 
     const logPath = this.path("execution-log.jsonl");
 

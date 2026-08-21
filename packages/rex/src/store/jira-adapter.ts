@@ -18,7 +18,7 @@ import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, walkTree } from "../core/tree.js";
-import { stampModified } from "../core/sync.js";
+import { stampModified, stampActor } from "../core/sync.js";
 import {
   mapIssuesToDocument,
   mapItemToCreate,
@@ -126,7 +126,7 @@ export class JiraStore implements PRDStore {
       throw new Error(`Parent "${parentId}" not found`);
     }
 
-    const stamped = stampModified(item);
+    const stamped = await stampModified(item);
     await this.client.createIssue(
       mapItemToCreate(stamped, this.projectKey, this.issueType, this.syncLabels, parentId),
     );
@@ -146,7 +146,7 @@ export class JiraStore implements PRDStore {
 
     const parentItem = entry.parents.length > 0 ? entry.parents[entry.parents.length - 1] : undefined;
     const merged = { ...entry.item, ...updates } as PRDItem;
-    const stamped = stampModified(merged);
+    const stamped = await stampModified(merged);
     await this.client.updateIssue(key, mapItemToUpdate(stamped, this.syncLabels, parentItem?.id));
   }
 
@@ -178,13 +178,14 @@ export class JiraStore implements PRDStore {
   }
 
   async appendLog(entry: LogEntry): Promise<void> {
-    const result = validateLogEntry(entry);
+    const stamped = await stampActor(entry);
+    const result = validateLogEntry(stamped);
     if (!result.ok) {
       throw new Error(`Invalid log entry: ${result.errors.message}`);
     }
     await appendFile(
       this.path("execution-log.jsonl"),
-      JSON.stringify(entry) + "\n",
+      JSON.stringify(stamped) + "\n",
       "utf-8",
     );
   }

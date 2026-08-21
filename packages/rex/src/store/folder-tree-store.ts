@@ -28,7 +28,7 @@ import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
 import { PRD_TREE_DIRNAME } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
-import { stampModified } from "../core/sync.js";
+import { stampModified, stampActor } from "../core/sync.js";
 
 // ---------------------------------------------------------------------------
 // FolderTreeStore
@@ -90,7 +90,7 @@ export class FolderTreeStore implements PRDStore {
     const lockPath = this.path("prd.lock");
     await withLock(lockPath, async () => {
       const doc = await this.loadDocument();
-      const stamped = stampModified(item);
+      const stamped = await stampModified(item);
       if (parentId) {
         if (!insertChild(doc.items, parentId, stamped)) {
           throw new Error(`Parent "${parentId}" not found`);
@@ -115,7 +115,7 @@ export class FolderTreeStore implements PRDStore {
       }
       // Merge updates onto the current item before stamping so `lastModified`
       // always reflects this write, even when `updates` omits it.
-      const merged = stampModified({ ...entry.item, ...updates } as PRDItem);
+      const merged = await stampModified({ ...entry.item, ...updates } as PRDItem);
       if (!updateInTree(doc.items, id, merged)) {
         throw new Error(`Item "${id}" not found`);
       }
@@ -142,7 +142,7 @@ export class FolderTreeStore implements PRDStore {
       // mutating it in place is sufficient — no re-lookup needed.
       const parent = entry.parents[entry.parents.length - 1];
       if (parent) {
-        Object.assign(parent, stampModified(parent));
+        Object.assign(parent, await stampModified(parent));
       }
       await this.saveDocument(doc);
     });
@@ -167,11 +167,12 @@ export class FolderTreeStore implements PRDStore {
   // ---- Execution log -------------------------------------------------------
 
   async appendLog(entry: LogEntry): Promise<void> {
-    const check = validateLogEntry(entry);
+    const stamped = await stampActor(entry);
+    const check = validateLogEntry(stamped);
     if (!check.ok) {
       throw new Error(`Invalid log entry: ${check.errors.message}`);
     }
-    await appendFile(this.path("execution-log.jsonl"), JSON.stringify(entry) + "\n", "utf-8");
+    await appendFile(this.path("execution-log.jsonl"), JSON.stringify(stamped) + "\n", "utf-8");
   }
 
   async readLog(limit?: number): Promise<LogEntry[]> {
