@@ -1,5 +1,0 @@
----
-"@n-dx/sourcevision": patch
----
-
-Classify `*.config.*` build/tooling artifacts as `config` instead of `source`. `classifyRole` derived the `config` role from a finite, hardcoded per-language `configFilenames` set, so any config file it did not enumerate — `drizzle.config.ts`, `playwright.config.ts`, `tsup.config.ts`, `cypress.config.js`, project-specific configs, and configs from newer tools — fell through to the `source` role and polluted source-logic analysis (archetype classification and enrichment both key off `role === "source"`). A universal convention heuristic now matches `<name>.config.<ext>` for JS/TS and data-config extensions (`ts/tsx/js/jsx/mjs/cjs/mts/cts/json/yaml/yml/toml`), so these artifacts are separated from source logic and rescans are less noisy. Matching requires the literal `.config.` segment, so genuine source files such as `config.ts`, `configuration.ts`, and `db-config.ts` are unaffected, and the pattern only fires for the listed extensions, leaving Python/Go/other source untouched.
