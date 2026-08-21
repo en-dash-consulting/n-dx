@@ -62,6 +62,7 @@ function installBrowserStubs(reducedMotion = false): void {
       takeRecords: vi.fn().mockReturnValue([]),
       root: null,
       rootMargin: "",
+      scrollMargin: "",
       thresholds: [],
     } satisfies IntersectionObserver;
   }) as unknown as typeof IntersectionObserver;

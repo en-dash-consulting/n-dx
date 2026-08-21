@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=22.0.0",
     "pnpm": ">=10.0.0"
   },
   "scripts": {
@@ -32,27 +32,31 @@
     "preflight": "node scripts/preflight.mjs"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.6.0",
-    "@changesets/cli": "^2.30.0",
+    "@changesets/changelog-github": "^1.0.0",
+    "@changesets/cli": "^3.0.0",
     "vitepress": "^1.6.4",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.10"
   },
   "pnpm": {
     "overrides": {
       "picomatch@<2.3.2": "^2.3.2",
       "picomatch@>=4.0.0 <4.0.4": "^4.0.4",
-      "postcss": "^8.5.10",
-      "hono": "^4.12.18",
-      "fast-uri": ">=3.1.2",
-      "@hono/node-server": "^1.19.13",
+      "postcss": "^8.5.26",
+      "hono": "^4.13.2",
+      "fast-uri": "^3.1.5",
+      "@hono/node-server": "^1.19.15",
       "ajv@>=7.0.0-alpha.0 <8.18.0": "^8.18.0",
       "path-to-regexp@>=8.0.0 <8.4.0": "^8.4.0",
-      "qs@>=6.7.0 <6.14.2": "^6.14.2",
-      "vite@>=7.0.0 <7.3.2": "^7.3.2",
+      "qs@>=6.5.0 <6.15.2": "^6.15.2",
+      "vite@<6": "^6.4.3",
       "esbuild@<0.25.0": "^0.25.0",
       "rollup@>=4.0.0 <4.59.0": "^4.59.0",
-      "vite@<6.4.2": "^6.4.2",
-      "ip-address@<10.1.1": "^10.1.1"
+      "ip-address@<10.5.0": "^10.5.0",
+      "js-yaml@>=4.0.0 <4.3.1": "^4.3.1",
+      "js-yaml@<3.15.1": "^3.15.1",
+      "nanoid@<3.3.18": "^3.3.18",
+      "ws@>=8.0.0 <8.21.0": "^8.21.0",
+      "body-parser@>=2.0.0 <2.3.0": "^2.3.0"
     }
   },
   "packageManager": "pnpm@10.33.0"
