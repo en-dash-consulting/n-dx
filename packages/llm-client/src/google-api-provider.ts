@@ -27,7 +27,7 @@
 
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
 import { ClaudeClientError } from "./types.js";
-import type { LLMProvider, ProviderInfo, StreamChunk } from "./provider-interface.js";
+import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { GoogleConfig } from "./llm-types.js";
 import type { GeminiFunctionDeclaration } from "./tool-schema.js";
 import { classifyAuthError } from "./llm-error-classifier.js";
@@ -174,7 +174,7 @@ export function resolveGoogleApiKey(
 /** Classify an HTTP status code into an ErrorReason and throw. */
 function classifyAndThrow(status: number, message: string): never {
   if (status === 401 || status === 403) {
-    throw classifyAuthError(new Error(message), "google") ??
+    throw classifyAuthError(new Error(message), LLM_VENDOR.GOOGLE) ??
       new ClaudeClientError(message, "auth", false);
   }
   if (status === 408) {
@@ -273,7 +273,7 @@ export function createGoogleApiProvider(
   const maxOutputTokens = options.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
 
   const info: ProviderInfo = {
-    vendor: "google",
+    vendor: LLM_VENDOR.GOOGLE,
     mode: "api",
     model: defaultModel,
     capabilities: ["streaming", "function-calling"],
@@ -345,7 +345,7 @@ export function createGoogleApiProvider(
             const message = `Gemini API error ${response.status}: ${body}`;
 
             if (response.status === 401 || response.status === 403) {
-              throw classifyAuthError(new Error(message), "google") ??
+              throw classifyAuthError(new Error(message), LLM_VENDOR.GOOGLE) ??
                 new ClaudeClientError(message, "auth", false);
             }
             if (response.status === 404) {
@@ -466,7 +466,7 @@ export function createGoogleApiProvider(
             const message = `Gemini API error ${response.status}: ${body}`;
 
             if (response.status === 401 || response.status === 403) {
-              throw classifyAuthError(new Error(message), "google") ??
+              throw classifyAuthError(new Error(message), LLM_VENDOR.GOOGLE) ??
                 new ClaudeClientError(message, "auth", false);
             }
             if (response.status === 404) {

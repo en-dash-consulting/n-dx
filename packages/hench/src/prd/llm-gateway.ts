@@ -46,13 +46,32 @@ export {
 } from "@n-dx/llm-client";
 
 // ---- Shared constants -------------------------------------------------------
-export { PROJECT_DIRS } from "@n-dx/llm-client";
+export {
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  LLM_VENDORS,
+  PROJECT_DIRS,
+  isLLMVendor,
+} from "@n-dx/llm-client";
 
 // ---- Canonical JSON ---------------------------------------------------------
 export { toCanonicalJSON } from "@n-dx/llm-client";
 
 // ---- CLI output control -----------------------------------------------------
-export { setQuiet, isQuiet, info, result, warn, createSpinner } from "@n-dx/llm-client";
+export {
+  setQuiet,
+  isQuiet,
+  setVerbose,
+  isVerbose,
+  setDebug,
+  isDebug,
+  info,
+  result,
+  warn,
+  verbose,
+  debug,
+  createSpinner,
+} from "@n-dx/llm-client";
 
 // ---- Deprecation filter (CLI entry points) ----------------------------------
 export { suppressKnownDeprecations } from "@n-dx/llm-client";

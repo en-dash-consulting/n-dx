@@ -1,5 +1,4 @@
-import type { LLMVendor } from "@n-dx/llm-client";
-import { resolveModel } from "@n-dx/llm-client";
+import { LLM_VENDOR, resolveModel, type LLMVendor } from "@n-dx/llm-client";
 
 /**
  * Legacy `.rex/config.json` may contain a model string from an older
@@ -12,15 +11,15 @@ export function isModelCompatibleWithVendor(
   const trimmed = model?.trim();
   if (!trimmed) return false;
 
-  if (vendor === "claude") {
+  if (vendor === LLM_VENDOR.CLAUDE) {
     return resolveModel(trimmed).startsWith("claude-");
   }
 
-  if (vendor === "google") {
+  if (vendor === LLM_VENDOR.GOOGLE) {
     return trimmed.startsWith("gemini-");
   }
 
-  if (vendor === "local") {
+  if (vendor === LLM_VENDOR.LOCAL) {
     // Local vendor accepts any non-empty model string — LM Studio will validate
     // against its own loaded model list. Empty string means "use whatever is loaded".
     return true;

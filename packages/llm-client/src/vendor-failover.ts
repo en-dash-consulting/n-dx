@@ -20,7 +20,7 @@
  * The chain terminates after 3 failover attempts (attempts 1-3), with attempt 4+ reporting exhaustion.
  */
 
-import type { LLMVendor, LLMConfig } from "./llm-types.js";
+import { LLM_VENDOR, type LLMVendor, type LLMConfig } from "./llm-types.js";
 import { resolveVendorModel } from "./config.js";
 
 /** Result of a failover attempt query. */
@@ -72,13 +72,13 @@ export function getNextFailoverAttempt(
     return { isExhausted: true };
   }
 
-  if (originVendor === "claude") {
+  if (originVendor === LLM_VENDOR.CLAUDE) {
     return getClaudeFailoverAttempt(attemptNumber, llmConfig);
   }
-  if (originVendor === "codex") {
+  if (originVendor === LLM_VENDOR.CODEX) {
     return getCodexFailoverAttempt(attemptNumber, llmConfig);
   }
-  if (originVendor === "google") {
+  if (originVendor === LLM_VENDOR.GOOGLE) {
     return getGoogleFailoverAttempt(attemptNumber, llmConfig);
   }
 
@@ -100,24 +100,24 @@ function getClaudeFailoverAttempt(
       // Try Claude light (haiku)
       return {
         isExhausted: false,
-        vendor: "claude",
-        model: resolveVendorModel("claude", llmConfig, "light"),
+        vendor: LLM_VENDOR.CLAUDE,
+        model: resolveVendorModel(LLM_VENDOR.CLAUDE, llmConfig, "light"),
       };
 
     case 2:
       // Cross to Codex standard (gpt-5.5)
       return {
         isExhausted: false,
-        vendor: "codex",
-        model: resolveVendorModel("codex", llmConfig, "standard"),
+        vendor: LLM_VENDOR.CODEX,
+        model: resolveVendorModel(LLM_VENDOR.CODEX, llmConfig, "standard"),
       };
 
     case 3:
       // Try Codex light (gpt-5.4-mini)
       return {
         isExhausted: false,
-        vendor: "codex",
-        model: resolveVendorModel("codex", llmConfig, "light"),
+        vendor: LLM_VENDOR.CODEX,
+        model: resolveVendorModel(LLM_VENDOR.CODEX, llmConfig, "light"),
       };
 
     default:
@@ -140,24 +140,24 @@ function getCodexFailoverAttempt(
       // Try Codex light (gpt-5.4-mini)
       return {
         isExhausted: false,
-        vendor: "codex",
-        model: resolveVendorModel("codex", llmConfig, "light"),
+        vendor: LLM_VENDOR.CODEX,
+        model: resolveVendorModel(LLM_VENDOR.CODEX, llmConfig, "light"),
       };
 
     case 2:
       // Cross to Claude standard (sonnet)
       return {
         isExhausted: false,
-        vendor: "claude",
-        model: resolveVendorModel("claude", llmConfig, "standard"),
+        vendor: LLM_VENDOR.CLAUDE,
+        model: resolveVendorModel(LLM_VENDOR.CLAUDE, llmConfig, "standard"),
       };
 
     case 3:
       // Try Claude light (haiku)
       return {
         isExhausted: false,
-        vendor: "claude",
-        model: resolveVendorModel("claude", llmConfig, "light"),
+        vendor: LLM_VENDOR.CLAUDE,
+        model: resolveVendorModel(LLM_VENDOR.CLAUDE, llmConfig, "light"),
       };
 
     default:
@@ -180,24 +180,24 @@ function getGoogleFailoverAttempt(
       // Try Google light (gemini-2.0-flash)
       return {
         isExhausted: false,
-        vendor: "google",
-        model: resolveVendorModel("google", llmConfig, "light"),
+        vendor: LLM_VENDOR.GOOGLE,
+        model: resolveVendorModel(LLM_VENDOR.GOOGLE, llmConfig, "light"),
       };
 
     case 2:
       // Cross to Claude standard (sonnet)
       return {
         isExhausted: false,
-        vendor: "claude",
-        model: resolveVendorModel("claude", llmConfig, "standard"),
+        vendor: LLM_VENDOR.CLAUDE,
+        model: resolveVendorModel(LLM_VENDOR.CLAUDE, llmConfig, "standard"),
       };
 
     case 3:
       // Try Claude light (haiku)
       return {
         isExhausted: false,
-        vendor: "claude",
-        model: resolveVendorModel("claude", llmConfig, "light"),
+        vendor: LLM_VENDOR.CLAUDE,
+        model: resolveVendorModel(LLM_VENDOR.CLAUDE, llmConfig, "light"),
       };
 
     default:

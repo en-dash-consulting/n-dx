@@ -487,7 +487,7 @@ export function renderAgentsMd() {
     "- Log what you did (`append_log`)",
     "- Check overall project progress (`get_prd_status`)",
     "",
-    "**SourceVision** — Codebase analysis. Use sourcevision tools when you need to:",
+    "**Sourcevision** — Codebase analysis. Use sourcevision tools when you need to:",
     "",
     "- Understand a file's role and dependencies (`get_file_info`, `get_imports`)",
     "- Find files related to a feature or module (`search_files`)",

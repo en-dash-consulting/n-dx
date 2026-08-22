@@ -38,7 +38,7 @@ import type { ScanResult, Proposal } from "../../analyze/index.js";
 import type {PRDItem, AnalyzeTokenUsage, LoEConfig} from "../../schema/index.js";import { LOE_DEFAULTS } from "../../schema/index.js";
 import type { BatchAcceptanceRecord } from "../../analyze/index.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveVendorModel, cyan, yellow, dim } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor, printVendorModelHeader, resolveVendorModel, cyan, yellow, dim } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 import { resolveVendorCompatibleRexModel } from "../model-resolution.js";
 
@@ -66,18 +66,18 @@ function resolveAnalyzeTokenEventMetadata(
     return { vendor, model: explicitModel };
   }
 
-  if (vendor === "codex" || vendor === "claude" || vendor === "google") {
+  if (isLLMVendor(vendor) && vendor !== LLM_VENDOR.LOCAL) {
     return {
       vendor,
       model: normalizeProviderMetadata(resolveVendorModel(vendor, llmConfig))
-        ?? (vendor === "codex" ? DEFAULT_CODEX_MODEL : DEFAULT_MODEL),
+        ?? (vendor === LLM_VENDOR.CODEX ? DEFAULT_CODEX_MODEL : DEFAULT_MODEL),
     };
   }
 
-  if (vendor === "local") {
+  if (vendor === LLM_VENDOR.LOCAL) {
     return {
       vendor,
-      model: normalizeProviderMetadata(resolveVendorModel("local", llmConfig)) ?? "local",
+      model: normalizeProviderMetadata(resolveVendorModel(LLM_VENDOR.LOCAL, llmConfig)) ?? LLM_VENDOR.LOCAL,
     };
   }
 
@@ -449,7 +449,7 @@ async function resolveModel(dir: string, flagModel?: string): Promise<string | u
       const rexDir = join(dir, REX_DIR);
       const store = await resolveStore(rexDir);
       const config = await store.loadConfig();
-      const vendor = getLLMVendor() ?? "claude";
+      const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
       const model = resolveVendorCompatibleRexModel(vendor, config.model);
       if (model) return model;
     } catch {

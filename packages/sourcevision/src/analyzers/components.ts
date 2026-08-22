@@ -31,6 +31,8 @@ import {
   findRoutesDir,
 } from "./route-detection.js";
 import { detectServerRoutes } from "./server-route-detection.js";
+import { isVerbose, verbose } from "@n-dx/llm-client";
+import { debugTimed, debugTimedAsync, checkpoint } from "../util/debug-timing.js";
 
 const JSX_EXTENSIONS = new Set([".tsx", ".jsx"]);
 const ALL_PARSEABLE = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
@@ -464,6 +466,11 @@ async function detectRoutes(
       if (configRoutes) {
         usedConfigRoutes = true;
 
+        if (isVerbose()) {
+          verbose(`  … scanning ${configRoutes.length} config-based route(s) from ${routesConfig.file}`);
+        }
+        checkpoint(`scanning ${configRoutes.length} config-based route(s)`);
+
         for (const mod of configRoutes) {
           if (canIncremental && changedFiles && !changedFiles.has(mod.file) && prevRouteMap.has(mod.file)) {
             const prevMod = prevRouteMap.get(mod.file)!;
@@ -479,13 +486,14 @@ async function detectRoutes(
           const routeFullPath = join(targetDir, mod.file);
           let routeSource: string;
           try {
-            routeSource = await readFile(routeFullPath, "utf-8");
+            routeSource = await debugTimedAsync(`read ${mod.file}`, () => readFile(routeFullPath, "utf-8"));
           } catch {
             routeModules.push(mod);
             continue;
           }
 
-          const conventionExports = extractConventionExports(routeSource, mod.file);
+          const conventionExports = debugTimed(`convention exports ${mod.file} (${routeSource.length} bytes)`,
+            () => extractConventionExports(routeSource, mod.file));
           routeModules.push({
             ...mod,
             exports: conventionExports,
@@ -513,6 +521,11 @@ async function detectRoutes(
         f.path.startsWith(routesDir + "/") && f.role !== "test"
       );
 
+      if (isVerbose()) {
+        verbose(`  … scanning ${routeFiles.length} file-based route(s) in ${routesDir}/`);
+      }
+      checkpoint(`scanning ${routeFiles.length} file-based route(s)`);
+
       for (const file of routeFiles) {
         if (canIncremental && changedFiles && !changedFiles.has(file.path) && prevRouteMap.has(file.path)) {
           const prevMod = prevRouteMap.get(file.path)!;
@@ -529,12 +542,13 @@ async function detectRoutes(
         const fullPath = join(targetDir, file.path);
         let sourceText: string;
         try {
-          sourceText = await readFile(fullPath, "utf-8");
+          sourceText = await debugTimedAsync(`read ${file.path}`, () => readFile(fullPath, "utf-8"));
         } catch {
           continue;
         }
 
-        const conventionExports = extractConventionExports(sourceText, file.path);
+        const conventionExports = debugTimed(`convention exports ${file.path} (${sourceText.length} bytes)`,
+          () => extractConventionExports(sourceText, file.path));
         const routePattern = parseFileRoutePattern(file.path, routesDir);
 
         const relToRoutes = toPosix(relative(routesDir, file.path));
@@ -714,11 +728,26 @@ export async function analyzeComponents(
     return true;
   });
 
-  for (const file of parseableFiles) {
+  // Throttled progress ticks (mirrors the inventory phase's scan reporting)
+  // name the file currently being parsed, not just a count — a single
+  // pathological file (huge generated bundle, deeply nested JSX) shows up
+  // as the last line printed staying put, telling a stuck file apart from
+  // a merely large one.
+  const verboseScan = isVerbose();
+  let lastTickMs = Date.now();
+  checkpoint(`component parse loop starting (${parseableFiles.length} files)`);
+
+  for (let i = 0; i < parseableFiles.length; i++) {
+    const file = parseableFiles[i];
+    if (verboseScan && Date.now() - lastTickMs >= 2000) {
+      verbose(`  … parsing components (${i}/${parseableFiles.length}) — ${file.path}`);
+      lastTickMs = Date.now();
+    }
+
     const fullPath = join(targetDir, file.path);
     let sourceText: string;
     try {
-      sourceText = await readFile(fullPath, "utf-8");
+      sourceText = await debugTimedAsync(`read ${file.path}`, () => readFile(fullPath, "utf-8"));
     } catch {
       continue;
     }
@@ -729,7 +758,8 @@ export async function analyzeComponents(
     // Extract components (JSX files only for actual component detection,
     // but we can check any file for convention exports)
     if (isJsx) {
-      const defs = extractComponentDefinitions(sourceText, file.path);
+      const defs = debugTimed(`component defs ${file.path} (${sourceText.length} bytes)`,
+        () => extractComponentDefinitions(sourceText, file.path));
       for (const def of defs) {
         allComponents.push(def);
         // Track by name for usage resolution
@@ -740,7 +770,8 @@ export async function analyzeComponents(
       }
 
       // Extract JSX usages
-      const usages = extractJsxUsages(sourceText, file.path);
+      const usages = debugTimed(`jsx usages ${file.path} (${sourceText.length} bytes)`,
+        () => extractJsxUsages(sourceText, file.path));
       for (const usage of usages) {
         allUsages.push({
           file: file.path,
@@ -754,6 +785,11 @@ export async function analyzeComponents(
     // and .tsx convention exports
   }
 
+  if (verboseScan) {
+    verbose(`  … parsed ${parseableFiles.length} files (${allComponents.length} components) — detecting routes...`);
+  }
+  checkpoint("component parse loop finished");
+
   const usageEdges = resolveUsageEdges(allUsages, importMap);
 
   const { routeModules, routeTree } = await detectRoutes(
@@ -765,9 +801,19 @@ export async function analyzeComponents(
     prev?.routeModules,
   );
 
+  if (verboseScan) {
+    verbose(`  … found ${routeModules.length} route module(s) — detecting server routes...`);
+  }
+  checkpoint("detectRoutes finished");
+
   // ── Server-side API route detection ────────────────────────────────────────
 
   const serverRoutes: ServerRouteGroup[] = await detectServerRoutes(targetDir, inventory);
+
+  checkpoint("detectServerRoutes finished");
+  if (verboseScan) {
+    verbose(`  … found ${serverRoutes.length} server route group(s) — finalizing...`);
+  }
 
   const summary = computeComponentsSummary(
     allComponents,

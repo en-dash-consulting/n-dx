@@ -6,6 +6,12 @@ import type {
   ProviderCapability,
   StreamChunk,
 } from "../../src/provider-interface.js";
+import {
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  LLM_VENDORS,
+  isLLMVendor,
+} from "../../src/provider-interface.js";
 import type { CompletionRequest, CompletionResult } from "../../src/types.js";
 
 // ── Test helpers ──────────────────────────────────────────────────────────
@@ -23,6 +29,30 @@ function makeInfo(overrides: Partial<ProviderInfo> = {}): ProviderInfo {
 
 const stubResult: CompletionResult = { text: "stub response" };
 const stubRequest: CompletionRequest = { prompt: "Hello", model: "test-model" };
+
+// ── Vendor constants ─────────────────────────────────────────────────────
+
+describe("LLM vendor constants", () => {
+  it("exports canonical vendor values and default", () => {
+    expect(LLM_VENDOR).toEqual({
+      CLAUDE: "claude",
+      CODEX: "codex",
+      GOOGLE: "google",
+      LOCAL: "local",
+    });
+    expect(DEFAULT_LLM_VENDOR).toBe(LLM_VENDOR.CLAUDE);
+    expect(LLM_VENDORS).toEqual(["claude", "codex", "google", "local"]);
+  });
+
+  it("narrows unknown values to supported LLM vendors", () => {
+    expect(isLLMVendor("claude")).toBe(true);
+    expect(isLLMVendor("codex")).toBe(true);
+    expect(isLLMVendor("google")).toBe(true);
+    expect(isLLMVendor("local")).toBe(true);
+    expect(isLLMVendor("project")).toBe(false);
+    expect(isLLMVendor(undefined)).toBe(false);
+  });
+});
 
 // ── Mock provider factories ───────────────────────────────────────────────
 

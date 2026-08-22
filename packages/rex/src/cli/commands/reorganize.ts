@@ -19,7 +19,7 @@ import { parseIntList } from "../parse-utils.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
 import { info, warn, result, startSpinner } from "../output.js";
 import { loadClaudeConfig, loadLLMConfig } from "../../store/project-config.js";
-import { printVendorModelHeader } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
 import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
@@ -44,7 +44,7 @@ async function runLlmAnalysis(
 
     // Resolve model: explicit flag > vendor config > default
     const resolvedModel = resolveConfiguredModel(flags.model);
-    const vendor = getLLMVendor() ?? "claude";
+    const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
     const modelSource = flags.model
       ? "cli-override" as const
       : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model

@@ -20,6 +20,11 @@ import { getVendorTarget } from "./assistant-assets.js";
 
 // ── Vendor registry ──────────────────────────────────────────────────────────
 
+const ASSISTANT_VENDOR = {
+  CLAUDE: "claude",
+  CODEX: "codex",
+};
+
 /**
  * Each entry maps a vendor name to its setup function and a one-line
  * summary formatter.  The registry is the single place where vendor
@@ -27,14 +32,14 @@ import { getVendorTarget } from "./assistant-assets.js";
  * directly (except to build the options object from CLI flags).
  */
 const VENDOR_REGISTRY = {
-  claude: {
+  [ASSISTANT_VENDOR.CLAUDE]: {
     label: "Claude Code",
     skipFlag: "--no-claude",
     setup: setupClaudeIntegration,
     summarize: (r) =>
       `CLAUDE.md, ${r.skills.written} skills, ${r.settings.total} permissions`,
   },
-  codex: {
+  [ASSISTANT_VENDOR.CODEX]: {
     label: "Codex",
     skipFlag: "--no-codex",
     setup: setupCodexIntegration,
@@ -168,7 +173,7 @@ export function formatInitReport(results, opts = {}) {
 function formatVendorArtifacts(vendor, detail) {
   const lines = [];
 
-  if (vendor === "claude") {
+  if (vendor === ASSISTANT_VENDOR.CLAUDE) {
     if (detail.instructions?.written) {
       lines.push("CLAUDE.md written");
     }
@@ -197,7 +202,7 @@ function formatVendorArtifacts(vendor, detail) {
     }
   }
 
-  if (vendor === "codex") {
+  if (vendor === ASSISTANT_VENDOR.CODEX) {
     if (detail.agents?.written) {
       lines.push("AGENTS.md written");
     }
