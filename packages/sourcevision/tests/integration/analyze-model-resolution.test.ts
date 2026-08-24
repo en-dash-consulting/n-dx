@@ -62,7 +62,7 @@ describe("sourcevision analyze respects .n-dx.json model config", () => {
   });
 
   it("changing llm.codex.model in .n-dx.json is reflected in token event metadata", async () => {
-    const customModel = "gpt-5.4-mini";
+    const customModel = "gpt-5.6-luna";
     await writeFile(
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({ llm: { vendor: "codex", codex: { model: customModel } } }),
@@ -91,7 +91,7 @@ describe("sourcevision analyze respects .n-dx.json model config", () => {
   });
 
   it("changing llm.google.model in .n-dx.json is reflected in token event metadata", async () => {
-    const customModel = "gemini-2.0-flash";
+    const customModel = "gemini-3.7-flash";
     await writeFile(
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({ llm: { vendor: "google", google: { model: customModel } } }),

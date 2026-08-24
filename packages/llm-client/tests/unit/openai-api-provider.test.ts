@@ -183,7 +183,7 @@ describe("createOpenAiApiProvider — LLMProvider interface", () => {
 
   it("uses default model when no model configured", () => {
     const provider = makeProvider();
-    expect(provider.info.model).toBe("gpt-4o");
+    expect(provider.info.model).toBe("gpt-5.6-terra");
   });
 
   it("sets info.model when model is configured", () => {

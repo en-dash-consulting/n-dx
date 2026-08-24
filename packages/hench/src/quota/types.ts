@@ -15,7 +15,7 @@
 export interface QuotaRemaining {
   /** Provider vendor identifier, e.g. "claude", "codex", or "google". */
   vendor: string;
-  /** Resolved model identifier, e.g. "claude-opus-4-5". */
+  /** Resolved model identifier, e.g. "claude-opus-5". */
   model: string;
   /** Percentage of quota (or configured budget) still available: 0–100. */
   percentRemaining: number;

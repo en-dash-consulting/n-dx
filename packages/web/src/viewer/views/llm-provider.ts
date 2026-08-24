@@ -76,9 +76,15 @@ const VENDORS = [
   { id: VIEWER_LLM_VENDOR.LOCAL, label: "Local", subtitle: "LM Studio / Ollama" },
 ] satisfies ReadonlyArray<{ id: ViewerLLMVendor; label: string; subtitle: string }>;
 
+// Keep in sync with packages/core/llm-model-catalog.js (the `ndx init`
+// selector). These are display-only suggestions; any model ID the vendor
+// accepts can still be typed in.
+//
+// NOTE: the `google` vendor is supported by the CLI but not yet by this view
+// (ProviderConfig has no google section), so it has no entry here.
 const MODEL_SUGGESTIONS: Record<ViewerLLMVendor, string[]> = {
-  [VIEWER_LLM_VENDOR.CLAUDE]: ["claude-sonnet-4-5", "claude-opus-4-5", "claude-haiku-3-5", "claude-3-7-sonnet-20250219"],
-  [VIEWER_LLM_VENDOR.CODEX]: ["codex-mini", "o4-mini", "o3"],
+  [VIEWER_LLM_VENDOR.CLAUDE]: ["claude-sonnet-5", "claude-opus-5", "claude-fable-5", "claude-haiku-4-5"],
+  [VIEWER_LLM_VENDOR.CODEX]: ["gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.5"],
   [VIEWER_LLM_VENDOR.LOCAL]: [],
 };
 

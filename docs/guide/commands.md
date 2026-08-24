@@ -140,7 +140,7 @@ ndx work --auto --iterations=4 .       # run 4 tasks sequentially
 ndx work --task=abc123 .               # specific task
 ndx work --epic="Auth System" --auto . # scope to epic
 ndx work --dry-run .                   # preview without executing
-ndx work --model=claude-opus-4-20250514 .  # override model
+ndx work --model=claude-opus-5 .          # override model
 ndx work --auto --loop .               # run continuously until done
 ```
 

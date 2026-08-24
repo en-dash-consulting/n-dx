@@ -211,7 +211,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     examples: [
       { command: "hench config", description: "Display all current settings" },
       { command: "hench config model", description: "Show current model" },
-      { command: "hench config model claude-sonnet-4-6", description: "Set the model" },
+      { command: "hench config model claude-sonnet-5", description: "Set the model" },
       { command: "hench config --interactive", description: "Interactive menu for all settings" },
     ],
     related: ["template"],

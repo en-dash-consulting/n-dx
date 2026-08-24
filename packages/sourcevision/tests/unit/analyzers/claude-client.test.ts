@@ -104,7 +104,7 @@ describe("claude-client model resolution", () => {
   });
 
   it("uses a configured Google model instead of the default", async () => {
-    const customGoogleModel = "gemini-2.0-flash";
+    const customGoogleModel = "gemini-3.7-flash";
     setLLMConfig({ vendor: "google", google: { model: customGoogleModel } });
     await callClaude("hello");
     expect(mockComplete).toHaveBeenCalledWith(
@@ -114,7 +114,7 @@ describe("claude-client model resolution", () => {
 
   it("resolveLightModel returns the Google light-tier model when vendor is google", () => {
     setLLMConfig({ vendor: "google" });
-    expect(resolveLightModel()).toBe("gemini-2.0-flash");
+    expect(resolveLightModel()).toBe("gemini-3.5-flash-lite");
   });
 
   it("getAuthMode returns api when Google API key is configured", () => {

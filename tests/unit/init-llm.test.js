@@ -863,9 +863,9 @@ describe("LLM_MODEL_CATALOG", () => {
     expect(recommended.id).toBe("claude-sonnet-5");
   });
 
-  it("recommended Codex model is gpt-5.5", () => {
+  it("recommended Codex model is gpt-5.6-terra", () => {
     const recommended = LLM_MODEL_CATALOG.codex.find((m) => m.recommended);
-    expect(recommended.id).toBe("gpt-5.5");
+    expect(recommended.id).toBe("gpt-5.6-terra");
   });
 });
 
@@ -897,7 +897,7 @@ describe("getRecommendedModel", () => {
     const recommended = getRecommendedModel("codex");
     expect(recommended).toBeDefined();
     expect(recommended.recommended).toBe(true);
-    expect(recommended.id).toBe("gpt-5.5");
+    expect(recommended.id).toBe("gpt-5.6-terra");
   });
 
   it("returns undefined for unknown vendor", () => {
@@ -919,7 +919,7 @@ describe("promptLLMSelection model prompt integration", () => {
         needsModelPrompt: true,
       };
       const result = await promptLLMSelection(resolution);
-      expect(result.model).toBe("gpt-5.5");
+      expect(result.model).toBe("gpt-5.6-terra");
       expect(result.modelSource).toBe("prompt");
     });
   });
@@ -940,7 +940,7 @@ describe("promptLLMSelection model prompt integration", () => {
         // No promptModel override — uses default, which selects the recommended catalog model
       });
       expect(result.provider).toBe("codex");
-      expect(result.model).toBe("gpt-5.5");
+      expect(result.model).toBe("gpt-5.6-terra");
       expect(result.modelSource).toBe("prompt");
     });
   });
