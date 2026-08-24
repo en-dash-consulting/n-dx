@@ -17,6 +17,9 @@ function runRefresh(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, "refresh", ...withFast], {
     encoding: "utf-8",
     timeout: 60000,
+    // execFileSync inherits the parent's stderr unless stdio is set, which
+    // leaks this fixture's CLI notices into the vitest report.
+    stdio: "pipe",
     ...opts,
   });
 }
@@ -139,7 +142,7 @@ describe("n-dx refresh", () => {
     const stdout = execFileSync(
       "node",
       ["--import", pathToFileURL(mockPath).href, CLI_PATH, "refresh", "--ui-only", "--no-build", tmpDir],
-      { encoding: "utf-8", timeout: 60000 },
+      { encoding: "utf-8", timeout: 60000, stdio: "pipe" },
     );
     expect(stdout).toContain(`Live reload: attempted on :${port} and succeeded (2 WebSocket clients notified).`);
   });
@@ -157,7 +160,7 @@ describe("n-dx refresh", () => {
     const stdout = execFileSync(
       "node",
       ["--import", pathToFileURL(mockPath).href, CLI_PATH, "refresh", "--ui-only", "--no-build", tmpDir],
-      { encoding: "utf-8", timeout: 60000 },
+      { encoding: "utf-8", timeout: 60000, stdio: "pipe" },
     );
 
     expect(stdout).toContain(`Live reload: unavailable on :${port} (server does not support reload signaling).`);

@@ -1627,6 +1627,31 @@ function parseArgs(args) {
   return { flags, positional };
 }
 
+/**
+ * True when `arg` names a config key rather than a directory.
+ *
+ * The single-positional grammar is ambiguous — `n-dx config [dir]` and
+ * `n-dx config <key>` occupy the same slot — so something has to break the tie.
+ * Existence on disk alone is the wrong tiebreaker: in a project that happens to
+ * contain a `hench/` subdirectory, `n-dx config hench` resolved to that
+ * directory, silently discarded the key, and reported "No n-dx configuration
+ * found" for a fully-initialized project.
+ *
+ * A known key wins instead, because a key is an exact match against a closed
+ * set while a directory name is arbitrary. `./hench` and `../hench` remain
+ * unambiguous ways to ask for the directory: their first dot sits at index 0,
+ * so the root segment is empty and never matches a section.
+ *
+ * @param {string} arg
+ * @returns {boolean}
+ */
+function isConfigKey(arg) {
+  if (arg === "language") return true;
+  const dotIdx = arg.indexOf(".");
+  const root = dotIdx === -1 ? arg : arg.slice(0, dotIdx);
+  return PROJECT_SECTIONS.has(root) || Object.hasOwn(PACKAGES, root);
+}
+
 /** Resolve dir, keyArg, and valueArg from positional args. */
 async function resolvePositionalArgs(positional) {
   let dir = process.cwd();
@@ -1644,7 +1669,7 @@ async function resolvePositionalArgs(positional) {
       valueArg = undefined;
     }
   } else if (positional.length === 1) {
-    if (await fileExists(resolve(positional[0]))) {
+    if (!isConfigKey(positional[0]) && (await fileExists(resolve(positional[0])))) {
       dir = resolve(positional[0]);
       keyArg = undefined;
     }

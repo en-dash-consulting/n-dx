@@ -54,6 +54,9 @@ function setConfig(key, value, dir) {
   execFileSync("node", [CLI_PATH, "config", key, value, dir], {
     encoding: "utf-8",
     timeout: DEFAULT_TIMEOUT,
+    // Without stdio, execFileSync routes child stderr to the parent's, so CLI
+    // notices from this fixture would print into the vitest report.
+    stdio: "pipe",
   });
 }
 
