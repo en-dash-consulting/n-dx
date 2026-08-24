@@ -328,6 +328,6 @@ Each skill below maps to a step in this guide. Edit the linked file in your proj
 | `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](./skills#ndx-work) | Step 6: picks the next spec task and executes it autonomously |
 | `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Tracking spec coverage: shows per-epic completion and next recommended task |
 
-Related guides: [Workflow](./workflow) (the core loop this guide extends), [Run While You Sleep](./overnight) (for multi-iteration overnight runs).
+Related guides: [Workflow](./workflow) (the core loop this guide extends), [Run While You Sleep](./overnight) (for multi-iteration overnight runs), [n-dx vs Spec Kit](./n-dx-vs-spec-kit) (how n-dx differs from Spec Kit, OpenSpec, and Kiro).
 
 For the full skill inventory and customization guidance, see the [Skills Reference](./skills).
