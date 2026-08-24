@@ -57,7 +57,7 @@ The alias `web-integration` was assigned by sourcevision's zone enrichment based
 1. **Do not add facade/adapter logic to this zone.** It is not an integration layer — it is a rate-limiting utility with associated tests.
 2. **Use the messaging barrel** (`src/viewer/messaging/index.ts`) as the stable import surface for all messaging utilities. The barrel exports both composed pipelines (`WSPipeline`, `FetchPipeline`) and individual primitives.
 3. **New integration tests** that exercise multiple messaging primitives together belong in `tests/integration/`, which is part of this zone. This is the correct and intended use of the zone.
-4. **Cross-zone imports** from `web-viewer` into messaging should go through the messaging barrel, not through individual implementation files. See the [messaging zone public interface](../packages/web/src/viewer/messaging/index.ts) for the full export surface.
+4. **Cross-zone imports** from `web-viewer` into messaging should go through the messaging barrel, not through individual implementation files. See the [messaging zone public interface](../../packages/web/src/viewer/messaging/index.ts) for the full export surface.
 
 ## Messaging Zone Stack
 

@@ -2,13 +2,63 @@
 
 Companion document to `CLAUDE.md` — covers zone promotion, naming conventions, and the zone-pin manifest.
 
+`CLAUDE.md` is generated from `packages/core/assistant-assets/` and ships to every
+`ndx init` target, so it carries only the **threshold rule** and the universal
+governance rules. n-dx's own measured zone data lives here instead, because this file
+is repo-internal and is not templated into downstream projects.
+
+## Current zone inventory
+
+From `ndx analyze --deep .` on `main`, 2026-08-24. **No production zone currently meets
+the dual-fragility threshold** (cohesion < 0.5 AND coupling > 0.5); the nearest are
+`rex-fix`, `web-composition-layer`, and `chunked`, all with coupling well under 0.5.
+
+| Zone | Package | Files | Cohesion | Coupling |
+|------|---------|------:|---------:|---------:|
+| `web-viewer` | web | 205 | 0.98 | 0.02 |
+| `rex-cli` | rex | 170 | 0.99 | 0.01 |
+| `hench` | hench | 109 | 1.00 | 0.00 |
+| `sourcevision` | sourcevision | 79 | 1.00 | 0.00 |
+| `web-server` | web | 62 | 0.96 | 0.04 |
+| `llm-client` | llm-client | 39 | 1.00 | 0.00 |
+| `core` | core | 35 | 1.00 | 0.00 |
+| `viewer-message-pipeline` | web | 7 | 1.00 | 0.00 |
+| `chunked` | rex | 5 | 0.67 | 0.33 |
+| `rex-fix` | rex | 4 | 0.57 | 0.43 |
+| `web-composition-layer` | web | 4 | 0.65 | 0.35 |
+
+Test-only zones (`tests-unit` 567, `tests-integration` 104, `tests-e2e` 83,
+`tests-fixtures` 79, plus smaller ones) are excluded — they carry no production
+governance obligation.
+
+### Zone IDs retired since earlier revisions
+
+These IDs appear in older governance text and in git history but not in the current
+analysis. Most were **renamed or merged**, not deleted — the directories still exist and
+their directory-level policies still apply.
+
+| Old zone ID | Current status |
+|-------------|----------------|
+| `web-shared` | Directory `packages/web/src/shared/` still exists (5 files); Louvain now absorbs it into `web-viewer`. Policy lives in `packages/web/CLAUDE.md`. |
+| `crash` | Directory `packages/web/src/viewer/crash/` still exists with barrel enforcement in `boundary-check.test.ts`. |
+| `viewer-ui-hub` | Now reported as `web-composition-layer` (4 files, 0.65 / 0.35). |
+| `prd-fix-command` | Now reported as `rex-fix` (4 files, 0.57 / 0.43). |
+| `chunked-review` | Now reported as `chunked` (5 files, 0.67 / 0.33). |
+| `hench-agent` | Now reported as `hench` (109 files, 1.00 / 0.00). |
+
+**Do not hand-maintain the numbers above.** Re-run `ndx analyze --deep .` and read
+`.sourcevision/zones.json`. Note that `.sourcevision/` is gitignored (except
+`hints.md`), so these values are a point-in-time snapshot committed for reference.
+
+---
+
 ## Zone Promotion Checklist
 
 A zone is **formally governed** when its sub-directory crosses the **5-file reliable-metrics threshold**. Below this threshold, cohesion and coupling values are unreliable because the Louvain algorithm has too few nodes to form stable communities. When a sub-directory crosses this threshold, the following checklist must be completed before the zone is referenced in governance documents:
 
 ### Checklist (triggered at > 5 files)
 
-- [ ] **CLAUDE.md zone policy entry** — Add a named subsection under "Monorepo-wide zone fragility governance" with current cohesion/coupling values, zone purpose, and any zone-specific addition rules.
+- [ ] **Zone policy entry** — Add the zone to the inventory above, plus a named policy subsection in the owning package's `CLAUDE.md` (`packages/<pkg>/CLAUDE.md`) with zone purpose and any addition rules. Do **not** add measured values to the root `CLAUDE.md` — it is generated and ships downstream.
 - [ ] **Zone-pin configuration** — Add explicit zone pins for anchor files in `.n-dx.json` under `sourcevision.zones.pins`. Without pins, Louvain may reassign files across re-analyses, making trend tracking unreliable.
 - [ ] **`index.ts` barrel** — If the zone is a physical directory sub-zone, ensure a barrel file exists that exports the public API. This enables barrel import enforcement in `boundary-check.test.ts`.
 - [ ] **`.sourcevision/zone-pins.md` entry** — Add all pinned files to the zone-pin manifest with a reason for each pin.
@@ -16,8 +66,9 @@ A zone is **formally governed** when its sub-directory crosses the **5-file reli
 
 ### Anti-patterns that bypass the checklist
 
-- Adding a zone to CLAUDE.md governance without adding pins → zone ID may silently diverge after re-analysis.
-- Adding pins without a CLAUDE.md entry → governance policy is invisible to contributors.
+- Adding a zone to governance without adding pins → zone ID may silently diverge after re-analysis.
+- Adding pins without a governance entry → the policy is invisible to contributors.
+- Hand-editing measured metrics into the root `CLAUDE.md` → the assistant-body-drift test fails, and n-dx's internals leak into every `ndx init` target.
 - Creating a barrel without updating `boundary-check.test.ts` → barrel enforcement is never activated.
 
 ---

@@ -1,6 +1,6 @@
 # CLI Smoke Parity
 
-The macOS and Windows smoke jobs in [ci.yml](/Users/hal/Documents/VSCodeProjects/n-dx-1/.github/workflows/ci.yml) must run the same canonical `ndx` validation sequence by invoking:
+The macOS and Windows smoke jobs in [ci.yml](../../.github/workflows/ci.yml) must run the same canonical `ndx` validation sequence by invoking:
 
 ```bash
 node scripts/cli-smoke-parity.mjs collect --output <artifact-path>
