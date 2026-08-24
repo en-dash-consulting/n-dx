@@ -170,7 +170,7 @@ jobs:
         uses: changesets/action@v1
         with:
           version: pnpm exec changeset version
-          publish: pnpm exec changeset publish --access public
+          publish: pnpm exec changeset publish
           title: "chore: version packages"
           commit: "chore: version packages"
         env:
