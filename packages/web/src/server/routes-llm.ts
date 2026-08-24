@@ -16,6 +16,7 @@ import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { invalidateAuthCheckCache } from "./routes-commands.js";
+import { LLM_VENDOR } from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,7 +65,11 @@ interface LlmConfigPutBody {
 // ---------------------------------------------------------------------------
 
 const NDX_CONFIG = ".n-dx.json";
-const VALID_VENDORS = new Set(["claude", "codex", "local"]);
+const VALID_VENDORS: ReadonlySet<string> = new Set([
+  LLM_VENDOR.CLAUDE,
+  LLM_VENDOR.CODEX,
+  LLM_VENDOR.LOCAL,
+]);
 
 /** Writable paths. Auth fields (api_key, api_endpoint, cli_path) are excluded. */
 const VALID_PATHS = new Set([

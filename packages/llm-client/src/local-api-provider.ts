@@ -35,7 +35,7 @@
 
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
 import { ClaudeClientError } from "./types.js";
-import type { LLMProvider, ProviderInfo, StreamChunk } from "./provider-interface.js";
+import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { LocalConfig } from "./llm-types.js";
 import { parseOpenAiTokenUsage } from "./openai-api-provider.js";
 
@@ -174,7 +174,7 @@ export function createLocalApiProvider(
   };
 
   const info: ProviderInfo = {
-    vendor: "local",
+    vendor: LLM_VENDOR.LOCAL,
     mode: "api",
     ...(defaultModel ? { model: defaultModel } : {}),
     capabilities: ["streaming"],

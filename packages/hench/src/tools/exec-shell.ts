@@ -1,4 +1,5 @@
 import { exec } from "../process/exec.js";
+import { isVerbose, verbose } from "../types/output.js";
 
 export interface ExecShellOptions {
   /** Shell command string to execute. */
@@ -11,6 +12,34 @@ export interface ExecShellOptions {
   maxBuffer?: number;
   /** Spread into the child process env. Defaults to process.env. */
   env?: NodeJS.ProcessEnv;
+}
+
+/**
+ * Line-buffer live stdout/stderr chunks and print each complete line via
+ * verbose() as it arrives, so a long-running command's output is visible
+ * while it runs rather than only after it exits. No-op unless verbose mode
+ * is active. Returns a flush() to print any trailing partial line once the
+ * process closes.
+ */
+function createLiveTail(): { onData: (stream: "stdout" | "stderr", chunk: string) => void; flush: () => void } {
+  if (!isVerbose()) {
+    return { onData: () => {}, flush: () => {} };
+  }
+  const buffers = { stdout: "", stderr: "" };
+  const onData = (stream: "stdout" | "stderr", chunk: string) => {
+    buffers[stream] += chunk;
+    const lines = buffers[stream].split("\n");
+    buffers[stream] = lines.pop() ?? "";
+    for (const line of lines) {
+      verbose(`  ${line}`);
+    }
+  };
+  const flush = () => {
+    for (const stream of ["stdout", "stderr"] as const) {
+      if (buffers[stream]) verbose(`  ${buffers[stream]}`);
+    }
+  };
+  return { onData, flush };
 }
 
 /**
@@ -32,7 +61,9 @@ export async function execShell(opts: ExecShellOptions): Promise<string> {
     env = { ...process.env },
   } = opts;
 
-  const result = await exec("sh", ["-c", command], { cwd, timeout, maxBuffer, env });
+  const liveTail = createLiveTail();
+  const result = await exec("sh", ["-c", command], { cwd, timeout, maxBuffer, env, onData: liveTail.onData });
+  liveTail.flush();
 
   // Timeout — exitCode is null when the process was killed
   if (result.exitCode === null) {

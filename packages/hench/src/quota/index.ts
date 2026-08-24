@@ -59,7 +59,7 @@ export { validateRunTokensPostRun } from "./token-validation-hook.js";
 import { fetchCodexQuota } from "./codex-quota.js";
 import { fetchClaudeQuota } from "./claude-quota.js";
 import { fetchGoogleQuota } from "./google-quota.js";
-import { loadLLMConfig, resolveVendorModel } from "../prd/llm-gateway.js";
+import { LLM_VENDOR, loadLLMConfig, resolveVendorModel } from "../prd/llm-gateway.js";
 import type { LLMConfig } from "../prd/llm-gateway.js";
 import { resolveLLMVendor } from "../store/project-config.js";
 import type { QuotaRemaining } from "./types.js";
@@ -102,7 +102,7 @@ export async function checkQuotaRemaining(): Promise<QuotaRemaining[]> {
   // Budget-based: reads .n-dx.json weeklyBudget + .hench/runs/ accumulated spend.
   // fetchClaudeQuota returns ok:false when no budget is configured — silent skip.
   {
-    const claudeModel = resolveVendorModel("claude", llmConfig);
+    const claudeModel = resolveVendorModel(LLM_VENDOR.CLAUDE, llmConfig);
     const claudeResult = fetchClaudeQuota({
       projectDir: process.cwd(),
       model: claudeModel,
@@ -116,7 +116,7 @@ export async function checkQuotaRemaining(): Promise<QuotaRemaining[]> {
   // Real-time: queries the OpenAI billing API when an API key is available.
   {
     const codexApiKey = llmConfig.codex?.api_key ?? process.env["OPENAI_API_KEY"];
-    const codexModel = resolveVendorModel("codex", llmConfig);
+    const codexModel = resolveVendorModel(LLM_VENDOR.CODEX, llmConfig);
 
     if (codexApiKey) {
       const codexResult = await fetchCodexQuota({ apiKey: codexApiKey, model: codexModel });
@@ -125,14 +125,14 @@ export async function checkQuotaRemaining(): Promise<QuotaRemaining[]> {
       }
       // On failure: silently skip — the inter-run loop must never be interrupted
       // by quota-check errors.
-    } else if (activeVendor === "codex") {
+    } else if (activeVendor === LLM_VENDOR.CODEX) {
       // No OPENAI_API_KEY: the primary Codex auth path is `codex login` (ChatGPT
       // session), which never sets an API key — the CLI provider even deletes it
       // so session auth wins. The billing quota API requires an API key, so
       // session-auth quota is not retrievable there. Surface a clear notice
       // instead of silently skipping, so the user understands why no quota shows.
       results.push({
-        vendor: "codex",
+        vendor: LLM_VENDOR.CODEX,
         model: codexModel,
         percentRemaining: 0,
         unavailable: true,
@@ -144,15 +144,15 @@ export async function checkQuotaRemaining(): Promise<QuotaRemaining[]> {
   // ── Google (Gemini) ─────────────────────────────────────────────────────────
   // Gemini does not expose a public quota API. When google is the active vendor,
   // emit a notice entry so the inter-run log is not silent about quota status.
-  if (activeVendor === "google") {
-    const googleModel = resolveVendorModel("google", llmConfig);
+  if (activeVendor === LLM_VENDOR.GOOGLE) {
+    const googleModel = resolveVendorModel(LLM_VENDOR.GOOGLE, llmConfig);
     const googleResult = fetchGoogleQuota({ model: googleModel });
     if (googleResult.ok) {
       results.push(googleResult.quota);
     } else {
       // Always "unavailable" — surface it as an informational notice.
       results.push({
-        vendor: "google",
+        vendor: LLM_VENDOR.GOOGLE,
         model: googleModel,
         percentRemaining: 0,
         unavailable: true,

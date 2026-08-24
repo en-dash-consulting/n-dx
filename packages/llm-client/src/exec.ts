@@ -59,6 +59,12 @@ export interface ExecOptions {
   /** Environment variables for the child process. Defaults to inheriting parent env. */
   env?: NodeJS.ProcessEnv;
   /**
+   * Optional live-output callback, invoked with each stdout/stderr chunk as
+   * it arrives — in addition to (not instead of) the final buffered result.
+   * Purely additive: omitting it preserves existing buffered-only behavior.
+   */
+  onData?: (stream: "stdout" | "stderr", chunk: string) => void;
+  /**
    * On timeout, terminate the command's whole process tree rather than only the
    * process that was spawned. Defaults to true.
    *
@@ -149,6 +155,7 @@ export function exec(
     timeout,
     maxBuffer = DEFAULT_MAX_BUFFER,
     env,
+    onData,
     treeKill = true,
     freeze = isPosixFreezeKillEnabled(env ?? process.env),
     _platform = process.platform as NodeJS.Platform,
@@ -326,6 +333,11 @@ export function exec(
     // child that reads from stdin (e.g. `rex add` calling readStdin() in a
     // non-TTY) hang forever waiting for an EOF that will never arrive.
     child.stdin?.end();
+
+    if (onData) {
+      child.stdout?.on("data", (chunk: Buffer) => onData("stdout", chunk.toString()));
+      child.stderr?.on("data", (chunk: Buffer) => onData("stderr", chunk.toString()));
+    }
   });
 }
 

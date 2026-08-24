@@ -31,9 +31,32 @@
  */
 
 // Re-export shared foundation primitives.
-export { setQuiet, isQuiet, info, result } from "../prd/llm-gateway.js";
+export {
+  setQuiet, isQuiet,
+  setVerbose, isVerbose,
+  setDebug, isDebug,
+  info, result, verbose, debug,
+} from "../prd/llm-gateway.js";
 
-import { isQuiet, bold, dim, yellow, colorDim, colorWarn, colorPink, isColorEnabled } from "../prd/llm-gateway.js";
+import { isQuiet, isVerbose, verbose, bold, dim, yellow, colorDim, colorWarn, colorPink, isColorEnabled } from "../prd/llm-gateway.js";
+
+/**
+ * Await a long-running operation, printing a periodic "still running" tick
+ * under --verbose so a slow step can be told apart from a hung one. No-op
+ * (besides awaiting) unless verbose mode is active.
+ */
+export async function withHeartbeat<T>(label: string, promise: Promise<T>, intervalMs = 15_000): Promise<T> {
+  if (!isVerbose()) return promise;
+  const startMs = Date.now();
+  const interval = setInterval(() => {
+    verbose(`  … ${label} (${Math.round((Date.now() - startMs) / 1000)}s elapsed)`);
+  }, intervalMs);
+  try {
+    return await promise;
+  } finally {
+    clearInterval(interval);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Rolling window state

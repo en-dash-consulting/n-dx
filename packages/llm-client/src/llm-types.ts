@@ -19,7 +19,19 @@ import type { ClaudeClient, ClaudeConfig } from "./types.js";
 // LLMVendor is defined in provider-interface.ts (its natural home as part of
 // the provider contract). Re-exported here so consumers can import it from
 // the vendor-neutral types module without knowing its origin.
-import type { LLMVendor } from "./provider-interface.js";
+import {
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  LLM_VENDORS,
+  isLLMVendor,
+  type LLMVendor,
+} from "./provider-interface.js";
+export {
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  LLM_VENDORS,
+  isLLMVendor,
+};
 export type { LLMVendor };
 
 /**

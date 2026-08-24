@@ -87,6 +87,10 @@ import {
   ProviderRegistry,
   createDefaultRegistry,
   defaultRegistry,
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  LLM_VENDORS,
+  isLLMVendor,
   // provider-session.ts
   ProviderSession,
   createProviderSession,
@@ -266,6 +270,14 @@ describe("public API — function exports", () => {
 
   it("exports resolveVendorModel as a function", () => {
     expect(typeof resolveVendorModel).toBe("function");
+  });
+
+  it("exports canonical LLM vendor values and guard", () => {
+    expect(LLM_VENDOR.CLAUDE).toBe("claude");
+    expect(DEFAULT_LLM_VENDOR).toBe(LLM_VENDOR.CLAUDE);
+    expect(LLM_VENDORS).toContain(LLM_VENDOR.CODEX);
+    expect(isLLMVendor("local")).toBe(true);
+    expect(isLLMVendor("project")).toBe(false);
   });
 
   it("exports NEWEST_MODELS as an object with claude and codex keys", () => {

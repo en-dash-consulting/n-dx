@@ -241,8 +241,14 @@ describe("hench → llm-client gateway contract", () => {
     "toCanonicalJSON",
     "setQuiet",
     "isQuiet",
+    "setVerbose",
+    "isVerbose",
+    "setDebug",
+    "isDebug",
     "info",
     "result",
+    "verbose",
+    "debug",
     "formatHelp",
     "formatTypoSuggestion",
     "exec",
@@ -601,7 +607,8 @@ describe("gateway export auto-detection", () => {
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
         "loadProjectOverrides", "mergeWithOverrides", "toCanonicalJSON",
-        "setQuiet", "isQuiet", "info", "result", "warn", "suppressKnownDeprecations",
+        "setQuiet", "isQuiet", "setVerbose", "isVerbose", "setDebug", "isDebug",
+        "info", "result", "verbose", "debug", "warn", "suppressKnownDeprecations",
         "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "carolinaBlue", "yellow",
         "green", "red", "magenta", "colorSuccess", "colorWarn", "colorInfo",
         "colorDim", "colorPending", "colorPink", "STATUS_COLORS", "colorStatus",
@@ -622,10 +629,11 @@ describe("gateway export auto-detection", () => {
         "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry",
         "classifyLLMError", "isAuthError", "parseLmStudioError", "getNextFailoverAttempt",
         "quoteWindowsToken", "buildWindowsCliCommandLine", "spawnCli",
-        "diagnoseCliInvocation", "diagnoseCliNotFound"],
+        "diagnoseCliInvocation", "diagnoseCliNotFound", "isLLMVendor"],
       ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "GOOGLE_MODELS",
         "VENDOR_CONTEXT_CHAR_LIMITS",
-        "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES"],
+        "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
+        "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));
