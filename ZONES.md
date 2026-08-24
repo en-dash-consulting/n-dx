@@ -75,7 +75,9 @@ A zone is **formally governed** when its sub-directory crosses the **5-file reli
 
 ## Zone ID Naming Convention
 
-Zone IDs must encode their package to prevent cross-package prefix collisions in zone-filter queries and zone reports. The Louvain algorithm assigns IDs based on the primary directory; the naming convention is enforced via zone pins in `.n-dx.json`.
+Zone IDs should encode their package to prevent cross-package prefix collisions in zone-filter queries and zone reports.
+
+> ⚠️ **This is a target, not the current state.** Louvain derives IDs from the primary directory, and zone pins in `.n-dx.json` control *membership*, not *naming* — they cannot rename a zone. Most current IDs therefore do not follow the table below. Treat it as the convention to apply when explicitly naming or pinning a zone, and reconcile against the inventory at the top of this file before relying on any prefix.
 
 | Prefix | Package path | Example zone IDs |
 |--------|-------------|-----------------|
@@ -88,9 +90,21 @@ Zone IDs must encode their package to prevent cross-package prefix collisions in
 | `web-sv-` | web zones rendering sourcevision data | `web-sv-view-tests` |
 | `web-` | other web package zones | `web-shared`, `web-landing` |
 
-### Known violations
+### Known divergences
 
-_(none — all resolved via zone pins in `.n-dx.json`)_
+As of the 2026-08-24 analysis, most production zone IDs do not carry the prefixes above:
+
+| Actual ID | Convention would suggest |
+|-----------|--------------------------|
+| `sourcevision` | `sv-*` |
+| `hench` | `hench-*` |
+| `llm-client` | `llm-*` |
+| `core` | (no rule — core predates the table) |
+| `chunked`, `rex-fix` | `rex-*` (`rex-fix` conforms; `chunked` does not) |
+| `web-composition-layer` | `web-viewer-*` |
+| `tests-*` | (no rule — test zones are unprefixed by convention) |
+
+Only `rex-cli`, `rex-fix`, `web-server`, and `web-viewer` currently match. Earlier revisions of this file claimed "none — all resolved via zone pins", which was not accurate: pins do not rename zones. Closing these divergences requires either renaming support in sourcevision or accepting the directory-derived IDs and rewriting this convention to match.
 
 ---
 

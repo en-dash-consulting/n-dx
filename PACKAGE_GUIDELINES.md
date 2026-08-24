@@ -179,10 +179,21 @@ gateway or `public.ts`, or the import should be removed.
 
 ### Naming
 
-| Pattern | When | Examples |
-|---|---|---|
-| Unscoped short name | CLI tools (for `npx`/`pnpm exec`) | `rex`, `sourcevision`, `hench` |
-| `@n-dx/` scoped | Internal-only packages | `@n-dx/web`, `@n-dx/llm-client` |
+All six packages are published under the `@n-dx/` scope:
+
+| Package name | Bin aliases |
+|---|---|
+| `@n-dx/core` | `n-dx`, `ndx` |
+| `@n-dx/rex` | `rex` |
+| `@n-dx/sourcevision` | `sourcevision`, `sv` |
+| `@n-dx/hench` | `hench` |
+| `@n-dx/llm-client` | _(library only)_ |
+| `@n-dx/web` | _(library only)_ |
+
+The bare `rex` / `sourcevision` / `sv` / `hench` names are **bin aliases declared in
+`package.json`**, not package names — they exist so the CLIs can be invoked directly
+once installed. `npx rex` would resolve to an unrelated package on the public
+registry; use `npx -p @n-dx/core ndx` instead.
 
 ## Test Structure
 
