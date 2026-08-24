@@ -1,5 +1,9 @@
 # Package Development Guidelines
 
+> **Canonical.** A condensed version of this page is published at
+> [`docs/contributing/package-guidelines.md`](docs/contributing/package-guidelines.md)
+> for the docs site. Make changes here first.
+
 Standards for creating and maintaining packages in the n-dx monorepo. These patterns emerged organically and are now codified to prevent drift and reduce onboarding friction.
 
 ## Public API (`src/public.ts`)

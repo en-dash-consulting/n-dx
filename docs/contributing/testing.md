@@ -1,5 +1,8 @@
 # Testing Conventions
 
+> Condensed from the canonical [`TESTING.md`](https://github.com/en-dash-consulting/n-dx/blob/main/TESTING.md)
+> in the repository root, which carries the full per-package coverage requirements.
+
 ## Test Directory Structure
 
 Every package maintains three test tiers:

@@ -1,4 +1,14 @@
-# PRD Markdown Schema
+# PRD Markdown Schema (legacy `rex/v1`)
+
+> ⚠️ **Legacy format — migration reference only.**
+> This describes the flat `.rex/prd.md` layout used before the folder tree. It is
+> still implemented for `rex migrate-to-folder-tree`, `rex migrate-to-md`, and
+> `rex parse-md`, but **no command writes this format any more**.
+>
+> For the current storage format see
+> [`docs/architecture/prd-folder-tree-schema.md`](../../../docs/architecture/prd-folder-tree-schema.md)
+> (normative) and [`docs/guide/prd-storage.md`](../../../docs/guide/prd-storage.md)
+> (guide).
 
 Specification for the rex/v1 PRD markdown storage format. This document is the authoritative reference for the serializer and parser implementations.
 

@@ -42,6 +42,7 @@ export default defineConfig({
             { text: "Spec-Driven Development", link: "/guide/spec-driven" },
             { text: "n-dx vs Spec Kit", link: "/guide/n-dx-vs-spec-kit" },
             { text: "Cleaning Up a Vibe-Coded App", link: "/guide/vibe-cleanup" },
+            { text: "Keeping Your PRD Alive", link: "/guide/change-management" },
             { text: ".gitignore Setup", link: "/guide/gitignore" },
             { text: "Troubleshooting", link: "/guide/troubleshooting" },
           ],
@@ -57,6 +58,16 @@ export default defineConfig({
             { text: "Zone Naming", link: "/architecture/zone-naming-conventions" },
             { text: "Level System", link: "/architecture/level-system-reference" },
             { text: "Viewer Architecture", link: "/architecture/viewer-architecture" },
+            { text: "PRD Folder-Tree Schema", link: "/architecture/prd-folder-tree-schema" },
+          ],
+        },
+        {
+          text: "Languages",
+          collapsed: true,
+          items: [
+            { text: "Multi-Language Architecture", link: "/architecture/multi-language-architecture" },
+            { text: "Go Integration", link: "/architecture/go-integration" },
+            { text: "Go Zone Detection", link: "/architecture/go-zone-detection" },
           ],
         },
         {
@@ -92,6 +103,12 @@ export default defineConfig({
           ],
         },
       ],
+      "/archive/": [
+        {
+          text: "Archive",
+          items: [{ text: "Overview", link: "/archive/" }],
+        },
+      ],
       "/contributing/": [
         {
           text: "Contributing",
@@ -110,8 +127,9 @@ export default defineConfig({
             { text: "Memory System Risks", link: "/contributing/memory-system-risks" },
             { text: "Memory Improvements", link: "/contributing/memory-system-improvements" },
             { text: "Refresh Memory Analysis", link: "/contributing/refresh-memory-analysis" },
-            { text: "Viewer Code Audit", link: "/contributing/viewer-code-audit" },
             { text: "Smart Add Dedup", link: "/contributing/smart-add-duplicate-detection" },
+            { text: "Accessibility", link: "/accessibility" },
+            { text: "CLI ↔ Dashboard Coverage", link: "/cli-ui-gap" },
           ],
         },
       ],

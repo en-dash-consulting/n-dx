@@ -214,3 +214,13 @@ performance.memory = {
 ### Windows
 - **Most accurate out of the box.** No special handling needed. Default thresholds should work as intended.
 - **WSL:** If running Node.js inside WSL, Linux behavior applies (reads `/proc/meminfo` from the WSL kernel, which may or may not reflect actual Windows availability depending on WSL version).
+
+---
+
+**Related memory documentation**
+
+- [Memory Management Architecture](/architecture/memory-architecture) — system overview across the three tiers
+- [Risks and Flaws](/contributing/memory-system-risks) — known issues by severity
+- [Areas of Improvement](/contributing/memory-system-improvements) — prioritized fixes, each referencing a risk
+- [Refresh Memory Analysis](/contributing/refresh-memory-analysis) — dated profiling of `ndx refresh`
+- [Memory OS Behavior](/process/memory-os-behavior) — platform-specific reporting caveats

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Node.js ≥ 18** (Node 22 LTS recommended) — [nodejs.org](https://nodejs.org/)
+- **Node.js ≥ 22** (22 LTS) — [nodejs.org](https://nodejs.org/)
 - **pnpm ≥ 10** — [pnpm.io/installation](https://pnpm.io/installation)
 
 ## Installation

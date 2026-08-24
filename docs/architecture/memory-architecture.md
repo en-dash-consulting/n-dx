@@ -385,3 +385,13 @@ Page loads
 | `polling-state.ts` | web/viewer | Centralized polling source registry |
 | `polling-suspension-indicator.ts` | web/viewer | UI indicator for suspended polling |
 | `memory-warning.ts` | web/viewer | Warning banner component |
+
+---
+
+**Related memory documentation**
+
+- [Memory Management Architecture](/architecture/memory-architecture) — system overview across the three tiers
+- [Risks and Flaws](/contributing/memory-system-risks) — known issues by severity
+- [Areas of Improvement](/contributing/memory-system-improvements) — prioritized fixes, each referencing a risk
+- [Refresh Memory Analysis](/contributing/refresh-memory-analysis) — dated profiling of `ndx refresh`
+- [Memory OS Behavior](/process/memory-os-behavior) — platform-specific reporting caveats

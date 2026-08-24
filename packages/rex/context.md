@@ -8,20 +8,26 @@ This document is for AI agents and developers working on the rex codebase itself
 src/
   schema/           Type definitions (PRDItem, PRDDocument, RexConfig, LogEntry)
                     Zod validation schemas with .passthrough() for extensibility
-  store/            Storage abstraction: PRDStore interface + FileStore adapter
+  store/            Storage abstraction: PRDStore interface + adapters
+                    FolderTreeStore (canonical) + FileStore (legacy migration path)
+                    folder-tree-{store,serializer,parser,mutations,index-generator}.ts
+                    Remote adapters: notion, jira, asana, github-projects
                     Factory: createStore("file", rexDir)
   core/             Pure logic with no I/O
     tree.ts         Tree traversal, find, insert, update, remove, stats
     dag.ts          Dependency graph validation (cycles, orphans, duplicates)
     next-task.ts    Priority-ordered depth-first search for next actionable task
     canonical.ts    Canonical JSON formatting, priority-based sorting
+  fix/              Auto-fix engine for `rex fix`
+  recommend/        SourceVision finding -> PRD proposal translation
   analyze/          Project analysis pipeline
     scanners.ts     Three scanners: tests, docs, sourcevision
     reconcile.ts    Dedup proposals against existing PRD items
     propose.ts      Group scan results into epic/feature/task hierarchy
   cli/
     index.ts        Arg parser and command dispatch (switch + dynamic import)
-    mcp.ts          MCP server (7 tools, 3 resources, stdio transport)
+    mcp.ts          MCP server (17 tools, 3 resources, stdio + HTTP transport)
+    mcp-tools.ts    Tool definitions and handlers
     commands/       One file per command, each exports cmdX(dir, flags)
   workflow/
     default.ts      Default agent workflow text
@@ -33,7 +39,10 @@ src/
 
 Commands that take positional args (add, update) receive them as extra parameters between dir and flags.
 
-**Store access:** Always `createStore("file", join(dir, ".rex"))`. Load document, mutate, save. Log actions via `store.appendLog()`.
+**Store access:** `createStore("file", join(dir, ".rex"))` resolves to the folder-tree
+store, which writes `.rex/prd_tree/` — the sole writable PRD surface. Load document,
+mutate, save. Log actions via `store.appendLog()`. Commands that touch the PRD call
+`ensureLegacyPrdMigrated()` first so pre-tree projects convert on first use.
 
 **Tree operations:** Use helpers from `core/tree.ts`. The tree is a `PRDItem[]` where each item may have `children: PRDItem[]`. `walkTree()` yields `{ item, parents }` for depth-first traversal.
 

@@ -1,8 +1,10 @@
 # Packages
 
-n-dx is composed of five packages in a strict dependency hierarchy.
+n-dx is composed of six packages in a strict dependency hierarchy.
 
 ```
+  @n-dx/core                    CLI orchestrator (spawns the tool CLIs)
+       ↓
   hench                         agent loops, tool dispatch
        ↓
   rex · sourcevision            PRD management · static analysis
