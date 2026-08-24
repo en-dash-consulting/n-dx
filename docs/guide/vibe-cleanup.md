@@ -354,6 +354,6 @@ Each skill below maps to a step in this guide. Edit the linked file in your proj
 | `/ndx-status` | [`.agents/skills/ndx-status/SKILL.md`](./skills#ndx-status) | Step 5: validates plan integrity and shows per-epic task counts before execution |
 | `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](./skills#ndx-work) | Step 6: executes cleanup tasks one at a time with test-passing acceptance criteria |
 
-Related guides: [Run While You Sleep](./overnight) (for unattended cleanup runs), [Self-Heal Loop](./self-heal) (ongoing post-cleanup improvement), [Workflow](./workflow) (the base loop).
+Related guides: [Run While You Sleep](./overnight) (for unattended cleanup runs), [Self-Heal Loop](./self-heal) (ongoing post-cleanup improvement), [Workflow](./workflow) (the base loop), [n-dx vs Spec Kit](./n-dx-vs-spec-kit) (how n-dx differs from Spec Kit, OpenSpec, and Kiro).
 
 For the full skill inventory and customization guidance, see the [Skills Reference](./skills).
