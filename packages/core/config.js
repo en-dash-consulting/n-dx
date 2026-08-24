@@ -1575,18 +1575,16 @@ Examples:
   n-dx config claude.api_key sk-ant-...        Set Anthropic API key (validates format)
   n-dx config claude.api_endpoint https://proxy.example.com
                                                Set custom API endpoint
-  n-dx config claude.model claude-opus-5        
-                                               Set default model for API calls
+  n-dx config claude.model claude-opus-5       Set default model for API calls
   n-dx config llm.vendor claude                Set active LLM vendor to Claude
   n-dx config llm.vendor codex                 Set active LLM vendor to Codex
   n-dx config llm.vendor google                Set active LLM vendor to Google (Gemini)
   n-dx config llm.vendor local                 Set active LLM vendor to local (LM Studio)
   n-dx config llm.local.host 192.168.1.10      Set local server host (default: localhost)
-  n-dx config llm.local.port 1234             Set local server port (default: 1234)
-  n-dx config llm.local.model qwen2.5-14b     Set local model ID (optional)
+  n-dx config llm.local.port 1234              Set local server port (default: 1234)
+  n-dx config llm.local.model qwen2.5-14b      Set local model ID (optional)
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
-  n-dx config llm.claude.model claude-opus-5   
-                                               Set Claude model (llm namespace)
+  n-dx config llm.claude.model claude-opus-5   Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex
                                                Set Codex CLI path
   n-dx config llm.autoFailover true            Enable automatic model/vendor failover
