@@ -118,4 +118,4 @@ Yes. Quickstart works on an empty folder. The tool is built for repos that alrea
 **Is n-dx open source the way Spec Kit is?**
 The code is public. The license is Elastic 2.0, not MIT. ELv2 allows internal use, modification, and distribution, with a hosted-service restriction. Spec Kit is MIT. OpenSpec is commonly cited as MIT; confirm the LICENSE file. "Open source" on the marketing site is informal. The precise term is source-available.
 
-Related guides: [Spec-Driven Development](./spec-driven) (spec file to executing agent), [Existing Project Onboarding](./existing-project) (brownfield first run), [Cleaning Up a Vibe-Coded App](./vibe-cleanup) (when the last six months were vibe-coded).
+Related guides: [Spec-Driven Development](./spec-driven) (spec file to executing agent), [Existing Project Onboarding](./existing-project) (brownfield first run), [Cleaning Up a Vibe-Coded App](./vibe-cleanup) (when the last six months were vibe-coded). See the [Skills Reference](./skills) for the workflow slash commands `ndx init` installs.
