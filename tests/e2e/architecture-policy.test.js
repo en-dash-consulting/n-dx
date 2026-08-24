@@ -100,6 +100,13 @@ const SKIP_DIRS = new Set([
   ".hench",
   ".rex",
   ".sourcevision",
+  // Gitignored, developer-local tooling scratch space (worktrees created by
+  // agent sessions, etc.) — never part of the committed source tree this
+  // policy audits. Without this, a stray worktree checkout on someone's
+  // machine re-surfaces every allowlisted file under a `.claude/worktrees/
+  // <name>/` prefix the ALLOWED list doesn't recognize, and reports it as
+  // a violation of a rule the real, committed file already satisfies.
+  ".claude",
 ]);
 
 function walk(dir, files = []) {
@@ -992,8 +999,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 143,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; Windows-safe CLI spawn surface — quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation + SpawnCliOptions/CliInvocationDiagnosis types added for the GH #37/#68/#69 spawn hardening so cli-loop can route .cmd shims through cmd.exe; diagnoseCliNotFound added so cli-loop's close/non-zero-exit path surfaces the Windows 'not recognized' missing-CLI diagnosis; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries; parseLmStudioError added so the local-LLM provider can classify LM Studio server errors)",
+    maxExports: 153,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; Windows-safe CLI spawn surface — quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation + SpawnCliOptions/CliInvocationDiagnosis types added for the GH #37/#68/#69 spawn hardening so cli-loop can route .cmd shims through cmd.exe; diagnoseCliNotFound added so cli-loop's close/non-zero-exit path surfaces the Windows 'not recognized' missing-CLI diagnosis; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries; parseLmStudioError added so the local-LLM provider can classify LM Studio server errors; LLM_VENDOR/LLMVendor helpers added so hench uses the canonical vendor literal set through the approved gateway)",
   },
 ];
 

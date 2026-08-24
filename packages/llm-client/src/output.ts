@@ -1,18 +1,28 @@
 /**
- * CLI output control — supports --quiet mode for scripting.
+ * CLI output control — supports --quiet/--verbose/--debug modes for scripting
+ * and diagnostics.
  *
  * Shared foundation for consistent output behavior across all packages.
  * Each package may extend this with additional output functions (spinners,
- * section headers, etc.) but the core quiet-mode primitives live here.
+ * section headers, etc.) but the core mode primitives live here.
  *
  * In quiet mode, only essential output is emitted:
  * - Error messages (always via console.error)
  * - Final result identifiers (e.g. JSON, IDs, structured results)
  *
  * Informational messages (progress, hints, summaries) are suppressed.
+ *
+ * --verbose/--debug are the opposite direction: they surface additional
+ * step-level progress (verbose) or timestamped internal diagnostics (debug)
+ * so a long-running command can be told apart from a hung one.
  */
 
+import { writeSync } from "node:fs";
+import { format } from "node:util";
+
 let _quiet = false;
+let _verbose = false;
+let _debug = false;
 
 /** Enable or disable quiet mode. Call once at CLI entry. */
 export function setQuiet(quiet: boolean): void {
@@ -22,6 +32,37 @@ export function setQuiet(quiet: boolean): void {
 /** Returns true when quiet mode is active. */
 export function isQuiet(): boolean {
   return _quiet;
+}
+
+/**
+ * Enable or disable verbose mode. Call once at CLI entry, alongside setQuiet.
+ * Debug mode implies verbose mode (isVerbose() is true whenever debug is on).
+ */
+export function setVerbose(verbose: boolean): void {
+  _verbose = verbose;
+}
+
+/** Returns true when verbose or debug mode is active. */
+export function isVerbose(): boolean {
+  return _verbose || _debug;
+}
+
+/**
+ * Enable or disable debug mode. Call once at CLI entry, alongside setQuiet.
+ * Also sets process.env.NDX_DEBUG so existing NDX_DEBUG/NDX_DEBUG_LLM-gated
+ * debug logging (e.g. LLM subprocess spawn tracing) turns on together with
+ * this flag instead of needing separate wiring.
+ */
+export function setDebug(debugMode: boolean): void {
+  _debug = debugMode;
+  if (debugMode) {
+    process.env.NDX_DEBUG = "1";
+  }
+}
+
+/** Returns true when debug mode is active. */
+export function isDebug(): boolean {
+  return _debug;
 }
 
 /**
@@ -47,4 +88,47 @@ export function result(...args: unknown[]): void {
  */
 export function warn(...args: unknown[]): void {
   if (!_quiet) console.error(...args);
+}
+
+/**
+ * Write a line straight to fd 2 (stderr) with a synchronous OS write,
+ * bypassing Node's buffered stdio Writable stream.
+ *
+ * When ndx spawns a tool as a child process, its stdout/stderr are OS
+ * pipes rather than a TTY. On POSIX, pipe writes queued through
+ * console.error()/process.stderr.write() are asynchronous — Node only
+ * flushes them to the pipe when the event loop gets a free tick. A hot
+ * loop running hundreds of fully-synchronous operations back-to-back
+ * (AST parsing, regex scanning) can starve the event loop for long
+ * stretches, so queued diagnostic lines only drain in one delayed burst
+ * instead of in real time — exactly the scenario --verbose/--debug exist
+ * to diagnose. A raw synchronous write leaves the process the instant
+ * it's called, regardless of what runs immediately afterward.
+ */
+function writeStderrSync(...args: unknown[]): void {
+  try {
+    writeSync(2, format(...args) + "\n");
+  } catch {
+    // Non-fatal (e.g. a full pipe buffer under extreme log volume) —
+    // losing a diagnostic line beats crashing the command it's diagnosing.
+  }
+}
+
+/**
+ * Print verbose progress output. Shown when --verbose or --debug is active.
+ * Output goes to stderr (like warn) so stdout stays machine-readable.
+ * Use for step-level "still working on X" signals during long operations —
+ * the primary tool for telling a hung process from a slow one.
+ */
+export function verbose(...args: unknown[]): void {
+  if (_verbose || _debug) writeStderrSync(...args);
+}
+
+/**
+ * Print debug output. Shown only when --debug is active.
+ * Output goes to stderr and is timestamped, since diagnosing a hang requires
+ * comparing wall-clock time against the last thing printed.
+ */
+export function debug(...args: unknown[]): void {
+  if (_debug) writeStderrSync(`[${new Date().toISOString()}]`, ...args);
 }

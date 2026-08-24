@@ -10,6 +10,10 @@
  */
 
 import type {RunRecord} from "../schema/index.js";
+import type { LLMVendor } from "../prd/llm-gateway.js";
+import { LLM_VENDOR, isLLMVendor } from "../prd/llm-gateway.js";
+
+type BaselineVendor = Exclude<LLMVendor, typeof LLM_VENDOR.LOCAL>;
 /**
  * Validation result for a run's token reporting.
  */
@@ -64,7 +68,7 @@ export interface TokenValidationMetrics {
  * Used for outlier detection and cost comparison.
  */
 export interface TokenBaseline {
-  vendor: "codex" | "claude" | "google";
+  vendor: BaselineVendor;
   taskComplexity: "simple" | "moderate" | "complex";
   /** Expected input tokens for this complexity level. */
   expectedInput: number;
@@ -99,14 +103,14 @@ export interface CodexClaudeComparison {
 const DEFAULT_BASELINES: TokenBaseline[] = [
   // Simple tasks (e.g., typo fixes, single-file changes)
   {
-    vendor: "claude",
+    vendor: LLM_VENDOR.CLAUDE,
     taskComplexity: "simple",
     expectedInput: 2000,
     rangePercent: 200, // Allow 0-4000 tokens
     expectedOutput: 400,
   },
   {
-    vendor: "codex",
+    vendor: LLM_VENDOR.CODEX,
     taskComplexity: "simple",
     expectedInput: 2000,
     rangePercent: 200,
@@ -114,14 +118,14 @@ const DEFAULT_BASELINES: TokenBaseline[] = [
   },
   // Moderate tasks (e.g., feature implementation, bug fixes)
   {
-    vendor: "claude",
+    vendor: LLM_VENDOR.CLAUDE,
     taskComplexity: "moderate",
     expectedInput: 5000,
     rangePercent: 150, // Allow 2500-7500 tokens
     expectedOutput: 1000,
   },
   {
-    vendor: "codex",
+    vendor: LLM_VENDOR.CODEX,
     taskComplexity: "moderate",
     expectedInput: 5000,
     rangePercent: 150,
@@ -129,14 +133,14 @@ const DEFAULT_BASELINES: TokenBaseline[] = [
   },
   // Complex tasks (e.g., architecture changes, multi-package refactoring)
   {
-    vendor: "claude",
+    vendor: LLM_VENDOR.CLAUDE,
     taskComplexity: "complex",
     expectedInput: 10000,
     rangePercent: 100, // Allow 5000-15000 tokens
     expectedOutput: 2000,
   },
   {
-    vendor: "codex",
+    vendor: LLM_VENDOR.CODEX,
     taskComplexity: "complex",
     expectedInput: 10000,
     rangePercent: 100,
@@ -201,9 +205,9 @@ export function validateTokenReporting(
     maxTokensPerTurn: 0,
     zeroTokenTurns: 0,
     vendorBreakdown: {},
-    isCodexRun: turns.some((t) => t.vendor === "codex"),
-    isClaudeRun: turns.some((t) => t.vendor === "claude"),
-    isGoogleRun: turns.some((t) => t.vendor === "google"),
+    isCodexRun: turns.some((t) => t.vendor === LLM_VENDOR.CODEX),
+    isClaudeRun: turns.some((t) => t.vendor === LLM_VENDOR.CLAUDE),
+    isGoogleRun: turns.some((t) => t.vendor === LLM_VENDOR.GOOGLE),
   };
 
   // Compute per-turn metrics
@@ -260,7 +264,7 @@ export function validateTokenReporting(
 
   // Validation 2: Outlier detection
   const complexity = detectTaskComplexity(run);
-  const baselineVendor = metrics.isCodexRun ? "codex" : metrics.isGoogleRun ? "google" : "claude";
+  const baselineVendor = metrics.isCodexRun ? LLM_VENDOR.CODEX : metrics.isGoogleRun ? LLM_VENDOR.GOOGLE : LLM_VENDOR.CLAUDE;
   const relevantBaselines = baselines.filter((b) => b.vendor === baselineVendor && b.taskComplexity === complexity);
 
   for (const baseline of relevantBaselines) {
@@ -288,7 +292,7 @@ export function validateTokenReporting(
   }
 
   // Validation 3: Vendor attribution
-  if (metrics.isCodexRun && !metrics.vendorBreakdown["codex"]) {
+  if (metrics.isCodexRun && !metrics.vendorBreakdown[LLM_VENDOR.CODEX]) {
     issues.push({
       severity: "error",
       category: "attribution",
@@ -384,17 +388,17 @@ export function validateVendorAttribution(run: RunRecord): string[] {
 
   // Check: All turns must have a vendor
   for (const turn of turns) {
-    if (!turn.vendor || !["codex", "claude"].includes(turn.vendor)) {
+    if (!isLLMVendor(turn.vendor)) {
       issues.push(`Turn ${turn.turn} has invalid vendor: ${turn.vendor ?? "missing"}`);
     }
   }
 
   // Check: Model field should match vendor
   const firstVendor = turns[0]?.vendor;
-  if (firstVendor === "codex" && run.model && !isCodexModel(run.model)) {
+  if (firstVendor === LLM_VENDOR.CODEX && run.model && !isCodexModel(run.model)) {
     issues.push(`Run vendor is Codex but model is not: ${run.model}`);
   }
-  if (firstVendor === "claude" && run.model && isCodexModel(run.model)) {
+  if (firstVendor === LLM_VENDOR.CLAUDE && run.model && isCodexModel(run.model)) {
     issues.push(`Run vendor is Claude but model is Codex: ${run.model}`);
   }
 
@@ -479,7 +483,7 @@ export function validateTokenReportingBatch(
   }
 
   // Codex-specific summary
-  const codexRuns = runs.filter((r) => r.turnTokenUsage?.some((t) => t.vendor === "codex") ?? false);
+  const codexRuns = runs.filter((r) => r.turnTokenUsage?.some((t) => t.vendor === LLM_VENDOR.CODEX) ?? false);
   const codexWithTokens = codexRuns.filter((r) => (r.tokenUsage?.input ?? 0) + (r.tokenUsage?.output ?? 0) > 0);
 
   let avgTokensPerCodexRun = 0;

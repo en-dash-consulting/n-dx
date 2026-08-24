@@ -18,6 +18,7 @@
  * Both require `Authorization: Bearer <api-key>`.
  */
 
+import { LLM_VENDOR } from "../prd/llm-gateway.js";
 import type { QuotaRemaining } from "./types.js";
 
 // ── Error types ──────────────────────────────────────────────────────────────
@@ -240,7 +241,7 @@ export async function fetchCodexQuota(options: FetchCodexQuotaOptions): Promise<
   return {
     ok: true,
     quota: {
-      vendor: "codex",
+      vendor: LLM_VENDOR.CODEX,
       model: options.model,
       percentRemaining,
     },

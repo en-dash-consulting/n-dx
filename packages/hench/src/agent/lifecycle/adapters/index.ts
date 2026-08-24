@@ -12,7 +12,7 @@
  */
 
 import type { VendorAdapter } from "../vendor-adapter.js";
-import type { LLMVendor } from "../../../prd/llm-gateway.js";
+import { LLM_VENDOR, type LLMVendor } from "../../../prd/llm-gateway.js";
 import { claudeCliAdapter } from "./claude-cli-adapter.js";
 import { codexCliAdapter } from "./codex-cli-adapter.js";
 
@@ -30,19 +30,19 @@ import { codexCliAdapter } from "./codex-cli-adapter.js";
  */
 export function resolveVendorAdapter(vendor: LLMVendor): VendorAdapter {
   switch (vendor) {
-    case "codex":
+    case LLM_VENDOR.CODEX:
       return codexCliAdapter;
-    case "google":
+    case LLM_VENDOR.GOOGLE:
       throw new Error(
         "Google vendor does not support CLI mode. " +
         "Use provider=api: 'n-dx config hench.provider api'",
       );
-    case "local":
+    case LLM_VENDOR.LOCAL:
       throw new Error(
         "Local vendor does not support CLI mode — it connects to a local REST server. " +
         "Use provider=api: 'n-dx config hench.provider api'",
       );
-    case "claude":
+    case LLM_VENDOR.CLAUDE:
     default:
       return claudeCliAdapter;
   }

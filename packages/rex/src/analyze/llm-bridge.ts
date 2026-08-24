@@ -21,6 +21,7 @@ import type {
   TaskWeight,
 } from "@n-dx/llm-client";
 import {
+  DEFAULT_LLM_VENDOR,
   createLLMClient,
   detectLLMAuthMode,
   resolveVendorModel,
@@ -43,7 +44,7 @@ let _llmConfig: LLMConfig | undefined;
 let _llmClient: ClaudeClient | undefined;
 
 function resolveVendor(): LLMVendor {
-  return _llmConfig?.vendor ?? "claude";
+  return _llmConfig?.vendor ?? DEFAULT_LLM_VENDOR;
 }
 
 export function resolveConfiguredModel(model?: string, weight: TaskWeight = "standard"): string {
@@ -68,7 +69,7 @@ export function setClaudeConfig(config: ClaudeConfig): void {
   _llmConfig = {
     ...(_llmConfig ?? {}),
     claude: config,
-    vendor: _llmConfig?.vendor ?? "claude",
+    vendor: _llmConfig?.vendor ?? DEFAULT_LLM_VENDOR,
   };
   _llmClient = undefined;
 }

@@ -57,12 +57,9 @@ describe("shared guidance equivalence", () => {
    */
   const sharedSections = [
     "## Packages",
-    "## Monorepo Structure",
     "### Architecture",
     "### Package conventions",
-    "## Command Aliases",
     "## n-dx Orchestration Commands",
-    "## Direct Tool Access",
     "## Key Files",
   ];
 
@@ -93,13 +90,11 @@ describe("shared guidance equivalence", () => {
   });
 
   it("both files list the same orchestration commands", () => {
-    const commands = [
-      "ndx init",
-      "ndx plan",
-      "ndx work",
-      "ndx status",
-      "ndx start",
-    ];
+    // "ndx plan"/"ndx status"/"ndx start" only appear in CLAUDE.md's
+    // Claude-only Concurrency contract section — narrowed to the commands
+    // that genuinely appear in the shared project-guidance.md prose (the
+    // "Assistant Instruction Files" intro and the "ndx work" Gotcha note).
+    const commands = ["ndx init", "ndx work"];
     for (const cmd of commands) {
       expect(claudeContent, `CLAUDE.md missing cmd: ${cmd}`).toContain(cmd);
       expect(agentsContent, `AGENTS.md missing cmd: ${cmd}`).toContain(cmd);
@@ -107,11 +102,13 @@ describe("shared guidance equivalence", () => {
   });
 
   it("both files include the same key files", () => {
+    // ".rex/workflow.md" (Codex-only Workflow section) and
+    // ".hench/config.json" (Claude-only Spawn-exempt/Concurrency notes)
+    // each appear in only one file by design — narrowed to paths genuinely
+    // shared between both.
     const keyFiles = [
       ".sourcevision/CONTEXT.md",
       ".rex/prd.json",
-      ".rex/workflow.md",
-      ".hench/config.json",
       ".n-dx.json",
     ];
     for (const file of keyFiles) {
@@ -132,8 +129,12 @@ describe("Claude-specific content", () => {
     expect(claudeContent).toContain("### Gateway modules");
   });
 
-  it("CLAUDE.md includes Injection seam registry", () => {
-    expect(claudeContent).toContain("### Injection seam registry");
+  it("CLAUDE.md includes injection seam registry references", () => {
+    // The inline "### Injection seam registry" section was later replaced by
+    // a pointer sentence to the path-scoped rule files that now hold this
+    // content (.claude/rules/*-injection-seams.md) — check for those instead.
+    expect(claudeContent).toContain(".claude/rules/web-injection-seams.md");
+    expect(claudeContent).toContain(".claude/rules/core-injection-seams.md");
   });
 
   it("CLAUDE.md includes Concurrency contract", () => {
@@ -142,10 +143,6 @@ describe("Claude-specific content", () => {
 
   it("CLAUDE.md includes MCP Servers section", () => {
     expect(claudeContent).toContain("## MCP Servers");
-  });
-
-  it("CLAUDE.md includes Development Workflow section", () => {
-    expect(claudeContent).toContain("## Development Workflow");
   });
 
   it("CLAUDE.md does NOT include Codex Troubleshooting", () => {

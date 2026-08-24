@@ -6,7 +6,7 @@
  * without violating the domain-layer independence constraint.
  */
 
-import type { LLMVendor } from "./llm-types.js";
+import { DEFAULT_LLM_VENDOR, LLM_VENDOR, type LLMVendor } from "./llm-types.js";
 import { formatRetryCountdown, classifyTimeout } from "./rate-limit.js";
 import type { TimeoutKind } from "./rate-limit.js";
 import { CLI_ERROR_CODES, AuthFailureError } from "./types.js";
@@ -203,7 +203,7 @@ export function isAuthError(message: string): boolean {
  */
 export function classifyLLMError(
   err: Error,
-  vendor: LLMVendor = "claude",
+  vendor: LLMVendor = DEFAULT_LLM_VENDOR,
   context?: string | LLMErrorContext,
 ): LLMErrorClassification {
   const msg = err.message.toLowerCase();
@@ -341,7 +341,7 @@ export function classifyLLMError(
     (msg.includes("enoent") &&
       (msg.includes("claude") || msg.includes("codex")))
   ) {
-    if (vendor === "codex") {
+    if (vendor === LLM_VENDOR.CODEX) {
       return {
         message: "Codex CLI not found on your system.",
         suggestion:
@@ -400,11 +400,11 @@ export function classifyLLMError(
   // ── Generic fallback ──────────────────────────────────────────────
   const label = ctx?.label ?? "complete the request";
   const authHint =
-    vendor === "codex"
+    vendor === LLM_VENDOR.CODEX
       ? "Check Codex CLI login (codex login) and your network connection, then try again."
-      : vendor === "google"
+      : vendor === LLM_VENDOR.GOOGLE
         ? "Check your Google API key (GEMINI_API_KEY) and network connection, then retry."
-        : vendor === "local"
+        : vendor === LLM_VENDOR.LOCAL
           ? "Check that your local LLM server (LM Studio) is running at the configured host/port."
           : "Check your API key and network connection, then try again.";
   return {
@@ -530,7 +530,7 @@ export function parseAuthPayload(
  */
 export function classifyAuthError(
   err: Error,
-  vendor: LLMVendor = "claude",
+  vendor: LLMVendor = DEFAULT_LLM_VENDOR,
 ): AuthFailureError | null {
   const payload = parseAuthPayload(err.message, vendor);
   if (!payload) return null;

@@ -61,16 +61,25 @@ interface LocalProfile {
 
 // ── Constants ─────────────────────────────────────────────────────────
 
-const VENDORS = [
-  { id: "claude",  label: "Claude", subtitle: "Anthropic" },
-  { id: "codex",   label: "Codex",  subtitle: "OpenAI" },
-  { id: "local",   label: "Local",  subtitle: "LM Studio / Ollama" },
-];
+const VIEWER_LLM_VENDOR = {
+  CLAUDE: "claude",
+  CODEX: "codex",
+  LOCAL: "local",
+} as const;
 
-const MODEL_SUGGESTIONS: Record<string, string[]> = {
-  claude: ["claude-sonnet-4-5", "claude-opus-4-5", "claude-haiku-3-5", "claude-3-7-sonnet-20250219"],
-  codex:  ["codex-mini", "o4-mini", "o3"],
-  local:  [],
+type ViewerLLMVendor = typeof VIEWER_LLM_VENDOR[keyof typeof VIEWER_LLM_VENDOR];
+type CloudViewerVendor = typeof VIEWER_LLM_VENDOR.CLAUDE | typeof VIEWER_LLM_VENDOR.CODEX;
+
+const VENDORS = [
+  { id: VIEWER_LLM_VENDOR.CLAUDE, label: "Claude", subtitle: "Anthropic" },
+  { id: VIEWER_LLM_VENDOR.CODEX, label: "Codex", subtitle: "OpenAI" },
+  { id: VIEWER_LLM_VENDOR.LOCAL, label: "Local", subtitle: "LM Studio / Ollama" },
+] satisfies ReadonlyArray<{ id: ViewerLLMVendor; label: string; subtitle: string }>;
+
+const MODEL_SUGGESTIONS: Record<ViewerLLMVendor, string[]> = {
+  [VIEWER_LLM_VENDOR.CLAUDE]: ["claude-sonnet-4-5", "claude-opus-4-5", "claude-haiku-3-5", "claude-3-7-sonnet-20250219"],
+  [VIEWER_LLM_VENDOR.CODEX]: ["codex-mini", "o4-mini", "o3"],
+  [VIEWER_LLM_VENDOR.LOCAL]: [],
 };
 
 // ── Vendor selector (segmented control) ───────────────────────────────
@@ -91,7 +100,7 @@ function VendorSelector({
         const active = vendor === v.id;
         // Connection dot on local tab
         const connDot =
-          v.id === "local" && localStatus !== null
+          v.id === VIEWER_LLM_VENDOR.LOCAL && localStatus !== null
             ? h("span", {
                 class: `llm-tab-conn-dot ${localStatus.ok ? "llm-tab-conn-ok" : "llm-tab-conn-err"}`,
                 title: localStatus.ok ? "Server reachable" : "Server unreachable",
@@ -250,7 +259,7 @@ function VendorSection({
   onChange,
   dirtyKeys,
 }: {
-  vendorId: string;
+  vendorId: CloudViewerVendor;
   config: VendorConfig;
   editValues: Record<string, string>;
   onChange: (key: string, v: string) => void;
@@ -729,7 +738,7 @@ export function LlmProviderView() {
   const [pendingVendor, setPendingVendor] = useState<string | null | undefined>(undefined);
 
   const effectiveVendor = pendingVendor !== undefined ? pendingVendor : data?.vendor ?? null;
-  const showLocal = effectiveVendor === "local";
+  const showLocal = effectiveVendor === VIEWER_LLM_VENDOR.LOCAL;
   const { status: localStatus, refresh: refreshLocal } = useLocalStatus(showLocal);
 
   const loadConfig = useCallback(async () => {
@@ -759,7 +768,7 @@ export function LlmProviderView() {
   // ── Dirty tracking
   const dirtyKeys = new Set<string>();
   if (data) {
-    for (const vid of ["claude", "codex"] as const) {
+    for (const vid of [VIEWER_LLM_VENDOR.CLAUDE, VIEWER_LLM_VENDOR.CODEX] as const) {
       for (const f of ["model", "lightModel"] as const) {
         const k = `${vid}.${f}`;
         if (k in editValues && editValues[k] !== (data[vid][f] ?? "")) dirtyKeys.add(k);
@@ -881,7 +890,7 @@ export function LlmProviderView() {
     }),
 
     // Active vendor settings
-    (effectiveVendor === "claude" || effectiveVendor === "codex")
+    (effectiveVendor === VIEWER_LLM_VENDOR.CLAUDE || effectiveVendor === VIEWER_LLM_VENDOR.CODEX)
       ? h(VendorSection, {
           key: effectiveVendor,
           vendorId: effectiveVendor,
@@ -893,7 +902,7 @@ export function LlmProviderView() {
       : null,
     showLocal
       ? h(LocalSection, {
-          key: "local",
+          key: VIEWER_LLM_VENDOR.LOCAL,
           config: data!.local ?? { model: null, lightModel: null, host: null, port: null },
           editValues,
           onChange: handleField,

@@ -8,7 +8,7 @@
 
 import { createClient, detectAuthMode, type CreateClientOptions } from "./create-client.js";
 import type { AuthMode, ClaudeClient, ClaudeConfig } from "./types.js";
-import type { LLMVendor, LLMConfig } from "./llm-types.js";
+import { DEFAULT_LLM_VENDOR, LLM_VENDOR, type LLMVendor, type LLMConfig } from "./llm-types.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
 import { resolveOpenAiApiKey } from "./openai-api-provider.js";
 import { createGoogleApiProvider, resolveGoogleApiKey } from "./google-api-provider.js";
@@ -35,7 +35,7 @@ export interface CreateLLMClientOptions extends Omit<CreateClientOptions, "claud
 }
 
 function resolveVendor(options: CreateLLMClientOptions): LLMVendor {
-  return options.vendor ?? options.llmConfig?.vendor ?? "claude";
+  return options.vendor ?? options.llmConfig?.vendor ?? DEFAULT_LLM_VENDOR;
 }
 
 /**
@@ -47,7 +47,7 @@ function resolveVendor(options: CreateLLMClientOptions): LLMVendor {
  */
 export function detectLLMAuthMode(options: CreateLLMClientOptions): AuthMode {
   const vendor = resolveVendor(options);
-  if (vendor === "codex") {
+  if (vendor === LLM_VENDOR.CODEX) {
     const apiKey = resolveOpenAiApiKey(
       options.llmConfig?.codex,
       options.apiKeyEnv ?? "OPENAI_API_KEY",
@@ -55,7 +55,7 @@ export function detectLLMAuthMode(options: CreateLLMClientOptions): AuthMode {
     return apiKey ? "api" : "cli";
   }
 
-  if (vendor === "google") {
+  if (vendor === LLM_VENDOR.GOOGLE) {
     const googleConfig = options.llmConfig?.google;
     const apiKey = resolveGoogleApiKey(
       googleConfig,
@@ -67,7 +67,7 @@ export function detectLLMAuthMode(options: CreateLLMClientOptions): AuthMode {
     return apiKey ? "api" : "cli";
   }
 
-  if (vendor === "local") {
+  if (vendor === LLM_VENDOR.LOCAL) {
     // Local (LM Studio) uses the REST API — no CLI binary involved.
     return "api";
   }
@@ -88,13 +88,13 @@ export function detectLLMAuthMode(options: CreateLLMClientOptions): AuthMode {
 export function createLLMClient(options: CreateLLMClientOptions): ClaudeClient {
   const vendor = resolveVendor(options);
 
-  if (vendor === "codex") {
+  if (vendor === LLM_VENDOR.CODEX) {
     return createCodexCliClient({
       codexConfig: options.llmConfig?.codex,
     });
   }
 
-  if (vendor === "google") {
+  if (vendor === LLM_VENDOR.GOOGLE) {
     // Google uses the REST API — adapt LLMProvider to the ClaudeClient shape.
     // The Google provider implements LLMProvider which is a superset of the
     // ClaudeClient interface (both expose complete() and info).
@@ -105,7 +105,7 @@ export function createLLMClient(options: CreateLLMClientOptions): ClaudeClient {
     return googleProvider as unknown as ClaudeClient;
   }
 
-  if (vendor === "local") {
+  if (vendor === LLM_VENDOR.LOCAL) {
     // Local (LM Studio) uses an OpenAI-compatible REST API.
     const localProvider = createLocalApiProvider({
       localConfig: options.llmConfig?.local,

@@ -6,7 +6,7 @@ import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, di
 import type { ToolContext } from "../../tools/contracts.js";
 import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
-import { section, subsection, stream, detail } from "../../types/output.js";
+import { section, subsection, stream, detail, withHeartbeat } from "../../types/output.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import {
   loadClaudeConfig,
@@ -14,7 +14,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -236,7 +236,7 @@ async function initApiResources(
   // The API loop currently requires the raw Anthropic SDK for multi-turn
   // tool-use. Non-Claude providers will be supported when the loop is
   // refactored to use LLMProvider.complete() with tool schemas.
-  if (vendor !== "claude") {
+  if (vendor !== LLM_VENDOR.CLAUDE) {
     throw new Error(
       `Hench API loop requires a Claude-compatible provider (got "${vendor}"). ` +
       "Non-Claude API providers are not yet supported. Use provider=cli for non-Claude vendors.",
@@ -328,11 +328,14 @@ async function executeToolCalls(
     const startMs = Date.now();
     stream("Tool", `${block.name}(${JSON.stringify(block.input).slice(0, 100)})`);
 
-    const output = await dispatchTool(
-      toolCtx,
-      block.name,
-      block.input as Record<string, unknown>,
-      rexToolHandlers,
+    const output = await withHeartbeat(
+      `running tool ${block.name}`,
+      dispatchTool(
+        toolCtx,
+        block.name,
+        block.input as Record<string, unknown>,
+        rexToolHandlers,
+      ),
     );
 
     const durationMs = Date.now() - startMs;
@@ -476,7 +479,10 @@ async function executeGeminiFunctionCalls(
     const startMs = Date.now();
     stream("Tool", `${fc.name}(${JSON.stringify(fc.args).slice(0, 100)})`);
 
-    const output = await dispatchTool(toolCtx, fc.name, fc.args, rexToolHandlers);
+    const output = await withHeartbeat(
+      `running tool ${fc.name}`,
+      dispatchTool(toolCtx, fc.name, fc.args, rexToolHandlers),
+    );
 
     const durationMs = Date.now() - startMs;
 
@@ -562,7 +568,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     taskTitle,
     model,
     henchDir,
-    vendor: "google",
+    vendor: LLM_VENDOR.GOOGLE,
     sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
     approvals: DEFAULT_EXECUTION_POLICY.approvals,
     parseMode: hasToolCalling ? "gemini-tools" : "provider-api",
@@ -618,13 +624,16 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
 
         pruneGeminiContents(contents);
 
-        const result = await provider.generateContentWithTools({
-          model,
-          contents,
-          tools,
-          systemInstruction: systemPrompt,
-          maxOutputTokens: config.maxTokens,
-        });
+        const result = await withHeartbeat(
+          `waiting on google/${model} response`,
+          provider.generateContentWithTools({
+            model,
+            contents,
+            tools,
+            systemInstruction: systemPrompt,
+            maxOutputTokens: config.maxTokens,
+          }),
+        );
 
         recordTurnTokenUsageNormalized(run, result.usage, turn + 1, "google", model);
 
@@ -929,7 +938,7 @@ async function runLocalToolLoop(params: {
     taskTitle,
     model,
     henchDir,
-    vendor: "local",
+    vendor: LLM_VENDOR.LOCAL,
     sandbox: DEFAULT_EXECUTION_POLICY.sandbox,
     approvals: DEFAULT_EXECUTION_POLICY.approvals,
     parseMode: "openai-tools",
@@ -1177,7 +1186,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Shared: assemble brief, format, build system prompt, display task info
   const { brief, taskId, briefText, systemPrompt } = await prepareBrief(
     store, config, opts.taskId,
-    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, projectDir },
+    { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
     opts.extraContext,
   );
@@ -1335,25 +1344,28 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       pruneMessages(messages);
 
       const _t0 = Date.now();
-      const response = await callWithFailover(
-        client,
-        {
+      const response = await withHeartbeat(
+        `waiting on ${vendor}/${model} response`,
+        callWithFailover(
+          client,
+          {
+            model,
+            max_tokens: config.maxTokens,
+            system: systemPrompt,
+            tools: TOOL_DEFINITIONS,
+            messages,
+          },
+          config,
+          vendor,
           model,
-          max_tokens: config.maxTokens,
-          system: systemPrompt,
-          tools: TOOL_DEFINITIONS,
-          messages,
-        },
-        config,
-        vendor,
-        model,
-        henchDir,
-        llmConfig,
-        projectDir,
-        store,
-        taskId,
-        brief.project.testCommand,
-        startingHead,
+          henchDir,
+          llmConfig,
+          projectDir,
+          store,
+          taskId,
+          brief.project.testCommand,
+          startingHead,
+        ),
       );
       const _latencyMs = Date.now() - _t0;
 

@@ -20,7 +20,7 @@ import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { section } from "../../types/output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { printVendorModelHeader, resolveModel, resolveVendorModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, printVendorModelHeader, resolveModel, resolveVendorModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
 import { formatQueueStatus } from "../../queue/format.js";
 import { resolveSchedulingPriority } from "../../queue/priority-scheduler.js";
@@ -921,18 +921,18 @@ export async function cmdRun(
   // vendor-pinned slot inside `resolveVendorModel`.
   const cliModelOverride =
     flags.model
-    ?? (llmVendor === "claude"
+    ?? (llmVendor === LLM_VENDOR.CLAUDE
       ? flags["claude-model"]
-      : llmVendor === "codex"
+      : llmVendor === LLM_VENDOR.CODEX
         ? flags["codex-model"]
         : flags["google-model"]);
   const configuredModel = resolveVendorModel(llmVendor, llmConfig);
   const resolvedModel = cliModelOverride ? resolveModel(cliModelOverride) : configuredModel;
   const hasConfiguredModel =
     !!llmConfig?.model
-    || (llmVendor === "claude"
+    || (llmVendor === LLM_VENDOR.CLAUDE
       ? !!llmConfig?.claude?.model
-      : llmVendor === "codex"
+      : llmVendor === LLM_VENDOR.CODEX
         ? !!llmConfig?.codex?.model
         : !!llmConfig?.google?.model);
   const modelSource: "cli-override" | "configured" | "default" = cliModelOverride
@@ -945,17 +945,17 @@ export async function cmdRun(
   // resolved (either top-level llm.model or vendor-pinned) is incompatible
   // with the active vendor. Picks the same value resolveVendorModel uses.
   const activeConfiguredModel = llmConfig?.model
-    ?? (llmVendor === "claude"
+    ?? (llmVendor === LLM_VENDOR.CLAUDE
       ? llmConfig?.claude?.model
-      : llmVendor === "codex"
+      : llmVendor === LLM_VENDOR.CODEX
         ? llmConfig?.codex?.model
-        : llmVendor === "google"
+        : llmVendor === LLM_VENDOR.GOOGLE
           ? llmConfig?.google?.model
           : llmConfig?.local?.model);
   if (!cliModelOverride && activeConfiguredModel) {
     if (
-      llmVendor === "claude" &&
-      !isModelCompatibleWithVendor("claude", activeConfiguredModel)
+      llmVendor === LLM_VENDOR.CLAUDE &&
+      !isModelCompatibleWithVendor(LLM_VENDOR.CLAUDE, activeConfiguredModel)
     ) {
       throw new CLIError(
         `Configured model "${activeConfiguredModel}" is not compatible with vendor="claude".`,
@@ -963,8 +963,8 @@ export async function cmdRun(
       );
     }
     if (
-      llmVendor === "codex" &&
-      !isModelCompatibleWithVendor("codex", activeConfiguredModel)
+      llmVendor === LLM_VENDOR.CODEX &&
+      !isModelCompatibleWithVendor(LLM_VENDOR.CODEX, activeConfiguredModel)
     ) {
       throw new CLIError(
         `Configured model "${activeConfiguredModel}" is not compatible with vendor="codex".`,
@@ -972,8 +972,8 @@ export async function cmdRun(
       );
     }
     if (
-      llmVendor === "google" &&
-      !isModelCompatibleWithVendor("google", activeConfiguredModel)
+      llmVendor === LLM_VENDOR.GOOGLE &&
+      !isModelCompatibleWithVendor(LLM_VENDOR.GOOGLE, activeConfiguredModel)
     ) {
       throw new CLIError(
         `Configured model "${activeConfiguredModel}" is not compatible with vendor="google".`,
@@ -1043,7 +1043,7 @@ export async function cmdRun(
   }
 
   // Codex only supports CLI mode (no API loop).
-  if (llmVendor === "codex" && provider === "api" && !dryRun) {
+  if (llmVendor === LLM_VENDOR.CODEX && provider === "api" && !dryRun) {
     throw new CLIError(
       "Hench API provider is only supported for vendor=claude or vendor=google.",
       "Set 'n-dx config hench.provider cli' or switch vendor: 'n-dx config llm.vendor claude'.",
@@ -1054,7 +1054,7 @@ export async function cmdRun(
   // Auto-switch silently — ndx config / ndx init persist hench.provider=api
   // automatically when local or google is selected as the vendor, so this
   // branch is a safety net for projects configured outside of those flows.
-  if ((llmVendor === "google" || llmVendor === "local") && provider === "cli" && !dryRun) {
+  if ((llmVendor === LLM_VENDOR.GOOGLE || llmVendor === LLM_VENDOR.LOCAL) && provider === "cli" && !dryRun) {
     provider = "api";
   }
 
@@ -1071,7 +1071,7 @@ export async function cmdRun(
 
   // Fail fast if CLI provider selected but vendor CLI binary not available.
   // Google and local are excluded — they have no CLI binary and are already guarded above.
-  if (provider === "cli" && !dryRun && llmVendor !== "google" && llmVendor !== "local") {
+  if (provider === "cli" && !dryRun && llmVendor !== LLM_VENDOR.GOOGLE && llmVendor !== LLM_VENDOR.LOCAL) {
     const customPath = resolveVendorCliPath(llmConfig);
     requireLLMCLI(llmVendor as "claude" | "codex", customPath);
   }
@@ -1079,7 +1079,7 @@ export async function cmdRun(
   // Local vendor preflight: verify the LM Studio server is reachable and a model is loaded.
   // Fails fast before task selection and brief assembly to give the user a clear error instead
   // of a mid-run context-window or connection failure deep in the loop.
-  if (llmVendor === "local" && !dryRun) {
+  if (llmVendor === LLM_VENDOR.LOCAL && !dryRun) {
     const localCfg = llmConfig?.local;
     const host = localCfg?.host ?? "localhost";
     const port = localCfg?.port ?? 1234;
@@ -1294,7 +1294,7 @@ export async function cmdRun(
       (permissionModeFlag as PermissionMode | undefined) ??
       config.permissionMode ??
       (autonomous ? "acceptEdits" : undefined);
-    if (effectivePermissionMode && llmVendor !== "claude") {
+    if (effectivePermissionMode && llmVendor !== LLM_VENDOR.CLAUDE) {
       info(
         `⚠ --permission-mode is a Claude CLI feature; ignoring "${effectivePermissionMode}" for vendor=${llmVendor}.`,
       );

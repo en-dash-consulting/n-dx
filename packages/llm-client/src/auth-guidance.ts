@@ -12,7 +12,7 @@
  * (JSON blobs, stack traces) must never be folded into these strings.
  */
 
-import type { LLMVendor } from "./provider-interface.js";
+import { LLM_VENDOR, type LLMVendor } from "./provider-interface.js";
 
 /** Structured, colorable pieces of an auth-failure message. */
 export interface AuthFailureGuidance {
@@ -47,7 +47,7 @@ export const VERIFY_CREDENTIALS_STEP = "Verify credentials: ndx auth";
  */
 export function authFailureGuidance(vendor: LLMVendor | string | undefined): AuthFailureGuidance {
   switch (vendor) {
-    case "codex":
+    case LLM_VENDOR.CODEX:
       return {
         provider: "Codex",
         headline: `Authentication failed for Codex — ${CANONICAL_CAUSE}.`,
@@ -57,7 +57,7 @@ export function authFailureGuidance(vendor: LLMVendor | string | undefined): Aut
           VERIFY_CREDENTIALS_STEP,
         ],
       };
-    case "google":
+    case LLM_VENDOR.GOOGLE:
       return {
         provider: "Google",
         headline: `Authentication failed for Google — ${CANONICAL_CAUSE}.`,
@@ -68,7 +68,7 @@ export function authFailureGuidance(vendor: LLMVendor | string | undefined): Aut
           VERIFY_CREDENTIALS_STEP,
         ],
       };
-    case "local":
+    case LLM_VENDOR.LOCAL:
       return {
         provider: "Local",
         headline: `Cannot reach local LLM server — ${CANONICAL_CAUSE}.`,
@@ -78,7 +78,7 @@ export function authFailureGuidance(vendor: LLMVendor | string | undefined): Aut
           VERIFY_CREDENTIALS_STEP,
         ],
       };
-    case "claude":
+    case LLM_VENDOR.CLAUDE:
     default:
       return {
         provider: "Claude",

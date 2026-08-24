@@ -26,6 +26,15 @@ export { quoteWindowsToken, buildWindowsCliCommandLine } from "./win-spawn.js";
 const PROJECT_CONFIG_FILE = ".n-dx.json";
 const LOCAL_CONFIG_FILE = ".n-dx.local.json";
 
+const LLM_VENDOR = {
+  CLAUDE: "claude",
+  CODEX: "codex",
+  GOOGLE: "google",
+  LOCAL: "local",
+};
+
+const LLM_VENDORS = Object.values(LLM_VENDOR);
+
 /**
  * How the API-key file is actually protected on this platform.
  *
@@ -566,7 +575,7 @@ function isValidGoogleApiKeyFormat(value) {
 async function runGoogleApiPreflight(llmConfig) {
   // Test bypass: allows integration tests to simulate successful auth without HTTP
   if (process.env.NDX_TEST_GOOGLE_PREFLIGHT === "ok") {
-    return { ok: true, vendor: "google" };
+    return { ok: true, vendor: LLM_VENDOR.GOOGLE };
   }
 
   const apiKeyEnvVar = llmConfig?.google?.apiKeyEnv || "GEMINI_API_KEY";
@@ -575,7 +584,7 @@ async function runGoogleApiPreflight(llmConfig) {
   if (!apiKey) {
     return {
       ok: false,
-      vendor: "google",
+      vendor: LLM_VENDOR.GOOGLE,
       detail:
         `No API key found. Set the ${apiKeyEnvVar} environment variable or store the key with: ` +
         "n-dx config llm.google.api_key <key>",
@@ -586,7 +595,7 @@ async function runGoogleApiPreflight(llmConfig) {
   if (!isValidGoogleApiKeyFormat(apiKey)) {
     return {
       ok: false,
-      vendor: "google",
+      vendor: LLM_VENDOR.GOOGLE,
       detail: `API key format is invalid. Google AI keys start with "AIza" or "AQ" and are at least 30 characters.`,
       errorCode: "NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT",
     };
@@ -597,7 +606,7 @@ async function runGoogleApiPreflight(llmConfig) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}&pageSize=1`;
     const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (resp.ok) {
-      return { ok: true, vendor: "google" };
+      return { ok: true, vendor: LLM_VENDOR.GOOGLE };
     }
     let detail;
     if (resp.status === 400) {
@@ -609,7 +618,7 @@ async function runGoogleApiPreflight(llmConfig) {
     }
     return {
       ok: false,
-      vendor: "google",
+      vendor: LLM_VENDOR.GOOGLE,
       detail,
       errorCode: (resp.status === 400 || resp.status === 403)
         ? "NDX_GOOGLE_PREFLIGHT_AUTH_FAILED"
@@ -619,7 +628,7 @@ async function runGoogleApiPreflight(llmConfig) {
   } catch (err) {
     return {
       ok: false,
-      vendor: "google",
+      vendor: LLM_VENDOR.GOOGLE,
       detail: err?.message || "Failed to connect to the Gemini API.",
       errorCode: "NDX_GOOGLE_PREFLIGHT_CONNECT_ERROR",
     };
@@ -640,18 +649,18 @@ async function runLocalApiPreflight(llmConfig) {
       signal: AbortSignal.timeout(5000),
     });
     if (resp.ok) {
-      return { ok: true, vendor: "local" };
+      return { ok: true, vendor: LLM_VENDOR.LOCAL };
     }
     return {
       ok: false,
-      vendor: "local",
+      vendor: LLM_VENDOR.LOCAL,
       detail: `Local server at ${baseUrl} returned HTTP ${resp.status}. Ensure LM Studio (or your local server) is running.`,
       errorCode: "NDX_LOCAL_PREFLIGHT_HTTP_ERROR",
     };
   } catch (err) {
     return {
       ok: false,
-      vendor: "local",
+      vendor: LLM_VENDOR.LOCAL,
       detail: `Cannot connect to local server at ${baseUrl}. ` +
         `Start LM Studio and enable "Local Server" in the Developer tab, then try again.`,
       errorCode: "NDX_LOCAL_PREFLIGHT_CONNECT_ERROR",
@@ -862,9 +871,9 @@ const CLAUDE_VALIDATORS = {
  * Validate llm.vendor.
  */
 function validateLLMVendor(value) {
-  if (value !== "claude" && value !== "codex" && value !== "google" && value !== "local") {
+  if (!LLM_VENDORS.includes(value)) {
     throw new Error(
-      `Invalid vendor "${value}". Expected one of: claude, codex, google, local.`,
+      `Invalid vendor "${value}". Expected one of: ${LLM_VENDORS.join(", ")}.`,
     );
   }
 }
@@ -919,7 +928,7 @@ const LLM_VALIDATORS = {
  * Returns binary + args for the selected vendor.
  */
 function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
-  if (vendor === "codex") {
+  if (vendor === LLM_VENDOR.CODEX) {
     const binary = llmConfig?.codex?.cli_path || "codex";
     return {
       binary,
@@ -945,11 +954,11 @@ function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
  * @returns {Promise<{ ok: boolean, binary?: string, args?: string[], detail?: string, errorCode?: string }>}
  */
 async function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
-  if (vendor === "google") {
+  if (vendor === LLM_VENDOR.GOOGLE) {
     return runGoogleApiPreflight(llmConfig);
   }
 
-  if (vendor === "local") {
+  if (vendor === LLM_VENDOR.LOCAL) {
     return runLocalApiPreflight(llmConfig);
   }
 
@@ -1125,7 +1134,7 @@ async function printVendorPreflightFailure(
 ) {
   const { red, yellow, dim } = await import("./cli-brand.js");
   // Google uses API-key auth — no binary / CLI args to display.
-  if (vendor === "google") {
+  if (vendor === LLM_VENDOR.GOOGLE) {
     const errorCode = preflight.errorCode || "NDX_GOOGLE_PREFLIGHT_FAILED";
     const apiKeyEnvVar = llmConfig?.google?.apiKeyEnv || "GEMINI_API_KEY";
     // A rejected or malformed key is an invalid-credentials problem →
@@ -1134,7 +1143,7 @@ async function printVendorPreflightFailure(
       errorCode === "NDX_GOOGLE_PREFLIGHT_AUTH_FAILED" ||
       errorCode === "NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT"
     ) {
-      await printAuthFailureGuidance("google", errorCode);
+      await printAuthFailureGuidance(LLM_VENDOR.GOOGLE, errorCode);
       return;
     }
     // No key configured yet → distinct "missing API key" root cause.
@@ -1160,7 +1169,7 @@ async function printVendorPreflightFailure(
   // auth failure → canonical re-auth guidance, never a raw payload dump.
   if (isAuthFailureDetail(preflight.detail)) {
     const code =
-      vendor === "codex"
+      vendor === LLM_VENDOR.CODEX
         ? "NDX_CODEX_PREFLIGHT_AUTH_FAILED"
         : "NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED";
     await printAuthFailureGuidance(vendor, code);
@@ -1169,7 +1178,7 @@ async function printVendorPreflightFailure(
 
   // Local vendor: server connectivity failure — guide user to start their
   // local server rather than suggesting a login command.
-  if (vendor === "local") {
+  if (vendor === LLM_VENDOR.LOCAL) {
     const host = llmConfig?.local?.host || "localhost";
     const port = llmConfig?.local?.port || 1234;
     console.error(red(`✗ Cannot reach local LLM server at http://${host}:${port}.`));
@@ -1182,7 +1191,7 @@ async function printVendorPreflightFailure(
     return;
   }
 
-  if (vendor !== "claude") {
+  if (vendor !== LLM_VENDOR.CLAUDE) {
     // codex (or other CLI vendor) non-auth launch failure.
     const loginCommand = getVendorLoginCommand(
       vendor,
@@ -1808,7 +1817,7 @@ async function runLLMVendorPreflight(coerced, configs, soft = false) {
   // check — the server doesn't need to be running at config time, only at
   // execution time. Print an info line reminding the user to start it before
   // `ndx work`.
-  if (coerced === "local" && soft) {
+  if (coerced === LLM_VENDOR.LOCAL && soft) {
     const { dim } = await import("./cli-brand.js");
     const host = llmForPreflight?.local?.host || "localhost";
     const port = llmForPreflight?.local?.port || 1234;
@@ -1942,7 +1951,7 @@ async function handleSetProjectSection(
   // Cascade: local and google vendors require API mode — no CLI binary exists.
   // Automatically persist hench.provider=api so `ndx work` never emits the
   // "vendor=local requires API mode — To persist: ndx config hench.provider api" hint.
-  if (pkg === "llm" && settingPath === "vendor" && (coerced === "local" || coerced === "google")) {
+  if (pkg === "llm" && settingPath === "vendor" && (coerced === LLM_VENDOR.LOCAL || coerced === LLM_VENDOR.GOOGLE)) {
     const henchConfigPath = join(dir, ".hench", "config.json");
     try {
       if (await fileExists(henchConfigPath)) {
@@ -2279,7 +2288,7 @@ export async function runAuthCheck(args) {
   const vendor =
     typeof llmConfig.vendor === "string" && llmConfig.vendor
       ? llmConfig.vendor
-      : "claude";
+      : LLM_VENDOR.CLAUDE;
 
   const { resolveVendorModel } = await import("@n-dx/llm-client");
   const { green, dim } = await import("./cli-brand.js");

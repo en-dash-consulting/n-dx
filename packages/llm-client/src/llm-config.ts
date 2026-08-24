@@ -8,7 +8,15 @@
 import { join } from "node:path";
 import { access, readFile } from "node:fs/promises";
 import { deepMerge } from "./project-config.js";
-import type { LLMConfig, LLMVendor, CodexConfig, GoogleConfig, LocalConfig } from "./llm-types.js";
+import {
+  LLM_VENDOR,
+  isLLMVendor,
+  type LLMConfig,
+  type LLMVendor,
+  type CodexConfig,
+  type GoogleConfig,
+  type LocalConfig,
+} from "./llm-types.js";
 import type { ClaudeConfig } from "./types.js";
 import { normalizeCodexModel } from "./config.js";
 
@@ -20,9 +28,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 function extractVendor(value: unknown): LLMVendor | undefined {
-  return value === "claude" || value === "codex" || value === "google" || value === "local"
-    ? value
-    : undefined;
+  return isLLMVendor(value) ? value : undefined;
 }
 
 function extractLocalConfig(value: unknown): LocalConfig | undefined {
@@ -112,7 +118,7 @@ function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
     // so downstream resolvers see a canonical model id. For claude, the
     // shorthand→full-id expansion happens later in `resolveModel()`.
     config.model =
-      llmVendor === "codex" ? normalizeCodexModel(rawTopLevelModel) : rawTopLevelModel;
+      llmVendor === LLM_VENDOR.CODEX ? normalizeCodexModel(rawTopLevelModel) : rawTopLevelModel;
   }
   if (llmClaude || legacyClaude) config.claude = llmClaude ?? legacyClaude;
   if (llmCodex) config.codex = llmCodex;

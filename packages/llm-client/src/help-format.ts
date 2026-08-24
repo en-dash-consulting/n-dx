@@ -217,6 +217,7 @@ export const STATUS_COLORS: Record<string, (text: string) => string> = {
   warn:            yellow,
   warning:         yellow,
   info:            cyan,
+  debug:           dim,
 };
 
 /**
