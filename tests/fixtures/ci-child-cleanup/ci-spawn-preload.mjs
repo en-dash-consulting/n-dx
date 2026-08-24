@@ -26,7 +26,10 @@ if (redirectScript) {
       typeof command === "string" &&
       Array.isArray(args) &&
       typeof args[0] === "string" &&
-      /(?:^|\/)(?:rex|sourcevision)\/dist\/cli\/index\.js$/.test(args[0])
+      // `[\\/]` not `\/` — see the sourcevision-child-cleanup preload: Windows
+      // resolves the CLI path with backslashes, so a forward-slash-only pattern
+      // silently never intercepts.
+      /(?:^|[\\/])(?:rex|sourcevision)[\\/]dist[\\/]cli[\\/]index\.js$/.test(args[0])
     ) {
       return originalSpawn.call(this, command, [redirectScript, ...args.slice(1)], options);
     }

@@ -27,7 +27,7 @@
 
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
 import { ClaudeClientError } from "./types.js";
-import type { LLMProvider, ProviderInfo, StreamChunk } from "./provider-interface.js";
+import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { CodexConfig } from "./llm-types.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
@@ -152,7 +152,7 @@ export function createOpenAiApiProvider(
   const defaultModel = codexConfig?.model ?? DEFAULT_MODEL;
 
   const info: ProviderInfo = {
-    vendor: "codex",
+    vendor: LLM_VENDOR.CODEX,
     mode: "api",
     ...(defaultModel ? { model: defaultModel } : {}),
     capabilities: ["streaming", "function-calling"],

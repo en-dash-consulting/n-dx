@@ -95,6 +95,12 @@ export type {
   StreamChunk,
   LLMProvider,
 } from "./provider-interface.js";
+export {
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  LLM_VENDORS,
+  isLLMVendor,
+} from "./provider-interface.js";
 
 // Provider registry and selection
 export type { ProviderFactory } from "./provider-registry.js";
@@ -272,6 +278,7 @@ export {
   diagnoseCliInvocation,
   isCliNotFoundError,
   diagnoseCliNotFound,
+  isPosixFreezeKillEnabled,
 } from "./exec.js";
 
 export type {
@@ -283,6 +290,14 @@ export type {
   SpawnCliOptions,
   CliInvocationDiagnosis,
 } from "./exec.js";
+
+// Process-tree termination — a kill that reaches descendants, not just the child.
+export {
+  terminateProcessTree,
+  treeKillSpawnOptions,
+  treeKillCommand,
+} from "./process-tree.js";
+export type { TerminateTreeOptions } from "./process-tree.js";
 
 // Project directory constants
 export { PROJECT_DIRS } from "./project-dirs.js";
@@ -298,13 +313,19 @@ export {
   mergeWithOverrides,
 } from "./project-config.js";
 
-// CLI output control (quiet mode)
+// CLI output control (quiet/verbose/debug modes)
 export {
   setQuiet,
   isQuiet,
+  setVerbose,
+  isVerbose,
+  setDebug,
+  isDebug,
   info,
   result,
   warn,
+  verbose,
+  debug,
 } from "./output.js";
 
 // Brand and animation

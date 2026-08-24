@@ -13,7 +13,42 @@
  * as incremental deltas rather than requiring a full re-scan.
  *
  * Change detection uses mtime + file size — the same strategy as
- * hench's `RunChangeDetector` — to avoid reading unchanged files.
+ * hench's `RunChangeDetector` — to avoid reading unchanged files, with the
+ * caveat below.
+ *
+ * ## Why mtime + size alone is not sufficient
+ *
+ * On Windows, file timestamps advance in ticks rather than continuously, so a
+ * rewrite of the same LENGTH inside one tick leaves both mtime and size
+ * unchanged and is therefore invisible. That is not hypothetical: a run record
+ * rewritten in place with an equal-length edit (a taskId or status swap) would
+ * keep its old contribution, so tokens stay attributed to the wrong task until
+ * some later change to that file forces a re-read.
+ *
+ * So mtime is trusted only once it is older than {@link MTIME_GRANULARITY_MS}. In
+ * the window where it cannot be trusted, the snapshot also carries a hash of the
+ * file's bytes and change detection falls back to comparing that. The hash is
+ * dropped as soon as the mtime ages out, so the steady state remains stat-only:
+ * a file is hashed for the scan or two after its last write and never again.
+ *
+ * Hashing unconditionally would close the same hole but defeat the design, since
+ * it means reading every unchanged file on every scan. Treating a fresh file as
+ * outright MODIFIED is also wrong, and was tried first: it re-subtracts and
+ * re-adds a contribution that did not change, which resurrects entries that
+ * `pruneStaleEntries` had removed and mutates the accumulator objects handed out
+ * by a previous `getTaskUsage()` call. Comparing content is the version that
+ * leaves unchanged files genuinely untouched.
+ *
+ * KNOWN LIMITATION: a file whose mtime is deliberately moved BACKWARDS (utimes)
+ * to an already-trusted value still reads as unchanged. Only the tests do that,
+ * and they do it on purpose to reproduce the tick collision.
+ *
+ * TWIN: hench's `RunChangeDetector` applies the same rule, and the two are
+ * deliberately NOT shared — see that file's docblock for the reasoning. The short
+ * version: no module both packages can import is an appropriate home, and unlike
+ * the `quoteWindowsToken` twin these two never need to agree with each other, so
+ * there is nothing for a parity test to assert. Each side carries its own
+ * utimes-pinned test instead. A third copy of this rule should trigger a rethink.
  *
  * @module web/server/task-usage/incremental-task-usage
  */
@@ -21,6 +56,7 @@
 import { join } from "node:path";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
+import { createHash } from "node:crypto";
 import type { TaskUsageAccumulator } from "../shared-types.js";
 
 export type { TaskUsageAccumulator } from "../shared-types.js";
@@ -29,10 +65,39 @@ export type { TaskUsageAccumulator } from "../shared-types.js";
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * How far apart two writes must be before the filesystem is guaranteed to give
+ * them different mtimes.
+ *
+ * Windows advances file timestamps in ticks rather than continuously: measured on
+ * NTFS, gaps between consecutive distinct mtimes ran up to 10ms, and 163 of 200
+ * back-to-back same-size rewrites produced a byte-identical mtimeMs. 16ms is the
+ * documented system-timer tick and covers the measured worst case with margin.
+ * ext4 records nanoseconds, so on Linux this bound is simply never reached.
+ */
+const MTIME_GRANULARITY_MS = 16;
+
 /** Filesystem snapshot of a single run file. */
 interface FileSnapshot {
   mtimeMs: number;
   size: number;
+  /**
+   * True when this snapshot was taken so soon after the file's own mtime that a
+   * later write could reuse that same mtime — in which case an unchanged
+   * (mtime, size) pair on the next scan proves nothing. See
+   * {@link MTIME_GRANULARITY_MS}.
+   */
+  mtimeMayBeShared: boolean;
+  /**
+   * Digest of the file's bytes, carried only while `mtimeMayBeShared` holds — the
+   * one window where mtime cannot settle the question. It is what makes an
+   * equal-length, equal-mtime rewrite visible.
+   *
+   * Null once the mtime is old enough to be trusted, so the steady state is
+   * stat-only: a file is hashed for the scan or two following its last write and
+   * never again.
+   */
+  contentHash: string | null;
 }
 
 /** A single run file's contribution to task usage aggregation. */
@@ -49,9 +114,10 @@ interface FileContribution {
  * Incrementally aggregates per-task token usage from `.hench/runs/` files.
  *
  * First call processes all existing run files (full scan). Subsequent calls
- * detect filesystem changes via mtime+size comparison and only read the
- * files that were added, modified, or deleted — keeping aggregation time
- * constant regardless of total run history size.
+ * detect filesystem changes via mtime+size comparison (plus a content hash
+ * inside the timestamp-granularity window) and only read the files that were
+ * added, modified, or deleted — keeping aggregation time constant regardless of
+ * total run history size.
  *
  * Usage:
  * ```ts
@@ -63,7 +129,7 @@ interface FileContribution {
 export class IncrementalTaskUsageAggregator {
   private readonly runsDir: string;
 
-  /** Current snapshot of each file's mtime + size. */
+  /** Current snapshot of each file's mtime, size, and freshness. */
   private fileSnapshots = new Map<string, FileSnapshot>();
 
   /** Per-file contribution to the aggregation (for subtract-on-change). */
@@ -184,6 +250,12 @@ export class IncrementalTaskUsageAggregator {
         added.push(file);
       } else if (prev.mtimeMs !== snapshot.mtimeMs || prev.size !== snapshot.size) {
         modified.push(file);
+      } else if (prev.contentHash !== null && prev.contentHash !== snapshot.contentHash) {
+        // Same mtime and size, different bytes: the rewrite landed inside one
+        // timestamp tick at the same length. Only reachable while the previous
+        // snapshot was within the granularity window, which is the only time a
+        // hash is carried.
+        modified.push(file);
       }
     }
 
@@ -211,7 +283,6 @@ export class IncrementalTaskUsageAggregator {
       if (contribution) {
         this.applyContribution(file, contribution);
       }
-      this.fileSnapshots.set(file, currentFiles.get(file)!);
     }
 
     // Process additions: read and add
@@ -220,7 +291,18 @@ export class IncrementalTaskUsageAggregator {
       if (contribution) {
         this.applyContribution(file, contribution);
       }
-      this.fileSnapshots.set(file, currentFiles.get(file)!);
+    }
+
+    // Re-snapshot EVERY surviving file, not just the ones that changed. An
+    // unchanged file still needs its freshness re-evaluated: once its mtime ages
+    // past the granularity window the hash is dropped and it returns to the
+    // stat-only path. Keeping the old snapshot would pin it as forever-fresh and
+    // hash it on every scan.
+    for (const [file, snapshot] of currentFiles) {
+      this.fileSnapshots.set(file, {
+        ...snapshot,
+        contentHash: snapshot.mtimeMayBeShared ? snapshot.contentHash : null,
+      });
     }
 
     this.initialized = true;
@@ -255,6 +337,21 @@ export class IncrementalTaskUsageAggregator {
   }
 
   // ---- File I/O ------------------------------------------------------------
+
+  /**
+   * Digest a run file's raw bytes. Gzipped files are hashed compressed — the
+   * question is only "did these bytes change", so there is no reason to inflate.
+   * Returns null when the file cannot be read, which the caller treats as
+   * "no usable hash" rather than as a change.
+   */
+  private async hashFile(file: string): Promise<string | null> {
+    try {
+      const raw = await readFile(join(this.runsDir, file));
+      return createHash("sha1").update(raw).digest("hex");
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Read a single run file (plain JSON or gzip-compressed) and extract
@@ -308,12 +405,24 @@ export class IncrementalTaskUsageAggregator {
       (f) => (f.endsWith(".json") || f.endsWith(".json.gz")) && !f.startsWith("."),
     );
 
+    // Taken before the stats so a file written during the scan is treated as
+    // fresh rather than trusted.
+    const scanStartedMs = Date.now();
+
     // Stat files in parallel for performance
     const entries = await Promise.all(
       runFiles.map(async (file) => {
         try {
           const st = await stat(join(this.runsDir, file));
-          return { file, snapshot: { mtimeMs: st.mtimeMs, size: st.size } };
+          const mtimeMayBeShared = st.mtimeMs >= scanStartedMs - MTIME_GRANULARITY_MS;
+          // Hash while the file is fresh, and for one more scan afterwards so the
+          // previous snapshot's hash has something to be compared against.
+          const previous = this.fileSnapshots.get(file);
+          const contentHash =
+            mtimeMayBeShared || previous?.contentHash != null
+              ? await this.hashFile(file)
+              : null;
+          return { file, snapshot: { mtimeMs: st.mtimeMs, size: st.size, mtimeMayBeShared, contentHash } };
         } catch {
           // File disappeared between readdir and stat — skip
           return null;

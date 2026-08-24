@@ -39,7 +39,7 @@
  */
 
 import type { LLMProvider } from "./provider-interface.js";
-import type { LLMConfig } from "./llm-types.js";
+import { DEFAULT_LLM_VENDOR, type LLMConfig } from "./llm-types.js";
 import {
   ProviderRegistry,
   createDefaultRegistry,
@@ -68,7 +68,7 @@ export class ProviderSession {
     initialConfig: LLMConfig,
   ) {
     this._config = initialConfig;
-    this._vendor = initialConfig.vendor ?? "claude";
+    this._vendor = initialConfig.vendor ?? DEFAULT_LLM_VENDOR;
     this._provider = registry.create(this._vendor, initialConfig);
   }
 
@@ -154,7 +154,7 @@ export class ProviderSession {
    * ```
    */
   updateConfig(config: LLMConfig): LLMProvider {
-    const newVendor = config.vendor ?? "claude";
+    const newVendor = config.vendor ?? DEFAULT_LLM_VENDOR;
     if (newVendor !== this._vendor) {
       // Vendor changed — create a fresh provider for the new backend
       this._provider = this.registry.create(newVendor, config);

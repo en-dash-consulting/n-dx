@@ -19,6 +19,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
+import { initGitFixtureRepo } from "../../../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -38,9 +39,7 @@ async function waitFor(condition: () => boolean, deadlineMs = 5000): Promise<voi
 }
 
 async function setupGitRepo(dir: string): Promise<void> {
-  await execAsync("git init", { cwd: dir });
-  await execAsync("git config user.email test@test.com", { cwd: dir });
-  await execAsync("git config user.name Test", { cwd: dir });
+  await initGitFixtureRepo(dir);
   // Initial commit so HEAD exists
   await writeFile(join(dir, "src.ts"), "export const x = 1;\n", "utf-8");
   await execAsync("git add .", { cwd: dir });

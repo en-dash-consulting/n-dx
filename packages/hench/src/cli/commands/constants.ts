@@ -48,6 +48,8 @@ export function usage(): void {
     options: [
       { flag: "--help, -h", description: "Show this help" },
       { flag: "--quiet, -q", description: "Suppress informational output (for scripting)" },
+      { flag: "--verbose", description: "Show step-level progress during long operations (agent runs)" },
+      { flag: "--debug", description: "Show verbose output plus stack traces on error" },
       { flag: "--format=json", description: "Output as JSON (for status/show/config)" },
     ],
     footer: [

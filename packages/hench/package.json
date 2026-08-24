@@ -1,6 +1,6 @@
 {
   "name": "@n-dx/hench",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "publishConfig": {
     "access": "public"
   },
@@ -35,14 +35,14 @@
     "prepare": "pnpm run build"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.94.0",
+    "@anthropic-ai/sdk": "^0.117.1",
     "@n-dx/llm-client": "workspace:*",
     "@n-dx/rex": "workspace:*",
-    "zod": "^3.22.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "typescript": "^5.3.0",
-    "vitest": "^4.0.0"
+    "@types/node": "^26.2.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }

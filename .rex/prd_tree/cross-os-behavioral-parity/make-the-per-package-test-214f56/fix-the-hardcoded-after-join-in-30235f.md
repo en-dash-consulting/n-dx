@@ -1,0 +1,28 @@
+---
+id: "30235fba-a44c-493e-b58a-33a9f86e5743"
+level: "task"
+title: "Fix the hardcoded \"/\" after join() in web's boundary-check exemptions"
+status: "completed"
+priority: "high"
+tags:
+  - "cross-os"
+  - "windows"
+  - "testing"
+  - "web"
+  - "paths"
+  - "architecture"
+source: "exploration-2026-08-18"
+startedAt: "2026-08-18T16:58:43.027Z"
+completedAt: "2026-08-18T17:03:21.446Z"
+endedAt: "2026-08-18T17:03:21.446Z"
+resolutionType: "code-change"
+resolutionDetail: "Both failures fixed; web 6 -> 4 failures (3 -> 2 files) with no production change (empty `git diff packages/web/src`), which is also how AC4 was met — the documented crash/ and messaging/ bypasses pass without touching any import. Chose normalise-at-the-source over patching nine comparisons: one relPosix() helper (relative(WEB_SRC,file).split(sep).join(\"/\")) applied at all 14 rel-computation sites, with every comparison literal converted to forward slashes. The scope was larger than the nine reported sites and missing the extras would have created NEW false positives: normalising rel invalidates every join()-built comparison, so 17 literals needed converting including four that previously WORKED (the ZONE_FILES Set checked with .has(rel), and the three `rel === join(...)` equality checks). Filesystem join() calls were deliberately left OS-native since they feed readdirSync/readFileSync. AC6 proven by injecting a real violation — a direct ../../shared/view-id.js import into viewer/views/analysis.ts, in neither exempt zone — which both rules flagged; reverted from backup with the diff confirmed empty. Grepped for the same pattern in ci.js and root e2e suites: none, so the class was confined to this file. POSIX preserved by construction (split(sep).join(\"/\") is a no-op when sep is \"/\"), stated as reasoning since no POSIX host was available. Side benefit: violation messages now print forward-slash paths identically on every platform. Typecheck clean; boundary-check 15/15; root suite 91 files / 2070 passed unaffected. web's remaining 4 are graph-view (3be5b199) and the intermittent EBUSY pair (8e79620a)."
+acceptanceCriteria:
+  - "Both currently-failing boundary-check assertions pass on Windows"
+  - "All nine join()+\"/\" sites are corrected, not just the two that surface today"
+  - "A single shared normalization helper is used rather than nine independent edits"
+  - "The documented crash/ and messaging/ bypasses are still exempted — verified by confirming the suite passes WITHOUT changing any production import"
+  - "The tests still pass on POSIX"
+  - "No exemption was widened to make the failure disappear — the rules still catch a genuine violation (verify by temporarily adding one)"
+description: "packages/web/tests/integration/boundary-check.test.ts builds exemption prefixes with join() and then appends a FORWARD slash:\n\n    const isCrash = rel.startsWith(join(\"viewer\", \"crash\") + \"/\") || rel === join(\"viewer\", \"crash\");\n\nOn Windows join() yields \"viewer\\crash\", so the expression becomes \"viewer\\crash/\" — which never matches\nrel \"viewer\\crash\\crash-detector.ts\". The segments were made portable; the separator was not.\n\nNINE OCCURRENCES of the pattern: lines 119, 125, 176, 294, 369, 372, 633, 689, 800. Two currently surface\nas failures (\"viewer cross-boundary imports flow through external.ts gateway\" and \"shared/ consumers\nimport through barrel, not leaf files\"); the rest are latent because the files they would exempt happen\nnot to have the imports in question.\n\nFAILURE DIRECTION — checked, not assumed. All nine are exemption-side (`continue` / `!isCrash`), so a\nnon-match makes the check RUN where it should have been skipped: a false POSITIVE. Line 176 was inspected\nspecifically because it builds a `zonePrefix` that could have been detection-side, which would instead\nmean a governance rule silently unenforced on Windows — it is used at line 179 as an exemption, so no rule\ngoes unchecked.\n\nWHY THIS IS WORSE THAN NOISE. The import it flags is a bypass CLAUDE.md documents as deliberate: \"crash\n(cohesion 0.5, unidirectional coupling: web-viewer → crash) ... Crash imports web-shared directly\n(documented bypass)\". So a Windows developer running the suite is told an intentional architectural\ndecision is a violation, and the obvious response — \"fix\" the import — would break the documented\ncycle-avoidance this exemption exists to permit.\n\nFIX: compare on a single canonical separator. Either build the prefix with `sep` instead of \"/\", or\nnormalize `rel` to posix once (`rel.split(sep).join(\"/\")`) and keep the forward-slash literals. Prefer\nONE helper used by all nine sites over nine independent edits, so the tenth exemption someone adds\ninherits correct behaviour rather than repeating the bug.\n\nNote the import specifiers themselves (\"../../shared/view-id.js\") are always forward-slash regardless of\nOS, since they are module paths, not filesystem paths — only the `rel` file paths need normalizing. Do not\n\"fix\" the import-side matching."
+---

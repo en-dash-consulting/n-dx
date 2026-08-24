@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { readFile, access } from "node:fs/promises";
 import { deepMerge } from "./project-config.js";
 import type { ClaudeConfig } from "./types.js";
-import type { LLMVendor, LLMConfig, TaskWeight } from "./llm-types.js";
+import { LLM_VENDOR, type LLMVendor, type LLMConfig, type TaskWeight } from "./llm-types.js";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
 const LOCAL_CONFIG_FILE = ".n-dx.local.json";
@@ -33,11 +33,11 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5";
  * via `resolveVendorModel()`.
  */
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
-  claude: "claude-sonnet-5",
-  codex: "gpt-5.5",
-  google: "gemini-2.5-pro",
+  [LLM_VENDOR.CLAUDE]: "claude-sonnet-5",
+  [LLM_VENDOR.CODEX]: "gpt-5.5",
+  [LLM_VENDOR.GOOGLE]: "gemini-2.5-pro",
   // Local (LM Studio): no canonical model — depends on whatever is loaded.
-  local: "",
+  [LLM_VENDOR.LOCAL]: "",
 };
 
 /**
@@ -69,19 +69,19 @@ export const GOOGLE_MODELS: Record<TaskWeight, string> = {
  *            TIER_MODELS.codex.standard  === NEWEST_MODELS.codex
  */
 export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
-  claude: {
+  [LLM_VENDOR.CLAUDE]: {
     light: "claude-haiku-4-5",
     standard: NEWEST_MODELS.claude,
     heavy: "claude-opus-4-7",
   },
-  codex: {
+  [LLM_VENDOR.CODEX]: {
     light: "gpt-5.4-mini",
     standard: NEWEST_MODELS.codex,
     heavy: NEWEST_MODELS.codex, // no ultra-codex tier yet — same as standard
   },
-  google: GOOGLE_MODELS,
+  [LLM_VENDOR.GOOGLE]: GOOGLE_MODELS,
   // Local: no catalog — model is whatever LM Studio has loaded.
-  local: { light: "", standard: "", heavy: "" },
+  [LLM_VENDOR.LOCAL]: { light: "", standard: "", heavy: "" },
 };
 
 /**
@@ -115,15 +115,15 @@ const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
  *   codex   128K-token window → ~512K chars; cap at 400K (78% utilisation)
  */
 export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
-  claude: 640_000,
-  codex: 400_000,
+  [LLM_VENDOR.CLAUDE]: 640_000,
+  [LLM_VENDOR.CODEX]: 400_000,
   // Gemini models have 1M+ token context windows; cap conservatively to
   // leave room for system prompt, tool definitions, and model overhead.
-  google: 800_000,
+  [LLM_VENDOR.GOOGLE]: 800_000,
   // Local (LM Studio): conservative default — actual limit depends on the
   // loaded model. Users running large context models can set a higher cap
   // via llm.local.model config if needed.
-  local: 128_000,
+  [LLM_VENDOR.LOCAL]: 128_000,
 };
 
 /**
@@ -234,7 +234,7 @@ export function resolveVendorModel(
   config?: LLMConfig,
   weight: TaskWeight = "standard",
 ): string {
-  if (vendor === "claude") {
+  if (vendor === LLM_VENDOR.CLAUDE) {
     if (weight === "light") {
       // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
       if (config?.claude?.lightModel) {
@@ -255,7 +255,7 @@ export function resolveVendorModel(
     }
     return resolveModel(TIER_MODELS.claude.standard);
   }
-  if (vendor === "codex") {
+  if (vendor === LLM_VENDOR.CODEX) {
     if (weight === "light") {
       // Light tier: only lightModel can override, then fall back to TIER_MODELS.light
       if (config?.codex?.lightModel) {
@@ -276,7 +276,7 @@ export function resolveVendorModel(
     }
     return TIER_MODELS.codex.standard;
   }
-  if (vendor === "google") {
+  if (vendor === LLM_VENDOR.GOOGLE) {
     if (weight === "light") {
       if (config?.google?.lightModel) {
         return config.google.lightModel;
@@ -296,7 +296,7 @@ export function resolveVendorModel(
     }
     return TIER_MODELS.google.standard;
   }
-  if (vendor === "local") {
+  if (vendor === LLM_VENDOR.LOCAL) {
     // Light tier: prefer lightModel, then fall back to model, then "".
     if (weight === "light" && config?.local?.lightModel) {
       return config.local.lightModel;

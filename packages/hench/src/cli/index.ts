@@ -23,7 +23,7 @@ import { resolve } from "node:path";
 import { usage } from "./commands/constants.js";
 import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireHenchDir } from "./errors.js";
-import { setQuiet } from "./output.js";
+import { setQuiet, setVerbose, setDebug } from "./output.js";
 import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from "../prd/llm-gateway.js";
 
 suppressKnownDeprecations();
@@ -75,6 +75,8 @@ async function main(): Promise<void> {
   }
 
   setQuiet(flags.quiet === "true");
+  setVerbose(flags.verbose === "true");
+  setDebug(flags.debug === "true");
 
   // Resolve dir: last positional arg or cwd
   const resolveDir = (): string => {
@@ -207,7 +209,7 @@ async function main(): Promise<void> {
       }
     }
   } catch (err) {
-    handleCLIError(err);
+    handleCLIError(err, flags.debug === "true");
   }
 }
 

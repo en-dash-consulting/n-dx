@@ -11,6 +11,7 @@ import { mkdtemp, writeFile, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 import { execSync } from "node:child_process";
+import { initGitFixtureRepoSync } from "../../helpers/index.js";
 import {
   captureCommitChanges,
   captureMultiCommitChanges,
@@ -25,15 +26,7 @@ describe("git-changed-files", () => {
   beforeEach(async () => {
     // Create a temporary git repository
     repoDir = await mkdtemp(join(tmpdir(), "hench-git-test-"));
-    execSync("git init", { cwd: repoDir, stdio: "ignore" });
-    execSync('git config user.email "test@example.com"', {
-      cwd: repoDir,
-      stdio: "ignore",
-    });
-    execSync('git config user.name "Test User"', {
-      cwd: repoDir,
-      stdio: "ignore",
-    });
+    initGitFixtureRepoSync(repoDir);
   });
 
   afterEach(async () => {

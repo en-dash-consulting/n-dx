@@ -7,6 +7,7 @@ import { exec as execCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
+import { initGitFixtureRepo } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -20,12 +21,6 @@ const execAsync = promisify(execCb);
  * - An explicit 'y' reverts.
  * - Autonomous runs never prompt and keep the unattended auto-revert.
  */
-
-async function setupGitRepo(dir: string): Promise<void> {
-  await execAsync("git init", { cwd: dir });
-  await execAsync("git config user.email test@test.com", { cwd: dir });
-  await execAsync("git config user.name Test", { cwd: dir });
-}
 
 async function makeInitialCommit(dir: string, file: string, content: string): Promise<void> {
   await writeFile(join(dir, file), content, "utf-8");
@@ -127,7 +122,7 @@ describe("rollbackOnFailure express-prompt gate", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await setupGitRepo(projectDir);
+    await initGitFixtureRepo(projectDir);
 
     originalIsTTY = process.stdin.isTTY;
     Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });

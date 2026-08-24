@@ -76,8 +76,14 @@ jobs:
       - name: PR check
         run: pnpm pr-check
 
+      # NOT `pnpm -r run test`: that bails on the first failing package, and
+      # because hench and web depend on rex they are ordered after it — so a red
+      # rex meant they never executed and their absence from the log read as
+      # "nothing to report". This runner executes every package regardless and
+      # still exits non-zero if any failed. (`pnpm -r --no-bail` is not an
+      # option: pnpm documents it as exiting 0 even when a script fails.)
       - name: Run unit tests
-        run: pnpm -r run test
+        run: node scripts/run-all-tests.mjs packages
 
       # Root-level e2e / integration / gauntlet suites live in tests/** and are
       # NOT covered by `pnpm -r run test` (which only runs per-package tests).
@@ -151,12 +157,39 @@ jobs:
           name: ndx-cli-smoke-macos
           path: ndx-cli-smoke-macos.json
 
+      # Runs AFTER the upload deliberately: a test failure then still leaves the
+      # smoke artifact published, so this job's collection contract with
+      # smoke-parity is unaffected by suite results. (smoke-parity is skipped
+      # when this job fails, because it `needs` it — the artifact itself is
+      # intact and the next green run compares normally.)
+      #
+      # SCOPE — root suite only, and deliberately narrower than smoke-windows.
+      # tests/** is where every cross-OS behaviour lives: spawn/quoting,
+      # child-process lifecycle, config file permissions, init, and the CLI e2e
+      # flows.
+      #
+      # The per-package suites run on ubuntu (validate) and on Windows
+      # (smoke-windows) but NOT here. macOS bills at 10x Linux minutes — five
+      # times the Windows rate — and it is the least informative of the three:
+      # ubuntu already covers POSIX, and the failures this whole effort found were
+      # Windows-specific by nature (path separators, file locking, CRLF,
+      # timestamp granularity, process trees). Paying the highest rate for the
+      # smallest increment is the wrong trade. If a macOS-only defect ever does
+      # surface, revisit this — but add the suites with evidence, not on principle.
+      - name: Run root e2e / integration tests
+        run: node scripts/run-vitest-bind-aware.mjs root
+
   smoke-windows:
     name: CLI Smoke (Windows)
     runs-on: windows-latest
     needs:
       - validate
-    timeout-minutes: 20
+    # 30 rather than the 20 the other jobs use: this job now runs the per-package
+    # suites on top of the root suite, measured locally at ~1.7x the root suite's
+    # wall time. A timeout kill presents as a red job, which is the failure mode
+    # this whole effort exists to avoid, so the headroom is deliberate. Lower it
+    # again if real runs land comfortably under 20.
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -185,6 +218,42 @@ jobs:
         with:
           name: ndx-cli-smoke-windows
           path: ndx-cli-smoke-windows.json
+
+      # See the equivalent step in smoke-macos for why this runs after the upload.
+      #
+      # Measured locally on Windows 11 (2026-08-18): 92 files, 2074 passed,
+      # 1 skipped, 0 failed, 69s wall. Same timed run as the cost figures below.
+      - name: Run root e2e / integration tests
+        run: node scripts/run-vitest-bind-aware.mjs root
+
+      # The per-package suites now run here too, not just on ubuntu.
+      #
+      # They were ubuntu-only because they were red on Windows and a permanently
+      # red job gets disabled, which would have cost all cross-OS coverage. That
+      # is fixed: every package passes on Windows (llm-client 1232, rex 4406,
+      # sourcevision 1691, hench 2901, web 2872 — 0 failures). The earlier note
+      # here claimed only two rex wall-clock budgets were failing; that was wrong,
+      # hench and web were red as well, and the runner below is what made their
+      # failures visible instead of silently skipped.
+      #
+      # NOT `pnpm -r run test`: it bails on the first failing package, and because
+      # hench and web depend on rex they are ordered after it — so a red rex meant
+      # they never executed and their absence read as "nothing to report". NOT
+      # `pnpm -r --no-bail run test` either: pnpm documents it as exiting 0 even
+      # when a script fails, which would report a red suite as green. Keep this in
+      # step with the equivalent comment in the validate job.
+      #
+      # COST, measured locally rather than assumed — both steps timed back to back
+      # in this job's order (2026-08-18, Windows 11):
+      #   root suite   69s  (92 files, 2074 passed, 1 skipped)
+      #   per-package  119s (5 packages, ~13,000 tests, 5/5 suites)
+      #   total       188s  vs 69s before, so the job's test time is ~2.7x
+      # This step is ~1.7x the root suite on its own. Windows bills at 2x Linux
+      # minutes, so the added spend is roughly 2 x (per-package runner minutes).
+      # A hosted runner is slower than this machine, so treat the RATIO as the
+      # transferable figure and the seconds as a floor.
+      - name: Run per-package tests
+        run: node scripts/run-all-tests.mjs packages
 
   smoke-parity:
     name: CLI Smoke Parity

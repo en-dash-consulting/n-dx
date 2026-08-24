@@ -1,10 +1,10 @@
 {
   "name": "@n-dx/core",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "publishConfig": {
     "access": "public"
   },
-  "description": "AI-powered development toolkit — analyze a codebase, build a PRD, and execute tasks autonomously",
+  "description": "AI-powered development toolkit \u2014 analyze a codebase, build a PRD, and execute tasks autonomously",
   "type": "module",
   "keywords": [
     "ai",
@@ -30,7 +30,7 @@
   },
   "homepage": "https://github.com/en-dash-consulting/n-dx#readme",
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=22.0.0",
     "pnpm": ">=10.0.0"
   },
   "bin": {
@@ -65,6 +65,8 @@
     "init-llm.js",
     "llm-model-catalog.js",
     "child-lifecycle.js",
+    "cli-log.js",
+    "file-permissions.js",
     "cli-timeout.js",
     "update-check.js",
     "pair-programming.js",
@@ -86,7 +88,7 @@
     "@n-dx/web": "workspace:*",
     "enquirer": "^2.4.1",
     "htm": "^3.1.1",
-    "ink": "^6.8.0",
-    "react": "^19.2.4"
+    "ink": "^7.1.1",
+    "react": "^19.2.8"
   }
 }

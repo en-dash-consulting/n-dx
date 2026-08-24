@@ -138,9 +138,17 @@ function renderCLIError(code: CLIErrorCode, message: string, suggestion?: string
 
 /**
  * Format an error for CLI output. Returns lines to print to stderr.
- * Never includes stack traces in the output.
+ * Never includes a stack trace unless debug is true.
  */
-export function formatCLIError(err: unknown): string {
+export function formatCLIError(err: unknown, debug = false): string {
+  let formatted = formatCLIErrorMessage(err);
+  if (debug && err instanceof Error && err.stack) {
+    formatted += `\n\n${err.stack}`;
+  }
+  return formatted;
+}
+
+function formatCLIErrorMessage(err: unknown): string {
   // CLIError — already user-friendly
   if (err instanceof CLIError) {
     return renderCLIError(err.code, err.message, err.suggestion);
@@ -172,9 +180,10 @@ export function formatCLIError(err: unknown): string {
  * Handle a CLI error: print it and exit.
  * Drop-in replacement for catch blocks in CLI entry points.
  * Respects custom exitCode if the error has one.
+ * Pass debug=true (from --debug) to append the stack trace.
  */
-export function handleCLIError(err: unknown): never {
-  console.error(formatCLIError(err));
+export function handleCLIError(err: unknown, debug = false): never {
+  console.error(formatCLIError(err, debug));
   const exitCode =
     err instanceof CLIError && "exitCode" in err
       ? (err as CLIError & { exitCode: number }).exitCode

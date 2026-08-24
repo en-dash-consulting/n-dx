@@ -12,10 +12,10 @@ import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
 import { migrateToFolderPerTask } from "../../core/folder-per-task-migration.js";
 import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
-import { printVendorModelHeader } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
 import { REX_DIR } from "./constants.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
-import { info, warn, result } from "../output.js";
+import { info, warn, result, startSpinner } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
 import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
@@ -110,7 +110,7 @@ async function _cmdReshapeCore(
 
   // Resolve model: explicit flag > vendor config > default
   const resolvedModel = resolveConfiguredModel(flags.model);
-  const vendor = getLLMVendor() ?? "claude";
+  const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
   const modelSource = flags.model
     ? "cli-override" as const
     : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
@@ -147,14 +147,16 @@ async function _cmdReshapeCore(
   const hashSuffixProposals = hashSuffixGroups.flatMap((g) => g.proposals);
 
   // Get reshape proposals from LLM
-  info("Analyzing PRD structure...");
+  const reshapeSpinner = startSpinner("Analyzing PRD structure...");
   let proposals: ReshapeProposal[];
   let tokenUsage: Awaited<ReturnType<typeof reasonForReshape>>["tokenUsage"];
   try {
     const reshapeResult = await reasonForReshape(docAfterCompaction.items, { dir, model: resolvedModel });
     proposals = reshapeResult.proposals;
     tokenUsage = reshapeResult.tokenUsage;
+    reshapeSpinner.stop();
   } catch (err) {
+    reshapeSpinner.stop();
     const classified = classifyLLMError(err instanceof Error ? err : new Error(String(err)), vendor, "analyze PRD structure");
     throw new CLIError(classified.message, classified.suggestion, classified.code);
   }

@@ -40,7 +40,7 @@ import { createRequire } from "module";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig } from "./config.js";
+import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv } from "./config.js";
 import {
   parseRecommendationsJson,
   formatQueuedTaskSummary,
@@ -56,7 +56,6 @@ import {
   readPidFile,
   removePidFile,
   removePortFile,
-  waitForProcessExit,
 } from "./web.js";
 import { buildRefreshPlan, RefreshPlanError } from "./refresh-plan.js";
 import { refreshSourcevisionDashboardArtifacts } from "./refresh-artifacts.js";
@@ -95,6 +94,8 @@ import {
   formatInitBanner,
   formatRecap,
   createSpinner,
+  createLineSplitter,
+  throttleDebugLines,
   INIT_PHASES,
   dim,
 } from "./cli-brand.js";
@@ -108,6 +109,8 @@ import {
 import {
   createChildProcessTracker,
   installTrackedChildProcessHandlers,
+  treeKillSpawnOptions,
+  terminateTreeByPid,
 } from "./child-lifecycle.js";
 import { startUpdateCheck, formatUpdateNotice } from "./update-check.js";
 import { checkProjectStaleness, formatStalenessNotice } from "./stale-check.js";
@@ -296,21 +299,28 @@ const ERROR_HINTS = [
 
 /**
  * Format an error for CLI output — user-friendly with optional hint.
- * Never shows stack traces.
+ * Never shows stack traces unless --debug is active (see cliDebug).
  */
 function formatError(err) {
   const message = err instanceof Error ? err.message : String(err);
   const errorLabel = red("Error:");
+  let formatted;
   // If the error already has a suggestion (e.g. from a CLIError-like object), use it
   if (err && err.suggestion) {
-    return `${errorLabel} ${message}\nHint: ${err.suggestion}`;
-  }
-  for (const [pattern, suggestion] of ERROR_HINTS) {
-    if (pattern.test(message)) {
-      return `${errorLabel} ${message}\nHint: ${suggestion}`;
+    formatted = `${errorLabel} ${message}\nHint: ${err.suggestion}`;
+  } else {
+    formatted = `${errorLabel} ${message}`;
+    for (const [pattern, suggestion] of ERROR_HINTS) {
+      if (pattern.test(message)) {
+        formatted = `${errorLabel} ${message}\nHint: ${suggestion}`;
+        break;
+      }
     }
   }
-  return `${errorLabel} ${message}`;
+  if (cliDebug && err instanceof Error && err.stack) {
+    formatted += `\n\n${err.stack}`;
+  }
+  return formatted;
 }
 
 class ExitRequest extends Error {
@@ -320,7 +330,7 @@ class ExitRequest extends Error {
   }
 }
 
-const childTracker = createChildProcessTracker({ processGroups: true });
+const childTracker = createChildProcessTracker({ treeKill: true });
 let exitPromise = null;
 
 /**
@@ -331,6 +341,16 @@ let pendingUpdateCheck = null;
 
 /** True when the user passed --quiet / -q — update notice is suppressed. */
 let updateCheckQuiet = false;
+
+/**
+ * True when the user passed --verbose / --debug — enables a periodic
+ * "still running" heartbeat in run() while awaiting a spawned child, so a
+ * hung child can be told apart from a slow one. Set early in main().
+ */
+let cliVerbose = false;
+
+/** True when the user passed --debug — formatError() appends the stack trace. */
+let cliDebug = false;
 
 /**
  * Stale-check result set before command dispatch.
@@ -346,13 +366,12 @@ let staleCheckResult = null;
 const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "auth"]);
 
 /**
- * On POSIX systems, spawn each child with `detached: true` so it becomes the
- * leader of a new process group.  This lets the process-group-aware tracker
- * kill grandchildren (spawned by the child) by signalling `-pgid` instead of
- * only the direct child PID.  On Windows the flag is omitted — process groups
- * are not supported and detached mode has different semantics there.
+ * Spawn options that make each child tree-killable by the tracker. Owned by
+ * child-lifecycle.js so this file does not test `process.platform` itself — the
+ * platform difference (POSIX needs `detached: true` for a process group;
+ * Windows needs nothing) is the termination layer's business, not the CLI's.
  */
-const SPAWN_DETACHED = process.platform !== "win32" ? { detached: true } : {};
+const SPAWN_DETACHED = treeKillSpawnOptions();
 
 function spawnTracked(command, args, options) {
   return childTracker.register(spawn(command, args, { ...SPAWN_DETACHED, ...options }));
@@ -431,10 +450,42 @@ function run(script, args) {
   return new Promise((res) => {
     const child = spawnTracked(process.execPath, [scriptPath, ...args], {
       stdio: "inherit",
+      env: childEnv(),
     });
-    child.on("close", (code) => res(code ?? 1));
+
+    let heartbeat = null;
+    if (cliVerbose) {
+      const label = scriptPath.match(/packages[/\\]([^/\\]+)[/\\]/)?.[1] ?? scriptPath;
+      const startedAtMs = Date.now();
+      heartbeat = setInterval(() => {
+        const elapsedSec = Math.round((Date.now() - startedAtMs) / 1000);
+        console.error(dim(`  … waiting on ${label} (pid ${child.pid}, ${elapsedSec}s elapsed)`));
+      }, 30_000);
+    }
+
+    child.on("close", (code) => {
+      if (heartbeat) clearInterval(heartbeat);
+      res(code ?? 1);
+    });
   });
 }
+
+/**
+ * Environment for spawned sub-CLIs: the ambient environment plus any BETA
+ * experimental flags the project has enabled.
+ *
+ * The decision itself lives in config.js's `experimentalEnv` so it is pure and
+ * testable; this only applies it. Resolved once per run rather than per spawn,
+ * because `run()` is called for every sub-CLI and the value cannot change mid-run.
+ */
+function childEnv() {
+  return Object.keys(experimentalEnvFragment).length > 0
+    ? { ...process.env, ...experimentalEnvFragment }
+    : process.env;
+}
+
+/** BETA experimental flags to forward to children. Empty unless opted in. */
+let experimentalEnvFragment = {};
 
 async function runOrDie(script, args) {
   const code = await run(script, args);
@@ -446,6 +497,27 @@ function resolveDir(args) {
     if (!args[i].startsWith("-")) return args[i];
   }
   return process.cwd();
+}
+
+/**
+ * Resolve the project directory for cross-cutting pre-dispatch concerns
+ * (command-timeout config, the stale-project check) — not for use inside
+ * a command handler, which each already knows its own positional-arg shape.
+ *
+ * resolveDir() blindly returns the last non-flag arg, which is correct for
+ * commands whose only positional arg is a target directory (analyze, work,
+ * ...). But `config`'s positional args are a key/value/dir triple — for
+ * `ndx config llm`, resolveDir(["llm"]) returns the literal string "llm",
+ * and since no such directory exists, the pre-dispatch stale check and
+ * timeout-config load silently ran against a directory that was never
+ * meant to be one, misreporting a fully-initialized project as
+ * uninitialized. Falls back to cwd whenever the naively-resolved candidate
+ * doesn't actually exist on disk, matching config.js's own
+ * resolvePositionalArgs()/fileExists() precedent for this exact ambiguity.
+ */
+function resolveProjectDirForPreDispatch(rest) {
+  const candidate = resolveDir(rest);
+  return existsSync(candidate) ? candidate : process.cwd();
 }
 
 function extractFlags(args) {
@@ -605,7 +677,7 @@ function readLLMVendor(dir) {
   try {
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
     const vendor = data?.llm?.vendor;
-    return vendor === "claude" || vendor === "codex" || vendor === "google" || vendor === "local" ? vendor : undefined;
+    return typeof vendor === "string" && SUPPORTED_PROVIDERS.includes(vendor) ? vendor : undefined;
   } catch {
     return undefined;
   }
@@ -723,33 +795,31 @@ async function detectAndCleanConflictingDashboard(absDir) {
   // Live process — terminate gracefully.
   const gracePeriodMs = Number(process.env.N_DX_STOP_GRACE_MS ?? 2_000);
 
+  // Probe with signal 0 before delegating. The shared primitive reports a boolean,
+  // but "not permitted" is a different user-facing outcome from "stopped", so the
+  // distinction has to be drawn here where the status is decided.
   try {
-    process.kill(info.pid, "SIGTERM");
+    process.kill(info.pid, 0);
   } catch (err) {
     if (err?.code === "EPERM") {
-      // No permission to signal the process.
+      // Process exists but is not ours to signal.
       return { status: "stop-failed", pid: info.pid, port: info.port };
     }
-    // ESRCH: process exited between the running-check and the kill — treat as stopped.
+    // ESRCH: exited between the running-check and here — treat as stopped.
     await removePidFile(absDir);
     await removePortFile(absDir);
     return { status: "stopped", pid: info.pid, port: info.port };
   }
 
-  // Wait for graceful exit up to the grace period.
-  await waitForProcessExit(info.pid, gracePeriodMs);
-
-  // Escalate to SIGKILL regardless of whether waitForProcessExit timed out.
-  // kill(pid, 0) returns success for zombie processes (exited but not yet reaped
-  // by their parent), so waitForProcessExit may report a timeout even when the
-  // process has effectively exited.  After SIGKILL, a short settle is sufficient —
-  // we do not poll again because SIGKILL is unblockable and zombies are already done.
-  try {
-    process.kill(info.pid, "SIGKILL");
-  } catch {
-    // Ignore: process is already gone or is a zombie — both are effectively stopped.
-  }
-  await new Promise((r) => setTimeout(r, 100));
+  // Terminate the server AND its children through the shared contract, so this is
+  // not a third copy of the SIGTERM → grace → SIGKILL sequence. On Windows this is
+  // what stops `rex analyze` / `hench run` children being orphaned by a stop.
+  //
+  // The result is deliberately not consulted: `kill(pid, 0)` succeeds for a zombie
+  // (exited, not yet reaped), so "still signallable" does not mean "still running",
+  // and reporting stop-failed on that basis would be wrong. SIGKILL is unblockable,
+  // so by this point the process is done in every sense the caller cares about.
+  await terminateTreeByPid(info.pid, { forceKillTimeoutMs: gracePeriodMs });
 
   await removePidFile(absDir);
   await removePortFile(absDir);
@@ -908,8 +978,15 @@ function handleVersion(rest) {
 /**
  * Run a sub-package init command, capturing output instead of streaming it.
  * Returns { code, stdout, stderr }.
+ *
+ * @param {string} toolPath
+ * @param {string[]} args
+ * @param {(chunk: string) => void} [onData]  Optional sink fed every raw
+ *   stdout/stderr chunk as it arrives — lets callers surface the child's own
+ *   progress messages live (under --verbose/--debug) without changing the
+ *   buffered return contract used for error reporting.
  */
-function runInitCapture(toolPath, args) {
+function runInitCapture(toolPath, args, onData) {
   return new Promise((resolve) => {
     const child = spawnTracked(process.execPath, [toolPath, ...args], {
       cwd: process.cwd(),
@@ -918,8 +995,8 @@ function runInitCapture(toolPath, args) {
     });
     let stdout = "";
     let stderr = "";
-    child.stdout.on("data", (d) => { stdout += d; });
-    child.stderr.on("data", (d) => { stderr += d; });
+    child.stdout.on("data", (d) => { stdout += d; onData?.(d.toString()); });
+    child.stderr.on("data", (d) => { stderr += d; onData?.(d.toString()); });
     child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
   });
 }
@@ -1128,7 +1205,9 @@ async function selectInitLLMProvider(dir, effectiveProvider, effectiveModel, qui
  * Exits with code 1 on failure.
  *
  * @param {string} name  Phase key (matched against INIT_PHASES for spinner config)
- * @param {() => Promise<{code: number, stdout: string, stderr: string}>} work
+ * @param {(spinner: ReturnType<typeof createSpinner>|null) => Promise<{code: number, stdout: string, stderr: string}>} work
+ *   Receives the active spinner (or null when quiet) so long-running phases
+ *   can surface live progress via spinner.update(...).
  * @param {string|undefined} detail  Optional text appended to the success spinner
  * @param {boolean} quiet
  */
@@ -1137,7 +1216,7 @@ async function runSubInitPhase(name, work, detail, quiet) {
   if (!quiet && phase) {
     const spinner = createSpinner(phase.spinner);
     spinner.start();
-    const result = await work();
+    const result = await work(spinner);
     if (result.code !== 0) {
       spinner.fail(`${name} failed`);
       console.error(result.stderr || result.stdout);
@@ -1145,7 +1224,7 @@ async function runSubInitPhase(name, work, detail, quiet) {
     }
     spinner.success(phase.success, detail);
   } else {
-    const result = await work();
+    const result = await work(null);
     if (result.code !== 0) {
       console.error(result.stderr || result.stdout);
       exitWithCleanup(1);
@@ -1353,10 +1432,21 @@ async function handleInit(rest) {
 
   // ── Static fallback (non-TTY, --quiet, or Ink unavailable) ────────
   await runSubInitPhase("sourcevision",
-    async () => {
-      const initResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir]);
+    async (spinner) => {
+      // Under --verbose/--debug, forward sourcevision's own per-phase
+      // progress (e.g. "[phase 1] Inventory...") into the spinner label
+      // instead of silently discarding it — otherwise a slow analyze run
+      // is indistinguishable from a hung one. Only debug()'s high-volume
+      // timestamped lines are throttled (not the coarser info()/verbose()
+      // checkpoints, which stay unthrottled) — a --debug firehose of
+      // thousands of lines/sec would otherwise turn "redraw the spinner"
+      // into the bottleneck that stalls draining the child's output pipe.
+      const onData = cliVerbose && spinner
+        ? createLineSplitter(throttleDebugLines((line) => spinner.update(`${INIT_PHASES.sourcevision.spinner} ${dim(line)}`), 100))
+        : undefined;
+      const initResult = await runInitCapture(tools.sourcevision, ["init", ...flags, dir], onData);
       if (initResult.code !== 0) return initResult;
-      return runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir]);
+      return runInitCapture(tools.sourcevision, ["analyze", "--fast", ...flags, dir], onData);
     },
     svExists ? "reused — .sourcevision/ already present" : undefined,
     quiet);
@@ -2434,6 +2524,11 @@ async function handlePairProgramming(rest) {
         reviewer,
         testCommand,
         contextFiles: contextFilePath ? [contextFilePath] : undefined,
+        // The reviewer CLI and the shell test command are spawned detached so a
+        // timeout can group-signal their descendants; registering them here is what
+        // keeps Ctrl-C working, since a detached child is no longer in this
+        // process's foreground group. See doNotTrack in pair-programming.js.
+        registerChild: childTracker.register,
       });
       process.stdout.write(formatReviewBanner(reviewer, reviewResult) + "\n");
 
@@ -2469,6 +2564,7 @@ async function handlePairProgramming(rest) {
           reviewer,
           testCommand,
           contextFiles: contextFilePath ? [contextFilePath] : undefined,
+          registerChild: childTracker.register,
         });
         process.stdout.write(formatReviewBanner(reviewer, finalResult) + "\n");
       }
@@ -2645,6 +2741,8 @@ async function main() {
   // The check runs as a background Promise concurrently with command
   // execution; flushAndExit() races it against a 500 ms timeout.
   updateCheckQuiet = rest.some((a) => a === "--quiet" || a === "-q");
+  cliVerbose = rest.some((a) => a === "--verbose" || a === "--debug");
+  cliDebug = rest.some((a) => a === "--debug");
   if (!updateCheckQuiet) {
     try {
       const { version: currentVersion } = JSON.parse(
@@ -2675,9 +2773,13 @@ async function main() {
   // ── Resolve command timeout from project config ─────────────────────────
   // Load project config from the directory inferred from args (best-effort:
   // failure is silently ignored so a missing .n-dx.json never blocks startup).
-  const dir = resolveDir(rest);
+  const dir = resolveProjectDirForPreDispatch(rest);
   const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
   const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
+
+  // Resolve BETA experimental flags from the same config read, so childEnv() can
+  // forward them to sub-CLIs without a second filesystem hit.
+  experimentalEnvFragment = experimentalEnv(projectConfig);
 
   // ── Stale-project detection (synchronous) ───────────────────────────────
   // Run before command dispatch so the notice can be shown after output.

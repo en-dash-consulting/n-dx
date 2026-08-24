@@ -17,6 +17,7 @@ import {
   claudeCliAdapter,
   buildClaudeCliArgs,
   buildAllowedTools,
+  WINDOWS_STDIN_PROMPT_SEPARATOR,
 } from "../../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
 import {
   buildClaudeCliArgs as originalBuildClaudeCliArgs,
@@ -41,7 +42,11 @@ import {
   FULL_ACCESS_POLICY,
   CROSS_VENDOR_ERROR_FIXTURES,
 } from "../../fixtures/cross-vendor-runtime.js";
-import { createStandardEnvelope, createMinimalEnvelope } from "../../helpers/index.js";
+import {
+  createStandardEnvelope,
+  createMinimalEnvelope,
+  decodeClaudeDelivery,
+} from "../../helpers/index.js";
 
 // ── 1. VendorAdapter interface compliance ────────────────────────────────
 
@@ -709,11 +714,112 @@ describe("ClaudeCliAdapter: git-subcommand allowlist scoping", () => {
     };
     const config = claudeCliAdapter.buildSpawnConfig(createMinimalEnvelope(), policy, {});
 
-    expect(config.args).toContain("Bash(git commit:*)");
-    expect(config.args).toContain("Bash(git status:*)");
-    expect(config.args).not.toContain("Bash(git:*)");
-    expect(config.args).not.toContain("Bash(git reset:*)");
-    expect(config.args).not.toContain("Bash(git clean:*)");
+    // Decoded rather than read off argv positions: POSIX passes each tool as its
+    // own argv entry while Windows comma-joins them into one, so `config.args`
+    // only ever contains a bare "Bash(git commit:*)" element on POSIX. The
+    // security property — git scoped per-subcommand, destructive subcommands
+    // absent — is identical on both, and this asserts that with exact set
+    // membership rather than a loosened substring check.
+    const { allowedTools } = decodeClaudeDelivery(config.args, config.stdinContent ?? "");
+
+    expect(allowedTools).toContain("Bash(git commit:*)");
+    expect(allowedTools).toContain("Bash(git status:*)");
+    expect(allowedTools).not.toContain("Bash(git:*)");
+    expect(allowedTools).not.toContain("Bash(git reset:*)");
+    expect(allowedTools).not.toContain("Bash(git clean:*)");
+  });
+});
+
+// ── 6b. Both delivery shapes, on any host ────────────────────────────────
+
+/**
+ * The coverage gap this section closes.
+ *
+ * buildClaudeCliArgs has two delivery shapes, and until now each could only be
+ * executed on its own platform: the Windows branch was unreachable on Linux, and
+ * CI runs on Linux. So the branch that exists SPECIFICALLY for Windows shipped
+ * without a test ever running it — while the POSIX assertions elsewhere in this
+ * file simply failed when a developer ran the suite on Windows.
+ *
+ * Passing the platform explicitly runs both branches everywhere, so a regression
+ * in either is caught by any CI job rather than by whoever happens to be on the
+ * affected OS.
+ */
+describe("ClaudeCliAdapter: both delivery shapes run on any platform", () => {
+  const INPUT: ClaudeCliInput = {
+    systemPrompt: "SYS line one\nSYS line two",
+    promptText: "TASK do the thing",
+    allowedTools: ["Bash(git commit:*)", "Read", "Edit"],
+  };
+
+  it("POSIX: system prompt travels as an argv flag, tools as separate entries", () => {
+    const { args, stdinContent } = buildClaudeCliArgs(INPUT, "linux");
+
+    const sysIdx = args.indexOf("--system-prompt");
+    expect(sysIdx).toBeGreaterThan(-1);
+    expect(args[sysIdx + 1]).toBe(INPUT.systemPrompt);
+    expect(stdinContent).toBe(INPUT.promptText);
+
+    const toolsIdx = args.indexOf("--allowed-tools");
+    expect(args.slice(toolsIdx + 1, toolsIdx + 1 + INPUT.allowedTools.length))
+      .toEqual(INPUT.allowedTools);
+  });
+
+  it("Windows: system prompt travels on stdin, tools comma-joined into one entry", () => {
+    const { args, stdinContent } = buildClaudeCliArgs(INPUT, "win32");
+
+    // The flag is absent BY DESIGN: a multi-line value cannot cross a cmd.exe
+    // command line safely (the BatBadBut newline class).
+    expect(args).not.toContain("--system-prompt");
+    expect(stdinContent).toBe(
+      `${INPUT.systemPrompt}${WINDOWS_STDIN_PROMPT_SEPARATOR}${INPUT.promptText}`,
+    );
+
+    const toolsIdx = args.indexOf("--allowed-tools");
+    expect(args[toolsIdx + 1]).toBe(INPUT.allowedTools.join(","));
+    // Exactly one entry — not one per tool.
+    expect(args[toolsIdx + 2]).toBeUndefined();
+  });
+
+  it("both shapes deliver identical effective content", () => {
+    const posix = buildClaudeCliArgs(INPUT, "linux");
+    const windows = buildClaudeCliArgs(INPUT, "win32");
+
+    const decodedPosix = decodeClaudeDelivery(posix.args, posix.stdinContent);
+    const decodedWindows = decodeClaudeDelivery(windows.args, windows.stdinContent);
+
+    expect(decodedPosix.shape).toBe("posix");
+    expect(decodedWindows.shape).toBe("windows");
+
+    // The whole point of the platform split: the CHANNEL differs, the CONTENT
+    // must not. Compared exactly, so a truncation or reordering on either side
+    // fails here.
+    expect(decodedWindows.systemPrompt).toBe(decodedPosix.systemPrompt);
+    expect(decodedWindows.taskPrompt).toBe(decodedPosix.taskPrompt);
+    expect(decodedWindows.allowedTools).toEqual(decodedPosix.allowedTools);
+    expect(decodedPosix.systemPrompt).toBe(INPUT.systemPrompt);
+    expect(decodedPosix.taskPrompt).toBe(INPUT.promptText);
+    expect(decodedPosix.allowedTools).toEqual(INPUT.allowedTools);
+  });
+
+  it("defaults to the running platform when none is passed", () => {
+    const explicit = buildClaudeCliArgs(INPUT, process.platform);
+    const implicit = buildClaudeCliArgs(INPUT);
+
+    // Guards the seam itself: the added parameter must not change what production
+    // callers (which pass one argument) get.
+    expect(implicit).toEqual(explicit);
+  });
+
+  it("model and permission-mode flags appear in both shapes", () => {
+    for (const platform of ["linux", "win32"] as const) {
+      const { args } = buildClaudeCliArgs(
+        { ...INPUT, modelOverride: "claude-opus-5", permissionMode: "acceptEdits" },
+        platform,
+      );
+      expect(args[args.indexOf("--model") + 1]).toBe("claude-opus-5");
+      expect(args[args.indexOf("--permission-mode") + 1]).toBe("acceptEdits");
+    }
   });
 });
 

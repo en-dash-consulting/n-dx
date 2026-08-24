@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { resolve } from "node:path";
 import { validatePath, simpleGlobMatch, GuardError } from "../../../src/guard/paths.js";
 
 describe("simpleGlobMatch", () => {
@@ -76,12 +77,12 @@ describe("validatePath", () => {
 
   it("allows valid relative paths", () => {
     const resolved = validatePath("src/file.ts", projectDir, blockedPaths);
-    expect(resolved).toBe("/project/src/file.ts");
+    expect(resolved).toBe(resolve(projectDir, "src/file.ts"));
   });
 
   it("allows nested valid paths", () => {
     const resolved = validatePath("src/deep/file.ts", projectDir, blockedPaths);
-    expect(resolved).toBe("/project/src/deep/file.ts");
+    expect(resolved).toBe(resolve(projectDir, "src/deep/file.ts"));
   });
 
   it("rejects paths that escape project directory", () => {
@@ -156,11 +157,11 @@ describe("validatePath", () => {
   it("allows internal traversal that stays within project", () => {
     // src/../lib/file.ts resolves to /project/lib/file.ts — valid
     const resolved = validatePath("src/../lib/file.ts", projectDir, blockedPaths);
-    expect(resolved).toBe("/project/lib/file.ts");
+    expect(resolved).toBe(resolve(projectDir, "lib/file.ts"));
   });
 
   it("allows absolute paths within the project directory", () => {
     const resolved = validatePath("/project/src/file.ts", projectDir, blockedPaths);
-    expect(resolved).toBe("/project/src/file.ts");
+    expect(resolved).toBe(resolve(projectDir, "src/file.ts"));
   });
 });

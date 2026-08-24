@@ -35,7 +35,7 @@ import type {
 import { ClaudeClientError } from "./types.js";
 import { resolveApiKey, resolveModel } from "./config.js";
 import { parseApiTokenUsage } from "./token-usage.js";
-import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
+import { LLM_VENDOR, type LLMProvider, type ProviderInfo } from "./provider-interface.js";
 import {
   extractRetryAfterMs,
   formatRetryCountdown,
@@ -132,7 +132,7 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
   const onRetry = options.onRetry ?? defaultApiRateLimitOnRetry;
 
   const info: ProviderInfo = {
-    vendor: "claude",
+    vendor: LLM_VENDOR.CLAUDE,
     mode: "api",
     ...(options.claudeConfig.model ? { model: options.claudeConfig.model } : {}),
     capabilities: [],
@@ -193,7 +193,7 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
           // Classify the error
           if (status === 401 || status === 403) {
             const errMsg = formatSdkError(err);
-            throw classifyAuthError(new Error(errMsg), "claude") ??
+            throw classifyAuthError(new Error(errMsg), LLM_VENDOR.CLAUDE) ??
               new ClaudeClientError(errMsg, "auth", false);
           }
 

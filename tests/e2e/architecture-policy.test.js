@@ -32,6 +32,11 @@ const ROOT = join(import.meta.dirname, "../..");
 const ALLOWED = new Set([
   // Foundation abstraction itself (llm-client is the canonical foundation)
   "packages/llm-client/src/exec.ts",
+  // Tree termination — part of the same foundation abstraction. It needs raw
+  // spawn for `taskkill /T /F` (the Windows analogue of signalling a process
+  // group) and cannot route through exec.ts's spawnCli without creating an import
+  // cycle, since exec.ts consumes this module for its timeout kill.
+  "packages/llm-client/src/process-tree.ts",
   // CLI streaming providers — need raw spawn for event-by-event parsing
   "packages/llm-client/src/cli-provider.ts",
   "packages/llm-client/src/codex-cli-provider.ts",
@@ -70,8 +75,10 @@ const ALLOWED = new Set([
   // Merge-history pipeline — walks `git log --merges` via execFileSync for the
   // PRD ↔ merge context graph endpoint (same pattern as branch-work-collector).
   "packages/web/src/server/merge-history.ts",
-  // Claude Code integration — runs `claude mcp add` via execSync
-  "packages/core/claude-integration.js",
+  // NOTE: packages/core/claude-integration.js used to be listed here for its
+  // `claude mcp add` execSync calls. It now routes through win-spawn.js and
+  // imports no child_process API directly, so the permission is no longer
+  // needed — removed rather than left as a permitted-but-unused entry.
   // Git preflight — invokes `git init` when the user consents during `ndx init`
   "packages/core/git-preflight.js",
   // Codex integration — writes .codex/config.toml, .agents/skills, AGENTS.md
@@ -93,6 +100,13 @@ const SKIP_DIRS = new Set([
   ".hench",
   ".rex",
   ".sourcevision",
+  // Gitignored, developer-local tooling scratch space (worktrees created by
+  // agent sessions, etc.) — never part of the committed source tree this
+  // policy audits. Without this, a stray worktree checkout on someone's
+  // machine re-surfaces every allowlisted file under a `.claude/worktrees/
+  // <name>/` prefix the ALLOWED list doesn't recognize, and reports it as
+  // a violation of a rule the real, committed file already satisfies.
+  ".claude",
 ]);
 
 function walk(dir, files = []) {
@@ -985,8 +999,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 143,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; Windows-safe CLI spawn surface — quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation + SpawnCliOptions/CliInvocationDiagnosis types added for the GH #37/#68/#69 spawn hardening so cli-loop can route .cmd shims through cmd.exe; diagnoseCliNotFound added so cli-loop's close/non-zero-exit path surfaces the Windows 'not recognized' missing-CLI diagnosis; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries; parseLmStudioError added so the local-LLM provider can classify LM Studio server errors)",
+    maxExports: 153,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; Windows-safe CLI spawn surface — quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation + SpawnCliOptions/CliInvocationDiagnosis types added for the GH #37/#68/#69 spawn hardening so cli-loop can route .cmd shims through cmd.exe; diagnoseCliNotFound added so cli-loop's close/non-zero-exit path surfaces the Windows 'not recognized' missing-CLI diagnosis; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries; parseLmStudioError added so the local-LLM provider can classify LM Studio server errors; LLM_VENDOR/LLMVendor helpers added so hench uses the canonical vendor literal set through the approved gateway)",
   },
 ];
 
@@ -1646,38 +1660,75 @@ describe("architecture policy: PRD storage invariant (prd.md migration-helper-on
 // ---------------------------------------------------------------------------
 
 /**
- * Prevents reintroduction of the Node.js [DEP0190] spawn anti-pattern at
- * CLI-binary spawn sites. Two banned patterns:
+ * Prevents reintroduction of hand-built shell command lines and the Node.js
+ * [DEP0190] spawn anti-pattern. Three banned patterns:
  *
  *   1. `shell: process.platform === "win32"` — the old conditional guard that
  *      triggered DEP0190 and broke binary paths with spaces (#68, #69).
  *   2. `shell: true` combined with a non-empty args array — same deprecation.
+ *   3. Importing `exec` or `execSync` from child_process. Those two APIs take a
+ *      command STRING, so every call site hand-builds a shell command line. On
+ *      Windows that breaks on `&`, `^`, `(`, `)`, `!` and on a trailing
+ *      backslash — and can exit 0 having run a truncated command, which is
+ *      worse than failing. `execFile`/`execFileSync`/`spawn` take argv and are
+ *      fine (subject to rules 1 and 2).
  *
- * Both were replaced on this branch with cmd.exe routing via win-spawn.js.
- *
- * Out-of-scope (not in DEP0190_SCOPE):
- *   - packages/llm-client/src/exec.ts — execShellCmd uses exec("sh", ["-c", cmd])
- *     with no shell:true; the execShellCmd doc mentions the pattern only in comments
- *   - packages/core/ci.js / pr-check.js — pnpm .cmd spawns (documented follow-up)
- *
- * In-scope exception (allowed by shellTrueIsEmptyArgsPattern):
- *   - pair-programming.js runShellTestCommand — spawn(cmd, [], { shell: true })
- *     passes an empty args array; only the command string is given to the shell,
- *     so no DEP0190 deprecation fires and no argv injection is possible.
+ * DISCOVERY IS BY SCAN, NOT BY LIST. This guard previously walked a hardcoded
+ * 12-file DEP0190_SCOPE, which meant it only ever ratcheted over files someone
+ * remembered to enumerate — and that is precisely how
+ * packages/core/claude-integration.js and packages/core/export.js kept
+ * hand-built `execSync` command lines through an entire Windows-hardening epic
+ * without the guard noticing. The scan now covers the whole production tree, and
+ * an exemption is a deliberate act that must carry a reason.
  */
-const DEP0190_SCOPE = [
-  "packages/llm-client/src/cli-provider.ts",
-  "packages/llm-client/src/codex-cli-provider.ts",
-  "packages/hench/src/agent/lifecycle/cli-loop.ts",
-  "packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts",
-  "packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts",
-  "packages/core/config.js",
-  "packages/core/pair-programming.js",
-  "packages/core/win-spawn.js",
-  "packages/sourcevision/src/analyzers/branch-work-collector.ts",
-  "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
-  "packages/sourcevision/src/util/exec-cli.ts",
-];
+
+/** Production source roots to scan. Tests and build output are excluded. */
+const SHELL_SCAN_ROOTS = ["packages", "scripts"];
+
+/** Repo-root orchestration scripts, which live outside SHELL_SCAN_ROOTS. */
+const SHELL_SCAN_ROOT_FILES = ["pr-check.js"];
+
+/**
+ * Files permitted to break the rules above, each with the reason.
+ *
+ * Adding an entry here is the deliberate act that replaces "the scan happened
+ * not to look at my file". Every entry states WHY, and anything tracked
+ * elsewhere names the task so the exemption can be retired.
+ */
+const SHELL_STRING_EXEMPT = new Map([
+  // packages/core/export.js was exempt here for its 16 hand-built git/rex
+  // command strings and its POSIX-only `rm -rf` / `2>/dev/null || true`. All of
+  // it now goes through win-spawn.js argv or Node's fs.rmSync, so the exemption
+  // was retired rather than left standing (PRD task c990fd76).
+  [
+    "packages/core/ci.js",
+    "`shell: process.platform === \"win32\"` on the `pnpm docs:build` spawn. pnpm " +
+      "is a .cmd shim on Windows; documented as an out-of-scope follow-up when " +
+      "the four CLI spawn sites were routed through win-spawn.js.",
+  ],
+  [
+    "pr-check.js",
+    "Same pnpm .cmd shim case as ci.js — repo-local tooling, not shipped code.",
+  ],
+]);
+
+/**
+ * `exec`/`execSync` are the string-command APIs. Matches a named import from
+ * child_process, ignoring the argv-based siblings whose names contain them
+ * (execFile, execFileSync).
+ */
+function importsShellStringApi(content) {
+  const importRe = /(?:import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["']|require\(["'](?:node:)?child_process["']\)\s*;?)/g;
+  for (const match of content.matchAll(importRe)) {
+    const named = match[1];
+    if (!named) continue; // bare require() — checked by the child_process allowlist
+    for (const spec of named.split(",")) {
+      const name = spec.split(/\s+as\s+/)[0].trim();
+      if (name === "exec" || name === "execSync") return name;
+    }
+  }
+  return null;
+}
 
 function isCodeLine(line) {
   const trimmed = line.trim();
@@ -1703,14 +1754,48 @@ function shellTrueIsEmptyArgsPattern(lines, lineIndex) {
   return /spawn\s*\([^)]*,\s*\[\s*\]/.test(window);
 }
 
-describe("architecture policy: DEP0190 spawn guard", () => {
-  it("DEP0190_SCOPE list contains no stale entries (all files exist on disk)", () => {
-    const stale = DEP0190_SCOPE.filter((rel) => !existsSync(join(ROOT, rel)));
+/**
+ * Every production JS/TS file under SHELL_SCAN_ROOTS plus the root-level
+ * orchestration scripts, as repo-relative POSIX paths. Skips build output,
+ * dependencies, and tests (test fixtures legitimately build command strings).
+ */
+function collectShellScanFiles() {
+  const files = [];
+
+  const walk = (absDir, relDir) => {
+    for (const entry of readdirSync(absDir, { withFileTypes: true })) {
+      const name = entry.name;
+      if (name === "node_modules" || name === "dist" || name === "tests") continue;
+      if (name.startsWith(".")) continue;
+      const abs = join(absDir, name);
+      const rel = relDir ? `${relDir}/${name}` : name;
+      if (entry.isDirectory()) {
+        walk(abs, rel);
+      } else if (/\.(js|mjs|cjs|ts|tsx)$/.test(name) && !/\.d\.ts$/.test(name) && !/\.test\./.test(name)) {
+        files.push(rel);
+      }
+    }
+  };
+
+  for (const root of SHELL_SCAN_ROOTS) {
+    const abs = join(ROOT, root);
+    if (existsSync(abs)) walk(abs, root);
+  }
+  for (const rel of SHELL_SCAN_ROOT_FILES) {
+    if (existsSync(join(ROOT, rel))) files.push(rel);
+  }
+
+  return files;
+}
+
+describe("architecture policy: shell-string and DEP0190 spawn guard", () => {
+  it("SHELL_STRING_EXEMPT contains no stale entries (all files exist on disk)", () => {
+    const stale = [...SHELL_STRING_EXEMPT.keys()].filter((rel) => !existsSync(join(ROOT, rel)));
     if (stale.length > 0) {
       expect.fail(
         [
-          "DEP0190_SCOPE contains files that no longer exist on disk.",
-          "Update paths after renames/moves:",
+          "SHELL_STRING_EXEMPT lists files that no longer exist on disk.",
+          "Update paths after renames/moves, or drop the exemption:",
           "",
           ...stale.map((s) => `  - ${s}`),
         ].join("\n"),
@@ -1718,12 +1803,50 @@ describe("architecture policy: DEP0190 spawn guard", () => {
     }
   });
 
-  it("no CLI spawn site reintroduces shell:true+args (DEP0190 pattern)", () => {
+  it("scans a meaningful number of production files (guard is actually looking)", () => {
+    // A regression in collectShellScanFiles that silently returned [] would make
+    // every other assertion here vacuously pass.
+    expect(collectShellScanFiles().length).toBeGreaterThan(100);
+  });
+
+  it("no production file imports exec/execSync (hand-built shell command lines)", () => {
     const violations = [];
 
-    for (const rel of DEP0190_SCOPE) {
+    for (const rel of collectShellScanFiles()) {
+      if (SHELL_STRING_EXEMPT.has(rel)) continue;
+      const api = importsShellStringApi(readFileSync(join(ROOT, rel), "utf-8"));
+      if (api) {
+        violations.push(`${rel} — imports \`${api}\` from child_process`);
+      }
+    }
+
+    if (violations.length > 0) {
+      expect.fail(
+        [
+          "Production files import a string-command child_process API.",
+          "`exec` and `execSync` take a command STRING, so the call site hand-builds",
+          "a shell command line. On Windows that breaks on & ^ ( ) ! and on a trailing",
+          "backslash, and can exit 0 having run a truncated command.",
+          "",
+          "Use execFileSyncCli / spawnCli from packages/core/win-spawn.js (or",
+          "execFileSync/spawn directly) and pass argv instead.",
+          "",
+          "Violations:",
+          ...violations.map((v) => `  - ${v}`),
+          "",
+          "If a case is genuinely unavoidable, add it to SHELL_STRING_EXEMPT with a",
+          "reason — and a tracking task if it is meant to be temporary.",
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("no production file reintroduces shell:true+args (DEP0190 pattern)", () => {
+    const violations = [];
+
+    for (const rel of collectShellScanFiles()) {
+      if (SHELL_STRING_EXEMPT.has(rel)) continue;
       const fullPath = join(ROOT, rel);
-      if (!existsSync(fullPath)) continue;
 
       const content = readFileSync(fullPath, "utf-8");
       const lines = content.split("\n");

@@ -5,7 +5,7 @@ import { existsSync, statSync } from "node:fs";
 import { usage } from "./commands/constants.js";
 import { showCommandHelp } from "./help.js";
 import { CLIError, handleCLIError, requireRexDir } from "./errors.js";
-import { setQuiet } from "./output.js";
+import { setQuiet, setVerbose, setDebug } from "./output.js";
 import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from "@n-dx/llm-client";
 import { isItemLevel } from "../schema/index.js";
 import { join } from "node:path";
@@ -536,11 +536,13 @@ async function main(): Promise<void> {
   }
 
   setQuiet(flags.quiet === "true");
+  setVerbose(flags.verbose === "true");
+  setDebug(flags.debug === "true");
 
   try {
     await dispatchCommand(command, positional, flags, multiFlags);
   } catch (err) {
-    handleCLIError(err);
+    handleCLIError(err, flags.debug === "true");
   }
 }
 

@@ -34,7 +34,7 @@ import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import type { ReviewDiff } from "../analysis/review.js";
-import { defaultRegistry, resolveVendorModel } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, defaultRegistry, resolveVendorModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
@@ -680,7 +680,7 @@ export async function runPostTaskTestsIfNeeded(
  */
 async function retrieveCodexTokensIfNeeded(run: RunRecord, projectDir: string): Promise<void> {
   // Check if any turn used Codex as the vendor
-  const isCodexRun = run.turnTokenUsage?.some((t) => t.vendor === "codex") ?? false;
+  const isCodexRun = run.turnTokenUsage?.some((t) => t.vendor === LLM_VENDOR.CODEX) ?? false;
   if (!isCodexRun) {
     return;
   }

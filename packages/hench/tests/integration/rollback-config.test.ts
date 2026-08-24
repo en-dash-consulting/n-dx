@@ -7,6 +7,7 @@ import { exec as execCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { initConfig, saveConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
+import { initGitFixtureRepo } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -20,12 +21,6 @@ const execAsync = promisify(execCb);
  * still governs (whether the interactive prompt is offered at all) is only
  * observable on a TTY and is covered in rollback-prompt.test.ts.
  */
-
-async function setupGitRepo(dir: string): Promise<void> {
-  await execAsync("git init", { cwd: dir });
-  await execAsync("git config user.email test@test.com", { cwd: dir });
-  await execAsync("git config user.name Test", { cwd: dir });
-}
 
 async function makeInitialCommit(dir: string, file: string, content: string): Promise<void> {
   await writeFile(join(dir, file), content, "utf-8");
@@ -61,7 +56,7 @@ describe("rollbackOnFailure config key (prompt-only)", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await setupGitRepo(projectDir);
+    await initGitFixtureRepo(projectDir);
     expect(process.stdin.isTTY).toBeFalsy();
   });
 
@@ -116,7 +111,7 @@ describe("non-interactive runs never revert (CI / --yes)", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await setupGitRepo(projectDir);
+    await initGitFixtureRepo(projectDir);
   });
 
   afterEach(async () => {

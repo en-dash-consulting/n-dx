@@ -13,15 +13,39 @@ import {
   writeFile,
   access,
   constants,
-  chmod,
   stat,
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { execFileSyncCli } from "./win-spawn.js";
+import {
+  describeUnrestrictedFile,
+  restrictFileToOwner,
+} from "./file-permissions.js";
 export { quoteWindowsToken, buildWindowsCliCommandLine } from "./win-spawn.js";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
 const LOCAL_CONFIG_FILE = ".n-dx.local.json";
+
+const LLM_VENDOR = {
+  CLAUDE: "claude",
+  CODEX: "codex",
+  GOOGLE: "google",
+  LOCAL: "local",
+};
+
+const LLM_VENDORS = Object.values(LLM_VENDOR);
+
+/**
+ * How the API-key file is actually protected on this platform.
+ *
+ * Stated per-platform because the help text used to promise "0600 (owner-only)"
+ * everywhere. On Windows that was false: `fs.chmod` cannot express a POSIX mode
+ * and leaves the DACL untouched, so the key stayed readable by other users while
+ * the docs said otherwise. See file-permissions.js.
+ */
+const API_KEY_PERMISSION_NOTE = process.platform === "win32"
+  ? "File ACL restricted to your user account (verified; warns if it cannot be)."
+  : "File permissions set to 0600 (owner-only) for security.";
 
 /**
  * Keys that are machine-specific and should be written to .n-dx.local.json
@@ -100,8 +124,14 @@ async function saveJSON(path, data) {
 }
 
 /**
- * Save .n-dx.json with owner-only permissions (0o600) when it contains
- * sensitive data like API keys. Otherwise uses standard permissions.
+ * Save .n-dx.json restricted to its owner when it contains sensitive data like
+ * API keys. Otherwise uses standard permissions.
+ *
+ * Restriction is attempted AND verified (see file-permissions.js): on Windows a
+ * bare `chmod(path, 0o600)` changes nothing about who can read the file, so a
+ * silent chmod would have left the key exposed while appearing to protect it.
+ * When verification fails the user is told, because a false assurance about an
+ * API key is worse than a stated limitation.
  */
 async function saveProjectJSON(path, data) {
   await saveJSON(path, data);
@@ -111,9 +141,11 @@ async function saveProjectJSON(path, data) {
       typeof data.llm.claude.api_key === "string") ||
     (data?.llm?.codex?.api_key && typeof data.llm.codex.api_key === "string") ||
     (data?.llm?.google?.api_key && typeof data.llm.google.api_key === "string");
-  if (hasSensitiveData) {
-    await chmod(path, 0o600);
-  }
+  if (!hasSensitiveData) return;
+
+  const result = await restrictFileToOwner(path);
+  const warning = describeUnrestrictedFile(path, result);
+  if (warning) process.stderr.write(`${warning}\n`);
 }
 
 /**
@@ -343,7 +375,27 @@ function coerceValue(newValue, existingValue) {
 // ── Claude config validation ─────────────────────────────────────────────────
 
 /**
- * Validate claude.cli_path: check the file exists and is executable.
+ * Whether an executable-bit check is meaningful on this platform.
+ *
+ * SKIPPED BY DESIGN ON WINDOWS. NTFS has no executable bit, and Node documents
+ * `fs.constants.X_OK` as having no effect there — it degrades to `F_OK`.
+ * Measured: `access("key.json", X_OK)` SUCCEEDS for a plain JSON file, so the
+ * check cannot reject anything and its "Run: chmod +x" hint is nonsense advice
+ * on Windows.
+ *
+ * REJECTED ALTERNATIVE: requiring a PATHEXT extension (.exe/.cmd/.bat). It would
+ * reject real binaries — as win-spawn.js documents, pnpm/npm global installs
+ * place an extensionless POSIX script beside the `.CMD` shim, and users
+ * legitimately point cli_path at either. A validation that rejects valid input is
+ * worse than no validation, so existence (F_OK) is the honest limit here and
+ * spawn-time diagnostics (diagnoseCliInvocation) cover the rest.
+ */
+function executableBitIsMeaningful(platform = process.platform) {
+  return platform !== "win32";
+}
+
+/**
+ * Validate claude.cli_path: check the file exists and — on POSIX — is executable.
  * Throws with a helpful message on failure.
  */
 async function validateCliPath(value) {
@@ -355,12 +407,14 @@ async function validateCliPath(value) {
         "  Provide an absolute path to the Claude Code CLI binary.",
     );
   }
-  try {
-    await access(value, constants.X_OK);
-  } catch {
-    throw new Error(
-      `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
-    );
+  if (executableBitIsMeaningful()) {
+    try {
+      await access(value, constants.X_OK);
+    } catch {
+      throw new Error(
+        `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
+      );
+    }
   }
 }
 
@@ -394,12 +448,14 @@ async function validateCodexCliPath(value) {
     );
   }
 
-  try {
-    await access(value, constants.X_OK);
-  } catch {
-    throw new Error(
-      `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
-    );
+  if (executableBitIsMeaningful()) {
+    try {
+      await access(value, constants.X_OK);
+    } catch {
+      throw new Error(
+        `File is not executable: ${value}\n` + "  Run: chmod +x " + value,
+      );
+    }
   }
 }
 
@@ -519,7 +575,7 @@ function isValidGoogleApiKeyFormat(value) {
 async function runGoogleApiPreflight(llmConfig) {
   // Test bypass: allows integration tests to simulate successful auth without HTTP
   if (process.env.NDX_TEST_GOOGLE_PREFLIGHT === "ok") {
-    return { ok: true, vendor: "google" };
+    return { ok: true, vendor: LLM_VENDOR.GOOGLE };
   }
 
   const apiKeyEnvVar = llmConfig?.google?.apiKeyEnv || "GEMINI_API_KEY";
@@ -528,7 +584,7 @@ async function runGoogleApiPreflight(llmConfig) {
   if (!apiKey) {
     return {
       ok: false,
-      vendor: "google",
+      vendor: LLM_VENDOR.GOOGLE,
       detail:
         `No API key found. Set the ${apiKeyEnvVar} environment variable or store the key with: ` +
         "n-dx config llm.google.api_key <key>",
@@ -539,7 +595,7 @@ async function runGoogleApiPreflight(llmConfig) {
   if (!isValidGoogleApiKeyFormat(apiKey)) {
     return {
       ok: false,
-      vendor: "google",
+      vendor: LLM_VENDOR.GOOGLE,
       detail: `API key format is invalid. Google AI keys start with "AIza" or "AQ" and are at least 30 characters.`,
       errorCode: "NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT",
     };
@@ -550,7 +606,7 @@ async function runGoogleApiPreflight(llmConfig) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}&pageSize=1`;
     const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (resp.ok) {
-      return { ok: true, vendor: "google" };
+      return { ok: true, vendor: LLM_VENDOR.GOOGLE };
     }
     let detail;
     if (resp.status === 400) {
@@ -562,7 +618,7 @@ async function runGoogleApiPreflight(llmConfig) {
     }
     return {
       ok: false,
-      vendor: "google",
+      vendor: LLM_VENDOR.GOOGLE,
       detail,
       errorCode: (resp.status === 400 || resp.status === 403)
         ? "NDX_GOOGLE_PREFLIGHT_AUTH_FAILED"
@@ -572,7 +628,7 @@ async function runGoogleApiPreflight(llmConfig) {
   } catch (err) {
     return {
       ok: false,
-      vendor: "google",
+      vendor: LLM_VENDOR.GOOGLE,
       detail: err?.message || "Failed to connect to the Gemini API.",
       errorCode: "NDX_GOOGLE_PREFLIGHT_CONNECT_ERROR",
     };
@@ -593,18 +649,18 @@ async function runLocalApiPreflight(llmConfig) {
       signal: AbortSignal.timeout(5000),
     });
     if (resp.ok) {
-      return { ok: true, vendor: "local" };
+      return { ok: true, vendor: LLM_VENDOR.LOCAL };
     }
     return {
       ok: false,
-      vendor: "local",
+      vendor: LLM_VENDOR.LOCAL,
       detail: `Local server at ${baseUrl} returned HTTP ${resp.status}. Ensure LM Studio (or your local server) is running.`,
       errorCode: "NDX_LOCAL_PREFLIGHT_HTTP_ERROR",
     };
   } catch (err) {
     return {
       ok: false,
-      vendor: "local",
+      vendor: LLM_VENDOR.LOCAL,
       detail: `Cannot connect to local server at ${baseUrl}. ` +
         `Start LM Studio and enable "Local Server" in the Developer tab, then try again.`,
       errorCode: "NDX_LOCAL_PREFLIGHT_CONNECT_ERROR",
@@ -746,6 +802,32 @@ const CLI_TIMEOUT_DEFAULTS = {
  * Zero is valid and means "no timeout".
  * Exported for unit testing.
  */
+/**
+ * Environment additions that carry BETA experimental settings into spawned CLIs.
+ *
+ * Returns `{}` unless a flag is explicitly enabled, so the common case leaves a
+ * child's environment untouched.
+ *
+ * This translation belongs to the orchestration tier: the foundation code that
+ * acts on the flag (llm-client's `exec`) must not read `.n-dx.json` itself, and a
+ * sub-CLI runs in its own process where an in-memory option could not reach it.
+ * Kept as a pure function so the decision is testable without spawning anything.
+ *
+ * `experimental.posixFreezeTreeKill` must be boolean `true`. A truthy string does
+ * NOT enable it: an experimental default-off switch should require a deliberate
+ * value, and `ndx config` coerces "true" to a boolean anyway.
+ *
+ * @param {Record<string, unknown>} [projectConfig] Merged project config.
+ * @returns {Record<string, string>} Env fragment to spread over a child's env.
+ */
+export function experimentalEnv(projectConfig) {
+  const experimental = projectConfig?.experimental;
+  if (experimental?.posixFreezeTreeKill === true) {
+    return { NDX_POSIX_FREEZE_KILL: "1" };
+  }
+  return {};
+}
+
 export function validateTimeoutMs(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new Error(
@@ -789,9 +871,9 @@ const CLAUDE_VALIDATORS = {
  * Validate llm.vendor.
  */
 function validateLLMVendor(value) {
-  if (value !== "claude" && value !== "codex" && value !== "google" && value !== "local") {
+  if (!LLM_VENDORS.includes(value)) {
     throw new Error(
-      `Invalid vendor "${value}". Expected one of: claude, codex, google, local.`,
+      `Invalid vendor "${value}". Expected one of: ${LLM_VENDORS.join(", ")}.`,
     );
   }
 }
@@ -846,7 +928,7 @@ const LLM_VALIDATORS = {
  * Returns binary + args for the selected vendor.
  */
 function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
-  if (vendor === "codex") {
+  if (vendor === LLM_VENDOR.CODEX) {
     const binary = llmConfig?.codex?.cli_path || "codex";
     return {
       binary,
@@ -872,11 +954,11 @@ function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
  * @returns {Promise<{ ok: boolean, binary?: string, args?: string[], detail?: string, errorCode?: string }>}
  */
 async function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
-  if (vendor === "google") {
+  if (vendor === LLM_VENDOR.GOOGLE) {
     return runGoogleApiPreflight(llmConfig);
   }
 
-  if (vendor === "local") {
+  if (vendor === LLM_VENDOR.LOCAL) {
     return runLocalApiPreflight(llmConfig);
   }
 
@@ -1052,7 +1134,7 @@ async function printVendorPreflightFailure(
 ) {
   const { red, yellow, dim } = await import("./cli-brand.js");
   // Google uses API-key auth — no binary / CLI args to display.
-  if (vendor === "google") {
+  if (vendor === LLM_VENDOR.GOOGLE) {
     const errorCode = preflight.errorCode || "NDX_GOOGLE_PREFLIGHT_FAILED";
     const apiKeyEnvVar = llmConfig?.google?.apiKeyEnv || "GEMINI_API_KEY";
     // A rejected or malformed key is an invalid-credentials problem →
@@ -1061,7 +1143,7 @@ async function printVendorPreflightFailure(
       errorCode === "NDX_GOOGLE_PREFLIGHT_AUTH_FAILED" ||
       errorCode === "NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT"
     ) {
-      await printAuthFailureGuidance("google", errorCode);
+      await printAuthFailureGuidance(LLM_VENDOR.GOOGLE, errorCode);
       return;
     }
     // No key configured yet → distinct "missing API key" root cause.
@@ -1087,7 +1169,7 @@ async function printVendorPreflightFailure(
   // auth failure → canonical re-auth guidance, never a raw payload dump.
   if (isAuthFailureDetail(preflight.detail)) {
     const code =
-      vendor === "codex"
+      vendor === LLM_VENDOR.CODEX
         ? "NDX_CODEX_PREFLIGHT_AUTH_FAILED"
         : "NDX_CLAUDE_PREFLIGHT_AUTH_REQUIRED";
     await printAuthFailureGuidance(vendor, code);
@@ -1096,7 +1178,7 @@ async function printVendorPreflightFailure(
 
   // Local vendor: server connectivity failure — guide user to start their
   // local server rather than suggesting a login command.
-  if (vendor === "local") {
+  if (vendor === LLM_VENDOR.LOCAL) {
     const host = llmConfig?.local?.host || "localhost";
     const port = llmConfig?.local?.port || 1234;
     console.error(red(`✗ Cannot reach local LLM server at http://${host}:${port}.`));
@@ -1109,7 +1191,7 @@ async function printVendorPreflightFailure(
     return;
   }
 
-  if (vendor !== "claude") {
+  if (vendor !== LLM_VENDOR.CLAUDE) {
     // codex (or other CLI vendor) non-auth launch failure.
     const loginCommand = getVendorLoginCommand(
       vendor,
@@ -1266,7 +1348,7 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     Validated: must start with "sk-ant-". Use --force
                                     to skip validation.
                                     Note: stored in .n-dx.json — add to .gitignore.
-                                    File permissions set to 0600 (owner-only) for security.
+                                    ${API_KEY_PERMISSION_NOTE}
   claude.api_endpoint      string    Anthropic API base URL (optional)
                                     Override the default API endpoint for proxies or
                                     compatible services.
@@ -1415,6 +1497,23 @@ Self-heal settings (.n-dx.json):
 
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)
+
+Experimental settings (.n-dx.json) — BETA, off by default:
+  experimental.posixFreezeTreeKill
+                           boolean   BETA. On POSIX, when a command hits its
+                                    timeout, freeze its whole process tree with
+                                    SIGSTOP and verify every process is stopped
+                                    before killing it — so nothing can fork its
+                                    way out from under the kill. Default: false.
+                                    NOT RIGOROUSLY TESTED: the unit coverage
+                                    injects its seams, and its behaviour against
+                                    real POSIX processes is not yet proven in CI.
+                                    The default path (signal, then sweep the
+                                    process table) has far more mileage.
+                                    No effect on Windows, which has no way to
+                                    pause a process from pure JS.
+                                    Equivalent one-off: NDX_POSIX_FREEZE_KILL=1
+                                    Example: n-dx config experimental.posixFreezeTreeKill true
 
 Language detection override (.n-dx.json):
   language                 string    Primary project language (default: "auto")
@@ -1718,7 +1817,7 @@ async function runLLMVendorPreflight(coerced, configs, soft = false) {
   // check — the server doesn't need to be running at config time, only at
   // execution time. Print an info line reminding the user to start it before
   // `ndx work`.
-  if (coerced === "local" && soft) {
+  if (coerced === LLM_VENDOR.LOCAL && soft) {
     const { dim } = await import("./cli-brand.js");
     const host = llmForPreflight?.local?.host || "localhost";
     const port = llmForPreflight?.local?.port || 1234;
@@ -1852,7 +1951,7 @@ async function handleSetProjectSection(
   // Cascade: local and google vendors require API mode — no CLI binary exists.
   // Automatically persist hench.provider=api so `ndx work` never emits the
   // "vendor=local requires API mode — To persist: ndx config hench.provider api" hint.
-  if (pkg === "llm" && settingPath === "vendor" && (coerced === "local" || coerced === "google")) {
+  if (pkg === "llm" && settingPath === "vendor" && (coerced === LLM_VENDOR.LOCAL || coerced === LLM_VENDOR.GOOGLE)) {
     const henchConfigPath = join(dir, ".hench", "config.json");
     try {
       if (await fileExists(henchConfigPath)) {
@@ -2189,7 +2288,7 @@ export async function runAuthCheck(args) {
   const vendor =
     typeof llmConfig.vendor === "string" && llmConfig.vendor
       ? llmConfig.vendor
-      : "claude";
+      : LLM_VENDOR.CLAUDE;
 
   const { resolveVendorModel } = await import("@n-dx/llm-client");
   const { green, dim } = await import("./cli-brand.js");

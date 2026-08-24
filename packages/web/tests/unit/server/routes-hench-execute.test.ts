@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute, resetHenchRouteStateForTests, shutdownActiveExecutions } from "../../../src/server/routes-hench.js";
-import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
+import {
+  startRouteTestServer,
+  closeRouteTestServer,
+  removeTestDir,
+} from "../../helpers/server-route-test-support.js";
 
 /** Minimal PRD document for testing. */
 function makePRD(items: Array<Record<string, unknown>> = []): Record<string, unknown> {
@@ -54,11 +58,13 @@ describe("POST /api/hench/execute", () => {
   });
 
   afterEach(async () => {
+    // Await the close before removing the directory: on Windows the still-open
+    // server handle is what makes the removal fail, so the order matters.
     await closeRouteTestServer(server);
     // Terminate any spawned hench processes before removing tmpDir.
     // On Windows, an active child process holds a CWD lock causing EBUSY.
     await shutdownActiveExecutions(500).catch(() => {});
-    await rm(tmpDir, { recursive: true, force: true });
+    await removeTestDir(tmpDir);
   });
 
   it("rejects request without taskId", async () => {
@@ -289,8 +295,10 @@ describe("GET /api/hench/execute/status", () => {
   });
 
   afterEach(async () => {
+    // Await the close before removing the directory: on Windows the still-open
+    // server handle is what makes the removal fail, so the order matters.
     await closeRouteTestServer(server);
-    await rm(tmpDir, { recursive: true, force: true });
+    await removeTestDir(tmpDir);
   });
 
   it("returns null execution for unknown task", async () => {
@@ -347,8 +355,10 @@ describe("broadcast on execute", () => {
   });
 
   afterEach(async () => {
+    // Await the close before removing the directory: on Windows the still-open
+    // server handle is what makes the removal fail, so the order matters.
     await closeRouteTestServer(server);
-    await rm(tmpDir, { recursive: true, force: true });
+    await removeTestDir(tmpDir);
   });
 
   it("broadcasts execution progress events when task is triggered", async () => {

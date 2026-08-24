@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
 import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
+import { initGitFixtureRepo } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -20,12 +21,6 @@ const execAsync = promisify(execCb);
  * commit. Autonomous runs (`--auto`, `--loop`) bypass the prompt so
  * unattended runs do not stall waiting for input.
  */
-
-async function setupGitRepo(dir: string): Promise<void> {
-  await execAsync("git init", { cwd: dir });
-  await execAsync("git config user.email test@test.com", { cwd: dir });
-  await execAsync("git config user.name Test", { cwd: dir });
-}
 
 async function makeInitialCommit(dir: string, file: string, content: string): Promise<void> {
   await writeFile(join(dir, file), content, "utf-8");
@@ -82,7 +77,7 @@ describe("performCommitPromptIfNeeded (commit approval bypass)", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await setupGitRepo(projectDir);
+    await initGitFixtureRepo(projectDir);
 
     originalIsTTY = process.stdin.isTTY;
   });
@@ -254,7 +249,7 @@ describe("performCommitPromptIfNeeded (PRD status integration)", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await setupGitRepo(projectDir);
+    await initGitFixtureRepo(projectDir);
 
     originalIsTTY = process.stdin.isTTY;
   });

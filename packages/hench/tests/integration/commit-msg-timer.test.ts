@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
+import { initGitFixtureRepo } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
 
@@ -16,12 +17,6 @@ const execAsync = promisify(execCb);
  * runs. The watcher must fire at the configured timeout and commit the staged
  * changes.
  */
-
-async function setupGitRepo(dir: string): Promise<void> {
-  await execAsync("git init", { cwd: dir });
-  await execAsync("git config user.email test@test.com", { cwd: dir });
-  await execAsync("git config user.name Test", { cwd: dir });
-}
 
 async function makeInitialCommit(dir: string): Promise<void> {
   await writeFile(join(dir, "src.ts"), "export const x = 1;\n", "utf-8");
@@ -55,7 +50,7 @@ describe("startCommitMsgWatcher (auto-commit timer)", () => {
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-timer-"));
-    await setupGitRepo(projectDir);
+    await initGitFixtureRepo(projectDir);
     await makeInitialCommit(projectDir);
   });
 

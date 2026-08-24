@@ -14,11 +14,16 @@
  * @module n-dx/export
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, statSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, statSync, rmSync } from "fs";
 import { createRequire } from "module";
 import { join, resolve, dirname, basename } from "path";
-import { fileURLToPath } from "url";
-import { execSync } from "child_process";
+import { fileURLToPath, pathToFileURL } from "url";
+// execFileSyncCli, not execSync: execSync takes a command STRING, so every call
+// site here hand-quoted interpolated paths (tmpWorktree, dir). A project path
+// ending in a backslash escapes its own closing quote on Windows, and one
+// containing `&` or `^` breaks the command apart. win-spawn.js applies the
+// quoteWindowsToken/ArgvQuote rules and also handles `rex` being a .cmd shim.
+import { execFileSyncCli } from "./win-spawn.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -67,7 +72,7 @@ function parseExportArgs(args) {
     // Check for CNAME: explicit flag, existing deploy branch, or .n-dx.json config
     if (!cname) {
       try {
-        cname = execSync("git show n-dx-dashboard:CNAME", { cwd: dir, encoding: "utf-8", stdio: "pipe" }).trim();
+        cname = execFileSyncCli("git", ["show", "n-dx-dashboard:CNAME"], { cwd: dir, encoding: "utf-8", stdio: "pipe" }).trim();
       } catch { /* no CNAME on deploy branch */ }
     }
 
@@ -76,7 +81,7 @@ function parseExportArgs(args) {
       basePath = "/";
     } else {
       try {
-        const remote = execSync("git remote get-url origin", { cwd: dir, encoding: "utf-8" }).trim();
+        const remote = execFileSyncCli("git", ["remote", "get-url", "origin"], { cwd: dir, encoding: "utf-8" }).trim();
         const match = remote.match(/[/:]([^/]+?)(?:\.git)?$/);
         if (match) {
           basePath = `/${match[1]}/`;
@@ -121,12 +126,12 @@ function readJSON(filePath) {
 
 function getGitInfo(dir) {
   try {
-    const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: dir, stdio: ["pipe", "pipe", "pipe"] }).toString().trim();
-    const sha = execSync("git rev-parse --short HEAD", { cwd: dir, stdio: ["pipe", "pipe", "pipe"] }).toString().trim();
+    const branch = execFileSyncCli("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: dir, stdio: ["pipe", "pipe", "pipe"] }).toString().trim();
+    const sha = execFileSyncCli("git", ["rev-parse", "--short", "HEAD"], { cwd: dir, stdio: ["pipe", "pipe", "pipe"] }).toString().trim();
     let remoteUrl = null;
     let repoName = null;
     try {
-      remoteUrl = execSync("git remote get-url origin", { cwd: dir, stdio: ["pipe", "pipe", "pipe"] }).toString().trim();
+      remoteUrl = execFileSyncCli("git", ["remote", "get-url", "origin"], { cwd: dir, stdio: ["pipe", "pipe", "pipe"] }).toString().trim();
       if (remoteUrl) {
         const match = remoteUrl.match(/\/([^/]+?)(?:\.git)?$/);
         if (match) repoName = match[1];
@@ -161,7 +166,14 @@ export async function runExport(args) {
   console.log(`[export] base path: ${basePath}`);
 
   // ── Dynamic import of rex functions ────────────────────────────────────
-  const rexPublic = await import(resolvePackagePath("packages/rex", "@n-dx/rex", "dist/public.js"));
+  // pathToFileURL is required, not cosmetic: Node's ESM loader rejects a bare
+  // absolute Windows path in dynamic import() with
+  //   ERR_UNSUPPORTED_ESM_URL_SCHEME … Received protocol 'c:'
+  // which aborted `ndx export` on Windows before it did any work. Same fix as
+  // importSpecifier() in tests/e2e/published-package-loadability.test.js.
+  const rexPublic = await import(
+    pathToFileURL(resolvePackagePath("packages/rex", "@n-dx/rex", "dist/public.js")).href
+  );
   const {
     computeStats,
     computeEpicStats,
@@ -192,7 +204,7 @@ export async function runExport(args) {
   console.log("[export] pre-rendering PRD data...");
   let prdDoc;
   try {
-    const statusJson = execSync(`rex status --format=json "${dir}"`, {
+    const statusJson = execFileSyncCli("rex", ["status", "--format=json", dir], {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -454,7 +466,7 @@ function deployToGitHubPages(outDir, projectDir, cname) {
   try {
     // Check if branch exists
     try {
-      execSync(`git rev-parse --verify ${branch}`, { cwd: projectDir, stdio: "pipe" });
+      execFileSyncCli("git", ["rev-parse", "--verify", branch], { cwd: projectDir, stdio: "pipe" });
     } catch {
       console.log(`[export] creating ${branch} orphan branch...`);
     }
@@ -463,16 +475,23 @@ function deployToGitHubPages(outDir, projectDir, cname) {
     const tmpWorktree = join(projectDir, ".ndx-deploy-tmp");
     try {
       // Clean up any stale worktree
-      try { execSync(`git worktree remove "${tmpWorktree}" --force`, { cwd: projectDir, stdio: "pipe" }); } catch { /* ok */ }
+      try { execFileSyncCli("git", ["worktree", "remove", tmpWorktree, "--force"], { cwd: projectDir, stdio: "pipe" }); } catch { /* ok */ }
 
       // Create or checkout branch
       try {
-        execSync(`git worktree add "${tmpWorktree}" ${branch}`, { cwd: projectDir, stdio: "pipe" });
+        execFileSyncCli("git", ["worktree", "add", tmpWorktree, branch], { cwd: projectDir, stdio: "pipe" });
       } catch {
         // Branch doesn't exist — create orphan
-        execSync(`git worktree add --detach "${tmpWorktree}"`, { cwd: projectDir, stdio: "pipe" });
-        execSync(`git checkout --orphan ${branch}`, { cwd: tmpWorktree, stdio: "pipe" });
-        execSync("git rm -rf . 2>/dev/null || true", { cwd: tmpWorktree, stdio: "pipe" });
+        execFileSyncCli("git", ["worktree", "add", "--detach", tmpWorktree], { cwd: projectDir, stdio: "pipe" });
+        execFileSyncCli("git", ["checkout", "--orphan", branch], { cwd: tmpWorktree, stdio: "pipe" });
+        // Was `git rm -rf . 2>/dev/null || true`. Both `2>/dev/null` and `|| true`
+        // are POSIX sh constructs — cmd.exe has no /dev/null path and does not
+        // treat `||` the same way — so the tolerate-failure intent moves into JS.
+        // A fresh orphan branch legitimately has nothing to remove, which is why
+        // failure here is ignored rather than reported.
+        try {
+          execFileSyncCli("git", ["rm", "-rf", "."], { cwd: tmpWorktree, stdio: "pipe" });
+        } catch { /* nothing tracked yet on a fresh orphan branch */ }
       }
 
       // Preserve CNAME from existing deploy branch, or use --cname flag
@@ -483,10 +502,15 @@ function deployToGitHubPages(outDir, projectDir, cname) {
         } catch { /* no CNAME */ }
       }
 
-      // Clean worktree and copy export output
+      // Clean worktree and copy export output.
+      // Was `rm -rf "<path>"` per entry, which simply does not work on Windows:
+      // `rm` is not a cmd.exe builtin, and although Git for Windows ships
+      // usr/bin/rm.exe it is not normally on PATH. With no try/catch that threw
+      // and aborted the whole deploy. Node's rm needs no shell at all, and
+      // `force: true` covers the "ignore missing" intent of `-f`.
       const existingFiles = readdirSync(tmpWorktree).filter((f) => f !== ".git");
       for (const f of existingFiles) {
-        execSync(`rm -rf "${join(tmpWorktree, f)}"`, { stdio: "pipe" });
+        rmSync(join(tmpWorktree, f), { recursive: true, force: true });
       }
 
       copyDirRecursive(outDir, tmpWorktree);
@@ -498,19 +522,19 @@ function deployToGitHubPages(outDir, projectDir, cname) {
       }
 
       // Commit and push
-      execSync("git add -A", { cwd: tmpWorktree, stdio: "pipe" });
+      execFileSyncCli("git", ["add", "-A"], { cwd: tmpWorktree, stdio: "pipe" });
 
-      const hasChanges = execSync("git status --porcelain", { cwd: tmpWorktree }).toString().trim();
+      const hasChanges = execFileSyncCli("git", ["status", "--porcelain"], { cwd: tmpWorktree }).toString().trim();
       if (!hasChanges) {
         console.log(`[export] ${branch} is already up to date`);
       } else {
         const timestamp = new Date().toISOString();
-        execSync(`git commit -m "Deploy dashboard (${timestamp})"`, { cwd: tmpWorktree, stdio: "pipe" });
-        execSync(`git push --force origin ${branch}`, { cwd: tmpWorktree, stdio: "inherit" });
+        execFileSyncCli("git", ["commit", "-m", `Deploy dashboard (${timestamp})`], { cwd: tmpWorktree, stdio: "pipe" });
+        execFileSyncCli("git", ["push", "--force", "origin", branch], { cwd: tmpWorktree, stdio: "inherit" });
         console.log(`[export] pushed to ${branch}`);
       }
     } finally {
-      try { execSync(`git worktree remove "${tmpWorktree}" --force`, { cwd: projectDir, stdio: "pipe" }); } catch { /* ok */ }
+      try { execFileSyncCli("git", ["worktree", "remove", tmpWorktree, "--force"], { cwd: projectDir, stdio: "pipe" }); } catch { /* ok */ }
     }
 
     return 0;

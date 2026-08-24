@@ -1,0 +1,25 @@
+---
+id: "94e03432-9a48-4efc-80d0-7c3f927a932e"
+level: "task"
+title: "Convert write-path-profile's absolute budgets to scaling assertions"
+status: "completed"
+priority: "low"
+tags:
+  - "testing"
+  - "flakiness"
+  - "performance"
+  - "rex"
+source: "exploration-2026-08-18"
+startedAt: "2026-08-19T15:31:55.610Z"
+completedAt: "2026-08-19T16:01:07.897Z"
+endedAt: "2026-08-19T16:01:07.897Z"
+resolutionType: "code-change"
+resolutionDetail: "Deleted the absolute REGRESSION_BUDGETS and replaced them with per-phase small-to-large growth assertions (39.6x size step) over the existing three fixtures, using a per-phase min-of-3 to filter load spikes. Bound is 4x linear, derived from four clean runs whose worst reading was 83.3x, and verified in both directions: a 6x bound was tried first and let a real n^2 degradation of parseFolderTree pass at 200.9x, while 4x fails it at 188.2x. Measurements, the OS-dependence of the ratio, and a re-derivation recipe recorded in the file. Green across three consecutive full rex-suite runs."
+acceptanceCriteria:
+  - "Per-phase assertions compare growth across the existing small/medium/large fixtures rather than absolute milliseconds"
+  - "The chosen bound is derived from a measured baseline, and that measurement is recorded in a comment"
+  - "No budget was raised as the fix"
+  - "The file passes as part of three consecutive full `pnpm test` runs"
+  - "An O(n²) regression in any measured phase still fails the test — verify by temporarily degrading one phase"
+description: "A FIFTH file of the same class as the four named in task 676af18f, found while working that task and deliberately left alone there to keep its scope honest.\n\npackages/rex/tests/unit/store/write-path-profile.test.ts asserts absolute wall-clock against per-fixture budgets:\n\n    const REGRESSION_BUDGETS = { small: 5_000, medium: 20_000, large: 60_000 };\n    const worst = Math.max(timing.parseMs, timing.serializeMs, timing.addItemMs, timing.updateItemMs);\n    if (worst > maxMs) throw new Error(`... exceeds regression budget ... likely O(n²) regression`);\n\nOBSERVED FAILING ONCE this session, under full-suite load: \"small fixture: slowest phase 5005ms exceeds\nregression budget 5000ms\" — over by 5ms out of 5000, i.e. 0.1%. It has not failed since rex's other\ntiming tests were fixed and the packages were made to run sequentially, which is why this is filed at low\npriority rather than fixed immediately.\n\nWHY IT IS STILL WORTH DOING: the budgets are described in the file as \"intentionally loose ... detect\nO(n²) regressions, not enforce sub-millisecond precision\" — and that is exactly a complexity claim\nexpressed as a wall-clock number, which is the same category error the sibling task corrected elsewhere.\nA loose absolute budget does not stop being machine-dependent; it just fails less often.\n\nTHE CONVERSION SHOULD BE EASY, because this file already has what it needs: it measures four phases\nacross THREE fixture sizes (small/medium/large). So the scaling data is already being collected — assert\nthe growth between sizes per phase instead of each size against a constant. See the two examples added by\nthe sibling task for the pattern and for how to pick a bound from a measured baseline:\n  - packages/rex/tests/unit/store/folder-tree-parser.test.ts (parse ratio, observed 6.3x for 11.3x size)\n  - packages/rex/tests/integration/add-auto-reshape.test.ts  (scoped pass, observed 4.3x for 4x size)\n\nRecord the measured ratios in a comment as those two do, so the next person can see what the bound was\nderived from rather than guessing whether it was picked arbitrarily.\n\nDO NOT simply raise the budgets. That is explicitly what the parent task's criteria rule out, and it\nwould leave the file failing again on the next unusually busy machine."
+---

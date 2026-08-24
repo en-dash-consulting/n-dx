@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, access } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import { persistRunLog } from "../../../src/store/run-log.js";
 
@@ -52,7 +52,13 @@ describe("persistRunLog", () => {
       [],
     );
 
-    const filename = logPath.split("/").at(-1)!;
+    // basename, not split("/"): on Windows the separator is a backslash, so
+    // split("/") returns the whole path as a single element and `.at(-1)` yields
+    // the full path. The assertions below then passed by accident — the path
+    // happens to contain the timestamp and not "999" — while never actually
+    // checking the filename. Not one of this task's six failures; a latent bug
+    // of the same class, found while fixing the line below.
+    const filename = basename(logPath);
     expect(filename).not.toContain("999");
     expect(filename).toContain("2026-04-08T23-21-17");
   });
@@ -60,7 +66,9 @@ describe("persistRunLog", () => {
   it("returns the absolute path of the written file", async () => {
     const logPath = await persistRunLog(projectDir, "run-id-4", "2026-04-08T00:00:00Z", []);
 
-    expect(logPath.startsWith("/")).toBe(true);
+    // isAbsolute, not a leading-slash check: an absolute Windows path starts with
+    // a drive letter ("C:\..."), so startsWith("/") could never hold there.
+    expect(isAbsolute(logPath)).toBe(true);
     await expect(access(logPath)).resolves.toBeUndefined();
   });
 
