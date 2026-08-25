@@ -239,17 +239,17 @@ async function writeSiblings(
 }
 
 /**
- * Derive a deterministic, title-first directory slug for one item.
+ * Derive a deterministic, title-first, id-qualified directory slug for one item.
  *
- * Normal titles produce the same slug regardless of ID. Titles whose normalized
- * slug exceeds 40 characters reserve room for `-{id6}` and append the first
- * six safe ID characters. Sibling collision suffixes are applied by
- * `resolveSiblingSlugs`, because collision detection requires parent context.
+ * Every slug carries a `-{id6}` suffix (the first six safe ID characters),
+ * unconditionally: same-titled items created on divergent branches would
+ * otherwise collide on identical paths, and a git merge would silently unify
+ * two distinct items. The title body is truncated at a word boundary to keep
+ * the whole slug within 40 characters. Trees written before this rule are
+ * renamed in one pass by `rex migrate-slugs`.
  */
 export function slugify(title: string, id: string): string {
-  const body = normalizeTitleSlug(title);
-  if (!requiresLongSuffix(title, body)) return body;
-  return appendShortIdSuffix(body, id);
+  return appendShortIdSuffix(normalizeTitleSlug(title), id);
 }
 
 /**
@@ -271,20 +271,7 @@ export function slugifyTitle(title: string): string {
  * already applied by the existing slug system.
  */
 function resolvePositionalSiblingSlugs(items: PRDItem[]): string[] {
-  const unsuffixed = items.map((item) => slugifyTitle(item.title));
-  const titleCounts = new Map<string, number>();
-  for (const slug of unsuffixed) {
-    titleCounts.set(slug, (titleCounts.get(slug) ?? 0) + 1);
-  }
-
-  const initial = items.map((item, i) => {
-    const normalized = normalizeTitleSlug(item.title);
-    const titleCollides = (titleCounts.get(unsuffixed[i]) ?? 0) > 1;
-    if (requiresLongSuffix(item.title, normalized) || titleCollides) {
-      return appendShortIdSuffix(normalized, item.id);
-    }
-    return unsuffixed[i];
-  });
+  const initial = items.map((item) => slugify(item.title, item.id));
 
   // Final dedup pass — for genuinely identical (title, id) pairs append a
   // position suffix so each item still gets its own directory.
@@ -303,31 +290,17 @@ function resolvePositionalSiblingSlugs(items: PRDItem[]): string[] {
 
 /**
  * Resolve final directory slugs for sibling items.
- * If two siblings normalize to the same unsuffixed slug, every colliding item
- * gets a short ID suffix.
+ *
+ * Every slug is id-qualified by `slugify`, so distinct sibling ids can never
+ * collide; the map form is kept for callers that key by item id.
  *
  * @public — used by folder-tree-mutations for rendering
  */
 export function resolveSiblingSlugs(items: PRDItem[]): Map<string, string> {
-  const unsuffixedById = new Map<string, string>();
-  const counts = new Map<string, number>();
-
-  for (const item of items) {
-    const unsuffixed = slugifyTitle(item.title);
-    unsuffixedById.set(item.id, unsuffixed);
-    counts.set(unsuffixed, (counts.get(unsuffixed) ?? 0) + 1);
-  }
-
   const resolved = new Map<string, string>();
   for (const item of items) {
-    const normalized = normalizeTitleSlug(item.title);
-    const unsuffixed = requireMapValue(unsuffixedById, item.id);
-    const collides = (counts.get(unsuffixed) ?? 0) > 1;
-    resolved.set(item.id, requiresLongSuffix(item.title, normalized) || collides
-      ? appendShortIdSuffix(normalized, item.id)
-      : unsuffixed);
+    resolved.set(item.id, slugify(item.title, item.id));
   }
-
   return resolved;
 }
 
@@ -342,10 +315,6 @@ function normalizeTitleSlug(title: string): string {
     .replace(/^-|-$/g, "");
 
   return body || EMPTY_TITLE_SLUG;
-}
-
-function requiresLongSuffix(title: string, normalizedSlug: string): boolean {
-  return Array.from(title).length > MAX_SLUG_LENGTH || normalizedSlug.length > MAX_SLUG_LENGTH;
 }
 
 function appendShortIdSuffix(slug: string, id: string): string {

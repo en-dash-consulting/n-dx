@@ -107,6 +107,7 @@ const REX_COMMANDS = [
   "adapter",
   "migrate-to-md",
   "migrate-folder-tree-filenames",
+  "migrate-slugs",
   "backfill-commit-attribution",
   "mcp",
 ];

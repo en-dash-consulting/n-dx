@@ -14,5 +14,5 @@ description: "Discovery Option 2. The PRD tree is designed to be committed, but 
 |-------|--------|
 | [Git merge driver for .rex/prd_tree](./git-merge-driver-for-rex-prd-tree.md) | pending |
 | [Guard removeStaleEntries against stale snapshots](./guard-removestaleentries-2eb303.md) | completed |
-| [ID-qualified slugs by default plus migrate-slugs command](./id-qualified-slugs-by-default-440add.md) | pending |
+| [ID-qualified slugs by default plus migrate-slugs command](./id-qualified-slugs-by-default-440add.md) | completed |
 | [rex validate --post-merge structural check](./rex-validate-post-merge-da1dc6.md) | pending |
