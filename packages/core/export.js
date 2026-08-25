@@ -24,6 +24,7 @@ import { fileURLToPath, pathToFileURL } from "url";
 // containing `&` or `^` breaks the command apart. win-spawn.js applies the
 // quoteWindowsToken/ArgvQuote rules and also handles `rex` being a .cmd shim.
 import { execFileSyncCli } from "./win-spawn.js";
+import { buildCommitMessage } from "./commit-trailers.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -529,7 +530,8 @@ function deployToGitHubPages(outDir, projectDir, cname) {
         console.log(`[export] ${branch} is already up to date`);
       } else {
         const timestamp = new Date().toISOString();
-        execFileSyncCli("git", ["commit", "-m", `Deploy dashboard (${timestamp})`], { cwd: tmpWorktree, stdio: "pipe" });
+        const message = buildCommitMessage(`Deploy dashboard (${timestamp})`, "export/dashboard");
+        execFileSyncCli("git", ["commit", "-m", message], { cwd: tmpWorktree, stdio: "pipe" });
         execFileSyncCli("git", ["push", "--force", "origin", branch], { cwd: tmpWorktree, stdio: "inherit" });
         console.log(`[export] pushed to ${branch}`);
       }

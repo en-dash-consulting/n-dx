@@ -2,9 +2,10 @@
 id: "738f6000-aa94-41a0-86da-1d505e2674dd"
 level: "epic"
 title: "Testing & Documentation"
-status: "pending"
+status: "completed"
 startedAt: "2026-05-06T13:27:57.504Z"
-endedAt: "2026-08-19T18:53:02.461Z"
+completedAt: "2026-08-20T13:35:06.867Z"
+endedAt: "2026-08-20T13:35:06.867Z"
 resolutionType: "acknowledgment"
 resolutionDetail: "Fixed final architecture policy test failure (PRD storage invariant violations). All child tasks completed. Test suite passes (1628 tests). Epic infrastructure and documentation goals met."
 description: "Local testing infrastructure (gauntlet config validation), platform/prerequisite documentation, and ongoing documentation refresh for PRD-related changes."
@@ -32,7 +33,7 @@ description: "Local testing infrastructure (gauntlet config validation), platfor
 | [Fix suggestion in web-server (1 finding)](./fix-suggestion-in-web-server-1-finding/index.md) | completed |
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-5a24a9/index.md) | completed |
 | [macOS Local Docker Test Suite](./macos-local-docker-test-suite/index.md) | completed |
-| [Make test results independent of ambient environment and machine load](./make-test-results-independent-3c5811/index.md) | pending |
+| [Make test results independent of ambient environment and machine load](./make-test-results-independent-3c5811/index.md) | completed |
 | [Project-aware Navigation and Context](./project-aware-navigation-and-context/index.md) | completed |
 | [Timeout Guardrails for Hanging Tests](./timeout-guardrails-for-hanging-tests/index.md) | completed |
 | [TreeNodes DOM Performance Optimization](./treenodes-dom-performance-optimization/index.md) | completed |

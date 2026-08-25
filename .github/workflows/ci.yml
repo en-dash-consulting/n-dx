@@ -168,14 +168,20 @@ jobs:
       # child-process lifecycle, config file permissions, init, and the CLI e2e
       # flows.
       #
-      # The per-package suites run on ubuntu (validate) and on Windows
-      # (smoke-windows) but NOT here. macOS bills at 10x Linux minutes — five
-      # times the Windows rate — and it is the least informative of the three:
-      # ubuntu already covers POSIX, and the failures this whole effort found were
-      # Windows-specific by nature (path separators, file locking, CRLF,
-      # timestamp granularity, process trees). Paying the highest rate for the
-      # smallest increment is the wrong trade. If a macOS-only defect ever does
-      # surface, revisit this — but add the suites with evidence, not on principle.
+      # The per-package suites run on Windows (smoke-windows) but NOT here.
+      # macOS bills at 10x Linux minutes — five times the Windows rate — and the
+      # failures this whole effort found were Windows-specific by nature (path
+      # separators, file locking, CRLF, timestamp granularity, process trees).
+      # Paying the highest rate for the smallest increment is the wrong trade. If
+      # a macOS-only defect ever does surface, revisit this — but add the suites
+      # with evidence, not on principle.
+      #
+      # CONSEQUENCE, worth knowing before choosing where to put a test: the
+      # ubuntu `validate` job already runs BOTH suites — per-package unit tests
+      # and the root e2e / integration suite — so POSIX coverage does not depend
+      # on this job. What this job uniquely provides is macOS specifically, and
+      # only for the root suite: a macOS-only behavior exercised solely by a
+      # per-package test never runs on macOS in CI.
       - name: Run root e2e / integration tests
         run: node scripts/run-vitest-bind-aware.mjs root
 

@@ -261,16 +261,19 @@ async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(pro
   // on one process and every `rex analyze` / `hench run` it had spawned orphaned —
   // and the server is started `detached: true`, which puts it outside libuv's job
   // object, so nothing else would have reaped them either.
-  const stopped = await terminateTreeByPid(info.pid, {
+  //
+  // The result is deliberately not consulted — see the contract on
+  // terminateTreeByPid, which cli.js's stop path follows for the same reason.
+  // This used to branch on it and warn that the server "did not exit", one line
+  // above the "Stopped" line below: a contradiction, and the warning was the
+  // wrong half, because a signallable pid after SIGKILL is as likely to be a
+  // zombie awaiting reaping as a survivor.
+  await terminateTreeByPid(info.pid, {
     // web.js keeps its own, shorter grace period: `ndx start stop` is interactive
     // and must stay responsive, where child-lifecycle's tracker defaults to 5s for
     // shutdown. Consolidating the mechanism must not change the latency.
     forceKillTimeoutMs: gracePeriodMs,
   });
-
-  if (!stopped) {
-    log(`Server (PID ${info.pid}) did not exit within ${gracePeriodMs} ms of SIGKILL.`);
-  }
 
   log(`Stopped ${label} (PID ${info.pid}, port ${info.port}).`);
   await removePidFile(dir);

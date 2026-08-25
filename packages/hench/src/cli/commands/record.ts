@@ -1,11 +1,20 @@
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { saveRun } from "../../store/runs.js";
 import { loadConfig } from "../../store/config.js";
+import {
+  EMPTY_CURSOR,
+  loadUsageCursor,
+  readUsageDelta,
+  resolveTranscriptPath,
+  saveUsageCursor,
+  type SessionUsageCursor,
+} from "../../store/session-usage.js";
 import { HENCH_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { result, info } from "../output.js";
-import type { RunRecord, RunStatus } from "../../schema/index.js";
+import type { RunRecord, RunStatus, TokenUsage } from "../../schema/index.js";
 
 const VALID_STATUSES: readonly RunStatus[] = [
   "running",
@@ -17,17 +26,47 @@ const VALID_STATUSES: readonly RunStatus[] = [
   "cancelled",
 ];
 
+/** Flags that set token counts by hand, and the field each fills. */
+const EXPLICIT_TOKEN_FLAGS = {
+  "input-tokens": "input",
+  "output-tokens": "output",
+  "cache-creation-tokens": "cacheCreationInput",
+  "cache-read-tokens": "cacheReadInput",
+} as const;
+
+const ZERO_USAGE: Required<TokenUsage> = {
+  input: 0,
+  output: 0,
+  cacheCreationInput: 0,
+  cacheReadInput: 0,
+};
+
 /**
  * Write a lightweight, assisted run record to `.hench/runs/`.
  *
- * Used by the `/ndx-work` skill so task execution driven through Claude Code
- * is visible in run history and auditable after the fact — closing the gap
- * where slash-command work left no `.hench/runs/` entry (issue #271). The
- * record is marked `assisted: true` and carries empty token usage: Claude Code
- * does not expose its own token consumption to the running skill, so unlike
- * `ndx work` (which parses the spawned `claude` CLI's token output) there is no
- * usage to attribute. The empty totals join to the PRD item at 0 tokens, so
- * the record never inflates `ndx usage` analytics.
+ * Used by the skills so work driven through Claude Code is visible in run
+ * history and auditable after the fact — closing the gap where slash-command
+ * work left no `.hench/runs/` entry (issue #271). The record is marked
+ * `assisted: true` to distinguish it from a spawned hench agent's run.
+ *
+ * ## Token usage
+ *
+ * Assisted records used to carry zeros, on the grounds that Claude Code does not
+ * expose its own consumption to the running skill. That holds for the tool
+ * surface but not for the filesystem: Claude Code writes a transcript per session
+ * whose assistant messages each carry the API's `usage` object, and exports
+ * `CLAUDE_CODE_SESSION_ID` to the tools it runs. So usage is read from there by
+ * default, and only what accumulated since the previous record for that session
+ * is claimed — see {@link readUsageDelta} for why a total would be wrong.
+ *
+ * Order of precedence:
+ *   1. explicit `--input-tokens` / `--output-tokens` / `--cache-*-tokens`
+ *   2. the session transcript (default)
+ *   3. zeros, when there is no session to read and nothing was passed
+ *
+ * Zeros remain a valid outcome rather than an error: an unrecorded run is worse
+ * than one recorded without its tokens, and `assisted` already marks the record
+ * so analytics do not read a 0-token entry as an anomaly.
  */
 export async function cmdRecord(
   dir: string,
@@ -39,7 +78,7 @@ export async function cmdRecord(
   if (!taskId) {
     throw new CLIError(
       "Missing --task.",
-      "Usage: hench record --task=<id> [--title=<title>] [--status=completed] [--summary=<text>] [--turns=N] [dir]",
+      "Usage: hench record --task=<id> [--title=<title>] [--status=completed] [--summary=<text>] [--turns=N] [--no-tokens] [--session=<id>] [--transcript=<path>] [dir]",
     );
   }
 
@@ -51,19 +90,12 @@ export async function cmdRecord(
     );
   }
 
-  let turns = 0;
-  if (flags.turns !== undefined) {
-    const parsed = parseInt(flags.turns, 10);
-    if (Number.isNaN(parsed) || parsed < 0) {
-      throw new CLIError(
-        `Invalid --turns value: "${flags.turns}"`,
-        "Must be a non-negative integer.",
-      );
-    }
-    turns = parsed;
-  }
+  const explicitTurns = parseCount(flags.turns, "--turns");
+  const explicitUsage = readExplicitUsage(flags);
 
   const config = await loadConfig(henchDir);
+  const usage = await resolveUsage(henchDir, flags, explicitUsage);
+
   const now = new Date().toISOString();
 
   const run: RunRecord = {
@@ -73,23 +105,34 @@ export async function cmdRecord(
     startedAt: flags.startedAt || now,
     finishedAt: now,
     status,
-    turns,
-    summary:
-      flags.summary ||
-      "Assisted /ndx-work run (Claude Code) — token usage not captured.",
-    tokenUsage: { input: 0, output: 0 },
+    // Each usage-bearing transcript message is one API call, which is what a turn
+    // counts — so the message count is a real turn count, not a stand-in.
+    turns: explicitTurns ?? usage.messages,
+    summary: flags.summary || "Assisted skill run (Claude Code).",
+    tokenUsage: usage.tokenUsage,
     toolCalls: [],
-    model: config.model,
+    model: flags.model || usage.model || config.model,
     invocationContext: "api",
     assisted: true,
   };
 
+  // saveRun derives the normalized `tokens` tuple from `tokenUsage`, so the PRD
+  // rollup picks this up by taskId with no further work. The web dashboard's
+  // aggregator watches the runs directory, which is what gets it cached.
   await saveRun(henchDir, run);
 
   if (flags.format === "json") {
     result(
       JSON.stringify(
-        { id: run.id, taskId: run.taskId, status: run.status, assisted: true },
+        {
+          id: run.id,
+          taskId: run.taskId,
+          status: run.status,
+          assisted: true,
+          turns: run.turns,
+          tokenUsage: run.tokenUsage,
+          usageSource: usage.source,
+        },
         null,
         2,
       ),
@@ -98,5 +141,162 @@ export async function cmdRecord(
   }
 
   result(`Recorded assisted run ${run.id} for task ${taskId} (${status}).`);
-  info("Assisted /ndx-work run — token usage is not captured for this path.");
+  info(usage.note);
+}
+
+interface ResolvedUsage {
+  tokenUsage: Required<TokenUsage>;
+  messages: number;
+  model?: string;
+  source: "flags" | "transcript" | "none";
+  note: string;
+}
+
+/**
+ * Decide what usage this record claims, and advance the session watermark.
+ *
+ * The watermark advances even when explicit flags supplied the numbers: that
+ * spend is now accounted for, and leaving the cursor behind would let the next
+ * transcript-derived record claim it a second time.
+ */
+async function resolveUsage(
+  henchDir: string,
+  flags: Record<string, string>,
+  explicitUsage: Required<TokenUsage> | null,
+): Promise<ResolvedUsage> {
+  const sessionId = flags.session || process.env.CLAUDE_CODE_SESSION_ID || "";
+  const transcriptDisabled = flags["no-tokens"] === "true";
+
+  if (transcriptDisabled && !explicitUsage) {
+    return {
+      tokenUsage: ZERO_USAGE,
+      messages: 0,
+      source: "none",
+      note: "Token usage not recorded (--no-tokens).",
+    };
+  }
+
+  const transcript = await readTranscript(flags, sessionId);
+
+  // No transcript to read: fall back to whatever was passed, or to zeros.
+  if (!transcript) {
+    if (explicitUsage) {
+      return {
+        tokenUsage: explicitUsage,
+        messages: 0,
+        source: "flags",
+        note: "Token usage taken from flags.",
+      };
+    }
+    return {
+      tokenUsage: ZERO_USAGE,
+      messages: 0,
+      source: "none",
+      note: sessionId
+        ? `No transcript found for session ${sessionId} — recorded without token usage.`
+        : "No Claude Code session detected (CLAUDE_CODE_SESSION_ID unset) — recorded without token usage.",
+    };
+  }
+
+  const cursor: SessionUsageCursor = sessionId
+    ? await loadUsageCursor(henchDir, sessionId)
+    : EMPTY_CURSOR;
+  // `--startedAt` doubles as the usage window: a record that says it started at a
+  // time cannot also claim what was spent before then. It matters for the FIRST
+  // record in a session, which has no watermark and would otherwise claim
+  // everything the session had spent before the work began.
+  const delta = readUsageDelta(transcript.text, cursor, flags.since || flags.startedAt);
+
+  if (sessionId) await saveUsageCursor(henchDir, sessionId, delta.cursor);
+
+  if (explicitUsage) {
+    return {
+      tokenUsage: explicitUsage,
+      messages: delta.messages,
+      model: delta.model,
+      source: "flags",
+      note: "Token usage taken from flags; session watermark advanced so the next record does not re-claim it.",
+    };
+  }
+
+  const total =
+    delta.tokenUsage.input +
+    delta.tokenUsage.output +
+    delta.tokenUsage.cacheCreationInput +
+    delta.tokenUsage.cacheReadInput;
+
+  const notes = [
+    `Token usage read from this session's transcript: ${total.toLocaleString()} tokens across ${delta.messages} message${delta.messages === 1 ? "" : "s"}.`,
+  ];
+  if (delta.resynced) {
+    notes.push(
+      "The previous watermark was missing from the transcript (it was rewritten, likely by compaction), so the delta is approximate.",
+    );
+  }
+  if (delta.messages === 0) {
+    notes.push("Nothing new since the last record for this session.");
+  }
+
+  return {
+    tokenUsage: delta.tokenUsage,
+    messages: delta.messages,
+    model: delta.model,
+    source: "transcript",
+    note: notes.join(" "),
+  };
+}
+
+/** Read the session transcript, by explicit path or by searching for the session. */
+async function readTranscript(
+  flags: Record<string, string>,
+  sessionId: string,
+): Promise<{ path: string; text: string } | null> {
+  const explicitPath = flags.transcript;
+  const path = explicitPath || (sessionId ? await resolveTranscriptPath(sessionId) : null);
+  if (!path) return null;
+
+  try {
+    return { path, text: await readFile(path, "utf-8") };
+  } catch {
+    // An explicitly named transcript that cannot be read is worth a hard error —
+    // the caller asked for that file specifically. A discovered one is not.
+    if (explicitPath) {
+      throw new CLIError(
+        `Could not read transcript: ${explicitPath}`,
+        "Pass a readable JSONL transcript, or omit --transcript to search by session id.",
+      );
+    }
+    return null;
+  }
+}
+
+/** Token counts passed by hand, or null when none were. */
+function readExplicitUsage(flags: Record<string, string>): Required<TokenUsage> | null {
+  const usage: Required<TokenUsage> = { ...ZERO_USAGE };
+  let any = false;
+
+  for (const [flag, field] of Object.entries(EXPLICIT_TOKEN_FLAGS)) {
+    const raw = flags[flag];
+    if (raw === undefined) continue;
+    const parsed = parseCount(raw, `--${flag}`);
+    if (parsed !== undefined) {
+      usage[field] = parsed;
+      any = true;
+    }
+  }
+
+  return any ? usage : null;
+}
+
+/** Parse a non-negative integer flag, or undefined when absent. */
+function parseCount(raw: string | undefined, flagName: string): number | undefined {
+  if (raw === undefined) return undefined;
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed) || parsed < 0) {
+    throw new CLIError(
+      `Invalid ${flagName} value: "${raw}"`,
+      "Must be a non-negative integer.",
+    );
+  }
+  return parsed;
 }

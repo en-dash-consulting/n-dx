@@ -2,6 +2,8 @@ Restructure the PRD hierarchy to keep it organized as a coherent product spec.
 
 Use this when the PRD has grown organically and needs cleanup: too many top-level epics, features that should be tasks, overlapping areas that should be merged, or items that belong under different parents.
 
+**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Is` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
+
 ## Process
 
 1. Call `get_prd_status` (rex MCP) to see the full epic/feature structure and item counts
@@ -18,7 +20,7 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
    - Suggest level changes (epic->feature, feature->task, etc.)
    - Suggest merges for overlapping items
 4. After user approval, execute the restructuring:
-   - Create new parent epics/features with `add_item` (rex MCP)
+   - Create new parent epics/features with `add_item` (rex MCP). Set `level` explicitly (`epic` or `feature` — it is required and has no default) and `parentId` for anything that is not a new top-level epic, so a new container never lands at root by accident. A container usually needs no acceptance criteria; when one does have a testable outcome of its own, put them in the `acceptanceCriteria` array rather than in `description`, since that is the field `verify_criteria` and the dashboard's requirements view read
    - Reparent items with `move_item` (rex MCP)
    - Change levels with `edit_item` (rex MCP) using the `level` field
    - Merge overlapping items with `merge_items` (rex MCP)
@@ -55,3 +57,15 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
 - `edit_item` — change level, rename, update descriptions
 - `merge_items` — consolidate overlapping items
 - `reorganize` — verify structural health after changes
+
+## Record the run and its token cost
+
+After committing, record this run so both the work and the tokens it spent are auditable alongside `ndx work` runs:
+
+```sh
+ndx hench record --task=<id> --status=completed --startedAt=<the time you noted>   --title="ndx-reshape: <what was restructured>"   --summary="<one-line summary>"
+```
+
+Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. Use `--task=skill:ndx-reshape`. Restructuring spans many items, so it is recorded against a synthetic id that `get_token_usage` reports in its `orphans` bucket rather than charging a single item.
+
+Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.

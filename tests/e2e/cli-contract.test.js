@@ -42,6 +42,10 @@ function getSupportedCommands(toolPath) {
       encoding: "utf-8",
       timeout: 10_000,
       cwd: root,
+      // Also makes err.stderr readable in the catch below — inherited stderr
+      // arrives as null there, so the fallback would silently lose the usage
+      // text it is trying to recover.
+      stdio: "pipe",
     });
   } catch (err) {
     // Some CLIs exit with non-zero on --help but still print usage

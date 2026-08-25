@@ -17,6 +17,7 @@ import { existsSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { execFileSync } from "child_process";
 import { createInterface } from "readline/promises";
+import { buildCommitMessage } from "./commit-trailers.js";
 
 const PREFLIGHT_MESSAGE = [
   "",
@@ -212,7 +213,7 @@ export function commitInitBaseline(dir) {
   }
 
   try {
-    execFileSync("git", ["commit", "-m", "chore: n-dx init"], {
+    execFileSync("git", ["commit", "-m", buildCommitMessage("chore: n-dx init", "init/baseline")], {
       cwd: dir, stdio: "pipe", timeout: 15_000,
     });
   } catch (err) {

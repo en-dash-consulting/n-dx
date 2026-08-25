@@ -10,6 +10,10 @@ import {
   buildScopedCommand,
   runPostTaskTests,
 } from "../../../src/tools/test-runner.js";
+// runPostTaskTests reaches `exec("sh", ["-c", cmd])` on every platform, so the
+// cases that actually run a command need a POSIX shell. The early-return cases
+// (no test command, no files changed) do not, and stay unguarded.
+import { itNeedsPosixShell } from "../../helpers/posix-shell.js";
 import { osPath, osPrefix } from "../../helpers/index.js";
 
 // ---------------------------------------------------------------------------
@@ -461,7 +465,7 @@ describe("runPostTaskTests", () => {
     expect(result.error).toBe("No files changed");
   });
 
-  it("runs the full test command when runner is not scopeable", async () => {
+  itNeedsPosixShell("runs the full test command when runner is not scopeable", async () => {
     // Use a command that will succeed quickly
     const result = await runPostTaskTests({
       projectDir,
@@ -476,7 +480,9 @@ describe("runPostTaskTests", () => {
     expect(result.targetedFiles).toEqual([]);
   });
 
-  it("reports failure when test command exits non-zero", async () => {
+  // Guarded despite passing without a shell: `sh -c 'exit 1'` failing to spawn
+  // also yields passed=false, so the assertion held for the wrong reason.
+  itNeedsPosixShell("reports failure when test command exits non-zero", async () => {
     const result = await runPostTaskTests({
       projectDir,
       filesChanged: ["src/foo.ts"],
@@ -488,7 +494,7 @@ describe("runPostTaskTests", () => {
     expect(result.passed).toBe(false);
   });
 
-  it("captures test output", async () => {
+  itNeedsPosixShell("captures test output", async () => {
     const result = await runPostTaskTests({
       projectDir,
       filesChanged: ["src/foo.ts"],
@@ -500,7 +506,7 @@ describe("runPostTaskTests", () => {
     expect(result.output).toContain("5 passed");
   });
 
-  it("measures test duration", async () => {
+  itNeedsPosixShell("measures test duration", async () => {
     const result = await runPostTaskTests({
       projectDir,
       filesChanged: ["src/foo.ts"],

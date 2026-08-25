@@ -406,6 +406,20 @@ async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl, env
  * Callers owning a pid file must keep their own staleness checks; a true return
  * here means "not signallable any more", not "the process we meant is gone".
  *
+ * WHICH MEANS: DO NOT REPORT A FALSE RETURN AS "STILL RUNNING". SIGKILL is
+ * unblockable, so by the time this resolves the process is done in every sense a
+ * caller cares about; a pid that still answers signal 0 is as likely to be an
+ * exited-but-unreaped zombie, or a PID now owned by something unrelated. Both
+ * stop paths (`cli.js`, `web.js`) therefore discard the result, and
+ * tests/unit/terminate-by-pid-result-unused.test.js keeps them that way —
+ * `web.js` once warned "did not exit" on this basis, one line above the "Stopped"
+ * line it printed anyway.
+ *
+ * A caller that genuinely needs to report a failed stop should probe with signal
+ * 0 BEFORE killing, which is where the meaningful distinction lives: `cli.js`
+ * separates EPERM ("exists, not ours to signal" — a real failure) from ESRCH
+ * ("already gone" — success).
+ *
  * @param {number} pid
  * @param {object} [options]
  * @param {number} [options.forceKillTimeoutMs=5000] Grace period before SIGKILL.
@@ -414,7 +428,8 @@ async function terminateWindowsTree(child, forceKillTimeoutMs, spawnCliImpl, env
  * @param {Function} [options.spawnCliImpl] Injectable spawn (defaults to win-spawn's spawnCli).
  * @param {Function} [options.killImpl] Injectable signaller (defaults to process.kill).
  * @param {number} [options.pollIntervalMs=100] Liveness poll interval.
- * @returns {Promise<boolean>} Whether the pid is gone.
+ * @returns {Promise<boolean>} Whether the pid stopped answering signal 0 — NOT
+ *   whether the intended process exited. See the contract above before using it.
  */
 export async function terminateTreeByPid(pid, {
   forceKillTimeoutMs = DEFAULT_FORCE_KILL_TIMEOUT_MS,

@@ -212,12 +212,22 @@ export class RunChangeDetector {
         changes.push({ file, type: "modified" });
       } else if (
         typeof prev.contentHash === "string" &&
+        typeof currentHashes[file] === "string" &&
         prev.contentHash !== currentHashes[file]
       ) {
         // Same mtime and size, different bytes: the rewrite landed inside one
         // timestamp tick at the same length. Only reachable while the previous
         // snapshot was inside the granularity window, which is the only time a hash
         // is carried.
+        //
+        // BOTH hashes have to be usable for a difference to mean anything. A null
+        // on the new side is a failed read, not a changed file — and this guard
+        // used to cover only the previous side, so a previously-hashed file whose
+        // read now failed was reported modified on the strength of `"abc" !== null`.
+        // mtime and size agree here, so nothing suggests a rewrite; only that this
+        // scan could not check. The web twin got the same fix, where the cost was
+        // higher — it acts on "modified" by re-reading, and dropped the file's
+        // tokens when that read failed too.
         changes.push({ file, type: "modified" });
       }
     }
@@ -337,7 +347,11 @@ export class RunChangeDetector {
   /**
    * Digest a run file's raw bytes. Gzipped files are hashed compressed — the
    * question is only "did these bytes change" — and a read failure yields null,
-   * which the caller treats as "no usable hash" rather than as a change.
+   * which the caller treats as "no usable hash" rather than as a change: see
+   * `detectChanges`, which requires both sides to be a string before a difference
+   * counts. That was once only a claim this docblock made and the caller
+   * contradicted; it is now enforced there and covered by "treats an unreadable
+   * file as no evidence of change, not as a change".
    */
   private async hashFile(file: string): Promise<string | null> {
     try {
