@@ -117,7 +117,11 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **General rule:** Commands that write to the PRD backend (`.rex/prd_tree/`), `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
-**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) write only to the folder tree (`.rex/prd_tree/`). No JSON files are produced. Never invoke MCP write tools while a CLI command that writes to the PRD is running in the background (e.g., `reorganize`, `prune`, `reshape`, `analyze`, `plan`). The last writer wins silently — no error, just data loss. Always wait for the background command to complete before making MCP writes.
+**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) write only to the folder tree (`.rex/prd_tree/`). No JSON files are produced.
+
+**What the code enforces:** the MCP write tools and the bulk restructurers `reorganize`, `prune`, and `reshape` perform their read-modify-write inside `store.withTransaction`, which holds the PRD file lock across the whole span — a concurrent writer's item is no longer silently dropped by their full-document save. Their LLM analysis runs on an unlocked snapshot; accepted proposals are re-applied against a freshly loaded document under the lock. `saveDocument` itself always takes the lock, so writes cannot interleave, and a writer that cannot acquire the lock within its timeout fails loudly with an error naming the holder PID rather than proceeding.
+
+**What remains operator discipline:** other CLI write paths (`analyze`/`plan` imports, `update`, `move`, `remove`, `fix`, and similar) still do their own load→mutate→save — the lock serializes their write but does not merge concurrent changes, so for those commands the last full-document writer still wins. Do not run them concurrently with other PRD writers, and prefer waiting for a background PRD-writing command to finish before making MCP writes: a restructure computed on a stale snapshot can turn individual proposals into no-ops (reported, not silent).
 
 **PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/prd_tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
 

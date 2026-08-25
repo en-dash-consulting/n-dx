@@ -4,8 +4,8 @@ level: "epic"
 title: "Rex"
 status: "completed"
 startedAt: "2026-03-24T20:09:27.774Z"
-completedAt: "2026-07-24T18:29:52.914Z"
-endedAt: "2026-07-24T18:29:52.914Z"
+completedAt: "2026-08-25T19:05:43.881Z"
+endedAt: "2026-08-25T19:05:43.881Z"
 description: "PRD management: hierarchical epics/features/tasks/subtasks, smart add from natural language, LLM-powered analysis and recommendations, validation, pruning, reshaping. Stores state in .rex/prd.json."
 ---
 
@@ -22,6 +22,7 @@ description: "PRD management: hierarchical epics/features/tasks/subtasks, smart 
 | [Fix suggestion in rex (1 finding)](./fix-suggestion-in-rex-1-finding/index.md) | completed |
 | [Interactive Workflow Shaping and Requirements Integration](./interactive-workflow-shaping-a19a8b/index.md) | completed |
 | [LoE-Calibrated Proposal Generation in rex add](./loe-calibrated-proposal-8feca9/index.md) | completed |
+| [Move file lock to saveDocument for complete write safety](./move-file-lock-to-savedocument-9fa854/index.md) | completed |
 | [Natural language PRD authoring](./natural-language-prd-authoring/index.md) | completed |
 | [ndx add CLI Delegation Fix](./ndx-add-cli-delegation-fix/index.md) | completed |
 | [PRD Management Enhancement](./prd-management-enhancement/index.md) | completed |
@@ -38,4 +39,3 @@ description: "PRD management: hierarchical epics/features/tasks/subtasks, smart 
 | [Audit MCP tool schemas against PRDItem fields](./audit-mcp-tool-schemas-against-8fc484.md) | completed |
 | [Fix --mode=fast being ignored when --accept is passed to reorganize](./fix-mode-fast-being-ignored-0f8711.md) | completed |
 | [Investigate flaky store-roundtrip concurrency test (0 items after serialized mutations)](./investigate-flaky-store-5d0a66.md) | completed |
-| [Move file lock to saveDocument for complete write safety](./move-file-lock-to-savedocument-9fa854.md) | completed |

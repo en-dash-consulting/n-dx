@@ -9,7 +9,8 @@ tags:
   - "reliability"
   - "concurrency"
 startedAt: "2026-03-24T05:12:16.787Z"
-completedAt: "2026-03-24T05:20:58.936Z"
+completedAt: "2026-08-25T19:05:43.076Z"
+endedAt: "2026-08-25T19:05:43.076Z"
 acceptanceCriteria:
   - "All writes to prd.json go through a single lock regardless of whether they use convenience methods or direct saveDocument"
   - "CLI commands (reorganize, prune, reshape) are protected from concurrent MCP writes"
@@ -17,3 +18,9 @@ acceptanceCriteria:
   - "Existing convenience methods still work without callers needing to acquire locks manually"
 description: "File locking was added to the convenience methods (addItem, updateItem, removeItem) but CLI commands like reorganize, prune, and reshape do their own loadDocument → mutate → saveDocument outside those methods, bypassing the lock entirely. The lock should be at the saveDocument level (or a withTransaction API) so all write paths are protected, not just the store convenience methods."
 ---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Every PRD write path does an unlocked load→mutate→save, so a concurrent writer's item is silently dropped](./every-prd-write-path-does-an-88f1ce.md) | completed |
