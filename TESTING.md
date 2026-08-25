@@ -1,5 +1,16 @@
 # Testing Conventions
 
+## Before Trusting a Red Result
+
+A stale `node_modules` produces failures that look exactly like real defects —
+observed 2026-08-24, a typescript installed at 5.9.3 against a declared ^6.0.3
+failed `pnpm typecheck` on a correct test while CI was green on the same commit.
+`pnpm typecheck` therefore runs `pnpm deps:check` first
+(`scripts/check-dependency-drift.mjs`): it compares every workspace dependency's
+installed version against its declared range and fails with a per-package report
+when they disagree. If it fires, run `pnpm install` — do not debug the red
+typecheck or test result until the tree is in line.
+
 ## Test Directory Structure
 
 Every package must maintain three test tiers:

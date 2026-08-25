@@ -12,7 +12,8 @@
   "scripts": {
     "build": "pnpm -r run build",
     "dev": "pnpm -r run dev",
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "node scripts/check-dependency-drift.mjs && pnpm -r run typecheck",
+    "deps:check": "node scripts/check-dependency-drift.mjs",
     "test": "node scripts/run-all-tests.mjs",
     "validate": "pnpm -r run validate",
     "verify": "pnpm security:obfuscation && vitest run tests/e2e && node packages/core/ci.js .",
