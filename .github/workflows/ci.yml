@@ -176,13 +176,12 @@ jobs:
       # a macOS-only defect ever does surface, revisit this — but add the suites
       # with evidence, not on principle.
       #
-      # CONSEQUENCE, worth knowing before choosing where to put a test: this job
-      # is the ONLY place CI runs anything on POSIX. The ubuntu `validate` job
-      # builds, typechecks and runs `pr-check` (build + rex validate) — it runs no
-      # tests, so an earlier version of this comment claiming "ubuntu already
-      # covers POSIX" was wrong. A POSIX-only assertion therefore has to live in
-      # tests/** to execute at all; one placed in a per-package suite runs on
-      # Windows alone, where it skips.
+      # CONSEQUENCE, worth knowing before choosing where to put a test: the
+      # ubuntu `validate` job already runs BOTH suites — per-package unit tests
+      # and the root e2e / integration suite — so POSIX coverage does not depend
+      # on this job. What this job uniquely provides is macOS specifically, and
+      # only for the root suite: a macOS-only behavior exercised solely by a
+      # per-package test never runs on macOS in CI.
       - name: Run root e2e / integration tests
         run: node scripts/run-vitest-bind-aware.mjs root
 

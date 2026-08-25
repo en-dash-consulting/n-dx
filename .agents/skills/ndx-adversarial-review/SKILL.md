@@ -143,7 +143,7 @@ In claim mode, if the review disproved a completion claim, also call `update_tas
 
 Then close out the run:
 
-1. **Commit.** `add_item`, `edit_item`, and `update_task_status` write to `.rex/prd_tree/<slug>/index.md` even though you edited no file directly, so there are changes to commit. Run `git status --porcelain` against the project root; if it is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage all changes with `git add -A` and commit with the n-dx authorship + model audit trailer block via a HEREDOC:
+1. **Commit.** `add_item`, `edit_item`, and `update_task_status` write to `.rex/prd_tree/<slug>/index.md` even though you edited no file directly, so there are changes to commit. Run `git status --porcelain -- .rex/prd_tree/`; if it is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage only what the review wrote with `git add .rex/prd_tree/` — never `git add -A` here: in diff mode the dirty working tree is the very thing under review, and staging everything would sweep the user's in-progress work into a commit attributed to the review. Commit with the n-dx authorship + model audit trailer block via a HEREDOC:
 
    ```sh
    git commit -m "$(cat <<'EOF'

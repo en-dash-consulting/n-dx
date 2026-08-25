@@ -164,6 +164,38 @@ describe("readUsageDelta", () => {
     expect(delta.cursor).toEqual({ lastUuid: "z", consumed: 3 });
   });
 
+  it("does not rewind the watermark when the newest scanned message has no uuid", () => {
+    // uuid is typed optional and the transcript is untrusted JSON. Keeping the
+    // OLD lastUuid while `consumed` advances past it makes the next read start
+    // over from the stale uuid — lastUuid takes precedence over `consumed` — so
+    // everything between the two is claimed twice. With no uuid at the tail the
+    // uuid watermark must be dropped so the count governs.
+    const uuidless = (output: number) =>
+      JSON.stringify({
+        type: "assistant",
+        message: { model: "claude-opus-5", usage: { output_tokens: output } },
+      });
+
+    const r1 = readUsageDelta(assistantLine("u1", { output_tokens: 10 }), EMPTY_CURSOR);
+    expect(r1.cursor).toEqual({ lastUuid: "u1", consumed: 1 });
+
+    const grown = [assistantLine("u1", { output_tokens: 10 }), uuidless(20), uuidless(30)].join(
+      "\n",
+    );
+    const r2 = readUsageDelta(grown, r1.cursor);
+    expect(r2.tokenUsage.output).toBe(50);
+    expect(r2.cursor.lastUuid).toBeUndefined();
+    expect(r2.cursor.consumed).toBe(3);
+
+    const r3 = readUsageDelta(
+      [grown, assistantLine("u2", { output_tokens: 7 })].join("\n"),
+      r2.cursor,
+    );
+    // 7, not 57: the 50 uuid-less tokens r2 already claimed must not resurface.
+    expect(r3.tokenUsage.output).toBe(7);
+    expect(r3.cursor).toEqual({ lastUuid: "u2", consumed: 4 });
+  });
+
   describe("window start", () => {
     /** A message stamped at a known time. */
     function at(uuid: string, iso: string, output: number): string {
@@ -294,6 +326,35 @@ describe("resolveTranscriptPath", () => {
     await writeFile(join(projectDir, "s1.jsonl"), "", "utf-8");
 
     expect(await resolveTranscriptPath("s1", { home, configDir })).toBe(join(projectDir, "s1.jsonl"));
+  });
+
+  it("honours CLAUDE_CONFIG_DIR when no explicit config directory is given", async () => {
+    // record.ts calls resolveTranscriptPath with no opts, so a user who has
+    // relocated their config tree gets found only if the env var is consulted
+    // here. Missing it degrades to "no transcript" and a silent zero-token
+    // record — the failure this feature exists to remove.
+    const configDir = join(home, "relocated");
+    const projectDir = join(configDir, "projects", "proj");
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, "s2.jsonl"), "", "utf-8");
+
+    const previous = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = configDir;
+    try {
+      expect(await resolveTranscriptPath("s2", { home })).toBe(join(projectDir, "s2.jsonl"));
+
+      // An explicit configDir still wins over the environment.
+      const explicit = join(home, "explicit");
+      const explicitProject = join(explicit, "projects", "proj");
+      await mkdir(explicitProject, { recursive: true });
+      await writeFile(join(explicitProject, "s3.jsonl"), "", "utf-8");
+      expect(await resolveTranscriptPath("s3", { home, configDir: explicit })).toBe(
+        join(explicitProject, "s3.jsonl"),
+      );
+    } finally {
+      if (previous === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = previous;
+    }
   });
 });
 

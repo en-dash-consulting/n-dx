@@ -49,9 +49,20 @@ describe("file-modifying skills: commit step presence", () => {
       expect(body).toContain("git status --porcelain");
     });
 
-    it(`${skill}: stages all changes before committing (git add -A)`, () => {
+    // ndx-adversarial-review's diff mode takes the dirty working tree as its
+    // review subject, so it must stage only the PRD tree it wrote — `git add -A`
+    // there would commit the very work under review. Every other committing
+    // skill has no uncommitted subject and stages everything.
+    const expectedStage =
+      skill === "ndx-adversarial-review" ? "git add .rex/prd_tree/" : "git add -A";
+
+    it(`${skill}: stages its changes before committing (${expectedStage})`, () => {
       const body = getSkillBody(skill);
-      expect(body).toContain("git add -A");
+      expect(body).toContain(expectedStage);
+      if (skill === "ndx-adversarial-review") {
+        // The body may only mention `git add -A` to prohibit it.
+        expect(body).toContain("never `git add -A`");
+      }
     });
 
     it(`${skill}: uses skill-scoped commit message prefix`, () => {

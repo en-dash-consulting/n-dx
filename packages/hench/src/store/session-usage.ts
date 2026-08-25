@@ -35,7 +35,7 @@
  * @module hench/store/session-usage
  */
 
-import { readFile, readdir, writeFile, mkdir } from "node:fs/promises";
+import { readFile, readdir, stat, writeFile, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { TokenUsage } from "../schema/index.js";
@@ -182,8 +182,14 @@ export function readUsageDelta(
     model,
     cursor: {
       // Hold the previous watermark when nothing was scanned, so a no-op record
-      // does not move it and a later one still sees the right window.
-      lastUuid: lastScanned?.uuid ?? cursor.lastUuid,
+      // does not move it and a later one still sees the right window. When
+      // something WAS scanned but the tail entry carries no uuid, drop the uuid
+      // watermark rather than keep the stale one: lastUuid takes precedence over
+      // `consumed` on the next read, so a stale uuid would rewind the window and
+      // re-claim everything scanned past it. (Walking back to the last entry
+      // that HAS a uuid would be wrong the same way — the uuid-less entries
+      // after it would be re-claimed.) With no uuid, `consumed` governs.
+      lastUuid: lastScanned ? lastScanned.uuid : cursor.lastUuid,
       consumed: startAt + scanned.length,
     },
     resynced,
@@ -209,7 +215,14 @@ export async function resolveTranscriptPath(
 ): Promise<string | null> {
   if (!sessionId || !isSafeSessionId(sessionId)) return null;
 
-  const configDir = opts.configDir ?? join(opts.home ?? homedir(), ".claude");
+  // CLAUDE_CONFIG_DIR relocates Claude Code's whole config tree, transcripts
+  // included. A user who has set it and does not get it honoured here would
+  // silently record zero tokens — the exact failure this module exists to
+  // remove — so the environment is consulted before falling back to ~/.claude.
+  const configDir =
+    opts.configDir ??
+    process.env.CLAUDE_CONFIG_DIR ??
+    join(opts.home ?? homedir(), ".claude");
   const projectsDir = join(configDir, PROJECTS_SUBDIR);
 
   let projectDirs: string[];
@@ -225,8 +238,9 @@ export async function resolveTranscriptPath(
   for (const projectDir of projectDirs) {
     const candidate = join(projectsDir, projectDir, filename);
     try {
-      await readFile(candidate, { encoding: "utf-8", flag: "r" });
-      return candidate;
+      // stat, not readFile: transcripts reach tens of MB, and the caller reads
+      // the file itself — probing with a full read would do all that I/O twice.
+      if ((await stat(candidate)).isFile()) return candidate;
     } catch {
       // Not in this project directory.
     }
