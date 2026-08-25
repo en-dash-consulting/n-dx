@@ -2,7 +2,7 @@
 id: "90e6afb9-a3ab-49e4-bea5-bcca4c5b28e4"
 level: "task"
 title: "`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "hench"
@@ -10,6 +10,9 @@ tags:
   - "ndx-adversarial-review"
   - "severity:medium"
 source: "ndx-adversarial-review"
+startedAt: "2026-08-25T20:21:14.059Z"
+completedAt: "2026-08-25T20:28:28.654Z"
+endedAt: "2026-08-25T20:28:28.654Z"
 acceptanceCriteria:
   - "Given a transcript with spend accrued before task A's record, `hench record --task=A --no-tokens` followed by `hench record --task=B` in the same session yields a B record whose tokenUsage does not include that spend"
   - "A unit test in `packages/hench/tests/unit/cli/record.test.ts` pins the chosen semantics with the two-record sequence above — it fails today and passes once fixed"

@@ -134,7 +134,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--status=<status>", description: "Run status: completed (default) | failed | cancelled | ..." },
       { flag: "--summary=<text>", description: "Short description of what was done" },
       { flag: "--turns=<n>", description: "Agent turns (default: the transcript's message count)" },
-      { flag: "--no-tokens", description: "Record without token usage" },
+      { flag: "--no-tokens", description: "Record without token usage (the suppressed spend is discarded — it does not roll into the session's next record)" },
       { flag: "--startedAt=<iso>", description: "When the work began; also the earliest spend this run may claim" },
       { flag: "--since=<iso>", description: "Claim spend from this time only (overrides --startedAt)" },
       { flag: "--session=<id>", description: "Session to read (default: $CLAUDE_CODE_SESSION_ID)" },

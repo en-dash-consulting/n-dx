@@ -243,6 +243,24 @@ describe("hench record", () => {
       expect(run.model).toBe("claude-sonnet-4-6");
     });
 
+    it("burns spend suppressed by --no-tokens instead of deferring it to the next record", async () => {
+      // --no-tokens means "this run claims nothing" — not "hold my spend for
+      // whoever records next". The watermark must advance past the suppressed
+      // messages, exactly as it already does when explicit flags supply the
+      // numbers ("that spend is now accounted for").
+      const transcript = await writeTranscript("t.jsonl", [message("a", 100)]);
+      await cmdRecord(projectDir, { task: "A", transcript, session: "s1", "no-tokens": "true" });
+
+      const grown = await writeTranscript("t2.jsonl", [message("a", 100), message("b", 7)]);
+      await cmdRecord(projectDir, { task: "B", transcript: grown, session: "s1" });
+
+      const runs = await listRuns(henchDir);
+      const byTask = Object.fromEntries(runs.map((r) => [r.taskId, r]));
+      expect(byTask.A.tokenUsage.output).toBe(0);
+      // B claims only its own message — A's suppressed 100 must not roll in.
+      expect(byTask.B.tokenUsage.output).toBe(7);
+    });
+
     it("fails loudly for a named transcript it cannot read", async () => {
       // Silence about a file the caller asked for by name would look like a run
       // that genuinely cost nothing.

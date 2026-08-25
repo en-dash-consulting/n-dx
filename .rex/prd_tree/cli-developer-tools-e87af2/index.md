@@ -21,7 +21,7 @@ endedAt: "2026-08-21T14:12:26.848Z"
 | [Target-Repo README Generation on ndx init](./target-repo-readme-generation-406b4b/index.md) | completed |
 | [`date -Is`, the timestamp example in every recording skill, fails on macOS (BSD date)](./date-is-the-timestamp-example-668662.md) | pending |
 | [Diagnose why the auto-commit step does not fire after MCP-driven PRD mutations in Claude Code skills](./diagnose-why-the-auto-commit-66437f.md) | completed |
-| [`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record](./hench-record-no-tokens-leaves-90e6af.md) | pending |
+| [`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record](./hench-record-no-tokens-leaves-90e6af.md) | completed |
 | [`hench record` with no usage window silently claims the entire session transcript](./hench-record-with-no-usage-f1ada0.md) | completed |
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-f93230.md) | completed |
 | [Skill commit steps prescribe a POSIX-only heredoc, which fails in PowerShell and can drop the attribution trailer](./skill-commit-steps-prescribe-a-bdd329.md) | pending |
