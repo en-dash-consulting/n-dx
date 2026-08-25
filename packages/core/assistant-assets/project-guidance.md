@@ -47,7 +47,7 @@ Within the web package, four internal zones form a hub topology with `web-viewer
 
 | Convention | Pattern | Notes |
 |-----------|---------|-------|
-| Naming | Mixed: `rex`, `sourcevision`, `hench` (unscoped) / `@n-dx/web`, `@n-dx/llm-client` (scoped) | Intentional: CLI tools use short unscoped names for `npx`/`pnpm exec`; internal-only packages use the `@n-dx/` scope |
+| Naming | All packages are `@n-dx/` scoped: `@n-dx/core`, `@n-dx/rex`, `@n-dx/hench`, `@n-dx/sourcevision`, `@n-dx/web`, `@n-dx/llm-client` | Short CLI invocation (`ndx`, `rex`, `hench`, `sv`) comes from `bin` entries, not from unscoped package names. Changesets must use the scoped name — an unscoped name fails `changeset status` with "not in the workspace" |
 | Subpath exports | `"./dist/*": "./dist/*"` | Intentional escape hatch — not public API, no stability guarantee. See `PACKAGE_GUIDELINES.md` for acceptable/prohibited uses |
 
 ## Assistant Instruction Files
@@ -114,6 +114,7 @@ Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files ar
 ## Changeset Versioning
 
 - **Always default changeset bumps to `patch`** across all affected packages unless explicitly instructed otherwise by a user.
+- **Use the scoped package name** (`@n-dx/rex`, `@n-dx/hench`, …) in changeset frontmatter. An unscoped name is not in the workspace and fails `changeset status`, breaking the release pipeline.
 
 ## Key Files
 

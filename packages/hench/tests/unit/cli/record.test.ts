@@ -3,6 +3,22 @@ import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+const { mockResolveActor, mockResolveHost } = vi.hoisted(() => ({
+  mockResolveActor: vi.fn(async () => "Test Actor <test@example.com>"),
+  mockResolveHost: vi.fn(() => "test-host"),
+}));
+
+// cmdRecord resolves actor/host via git config and os.hostname(); stub both
+// so the assertions below don't depend on the machine running the tests.
+vi.mock("../../../src/process/actor-identity.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/process/actor-identity.js")>();
+  return {
+    ...actual,
+    resolveActor: mockResolveActor,
+    resolveHost: mockResolveHost,
+  };
+});
+
 import { cmdRecord } from "../../../src/cli/commands/record.js";
 import { listRuns } from "../../../src/store/runs.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/index.js";
@@ -66,6 +82,8 @@ describe("hench record", () => {
       cacheReadInput: 0,
     });
     expect(run.tokens?.total ?? 0).toBe(0);
+    expect(run.actor).toBe("Test Actor <test@example.com>");
+    expect(run.host).toBe("test-host");
   });
 
   it("defaults status to completed and title to the task id", async () => {

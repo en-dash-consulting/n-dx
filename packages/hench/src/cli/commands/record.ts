@@ -15,6 +15,7 @@ import { HENCH_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { result, info } from "../output.js";
 import type { RunRecord, RunStatus, TokenUsage } from "../../schema/index.js";
+import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 
 const VALID_STATUSES: readonly RunStatus[] = [
   "running",
@@ -114,6 +115,8 @@ export async function cmdRecord(
     model: flags.model || usage.model || config.model,
     invocationContext: "api",
     assisted: true,
+    actor: await resolveActor(dir),
+    host: resolveHost(),
   };
 
   // saveRun derives the normalized `tokens` tuple from `tokenUsage`, so the PRD

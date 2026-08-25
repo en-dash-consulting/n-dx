@@ -816,6 +816,20 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   assisted?: boolean;
+  /**
+   * Actor identity that started this run, e.g. `"Jane Doe <jane@example.com>"`.
+   * Resolved from git `user.name`/`user.email`, falling back to the OS
+   * username, then `"unknown"`. See `process/actor-identity.ts`.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  actor?: string;
+  /**
+   * Host name the run executed on (`os.hostname()`).
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  host?: string;
 }
 
 export interface TaskBriefTask {

@@ -20,7 +20,7 @@ import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, walkTree } from "../core/tree.js";
-import { stampModified } from "../core/sync.js";
+import { stampModified, stampActor } from "../core/sync.js";
 import {
   mapItemsToDocument,
   mapItemToDraft,
@@ -129,7 +129,7 @@ export class GitHubProjectsStore implements PRDStore {
       throw new Error(`Parent "${parentId}" not found`);
     }
 
-    const stamped = stampModified(item);
+    const stamped = await stampModified(item);
     await this.client.createDraftItem(this.projectId, mapItemToDraft(stamped, parentId));
   }
 
@@ -147,7 +147,7 @@ export class GitHubProjectsStore implements PRDStore {
 
     const parentItem = entry.parents.length > 0 ? entry.parents[entry.parents.length - 1] : undefined;
     const merged = { ...entry.item, ...updates } as PRDItem;
-    const stamped = stampModified(merged);
+    const stamped = await stampModified(merged);
     await this.client.updateDraftItem(ref.contentId, mapItemToDraft(stamped, parentItem?.id));
   }
 
@@ -179,13 +179,14 @@ export class GitHubProjectsStore implements PRDStore {
   }
 
   async appendLog(entry: LogEntry): Promise<void> {
-    const result = validateLogEntry(entry);
+    const stamped = await stampActor(entry);
+    const result = validateLogEntry(stamped);
     if (!result.ok) {
       throw new Error(`Invalid log entry: ${result.errors.message}`);
     }
     await appendFile(
       this.path("execution-log.jsonl"),
-      JSON.stringify(entry) + "\n",
+      JSON.stringify(stamped) + "\n",
       "utf-8",
     );
   }
