@@ -42,6 +42,13 @@ export class FolderTreeStore implements PRDStore {
   private rexDir: string;
   private treeRoot: string;
 
+  /**
+   * When this instance last loaded the tree (epoch ms). Passed to the
+   * serializer's stale-save guard: a save may only delete entries no newer
+   * than this. Zero means "never loaded" — such a save may delete nothing.
+   */
+  private loadedAt = 0;
+
   constructor(rexDir: string) {
     this.rexDir = rexDir;
     this.treeRoot = join(rexDir, PRD_TREE_DIRNAME);
@@ -54,6 +61,9 @@ export class FolderTreeStore implements PRDStore {
   // ---- Document CRUD -------------------------------------------------------
 
   async loadDocument(): Promise<PRDDocument> {
+    // Taken before the read starts, so an entry written during or after the
+    // parse registers as newer than the load and the guard flags it.
+    this.loadedAt = Date.now();
     let title = "PRD";
     try {
       const raw = await readFile(this.path("tree-meta.json"), "utf-8");
@@ -73,7 +83,10 @@ export class FolderTreeStore implements PRDStore {
   private async writeTree(doc: PRDDocument): Promise<void> {
     await mkdir(this.treeRoot, { recursive: true });
     await writeFile(this.path("tree-meta.json"), JSON.stringify({ title: doc.title }), "utf-8");
-    await serializeFolderTree(doc.items, this.treeRoot);
+    await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    // A completed save makes this instance's view of the tree current again:
+    // its own writes must not read as "another writer's work" on the next save.
+    this.loadedAt = Date.now();
   }
 
   /**

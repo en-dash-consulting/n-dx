@@ -27,6 +27,12 @@ export const PRD_FILENAME = "prd.json";
 
 export class FileStore implements PRDStore {
   private rexDir: string;
+  /**
+   * When this instance last loaded the tree (epoch ms). Passed to the
+   * serializer's stale-save guard: a save may only delete entries no newer
+   * than this. Zero means "never loaded" — such a save may delete nothing.
+   */
+  private loadedAt = 0;
   private itemToFile: Map<string, string> = new Map();
   private fileMetadata: Map<string, { schema: string; title: string }> = new Map();
   private ownershipLoaded = false;
@@ -261,7 +267,9 @@ export class FileStore implements PRDStore {
         this.path("tree-meta.json"),
         JSON.stringify({ title: doc.title }),
       );
-      await serializeFolderTree(doc.items, this.treeRoot);
+      await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+      // A completed save makes this instance's view current again — see writeFolderTree.
+      this.loadedAt = Date.now();
       this.rebuildOwnershipFromItems(doc);
       return result;
     });
@@ -394,6 +402,9 @@ export class FileStore implements PRDStore {
    * Document title is read from `tree-meta.json` if present; defaults to "PRD".
    */
   async loadDocument(): Promise<PRDDocument> {
+    // Taken before the read starts, so an entry written during or after the
+    // parse registers as newer than the load and the guard flags it.
+    this.loadedAt = Date.now();
     if (!(await this.directoryExists(this.treeRoot))) {
       return this.loadLegacyDocument();
     }
@@ -471,7 +482,10 @@ export class FileStore implements PRDStore {
       this.path("tree-meta.json"),
       JSON.stringify({ title: doc.title }),
     );
-    await serializeFolderTree(doc.items, this.treeRoot);
+    await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    // A completed save makes this instance's view of the tree current again:
+    // its own writes must not read as "another writer's work" on the next save.
+    this.loadedAt = Date.now();
     this.rebuildOwnershipFromItems(doc);
   }
 

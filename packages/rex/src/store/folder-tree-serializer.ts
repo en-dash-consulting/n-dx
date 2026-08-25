@@ -43,6 +43,38 @@ export interface SerializeResult {
   directoriesRemoved: number;
 }
 
+/**
+ * Guard options for the stale-entry cleanup.
+ *
+ * Serialization deletes every on-disk item absent from the in-memory tree, so
+ * a save from a stale snapshot silently destroys items it never loaded. These
+ * options let the caller prove its snapshot's age; without them the serializer
+ * keeps its legacy delete-freely behavior (for migration internals and tests —
+ * production writes go through the stores, which always pass `loadedAt`).
+ */
+export interface SerializeOptions {
+  /**
+   * When the document being saved was loaded from this tree (epoch ms).
+   * A deletion candidate whose on-disk state is newer than this was written
+   * by someone else after the snapshot was taken — the save is stale, and it
+   * fails loudly (naming the items) instead of deleting. Pass `0` for "this
+   * writer never loaded the tree": every deletion is then refused unless
+   * `allowBulkDelete` is set.
+   */
+  loadedAt?: number;
+  /**
+   * Explicit intent to delete without staleness proof — a deliberate
+   * whole-tree rewrite (migration, restore). Skips the guard entirely.
+   */
+  allowBulkDelete?: boolean;
+}
+
+/** One on-disk entry the serializer wants to remove. */
+interface StaleEntry {
+  path: string;
+  isDir: boolean;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -57,6 +89,7 @@ export interface SerializeResult {
 export async function serializeFolderTree(
   items: PRDItem[],
   treeRoot: string,
+  options: SerializeOptions = {},
 ): Promise<SerializeResult> {
   const result: SerializeResult = {
     filesWritten: 0,
@@ -66,9 +99,86 @@ export async function serializeFolderTree(
   };
 
   await ensureDir(treeRoot, result);
-  await writeSiblings(items, treeRoot, result);
+  // Deletions are collected during the walk and applied only after the guard
+  // passes, so a stale save aborts with nothing deleted — file writes are
+  // additive and idempotent, deletions are the destructive part.
+  const staleEntries: StaleEntry[] = [];
+  await writeSiblings(items, treeRoot, result, staleEntries);
+
+  await guardStaleEntries(staleEntries, options);
+
+  for (const entry of staleEntries) {
+    await rm(entry.path, { recursive: entry.isDir, force: true });
+    if (entry.isDir) result.directoriesRemoved++;
+  }
 
   return result;
+}
+
+/**
+ * Refuse deletions a stale snapshot cannot vouch for.
+ *
+ * With `loadedAt`, a candidate whose newest on-disk mtime (recursive — a fresh
+ * child inside an old folder counts) is later than the load was written after
+ * the snapshot was taken; deleting it would destroy another writer's work.
+ * With no options at all the legacy delete-freely behavior is kept.
+ */
+async function guardStaleEntries(staleEntries: StaleEntry[], options: SerializeOptions): Promise<void> {
+  if (staleEntries.length === 0 || options.allowBulkDelete || options.loadedAt === undefined) return;
+
+  // stat().mtimeMs carries fractional milliseconds while Date.now() is an
+  // integer, so a file written in the same millisecond as the load can read
+  // as fractionally "newer" than it. Tolerate that granularity — a write the
+  // load genuinely raced within 2ms is indistinguishable from one it saw.
+  const MTIME_TOLERANCE_MS = 2;
+
+  const violations: string[] = [];
+  for (const entry of staleEntries) {
+    if ((await newestMtime(entry.path)) > options.loadedAt + MTIME_TOLERANCE_MS) {
+      violations.push(await describeEntry(entry));
+    }
+  }
+  if (violations.length === 0) return;
+
+  throw new Error(
+    `Stale-save guard: this save would delete ${violations.length} item${violations.length === 1 ? "" : "s"} ` +
+      `written after the document being saved was loaded — the snapshot is stale, and saving it would ` +
+      `destroy another writer's work:\n` +
+      violations.map((v) => `  - ${v}`).join("\n") +
+      `\nReload the document (or run the mutation inside store.withTransaction) and retry. ` +
+      `A deliberate whole-tree rewrite can pass allowBulkDelete.`,
+  );
+}
+
+/** Newest mtime under `path` (the entry itself and, for directories, everything inside). */
+async function newestMtime(path: string): Promise<number> {
+  let newest = 0;
+  try {
+    const info = await stat(path);
+    newest = info.mtimeMs;
+    if (!info.isDirectory()) return newest;
+    for (const entry of await readdir(path)) {
+      const childNewest = await newestMtime(join(path, entry));
+      if (childNewest > newest) newest = childNewest;
+    }
+  } catch {
+    // Vanished mid-scan — nothing left to protect.
+  }
+  return newest;
+}
+
+/** Human-readable identity for a doomed entry: title and id from its frontmatter, else its path. */
+async function describeEntry(entry: StaleEntry): Promise<string> {
+  const contentFile = entry.isDir ? join(entry.path, "index.md") : entry.path;
+  try {
+    const raw = await readFile(contentFile, "utf8");
+    const title = /^title:\s*"?(.*?)"?\s*$/m.exec(raw)?.[1];
+    const id = /^id:\s*"?([^"\n]+?)"?\s*$/m.exec(raw)?.[1];
+    if (title || id) return `${title ?? "(untitled)"} [${id ?? "?"}] (${entry.path})`;
+  } catch {
+    // No readable frontmatter — the path still identifies it.
+  }
+  return entry.path;
 }
 
 /**
@@ -89,6 +199,7 @@ async function writeSiblings(
   items: PRDItem[],
   parentDir: string,
   result: SerializeResult,
+  staleEntries: StaleEntry[],
 ): Promise<void> {
   const positionalSlugs = resolvePositionalSiblingSlugs(items);
   const folderSlugs = new Set<string>();
@@ -121,10 +232,10 @@ async function writeSiblings(
     await writeIfChanged(itemPath, itemContent, result);
 
     // Recurse into the item's directory; cleanup happens inside writeSiblings.
-    await writeSiblings(children, itemDir, result);
+    await writeSiblings(children, itemDir, result, staleEntries);
   }
 
-  await removeStaleEntries(parentDir, folderSlugs, leafFiles, result);
+  await collectStaleEntries(parentDir, folderSlugs, leafFiles, staleEntries);
 }
 
 /**
@@ -401,22 +512,25 @@ export function emitYamlField(lines: string[], key: string, value: unknown): voi
 // ── Stale-entry cleanup ──────────────────────────────────────────────────────
 
 /**
- * Remove stale subdirectories and stale `.md` files in `dir`.
+ * Collect stale subdirectories and stale `.md` files in `dir`.
  *
- * - Subdirectories whose names are not in `expectedSubdirs` are removed.
- * - Plain `.md` files whose names are not in `expectedFiles` are removed,
+ * - Subdirectories whose names are not in `expectedSubdirs` are stale.
+ * - Plain `.md` files whose names are not in `expectedFiles` are stale,
  *   except `index.md` (the owning folder item's content file is written by
  *   the caller in a separate step).
  * - Dotfiles, dotdirs, and non-md files are left untouched so adjacent
  *   tooling output (caches, lockfiles, hand-managed README files) survives.
  *
- * Increments `directoriesRemoved` for each removed subdirectory.
+ * Nothing is deleted here: the entries are appended to `staleEntries`, and
+ * `serializeFolderTree` deletes them only after the stale-save guard passes —
+ * a save that would destroy another writer's items must abort with nothing
+ * deleted, not part-way through.
  */
-async function removeStaleEntries(
+async function collectStaleEntries(
   dir: string,
   expectedSubdirs: Set<string>,
   expectedFiles: Set<string>,
-  result: SerializeResult,
+  staleEntries: StaleEntry[],
 ): Promise<void> {
   let entries: string[];
   try {
@@ -439,13 +553,12 @@ async function removeStaleEntries(
 
     if (isDir) {
       if (expectedSubdirs.has(entry)) continue;
-      await rm(entryPath, { recursive: true, force: true });
-      result.directoriesRemoved++;
+      staleEntries.push({ path: entryPath, isDir: true });
       continue;
     }
 
     if (entry.endsWith(".md") && !expectedFiles.has(entry)) {
-      await rm(entryPath, { force: true });
+      staleEntries.push({ path: entryPath, isDir: false });
     }
   }
 }
