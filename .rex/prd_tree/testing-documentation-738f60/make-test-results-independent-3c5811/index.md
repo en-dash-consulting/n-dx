@@ -31,6 +31,7 @@ description: "Four verified cases where the suite's result depends on something 
 | [Give add-auto-reshape's scaling gate a min-of-N, and fix its shared-tree confound](./give-add-auto-reshape-s-scaling-5980e3.md) | completed |
 | [Make the tests' sh-on-PATH dependency explicit instead of failing opaquely](./make-the-tests-sh-on-path-be8e19.md) | completed |
 | [Neutralize ambient color env so FORCE_COLOR does not fail 24 tests](./neutralize-ambient-color-env-so-4afde0.md) | completed |
+| [packages/hench/tests/unit/tools/git.test.ts spawns `sh` unguarded, so 7 cases fail from PowerShell](./packages-hench-tests-unit-tools-9a38b7.md) | completed |
 | [Stabilize rex's load-sensitive performance assertions](./stabilize-rex-s-load-sensitive-676af1.md) | completed |
 | [Triage the 39 hench/web failures now that the run no longer hides them](./triage-the-39-hench-web-741bac.md) | completed |
 | [vi.stubEnv in child-lifecycle.test.js leaks NDX_DEBUG_LIFECYCLE into sibling e2e children](./vi-stubenv-in-child-lifecycle-afec81.md) | completed |

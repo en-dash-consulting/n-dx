@@ -40,10 +40,13 @@ PowerShell (no `sh`) and from Git Bash (`sh` at `/usr/bin/sh`), same commit.
 | `packages/llm-client/tests/integration/exec-timeout-tree-kill.test.ts` | scaffolding | 6 of 6 | 4 false failures + **2 false passes** | `describeEachNeedsPosixShell` |
 | `packages/hench/tests/unit/tools/shell.test.ts` | under test | 14 of 34 | 13 false failures + **1 false pass** | `describeNeedsPosixShell` ×4, `itNeedsPosixShell` ×2 |
 | `packages/hench/tests/unit/tools/test-runner.test.ts` | under test | 4 of 58 | 2 false failures + **2 false passes** | `itNeedsPosixShell` ×4 |
+| `packages/hench/tests/unit/tools/git.test.ts` | under test | 7 of 25 | 7 false failures (`expected 'Exit code: 1' to contain 'branch'` etc.) | `itNeedsPosixShell` ×7 |
 
-Totals: 28 guarded cases across 5 files — 21 were failing, 5 were passing
+Totals: 35 guarded cases across 6 files — 28 were failing, 5 were passing
 vacuously, and 2 are the POSIX-only interrupt cases that skip on Windows for a
-separate, already-stated reason.
+separate, already-stated reason. (The `git.test.ts` row was measured 2026-08-25;
+it was missed by the original hand audit, which is why the completeness scan
+below now exists.)
 
 The false passes matter more than the false failures. A case asserting "nothing
 was written after the timeout" is trivially satisfied when nothing ever ran, and
@@ -60,6 +63,8 @@ exercised.
 | `tests/e2e/published-imports-resolved.test.js:60` | `shell: true`, as above |
 | `packages/hench/tests/unit/tools/go-test-runner.test.ts` | Passes from PowerShell — verified, no shell-dependent assertion |
 | `runTestGate` cases in `test-runner.test.ts` | Assert shape only (`typeof passed === "boolean"`, `duration >= 0`), so they neither fail nor pass *because of* the shell. Weak, but not shell-dependent |
+| `packages/hench/tests/integration/test-gate.test.ts` | Same shape-only rationale as the `runTestGate` cases above — asserts result structure, never shell output |
+| 4 cases in `packages/hench/tests/unit/tools/git.test.ts` (`runs git branch`, `properly handles quoted args…`, `handles args with special characters…`, `records git operations in policy audit log`) | Assert shape (`typeof result === "string"`) or guard bookkeeping that happens before the spawn — verified passing from PowerShell without `sh` |
 | Files writing `#!/bin/sh` shims (`cli-auth`, `cli-config`, `cli-stale-check`, `codex-integration`, `assistant-parity-smoke`, `llm-client/tests/helpers/fake-cli.ts`) | Write a script; execution is either POSIX-only (where `/bin/sh` exists by definition) or routed through cmd.exe on Windows |
 | Unit tests asserting `cmd === "sh"` (`llm-client/tests/unit/exec.test.ts:270`, `hench/tests/unit/process/exec.test.ts:124`, `hench/tests/unit/agent/completion.test.ts:320`) | Inspect a fake spawn's arguments; no process is created |
 
@@ -91,4 +96,8 @@ process.
    `stop-orphan-children.test.js`).
 3. Check whether your assertion can pass *without* the shell. If it can, it is a
    false pass waiting to happen — guard it even though it is green today.
-4. Add a row here.
+4. Add a row here. This step is enforced:
+   `tests/e2e/shell-spawn-inventory-policy.test.js` scans every test file for
+   real shell spawns (direct `spawn("sh", …)` or an unmocked import of a
+   shell-backed hench tool module) and fails when a flagged file has no entry
+   in this document.
