@@ -75,7 +75,9 @@
     "git-preflight.js",
     "gitattributes-pins.js",
     "self-heal-confirm.js",
-    "stale-check.js"
+    "stale-check.js",
+    "commit-trailers.js",
+    "resolve-existing-dir.js"
   ],
   "scripts": {
     "build": "echo '@n-dx/core: plain JS, no build needed'"

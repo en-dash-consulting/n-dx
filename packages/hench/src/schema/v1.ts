@@ -800,12 +800,18 @@ export interface RunRecord {
    */
   invocationContext?: "cli" | "api";
   /**
-   * True when the record was written by an assisted execution path (the
-   * `/ndx-work` skill driving the task through Claude Code) rather than by a
-   * spawned hench agent. Assisted runs are auditable in run history but their
-   * `tokenUsage` is empty — Claude Code does not expose its own token usage to
-   * the running skill. Distinguishes a 0-token assisted record from a genuine
-   * hench run so token analytics don't read it as an anomaly.
+   * True when the record was written by an assisted execution path (a skill
+   * driving the work through Claude Code) rather than by a spawned hench agent.
+   *
+   * Assisted runs DO carry token usage: Claude Code does not hand a skill its
+   * counts, but it writes them to the session transcript, which `hench record`
+   * reads (see `store/session-usage.ts`). The flag therefore marks provenance —
+   * assisted vs agent — not the absence of usage. It stays useful for exactly
+   * that: `turns` and `toolCalls` are thin on these records, so analytics that
+   * expect per-turn detail should branch on it.
+   *
+   * A 0-token assisted record is still possible and still valid — no transcript
+   * was found, or `--no-tokens` was passed — and is not an anomaly.
    *
    * v1 additive field — old records without this field load normally.
    */

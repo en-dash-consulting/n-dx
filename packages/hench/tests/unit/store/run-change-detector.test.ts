@@ -264,6 +264,47 @@ describe("RunChangeDetector", () => {
       ]);
     });
 
+    it("treats an unreadable file as no evidence of change, not as a change", async () => {
+      // `hashFile` returns null when the bytes cannot be read, and its docblock
+      // says the caller treats that as "no usable hash" rather than as a change.
+      // The caller did the opposite: the comparison guarded the PREVIOUS hash
+      // against null but not the new one, so a previously-hashed file whose read
+      // now fails compared `"abc" !== null` and was reported modified.
+      //
+      // A null hash is the absence of evidence. The file's mtime and size are
+      // unchanged, so there is nothing to suggest it was rewritten — only that
+      // this scan could not check.
+      const runFile = join(runsDir, "run-a.json");
+      await writeRunFile("run-a.json", '{"id":"aaa"}');
+      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      await utimes(runFile, pinned, pinned);
+
+      const det = detector();
+      const first = await det.detectChanges();
+      await det.saveCheckpoint(first.checkpoint);
+
+      // Precondition: the checkpoint really is carrying a hash, so this exercises
+      // the branch it is meant to. Without it the case could pass vacuously.
+      expect(typeof first.checkpoint.files["run-a.json"]?.contentHash).toBe("string");
+
+      // The read fails while stat still succeeds — a locked file, a permissions
+      // change, an I/O error. Injected because reproducing it from the filesystem
+      // is platform-specific, while the branch under test is not.
+      const failing = det as unknown as { hashFile: (file: string) => Promise<string | null> };
+      const realHashFile = failing.hashFile.bind(failing);
+      failing.hashFile = async () => null;
+
+      const second = await det.detectChanges();
+      expect(second.changes).toEqual([]);
+
+      // And once the file can be read again, with the same bytes, it is still not
+      // a change — the unreadable scan must not have poisoned the checkpoint.
+      failing.hashFile = realHashFile;
+      await det.saveCheckpoint(second.checkpoint);
+      const third = await det.detectChanges();
+      expect(third.changes).toEqual([]);
+    });
+
     it("carries a hash only while the mtime is fresh, then drops it", async () => {
       // The hash exists solely for the window where mtime cannot settle the
       // question. If it were carried forever, every scan would read every run file

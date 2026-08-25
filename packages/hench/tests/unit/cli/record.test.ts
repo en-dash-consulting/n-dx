@@ -53,7 +53,7 @@ describe("hench record", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  it("writes an assisted run record with zero token usage", async () => {
+  it("writes an assisted run record, with zero usage when there is no session", async () => {
     await cmdRecord(projectDir, {
       task: "EPIC.F1.T2",
       title: "Implement login",
@@ -70,9 +70,17 @@ describe("hench record", () => {
     expect(run.summary).toBe("Added auth flow");
     expect(run.assisted).toBe(true);
     expect(run.model).toBe("claude-sonnet-4-6");
-    // Token usage is intentionally empty — Claude Code does not expose its own
-    // usage to the skill, so the record must not fabricate token totals.
-    expect(run.tokenUsage).toEqual({ input: 0, output: 0 });
+    // Zeros because no Claude Code session is visible: tests/setup-session-env.js
+    // clears CLAUDE_CODE_SESSION_ID, which Claude Code otherwise exports to every
+    // tool it runs — including the test runner. Without that, this case picked up
+    // the ambient session's real transcript and asserted against live numbers.
+    // All four fields are present so the shape does not vary with the source.
+    expect(run.tokenUsage).toEqual({
+      input: 0,
+      output: 0,
+      cacheCreationInput: 0,
+      cacheReadInput: 0,
+    });
     expect(run.tokens?.total ?? 0).toBe(0);
     expect(run.actor).toBe("Test Actor <test@example.com>");
     expect(run.host).toBe("test-host");
@@ -108,5 +116,148 @@ describe("hench record", () => {
     await expect(
       cmdRecord(projectDir, { task: "T1", turns: "-3" }),
     ).rejects.toThrow(/turns/i);
+  });
+
+  /**
+   * Usage comes from the session transcript, so assisted runs stop reporting
+   * zeros. Driven through `--transcript` rather than the ambient session: a
+   * fixture is deterministic, and the live transcript grows between assertions.
+   */
+  describe("token usage from a transcript", () => {
+    /** One assistant message, in the shape Claude Code writes. */
+    function message(uuid: string, output: number, cacheRead = 0): string {
+      return JSON.stringify({
+        type: "assistant",
+        uuid,
+        message: {
+          model: "claude-opus-5",
+          usage: {
+            input_tokens: 1,
+            output_tokens: output,
+            cache_creation_input_tokens: 2,
+            cache_read_input_tokens: cacheRead,
+          },
+        },
+      });
+    }
+
+    async function writeTranscript(name: string, lines: string[]): Promise<string> {
+      const path = join(projectDir, name);
+      await writeFile(path, lines.join("\n"), "utf-8");
+      return path;
+    }
+
+    it("records the transcript's usage and takes its model", async () => {
+      const transcript = await writeTranscript("t.jsonl", [
+        message("a", 100, 5000),
+        message("b", 50),
+      ]);
+
+      await cmdRecord(projectDir, { task: "T1", transcript, session: "s1" });
+
+      const [run] = await listRuns(henchDir);
+      expect(run.tokenUsage).toEqual({
+        input: 2,
+        output: 150,
+        cacheCreationInput: 4,
+        cacheReadInput: 5000,
+      });
+      // The model actually used, not the configured default.
+      expect(run.model).toBe("claude-opus-5");
+      // One usage-bearing message is one API call, which is what a turn counts.
+      expect(run.turns).toBe(2);
+      // saveRun derives the rollup tuple, which is what joins to the PRD item.
+      expect(run.tokens?.total).toBe(2 + 150 + 4 + 5000);
+    });
+
+    it("claims only what is new when one session records twice", async () => {
+      // The case this exists for: a single Claude Code session completing several
+      // tasks. Without a watermark both records would claim the whole session.
+      const first = await writeTranscript("t1.jsonl", [message("a", 100)]);
+      await cmdRecord(projectDir, { task: "T1", transcript: first, session: "s1" });
+
+      const second = await writeTranscript("t2.jsonl", [message("a", 100), message("b", 7)]);
+      await cmdRecord(projectDir, { task: "T2", transcript: second, session: "s1" });
+
+      const runs = await listRuns(henchDir);
+      const byTask = Object.fromEntries(runs.map((r) => [r.taskId, r]));
+      expect(byTask.T1.tokenUsage.output).toBe(100);
+      expect(byTask.T2.tokenUsage.output).toBe(7);
+    });
+
+    it("keeps separate watermarks per session", async () => {
+      const transcript = await writeTranscript("t.jsonl", [message("a", 100)]);
+
+      await cmdRecord(projectDir, { task: "T1", transcript, session: "s1" });
+      await cmdRecord(projectDir, { task: "T2", transcript, session: "s2" });
+
+      // A different session has consumed nothing, so it sees the full file.
+      const runs = await listRuns(henchDir);
+      for (const run of runs) expect(run.tokenUsage.output).toBe(100);
+    });
+
+    it("records zero when nothing is new, rather than repeating the last delta", async () => {
+      const transcript = await writeTranscript("t.jsonl", [message("a", 100)]);
+      await cmdRecord(projectDir, { task: "T1", transcript, session: "s1" });
+      await cmdRecord(projectDir, { task: "T2", transcript, session: "s1" });
+
+      const [second] = (await listRuns(henchDir)).filter((r) => r.taskId === "T2");
+      expect(second.tokenUsage.output).toBe(0);
+      expect(second.turns).toBe(0);
+    });
+
+    it("prefers explicit token flags over the transcript", async () => {
+      const transcript = await writeTranscript("t.jsonl", [message("a", 100)]);
+
+      await cmdRecord(projectDir, {
+        task: "T1",
+        transcript,
+        session: "s1",
+        "output-tokens": "42",
+        "input-tokens": "7",
+      });
+
+      const [run] = await listRuns(henchDir);
+      expect(run.tokenUsage.output).toBe(42);
+      expect(run.tokenUsage.input).toBe(7);
+    });
+
+    it("advances the watermark even when flags supplied the numbers", async () => {
+      // Otherwise the next transcript-derived record would claim this spend too.
+      const transcript = await writeTranscript("t.jsonl", [message("a", 100)]);
+      await cmdRecord(projectDir, { task: "T1", transcript, session: "s1", "output-tokens": "42" });
+
+      await cmdRecord(projectDir, { task: "T2", transcript, session: "s1" });
+
+      const [second] = (await listRuns(henchDir)).filter((r) => r.taskId === "T2");
+      expect(second.tokenUsage.output).toBe(0);
+    });
+
+    it("records without usage when --no-tokens is passed", async () => {
+      const transcript = await writeTranscript("t.jsonl", [message("a", 100)]);
+
+      await cmdRecord(projectDir, { task: "T1", transcript, session: "s1", "no-tokens": "true" });
+
+      const [run] = await listRuns(henchDir);
+      expect(run.tokenUsage.output).toBe(0);
+      expect(run.model).toBe("claude-sonnet-4-6");
+    });
+
+    it("fails loudly for a named transcript it cannot read", async () => {
+      // Silence about a file the caller asked for by name would look like a run
+      // that genuinely cost nothing.
+      await expect(
+        cmdRecord(projectDir, { task: "T1", transcript: join(projectDir, "missing.jsonl") }),
+      ).rejects.toThrow(/transcript/i);
+    });
+
+    it("still records when the session has no transcript to find", async () => {
+      // A missing transcript must cost the tokens, never the record.
+      await cmdRecord(projectDir, { task: "T1", session: "no-such-session" });
+
+      const [run] = await listRuns(henchDir);
+      expect(run.taskId).toBe("T1");
+      expect(run.tokenUsage.output).toBe(0);
+    });
   });
 });

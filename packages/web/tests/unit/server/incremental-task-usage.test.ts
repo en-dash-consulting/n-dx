@@ -8,7 +8,7 @@
  * - Edge cases: missing directory, empty runs, malformed files
  * - Stale entry pruning for deleted PRD tasks
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm, unlink, utimes, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -326,6 +326,150 @@ describe("IncrementalTaskUsageAggregator", () => {
       const second = await aggregator.getTaskUsage();
 
       // Results should be identical (served from cache)
+      expect(second).toEqual(first);
+    });
+
+    /**
+     * A quiet poll must still re-evaluate freshness.
+     *
+     * The hash exists only for the window where mtime cannot be trusted, and the
+     * module's contract is that a file is "hashed for the scan or two following
+     * its last write and never again". Delivering that requires re-snapshotting
+     * surviving files on EVERY scan — including scans where nothing changed,
+     * which is the common case. While the re-snapshot ran only after the
+     * short-circuit, a file first seen inside the granularity window kept its
+     * carried hash forever and was re-read on every poll for the life of the
+     * process.
+     *
+     * These reach into private state deliberately. The defect is invisible in
+     * the public result — `getTaskUsage()` returns the same correct numbers
+     * either way — and lives entirely in what the cache retains and re-reads.
+     */
+    function snapshotOf(aggregator: IncrementalTaskUsageAggregator, file: string) {
+      const internals = aggregator as unknown as {
+        fileSnapshots: Map<string, { contentHash: string | null; mtimeMayBeShared: boolean }>;
+      };
+      return internals.fileSnapshots.get(file);
+    }
+
+    /** Long enough that the file's mtime is older than MTIME_GRANULARITY_MS (16ms). */
+    const PAST_GRANULARITY_WINDOW_MS = 80;
+
+    it("drops the carried hash on a quiet poll once the mtime ages out", async () => {
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+      const runFile = join(runsDir, "run-1.json");
+
+      // Whole milliseconds, matching the pinning in the same-size-rewrite test
+      // above: a fresh write leaves a fractional mtimeMs that utimes would round,
+      // and this test needs the mtime to be IDENTICAL across polls so they stay
+      // quiet. A changed mtime would be categorised as modified, which
+      // re-snapshots anyway and would hide the defect.
+      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      await utimes(runFile, pinned, pinned);
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      await aggregator.getTaskUsage();
+
+      // Precondition, not decoration: if the first scan happened more than 16ms
+      // after the write, nothing was ever carried and the rest would pass
+      // vacuously.
+      expect(snapshotOf(aggregator, "run-1.json")?.contentHash).not.toBe(null);
+
+      await new Promise((r) => setTimeout(r, PAST_GRANULARITY_WINDOW_MS));
+
+      // A quiet poll: same mtime, same size, same bytes.
+      await aggregator.getTaskUsage();
+
+      expect(snapshotOf(aggregator, "run-1.json")?.mtimeMayBeShared).toBe(false);
+      expect(snapshotOf(aggregator, "run-1.json")?.contentHash).toBe(null);
+    });
+
+    it("stops re-reading a file whose mtime is old, however many quiet polls follow", async () => {
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+      const runFile = join(runsDir, "run-1.json");
+      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      await utimes(runFile, pinned, pinned);
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      const hashSpy = vi.spyOn(
+        aggregator as unknown as { hashFile: (file: string) => Promise<string | null> },
+        "hashFile",
+      );
+
+      await aggregator.getTaskUsage();
+      expect(hashSpy).toHaveBeenCalled(); // in-window: hashed, as designed
+
+      await new Promise((r) => setTimeout(r, PAST_GRANULARITY_WINDOW_MS));
+      await aggregator.getTaskUsage(); // the one further scan the contract allows
+
+      // From here the file is stat-only forever. Every one of these polls used to
+      // re-hash it — the steady-state cost the whole snapshot design exists to
+      // avoid, paid on every poll for the life of the process.
+      hashSpy.mockClear();
+      await aggregator.getTaskUsage();
+      await aggregator.getTaskUsage();
+      await aggregator.getTaskUsage();
+
+      expect(hashSpy).not.toHaveBeenCalled();
+    });
+
+    it("keeps a file's tokens when its bytes cannot be read", async () => {
+      // `hashFile` returns null when the read fails, and its docblock says the
+      // caller treats that as "no usable hash" rather than as a change. The
+      // caller did the opposite: the comparison guarded the PREVIOUS hash against
+      // null but not the new one, so `"abc" !== null` reported the file modified.
+      //
+      // Here that is worse than a spurious change flag. Being modified means
+      // subtract-then-re-read, and if the re-read fails too the contribution is
+      // simply gone — the file's tokens vanish from the aggregate until something
+      // else touches it. Absence of evidence became a silent deletion.
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+      const runFile = join(runsDir, "run-1.json");
+      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      await utimes(runFile, pinned, pinned);
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      expect((await aggregator.getTaskUsage())["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+
+      // Precondition: a hash really is being carried, so this exercises the
+      // branch it is meant to rather than passing vacuously.
+      expect(snapshotOf(aggregator, "run-1.json")?.contentHash).not.toBe(null);
+
+      // Read fails while stat still succeeds: a locked file, a permissions change,
+      // an I/O error. Injected because reproducing it from the filesystem is
+      // platform-specific while the branch under test is not.
+      const internals = aggregator as unknown as {
+        hashFile: (file: string) => Promise<string | null>;
+        readFileContribution: (file: string) => Promise<unknown>;
+      };
+      internals.hashFile = async () => null;
+      const readSpy = vi.spyOn(internals, "readFileContribution");
+
+      const usage = await aggregator.getTaskUsage();
+
+      // The tokens are still there, and no re-read was attempted at all.
+      expect(usage["task-a"]).toEqual({ totalTokens: 150, runCount: 1 });
+      expect(readSpy).not.toHaveBeenCalled();
+    });
+
+    it("still skips the subtract/re-read work when nothing changed", async () => {
+      await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
+
+      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+      const first = await aggregator.getTaskUsage();
+
+      const readSpy = vi.spyOn(
+        aggregator as unknown as { readFileContribution: (file: string) => Promise<unknown> },
+        "readFileContribution",
+      );
+
+      const second = await aggregator.getTaskUsage();
+
+      // Re-snapshotting earlier must not turn a quiet poll into a re-read: the
+      // short-circuit still has to stand between the scan and the contribution
+      // work. Moving the loop up is a fix for what the cache RETAINS, not a
+      // licence to redo the aggregation.
+      expect(readSpy).not.toHaveBeenCalled();
       expect(second).toEqual(first);
     });
   });

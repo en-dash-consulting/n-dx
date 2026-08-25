@@ -250,11 +250,25 @@ export class IncrementalTaskUsageAggregator {
         added.push(file);
       } else if (prev.mtimeMs !== snapshot.mtimeMs || prev.size !== snapshot.size) {
         modified.push(file);
-      } else if (prev.contentHash !== null && prev.contentHash !== snapshot.contentHash) {
+      } else if (
+        prev.contentHash !== null &&
+        snapshot.contentHash !== null &&
+        prev.contentHash !== snapshot.contentHash
+      ) {
         // Same mtime and size, different bytes: the rewrite landed inside one
         // timestamp tick at the same length. Only reachable while the previous
         // snapshot was within the granularity window, which is the only time a
         // hash is carried.
+        //
+        // BOTH hashes have to be usable for a difference to mean anything. A null
+        // on the new side is a failed read, not a changed file — and this guard
+        // used to cover only the previous side, so `"abc" !== null` reported the
+        // file modified. That is the expensive direction to get wrong: modified
+        // means subtract-then-re-read, and when the re-read failed too the
+        // contribution was dropped outright, so a momentarily unreadable file
+        // silently lost its tokens from the aggregate until something else
+        // touched it. mtime and size agree here, so nothing suggests a rewrite —
+        // only that this scan could not check.
         modified.push(file);
       }
     }
@@ -265,7 +279,32 @@ export class IncrementalTaskUsageAggregator {
       }
     }
 
-    // Short-circuit: no changes after initial scan
+    // Re-snapshot EVERY surviving file, not just the ones that changed. An
+    // unchanged file still needs its freshness re-evaluated: once its mtime ages
+    // past the granularity window the hash is dropped and it returns to the
+    // stat-only path. Keeping the old snapshot would pin it as forever-fresh and
+    // hash it on every scan.
+    //
+    // Placement is the whole point, and it is bounded on both sides. It must come
+    // AFTER categorisation, which compares the new snapshots against the previous
+    // ones — overwriting them first would compare each file with itself and no
+    // change would ever be detected. And it must come BEFORE the short-circuit
+    // below, because the scans it needs to run on are precisely the quiet ones.
+    // It sat after that early return, so on the common path it never ran: a file
+    // first observed inside the window kept its hash for the life of the process
+    // and was re-read on every poll, which is the steady-state cost this design
+    // exists to avoid.
+    for (const [file, snapshot] of currentFiles) {
+      this.fileSnapshots.set(file, {
+        ...snapshot,
+        contentHash: snapshot.mtimeMayBeShared ? snapshot.contentHash : null,
+      });
+    }
+
+    // Short-circuit: no changes after initial scan. Below this line is only the
+    // contribution work — subtract, re-read, re-add — which a quiet poll must
+    // still skip. Re-snapshotting above is about what the cache RETAINS; it does
+    // not make a quiet poll redo the aggregation.
     if (this.initialized && added.length === 0 && modified.length === 0 && deleted.length === 0) {
       return;
     }
@@ -291,18 +330,6 @@ export class IncrementalTaskUsageAggregator {
       if (contribution) {
         this.applyContribution(file, contribution);
       }
-    }
-
-    // Re-snapshot EVERY surviving file, not just the ones that changed. An
-    // unchanged file still needs its freshness re-evaluated: once its mtime ages
-    // past the granularity window the hash is dropped and it returns to the
-    // stat-only path. Keeping the old snapshot would pin it as forever-fresh and
-    // hash it on every scan.
-    for (const [file, snapshot] of currentFiles) {
-      this.fileSnapshots.set(file, {
-        ...snapshot,
-        contentHash: snapshot.mtimeMayBeShared ? snapshot.contentHash : null,
-      });
     }
 
     this.initialized = true;
@@ -341,8 +368,13 @@ export class IncrementalTaskUsageAggregator {
   /**
    * Digest a run file's raw bytes. Gzipped files are hashed compressed — the
    * question is only "did these bytes change", so there is no reason to inflate.
-   * Returns null when the file cannot be read, which the caller treats as
-   * "no usable hash" rather than as a change.
+   *
+   * Returns null when the file cannot be read, which the caller treats as "no
+   * usable hash" rather than as a change — see the comparison in `refresh`, which
+   * requires both sides to be non-null before a difference counts. That was once
+   * only a claim this docblock made and the caller contradicted; it is now
+   * enforced there and covered by "keeps a file's tokens when its bytes cannot be
+   * read".
    */
   private async hashFile(file: string): Promise<string | null> {
     try {

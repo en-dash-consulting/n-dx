@@ -85,6 +85,7 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 | `.rex/prd.json` | (Legacy) JSON PRD; migration source when neither `prd.md` nor the tree exists. |
 | `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
 | `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
+| `.hench/usage-cursors/` | Per-session watermarks recording how far through a Claude Code transcript `hench record` has already attributed tokens (machine-local; safe to delete) |
 | `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model) |
 | `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
 | `tests/e2e/domain-isolation.test.js` | Gateway enforcement, domain layer isolation, foundation tier boundary |
@@ -123,6 +124,7 @@ The following skills are installed in `.agents/skills/`. Each skill directory co
 - **ndx-config** `[key] [value]` — View or change n-dx configuration with guided assistance
 - **ndx-reshape** — Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps, create new containers
 - **ndx-feedback** `[description]` — Submit feedback, bug reports, or feature requests for n-dx
+- **ndx-adversarial-review** `[task-id | name | topic]` — Attack a change or a completion claim, triage what breaks, and capture only what the user approves
 
 ## MCP Servers
 
