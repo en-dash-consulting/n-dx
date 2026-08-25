@@ -22,7 +22,7 @@ endedAt: "2026-08-21T14:12:26.848Z"
 | [`date -Is`, the timestamp example in every recording skill, fails on macOS (BSD date)](./date-is-the-timestamp-example-668662.md) | pending |
 | [Diagnose why the auto-commit step does not fire after MCP-driven PRD mutations in Claude Code skills](./diagnose-why-the-auto-commit-66437f.md) | completed |
 | [`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record](./hench-record-no-tokens-leaves-90e6af.md) | pending |
-| [`hench record` with no usage window silently claims the entire session transcript](./hench-record-with-no-usage-f1ada0.md) | pending |
+| [`hench record` with no usage window silently claims the entire session transcript](./hench-record-with-no-usage-f1ada0.md) | completed |
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-f93230.md) | completed |
 | [Skill commit steps prescribe a POSIX-only heredoc, which fails in PowerShell and can drop the attribution trailer](./skill-commit-steps-prescribe-a-bdd329.md) | pending |
 | [Skills that call add_item describe item content in prose instead of naming its parameters](./skills-that-call-add-item-08c198.md) | completed |

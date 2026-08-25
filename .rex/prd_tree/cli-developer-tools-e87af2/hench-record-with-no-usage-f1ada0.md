@@ -2,7 +2,7 @@
 id: "f1ada08d-b9e6-4f4e-b71f-407cf344cbfe"
 level: "task"
 title: "`hench record` with no usage window silently claims the entire session transcript"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "hench"
@@ -11,6 +11,9 @@ tags:
   - "ndx-adversarial-review"
   - "severity:high"
 source: "ndx-adversarial-review"
+startedAt: "2026-08-25T19:20:28.508Z"
+completedAt: "2026-08-25T19:27:30.156Z"
+endedAt: "2026-08-25T19:27:30.156Z"
 acceptanceCriteria:
   - "`hench record --task=X` run as the first record in a session with no `--startedAt` and no `--since` emits a warning naming the message count it is about to claim and pointing at `--startedAt`, before the record is written"
   - "`hench record --task=X --startedAt=<unparseable>` fails with a CLIError naming the flag, the same way `--turns=abc` already does, rather than silently discarding the window"

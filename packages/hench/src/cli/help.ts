@@ -122,7 +122,12 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "\n" +
       "Precedence: explicit --*-tokens flags, then the transcript, then zeros.\n" +
       "A missing transcript never fails the record — an unrecorded run is worse\n" +
-      "than one missing its tokens.",
+      "than one missing its tokens.\n" +
+      "\n" +
+      "With no --startedAt/--since, the FIRST record for a session claims every\n" +
+      "usage-bearing message in the transcript (a warning says how many) — pass\n" +
+      "--startedAt so the record claims only spend from when the work began.\n" +
+      "An unparseable --startedAt/--since value is an error, not a silent no-op.",
     options: [
       { flag: "--task=<id>", description: "Rex task ID the work addressed (required)" },
       { flag: "--title=<title>", description: "Task title (defaults to the task ID)" },
@@ -142,7 +147,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--format=json", description: "Output the new run ID and usage as JSON" },
     ],
     examples: [
-      { command: "hench record --task=abc123 --status=completed", description: "Record a completed assisted run, with usage from this session" },
+      { command: "hench record --task=abc123 --status=completed --startedAt=2026-08-25T18:30:00Z", description: "Record a completed assisted run, claiming usage from when the work began" },
+      { command: "hench record --task=abc123 --status=completed", description: "Without --startedAt: a first record claims the whole session's usage (warned)" },
       { command: "hench record --task=abc123 --title=\"Add auth\" --summary=\"Implemented login\"", description: "Record with title and summary" },
       { command: "hench record --task=abc123 --no-tokens", description: "Record without attributing any token usage" },
     ],

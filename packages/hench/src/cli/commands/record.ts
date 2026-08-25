@@ -13,7 +13,7 @@ import {
 } from "../../store/session-usage.js";
 import { HENCH_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
-import { result, info } from "../output.js";
+import { result, info, warn } from "../output.js";
 import type { RunRecord, RunStatus, TokenUsage } from "../../schema/index.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 
@@ -90,6 +90,12 @@ export async function cmdRecord(
       `Must be one of: ${VALID_STATUSES.join(", ")}`,
     );
   }
+
+  // Validate the usage window up front: an unparseable value used to be
+  // silently discarded, which made `--startedAt=25/08/2026` claim the whole
+  // session transcript — the exact spend the flag exists to fence off.
+  parseWindow(flags.startedAt, "--startedAt");
+  parseWindow(flags.since, "--since");
 
   const explicitTurns = parseCount(flags.turns, "--turns");
   const explicitUsage = readExplicitUsage(flags);
@@ -208,7 +214,20 @@ async function resolveUsage(
   // time cannot also claim what was spent before then. It matters for the FIRST
   // record in a session, which has no watermark and would otherwise claim
   // everything the session had spent before the work began.
-  const delta = readUsageDelta(transcript.text, cursor, flags.since || flags.startedAt);
+  const window = flags.since || flags.startedAt;
+  const delta = readUsageDelta(transcript.text, cursor, window);
+
+  // A record with no window and no watermark claims every usage-bearing
+  // message the transcript holds — legitimate when the whole session really
+  // was this task, wildly wrong otherwise. Say so before it is written.
+  const hasWatermark = Boolean(cursor.lastUuid) || cursor.consumed > 0;
+  if (!explicitUsage && !window && !hasWatermark && delta.messages > 0) {
+    warn(
+      `Warning: no --startedAt/--since and no prior record for this session — ` +
+        `claiming all ${delta.messages} usage-bearing message${delta.messages === 1 ? "" : "s"} in the transcript. ` +
+        `Pass --startedAt=<when the work began> to claim only this task's spend.`,
+    );
+  }
 
   if (sessionId) await saveUsageCursor(henchDir, sessionId, delta.cursor);
 
@@ -289,6 +308,26 @@ function readExplicitUsage(flags: Record<string, string>): Required<TokenUsage> 
   }
 
   return any ? usage : null;
+}
+
+/**
+ * Validate a usage-window timestamp flag, or pass when absent.
+ *
+ * `readUsageDelta` deliberately tolerates an unparseable window (dropping the
+ * filter is safer than dropping spend once the value is in flight), so the
+ * rejection has to happen here — the same layer that already rejects
+ * `--turns=abc` — before a malformed flag silently widens the claim to the
+ * whole session.
+ */
+function parseWindow(raw: string | undefined, flagName: string): void {
+  if (raw === undefined) return;
+  if (Number.isNaN(Date.parse(raw))) {
+    throw new CLIError(
+      `Invalid ${flagName} value: "${raw}"`,
+      "Must be a timestamp Date.parse accepts — ISO-8601 recommended (e.g. 2026-08-25T18:30:51Z). " +
+        "Locale-formatted dates like 25/08/2026 are not parseable.",
+    );
+  }
 }
 
 /** Parse a non-negative integer flag, or undefined when absent. */

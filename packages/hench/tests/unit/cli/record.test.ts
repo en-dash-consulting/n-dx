@@ -260,4 +260,67 @@ describe("hench record", () => {
       expect(run.tokenUsage.output).toBe(0);
     });
   });
+
+  /**
+   * The usage window is what stops one record from claiming a whole session.
+   * A malformed window must be an error (like --turns already is), and a
+   * genuinely windowless first record must say what it is about to claim —
+   * silence here once attributed 549 messages and 127M cache-read tokens,
+   * four earlier tasks' spend included, to a single PRD item.
+   */
+  describe("usage window validation", () => {
+    function message(uuid: string, output: number): string {
+      return JSON.stringify({
+        type: "assistant",
+        uuid,
+        message: {
+          model: "claude-opus-5",
+          usage: { input_tokens: 1, output_tokens: output },
+        },
+      });
+    }
+
+    it("rejects an unparseable --startedAt instead of silently claiming everything", async () => {
+      // A locale-formatted date — exactly what a non-US `Get-Date` produces.
+      await expect(
+        cmdRecord(projectDir, { task: "T1", startedAt: "25/08/2026" }),
+      ).rejects.toThrow(/--startedAt/);
+    });
+
+    it("rejects an unparseable --since the same way", async () => {
+      await expect(
+        cmdRecord(projectDir, { task: "T1", since: "not-a-time" }),
+      ).rejects.toThrow(/--since/);
+    });
+
+    it("warns before a windowless first record claims a whole transcript", async () => {
+      const transcript = join(projectDir, "windowless.jsonl");
+      await writeFile(transcript, [message("a", 100), message("b", 50), message("c", 7)].join("\n"), "utf-8");
+
+      await cmdRecord(projectDir, { task: "T1", transcript, session: "s-warn" });
+
+      // The record is still written — the warning informs, it does not block.
+      const [run] = await listRuns(henchDir);
+      expect(run.tokenUsage.output).toBe(157);
+
+      const warned = vi.mocked(console.error).mock.calls.flat().join("\n");
+      expect(warned).toMatch(/3 usage-bearing messages/);
+      expect(warned).toMatch(/--startedAt/);
+    });
+
+    it("does not warn when a window was given", async () => {
+      const transcript = join(projectDir, "windowed.jsonl");
+      await writeFile(transcript, [message("a", 100), message("b", 50)].join("\n"), "utf-8");
+
+      await cmdRecord(projectDir, {
+        task: "T1",
+        transcript,
+        session: "s-windowed",
+        startedAt: "2026-08-25T00:00:00Z",
+      });
+
+      const warned = vi.mocked(console.error).mock.calls.flat().join("\n");
+      expect(warned).not.toMatch(/usage-bearing messages/);
+    });
+  });
 });
