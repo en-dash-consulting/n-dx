@@ -372,6 +372,9 @@ export interface BodyMergeResult {
 /**
  * Use LLM to generate a merged description for a group of hash-suffix duplicate items.
  * Returns a generic description that covers the combined scope of all items.
+ *
+ * Mechanical single-shot call: when no explicit model is given, routes to the
+ * vendor's light-tier model (e.g. haiku) instead of the standard tier.
  */
 export async function reasonForBodyMerge(
   group: PRDItem[],
@@ -397,7 +400,7 @@ export async function reasonForBodyMerge(
     itemSummary,
   ].join("\n");
 
-  const llmResult = await spawnClaude(prompt, model);
+  const llmResult = await spawnClaude(prompt, model, undefined, "light");
   accumulateTokenUsage(tokenUsage, llmResult.tokenUsage);
 
   return {

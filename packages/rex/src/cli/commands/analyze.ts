@@ -626,8 +626,12 @@ async function postProcessProposals(
 
   const loeConfig = await loadLoEConfig(dir, noLlm);
 
-  // Consolidation guard: reduce over-granular LLM output
-  const guardSpin = startSpinner("Checking proposal granularity…");
+  // Consolidation guard: reduce over-granular LLM output.
+  // The guard is a mechanical single-shot pass — it runs on the light tier
+  // unless a model was explicitly provided (--model / rex config).
+  const guardSpin = startSpinner(
+    model ? "Checking proposal granularity…" : "Checking proposal granularity (light tier)…",
+  );
   const guardResult = await applyConsolidationGuard(proposals, loeConfig, model);
   guardSpin.stop();
   if (guardResult.triggered) {
@@ -885,6 +889,9 @@ async function handleAcceptance(
     const assessmentHandler = async (
       targetProposals: Proposal[],
     ): Promise<{ assessments: import("./chunked-review.js").ProposalAssessment[]; formatted: string }> => {
+      // Granularity assessment is a mechanical single-shot pass — it runs
+      // on the light tier unless a model was explicitly provided.
+      if (!model) info("Assessing granularity (light tier)…");
       const r = await assessGranularity(targetProposals, model);
       return {
         assessments: r.assessments,

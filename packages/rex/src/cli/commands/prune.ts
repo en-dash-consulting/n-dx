@@ -157,18 +157,21 @@ export async function cmdPrune(
         const claudeConfig = await loadClaudeConfig(rexDir);
         setClaudeConfig(claudeConfig);
 
-        // Resolve model: explicit flag > vendor config > default
-        const resolvedModel = resolveConfiguredModel(flags.model);
+        // Resolve model: explicit flag > light-tier resolution (consolidation
+        // is a mechanical single-shot pass, so it runs on the light tier;
+        // only lightModel config or --model overrides it).
+        const resolvedModel = resolveConfiguredModel(flags.model, "light");
         const dryRunVendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
         const dryRunModelSource = flags.model
           ? "cli-override" as const
-          : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
+          : llmConfig.claude?.lightModel || llmConfig.codex?.lightModel || llmConfig.google?.lightModel
             ? "configured" as const
             : "default" as const;
         printVendorModelHeader(dryRunVendor, llmConfig, {
           format: flags.format,
           resolvedModel,
           modelSource: dryRunModelSource,
+          tier: "light",
         });
 
         // Pre-flight budget check
@@ -382,18 +385,21 @@ async function consolidateAfterPrune(
     const claudeConfig = await loadClaudeConfig(rexDir);
     setClaudeConfig(claudeConfig);
 
-    // Resolve model: explicit flag > vendor config > default
-    const resolvedModel = resolveConfiguredModel(flags.model);
+    // Resolve model: explicit flag > light-tier resolution (post-prune
+    // consolidation is a mechanical single-shot pass, so it runs on the
+    // light tier; only lightModel config or --model overrides it).
+    const resolvedModel = resolveConfiguredModel(flags.model, "light");
     const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
     const modelSource = flags.model
       ? "cli-override" as const
-      : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
+      : llmConfig.claude?.lightModel || llmConfig.codex?.lightModel || llmConfig.google?.lightModel
         ? "configured" as const
         : "default" as const;
     printVendorModelHeader(vendor, llmConfig, {
       format: flags.format,
       resolvedModel,
       modelSource,
+      tier: "light",
     });
 
     // Pre-flight budget check
