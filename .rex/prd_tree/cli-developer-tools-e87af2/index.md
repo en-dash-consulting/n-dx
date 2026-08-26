@@ -12,6 +12,7 @@ endedAt: "2026-08-21T14:12:26.848Z"
 
 | Title | Status |
 |-------|--------|
+| [Adversarial review pass for ndx work (--review)](./adversarial-review-pass-for-ndx-6eb227/index.md) | pending |
 | [Auto-Commit on Completion for File-Modifying Claude Code Skills](./auto-commit-on-completion-for-efac37/index.md) | completed |
 | [Git Repository Detection and Init Prompt in ndx init](./git-repository-detection-and-ba9504/index.md) | completed |
 | [/ndx-adversarial-review skill hardening](./ndx-adversarial-review-skill-hardening/index.md) | completed |
