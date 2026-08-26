@@ -36,7 +36,7 @@ PowerShell (no `sh`) and from Git Bash (`sh` at `/usr/bin/sh`), same commit.
 | Site | Kind | Cases needing `sh` | Before | Guard |
 |------|------|-----|--------|-------|
 | `tests/e2e/stop-orphan-children.test.js` | scaffolding | 1 of 2 | 1 false failure (`expected false to be true` after a 5s wait) | `itNeedsPosixShell` + spawn error surfaced |
-| `tests/integration/exec-interrupt-forwarding.test.js` | scaffolding | 3 of 3 | 1 false failure, 10s burn | `describeNeedsPosixShell` |
+| `tests/integration/exec-interrupt-forwarding.test.js` | scaffolding | 2 of 3 | 1 false failure, 10s burn | `describeNeedsPosixShell` (the listener-registration case spawns node directly and runs ungated on every host) |
 | `packages/llm-client/tests/integration/exec-timeout-tree-kill.test.ts` | scaffolding | 6 of 6 | 4 false failures + **2 false passes** | `describeEachNeedsPosixShell` |
 | `packages/hench/tests/unit/tools/shell.test.ts` | under test | 14 of 34 | 13 false failures + **1 false pass** | `describeNeedsPosixShell` ×4, `itNeedsPosixShell` ×2 |
 | `packages/hench/tests/unit/tools/test-runner.test.ts` | under test | 4 of 58 | 2 false failures + **2 false passes** | `itNeedsPosixShell` ×4 |
