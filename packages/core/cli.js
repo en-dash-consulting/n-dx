@@ -40,7 +40,7 @@ import { createRequire } from "module";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv } from "./config.js";
+import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv, isConfigKey } from "./config.js";
 import {
   parseRecommendationsJson,
   formatQueuedTaskSummary,
@@ -2798,8 +2798,12 @@ async function main() {
   // positional is a config key rather than a directory. This dir only says
   // where to LOOK — it is never an operation target — so requiring the
   // positional to be a real directory is safe here and wrong for the handler
-  // call sites.
-  const dir = resolveExistingDir(rest);
+  // call sites. For `config`, a positional that names a known config key is
+  // never a directory even when one of that name exists on disk — the same
+  // key-beats-directory tiebreaker the config handler itself applies
+  // (isConfigKey); disagreeing here made `ndx config hench` read config from
+  // ./hench and report an initialized project as stale.
+  const dir = resolveExistingDir(rest, undefined, command === "config" ? { skip: isConfigKey } : undefined);
   const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
   const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
 
