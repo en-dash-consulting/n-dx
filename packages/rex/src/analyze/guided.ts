@@ -180,6 +180,10 @@ export async function runGuidedSpec(
   model?: string,
 ): Promise<ReasonResult> {
   const effectiveModel = resolveConfiguredModel(model);
+  // Clarify rounds are mechanical single-shot calls (question generation) —
+  // route them to the light tier. Spec synthesis stays on the standard model.
+  // An explicit --model flag overrides both.
+  const clarifyModel = resolveConfiguredModel(model, "light");
   const tokenUsage = emptyAnalyzeTokenUsage();
 
   info("Guided spec builder — let's define your project.\n");
@@ -199,7 +203,7 @@ export async function runGuidedSpec(
   // Clarification loop
   for (let round = 0; round < MAX_CLARIFY_ROUNDS; round++) {
     info("\nAnalyzing your project...");
-    const response = await clarify(context, projectContext, effectiveModel);
+    const response = await clarify(context, projectContext, clarifyModel);
 
     if (response.status === "ready") {
       if (response.summary) {

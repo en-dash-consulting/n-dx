@@ -110,6 +110,9 @@ async function _cmdReshapeCore(
 
   // Resolve model: explicit flag > vendor config > default
   const resolvedModel = resolveConfiguredModel(flags.model);
+  // Mechanical single-shot sub-passes (body merges, group renames) run on the
+  // vendor's light tier. An explicit --model flag still overrides everything.
+  const lightModel = resolveConfiguredModel(flags.model, "light");
   const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
   const modelSource = flags.model
     ? "cli-override" as const
@@ -232,6 +235,17 @@ async function _cmdReshapeCore(
 
   // LLM body merge: for each accepted hash-suffix MergeAction, generate a merged description
   const { findItem: findItemInTree, updateInTree } = await import("../../core/tree.js");
+  // Surface the tier for the mechanical sub-passes (mirrors the vendor header's
+  // "(light tier)" annotation) — only when they will actually run and the
+  // model was not explicitly overridden.
+  const hasLightSubPasses = reshapeResult.applied.some(
+    (p) =>
+      (p.action.action === "merge" && (p.action as MergeAction).reason === "hash-suffix-duplicate-sibling") ||
+      p.action.action === "group",
+  );
+  if (hasLightSubPasses && !flags.model) {
+    info(`  [hash-suffix] merge/rename sub-passes use model: ${lightModel} (light tier)`);
+  }
   for (const proposal of reshapeResult.applied) {
     if (
       proposal.action.action === "merge" &&
@@ -246,7 +260,7 @@ async function _cmdReshapeCore(
       if (survivorEntry && loserItems.length > 0) {
         const group = [survivorEntry.item, ...loserItems];
         try {
-          const bodyMerge = await reasonForBodyMerge(group, resolvedModel);
+          const bodyMerge = await reasonForBodyMerge(group, lightModel);
           updateInTree(docAfterCompaction.items, mergeAction.survivorId, {
             description: bodyMerge.description,
           });
@@ -280,7 +294,7 @@ async function _cmdReshapeCore(
       };
 
       try {
-        const renameProposal = await proposeGroupRenames(consolidationGroup, resolvedModel);
+        const renameProposal = await proposeGroupRenames(consolidationGroup, lightModel);
         for (const rename of renameProposal.renames) {
           updateInTree(docAfterCompaction.items, rename.id, { title: rename.newTitle });
         }

@@ -87,9 +87,12 @@ Respond with JSON only (no markdown wrapper, no prose):
 /**
  * Invoke the LLM to propose distinct titles for two siblings that share a title.
  *
+ * Mechanical single-shot call: when no explicit model is given, resolves the
+ * vendor's light-tier model (e.g. haiku) instead of the standard tier.
+ *
  * @param itemA - First colliding sibling.
  * @param itemB - Second colliding sibling.
- * @param model - Optional model override (falls back to configured default).
+ * @param model - Optional model override (falls back to the light-tier model).
  * @returns A rename proposal with new titles and reasoning.
  * @throws {Error} If the LLM call fails, the response is unparseable, or the
  *   proposed titles still collide with each other.
@@ -100,7 +103,7 @@ export async function proposeSiblingRenames(
   model?: string,
 ): Promise<SiblingRenameProposal> {
   const prompt = buildRenamePrompt(itemA, itemB);
-  const resolvedModel = resolveConfiguredModel(model);
+  const resolvedModel = resolveConfiguredModel(model, "light");
 
   const llmResult = await spawnClaude(prompt, resolvedModel);
   const jsonText = extractJson(llmResult.text);
