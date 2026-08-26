@@ -90,8 +90,27 @@ export interface SharedLoopOptions {
   taskId?: string;
   dryRun?: boolean;
   model?: string;
-  /** Show diff and prompt for approval before finalizing. */
-  review?: boolean;
+  /**
+   * Show the diff and prompt for approval before finalizing (`--approve-diff`).
+   *
+   * Renamed from `review` when `--review` was reassigned to the adversarial
+   * review pass. The two are independent and may both be set: the review pass
+   * runs first (so its fixes are part of what the human sees), then the diff
+   * gate asks whether to keep the result.
+   */
+  approveDiff?: boolean;
+  /**
+   * Run the adversarial review pass after the task's changes validate and
+   * before the commit prompt (`--review`). See
+   * `agent/analysis/adversarial-review.ts`.
+   */
+  reviewPass?: boolean;
+  /**
+   * Model the review pass runs on (`--review-model`). When unset, resolved
+   * from `llm.<vendor>.reviewModel`, `llm.reviewModel`, then the vendor's
+   * recommended default in `REVIEW_MODELS`.
+   */
+  reviewModel?: string;
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
   excludeTaskIds?: Set<string>;
   /** Restrict task selection to this epic (ID). */

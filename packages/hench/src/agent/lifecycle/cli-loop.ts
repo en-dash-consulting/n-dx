@@ -31,6 +31,17 @@ import { startHeartbeat } from "./heartbeat.js";
 import { section, subsection, stream, info, withHeartbeat } from "../../types/output.js";
 import { isSpinningRun } from "../analysis/spin.js";
 import {
+  buildReviewSystemPrompt,
+  buildReviewBrief,
+  readReviewReport,
+  reviewReportPath,
+  formatReviewSummary,
+  unresolvedFindings,
+} from "../analysis/adversarial-review.js";
+import type { ReviewPassOutcome } from "../analysis/adversarial-review.js";
+import { mkdir, rm } from "node:fs/promises";
+import { dirname } from "node:path";
+import {
   loadLLMConfig,
   type LLMVendor,
   resolveLLMVendor,
@@ -38,7 +49,7 @@ import {
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
-import { LLM_VENDOR, resolveVendorModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveVendorModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -133,6 +144,20 @@ interface SpawnResult {
    * back into the brief, or aborts the run with status "cancelled".
    */
   planModeIntercept?: { planText: string };
+  /**
+   * Vendor session identifier reported by the CLI, when it reports one.
+   *
+   * Claude's `--output-format stream-json` stamps `session_id` on every line,
+   * starting with the `system`/`init` event, so this is populated as soon as
+   * the process emits anything. The adversarial review pass uses it to
+   * re-enter the same conversation via `--resume`, giving the reviewer the
+   * implementation context instead of only the diff.
+   *
+   * Undefined for vendors whose CLI does not report a session id, and for a
+   * spawn that died before producing output — both cases fall back to a fresh
+   * review session.
+   */
+  sessionId?: string;
 }
 
 interface SpawnTokenMetadata {
@@ -850,6 +875,20 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
 
     // ── Line processing helper ──────────────────────────────────────────
 
+    /**
+     * Record the vendor session id the first time a line carries one.
+     *
+     * Only the first value is kept: a single spawn is a single session, and
+     * ignoring later lines means a malformed or adversarial payload late in
+     * the stream cannot redirect a subsequent `--resume` at another session.
+     */
+    function captureSessionId(rawJson: unknown): void {
+      if (result.sessionId) return;
+      if (!rawJson || typeof rawJson !== "object") return;
+      const id = (rawJson as Record<string, unknown>).session_id;
+      if (typeof id === "string" && id) result.sessionId = id;
+    }
+
     function processLine(line: string): void {
       // Step 1: Parse the line through the adapter for event classification
       const event = adapter.parseEvent(line, turnCounter.value + 1, {});
@@ -885,6 +924,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         if (line.trim()) {
           try {
             const rawJson = JSON.parse(line);
+            captureSessionId(rawJson);
             const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata);
             if (tokenEvent) accumulator.push(tokenEvent);
 
@@ -928,6 +968,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         if (line.trim()) {
           try {
             const rawJson = JSON.parse(line);
+            captureSessionId(rawJson);
             extractTokenUsage(rawJson, result, turnCounter, tokenMetadata);
 
             // Extract completion metadata (num_turns, cost_usd, fallback usage)
@@ -997,6 +1038,181 @@ function syncRunFromAccumulated(
   run.retryAttempts = attempt > 0 ? attempt : undefined;
 }
 
+// ── Adversarial review pass ───────────────────────────────────────────────
+
+/**
+ * Everything the review pass needs in order to spawn a reviewer.
+ *
+ * Assembled once in {@link cliLoop} and carried on the success context, so
+ * `--review` being off is representable as a single missing field rather than
+ * half a dozen unused ones.
+ */
+export interface ReviewPassContext {
+  adapter: VendorAdapter;
+  vendor: LLMVendor;
+  cliBinary: string;
+  cliEnv?: NodeJS.ProcessEnv;
+  policy: ExecutionPolicy;
+  henchDir: string;
+  /** Resolved review model. Empty string means "send no model flag" (local vendor). */
+  reviewModel: string;
+  /** Permission posture for the reviewer. It must be able to apply must-fixes. */
+  permissionMode: PermissionMode;
+  /** True when no human is attached — the reviewer applies the verdict policy itself. */
+  autonomous: boolean;
+  taskTitle: string;
+}
+
+/** Per-invocation inputs that only exist once the task has actually run. */
+interface ReviewPassInvocation {
+  run: RunRecord;
+  taskId: string;
+  projectDir: string;
+  startingHead: string | undefined;
+  /** Work-session id to resume, when the vendor CLI reported one. */
+  sessionId: string | undefined;
+}
+
+/**
+ * Run the adversarial review pass for a completed task.
+ *
+ * The pass never fails the task. By the time it runs, completion validation
+ * has already passed and the work is real; a reviewer that crashes, times out,
+ * or writes an unparseable report tells us nothing about the work's quality,
+ * so the failure is reported and the run continues. The alternative — treating
+ * a broken reviewer as a broken task — would make `--review` strictly riskier
+ * than not reviewing at all, which is the fastest way to get it switched off.
+ *
+ * What the pass *can* change is the working tree: a must-fix repair lands
+ * before the commit prompt, so it ships in the same commit as the work it
+ * repairs.
+ */
+async function runAdversarialReviewPass(
+  ctx: ReviewPassContext,
+  inv: ReviewPassInvocation,
+): Promise<ReviewPassOutcome> {
+  subsection("Adversarial review");
+
+  // Resume only when the adapter can actually honor it. Codex, Google, and
+  // local have no `--resume` equivalent here, so they get a fresh reviewer
+  // seeded with the full task context instead.
+  const resumeSessionId =
+    ctx.vendor === LLM_VENDOR.CLAUDE && inv.sessionId ? inv.sessionId : undefined;
+
+  const reportPath = reviewReportPath(ctx.henchDir, inv.run.id);
+  // Remove a stale report from a previous pass at this path before spawning.
+  // Without this, a reviewer that dies before writing would leave the old
+  // file in place and the run would report the previous pass's findings as
+  // if they were this one's.
+  await rm(reportPath, { force: true }).catch(() => { /* best effort */ });
+  await mkdir(dirname(reportPath), { recursive: true });
+
+  const brief = buildReviewBrief({
+    taskId: inv.taskId,
+    taskTitle: ctx.taskTitle,
+    startingHead: inv.startingHead,
+    reportPath,
+    resumed: !!resumeSessionId,
+    autonomous: ctx.autonomous,
+  });
+
+  const envelope = createPromptEnvelope([
+    { name: "system" as PromptSectionName, content: buildReviewSystemPrompt() } as PromptSection,
+    { name: "brief" as PromptSectionName, content: brief } as PromptSection,
+  ]);
+
+  const spawnConfig = ctx.adapter.buildSpawnConfig(envelope, ctx.policy, {
+    model: ctx.reviewModel || undefined,
+    permissionMode: ctx.permissionMode,
+    resumeSessionId,
+  });
+
+  stream(
+    "Review",
+    `${resumeSessionId ? "Resuming work session" : "Fresh session"} on ` +
+      `${ctx.reviewModel || "the loaded model"}...`,
+  );
+
+  let result: SpawnResult;
+  try {
+    result = await withHeartbeat(
+      "waiting on review pass",
+      spawnWithAdapter({
+        adapter: ctx.adapter,
+        spawnConfig,
+        cliBinary: ctx.cliBinary,
+        cliEnv: ctx.cliEnv,
+        cwd: inv.projectDir,
+        tokenMetadata: { vendor: ctx.vendor, model: ctx.reviewModel },
+      }),
+    );
+  } catch (err) {
+    const outcome: ReviewPassOutcome = {
+      ok: false,
+      reason: "spawn-failed",
+      detail: (err as Error).message,
+    };
+    reportReviewFailure(inv.run, outcome);
+    return outcome;
+  }
+
+  // Charge the review to the run it reviewed. It is part of the cost of
+  // completing this task, and leaving it out would make `--review` look free
+  // in `ndx usage`.
+  inv.run.tokenUsage = addTokenUsage(inv.run.tokenUsage ?? { input: 0, output: 0 }, result.tokenUsage);
+
+  if (result.error) {
+    const outcome: ReviewPassOutcome = {
+      ok: false,
+      reason: "spawn-failed",
+      detail: result.error,
+    };
+    reportReviewFailure(inv.run, outcome);
+    return outcome;
+  }
+
+  const outcome = await readReviewReport(reportPath);
+  if (!outcome.ok) {
+    reportReviewFailure(inv.run, outcome);
+    return outcome;
+  }
+
+  for (const line of formatReviewSummary(outcome.report)) info(line);
+
+  const unresolved = unresolvedFindings(outcome.report);
+  if (unresolved.length > 0) {
+    info("");
+    info(
+      `⚠ ${unresolved.length} must-fix finding(s) were not repaired. ` +
+        "Inspect them before trusting this commit.",
+    );
+  }
+
+  inv.run.review = {
+    model: ctx.reviewModel,
+    resumedSession: !!resumeSessionId,
+    findingCount: outcome.report.findings.length,
+    unresolvedCount: unresolved.length,
+    fixesApplied: outcome.report.fixesApplied,
+    reportPath,
+  };
+
+  return outcome;
+}
+
+/**
+ * Surface a failed review without failing the run.
+ *
+ * The warning goes to the operator *and* onto the run record: a review that
+ * silently did not happen is indistinguishable from one that found nothing,
+ * and only the run record survives the terminal scrollback.
+ */
+function reportReviewFailure(run: RunRecord, outcome: ReviewPassOutcome & { ok: false }): void {
+  info(`⚠ Adversarial review did not complete (${outcome.reason}): ${outcome.detail}`);
+  info("  The task's own validation still passed — continuing without review findings.");
+  run.review = { failed: outcome.reason, detail: outcome.detail };
+}
+
 // ── Successful result processing ──────────────────────────────────────────
 
 /** Return value from processSuccessfulResult indicating whether the loop should break. */
@@ -1013,7 +1229,14 @@ interface SuccessContext {
   startingHead: string | undefined;
   testCommand?: string;
   tokenBudget?: number;
-  review?: boolean;
+  /** Show the diff and prompt for approval before finalizing (`--approve-diff`). */
+  approveDiff?: boolean;
+  /**
+   * Everything the adversarial review pass needs to spawn, or undefined when
+   * `--review` was not passed. Bundled rather than spread across the context
+   * so the "review is off" case is a single absent field.
+   */
+  reviewPass?: ReviewPassContext;
   selfHeal?: boolean;
   /** Automatically revert on review rejection. Default: true; false via --no-rollback. */
   rollbackOnFailure?: boolean;
@@ -1083,8 +1306,21 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
   }
 
   if (validation.valid) {
-    // Review gate
-    if (ctx.review) {
+    // Adversarial review pass — runs BEFORE the diff gate and before the
+    // commit prompt, so any must-fix repairs it makes are part of what the
+    // human approves and part of the commit the run produces.
+    if (ctx.reviewPass) {
+      await runAdversarialReviewPass(ctx.reviewPass, {
+        run,
+        taskId,
+        projectDir,
+        startingHead: ctx.startingHead,
+        sessionId: result.sessionId,
+      });
+    }
+
+    // Diff-approval gate
+    if (ctx.approveDiff) {
       const reviewGate = await runReviewGate(projectDir, store, taskId, run, {
         rollbackOnFailure: ctx.rollbackOnFailure,
         yes: ctx.yes,
@@ -1265,6 +1501,29 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const cliBinary = resolveVendorCliPath(llmConfig, config);
   const cliEnv = resolveVendorCliEnv(llmConfig);
 
+  // Assemble the review-pass context once, if `--review` is on. Building it
+  // here rather than at the call site keeps the per-attempt success path free
+  // of config resolution, and makes "review is off" a single undefined value.
+  const reviewPassContext: ReviewPassContext | undefined = opts.reviewPass
+    ? {
+        adapter,
+        vendor,
+        cliBinary,
+        cliEnv,
+        policy,
+        henchDir,
+        reviewModel: resolveReviewModel(vendor, llmConfig, opts.reviewModel),
+        // The reviewer has to be able to apply must-fixes and run the
+        // project's checks. `plan` would leave it able to do neither, so the
+        // review pass always runs with edit permission regardless of the
+        // posture chosen for the work spawn — a reviewer that can only
+        // describe a fix is the interactive workflow, not this one.
+        permissionMode: "acceptEdits",
+        autonomous: opts.autonomous === true || opts.yes === true || process.stdin.isTTY !== true,
+        taskTitle: brief.task.title,
+      }
+    : undefined;
+
   // Shared: capture HEAD before agent runs
   const startingHead = captureStartingHead(projectDir);
   // Snapshot untracked files before the agent runs, so a rollback removes only
@@ -1437,7 +1696,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           store, taskId, projectDir, startingHead,
           testCommand: brief.project.testCommand,
           tokenBudget: config.tokenBudget,
-          review: opts.review,
+          approveDiff: opts.approveDiff,
+          reviewPass: reviewPassContext,
           selfHeal: config.selfHeal,
           rollbackOnFailure: opts.rollbackOnFailure,
           yes: opts.yes,

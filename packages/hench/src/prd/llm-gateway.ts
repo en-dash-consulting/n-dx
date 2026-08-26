@@ -150,8 +150,10 @@ export type {
 export {
   resolveModel,
   resolveVendorModel,
+  resolveReviewModel,
   NEWEST_MODELS,
   TIER_MODELS,
+  REVIEW_MODELS,
   GOOGLE_MODELS,
   VENDOR_CONTEXT_CHAR_LIMITS,
   isModelCompatibleWithVendor,

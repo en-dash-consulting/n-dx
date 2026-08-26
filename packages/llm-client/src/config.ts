@@ -145,6 +145,8 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   "claude-fable-5": 1_000_000,
   "claude-sonnet-5": 1_000_000,
   "claude-sonnet-4-6": 200_000,
+  "claude-opus-5": 1_000_000,
+  "claude-opus-4-8": 1_000_000,
   "claude-opus-4-7": 200_000,
   // Codex / OpenAI
   "gpt-5.4-mini": 128_000,
@@ -169,6 +171,8 @@ export const MODEL_COSTS: Readonly<
   "claude-fable-5": { inputPerMToken: 10.00, outputPerMToken: 50.00 },
   "claude-sonnet-5": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
   "claude-sonnet-4-6": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
+  "claude-opus-5": { inputPerMToken: 5.00, outputPerMToken: 25.00 },
+  "claude-opus-4-8": { inputPerMToken: 5.00, outputPerMToken: 25.00 },
   "claude-opus-4-7": { inputPerMToken: 15.00, outputPerMToken: 75.00 },
   // Codex / OpenAI
   "gpt-5.4-mini": { inputPerMToken: 0.40, outputPerMToken: 1.60 },
@@ -310,6 +314,100 @@ export function resolveVendorModel(
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).
   return (NEWEST_MODELS as Record<string, string>)[vendor] ?? "";
+}
+
+/**
+ * Recommended model per vendor for the adversarial review pass.
+ *
+ * ## Why review gets its own tier
+ *
+ * Review is a different workload from execution. It is read-heavy and
+ * judgment-dense — the reviewer must construct a failure trigger, then try to
+ * refute its own finding — but it is *short*: one diff, one pass, no
+ * multi-hour tool loop. That inverts the usual cost calculus. The token volume
+ * is a fraction of the implementation run it audits, so paying a higher
+ * per-token rate for stronger reasoning costs little in absolute terms while
+ * buying the thing review exists for: catching the defect the implementer
+ * could not see.
+ *
+ * A weaker reviewer fails in the expensive direction. A missed critical
+ * finding ships; a fabricated one costs a human triage cycle and erodes trust
+ * in the whole pass. Neither is worth the few cents saved.
+ *
+ * ## Per-vendor rationale
+ *
+ * - **claude → `claude-opus-5`** ($5/$25 per MTok, 1M context). Opus-tier
+ *   reasoning at the same input price as Opus 4.8/4.7 and ~1.67x the input
+ *   price of the Sonnet 5 execution default. `claude-fable-5` is stronger
+ *   still but costs 2x Opus ($10/$50) — available via override, not worth it
+ *   as the default for a single-pass review.
+ * - **codex → `gpt-5.5`.** The Codex catalog has no tier above standard, so
+ *   the review model equals the execution model.
+ * - **google → `gemini-2.5-pro`.** The heavy tier; `gemini-2.5-flash` is the
+ *   balanced execution default.
+ * - **local → `""`.** LM Studio serves whichever model is loaded; there is no
+ *   second model to escalate to.
+ *
+ * Override precedence is handled by {@link resolveReviewModel}.
+ */
+export const REVIEW_MODELS: Record<LLMVendor, string> = {
+  [LLM_VENDOR.CLAUDE]: "claude-opus-5",
+  [LLM_VENDOR.CODEX]: NEWEST_MODELS.codex,
+  [LLM_VENDOR.GOOGLE]: TIER_MODELS.google.heavy,
+  [LLM_VENDOR.LOCAL]: "",
+};
+
+/**
+ * Resolve the model the adversarial review pass should run on.
+ *
+ * Precedence, highest first:
+ * 1. `override` — the `--review-model=…` CLI flag.
+ * 2. `llm.<vendor>.reviewModel` — vendor-pinned project config.
+ * 3. `llm.reviewModel` — vendor-neutral project config.
+ * 4. {@link REVIEW_MODELS} — the recommended default for the vendor.
+ *
+ * Note what is deliberately *absent*: `llm.model` and `llm.<vendor>.model`.
+ * Those pin the execution model, and silently reusing them for review would
+ * defeat the point of a separate tier — a project that pins Haiku for cheap
+ * execution would get a Haiku reviewer without ever asking for one. Reviewers
+ * only ever come from a review-specific setting or the recommended default.
+ *
+ * For the local vendor every branch may legitimately yield `""`, meaning
+ * "whatever LM Studio has loaded" — callers must treat empty as "send no
+ * model flag", not as an error.
+ *
+ * @param vendor    Active LLM vendor.
+ * @param config    Optional `LLMConfig` loaded from `.n-dx.json`.
+ * @param override  Optional explicit model (the `--review-model` flag value).
+ * @returns         A model string, alias-expanded for Claude; `""` for local.
+ */
+export function resolveReviewModel(
+  vendor: LLMVendor,
+  config?: LLMConfig,
+  override?: string,
+): string {
+  const expand = (model: string): string =>
+    vendor === LLM_VENDOR.CLAUDE
+      ? resolveModel(model)
+      : vendor === LLM_VENDOR.CODEX
+        ? normalizeCodexModel(model)
+        : model;
+
+  if (override) return expand(override);
+
+  const vendorPinned =
+    vendor === LLM_VENDOR.CLAUDE
+      ? config?.claude?.reviewModel
+      : vendor === LLM_VENDOR.CODEX
+        ? config?.codex?.reviewModel
+        : vendor === LLM_VENDOR.GOOGLE
+          ? config?.google?.reviewModel
+          : config?.local?.reviewModel;
+  if (vendorPinned) return expand(vendorPinned);
+
+  if (config?.reviewModel) return expand(config.reviewModel);
+
+  return (REVIEW_MODELS as Record<string, string>)[vendor] ?? "";
 }
 
 /**

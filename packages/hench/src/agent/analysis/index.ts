@@ -4,6 +4,7 @@
  * Five analysis domains, each a pure-function module with no I/O:
  *
  * - **adaptive** — project evolution metrics → automatic config adjustments
+ * - **adversarial-review** — review-pass prompt construction and report parsing
  * - **review**   — diff collection and interactive approval gate
  * - **spin**     — empty-turn detection (agent producing text without tool calls)
  * - **stuck**    — consecutive-failure detection for task-level blocking
@@ -45,6 +46,32 @@ export type {
   ReviewResult,
   ReviewDiff,
 } from "./review.js";
+
+// ── Adversarial review pass ──────────────────────────────────────────
+export {
+  buildReviewSystemPrompt,
+  buildReviewBrief,
+  parseReviewReport,
+  readReviewReport,
+  reviewReportPath,
+  formatReviewSummary,
+  unresolvedFindings,
+  REVIEW_SEVERITIES,
+  REVIEW_VERDICTS,
+  REVIEW_ACTIONS,
+  REVIEW_REPORT_SUBDIR,
+} from "./adversarial-review.js";
+
+export type {
+  ReviewFinding,
+  ReviewReport,
+  ReviewSeverity,
+  ReviewVerdict,
+  ReviewAction,
+  ReviewPassOutcome,
+  ReviewFailureReason,
+  ReviewPromptContext,
+} from "./adversarial-review.js";
 
 // ── Spin detection ───────────────────────────────────────────────────
 export {

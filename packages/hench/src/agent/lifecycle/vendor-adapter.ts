@@ -95,6 +95,19 @@ export interface VendorSpawnOptions {
    * `--permission-mode <value>`. Other adapters silently ignore it.
    */
   readonly permissionMode?: PermissionMode;
+  /**
+   * Resume an existing vendor session instead of starting a fresh one.
+   *
+   * Set by the adversarial review pass so the reviewer re-enters the session
+   * that just executed the task and inherits its context — what was tried,
+   * what was rejected, which files were read — rather than rediscovering it
+   * from the diff alone.
+   *
+   * Currently only honored by the Claude CLI adapter, which forwards it as
+   * `--resume <session-id>`. Other adapters ignore it, and the review pass
+   * falls back to a fresh session for those vendors.
+   */
+  readonly resumeSessionId?: string;
 }
 
 // ── VendorAdapter ────────────────────────────────────────────────────────

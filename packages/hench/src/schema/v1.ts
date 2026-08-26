@@ -727,6 +727,37 @@ export interface CleanupTransformationResult {
   error?: string;
 }
 
+/**
+ * What the adversarial review pass did, recorded on the run it reviewed.
+ *
+ * A discriminated pair of shapes rather than one shape with optional fields:
+ * a failed review has no finding counts, and a successful one has no failure
+ * reason. Collapsing them would make `findingCount: 0` ambiguous between "the
+ * attack found nothing" and "the reviewer never ran".
+ */
+export type RunReviewRecord =
+  | {
+      /** Model the reviewer ran on. Empty for the local vendor. */
+      model: string;
+      /** True when the reviewer resumed the work session rather than starting fresh. */
+      resumedSession: boolean;
+      /** Findings surviving both passes, including the ones deliberately dropped. */
+      findingCount: number;
+      /** Must-fix findings the pass could not repair. Non-zero needs a human. */
+      unresolvedCount: number;
+      /** True when the reviewer edited a file. */
+      fixesApplied: boolean;
+      /** Absolute path of the JSON report the reviewer wrote. */
+      reportPath: string;
+      failed?: undefined;
+    }
+  | {
+      /** Why the pass produced no usable report. */
+      failed: string;
+      /** Human-readable detail for the failure. */
+      detail: string;
+    };
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -781,6 +812,17 @@ export interface RunRecord {
   cleanupTransformations?: CleanupTransformationResult;
   /** Run-level diagnostics for token parsing and vendor observability. */
   diagnostics?: RunDiagnostics;
+  /**
+   * Outcome of the adversarial review pass (`ndx work --review`).
+   *
+   * Absent when `--review` was not passed. Present-and-failed is a distinct,
+   * meaningful state: a review that could not run must not be readable as a
+   * review that found nothing, and the terminal output where the warning was
+   * printed does not survive the session.
+   *
+   * v1 additive field — records without it load normally.
+   */
+  review?: RunReviewRecord;
   /**
    * Full RuntimeEvent stream captured during the run.
    *

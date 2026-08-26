@@ -51,7 +51,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--priority=<level>", description: "Override task scheduling priority (critical|high|medium|low)" },
       { flag: "--reset-deferred", description: "Reset all deferred/failing tasks to pending before running" },
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
-      { flag: "--review", description: "Show proposed changes and prompt for approval" },
+      { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
+      { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
+      { flag: "--approve-diff", description: "Show proposed changes and prompt for approval (was --review before the review pass took that flag)" },
       { flag: "--max-turns=<n>", description: "Override max agent turns per task" },
       { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },
       { flag: "--model=<model>", description: "Override the Claude model" },
@@ -59,6 +61,27 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--allow-dirty", description: "Start with an uncommitted working tree: autonomous runs (--auto/--loop/--epic-by-epic) abort by default, and this flag also overrides hench.git.requireCleanTree and hench.git.checkpointThreshold escalation" },
     ],
     sections: [
+      {
+        title: "Adversarial review (--review)",
+        content:
+          "After a task's changes pass completion validation and before the\n" +
+          "commit prompt, a reviewer attacks the change: it finds failures,\n" +
+          "triages each for severity and necessity, fixes what must be fixed,\n" +
+          "and captures the rest to the PRD. Fixes land in the same commit as\n" +
+          "the work they repair.\n" +
+          "\n" +
+          "For the Claude CLI the reviewer resumes the session that did the\n" +
+          "work, so it inherits what was tried and rejected — not just the diff.\n" +
+          "Other vendors get a fresh reviewer seeded with the task context.\n" +
+          "\n" +
+          "Model: --review-model wins, then llm.<vendor>.reviewModel, then\n" +
+          "llm.reviewModel, then the vendor default (claude: claude-opus-5).\n" +
+          "The execution model is never inherited — pinning a cheap executor\n" +
+          "must not silently downgrade the reviewer.\n" +
+          "\n" +
+          "Requires the CLI provider. A review that cannot complete warns and\n" +
+          "leaves the task's own result alone; it never fails a valid task.",
+      },
       {
         title: "Pre-run commit gate",
         content:
@@ -75,6 +98,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "hench run --epic=\"Auth\" --auto", description: "Auto-run tasks in the Auth epic" },
       { command: "hench run --loop --epic-by-epic", description: "Continuously process epics in order" },
       { command: "hench run --dry-run .", description: "Preview the brief without execution" },
+      { command: "hench run --auto --review", description: "Auto-run with an adversarial review pass after each task" },
+      { command: "hench run --review --review-model=claude-fable-5", description: "Review on a specific model" },
     ],
     related: ["status", "show"],
   },
