@@ -16,6 +16,8 @@ export { MemoryPanel } from "./memory-panel.js";
 export { WsHealthPanel } from "./ws-health-panel.js";
 export { ThrottleControlsPanel } from "./throttle-controls.js";
 export { DetailPanel } from "./detail-panel.js";
+export { StartTaskButton } from "./start-task-button.js";
+export type { StartTaskButtonProps } from "./start-task-button.js";
 
 // ── Banners ──────────────────────────────────────────────────────────
 

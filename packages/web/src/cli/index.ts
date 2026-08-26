@@ -41,6 +41,18 @@ setVerbose(args.includes("--verbose"));
 setDebug(args.includes("--debug"));
 
 if (command === "serve") {
+  // setDebug() above intentionally sets process.env.NDX_DEBUG so a one-shot
+  // CLI invocation's own debug tracing propagates to whatever it spawns —
+  // but "serve" is a long-running server, not a one-shot invocation. Left
+  // in place, every rex/hench/sourcevision subprocess *any* dashboard
+  // request spawns for the rest of this process's life would silently
+  // inherit it. Individual command triggers pass --verbose/--debug
+  // explicitly to the specific command they spawn when requested (see
+  // routes-commands.ts), so undo the global env mutation here — this
+  // process's own isVerbose()/isDebug() flags (for its heartbeat/error
+  // output) are unaffected, since those read module-local state, not env.
+  delete process.env.NDX_DEBUG;
+
   const dir = resolve(targetArg || ".");
   const dev = args.includes("--dev");
   await startServer(dir, port, { dev, scope });

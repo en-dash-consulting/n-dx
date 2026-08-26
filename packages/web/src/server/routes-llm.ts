@@ -2,7 +2,11 @@
  * LLM provider configuration API routes.
  *
  * Reads and writes LLM provider settings from `.n-dx.json` under the
- * `llm` key (modern namespace) and `claude` key (legacy namespace).
+ * `llm` key (modern namespace) and `claude` key (legacy namespace), merged
+ * with `.n-dx.local.json` (local wins) for reads — the same "local wins"
+ * overlay `packages/core/config.js` and `@n-dx/llm-client`'s config loader
+ * apply, so a per-machine override in the gitignored local file is reflected
+ * here too. Writes still go to the shared `.n-dx.json` only.
  * Auth-sensitive fields (api_key, api_endpoint, cli_path) are omitted
  * from the response; only vendor selection and model names are exposed.
  *
@@ -16,7 +20,7 @@ import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { invalidateAuthCheckCache } from "./routes-commands.js";
-import { LLM_VENDOR } from "@n-dx/llm-client";
+import { LLM_VENDOR, deepMerge } from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,22 +31,47 @@ export interface VendorConfig {
   lightModel: string | null;
 }
 
+/** Second-model verifier config, nested under `local`. */
+export interface LocalVerifierVendorConfig {
+  host: string | null;
+  port: number | null;
+  model: string | null;
+  maxCycles: number | null;
+}
+
 /** Local model config shape returned by GET /api/llm/config. */
 export interface LocalVendorConfig {
   model: string | null;
   lightModel: string | null;
   host: string | null;
   port: number | null;
+  /** Max context window (tokens) hench pre-checks a brief against before sending. */
+  maxContextTokens: number | null;
+  /** Second-model review pass config. All fields null when unset. */
+  verifier: LocalVerifierVendorConfig;
+}
+
+/**
+ * Google (Gemini) config shape returned by GET /api/llm/config.
+ * `apiKey` is intentionally never returned (write-only, like a password) —
+ * `hasApiKey` tells the UI whether a key is configured without exposing it.
+ */
+export interface GoogleVendorConfig {
+  model: string | null;
+  lightModel: string | null;
+  hasApiKey: boolean;
 }
 
 /** Shape returned by GET /api/llm/config. */
 export interface LlmConfigResponse {
-  /** Active LLM vendor: "claude", "codex", "local", or null if unset. */
+  /** Active LLM vendor: "claude", "codex", "google", "local", or null if unset. */
   vendor: string | null;
   /** Claude-specific settings from llm.claude.* */
   claude: VendorConfig;
   /** Codex-specific settings from llm.codex.* */
   codex: VendorConfig;
+  /** Google (Gemini)-specific settings from llm.google.* */
+  google: GoogleVendorConfig;
   /** Local server settings from llm.local.* */
   local: LocalVendorConfig;
   /**
@@ -65,43 +94,87 @@ interface LlmConfigPutBody {
 // ---------------------------------------------------------------------------
 
 const NDX_CONFIG = ".n-dx.json";
+const NDX_LOCAL_CONFIG = ".n-dx.local.json";
 const VALID_VENDORS: ReadonlySet<string> = new Set([
   LLM_VENDOR.CLAUDE,
   LLM_VENDOR.CODEX,
+  LLM_VENDOR.GOOGLE,
   LLM_VENDOR.LOCAL,
 ]);
 
-/** Writable paths. Auth fields (api_key, api_endpoint, cli_path) are excluded. */
+/**
+ * Writable paths. Auth fields are excluded EXCEPT `llm.google.api_key` —
+ * unlike Claude/Codex (which authenticate via their own CLI), the Google
+ * vendor has no CLI/OAuth path and cannot function without a key, so it must
+ * be settable from this route. Its value is still never echoed back by GET
+ * (see `extractLlmConfig`'s `hasApiKey` boolean instead of a `google.apiKey`
+ * field) — writable but not readable, same as a password field.
+ */
 const VALID_PATHS = new Set([
   "llm.vendor",
   "llm.claude.model",
   "llm.claude.lightModel",
   "llm.codex.model",
   "llm.codex.lightModel",
+  "llm.google.model",
+  "llm.google.lightModel",
+  "llm.google.api_key",
   "llm.local.model",
   "llm.local.lightModel",
   "llm.local.host",
   "llm.local.port",
+  "llm.local.maxContextTokens",
+  "llm.local.verifier.host",
+  "llm.local.verifier.port",
+  "llm.local.verifier.model",
+  "llm.local.verifier.maxCycles",
   "llm.autoFailover",
   "claude.model",
   "claude.lightModel",
 ]);
 
 /** Paths that accept numeric values (stored as numbers in JSON). */
-const NUMERIC_PATHS = new Set(["llm.local.port"]);
+const NUMERIC_PATHS = new Set([
+  "llm.local.port",
+  "llm.local.maxContextTokens",
+  "llm.local.verifier.port",
+  "llm.local.verifier.maxCycles",
+]);
+
+/** Numeric paths validated as a TCP port (1–65535) rather than a plain positive integer. */
+const PORT_PATHS = new Set(["llm.local.port", "llm.local.verifier.port"]);
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function readNdxConfig(projectDir: string): Record<string, unknown> {
-  const configPath = join(projectDir, NDX_CONFIG);
-  if (!existsSync(configPath)) return {};
+function readJsonFile(path: string): Record<string, unknown> {
+  if (!existsSync(path)) return {};
   try {
-    return JSON.parse(readFileSync(configPath, "utf-8"));
+    return JSON.parse(readFileSync(path, "utf-8"));
   } catch {
     return {};
   }
+}
+
+/** Read the shared, git-tracked `.n-dx.json` only. Writes always target this file. */
+function readNdxConfig(projectDir: string): Record<string, unknown> {
+  return readJsonFile(join(projectDir, NDX_CONFIG));
+}
+
+/**
+ * Read the shared config deep-merged with the gitignored `.n-dx.local.json`
+ * overlay (local wins) — the same merge `core/config.js`'s
+ * `loadEffectiveProjectConfig` and `@n-dx/llm-client`'s config loader apply.
+ * Use this for anything the user should *see* (GET responses, status
+ * probes); use `readNdxConfig` for anything about to be *written back*, so a
+ * write never flattens the local overlay's values into the shared file.
+ */
+function readEffectiveNdxConfig(projectDir: string): Record<string, unknown> {
+  const shared = readNdxConfig(projectDir);
+  const local = readJsonFile(join(projectDir, NDX_LOCAL_CONFIG));
+  if (Object.keys(local).length === 0) return shared;
+  return deepMerge(shared, local);
 }
 
 function writeNdxConfig(projectDir: string, config: Record<string, unknown>): void {
@@ -113,6 +186,12 @@ function writeNdxConfig(projectDir: string, config: Record<string, unknown>): vo
 function getString(obj: Record<string, unknown>, key: string): string | null {
   const v = obj[key];
   return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+/** Read a numeric leaf from a nested object. Returns null if absent or not a number. */
+function getNumber(obj: Record<string, unknown>, key: string): number | null {
+  const v = obj[key];
+  return typeof v === "number" ? v : null;
 }
 
 /** Set a nested value by dot-separated path, creating intermediate objects. */
@@ -143,11 +222,13 @@ function deleteByPath(obj: Record<string, unknown>, path: string): void {
 }
 
 function extractLlmConfig(projectDir: string): LlmConfigResponse {
-  const config = readNdxConfig(projectDir);
+  const config = readEffectiveNdxConfig(projectDir);
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmClaude = (llm["claude"] ?? {}) as Record<string, unknown>;
   const llmCodex = (llm["codex"] ?? {}) as Record<string, unknown>;
+  const llmGoogle = (llm["google"] ?? {}) as Record<string, unknown>;
   const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
+  const llmLocalVerifier = (llmLocal["verifier"] ?? {}) as Record<string, unknown>;
   const legacyClaude = (config["claude"] ?? {}) as Record<string, unknown>;
 
   const result: LlmConfigResponse = {
@@ -160,11 +241,23 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
       model: getString(llmCodex, "model"),
       lightModel: getString(llmCodex, "lightModel"),
     },
+    google: {
+      model: getString(llmGoogle, "model"),
+      lightModel: getString(llmGoogle, "lightModel"),
+      hasApiKey: getString(llmGoogle, "api_key") !== null,
+    },
     local: {
       model: getString(llmLocal, "model"),
       lightModel: getString(llmLocal, "lightModel"),
       host: getString(llmLocal, "host"),
-      port: typeof llmLocal["port"] === "number" ? llmLocal["port"] : null,
+      port: getNumber(llmLocal, "port"),
+      maxContextTokens: getNumber(llmLocal, "maxContextTokens"),
+      verifier: {
+        host: getString(llmLocalVerifier, "host"),
+        port: getNumber(llmLocalVerifier, "port"),
+        model: getString(llmLocalVerifier, "model"),
+        maxCycles: getNumber(llmLocalVerifier, "maxCycles"),
+      },
     },
     legacyClaude: {
       model: getString(legacyClaude, "model"),
@@ -194,6 +287,32 @@ interface LocalStatusResponse {
   error?: string;
 }
 
+/**
+ * Detect a refused TCP connection from a failed `fetch()`.
+ *
+ * Node's native `fetch` (undici) never puts "ECONNREFUSED" in `err.message` —
+ * a refused connection surfaces as `TypeError: fetch failed`, with the real
+ * code nested in `err.cause.code` (or, for a dual-stack connect attempt,
+ * inside an AggregateError's `err.cause.errors[]`). Checking `err.message`
+ * alone (the previous implementation) could never match the single most
+ * common failure here: the local server just isn't running yet.
+ */
+function isConnectionRefused(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.message.includes("ECONNREFUSED")) return true;
+  const cause = (err as { cause?: unknown }).cause;
+  if (cause && typeof cause === "object") {
+    if ((cause as { code?: unknown }).code === "ECONNREFUSED") return true;
+    const nested = (cause as { errors?: unknown }).errors;
+    if (Array.isArray(nested)) {
+      return nested.some(
+        (e) => e && typeof e === "object" && (e as { code?: unknown }).code === "ECONNREFUSED",
+      );
+    }
+  }
+  return false;
+}
+
 async function probeLocalServer(
   host: string,
   port: number,
@@ -215,7 +334,7 @@ async function probeLocalServer(
     const msg = err instanceof Error ? err.message : String(err);
     const friendly = msg.includes("abort") || msg.includes("Cancel")
       ? "Timed out — is LM Studio running?"
-      : msg.includes("ECONNREFUSED")
+      : isConnectionRefused(err)
         ? "Connection refused — check host/port"
         : msg;
     return { ok: false, url, models: [], error: friendly };
@@ -289,7 +408,7 @@ async function runSmokeTest(
     const msg = err instanceof Error ? err.message : String(err);
     const friendly = msg.includes("abort") || msg.includes("Cancel")
       ? `Timed out after ${SMOKE_TEST_TIMEOUT_MS / 1000}s — model may still be loading`
-      : msg.includes("ECONNREFUSED")
+      : isConnectionRefused(err)
         ? "Connection refused — is LM Studio running?"
         : msg;
     return { ok: false, latencyMs, tokensPerSecond: null, outputTokens: null, reply: null, error: friendly, url };
@@ -352,15 +471,19 @@ export async function handleLlmRoute(
 ): Promise<boolean> {
   const url = req.url || "/";
   const method = req.method || "GET";
+  // Query-string-free form for exact-equality route matching below — `url`
+  // itself is kept intact because the DELETE branch further down still needs
+  // its query string (?name=...) to reach `new URL(url, ...)`.
+  const pathname = url.split("?")[0];
 
   // GET /api/llm/local-profiles — list saved local profiles
-  if (method === "GET" && url === LLM_LOCAL_PROFILES) {
+  if (method === "GET" && pathname === LLM_LOCAL_PROFILES) {
     jsonResponse(res, 200, { profiles: readProfiles(ctx.projectDir) });
     return true;
   }
 
   // POST /api/llm/local-profiles — create or update a named profile
-  if (method === "POST" && url === LLM_LOCAL_PROFILES) {
+  if (method === "POST" && pathname === LLM_LOCAL_PROFILES) {
     try {
       const body = await readBody(req);
       const data = JSON.parse(body) as Partial<LocalProfile>;
@@ -404,8 +527,8 @@ export async function handleLlmRoute(
   // POST /api/llm/local-test — run a real inference smoke test.
   // Optional JSON body: { host?, port?, model? } — overrides saved config so
   // the client can test unsaved edit values without saving first.
-  if (method === "POST" && url === LLM_LOCAL_TEST) {
-    const config = readNdxConfig(ctx.projectDir);
+  if (method === "POST" && pathname === LLM_LOCAL_TEST) {
+    const config = readEffectiveNdxConfig(ctx.projectDir);
     const llm = (config["llm"] ?? {}) as Record<string, unknown>;
     const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
     // Saved config defaults
@@ -432,8 +555,8 @@ export async function handleLlmRoute(
   }
 
   // GET /api/llm/local-status — probe the configured local LLM server
-  if (method === "GET" && url === LLM_LOCAL_STATUS) {
-    const config = readNdxConfig(ctx.projectDir);
+  if (method === "GET" && pathname === LLM_LOCAL_STATUS) {
+    const config = readEffectiveNdxConfig(ctx.projectDir);
     const llm = (config["llm"] ?? {}) as Record<string, unknown>;
     const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
     const host = typeof llmLocal["host"] === "string" && llmLocal["host"]
@@ -448,13 +571,13 @@ export async function handleLlmRoute(
   }
 
   // GET /api/llm/config
-  if (method === "GET" && url === LLM_PREFIX) {
+  if (method === "GET" && pathname === LLM_PREFIX) {
     jsonResponse(res, 200, extractLlmConfig(ctx.projectDir));
     return true;
   }
 
   // PUT /api/llm/config
-  if (method === "PUT" && url === LLM_PREFIX) {
+  if (method === "PUT" && pathname === LLM_PREFIX) {
     try {
       const body = await readBody(req);
       const parsed = JSON.parse(body) as LlmConfigPutBody;
@@ -482,8 +605,11 @@ export async function handleLlmRoute(
           }
           if (value !== null) {
             const n = Number(value);
-            if (!Number.isInteger(n) || n < 1 || n > 65535) {
-              errorResponse(res, 400, `Value for "${path}" must be a valid port number (1–65535), got ${JSON.stringify(value)}`);
+            const isPort = PORT_PATHS.has(path);
+            const valid = isPort ? Number.isInteger(n) && n >= 1 && n <= 65535 : Number.isInteger(n) && n >= 1;
+            if (!valid) {
+              const expected = isPort ? "a valid port number (1–65535)" : "a positive integer";
+              errorResponse(res, 400, `Value for "${path}" must be ${expected}, got ${JSON.stringify(value)}`);
               return true;
             }
           }

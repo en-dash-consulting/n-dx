@@ -309,55 +309,7 @@
 }
 
 /* Next-task status badge uses the shared .status-badge from badges.css */
-
-/* Start button */
-.rex-dash-start-btn {
-  font-size: var(--font-sm);
-  font-weight: var(--weight-semibold);
-  color: #fff;
-  background: var(--accent);
-  border: none;
-  padding: var(--space-1-5) var(--space-3-5);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background var(--transition-fast), transform var(--transition-fast);
-  white-space: nowrap;
-}
-
-.rex-dash-start-btn:hover {
-  background: var(--accent-dim);
-  transform: translateY(-1px);
-}
-
-.rex-dash-start-btn:active {
-  transform: translateY(0);
-}
-
-.rex-dash-start-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.rex-dash-start-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-1);
-}
-
-.rex-dash-start-error {
-  font-size: var(--font-xs);
-  color: var(--red, #ef4444);
-  max-width: 200px;
-  text-align: right;
-  animation: rex-dash-error-in 0.2s ease;
-}
-
-@keyframes rex-dash-error-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+/* Start button — see the shared .start-task-* rules in components.css */
 
 /* ── Smart Add (dashboard) ────────────────────────────────────────── */
 
@@ -1381,4 +1333,65 @@
     flex: 1;
     text-align: center;
   }
+}
+
+/* ── Restore panel (undo for reorganize/prune/reshape/fix) ──────────── */
+
+.restore-panel-desc {
+  color: var(--text-dim);
+  font-size: var(--font-sm);
+  margin: 0 0 var(--space-3);
+}
+
+.restore-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.restore-panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.restore-panel-row-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.restore-panel-row-timestamp {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-sm);
+}
+
+.restore-panel-badge {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 1px var(--space-2);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.restore-panel-row-files {
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+}
+
+.restore-panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }

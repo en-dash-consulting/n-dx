@@ -30,7 +30,7 @@ ndx destroy-sample .
 
 ## Requirements
 
-**Node.js ≥ 18** (Node 22 LTS recommended) · **pnpm ≥ 10**
+**Node.js ≥ 22** · **pnpm ≥ 10**
 
 ### Platform Support
 
@@ -93,7 +93,7 @@ See [`.local_testing/README.md`](.local_testing/) for advanced usage:
 
 ## Quick Start
 
-**Prerequisites:** Node.js ≥ 18 (22 LTS recommended).
+**Prerequisites:** Node.js ≥ 22.
 
 **Recommended:** install `@n-dx/core` globally with npm.
 

@@ -2251,13 +2251,13 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
 }
 
 /** POST /api/hench/execute/:taskId/terminate — terminate a running task. */
-function handleTerminate(
+async function handleTerminate(
   taskId: string,
   res: ServerResponse,
   runsDir: string,
   broadcast?: WebSocketBroadcaster,
   onStatusInvalidate?: () => void,
-): boolean {
+): Promise<boolean> {
   const entry = activeExecutions.get(taskId);
 
   if (!entry) {
@@ -2302,9 +2302,17 @@ function handleTerminate(
     return true;
   }
 
-  // Kill the managed process
+  // Kill the managed process and wait for it to actually exit (escalating to
+  // SIGKILL if it doesn't respond to SIGTERM within the grace period) before
+  // touching any state below. Deleting the activeExecutions entry before the
+  // process is confirmed dead would let a second run start on the same task
+  // while this one might still be alive — including still-running hench/LLM
+  // CLI children that could keep mutating the PRD tree.
   const pid = entry.handle.pid;
-  const killed = entry.handle.kill("SIGTERM");
+  const killed = pid !== undefined;
+  // Escalates to SIGKILL internally if the process doesn't exit within the
+  // default grace period, so by the time this resolves it is confirmed gone.
+  await killWithFallback(entry.handle);
 
   // Update state
   entry.state.status = "failed";
@@ -2323,7 +2331,7 @@ function handleTerminate(
     pid,
     terminated: true,
     signalSent: killed,
-    method: "sigterm",
+    method: "sigterm-or-sigkill",
     message: "Process terminated",
   });
   return true;

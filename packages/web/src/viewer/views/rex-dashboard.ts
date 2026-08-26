@@ -11,7 +11,8 @@ import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import { BrandedHeader } from "../components/index.js";
 import { RexTaskLink } from "../components/index.js";
-import { SmartAddInput, ExecutionPanel, ReorganizePanel } from "../components/prd-tree/index.js";
+import { StartTaskButton } from "../components/index.js";
+import { SmartAddInput, ExecutionPanel, ReorganizePanel, RestorePanel } from "../components/prd-tree/index.js";
 import { HealthGauge } from "../visualization/index.js";
 import { usePolling } from "../hooks/index.js";
 
@@ -161,49 +162,6 @@ function StatChip({ value, label, color, accent }: {
   );
 }
 
-/** Quick action button for starting the next task */
-function StartButton({ taskId, onStarted }: { taskId: string; onStarted: () => void }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleStart = useCallback(async (e: Event) => {
-    e.stopPropagation();
-    setLoading(true);
-    setError(null);
-    try {
-      // Launch an autonomous hench run for this task. The agent sets the task
-      // to in_progress itself; the dashboard reflects progress via WebSocket.
-      const res = await fetch("/api/hench/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(data.error || `Failed (${res.status})`);
-      }
-      onStarted();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start task");
-      setTimeout(() => setError(null), 4000);
-    } finally {
-      setLoading(false);
-    }
-  }, [taskId, onStarted]);
-
-  return h("div", { class: "rex-dash-start-wrapper" },
-    h("button", {
-      class: "rex-dash-start-btn",
-      onClick: handleStart,
-      disabled: loading,
-      "aria-label": "Run this task with the agent",
-    }, loading ? "Starting…" : "Start Task"),
-    error
-      ? h("div", { class: "rex-dash-start-error", role: "alert" }, error)
-      : null,
-  );
-}
-
 /** Epic card with enhanced progress and status display */
 function EpicCard({ epic, navigateTo }: { epic: EpicStats; navigateTo?: NavigateTo }) {
   const { stats } = epic;
@@ -269,6 +227,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [reorgOpen, setReorgOpen] = useState(false);
   const [reorgCount, setReorgCount] = useState(0);
+  const [restoreOpen, setRestoreOpen] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -441,7 +400,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                       : null,
                   ),
                   nextTask.status === "pending"
-                    ? h(StartButton, { taskId: nextTask.id, onStarted: fetchDashboard })
+                    ? h(StartTaskButton, { taskId: nextTask.id, onStarted: fetchDashboard })
                     : nextTask.status === "in_progress"
                       ? h("span", { class: "status-badge status-badge--in_progress" }, "In Progress")
                       : null,
@@ -616,6 +575,11 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                   class: `rex-dash-action-btn${reorgCount > 0 ? " rex-dash-action-btn-accent" : ""}`,
                   onClick: () => setReorgOpen(true),
                 }, reorgCount > 0 ? `Reorganize (${reorgCount})` : "Reorganize"),
+                h("button", {
+                  class: "rex-dash-action-btn",
+                  onClick: () => setRestoreOpen(true),
+                  title: "Undo reorganize, prune, reshape, or fix by restoring a PRD snapshot",
+                }, "Restore Snapshot"),
               ),
             )
           : null,
@@ -627,6 +591,17 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
       open: reorgOpen,
       onClose: () => setReorgOpen(false),
       onApplied: () => {
+        fetchDashboard();
+        fetchHealth();
+        fetchReorgCount();
+      },
+    }),
+
+    // Restore slide-out panel — undo for reorganize/prune/reshape/fix
+    h(RestorePanel, {
+      open: restoreOpen,
+      onClose: () => setRestoreOpen(false),
+      onRestored: () => {
         fetchDashboard();
         fetchHealth();
         fetchReorgCount();

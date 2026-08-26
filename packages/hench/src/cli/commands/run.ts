@@ -1489,6 +1489,11 @@ async function runLoop(
   };
 
   process.on("SIGINT", onSignal);
+  // Also handle SIGTERM (e.g. the web dashboard's Stop button, or a graceful
+  // server shutdown) the same way as Ctrl-C — otherwise an unhandled SIGTERM
+  // kills this process immediately, orphaning whatever LLM CLI child is
+  // currently in flight instead of draining the queue first.
+  process.on("SIGTERM", onSignal);
 
   let completed = 0;
   // Tracks per-task outcomes when a tag filter is active (e.g. self-heal mode).
@@ -1663,6 +1668,7 @@ async function runLoop(
     }
   } finally {
     process.removeListener("SIGINT", onSignal);
+    process.removeListener("SIGTERM", onSignal);
   }
 }
 
@@ -1741,6 +1747,11 @@ async function runEpicByEpic(
   };
 
   process.on("SIGINT", onSignal);
+  // Also handle SIGTERM (e.g. the web dashboard's Stop button, or a graceful
+  // server shutdown) the same way as Ctrl-C — otherwise an unhandled SIGTERM
+  // kills this process immediately, orphaning whatever LLM CLI child is
+  // currently in flight instead of draining the queue first.
+  process.on("SIGTERM", onSignal);
 
   const summaries: EpicRunSummary[] = [];
 
@@ -1932,6 +1943,7 @@ async function runEpicByEpic(
     printEpicByEpicSummary(summaries);
   } finally {
     process.removeListener("SIGINT", onSignal);
+    process.removeListener("SIGTERM", onSignal);
   }
 }
 

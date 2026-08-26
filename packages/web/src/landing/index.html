@@ -245,8 +245,84 @@
           </div>
         </div>
 
-        <!-- Step-by-step commands -->
-        <div class="install-steps fade-in">
+        <!-- Interactive setup wizard — bootstraps this project without a terminal -->
+        <form class="setup-wizard fade-in" id="setup-wizard" novalidate>
+          <fieldset class="wizard-fieldset">
+            <legend class="wizard-label">Which assistant(s) will you use?</legend>
+            <div class="wizard-choice-group">
+              <label class="wizard-checkbox">
+                <input type="checkbox" name="assistant" value="claude" checked>
+                <span>Claude Code</span>
+              </label>
+              <label class="wizard-checkbox">
+                <input type="checkbox" name="assistant" value="codex" checked>
+                <span>Codex</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="wizard-fieldset">
+            <legend class="wizard-label">Which LLM will power autonomous execution?</legend>
+            <div class="wizard-vendor-tabs" id="wizard-vendor-tabs" role="radiogroup" aria-label="LLM vendor">
+              <button type="button" class="wizard-vendor-tab" data-vendor="claude" aria-pressed="true">
+                <span class="wizard-vendor-name">Claude</span><span class="wizard-vendor-sub">Anthropic</span>
+              </button>
+              <button type="button" class="wizard-vendor-tab" data-vendor="codex" aria-pressed="false">
+                <span class="wizard-vendor-name">Codex</span><span class="wizard-vendor-sub">OpenAI</span>
+              </button>
+              <button type="button" class="wizard-vendor-tab" data-vendor="google" aria-pressed="false">
+                <span class="wizard-vendor-name">Google</span><span class="wizard-vendor-sub">Gemini</span>
+              </button>
+              <button type="button" class="wizard-vendor-tab" data-vendor="local" aria-pressed="false">
+                <span class="wizard-vendor-name">Local</span><span class="wizard-vendor-sub">LM Studio / Ollama</span>
+              </button>
+            </div>
+            <p class="wizard-vendor-hint" id="wizard-vendor-hint" role="status">
+              Uses the <code>claude</code> CLI — install and sign in on this machine first.
+            </p>
+
+            <div class="wizard-vendor-fields" data-for="google" hidden>
+              <label class="wizard-field-label" for="wizard-google-key">
+                Gemini API key <span class="wizard-optional">(optional — set later in Settings instead)</span>
+              </label>
+              <input type="password" id="wizard-google-key" class="wizard-input" placeholder="AIza…" autocomplete="off">
+            </div>
+
+            <div class="wizard-vendor-fields" data-for="local" hidden>
+              <div class="wizard-conn-row">
+                <div>
+                  <label class="wizard-field-label" for="wizard-local-host">Host</label>
+                  <input type="text" id="wizard-local-host" class="wizard-input" placeholder="localhost">
+                </div>
+                <div>
+                  <label class="wizard-field-label" for="wizard-local-port">Port</label>
+                  <input type="text" inputmode="numeric" id="wizard-local-port" class="wizard-input" placeholder="1234">
+                </div>
+              </div>
+            </div>
+          </fieldset>
+
+          <button type="submit" class="btn btn-primary wizard-submit" id="wizard-submit">
+            <span class="wizard-submit-label">Initialize project</span>
+            <span class="wizard-submit-spinner" aria-hidden="true" hidden></span>
+          </button>
+
+          <p class="wizard-progress" id="wizard-progress" role="status" aria-live="polite" hidden>
+            Setting up — this can take a minute on a large codebase…
+          </p>
+          <p class="wizard-error" id="wizard-error" role="alert" hidden></p>
+          <p class="wizard-success" id="wizard-success" role="status" hidden>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 4.5L6.5 11.5L2.5 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Ready — opening your dashboard…
+          </p>
+        </form>
+
+        <button type="button" class="wizard-toggle-cli" id="wizard-toggle-cli" aria-expanded="false" aria-controls="cli-fallback">
+          Prefer the terminal?
+        </button>
+
+        <!-- Raw CLI steps — same three commands, for terminal-first users and CI scripts -->
+        <div class="install-steps" id="cli-fallback" hidden>
           <div class="install-step">
             <div class="install-step-header">
               <span class="install-step-number" aria-hidden="true">1</span>

@@ -1,6 +1,6 @@
 # CLI ↔ Dashboard Coverage Gap Inventory
 
-_Last updated: 2026-08-14_
+_Last updated: 2026-08-24_
 
 ## Methodology
 
@@ -51,10 +51,16 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `ndx ci` | **full** | medium | Run-CI-check action in the Validation view with structured results from `--format=json` |
 | `ndx config` | full | medium | Settings section: General (LLM provider), project settings, hench config, Notion, feature flags, CLI timeouts — grouped by CLI command |
 | `ndx auth` | **full** | low | Credential status chip in Settings → General (GET `/api/commands/auth`), with re-check |
+| `ndx install-sample` / `ndx destroy-sample` | **full** | low | Sample App panel in Commands view (`packages/web/src/viewer/views/commands.ts`) — Install/Destroy buttons, live status polling via GET `/api/commands/sample-status`, POST `/api/commands/install-sample` and `/api/commands/destroy-sample` |
 | `ndx pair-programming` / `bicker` | none | low | Experimental; not yet a dashboard workflow |
 | `ndx init` | n/a | — | One-time setup; dashboard requires init to exist |
 | `ndx start` / `ndx dev` | n/a | — | These commands launch the dashboard |
 | `ndx version` / `ndx help` | n/a | — | Footer version + Guide/FAQ views cover this |
+
+### `ndx config` — LLM Provider view detail
+
+- **Local vendor (full):** the LLM Provider view (`packages/web/src/viewer/views/llm-provider.ts`) adds a "local" vendor alongside Claude/Codex — host/port/model fields, a live status probe, a connection smoke test (latency + tokens/sec), and saved server profiles. Backed by GET/PUT `/api/llm/config` plus GET `/api/llm/local-status`, POST `/api/llm/local-test`, and GET/POST/DELETE `/api/llm/local-profiles` (`packages/web/src/server/routes-llm.ts`).
+- **Google/Gemini vendor (none, impact: medium):** the CLI's `google` vendor (`packages/core/config.js`) has no dashboard representation — `VENDORS` in `llm-provider.ts` and `VALID_VENDORS` in `routes-llm.ts` cover only claude/codex/local; no tab, no field in the `GET`/`PUT /api/llm/config` contract.
 
 ## rex package CLI
 
@@ -70,6 +76,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `rex prune` | full | medium | Prune preview + confirmation + execute |
 | `rex reshape` | **full** | medium | Reshape action in the Validation view: previews proposals via `--dry-run`, applies only on explicit confirm |
 | `rex fix` | **full** | medium | Fix action in the Validation view: `--dry-run` preview, then apply, then automatic re-validation |
+| `rex restore` | **full** | high | Snapshots/Restore panel on the Rex dashboard (list + restore-with-confirmation) — GET `/api/rex/backups`, POST `/api/rex/restore` (`routes-rex/restore.ts`). The in-app undo for `reorganize`/`prune`/`reshape`/`fix` |
 | `rex verify` | **full** | medium | Requirements page renders coverage + traceability matrix (per-item CRUD deferred to the task detail panel) |
 | `rex analyze` / `import` | partial | medium | Same orphaned-panel regression as `ndx plan` |
 | `rex usage` | full | medium | Same coverage as `ndx usage` |

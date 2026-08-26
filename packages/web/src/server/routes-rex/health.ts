@@ -35,7 +35,7 @@ export function routeHealthReorganize(
   }
 
   // GET /api/rex/reorganize — detect reorganization proposals
-  // Query params: mode=fast|full (default: full)
+  // Query params: mode=fast|full (default: fast)
   if (path === "reorganize" && method === "GET") {
     return (async () => {
       const doc = loadPRDSync(ctx.rexDir);
@@ -49,7 +49,7 @@ export function routeHealthReorganize(
       }
 
       const urlObj = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-      const mode = urlObj.searchParams.get("mode") ?? "full";
+      const mode = urlObj.searchParams.get("mode") ?? "fast";
 
       const plan = detectReorganizations(doc.items);
       const structural = {

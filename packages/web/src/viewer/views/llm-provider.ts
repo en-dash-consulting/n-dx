@@ -19,17 +19,34 @@ interface VendorConfig {
   lightModel: string | null;
 }
 
+interface GoogleVendorConfig {
+  model: string | null;
+  lightModel: string | null;
+  /** Whether an API key is already saved. The key itself is never returned. */
+  hasApiKey: boolean;
+}
+
+interface LocalVerifierVendorConfig {
+  host: string | null;
+  port: number | null;
+  model: string | null;
+  maxCycles: number | null;
+}
+
 interface LocalVendorConfig {
   model: string | null;
   lightModel: string | null;
   host: string | null;
   port: number | null;
+  maxContextTokens: number | null;
+  verifier: LocalVerifierVendorConfig;
 }
 
 interface LlmConfigResponse {
   vendor: string | null;
   claude: VendorConfig;
   codex: VendorConfig;
+  google: GoogleVendorConfig;
   local: LocalVendorConfig;
   legacyClaude: VendorConfig;
   autoFailover?: boolean;
@@ -64,6 +81,7 @@ interface LocalProfile {
 const VIEWER_LLM_VENDOR = {
   CLAUDE: "claude",
   CODEX: "codex",
+  GOOGLE: "google",
   LOCAL: "local",
 } as const;
 
@@ -73,12 +91,14 @@ type CloudViewerVendor = typeof VIEWER_LLM_VENDOR.CLAUDE | typeof VIEWER_LLM_VEN
 const VENDORS = [
   { id: VIEWER_LLM_VENDOR.CLAUDE, label: "Claude", subtitle: "Anthropic" },
   { id: VIEWER_LLM_VENDOR.CODEX, label: "Codex", subtitle: "OpenAI" },
+  { id: VIEWER_LLM_VENDOR.GOOGLE, label: "Google", subtitle: "Gemini" },
   { id: VIEWER_LLM_VENDOR.LOCAL, label: "Local", subtitle: "LM Studio / Ollama" },
 ] satisfies ReadonlyArray<{ id: ViewerLLMVendor; label: string; subtitle: string }>;
 
 const MODEL_SUGGESTIONS: Record<ViewerLLMVendor, string[]> = {
   [VIEWER_LLM_VENDOR.CLAUDE]: ["claude-sonnet-4-5", "claude-opus-4-5", "claude-haiku-3-5", "claude-3-7-sonnet-20250219"],
   [VIEWER_LLM_VENDOR.CODEX]: ["codex-mini", "o4-mini", "o3"],
+  [VIEWER_LLM_VENDOR.GOOGLE]: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
   [VIEWER_LLM_VENDOR.LOCAL]: [],
 };
 
@@ -289,6 +309,72 @@ function VendorSection({
       onChange,
       dirty: dirtyKeys.has(lightKey),
     }),
+  );
+}
+
+// ── Google (Gemini) settings card ──────────────────────────────────────
+
+function GoogleSection({
+  config,
+  editValues,
+  onChange,
+  dirtyKeys,
+}: {
+  config: GoogleVendorConfig;
+  editValues: Record<string, string>;
+  onChange: (key: string, v: string) => void;
+  dirtyKeys: Set<string>;
+}) {
+  const cliName = useCliName();
+  const suggestions = MODEL_SUGGESTIONS[VIEWER_LLM_VENDOR.GOOGLE];
+  const apiKeyDirty = dirtyKeys.has("google.api_key");
+
+  return h("div", { class: "llm-vendor-section" },
+    h(ModelField, {
+      fieldKey: "google.model",
+      label: "Primary model",
+      description: `Used for agentic tasks (${cliName} work, ${cliName} plan). Must be a Gemini model ID. Leave blank for the CLI default.`,
+      value: editValues["google.model"] ?? config.model ?? "",
+      suggestions,
+      onChange,
+      dirty: dirtyKeys.has("google.model"),
+    }),
+    h(ModelField, {
+      fieldKey: "google.lightModel",
+      label: "Light model",
+      description: "Cheaper Gemini model for recommendations and summaries. Falls back to primary if blank.",
+      value: editValues["google.lightModel"] ?? config.lightModel ?? "",
+      suggestions,
+      onChange,
+      dirty: dirtyKeys.has("google.lightModel"),
+    }),
+
+    h("hr", { class: "llm-rule" }),
+
+    h("div", { class: `llm-field${apiKeyDirty ? " llm-field-dirty" : ""}` },
+      h("label", { class: "llm-field-label", htmlFor: "google.api_key" },
+        "Gemini API key",
+        apiKeyDirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+      ),
+      h("p", { class: "llm-field-desc" },
+        config.hasApiKey
+          ? "A key is already saved (not shown here). Enter a new key to replace it, or type then clear this field to remove it."
+          : h("span", null,
+              "Required for the Google vendor to work. Get a key at ",
+              h("a", { href: "https://aistudio.google.com/apikey", target: "_blank", rel: "noreferrer" }, "aistudio.google.com/apikey"),
+              ".",
+            ),
+      ),
+      h("input", {
+        id: "google.api_key",
+        type: "password",
+        class: "llm-text-input",
+        autocomplete: "off",
+        value: editValues["google.api_key"] ?? "",
+        placeholder: config.hasApiKey ? "•••••••• (saved — leave blank to keep)" : "AIza…",
+        onInput: (e: Event) => onChange("google.api_key", (e.target as HTMLInputElement).value),
+      }),
+    ),
   );
 }
 
@@ -538,6 +624,18 @@ function LocalSection({
   const model = editValues["local.model"]      ?? config.model             ?? "";
   const light = editValues["local.lightModel"] ?? config.lightModel        ?? "";
 
+  const maxContextTokens = editValues["local.maxContextTokens"]
+    ?? (config.maxContextTokens !== null ? String(config.maxContextTokens) : "");
+  const verifierHost = editValues["local.verifier.host"] ?? config.verifier.host ?? "";
+  const verifierPort = editValues["local.verifier.port"]
+    ?? (config.verifier.port !== null ? String(config.verifier.port) : "");
+  const verifierModel = editValues["local.verifier.model"] ?? config.verifier.model ?? "";
+  const verifierMaxCycles = editValues["local.verifier.maxCycles"]
+    ?? (config.verifier.maxCycles !== null ? String(config.verifier.maxCycles) : "");
+  const verifierDirty = dirtyKeys.has("local.verifier.host") || dirtyKeys.has("local.verifier.port")
+    || dirtyKeys.has("local.verifier.model") || dirtyKeys.has("local.verifier.maxCycles");
+  const verifierConfigured = config.verifier.host !== null || config.verifier.port !== null;
+
   const connDirty = dirtyKeys.has("local.host") || dirtyKeys.has("local.port");
 
   // Model field — select when live list available, text input otherwise
@@ -648,6 +746,86 @@ function LocalSection({
       host, port, model,
       hasDirtyFields: connDirty || dirtyKeys.has("local.model"),
     }),
+
+    h("hr", { class: "llm-rule" }),
+
+    // ── Advanced: context budget + second-model verifier
+    h("p", { class: "llm-section-sub" }, "Advanced"),
+    h("div", { class: `llm-field${dirtyKeys.has("local.maxContextTokens") ? " llm-field-dirty" : ""}` },
+      h("label", { class: "llm-field-label", htmlFor: "local.maxContextTokens" },
+        "Max context tokens",
+        dirtyKeys.has("local.maxContextTokens") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+      ),
+      h("p", { class: "llm-field-desc" },
+        "Check that a brief fits before sending it, so an oversized prompt fails fast with a clear error instead of a cryptic HTTP 400. Match your server's \"Context Length\" setting. Leave blank to skip this check.",
+      ),
+      h("input", {
+        id: "local.maxContextTokens",
+        type: "text",
+        inputMode: "numeric",
+        class: "llm-text-input",
+        value: maxContextTokens,
+        placeholder: "e.g. 32768",
+        onInput: (e: Event) => onChange("local.maxContextTokens", (e.target as HTMLInputElement).value),
+      }),
+    ),
+    h("details", { class: "llm-verifier-details", open: verifierConfigured || verifierDirty },
+      h("summary", { class: "llm-verifier-summary" },
+        "Second-model verifier (optional)",
+        verifierDirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+      ),
+      h("p", { class: "llm-field-desc" },
+        "After the primary model finishes, send its solution to a second local endpoint for review before finalizing the run. Good pairing: a smaller/faster model here. Leave all fields blank to disable.",
+      ),
+      h("div", { class: "llm-conn-row" },
+        h("div", { class: `llm-field${dirtyKeys.has("local.verifier.host") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.verifier.host" }, "Host"),
+          h("input", {
+            id: "local.verifier.host",
+            type: "text",
+            class: "llm-text-input",
+            value: verifierHost,
+            placeholder: "localhost",
+            onInput: (e: Event) => onChange("local.verifier.host", (e.target as HTMLInputElement).value),
+          }),
+        ),
+        h("div", { class: `llm-field${dirtyKeys.has("local.verifier.port") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.verifier.port" }, "Port"),
+          h("input", {
+            id: "local.verifier.port",
+            type: "text",
+            inputMode: "numeric",
+            class: "llm-text-input",
+            value: verifierPort,
+            placeholder: "1235",
+            onInput: (e: Event) => onChange("local.verifier.port", (e.target as HTMLInputElement).value),
+          }),
+        ),
+      ),
+      h(ModelField, {
+        fieldKey: "local.verifier.model",
+        label: "Model",
+        description: "Leave blank to use whichever model is currently loaded on the verifier endpoint.",
+        value: verifierModel,
+        suggestions: [],
+        onChange,
+        dirty: dirtyKeys.has("local.verifier.model"),
+        placeholder: "model-id",
+      }),
+      h("div", { class: `llm-field${dirtyKeys.has("local.verifier.maxCycles") ? " llm-field-dirty" : ""}` },
+        h("label", { class: "llm-field-label", htmlFor: "local.verifier.maxCycles" }, "Max review cycles"),
+        h("p", { class: "llm-field-desc" }, "How many FAIL → revise rounds before finalizing regardless (default: 2)."),
+        h("input", {
+          id: "local.verifier.maxCycles",
+          type: "text",
+          inputMode: "numeric",
+          class: "llm-text-input",
+          value: verifierMaxCycles,
+          placeholder: "2",
+          onInput: (e: Event) => onChange("local.verifier.maxCycles", (e.target as HTMLInputElement).value),
+        }),
+      ),
+    ),
 
     h("hr", { class: "llm-rule" }),
 
@@ -766,21 +944,55 @@ export function LlmProviderView() {
   const handleToggle = useCallback((key: string, val: boolean) => setEditToggles((p) => ({ ...p, [key]: val })), []);
 
   // ── Dirty tracking
+  //
+  // Scoped to `effectiveVendor` (the currently-visible tab) only. editValues
+  // itself is never cleared on tab switch — so a draft edit on a hidden tab
+  // is preserved if the user comes back to it — but it must never leak into
+  // a Save triggered from a *different* tab. Computing dirtyKeys (and thus
+  // handleSave's payload and the "N unsaved changes" count below) only from
+  // the active tab's own fields is what keeps that hidden draft from being
+  // silently included in an unrelated save.
   const dirtyKeys = new Set<string>();
   if (data) {
-    for (const vid of [VIEWER_LLM_VENDOR.CLAUDE, VIEWER_LLM_VENDOR.CODEX] as const) {
+    if (effectiveVendor === VIEWER_LLM_VENDOR.CLAUDE || effectiveVendor === VIEWER_LLM_VENDOR.CODEX) {
+      const vid = effectiveVendor;
       for (const f of ["model", "lightModel"] as const) {
         const k = `${vid}.${f}`;
         if (k in editValues && editValues[k] !== (data[vid][f] ?? "")) dirtyKeys.add(k);
       }
-    }
-    for (const f of ["model", "lightModel", "host"] as const) {
-      const k = `local.${f}`;
-      if (k in editValues && editValues[k] !== (data.local[f] ?? "")) dirtyKeys.add(k);
-    }
-    if ("local.port" in editValues) {
-      const saved = data.local.port !== null ? String(data.local.port) : "1234";
-      if (editValues["local.port"] !== saved) dirtyKeys.add("local.port");
+    } else if (effectiveVendor === VIEWER_LLM_VENDOR.GOOGLE) {
+      for (const f of ["model", "lightModel"] as const) {
+        const k = `google.${f}`;
+        if (k in editValues && editValues[k] !== (data.google[f] ?? "")) dirtyKeys.add(k);
+      }
+      // api_key is write-only (never echoed back by GET), so there's no saved
+      // value to diff against — any interaction with the field at all (typed
+      // then possibly cleared again) is the user's explicit signal to change it.
+      if ("google.api_key" in editValues) dirtyKeys.add("google.api_key");
+    } else if (effectiveVendor === VIEWER_LLM_VENDOR.LOCAL) {
+      for (const f of ["model", "lightModel", "host"] as const) {
+        const k = `local.${f}`;
+        if (k in editValues && editValues[k] !== (data.local[f] ?? "")) dirtyKeys.add(k);
+      }
+      if ("local.port" in editValues) {
+        const saved = data.local.port !== null ? String(data.local.port) : "1234";
+        if (editValues["local.port"] !== saved) dirtyKeys.add("local.port");
+      }
+      if ("local.maxContextTokens" in editValues) {
+        const saved = data.local.maxContextTokens !== null ? String(data.local.maxContextTokens) : "";
+        if (editValues["local.maxContextTokens"] !== saved) dirtyKeys.add("local.maxContextTokens");
+      }
+      for (const f of ["host", "model"] as const) {
+        const k = `local.verifier.${f}`;
+        if (k in editValues && editValues[k] !== (data.local.verifier[f] ?? "")) dirtyKeys.add(k);
+      }
+      for (const f of ["port", "maxCycles"] as const) {
+        const k = `local.verifier.${f}`;
+        if (k in editValues) {
+          const saved = data.local.verifier[f] !== null ? String(data.local.verifier[f]) : "";
+          if (editValues[k] !== saved) dirtyKeys.add(k);
+        }
+      }
     }
   }
   const vendorDirty = pendingVendor !== undefined && pendingVendor !== (data?.vendor ?? null);
@@ -900,10 +1112,22 @@ export function LlmProviderView() {
           dirtyKeys,
         })
       : null,
+    effectiveVendor === VIEWER_LLM_VENDOR.GOOGLE
+      ? h(GoogleSection, {
+          key: VIEWER_LLM_VENDOR.GOOGLE,
+          config: data!.google ?? { model: null, lightModel: null, hasApiKey: false },
+          editValues,
+          onChange: handleField,
+          dirtyKeys,
+        })
+      : null,
     showLocal
       ? h(LocalSection, {
           key: VIEWER_LLM_VENDOR.LOCAL,
-          config: data!.local ?? { model: null, lightModel: null, host: null, port: null },
+          config: data!.local ?? {
+            model: null, lightModel: null, host: null, port: null,
+            maxContextTokens: null, verifier: { host: null, port: null, model: null, maxCycles: null },
+          },
           editValues,
           onChange: handleField,
           dirtyKeys,

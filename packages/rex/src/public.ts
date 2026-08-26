@@ -493,6 +493,15 @@ export type {
   FileValidationErrorCode,
 } from "./analyze/file-validation.js";
 
+// ---- PRD tree backup snapshots ----------------------------------------------
+
+export {
+  getAvailableBackups,
+  restoreFromBackup,
+  encodeSnapshotId,
+} from "./core/backup-snapshots.js";
+export type { BackupSnapshot } from "./core/backup-snapshots.js";
+
 // ---- MCP server factory -----------------------------------------------------
 
 export { createRexMcpServer } from "./cli/mcp.js";

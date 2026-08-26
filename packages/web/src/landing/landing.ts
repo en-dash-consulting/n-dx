@@ -73,6 +73,178 @@ function initCopyButtons(): void {
   });
 }
 
+// ── Setup wizard (bootstraps this project without a terminal) ──
+
+interface InitStatusResponse {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  output: string;
+  error: string | null;
+}
+
+const WIZARD_VENDOR_HINTS: Record<string, string> = {
+  claude: "Uses the <code>claude</code> CLI — install and sign in on this machine first.",
+  codex: "Uses the <code>codex</code> CLI — install and sign in on this machine first.",
+  google: "Needs a Gemini API key. Paste one below, or skip and set it later in Settings.",
+  local: "Connects to a local OpenAI-compatible server (LM Studio, Ollama). No account needed.",
+};
+
+function initSetupWizard(): void {
+  const form = document.getElementById("setup-wizard") as HTMLFormElement | null;
+  const vendorTabs = document.getElementById("wizard-vendor-tabs");
+  const submitBtn = document.getElementById("wizard-submit") as HTMLButtonElement | null;
+  if (!form || !vendorTabs || !submitBtn) return;
+
+  const vendorHint = document.getElementById("wizard-vendor-hint");
+  const submitLabel = submitBtn.querySelector<HTMLElement>(".wizard-submit-label");
+  const submitSpinner = submitBtn.querySelector<HTMLElement>(".wizard-submit-spinner");
+  const progressEl = document.getElementById("wizard-progress");
+  const errorEl = document.getElementById("wizard-error");
+  const successEl = document.getElementById("wizard-success");
+  const googleFields = form.querySelector<HTMLElement>('.wizard-vendor-fields[data-for="google"]');
+  const localFields = form.querySelector<HTMLElement>('.wizard-vendor-fields[data-for="local"]');
+  const googleKeyInput = document.getElementById("wizard-google-key") as HTMLInputElement | null;
+  const localHostInput = document.getElementById("wizard-local-host") as HTMLInputElement | null;
+  const localPortInput = document.getElementById("wizard-local-port") as HTMLInputElement | null;
+
+  let selectedVendor = "claude";
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  function selectVendor(vendor: string): void {
+    selectedVendor = vendor;
+    vendorTabs!.querySelectorAll<HTMLButtonElement>(".wizard-vendor-tab").forEach((tab) => {
+      tab.setAttribute("aria-pressed", String(tab.dataset.vendor === vendor));
+    });
+    if (vendorHint) vendorHint.innerHTML = WIZARD_VENDOR_HINTS[vendor] ?? "";
+    if (googleFields) googleFields.hidden = vendor !== "google";
+    if (localFields) localFields.hidden = vendor !== "local";
+  }
+
+  vendorTabs.addEventListener("click", (e) => {
+    const tab = (e.target as HTMLElement).closest<HTMLButtonElement>(".wizard-vendor-tab");
+    if (tab?.dataset.vendor) selectVendor(tab.dataset.vendor);
+  });
+
+  function setBusy(busy: boolean): void {
+    submitBtn!.disabled = busy;
+    if (submitLabel) submitLabel.textContent = busy ? "Initializing…" : "Initialize project";
+    if (submitSpinner) submitSpinner.hidden = !busy;
+  }
+
+  function showError(message: string): void {
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.hidden = false;
+    }
+    if (progressEl) progressEl.hidden = true;
+  }
+
+  function stopPolling(): void {
+    if (pollTimer !== null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  async function pollStatus(): Promise<void> {
+    try {
+      const res = await fetch("/api/commands/init/status");
+      if (!res.ok) return;
+      const data = (await res.json()) as InitStatusResponse;
+      if (data.running || !data.finishedAt) return;
+
+      stopPolling();
+      if (data.error) {
+        setBusy(false);
+        showError(data.error);
+        return;
+      }
+      if (progressEl) progressEl.hidden = true;
+      if (successEl) successEl.hidden = false;
+      // The server now sees .rex/.sourcevision/.hench on disk, so the next
+      // request to "/" serves the real dashboard instead of this page.
+      setTimeout(() => {
+        location.href = "/";
+      }, 900);
+    } catch {
+      // Transient network hiccup — keep polling, the interval will retry.
+    }
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (errorEl) errorEl.hidden = true;
+    if (successEl) successEl.hidden = true;
+
+    const assistants = Array.from(
+      form.querySelectorAll<HTMLInputElement>('input[name="assistant"]:checked'),
+    ).map((el) => el.value);
+    if (assistants.length === 0) {
+      showError("Choose at least one assistant.");
+      return;
+    }
+
+    const body: Record<string, unknown> = { assistants, provider: selectedVendor };
+    if (selectedVendor === "google") {
+      const key = googleKeyInput?.value.trim();
+      if (key) body.googleApiKey = key;
+    }
+    if (selectedVendor === "local") {
+      const host = localHostInput?.value.trim();
+      if (host) body.localHost = host;
+      const portRaw = localPortInput?.value.trim();
+      if (portRaw) {
+        const port = parseInt(portRaw, 10);
+        if (!Number.isNaN(port)) body.localPort = port;
+      }
+    }
+
+    setBusy(true);
+    if (progressEl) progressEl.hidden = false;
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/commands/init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok && res.status !== 409) {
+          const data = (await res.json().catch(() => ({ error: `HTTP ${res.status}` }))) as { error?: string };
+          setBusy(false);
+          showError(data.error || "Failed to start initialization.");
+          return;
+        }
+        // 202 (started) or 409 (already running, e.g. a previous click that
+        // didn't get a response back) both mean: start watching status.
+        stopPolling();
+        pollTimer = setInterval(() => void pollStatus(), 1500);
+      } catch (err) {
+        setBusy(false);
+        showError(err instanceof Error ? err.message : "Failed to start initialization.");
+      }
+    })();
+  });
+
+  selectVendor(selectedVendor);
+}
+
+// ── "Prefer the terminal?" toggle for the raw CLI fallback ──
+
+function initCliFallbackToggle(): void {
+  const toggle = document.getElementById("wizard-toggle-cli");
+  const fallback = document.getElementById("cli-fallback");
+  if (!toggle || !fallback) return;
+
+  toggle.addEventListener("click", () => {
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!expanded));
+    fallback.hidden = expanded;
+    toggle.textContent = expanded ? "Prefer the terminal?" : "Hide terminal commands";
+  });
+}
+
 // ── Smooth scroll for anchor links ──
 
 function initSmoothScroll(): void {
@@ -346,6 +518,8 @@ function initLanding(): void {
 
   initThemeToggle();
   initCopyButtons();
+  initSetupWizard();
+  initCliFallbackToggle();
   initSmoothScroll();
   initFadeAnimations(prefersReducedMotion);
   initTerminalDemo(prefersReducedMotion);

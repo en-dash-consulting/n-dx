@@ -383,6 +383,8 @@ describe("web → rex gateway contract", () => {
     "resolveSiblingSlugs",
     "resolveStore",
     "cascadeParentReset",
+    "getAvailableBackups",
+    "restoreFromBackup",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -669,6 +671,7 @@ describe("gateway export auto-detection", () => {
         "handleEditItem", "aggregateItemTokenUsage", "aggregateItemDurations",
         "serializeDocument", "parseDocument",
         "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "cascadeParentReset",
+        "getAvailableBackups", "restoreFromBackup",
         "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "CHILD_LEVEL"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME"],

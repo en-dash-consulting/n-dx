@@ -32,6 +32,7 @@ export type { RawProposal, ProposalEditorProps } from "./proposal-editor.js";
 export { ExecutionPanel } from "./execution-panel.js";
 export type { ExecutionPanelProps } from "./execution-panel.js";
 export { ReorganizePanel } from "./reorganize-panel.js";
+export { RestorePanel } from "./restore-panel.js";
 export {
   countVisibleNodes,
   sliceVisibleTree,

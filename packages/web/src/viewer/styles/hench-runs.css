@@ -500,6 +500,29 @@
   border-radius: 3px;
 }
 
+.hench-empty-next-task {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.hench-empty-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.hench-empty-link-btn:hover {
+  color: var(--accent-dim);
+}
+
 /* ── Detail view ─────────────────────────────────────────────────── */
 
 .hench-run-detail {
