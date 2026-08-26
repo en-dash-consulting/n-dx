@@ -74,3 +74,34 @@ describe("timestamp instructions are platform-neutral", () => {
     });
   }
 });
+
+// ── Commit steps must not be POSIX-only ──────────────────────────────────────
+
+describe("commit-message construction is shell-neutral", () => {
+  for (const name of SKILLS) {
+    it(`${name}: builds no commit message with a heredoc or command substitution`, () => {
+      const body = getSkillBody(name);
+
+      // `cat <<'EOF'` and `$(...)` do not exist in PowerShell or cmd.exe, and
+      // Git Bash is not part of Windows — it arrives only with Git for
+      // Windows, whose usr/bin is NOT on PATH outside Git Bash itself. A
+      // heredoc commit step therefore fails at the LAST step of the skill,
+      // after all real work is done, on a stock Windows shell. Worse, an
+      // assistant improvising around the parse error can drop the trailer
+      // block, and a missing Co-Authored-By fails silently (the commit lands
+      // but vanishes from the dashboard merge graph). Build the message with
+      // the assistant's file-writing tool and `git commit -F <file>` instead.
+      expect(
+        body,
+        `${name} uses a heredoc ('cat <<') to build a commit message — ` +
+          `POSIX-only, fails in PowerShell/cmd.exe. Write the message to a ` +
+          `scratch file with the file-writing tool and use 'git commit -F'.`,
+      ).not.toMatch(/cat <</);
+      expect(
+        body,
+        `${name} uses '$(...)' command substitution in a commit step — ` +
+          `POSIX-only, fails in PowerShell/cmd.exe.`,
+      ).not.toMatch(/\$\(cat/);
+    });
+  }
+});

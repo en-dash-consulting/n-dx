@@ -27,17 +27,16 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
    - Rename items for consistency with `edit_item` (rex MCP)
 5. Run `reorganize` (rex MCP) with mode `fast` to verify no structural issues remain
 6. Show the updated structure via `get_prd_status`
-7. **Commit**: run `git status --porcelain` against the project root — this catches every MCP-driven write under `.rex/prd_tree/` (`move_item`, `merge_items`, `edit_item`, `add_item`, and `reorganize` all mutate the folder tree). If the output is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage all changes with `git add -A` and commit with the n-dx authorship + model audit trailer block via a HEREDOC:
+7. **Commit**: run `git status --porcelain` against the project root — this catches every MCP-driven write under `.rex/prd_tree/` (`move_item`, `merge_items`, `edit_item`, `add_item`, and `reorganize` all mutate the folder tree). If the output is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage all changes with `git add -A` and commit with the n-dx authorship + model audit trailer block . Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to a scratch file such as `.git/NDX_COMMIT_MSG`:
 
-   ```sh
-   git commit -m "$(cat <<'EOF'
+   ```
    ndx-reshape: restructure PRD hierarchy
 
    N-DX: skill/ndx-reshape
    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
-   EOF
-   )"
    ```
+
+   Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
 
    Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
 

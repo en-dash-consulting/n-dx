@@ -19,17 +19,16 @@ Capture a requirement, feature idea, or task from conversation context.
 6. Present to the user for confirmation before creating
 7. Use `add_item` (rex MCP) to create, then confirm placement in hierarchy
 8. Check for dependencies: does this item block or depend on other pending items? If so, set `blockedBy` via `edit_item` (rex MCP)
-9. **Commit**: run `git status --porcelain` against the project root — this catches MCP side-effect writes (e.g. `add_item` and `edit_item` write to `.rex/prd_tree/<slug>/index.md`) even when no files were edited directly. If the output is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage all changes with `git add -A` and commit with the n-dx authorship + model audit trailer block via a HEREDOC:
+9. **Commit**: run `git status --porcelain` against the project root — this catches MCP side-effect writes (e.g. `add_item` and `edit_item` write to `.rex/prd_tree/<slug>/index.md`) even when no files were edited directly. If the output is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage all changes with `git add -A` and commit with the n-dx authorship + model audit trailer block . Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to a scratch file such as `.git/NDX_COMMIT_MSG`:
 
-   ```sh
-   git commit -m "$(cat <<'EOF'
+   ```
    ndx-capture: add '<title>' to PRD
 
    N-DX: skill/ndx-capture
    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
-   EOF
-   )"
    ```
+
+   Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
 
    Substitute `<title>` with the captured item title. Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
 
