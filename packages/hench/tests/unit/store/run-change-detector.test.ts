@@ -241,8 +241,12 @@ describe("RunChangeDetector", () => {
       // Pin BEFORE the first read as well as after the rewrite: a fresh write leaves
       // a fractional mtimeMs while utimes stores whole milliseconds, so pinning only
       // the second write would leave the snapshots different and the change would be
-      // detected for the wrong reason.
-      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      // detected for the wrong reason. The pin sits slightly in the future so the
+      // file is inside the mtime-granularity window at scan time no matter how
+      // slowly the test host schedules the intervening awaits — the detector
+      // treats "written during or after scan start" as fresh, so a future mtime
+      // is deterministically fresh while "just written" is a race.
+      const pinned = new Date(Math.floor(Date.now()) + 5000);
       await utimes(runFile, pinned, pinned);
 
       const det = detector();
@@ -276,7 +280,9 @@ describe("RunChangeDetector", () => {
       // this scan could not check.
       const runFile = join(runsDir, "run-a.json");
       await writeRunFile("run-a.json", '{"id":"aaa"}');
-      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      // Future pin: keeps the file inside the mtime-granularity window at scan
+      // time (so the checkpoint carries a hash) regardless of host scheduling.
+      const pinned = new Date(Math.floor(Date.now()) + 5000);
       await utimes(runFile, pinned, pinned);
 
       const det = detector();
@@ -313,10 +319,14 @@ describe("RunChangeDetector", () => {
       // on an old file" would also pass if hashing did not exist at all.
       const runFile = join(runsDir, "run-a.json");
       await writeRunFile("run-a.json", '{"id":"aaa"}');
+      // Future pin: "just written" is only inside the granularity window if the
+      // scan starts within milliseconds, which a busy host does not guarantee.
+      const future = new Date(Date.now() + 5000);
+      await utimes(runFile, future, future);
 
       const det = detector();
       const fresh = await det.detectChanges();
-      // Just written, so inside the granularity window: hash carried.
+      // Inside the granularity window: hash carried.
       expect(typeof fresh.checkpoint.files["run-a.json"]?.contentHash).toBe("string");
       expect(fresh.checkpoint.files["run-a.json"]?.mtimeMayBeShared).toBe(true);
       await det.saveCheckpoint(fresh.checkpoint);
