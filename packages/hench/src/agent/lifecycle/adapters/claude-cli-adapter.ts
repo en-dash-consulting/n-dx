@@ -102,6 +102,16 @@ export interface ClaudeCliInput {
    * built-in default mode.
    */
   permissionMode?: PermissionMode;
+  /**
+   * When set, resume this Claude CLI session instead of starting a new one
+   * (`--resume <id>`). The prompt on stdin becomes the next turn of that
+   * conversation, so the model still has the task context in its window.
+   *
+   * The flag is appended last so it cannot be shadowed by an earlier
+   * occurrence, and it is orthogonal to `modelOverride` — resuming with a
+   * different model is exactly what the review pass does.
+   */
+  resumeSessionId?: string;
 }
 
 /** Separates the system prompt from the task prompt when both travel via stdin. */
@@ -137,6 +147,7 @@ export function buildClaudeCliArgs(
     ...(isWindows ? [input.allowedTools.join(",")] : input.allowedTools),
     ...(input.modelOverride ? ["--model", input.modelOverride] : []),
     ...(input.permissionMode ? ["--permission-mode", input.permissionMode] : []),
+    ...(input.resumeSessionId ? ["--resume", input.resumeSessionId] : []),
   ];
 
   return { args, stdinContent };
@@ -374,6 +385,7 @@ export const claudeCliAdapter: VendorAdapter = {
       allowedTools,
       modelOverride: opts.model,
       permissionMode: opts.permissionMode,
+      resumeSessionId: opts.resumeSessionId,
     });
 
     return {

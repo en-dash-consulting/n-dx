@@ -942,3 +942,58 @@ describe("ClaudeCliAdapter: end-to-end pipeline", () => {
     expect(claudeCliAdapter.classifyError(unknownErr)).toBe("unknown");
   });
 });
+
+describe("session resume (--resume)", () => {
+  const base = {
+    systemPrompt: "SYS",
+    promptText: "TASK",
+    allowedTools: ["Bash(git:*)", "Read"],
+  };
+
+  it("omits --resume entirely when no session id is supplied", () => {
+    const { args } = buildClaudeCliArgs(base, "darwin");
+
+    expect(args).not.toContain("--resume");
+  });
+
+  it("appends --resume <id> when a session id is supplied", () => {
+    const { args } = buildClaudeCliArgs(
+      { ...base, resumeSessionId: "9af5cec8-c78d-4bd8-bfb6-4207314c9d8c" },
+      "darwin",
+    );
+
+    const idx = args.indexOf("--resume");
+    expect(idx).toBeGreaterThan(-1);
+    expect(args[idx + 1]).toBe("9af5cec8-c78d-4bd8-bfb6-4207314c9d8c");
+  });
+
+  it("combines --resume with a different --model — the review pass depends on it", () => {
+    const { args } = buildClaudeCliArgs(
+      { ...base, modelOverride: "claude-opus-5", resumeSessionId: "sess-1" },
+      "darwin",
+    );
+
+    expect(args[args.indexOf("--model") + 1]).toBe("claude-opus-5");
+    expect(args[args.indexOf("--resume") + 1]).toBe("sess-1");
+  });
+
+  it("still delivers the prompt on stdin when resuming, on both platforms", () => {
+    const posix = buildClaudeCliArgs({ ...base, resumeSessionId: "s" }, "darwin");
+    const win = buildClaudeCliArgs({ ...base, resumeSessionId: "s" }, "win32");
+
+    expect(posix.stdinContent).toBe("TASK");
+    expect(win.stdinContent).toBe(`SYS${WINDOWS_STDIN_PROMPT_SEPARATOR}TASK`);
+    expect(win.args).toContain("--resume");
+  });
+
+  it("passes resumeSessionId through buildSpawnConfig", () => {
+    const config = claudeCliAdapter.buildSpawnConfig(
+      { sections: [{ name: "system", content: "SYS" }, { name: "brief", content: "TASK" }] },
+      { sandbox: "workspace-write", approvals: "never", allowedCommands: ["git"] } as never,
+      { model: "claude-opus-5", resumeSessionId: "sess-2" },
+    );
+
+    expect(config.args).toContain("--resume");
+    expect(config.args[config.args.indexOf("--resume") + 1]).toBe("sess-2");
+  });
+});

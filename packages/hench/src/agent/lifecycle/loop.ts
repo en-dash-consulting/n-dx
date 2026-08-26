@@ -689,7 +689,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
 
   heartbeat.stop();
 
-  if (opts.review && run.status === "completed") {
+  if (opts.approveDiff && run.status === "completed") {
     await runReviewGate(projectDir, store, taskId, run, {
       rollbackOnFailure: opts.rollbackOnFailure,
       yes: opts.yes,
@@ -1145,7 +1145,7 @@ async function runLocalToolLoop(params: {
 
   heartbeat.stop();
 
-  if (opts.review && run.status === "completed") {
+  if (opts.approveDiff && run.status === "completed") {
     await runReviewGate(projectDir, store, taskId, run, {
       rollbackOnFailure: opts.rollbackOnFailure,
       yes: opts.yes,
@@ -1506,7 +1506,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   heartbeat.stop();
 
   // Shared: review gate
-  if (opts.review && run.status === "completed") {
+  if (opts.approveDiff && run.status === "completed") {
     await runReviewGate(projectDir, store, taskId, run, {
       rollbackOnFailure: opts.rollbackOnFailure,
       yes: opts.yes,
