@@ -226,7 +226,15 @@ describe("IncrementalTaskUsageAggregator", () => {
       // two snapshots different and the change gets detected for the wrong
       // reason — this test passed against the unfixed code until both were
       // pinned.
-      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      //
+      // The instant is fixed rather than read back off the file so it also lands
+      // inside the granularity window deterministically. Detecting this rewrite
+      // rests entirely on the content hash — mtime and size are equal by
+      // construction — and a hash is only carried when the FIRST scan runs within
+      // MTIME_GRANULARITY_MS (16ms) of the write, a bound a loaded CI runner
+      // misses. When it did, the rewrite went unnoticed and the failure read as a
+      // detector that no longer sees same-size rewrites.
+      const pinned = new Date(Date.now() + 60_000);
       await utimes(runFile, pinned, pinned);
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);
@@ -366,22 +374,36 @@ describe("IncrementalTaskUsageAggregator", () => {
       // re-snapshots anyway and would hide the defect.
       const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
       await utimes(runFile, pinned, pinned);
+      // Read back what the filesystem actually stored rather than assuming utimes
+      // round-trips exactly, then drive the clock from that.
+      const pinnedMs = (await stat(runFile)).mtimeMs;
 
-      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
-      await aggregator.getTaskUsage();
+      // Move the clock rather than waiting on it. Both phases are needed here —
+      // in-window is mtime >= now - 16ms, aged is mtime < now - 16ms — and the
+      // poll in between has to stay quiet, so the mtime is the one thing that
+      // cannot move. Sleeping made the in-window phase depend on the first scan
+      // landing within 16ms of the write, which a loaded CI runner misses.
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(pinnedMs);
 
-      // Precondition, not decoration: if the first scan happened more than 16ms
-      // after the write, nothing was ever carried and the rest would pass
-      // vacuously.
-      expect(snapshotOf(aggregator, "run-1.json")?.contentHash).not.toBe(null);
+        const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+        await aggregator.getTaskUsage();
 
-      await new Promise((r) => setTimeout(r, PAST_GRANULARITY_WINDOW_MS));
+        // Precondition, not decoration: with nothing carried the rest of this case
+        // would pass vacuously.
+        expect(snapshotOf(aggregator, "run-1.json")?.contentHash).not.toBe(null);
 
-      // A quiet poll: same mtime, same size, same bytes.
-      await aggregator.getTaskUsage();
+        vi.setSystemTime(pinnedMs + PAST_GRANULARITY_WINDOW_MS);
 
-      expect(snapshotOf(aggregator, "run-1.json")?.mtimeMayBeShared).toBe(false);
-      expect(snapshotOf(aggregator, "run-1.json")?.contentHash).toBe(null);
+        // A quiet poll: same mtime, same size, same bytes.
+        await aggregator.getTaskUsage();
+
+        expect(snapshotOf(aggregator, "run-1.json")?.mtimeMayBeShared).toBe(false);
+        expect(snapshotOf(aggregator, "run-1.json")?.contentHash).toBe(null);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("stops re-reading a file whose mtime is old, however many quiet polls follow", async () => {
@@ -389,28 +411,38 @@ describe("IncrementalTaskUsageAggregator", () => {
       const runFile = join(runsDir, "run-1.json");
       const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
       await utimes(runFile, pinned, pinned);
+      const pinnedMs = (await stat(runFile)).mtimeMs;
 
-      const aggregator = new IncrementalTaskUsageAggregator(runsDir);
-      const hashSpy = vi.spyOn(
-        aggregator as unknown as { hashFile: (file: string) => Promise<string | null> },
-        "hashFile",
-      );
+      // Clock-driven for the same reason as the case above: the in-window phase
+      // must not depend on this scan landing within 16ms of the write.
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(pinnedMs);
 
-      await aggregator.getTaskUsage();
-      expect(hashSpy).toHaveBeenCalled(); // in-window: hashed, as designed
+        const aggregator = new IncrementalTaskUsageAggregator(runsDir);
+        const hashSpy = vi.spyOn(
+          aggregator as unknown as { hashFile: (file: string) => Promise<string | null> },
+          "hashFile",
+        );
 
-      await new Promise((r) => setTimeout(r, PAST_GRANULARITY_WINDOW_MS));
-      await aggregator.getTaskUsage(); // the one further scan the contract allows
+        await aggregator.getTaskUsage();
+        expect(hashSpy).toHaveBeenCalled(); // in-window: hashed, as designed
 
-      // From here the file is stat-only forever. Every one of these polls used to
-      // re-hash it — the steady-state cost the whole snapshot design exists to
-      // avoid, paid on every poll for the life of the process.
-      hashSpy.mockClear();
-      await aggregator.getTaskUsage();
-      await aggregator.getTaskUsage();
-      await aggregator.getTaskUsage();
+        vi.setSystemTime(pinnedMs + PAST_GRANULARITY_WINDOW_MS);
+        await aggregator.getTaskUsage(); // the one further scan the contract allows
 
-      expect(hashSpy).not.toHaveBeenCalled();
+        // From here the file is stat-only forever. Every one of these polls used to
+        // re-hash it — the steady-state cost the whole snapshot design exists to
+        // avoid, paid on every poll for the life of the process.
+        hashSpy.mockClear();
+        await aggregator.getTaskUsage();
+        await aggregator.getTaskUsage();
+        await aggregator.getTaskUsage();
+
+        expect(hashSpy).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("keeps a file's tokens when its bytes cannot be read", async () => {
@@ -425,7 +457,11 @@ describe("IncrementalTaskUsageAggregator", () => {
       // else touches it. Absence of evidence became a silent deletion.
       await writeRun("run-1.json", "task-a", { input: 100, output: 50 });
       const runFile = join(runsDir, "run-1.json");
-      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      // Pinned forward, not read back off the file: this case only needs the
+      // in-window phase (never the aged one), so a fixed future instant keeps the
+      // mtime inside the granularity window however long the scan takes to start.
+      // Reading it back would tie the precondition below to a 16ms deadline.
+      const pinned = new Date(Date.now() + 60_000);
       await utimes(runFile, pinned, pinned);
 
       const aggregator = new IncrementalTaskUsageAggregator(runsDir);

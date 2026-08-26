@@ -335,6 +335,14 @@ describe("RunChangeDetector", () => {
       const future = new Date(Date.now() + 5000);
       await utimes(runFile, future, future);
 
+      // Pin forward instead of trusting "just written": the write-to-scan gap has
+      // to stay under MTIME_GRANULARITY_MS (16ms) for a hash to be carried, and a
+      // loaded CI runner misses that. Both phases are now driven by utimes rather
+      // than by elapsed real time — forward for the in-window phase, backward for
+      // the aged phase below.
+      const inWindow = new Date(Date.now() + 60_000);
+      await utimes(runFile, inWindow, inWindow);
+
       const det = detector();
       const fresh = await det.detectChanges();
       // Inside the granularity window: hash carried.
