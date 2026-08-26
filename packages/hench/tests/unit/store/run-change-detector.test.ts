@@ -241,12 +241,16 @@ describe("RunChangeDetector", () => {
       // Pin BEFORE the first read as well as after the rewrite: a fresh write leaves
       // a fractional mtimeMs while utimes stores whole milliseconds, so pinning only
       // the second write would leave the snapshots different and the change would be
-      // detected for the wrong reason. The pin sits slightly in the future so the
-      // file is inside the mtime-granularity window at scan time no matter how
-      // slowly the test host schedules the intervening awaits — the detector
-      // treats "written during or after scan start" as fresh, so a future mtime
-      // is deterministically fresh while "just written" is a race.
-      const pinned = new Date(Math.floor(Date.now()) + 5000);
+      // detected for the wrong reason.
+      //
+      // The instant is fixed rather than read back from the file so it also sits
+      // inside the granularity window deterministically. Detecting this rewrite
+      // needs the FIRST scan to carry a hash (mtime and size are equal, so the hash
+      // is the only thing left to compare), and that only happens within
+      // MTIME_GRANULARITY_MS (16ms) of the write — a bound a loaded CI runner
+      // misses. When it did, `second.changes` came back empty and the failure read
+      // as a broken detector rather than a missed deadline.
+      const pinned = new Date(Date.now() + 60_000);
       await utimes(runFile, pinned, pinned);
 
       const det = detector();
