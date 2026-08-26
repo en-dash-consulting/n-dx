@@ -25,7 +25,7 @@ export function usage(): void {
           { name: "reshape [dir]", description: "LLM-powered PRD restructuring (merge, update, reparent, split)" },
           { name: "prune [dir]", description: "Remove completed subtrees and consolidate remaining items" },
           { name: "usage [dir]", description: "Detailed token usage analytics and cost estimation" },
-          { name: "validate [dir]", description: "Check PRD integrity (DAG, schema)" },
+          { name: "validate [dir]", description: "Check PRD integrity (DAG, schema); --post-merge scans a merged tree, --repair fixes safe issues" },
           { name: "fix [dir]", description: "Auto-fix common validation issues (timestamps, refs, status)" },
           { name: "report [dir]", description: "Generate JSON health report for CI dashboards" },
           { name: "verify [dir]", description: "Run tests for acceptance criteria" },

@@ -874,6 +874,20 @@ The parser (folder tree → PRD) must:
 
 ---
 
+## Post-Merge Validation
+
+A git merge of the tree can leave corruption no rex code path produces: duplicate IDs (both branches created or moved the same item at different paths), directories whose `index.md` was lost in conflict resolution, files at the wrong nesting depth, `blockedBy` references to items the other branch deleted, and unresolved conflict markers. `rex validate --post-merge` scans the raw tree for all five classes; `--repair` fixes the deterministic ones (empty orphaned directories are removed, `level` is rewritten to the depth-implied value, dangling `blockedBy` ids are dropped) and refuses the ambiguous ones (duplicate IDs, conflict markers, orphaned directories that still contain items) with instructions.
+
+Exit codes are hook-friendly — 0 means clean (including a repo with no PRD tree at all), 1 means issues remain — so it wires directly into an optional git post-merge hook:
+
+```sh
+#!/bin/sh
+# .git/hooks/post-merge  (chmod +x)
+rex validate --post-merge || echo "PRD tree needs attention: run 'rex validate --post-merge --repair'"
+```
+
+A post-merge hook cannot abort the merge (it runs after the fact); the exit code exists so CI or wrapper scripts can gate on it. Pair with the `rex-prd` merge driver (registered by `ndx init`), which prevents most of these states from arising in the first place.
+
 ## Related Documentation
 
 This schema is the normative storage contract for the PRD folder-tree format. For broader context:
