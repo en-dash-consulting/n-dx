@@ -13,4 +13,4 @@ endedAt: "2026-05-08T04:46:14.632Z"
 
 | Title | Status |
 |-------|--------|
-| [PRD Tree CLI Visualization Command](./prd-tree-cli-visualization-command/index.md) | completed |
+| [PRD Tree CLI Visualization Command](./prd-tree-cli-visualization-13d17a/index.md) | completed |

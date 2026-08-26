@@ -38,6 +38,7 @@ export function usage(): void {
           { name: "migrate-to-md [dir]", description: "Create .rex/prd.md from .rex/prd.json without modifying JSON" },
           { name: "migrate-folder-tree-filenames [dir]", description: "Rename legacy index.md files to title-based filenames" },
           { name: "migrate-slugs [dir]", description: "Rename the PRD tree to id-qualified slugs (one-shot, idempotent)" },
+          { name: "merge-driver <ancestor> <ours> <theirs>", description: "Git merge driver: three-way frontmatter-aware merge of PRD markdown" },
           { name: "backfill-commit-attribution [dir]", description: "Populate commits array from git history N-DX-Status trailers" },
           { name: "adapter <sub> [name]", description: "Manage store adapters (list|add|remove|show)" },
           { name: "mcp [dir]", description: "Start MCP server" },

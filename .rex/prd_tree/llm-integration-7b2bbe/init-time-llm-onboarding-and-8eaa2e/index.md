@@ -13,6 +13,6 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Direct Claude API Integration](./direct-claude-api-integration.md) | completed |
+| [Direct Claude API Integration](./direct-claude-api-integration-66f9d8.md) | completed |
 | [Interactive init banner and provider selection](./interactive-init-banner-and-cdfde9.md) | completed |
 | [Provider authentication preflight during init](./provider-authentication-83e155.md) | completed |

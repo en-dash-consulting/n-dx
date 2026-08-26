@@ -317,6 +317,9 @@ async function dispatchCommand(
   const SKIP_DIR_CHECK = new Set([
     "init", "analyze", "import", "update", "move", "add", "reshape", "remove",
     "parse-md",
+    // Invoked by git with three temp-file paths (%O %A %B) from any cwd —
+    // there is no project dir to check.
+    "merge-driver",
   ]);
   if (!SKIP_DIR_CHECK.has(command)) {
     requireRexDir(resolveDir(positional));
@@ -478,6 +481,11 @@ async function dispatchCommand(
       await cmdMigrateSlugs(resolveDir(positional), flags);
       break;
     }
+    case "merge-driver": {
+      const { cmdMergeDriver } = await import("./commands/merge-driver.js");
+      await cmdMergeDriver(positional);
+      break;
+    }
     case "parse-md": {
       const { cmdParseMd } = await import("./commands/parse-md.js");
       const stdinInput = flags.stdin === "true" ? await readStdin() : "";
@@ -512,7 +520,7 @@ async function dispatchCommand(
         "init", "status", "tree", "next", "add", "update", "move", "remove", "reshape",
         "prune", "restore", "validate", "fix", "sync", "usage", "report", "verify",
         "recommend", "analyze", "import", "adapter", "reorganize", "health", "mcp",
-        "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "parse-md",
+        "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "parse-md",
         "backfill-commit-attribution",
       ];
       const typoHint = formatTypoSuggestion(command, REX_COMMANDS, "rex ");
