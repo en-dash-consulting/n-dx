@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Smart Add UI Integration](./smart-add-ui-integration.md) | completed |
-| [Smart Pruning UI Integration](./smart-pruning-ui-integration.md) | completed |
+| [Smart Add UI Integration](./smart-add-ui-integration-6efaf2.md) | completed |
+| [Smart Pruning UI Integration](./smart-pruning-ui-integration-07c19b.md) | completed |

@@ -82,6 +82,29 @@ describe("resolveExistingDir()", () => {
 
   // ── Degenerate input ─────────────────────────────────────────────────────
 
+  // ── A skipped positional never wins, even when it names a real directory ──
+  // `ndx config hench` in a project with a `hench/` subdirectory: the handler's
+  // isConfigKey tiebreaker says a known key beats a directory, and the
+  // pre-dispatch layer must agree or config reads and the staleness check
+  // silently point at the wrong root.
+
+  it("skips a positional the skip predicate claims, even when it is a directory", () => {
+    mkdirSync(join(base, "hench"), { recursive: true });
+    const args = ["hench"];
+    expect(resolveExistingDir(args, base, { skip: (arg) => arg === "hench" })).toBe(base);
+  });
+
+  it("skips a dotted key with a same-named directory present", () => {
+    mkdirSync(join(base, "rex.project"), { recursive: true });
+    const args = ["rex.project"];
+    expect(resolveExistingDir(args, base, { skip: (arg) => arg.startsWith("rex") })).toBe(base);
+  });
+
+  it("still returns a trailing directory the skip predicate does not claim", () => {
+    const args = ["hench.model", "claude-x", "realdir"];
+    expect(resolveExistingDir(args, base, { skip: (arg) => arg.startsWith("hench") })).toBe("realdir");
+  });
+
   it("falls back to the cwd for an empty argument list", () => {
     expect(resolveExistingDir([], base)).toBe(base);
   });

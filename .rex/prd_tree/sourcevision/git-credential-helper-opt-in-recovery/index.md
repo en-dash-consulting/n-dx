@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Credential Helper Command Surface](./credential-helper-command-surface.md) | completed |
-| [Non-Interactive Refresh Compatibility](./non-interactive-refresh-compatibility.md) | completed |
+| [Credential Helper Command Surface](./credential-helper-command-surface-4d3d81.md) | completed |
+| [Non-Interactive Refresh Compatibility](./non-interactive-refresh-aafa20.md) | completed |

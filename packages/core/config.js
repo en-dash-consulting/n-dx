@@ -1645,7 +1645,7 @@ function parseArgs(args) {
  * @param {string} arg
  * @returns {boolean}
  */
-function isConfigKey(arg) {
+export function isConfigKey(arg) {
   if (arg === "language") return true;
   const dotIdx = arg.indexOf(".");
   const root = dotIdx === -1 ? arg : arg.slice(0, dotIdx);

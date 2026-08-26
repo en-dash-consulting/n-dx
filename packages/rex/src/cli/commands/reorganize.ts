@@ -161,16 +161,19 @@ function selectStructuralProposals(
 async function applyStructural(
   store: PRDStore,
   rexDir: string,
-  doc: PRDDocument,
   toApply: ReorganizationProposal[],
   isJson: boolean,
 ): Promise<number> {
   if (toApply.length === 0) return 0;
 
   info(`\nApplying ${toApply.length} structural proposal${toApply.length === 1 ? "" : "s"}...`);
-  const applyResult = applyProposals(doc.items, toApply);
+  // Proposals were computed on a snapshot (possibly after a long LLM call).
+  // Re-apply against a freshly loaded document under the lock so an item a
+  // concurrent writer added in the meantime survives this full-document save.
+  const applyResult = await store.withTransaction(async (doc) =>
+    applyProposals(doc.items, toApply),
+  );
   if (applyResult.applied > 0) {
-    await store.saveDocument(doc);
     await store.appendLog({
       timestamp: new Date().toISOString(),
       event: "reorganize_applied",
@@ -225,22 +228,20 @@ function selectLlmProposals(
 
 async function applyLlm(
   store: PRDStore,
-  doc: PRDDocument,
   toApply: ReshapeProposal[],
-  structuralApplied: number,
   isJson: boolean,
 ): Promise<number> {
   if (toApply.length === 0) return 0;
 
-  // Reload document if structural proposals were applied (to get updated tree)
-  const targetDoc = structuralApplied > 0 ? await store.loadDocument() : doc;
-
   info(`\nApplying ${toApply.length} LLM proposal${toApply.length === 1 ? "" : "s"}...`);
-  const reshapeResult = applyReshape(targetDoc.items, toApply);
+  // The transaction loads a fresh document, so structural proposals applied
+  // just before this are picked up, and a concurrent writer's item survives.
+  const reshapeResult = await store.withTransaction(async (doc) =>
+    applyReshape(doc.items, toApply),
+  );
   const applied = reshapeResult.applied.length;
 
   if (applied > 0) {
-    await store.saveDocument(targetDoc);
     await store.appendLog({
       timestamp: new Date().toISOString(),
       event: "reorganize_llm_applied",
@@ -351,14 +352,14 @@ export async function cmdReorganize(
   let structuralApplied = 0;
   if (acceptFlag !== undefined && hasStructural) {
     const toApply = selectStructuralProposals(plan, acceptFlag, isAcceptAll);
-    structuralApplied = await applyStructural(store, rexDir, doc, toApply, isJson);
+    structuralApplied = await applyStructural(store, rexDir, toApply, isJson);
   }
 
   // Apply LLM proposals
   let llmApplied = 0;
   if ((acceptLlmFlag !== undefined || isAcceptAll) && hasLlm) {
     const toApply = selectLlmProposals(reshapeProposals, acceptLlmFlag, isAcceptAll);
-    llmApplied = await applyLlm(store, doc, toApply, structuralApplied, isJson);
+    llmApplied = await applyLlm(store, toApply, isJson);
   }
 
   // JSON output

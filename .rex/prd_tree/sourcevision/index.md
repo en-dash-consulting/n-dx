@@ -12,29 +12,29 @@ description: "Static analysis engine: file inventory, import graph, zone detecti
 
 | Title | Status |
 |-------|--------|
-| [Analysis Pipeline Optimization](./analysis-pipeline-optimization/index.md) | completed |
-| [Analyze pipeline improvements](./analyze-pipeline-improvements/index.md) | completed |
-| [Automatic PR Markdown Generation](./automatic-pr-markdown-generation/index.md) | completed |
-| [Background Tab Resource Optimization](./background-tab-resource-optimization/index.md) | completed |
-| [Fix 1: Go Zone Edge Resolution](./fix-1-go-zone-edge-resolution/index.md) | completed |
-| [Fix 2: Mixed-Language Support](./fix-2-mixed-language-support/index.md) | completed |
+| [Analysis Pipeline Optimization](./analysis-pipeline-optimization-3bf375/index.md) | completed |
+| [Analyze pipeline improvements](./analyze-pipeline-improvements-e4868f/index.md) | completed |
+| [Automatic PR Markdown Generation](./automatic-pr-markdown-generation-7ce2cc/index.md) | completed |
+| [Background Tab Resource Optimization](./background-tab-resource-48fb83/index.md) | completed |
+| [Fix 1: Go Zone Edge Resolution](./fix-1-go-zone-edge-resolution-d373f5/index.md) | completed |
+| [Fix 2: Mixed-Language Support](./fix-2-mixed-language-support-a40abb/index.md) | completed |
 | [Fix observation in sourcevision-2 (1 finding)](./fix-observation-in-sourcevision-3f7352/index.md) | completed |
 | [Fix observation in sourcevision-cli (1 finding)](./fix-observation-in-sourcevision-6c79b3/index.md) | completed |
-| [Fix suggestion in polling (1 finding)](./fix-suggestion-in-polling-1-finding/index.md) | completed |
-| [Git Credential Helper Opt-In Recovery](./git-credential-helper-opt-in-recovery/index.md) | completed |
-| [Git-Independent PR Markdown Generation](./git-independent-pr-markdown-generation/index.md) | completed |
-| [Go Fixture Enhancement](./go-fixture-enhancement/index.md) | completed |
-| [Go Import Parser](./go-import-parser/index.md) | completed |
-| [Import Analyzer Language Dispatch](./import-analyzer-language-dispatch/index.md) | completed |
-| [Landing page for n-dx](./landing-page-for-n-dx/index.md) | completed |
-| [Live PR Markdown in SourceVision UI](./live-pr-markdown-in-sourcevision-ui/index.md) | completed |
+| [Fix suggestion in polling (1 finding)](./fix-suggestion-in-polling-1-1fd3f6/index.md) | completed |
+| [Git Credential Helper Opt-In Recovery](./git-credential-helper-opt-in-a04a79/index.md) | completed |
+| [Git-Independent PR Markdown Generation](./git-independent-pr-markdown-d8b639/index.md) | completed |
+| [Go Fixture Enhancement](./go-fixture-enhancement-41a438/index.md) | completed |
+| [Go Import Parser](./go-import-parser-dfa181/index.md) | completed |
+| [Import Analyzer Language Dispatch](./import-analyzer-language-dispatch-aac0a4/index.md) | completed |
+| [Landing page for n-dx](./landing-page-for-n-dx-4aa53b/index.md) | completed |
+| [Live PR Markdown in SourceVision UI](./live-pr-markdown-in-f4a201/index.md) | completed |
 | [ndx work Model Resolution, Display, and Vendor-Change Reset](./ndx-work-model-resolution-3d1dfc/index.md) | completed |
 | [Phase 1: Language Registry & Inventory Foundation](./phase-1-language-registry-956b71/index.md) | completed |
-| [PR Markdown Reviewer Context Enrichment](./pr-markdown-reviewer-context-enrichment/index.md) | completed |
-| [PR Markdown View Toggle and Copy UX](./pr-markdown-view-toggle-and-copy-ux/index.md) | completed |
-| [Recursive zone architecture](./recursive-zone-architecture/index.md) | completed |
+| [PR Markdown Reviewer Context Enrichment](./pr-markdown-reviewer-context-1d7ebe/index.md) | completed |
+| [PR Markdown View Toggle and Copy UX](./pr-markdown-view-toggle-and-b59bc8/index.md) | completed |
+| [Recursive zone architecture](./recursive-zone-architecture-epicre/index.md) | completed |
 | [Resolve critical SourceVision architectural findings](./resolve-critical-sourcevision-ecbbbb/index.md) | completed |
-| [SourceVision Findings Remediation](./sourcevision-findings-remediation/index.md) | completed |
+| [SourceVision Findings Remediation](./sourcevision-findings-remediation-bcd3ec/index.md) | completed |
 | [SourceVision Import Graph Visualization Enhancement](./sourcevision-import-graph-f5284d/index.md) | completed |
 | [SourceVision PR Markdown Quality & Manual Refresh](./sourcevision-pr-markdown-1c8695/index.md) | completed |
 | [SourceVision PR Markdown Artifact-Based Fallback Mode](./sourcevision-pr-markdown-5e3862/index.md) | completed |
@@ -43,7 +43,7 @@ description: "Static analysis engine: file inventory, import graph, zone detecti
 | [SourceVision PR Markdown Tab Parity Hardening](./sourcevision-pr-markdown-tab-9d8ae9/index.md) | completed |
 | [SourceVision Semantic Diff Failure UX Hardening](./sourcevision-semantic-diff-b52062/index.md) | completed |
 | [SourceVision Token Efficiency and Prompt Compaction](./sourcevision-token-efficiency-ede8a6/index.md) | completed |
-| [SourceVision UI Import Graph Enhancement](./sourcevision-ui-import-graph-enhancement/index.md) | completed |
-| [Web Server Port Management](./web-server-port-management/index.md) | completed |
+| [SourceVision UI Import Graph Enhancement](./sourcevision-ui-import-graph-b39d3a/index.md) | completed |
+| [Web Server Port Management](./web-server-port-management-8ea822/index.md) | completed |
 | [Web UI Memory Management and Crash Resolution](./web-ui-memory-management-and-0344ce/index.md) | completed |
 | [Zone Detection Validation for Go Projects](./zone-detection-validation-for-fe5bf3/index.md) | completed |

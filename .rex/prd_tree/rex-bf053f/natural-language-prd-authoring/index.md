@@ -14,5 +14,5 @@ description: "Enable natural language input for PRD creation, allowing users to 
 
 | Title | Status |
 |-------|--------|
-| [Bulk natural language input](./bulk-natural-language-input.md) | completed |
-| [Smart add functionality](./smart-add-functionality.md) | completed |
+| [Bulk natural language input](./bulk-natural-language-input-4c522d.md) | completed |
+| [Smart add functionality](./smart-add-functionality-5b558c.md) | completed |

@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Chunked proposal acceptance](./chunked-proposal-acceptance.md) | completed |
-| [Dynamic port allocation](./dynamic-port-allocation.md) | completed |
+| [Chunked proposal acceptance](./chunked-proposal-acceptance-339073.md) | completed |
+| [Dynamic port allocation](./dynamic-port-allocation-775f74.md) | completed |

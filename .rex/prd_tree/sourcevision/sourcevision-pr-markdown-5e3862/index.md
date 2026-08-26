@@ -13,6 +13,6 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Fallback Output Semantics and Metadata](./fallback-output-semantics-and-metadata.md) | completed |
+| [Fallback Output Semantics and Metadata](./fallback-output-semantics-and-238c6b.md) | completed |
 | [Fallback Trigger and Quality Regression Coverage](./fallback-trigger-and-quality-3c6675.md) | completed |
-| [Fallback Triggering and Orchestration](./fallback-triggering-and-orchestration.md) | completed |
+| [Fallback Triggering and Orchestration](./fallback-triggering-and-39d1c6.md) | completed |

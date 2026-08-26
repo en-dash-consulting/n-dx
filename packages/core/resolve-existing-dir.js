@@ -42,14 +42,26 @@ import { isAbsolute, resolve } from "path";
  * Scans `args` from the end and returns the first positional that names an
  * existing directory. Returns `cwd` when there is none.
  *
+ * `options.skip` lets a caller rule out positionals that only LOOK like
+ * directories. The one known case: `ndx config hench` in a project that also
+ * contains a `hench/` subdirectory. The config handler's `isConfigKey`
+ * tiebreaker says a known key beats a directory (a key is an exact match
+ * against a closed set; a directory name is arbitrary) — this layer must
+ * agree, or config reads and the staleness check point at `./hench` while the
+ * handler operates on the key: timeouts and experimental flags silently stop
+ * applying and a fully initialized project reports "Project setup incomplete".
+ * `./hench` stays unambiguous (its root segment is empty, never a key).
+ *
  * @param {string[]} args  Arguments after the command, possibly including a subcommand.
  * @param {string} [cwd]   Directory to fall back to. Defaults to `process.cwd()`.
+ * @param {{skip?: (arg: string) => boolean}} [options]  Positionals to never treat as directories.
  * @returns {string} The argument as written, or `cwd`.
  */
-export function resolveExistingDir(args, cwd = process.cwd()) {
+export function resolveExistingDir(args, cwd = process.cwd(), options = {}) {
   for (let i = args.length - 1; i >= 0; i--) {
     const arg = args[i];
     if (arg.startsWith("-")) continue;
+    if (options.skip?.(arg)) continue;
     if (isDirectory(arg, cwd)) return arg;
   }
   return cwd;

@@ -15,7 +15,7 @@ description: "End-to-end narrative guides covering the primary n-dx workflows: a
 | Title | Status |
 |-------|--------|
 | [Write Autonomous Overnight Operation Guide ('Run While You Sleep')](./write-autonomous-overnight-800f82.md) | completed |
-| [Write Codebase Onboarding Guide](./write-codebase-onboarding-guide.md) | completed |
+| [Write Codebase Onboarding Guide](./write-codebase-onboarding-guide-984b4c.md) | completed |
 | [Write Ongoing Change Management and PRD Pruning Guide](./write-ongoing-change-management-bd4666.md) | completed |
-| [Write Spec-Driven Development Guide](./write-spec-driven-development-guide.md) | completed |
+| [Write Spec-Driven Development Guide](./write-spec-driven-development-41bc75.md) | completed |
 | [Write Vibe-Coded App Cleanup and Self-Healing Guide](./write-vibe-coded-app-cleanup-bdf200.md) | completed |

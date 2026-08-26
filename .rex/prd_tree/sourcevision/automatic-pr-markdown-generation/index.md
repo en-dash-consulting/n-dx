@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Rex-based content generation](./rex-based-content-generation.md) | completed |
-| [Sourcevision analyze integration](./sourcevision-analyze-integration.md) | completed |
+| [Rex-based content generation](./rex-based-content-generation-31100b.md) | completed |
+| [Sourcevision analyze integration](./sourcevision-analyze-integration-1d377d.md) | completed |

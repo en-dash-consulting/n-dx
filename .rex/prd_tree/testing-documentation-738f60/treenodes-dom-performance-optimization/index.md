@@ -13,6 +13,6 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Event Listener Optimization](./event-listener-optimization.md) | completed |
-| [Lazy Rendering and Node Culling](./lazy-rendering-and-node-culling.md) | completed |
-| [Performance Monitoring and Metrics](./performance-monitoring-and-metrics.md) | completed |
+| [Event Listener Optimization](./event-listener-optimization-9b2818.md) | completed |
+| [Lazy Rendering and Node Culling](./lazy-rendering-and-node-culling-f8b985.md) | completed |
+| [Performance Monitoring and Metrics](./performance-monitoring-and-e07521.md) | completed |

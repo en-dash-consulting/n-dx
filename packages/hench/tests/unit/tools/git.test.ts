@@ -6,6 +6,12 @@ import { execFileSync, execSync } from "node:child_process";
 import { toolGit } from "../../../src/tools/git.js";
 import type { ToolGuard } from "../../../src/tools/contracts.js";
 import { initGitFixtureRepoSync } from "../../helpers/index.js";
+// toolGit runs exec("sh", ["-c", ...]) on every platform. Cases asserting on
+// git's actual output need a real `sh`; without one they'd fail with
+// "Exit code: 1" and no mention of a shell. Cases asserting only shape
+// (typeof result === "string") or guard behaviour stay unguarded — see the
+// shape-only precedent in tests/shell-spawn-inventory.md.
+import { itNeedsPosixShell } from "../../helpers/posix-shell.js";
 
 function createGitGuard(allowedGitSubcommands: string[]): ToolGuard {
   return {
@@ -49,12 +55,12 @@ describe("toolGit", () => {
   });
 
   describe("allowed subcommands", () => {
-    it("runs git status", async () => {
+    itNeedsPosixShell("runs git status", async () => {
       const result = await toolGit(guard, projectDir, { subcommand: "status" });
       expect(result).toContain("branch");
     });
 
-    it("runs git rev-parse", async () => {
+    itNeedsPosixShell("runs git rev-parse", async () => {
       const result = await toolGit(guard, projectDir, {
         subcommand: "rev-parse",
         args: "--git-dir",
@@ -68,7 +74,7 @@ describe("toolGit", () => {
       expect(typeof result).toBe("string");
     });
 
-    it("runs git log on repo with commits", async () => {
+    itNeedsPosixShell("runs git log on repo with commits", async () => {
       await writeFile(join(projectDir, "test.txt"), "hello");
       execSync("git add test.txt", { cwd: projectDir });
       execFileSync("git", ["commit", "-m", "test commit"], { cwd: projectDir });
@@ -77,7 +83,7 @@ describe("toolGit", () => {
       expect(result).toContain("test commit");
     });
 
-    it("runs git diff", async () => {
+    itNeedsPosixShell("runs git diff", async () => {
       await writeFile(join(projectDir, "test.txt"), "hello");
       execSync("git add test.txt", { cwd: projectDir });
       execFileSync("git", ["commit", "-m", "initial"], { cwd: projectDir });
@@ -188,7 +194,7 @@ describe("toolGit", () => {
   });
 
   describe("guard integration", () => {
-    it("uses guard allowlist instead of hardcoded list", async () => {
+    itNeedsPosixShell("uses guard allowlist instead of hardcoded list", async () => {
       // Create a guard with custom git subcommand allowlist
       const customGuard = createGitGuard(["status", "log"]);
 
@@ -227,13 +233,13 @@ describe("toolGit", () => {
   });
 
   describe("output handling", () => {
-    it("returns (no output) for commands with empty output", async () => {
+    itNeedsPosixShell("returns (no output) for commands with empty output", async () => {
       // A diff with no changes returns empty output
       const result = await toolGit(guard, projectDir, { subcommand: "diff" });
       expect(result).toBe("(no output)");
     });
 
-    it("captures stderr output", async () => {
+    itNeedsPosixShell("captures stderr output", async () => {
       // Asking for a non-existent branch should produce stderr
       const result = await toolGit(guard, projectDir, {
         subcommand: "branch",

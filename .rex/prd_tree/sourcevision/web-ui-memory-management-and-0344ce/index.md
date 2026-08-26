@@ -13,6 +13,6 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Crash Recovery and User Experience](./crash-recovery-and-user-experience.md) | completed |
-| [Memory Optimization and Leak Prevention](./memory-optimization-and-leak-prevention.md) | completed |
+| [Crash Recovery and User Experience](./crash-recovery-and-user-8786c4.md) | completed |
+| [Memory Optimization and Leak Prevention](./memory-optimization-and-leak-3eda1c.md) | completed |
 | [OOM Crash Investigation and Root Cause Analysis](./oom-crash-investigation-and-0cf188.md) | completed |

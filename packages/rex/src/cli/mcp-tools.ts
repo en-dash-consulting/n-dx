@@ -128,12 +128,15 @@ export async function handleUpdateTaskStatus(
       }
     }
 
-    // Handle deletion: remove item and children from tree
+    // Handle deletion: remove item and children from tree. The transaction
+    // holds the PRD lock across the whole read-modify-write so a concurrent
+    // writer's item cannot be clobbered by this full-document save.
     if (status === "deleted") {
-      const doc = await store.loadDocument();
-      const deletedIds = deleteItem(doc.items, id);
-      cleanBlockedByRefs(doc.items, new Set(deletedIds));
-      await store.saveDocument(doc);
+      const deletedIds = await store.withTransaction(async (doc) => {
+        const ids = deleteItem(doc.items, id);
+        cleanBlockedByRefs(doc.items, new Set(ids));
+        return ids;
+      });
 
       await store.appendLog({
         timestamp: new Date().toISOString(),
@@ -298,18 +301,23 @@ export async function handleMoveItem(
 ): Promise<McpResult> {
   try {
     const { id, parentId } = args;
-    const doc = await store.loadDocument();
 
-    const validation = validateMove(doc.items, id, parentId);
-    if (!validation.valid) {
-      return textResult(
-        `${validation.error}${validation.suggestion ? ` ${validation.suggestion}` : ""}`,
-        true,
-      );
+    // Validate and move inside one transaction so the lock covers the whole
+    // read-modify-write — a concurrent writer's item survives this save.
+    const outcome = await store.withTransaction(async (doc) => {
+      const validation = validateMove(doc.items, id, parentId);
+      if (!validation.valid) {
+        return {
+          ok: false as const,
+          message: `${validation.error}${validation.suggestion ? ` ${validation.suggestion}` : ""}`,
+        };
+      }
+      return { ok: true as const, result: moveItem(doc.items, id, parentId) };
+    });
+    if (!outcome.ok) {
+      return textResult(outcome.message, true);
     }
-
-    const result = moveItem(doc.items, id, parentId);
-    await store.saveDocument(doc);
+    const result = outcome.result;
 
     const fromLabel = result.previousParentId ?? "root";
     const toLabel = result.newParentId ?? "root";
@@ -349,12 +357,6 @@ export async function handleMergeItems(
 ): Promise<McpResult> {
   try {
     const { sourceIds, targetId, preview, title, description } = args;
-    const doc = await store.loadDocument();
-
-    const validation = validateMerge(doc.items, sourceIds, targetId);
-    if (!validation.valid) {
-      return textResult(`${validation.error}`, true);
-    }
 
     const options = {
       ...(title ? { title } : {}),
@@ -362,12 +364,28 @@ export async function handleMergeItems(
     };
 
     if (preview) {
+      const doc = await store.loadDocument();
+      const validation = validateMerge(doc.items, sourceIds, targetId);
+      if (!validation.valid) {
+        return textResult(`${validation.error}`, true);
+      }
       const previewResult = previewMerge(doc.items, sourceIds, targetId, options);
       return textResult(JSON.stringify(previewResult, null, 2));
     }
 
-    const result = mergeItems(doc.items, sourceIds, targetId, options);
-    await store.saveDocument(doc);
+    // Validate and merge inside one transaction so the lock covers the whole
+    // read-modify-write — a concurrent writer's item survives this save.
+    const outcome = await store.withTransaction(async (doc) => {
+      const validation = validateMerge(doc.items, sourceIds, targetId);
+      if (!validation.valid) {
+        return { ok: false as const, message: `${validation.error}` };
+      }
+      return { ok: true as const, result: mergeItems(doc.items, sourceIds, targetId, options) };
+    });
+    if (!outcome.ok) {
+      return textResult(outcome.message, true);
+    }
+    const result = outcome.result;
 
     const absorbedTitles = result.absorbedIds
       .map((id) => `"${id}"`)
@@ -585,13 +603,17 @@ export async function handleReorganize(
     let failed = 0;
 
     if (toApply.length > 0) {
-      const result = applyProposals(doc.items, toApply);
+      // Proposals were computed on a snapshot (the LLM call above may take
+      // minutes); re-apply them against a freshly loaded document under the
+      // lock so a concurrent writer's item is not clobbered by the save.
+      const result = await store.withTransaction(async (freshDoc) =>
+        applyProposals(freshDoc.items, toApply),
+      );
       applied = result.applied;
       failed = result.failed;
     }
 
     if (applied > 0) {
-      await store.saveDocument(doc);
       await store.appendLog({
         timestamp: new Date().toISOString(),
         event: "reorganize_applied",

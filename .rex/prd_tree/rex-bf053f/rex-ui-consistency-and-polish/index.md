@@ -15,5 +15,5 @@ acceptanceCriteria: []
 |-------|--------|
 | [Broken and Non-Functional UI Element Repair](./broken-and-non-functional-ui-5af8ca.md) | completed |
 | [Interactive Element Placement Standardization](./interactive-element-placement-3c630e.md) | completed |
-| [Typography and Text Rendering Fixes](./typography-and-text-rendering-fixes.md) | completed |
-| [Visual and Spacing Consistency](./visual-and-spacing-consistency.md) | completed |
+| [Typography and Text Rendering Fixes](./typography-and-text-rendering-9a56a5.md) | completed |
+| [Visual and Spacing Consistency](./visual-and-spacing-consistency-b29321.md) | completed |

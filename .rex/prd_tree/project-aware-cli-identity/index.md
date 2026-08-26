@@ -13,5 +13,5 @@ endedAt: "2026-08-14T17:28:58.958Z"
 
 | Title | Status |
 |-------|--------|
-| [CLI Identity Detection and Configuration](./cli-identity-detection-and-configuration/index.md) | completed |
+| [CLI Identity Detection and Configuration](./cli-identity-detection-and-a9fcab/index.md) | completed |
 | [CLI Identity Propagation Across Dashboard](./cli-identity-propagation-across-24f931/index.md) | completed |

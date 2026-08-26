@@ -13,6 +13,6 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Intelligent Workflow Optimization](./intelligent-workflow-optimization.md) | completed |
+| [Intelligent Workflow Optimization](./intelligent-workflow-optimization-ad93cf.md) | completed |
 | [Interactive Workflow Configuration System](./interactive-workflow-26afc8.md) | completed |
 | [Requirements Integration and Traceability](./requirements-integration-and-917ecf.md) | completed |

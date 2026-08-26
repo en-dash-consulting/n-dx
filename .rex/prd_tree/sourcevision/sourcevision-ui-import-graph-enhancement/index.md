@@ -13,9 +13,9 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Call graph extraction and analysis](./call-graph-extraction-and-analysis.md) | completed |
-| [Markdown and Text File Processing](./markdown-and-text-file-processing.md) | completed |
-| [Pass Reset Status Indication](./pass-reset-status-indication.md) | completed |
+| [Call graph extraction and analysis](./call-graph-extraction-and-01490e.md) | completed |
+| [Markdown and Text File Processing](./markdown-and-text-file-processing-a372d2.md) | completed |
+| [Pass Reset Status Indication](./pass-reset-status-indication-f8963f.md) | completed |
 | [Replace grid layout with interactive slideout](./replace-grid-layout-with-cbb158.md) | completed |
-| [Selective file filtering](./selective-file-filtering.md) | completed |
-| [Zone Slideout Interaction Regression Fix](./zone-slideout-interaction-regression-fix.md) | completed |
+| [Selective file filtering](./selective-file-filtering-90be33.md) | completed |
+| [Zone Slideout Interaction Regression Fix](./zone-slideout-interaction-09c29f.md) | completed |

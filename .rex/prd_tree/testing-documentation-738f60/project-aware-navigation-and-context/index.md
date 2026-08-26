@@ -13,8 +13,8 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Enhanced Navigation Interface](./enhanced-navigation-interface.md) | completed |
-| [Hench Run Deep-linking](./hench-run-deep-linking.md) | completed |
-| [Project-centric Page Title and Branding](./project-centric-page-title-and-branding.md) | completed |
-| [Project Configuration and Switching](./project-configuration-and-switching.md) | completed |
-| [Top-level Token Usage Navigation](./top-level-token-usage-navigation.md) | completed |
+| [Enhanced Navigation Interface](./enhanced-navigation-interface-45553d.md) | completed |
+| [Hench Run Deep-linking](./hench-run-deep-linking-a62d28.md) | completed |
+| [Project-centric Page Title and Branding](./project-centric-page-title-and-dee97c.md) | completed |
+| [Project Configuration and Switching](./project-configuration-and-986cc8.md) | completed |
+| [Top-level Token Usage Navigation](./top-level-token-usage-navigation-3178b0.md) | completed |

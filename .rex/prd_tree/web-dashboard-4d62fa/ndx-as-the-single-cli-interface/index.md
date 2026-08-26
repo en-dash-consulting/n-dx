@@ -16,4 +16,4 @@ description: "Every user-facing command accessible through ndx. Users never need
 |-------|--------|
 | [Audit and surface all package commands through ndx](./audit-and-surface-all-package-70cd90.md) | completed |
 | [Helpful error when users run package commands that belong to ndx](./helpful-error-when-users-run-926c6d.md) | completed |
-| [Rewrite ndx --help to be user-centric](./rewrite-ndx-help-to-be-user-centric.md) | completed |
+| [Rewrite ndx --help to be user-centric](./rewrite-ndx-help-to-be-user-6440a3.md) | completed |

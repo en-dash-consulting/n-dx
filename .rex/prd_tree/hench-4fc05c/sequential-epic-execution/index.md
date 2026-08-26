@@ -13,6 +13,6 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Epic Filtering for Work Command](./epic-filtering-for-work-command.md) | completed |
-| [Task UI Auto-trigger Integration](./task-ui-auto-trigger-integration.md) | completed |
-| [Web UI Epic-by-Epic Execution](./web-ui-epic-by-epic-execution.md) | completed |
+| [Epic Filtering for Work Command](./epic-filtering-for-work-command-8659f1.md) | completed |
+| [Task UI Auto-trigger Integration](./task-ui-auto-trigger-integration-08ff88.md) | completed |
+| [Web UI Epic-by-Epic Execution](./web-ui-epic-by-epic-execution-d001b4.md) | completed |

@@ -18,9 +18,9 @@ description: "Systematically address high-priority SourceVision findings includi
 
 | Title | Status |
 |-------|--------|
-| [Address observation issues (26 findings)](./address-observation-issues-26-findings.md) | completed |
-| [Address pattern issues (9 findings)](./address-pattern-issues-9-findings.md) | completed |
-| [Address relationship issues (2 findings)](./address-relationship-issues-2-findings.md) | completed |
-| [Address suggestion issues (11 findings)](./address-suggestion-issues-11-findings.md) | completed |
-| [Audit and clean dead/unused exports](./audit-and-clean-dead-unused-exports.md) | completed |
+| [Address observation issues (26 findings)](./address-observation-issues-26-a073ce.md) | completed |
+| [Address pattern issues (9 findings)](./address-pattern-issues-9-findings-d4148d.md) | completed |
+| [Address relationship issues (2 findings)](./address-relationship-issues-2-6eaa3b.md) | completed |
+| [Address suggestion issues (11 findings)](./address-suggestion-issues-11-1c0d65.md) | completed |
+| [Audit and clean dead/unused exports](./audit-and-clean-dead-unused-b6af73.md) | completed |
 | [Suppress false positives in SourceVision analysis](./suppress-false-positives-in-149e7d.md) | completed |

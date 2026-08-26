@@ -88,11 +88,11 @@ async function _cmdReshapeCore(
   // through the serializer, which writes one `index.md` per folder item and
   // sweeps up stale leftovers via `removeStaleEntries`. This satisfies the
   // user-facing rule that reshape always migrates the tree forward, even
-  // when no proposals end up being applied.
-  const canonicalDoc = await store.loadDocument();
-  await store.saveDocument(canonicalDoc);
-
-  const docAfterCompaction = canonicalDoc;
+  // when no proposals end up being applied. Done as a transaction so the
+  // load→save round-trip holds the PRD lock and cannot clobber a concurrent
+  // writer; the pass-through callback returns the canonical document for the
+  // analysis below.
+  const docAfterCompaction = await store.withTransaction(async (doc) => doc);
 
   // Load file ownership map for cross-file duplicate detection (FileStore feature)
   const fileOwnership = store instanceof FileStore
@@ -225,20 +225,20 @@ async function _cmdReshapeCore(
   // Capture pre-reshape commit hash for rollback support
   const preReshapeCommit = await captureGitCommitHash(dir);
 
-  // Apply accepted proposals
-  const reshapeResult = applyReshape(docAfterCompaction.items, accepted);
-
-  // Report errors
-  for (const err of reshapeResult.errors) {
-    info(`  Warning: ${err.error}`);
-  }
+  // Dry-apply the accepted proposals on the in-memory snapshot to learn what
+  // the reshape will do, then run the LLM follow-up passes (body merges, group
+  // renames) OUTSIDE the PRD lock — they can take minutes, and holding the
+  // lock across them would starve every other writer (and exceed the lock's
+  // staleness window). Their results are plain per-item updates that are
+  // re-applied under the lock below.
+  const previewResult = applyReshape(docAfterCompaction.items, accepted);
 
   // LLM body merge: for each accepted hash-suffix MergeAction, generate a merged description
   const { findItem: findItemInTree, updateInTree } = await import("../../core/tree.js");
   // Surface the tier for the mechanical sub-passes (mirrors the vendor header's
   // "(light tier)" annotation) — only when they will actually run and the
   // model was not explicitly overridden.
-  const hasLightSubPasses = reshapeResult.applied.some(
+  const hasLightSubPasses = previewResult.applied.some(
     (p) =>
       (p.action.action === "merge" && (p.action as MergeAction).reason === "hash-suffix-duplicate-sibling") ||
       p.action.action === "group",
@@ -246,7 +246,8 @@ async function _cmdReshapeCore(
   if (hasLightSubPasses && !flags.model) {
     info(`  [hash-suffix] merge/rename sub-passes use model: ${lightModel} (light tier)`);
   }
-  for (const proposal of reshapeResult.applied) {
+  const bodyMergeUpdates: Array<{ id: string; description: string }> = [];
+  for (const proposal of previewResult.applied) {
     if (
       proposal.action.action === "merge" &&
       (proposal.action as MergeAction).reason === "hash-suffix-duplicate-sibling"
@@ -254,16 +255,14 @@ async function _cmdReshapeCore(
       const mergeAction = proposal.action as MergeAction;
       // Collect original items (survivor + losers, which are now archived)
       const survivorEntry = findItemInTree(docAfterCompaction.items, mergeAction.survivorId);
-      const loserItems = reshapeResult.archivedItems.filter((item) =>
+      const loserItems = previewResult.archivedItems.filter((item) =>
         mergeAction.mergedIds.includes(item.id),
       );
       if (survivorEntry && loserItems.length > 0) {
         const group = [survivorEntry.item, ...loserItems];
         try {
           const bodyMerge = await reasonForBodyMerge(group, lightModel);
-          updateInTree(docAfterCompaction.items, mergeAction.survivorId, {
-            description: bodyMerge.description,
-          });
+          bodyMergeUpdates.push({ id: mergeAction.survivorId, description: bodyMerge.description });
         } catch {
           // Body merge is best-effort; don't fail the reshape command
         }
@@ -274,7 +273,8 @@ async function _cmdReshapeCore(
   // LLM rename pass: for each accepted GroupAction, propose descriptive titles
   // for the reparented children. Failures degrade gracefully — children keep
   // their hash-suffixed titles and reshape continues with a warning.
-  for (const proposal of reshapeResult.applied) {
+  const renameUpdates: Array<{ id: string; newTitle: string }> = [];
+  for (const proposal of previewResult.applied) {
     if (proposal.action.action === "group") {
       const groupAction = proposal.action as GroupAction;
       const containerEntry = findItemInTree(docAfterCompaction.items, groupAction.containerId);
@@ -295,9 +295,7 @@ async function _cmdReshapeCore(
 
       try {
         const renameProposal = await proposeGroupRenames(consolidationGroup, lightModel);
-        for (const rename of renameProposal.renames) {
-          updateInTree(docAfterCompaction.items, rename.id, { title: rename.newTitle });
-        }
+        renameUpdates.push(...renameProposal.renames.map((r) => ({ id: r.id, newTitle: r.newTitle })));
         if (renameProposal.renames.length > 0) {
           info(
             `  [hash-suffix] renamed ${renameProposal.renames.length} children under "${groupAction.containerTitle}"`,
@@ -316,51 +314,65 @@ async function _cmdReshapeCore(
     }
   }
 
-  // Archive removed items and record group audit trail
-  const hasArchivedItems = reshapeResult.archivedItems.length > 0;
-  const hasGroupAudit = reshapeResult.groupAuditTrail.length > 0;
+  // Apply for real: re-run the accepted proposals against a freshly loaded
+  // document under the PRD lock, layer on the LLM-produced updates by item id,
+  // and archive before saving — all in one transaction so an item a concurrent
+  // writer added during the LLM passes survives this full-document save.
+  const reshapeResult = await store.withTransaction(async (doc) => {
+    const outcome = applyReshape(doc.items, accepted);
+    for (const u of bodyMergeUpdates) {
+      updateInTree(doc.items, u.id, { description: u.description });
+    }
+    for (const u of renameUpdates) {
+      updateInTree(doc.items, u.id, { title: u.newTitle });
+    }
 
-  if (hasArchivedItems || hasGroupAudit) {
-    const archivePath = join(rexDir, ARCHIVE_FILE);
-    const archive = await loadArchive(archivePath);
-    const batchTimestamp = new Date().toISOString();
+    // Archive removed items and record group audit trail
+    if (outcome.archivedItems.length > 0 || outcome.groupAuditTrail.length > 0) {
+      const archivePath = join(rexDir, ARCHIVE_FILE);
+      const archive = await loadArchive(archivePath);
+      const batchTimestamp = new Date().toISOString();
 
-    // Build merge audit trail entries with pre-reshape commit hash
-    const mergeAuditTrail: MergeAuditEntry[] = reshapeResult.mergeAuditTrail.map((merge) => ({
-      survivorId: merge.survivorId,
-      mergedFromIds: merge.mergedFromIds,
-      reasoning: merge.reasoning,
-      preReshapeCommit,
-      timestamp: batchTimestamp,
-    }));
+      // Build merge audit trail entries with pre-reshape commit hash
+      const mergeAuditTrail: MergeAuditEntry[] = outcome.mergeAuditTrail.map((merge) => ({
+        survivorId: merge.survivorId,
+        mergedFromIds: merge.mergedFromIds,
+        reasoning: merge.reasoning,
+        preReshapeCommit,
+        timestamp: batchTimestamp,
+      }));
 
-    // Build group audit trail entries with pre-reshape commit hash
-    const groupAuditTrail: GroupAuditEntry[] = reshapeResult.groupAuditTrail.map((g) => ({
-      containerId: g.containerId,
-      containerTitle: g.containerTitle,
-      originalParentId: g.originalParentId,
-      movedItemIds: g.movedItemIds,
-      reasoning: g.reasoning,
-      preReshapeCommit,
-      timestamp: batchTimestamp,
-    }));
+      // Build group audit trail entries with pre-reshape commit hash
+      const groupAuditTrail: GroupAuditEntry[] = outcome.groupAuditTrail.map((g) => ({
+        containerId: g.containerId,
+        containerTitle: g.containerTitle,
+        originalParentId: g.originalParentId,
+        movedItemIds: g.movedItemIds,
+        reasoning: g.reasoning,
+        preReshapeCommit,
+        timestamp: batchTimestamp,
+      }));
 
-    archive.batches.push({
-      timestamp: batchTimestamp,
-      source: "reshape",
-      items: reshapeResult.archivedItems,
-      count: reshapeResult.archivedItems.length,
-      reason: `Reshape: ${accepted.map((p) => p.action.action).join(", ")}`,
-      actions: accepted,
-      mergeAuditTrail: mergeAuditTrail.length > 0 ? mergeAuditTrail : undefined,
-      groupAuditTrail: groupAuditTrail.length > 0 ? groupAuditTrail : undefined,
-    });
-    trimArchive(archive);
-    await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
+      archive.batches.push({
+        timestamp: batchTimestamp,
+        source: "reshape",
+        items: outcome.archivedItems,
+        count: outcome.archivedItems.length,
+        reason: `Reshape: ${accepted.map((p) => p.action.action).join(", ")}`,
+        actions: accepted,
+        mergeAuditTrail: mergeAuditTrail.length > 0 ? mergeAuditTrail : undefined,
+        groupAuditTrail: groupAuditTrail.length > 0 ? groupAuditTrail : undefined,
+      });
+      trimArchive(archive);
+      await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
+    }
+    return outcome;
+  });
+
+  // Report errors from the real apply
+  for (const err of reshapeResult.errors) {
+    info(`  Warning: ${err.error}`);
   }
-
-  // Save document (use docAfterCompaction which holds the mutated items)
-  await store.saveDocument(docAfterCompaction);
 
   // Log the reshape and migrations
   await store.appendLog({

@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [PRD Epic Attribution in PR Summaries](./prd-epic-attribution-in-pr-summaries.md) | completed |
-| [Significant Change Narrative](./significant-change-narrative.md) | completed |
+| [PRD Epic Attribution in PR Summaries](./prd-epic-attribution-in-pr-b9e2ba.md) | completed |
+| [Significant Change Narrative](./significant-change-narrative-b5fb8f.md) | completed |

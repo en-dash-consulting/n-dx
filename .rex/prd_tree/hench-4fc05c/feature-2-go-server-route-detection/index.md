@@ -15,4 +15,4 @@ description: "Create a regex-based Go HTTP route detector that identifies route 
 | Title | Status |
 |-------|--------|
 | [Implement Go route detection analyzer and integrate into the server-route pipeline](./implement-go-route-detection-939ef5.md) | completed |
-| [Write unit tests for Go route detection](./write-unit-tests-for-go-route-detection.md) | completed |
+| [Write unit tests for Go route detection](./write-unit-tests-for-go-route-49bff3.md) | completed |

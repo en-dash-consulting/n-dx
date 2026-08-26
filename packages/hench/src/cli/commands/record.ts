@@ -13,7 +13,7 @@ import {
 } from "../../store/session-usage.js";
 import { HENCH_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
-import { result, info } from "../output.js";
+import { result, info, warn } from "../output.js";
 import type { RunRecord, RunStatus, TokenUsage } from "../../schema/index.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 
@@ -91,6 +91,12 @@ export async function cmdRecord(
     );
   }
 
+  // Validate the usage window up front: an unparseable value used to be
+  // silently discarded, which made `--startedAt=25/08/2026` claim the whole
+  // session transcript — the exact spend the flag exists to fence off.
+  parseWindow(flags.startedAt, "--startedAt");
+  parseWindow(flags.since, "--since");
+
   const explicitTurns = parseCount(flags.turns, "--turns");
   const explicitUsage = readExplicitUsage(flags);
 
@@ -158,9 +164,10 @@ interface ResolvedUsage {
 /**
  * Decide what usage this record claims, and advance the session watermark.
  *
- * The watermark advances even when explicit flags supplied the numbers: that
- * spend is now accounted for, and leaving the cursor behind would let the next
- * transcript-derived record claim it a second time.
+ * The watermark advances even when the numbers do not come from the transcript
+ * — explicit flags, or `--no-tokens` — because that spend is now accounted for
+ * (claimed by hand, or deliberately discarded), and leaving the cursor behind
+ * would let the next transcript-derived record claim it instead.
  */
 async function resolveUsage(
   henchDir: string,
@@ -170,16 +177,10 @@ async function resolveUsage(
   const sessionId = flags.session || process.env.CLAUDE_CODE_SESSION_ID || "";
   const transcriptDisabled = flags["no-tokens"] === "true";
 
-  if (transcriptDisabled && !explicitUsage) {
-    return {
-      tokenUsage: ZERO_USAGE,
-      messages: 0,
-      source: "none",
-      note: "Token usage not recorded (--no-tokens).",
-    };
-  }
-
-  const transcript = await readTranscript(flags, sessionId);
+  // Even under --no-tokens the transcript is still read, so the watermark can
+  // advance past the suppressed spend. A transcript problem must not fail a
+  // --no-tokens record, though — the caller asked for no usage at all.
+  const transcript = await readTranscript(flags, sessionId, transcriptDisabled);
 
   // No transcript to read: fall back to whatever was passed, or to zeros.
   if (!transcript) {
@@ -189,6 +190,14 @@ async function resolveUsage(
         messages: 0,
         source: "flags",
         note: "Token usage taken from flags.",
+      };
+    }
+    if (transcriptDisabled) {
+      return {
+        tokenUsage: ZERO_USAGE,
+        messages: 0,
+        source: "none",
+        note: "Token usage not recorded (--no-tokens).",
       };
     }
     return {
@@ -208,7 +217,20 @@ async function resolveUsage(
   // time cannot also claim what was spent before then. It matters for the FIRST
   // record in a session, which has no watermark and would otherwise claim
   // everything the session had spent before the work began.
-  const delta = readUsageDelta(transcript.text, cursor, flags.since || flags.startedAt);
+  const window = flags.since || flags.startedAt;
+  const delta = readUsageDelta(transcript.text, cursor, window);
+
+  // A record with no window and no watermark claims every usage-bearing
+  // message the transcript holds — legitimate when the whole session really
+  // was this task, wildly wrong otherwise. Say so before it is written.
+  const hasWatermark = Boolean(cursor.lastUuid) || cursor.consumed > 0;
+  if (!explicitUsage && !transcriptDisabled && !window && !hasWatermark && delta.messages > 0) {
+    warn(
+      `Warning: no --startedAt/--since and no prior record for this session — ` +
+        `claiming all ${delta.messages} usage-bearing message${delta.messages === 1 ? "" : "s"} in the transcript. ` +
+        `Pass --startedAt=<when the work began> to claim only this task's spend.`,
+    );
+  }
 
   if (sessionId) await saveUsageCursor(henchDir, sessionId, delta.cursor);
 
@@ -219,6 +241,21 @@ async function resolveUsage(
       model: delta.model,
       source: "flags",
       note: "Token usage taken from flags; session watermark advanced so the next record does not re-claim it.",
+    };
+  }
+
+  if (transcriptDisabled) {
+    // Burn, don't defer: the suppressed spend is deliberately unattributed,
+    // and must not roll into whichever record happens to come next.
+    return {
+      tokenUsage: ZERO_USAGE,
+      messages: 0,
+      source: "none",
+      note:
+        delta.messages > 0
+          ? `Token usage not recorded (--no-tokens); the session watermark advanced past ` +
+            `${delta.messages} usage-bearing message${delta.messages === 1 ? "" : "s"}, so that spend is discarded — not claimed by the next record.`
+          : "Token usage not recorded (--no-tokens).",
     };
   }
 
@@ -249,10 +286,17 @@ async function resolveUsage(
   };
 }
 
-/** Read the session transcript, by explicit path or by searching for the session. */
+/**
+ * Read the session transcript, by explicit path or by searching for the session.
+ *
+ * With `tolerateUnreadable` (the --no-tokens path, where the transcript is
+ * only read to advance the watermark), a broken path degrades to null instead
+ * of failing the record.
+ */
 async function readTranscript(
   flags: Record<string, string>,
   sessionId: string,
+  tolerateUnreadable = false,
 ): Promise<{ path: string; text: string } | null> {
   const explicitPath = flags.transcript;
   const path = explicitPath || (sessionId ? await resolveTranscriptPath(sessionId) : null);
@@ -261,6 +305,7 @@ async function readTranscript(
   try {
     return { path, text: await readFile(path, "utf-8") };
   } catch {
+    if (tolerateUnreadable) return null;
     // An explicitly named transcript that cannot be read is worth a hard error —
     // the caller asked for that file specifically. A discovered one is not.
     if (explicitPath) {
@@ -289,6 +334,26 @@ function readExplicitUsage(flags: Record<string, string>): Required<TokenUsage> 
   }
 
   return any ? usage : null;
+}
+
+/**
+ * Validate a usage-window timestamp flag, or pass when absent.
+ *
+ * `readUsageDelta` deliberately tolerates an unparseable window (dropping the
+ * filter is safer than dropping spend once the value is in flight), so the
+ * rejection has to happen here — the same layer that already rejects
+ * `--turns=abc` — before a malformed flag silently widens the claim to the
+ * whole session.
+ */
+function parseWindow(raw: string | undefined, flagName: string): void {
+  if (raw === undefined) return;
+  if (Number.isNaN(Date.parse(raw))) {
+    throw new CLIError(
+      `Invalid ${flagName} value: "${raw}"`,
+      "Must be a timestamp Date.parse accepts — ISO-8601 recommended (e.g. 2026-08-25T18:30:51Z). " +
+        "Locale-formatted dates like 25/08/2026 are not parseable.",
+    );
+  }
 }
 
 /** Parse a non-negative integer flag, or undefined when absent. */

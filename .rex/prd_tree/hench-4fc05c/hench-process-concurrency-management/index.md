@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Execution Concurrency Controls](./execution-concurrency-controls.md) | completed |
-| [Resource-Aware Execution Scheduling](./resource-aware-execution-scheduling.md) | completed |
+| [Execution Concurrency Controls](./execution-concurrency-controls-110d22.md) | completed |
+| [Resource-Aware Execution Scheduling](./resource-aware-execution-f77efe.md) | completed |

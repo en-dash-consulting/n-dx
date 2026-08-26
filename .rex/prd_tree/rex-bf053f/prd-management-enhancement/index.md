@@ -13,6 +13,6 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Core Tree Operations](./core-tree-operations.md) | completed |
-| [PRD Enhancement Features in Web UI](./prd-enhancement-features-in-web-ui.md) | completed |
-| [PRD Validation and Maintenance](./prd-validation-and-maintenance.md) | completed |
+| [Core Tree Operations](./core-tree-operations-5ea113.md) | completed |
+| [PRD Enhancement Features in Web UI](./prd-enhancement-features-in-web-a1b2c3.md) | completed |
+| [PRD Validation and Maintenance](./prd-validation-and-maintenance-428fed.md) | completed |

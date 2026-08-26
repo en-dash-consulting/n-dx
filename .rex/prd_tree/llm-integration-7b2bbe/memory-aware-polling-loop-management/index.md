@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Memory-Aware Polling Validation](./memory-aware-polling-validation.md) | completed |
-| [Memory Pressure Polling Suspension](./memory-pressure-polling-suspension.md) | completed |
+| [Memory-Aware Polling Validation](./memory-aware-polling-validation-2351e3.md) | completed |
+| [Memory Pressure Polling Suspension](./memory-pressure-polling-e385d4.md) | completed |

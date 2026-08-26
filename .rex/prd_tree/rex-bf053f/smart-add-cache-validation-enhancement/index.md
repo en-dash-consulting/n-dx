@@ -14,4 +14,4 @@ acceptanceCriteria: []
 | Title | Status |
 |-------|--------|
 | [Integration tests for smart-add cache staleness detection](./integration-tests-for-smart-add-3ac045.md) | completed |
-| [PRD Hash Validation for Smart Add Cache](./prd-hash-validation-for-smart-add-cache.md) | completed |
+| [PRD Hash Validation for Smart Add Cache](./prd-hash-validation-for-smart-e8159d.md) | completed |

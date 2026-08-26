@@ -293,33 +293,37 @@ export async function cmdPrune(
   const isJson = flags.format === "json";
   const progress = (msg: string): void => { if (!isJson) info(msg); };
 
-  // Prune completed subtrees
+  // Prune completed subtrees. The preview above ran on a snapshot; the prune
+  // itself re-runs against a freshly loaded document under the PRD lock, so an
+  // item a concurrent writer added since the preview survives the save. The
+  // archive is written inside the transaction, before the document, so a crash
+  // cannot persist a prune whose items were never archived.
   progress("Pruning completed subtrees...");
-  const pruneResult = pruneItems(doc.items);
+  const archivePath = join(rexDir, ARCHIVE_FILE);
+  const { pruneResult, prunedDoc } = await store.withTransaction(async (freshDoc) => {
+    const outcome = pruneItems(freshDoc.items);
+    if (outcome.prunedCount > 0) {
+      progress("Archiving pruned items...");
+      const archive = await loadArchive(archivePath);
+      archive.batches.push({
+        timestamp: new Date().toISOString(),
+        source: "prune",
+        items: outcome.pruned,
+        count: outcome.prunedCount,
+      });
+      await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
+      progress("Saving pruned document...");
+    }
+    return { pruneResult: outcome, prunedDoc: freshDoc };
+  });
 
   if (pruneResult.prunedCount === 0) {
     result("Nothing to prune.");
-    if (!skipConsolidate && doc.items.length > 0) {
-      await consolidateAfterPrune(dir, rexDir, store, doc, flags);
+    if (!skipConsolidate && prunedDoc.items.length > 0) {
+      await consolidateAfterPrune(dir, rexDir, store, prunedDoc, flags);
     }
     return;
   }
-
-  // Archive pruned items
-  progress("Archiving pruned items...");
-  const archivePath = join(rexDir, ARCHIVE_FILE);
-  const archive = await loadArchive(archivePath);
-  archive.batches.push({
-    timestamp: new Date().toISOString(),
-    source: "prune",
-    items: pruneResult.pruned,
-    count: pruneResult.prunedCount,
-  });
-  await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
-
-  // Persist the pruned document
-  progress("Saving pruned document...");
-  await store.saveDocument(doc);
 
   // Log the prune action
   const titles = pruneResult.pruned.map((i) => i.title).join(", ");
@@ -338,8 +342,8 @@ export async function cmdPrune(
     };
 
     // Run consolidation and include in JSON output
-    if (!skipConsolidate && doc.items.length > 0) {
-      const consolidation = await consolidateAfterPrune(dir, rexDir, store, doc, flags);
+    if (!skipConsolidate && prunedDoc.items.length > 0) {
+      const consolidation = await consolidateAfterPrune(dir, rexDir, store, prunedDoc, flags);
       if (consolidation) {
         jsonResult.consolidation = consolidation;
       }
@@ -354,8 +358,8 @@ export async function cmdPrune(
     info(`Archived to ${ARCHIVE_FILE}`);
 
     // Chain consolidation after prune
-    if (!skipConsolidate && doc.items.length > 0) {
-      await consolidateAfterPrune(dir, rexDir, store, doc, flags);
+    if (!skipConsolidate && prunedDoc.items.length > 0) {
+      await consolidateAfterPrune(dir, rexDir, store, prunedDoc, flags);
     }
   }
 }
@@ -458,33 +462,34 @@ async function consolidateAfterPrune(
       return undefined;
     }
 
-    // Apply via reshape
+    // Apply via reshape. Proposals came from an LLM call on a snapshot; the
+    // apply re-runs against a freshly loaded document under the PRD lock so a
+    // concurrent writer's item survives the save. Archive first, inside the
+    // transaction, so a crash cannot persist an un-archived consolidation.
     info("Applying consolidation...");
-    const reshapeResult = applyReshape(doc.items, accepted);
+    const reshapeResult = await store.withTransaction(async (freshDoc) => {
+      const outcome = applyReshape(freshDoc.items, accepted);
+      if (outcome.archivedItems.length > 0) {
+        info("Archiving consolidated items...");
+        const archivePath = join(rexDir, ARCHIVE_FILE);
+        const archive = await loadArchive(archivePath);
+        archive.batches.push({
+          timestamp: new Date().toISOString(),
+          source: "reshape",
+          items: outcome.archivedItems,
+          count: outcome.archivedItems.length,
+          reason: "Post-prune consolidation: LLM-proposed restructuring",
+          actions: accepted,
+        });
+        await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
+      }
+      info("Saving consolidated document...");
+      return outcome;
+    });
 
     for (const err of reshapeResult.errors) {
       info(`  Warning: ${err.error}`);
     }
-
-    // Archive any items removed during consolidation
-    if (reshapeResult.archivedItems.length > 0) {
-      info("Archiving consolidated items...");
-      const archivePath = join(rexDir, ARCHIVE_FILE);
-      const archive = await loadArchive(archivePath);
-      archive.batches.push({
-        timestamp: new Date().toISOString(),
-        source: "reshape",
-        items: reshapeResult.archivedItems,
-        count: reshapeResult.archivedItems.length,
-        reason: "Post-prune consolidation: LLM-proposed restructuring",
-        actions: accepted,
-      });
-      await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
-    }
-
-    // Save document
-    info("Saving consolidated document...");
-    await store.saveDocument(doc);
 
     // Log the consolidation
     await store.appendLog({
@@ -667,32 +672,34 @@ async function smartPrune(
     return;
   }
 
-  // Apply via reshape
+  // Apply via reshape. Proposals came from an LLM call (or cache) computed on
+  // a snapshot; the apply re-runs against a freshly loaded document under the
+  // PRD lock so a concurrent writer's item survives the save. Archive first,
+  // inside the transaction, so a crash cannot persist an un-archived prune.
   info("Applying smart prune...");
-  const reshapeResult = applyReshape(doc.items, accepted);
+  const reshapeResult = await store.withTransaction(async (freshDoc) => {
+    const outcome = applyReshape(freshDoc.items, accepted);
+    if (outcome.archivedItems.length > 0) {
+      info("Archiving pruned items...");
+      const archivePath = join(rexDir, ARCHIVE_FILE);
+      const archive = await loadArchive(archivePath);
+      archive.batches.push({
+        timestamp: new Date().toISOString(),
+        source: "reshape",
+        items: outcome.archivedItems,
+        count: outcome.archivedItems.length,
+        reason: "Smart prune: LLM-identified obsolete/mergeable items",
+        actions: accepted,
+      });
+      await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
+    }
+    info("Saving document...");
+    return outcome;
+  });
 
   for (const err of reshapeResult.errors) {
     info(`  Warning: ${err.error}`);
   }
-
-  // Archive
-  if (reshapeResult.archivedItems.length > 0) {
-    info("Archiving pruned items...");
-    const archivePath = join(rexDir, ARCHIVE_FILE);
-    const archive = await loadArchive(archivePath);
-    archive.batches.push({
-      timestamp: new Date().toISOString(),
-      source: "reshape",
-      items: reshapeResult.archivedItems,
-      count: reshapeResult.archivedItems.length,
-      reason: "Smart prune: LLM-identified obsolete/mergeable items",
-      actions: accepted,
-    });
-    await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
-  }
-
-  info("Saving document...");
-  await store.saveDocument(doc);
 
   // Clear cache after successful application
   await clearPendingSmartPrune(rexDir);

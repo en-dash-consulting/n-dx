@@ -14,6 +14,6 @@ acceptanceCriteria: []
 | Title | Status |
 |-------|--------|
 | [Add file-level locking to PRD store to prevent concurrent write corruption](./add-file-level-locking-to-prd-8d4e79.md) | completed |
-| [Better task lifecycle](./better-task-lifecycle.md) | completed |
-| [Flexible hierarchy](./flexible-hierarchy.md) | completed |
-| [PRD quality](./prd-quality.md) | completed |
+| [Better task lifecycle](./better-task-lifecycle-4ac64a.md) | completed |
+| [Flexible hierarchy](./flexible-hierarchy-d0937f.md) | completed |
+| [PRD quality](./prd-quality-7f8226.md) | completed |

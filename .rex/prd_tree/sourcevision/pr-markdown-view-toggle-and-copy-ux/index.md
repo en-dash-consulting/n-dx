@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Copy-to-Clipboard Workflow](./copy-to-clipboard-workflow.md) | completed |
-| [Single-Pane Preview/Raw Toggle](./single-pane-preview-raw-toggle.md) | completed |
+| [Copy-to-Clipboard Workflow](./copy-to-clipboard-workflow-b0835e.md) | completed |
+| [Single-Pane Preview/Raw Toggle](./single-pane-preview-raw-toggle-3d5d84.md) | completed |

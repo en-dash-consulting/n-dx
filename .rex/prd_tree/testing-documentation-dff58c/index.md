@@ -13,4 +13,4 @@ endedAt: "2026-05-18T13:10:44.726Z"
 
 | Title | Status |
 |-------|--------|
-| [Contributor Page Section Expansion](./contributor-page-section-expansion/index.md) | completed |
+| [Contributor Page Section Expansion](./contributor-page-section-61b073/index.md) | completed |
