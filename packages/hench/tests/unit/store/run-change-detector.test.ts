@@ -280,9 +280,16 @@ describe("RunChangeDetector", () => {
       // this scan could not check.
       const runFile = join(runsDir, "run-a.json");
       await writeRunFile("run-a.json", '{"id":"aaa"}');
-      // Future pin: keeps the file inside the mtime-granularity window at scan
-      // time (so the checkpoint carries a hash) regardless of host scheduling.
-      const pinned = new Date(Math.floor(Date.now()) + 5000);
+      // Pin the mtime deterministically INSIDE the granularity window rather than
+      // relying on the scan landing within MTIME_GRANULARITY_MS (16ms) of the
+      // write. Racing that bound made this case flaky on loaded CI runners — the
+      // write-to-scan gap already reaches ~9ms on an idle machine, and once it
+      // exceeds 16ms no hash is carried and the precondition below fails with
+      // `expected 'undefined' to be 'string'`. A fixed instant is also stable
+      // across all three scans, which this case needs (the comparison comes down
+      // to mtime/size equality, so only the freshness check reads it relationally).
+      // Counterpart of the `Date.now() - 60_000` ageing trick in the case below.
+      const pinned = new Date(Date.now() + 60_000);
       await utimes(runFile, pinned, pinned);
 
       const det = detector();
