@@ -575,6 +575,63 @@ describe("init injects .gitattributes EOL pins (issue #283)", () => {
     }
   }, 120_000);
 
+  it("registers the rex-prd merge driver in a git repo, idempotently", async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-mergedrv-"));
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-init-mergedrv-bin-"));
+    try {
+      execFileSync("git", ["init", "-b", "main"], { cwd: projectDir, stdio: "pipe" });
+
+      await initWithFakeCodex(projectDir, binDir);
+
+      // The attribute routes PRD tree paths to the driver...
+      const attrs = await readFile(join(projectDir, ".gitattributes"), "utf-8");
+      expect(attrs).toMatch(/^\.rex\/prd_tree\/\*\*\s+merge=rex-prd$/m);
+      // ...and git config names the driver command.
+      const driver = execFileSync("git", ["config", "--get", "merge.rex-prd.driver"], {
+        cwd: projectDir,
+        encoding: "utf-8",
+      }).trim();
+      expect(driver).toBe("rex merge-driver %O %A %B");
+
+      // Re-init changes neither the attributes file nor the config.
+      const firstAttrs = attrs;
+      await initWithFakeCodex(projectDir, binDir);
+      expect(await readFile(join(projectDir, ".gitattributes"), "utf-8")).toBe(firstAttrs);
+      const driverAgain = execFileSync("git", ["config", "--get", "merge.rex-prd.driver"], {
+        cwd: projectDir,
+        encoding: "utf-8",
+      }).trim();
+      expect(driverAgain).toBe(driver);
+    } finally {
+      await rm(binDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  it("leaves a user-customized merge driver command untouched on re-init", async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-mergedrv-user-"));
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-init-mergedrv-user-bin-"));
+    try {
+      execFileSync("git", ["init", "-b", "main"], { cwd: projectDir, stdio: "pipe" });
+      execFileSync(
+        "git",
+        ["config", "merge.rex-prd.driver", "my-custom-driver %O %A %B"],
+        { cwd: projectDir, stdio: "pipe" },
+      );
+
+      await initWithFakeCodex(projectDir, binDir);
+
+      const driver = execFileSync("git", ["config", "--get", "merge.rex-prd.driver"], {
+        cwd: projectDir,
+        encoding: "utf-8",
+      }).trim();
+      expect(driver).toBe("my-custom-driver %O %A %B");
+    } finally {
+      await rm(binDir, { recursive: true, force: true });
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   it("preserves existing .gitattributes content and user overrides for overlapping patterns", async () => {
     const projectDir = await mkdtemp(join(tmpdir(), "ndx-init-attrs-merge-"));
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-attrs-merge-bin-"));
