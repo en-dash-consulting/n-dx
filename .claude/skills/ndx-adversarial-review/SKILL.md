@@ -17,7 +17,7 @@ The necessity pass is not optional and is not a formality. A review that lists t
 
 ## Step 1 — Note the time, then resolve the target
 
-**Before reading anything, record the current time in ISO-8601.** Use whatever your shell provides — `date -Is` on POSIX shells, `Get-Date -Format o` in PowerShell, or a timestamp your environment already exposes. Step 7 passes it as `--startedAt`, which is what stops the run record from claiming every token the session spent before the review began.
+**Before reading anything, record the current time in ISO-8601.** Use whatever your shell provides — `date -Iseconds` on POSIX shells, `Get-Date -Format o` in PowerShell, or a timestamp your environment already exposes. Step 7 passes it as `--startedAt`, which is what stops the run record from claiming every token the session spent before the review began.
 
 Then read the argument, if any:
 

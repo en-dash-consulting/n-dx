@@ -6,7 +6,7 @@ argument-hint: "[description]"
 
 Capture a requirement, feature idea, or task from conversation context.
 
-**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Is` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
+**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Iseconds` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
 
 1. If a description is provided, use it. Otherwise, review recent conversation for feature requests, requirements, or product decisions
 2. Call `get_prd_status` (rex MCP) to understand current PRD structure

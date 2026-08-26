@@ -2,7 +2,7 @@ Restructure the PRD hierarchy to keep it organized as a coherent product spec.
 
 Use this when the PRD has grown organically and needs cleanup: too many top-level epics, features that should be tasks, overlapping areas that should be merged, or items that belong under different parents.
 
-**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Is` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
+**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Iseconds` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
 
 ## Process
 

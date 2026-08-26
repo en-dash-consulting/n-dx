@@ -1,6 +1,6 @@
 Analyze the codebase and propose PRD updates.
 
-**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Is` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
+**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Iseconds` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
 
 1. Call `get_overview` (sourcevision MCP) to understand current project state
 2. Call `get_findings` (sourcevision MCP) to identify anti-patterns and suggestions

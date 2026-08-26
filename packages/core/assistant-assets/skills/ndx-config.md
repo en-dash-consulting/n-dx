@@ -1,6 +1,6 @@
 View or change n-dx configuration with guided assistance.
 
-**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Is` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
+**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Iseconds` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
 
 Available configuration areas:
 - LLM settings: vendor (claude/codex), model, API keys, CLI paths
