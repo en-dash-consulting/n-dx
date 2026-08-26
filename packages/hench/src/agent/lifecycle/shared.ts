@@ -1138,8 +1138,17 @@ async function promptPreRunCommitChoice(opts: PreRunPromptOptions): Promise<PreR
  * Best-effort LLM commit subject for pre-existing changes. Falls back to a
  * deterministic message when no provider/credentials are available or the
  * call fails — the gate must never block or error on message generation.
+ *
+ * Commit-message generation is a mechanical single-shot call, so it runs on
+ * the vendor's light tier (e.g. haiku) rather than the run's standard model.
+ * The caller passes the run's resolved model; when that matches the
+ * config-derived standard resolution (i.e. no explicit --model override was
+ * given), the light tier is used instead. A model that differs from the
+ * standard resolution is an explicit operator override and is honored as-is.
+ *
+ * Exported for testing.
  */
-async function proposePreRunCommitMessage(
+export async function proposePreRunCommitMessage(
   diff: ReviewDiff,
   henchDir: string,
   model?: string,
@@ -1147,7 +1156,16 @@ async function proposePreRunCommitMessage(
   try {
     const llmConfig = await loadLLMConfig(henchDir);
     const provider = defaultRegistry.getActiveProvider(llmConfig);
-    const resolvedModel = model ?? resolveVendorModel(resolveLLMVendor(llmConfig), llmConfig);
+    const vendor = resolveLLMVendor(llmConfig);
+    const standardModel = resolveVendorModel(vendor, llmConfig);
+    const isExplicitOverride = Boolean(model) && model !== standardModel;
+    const resolvedModel = isExplicitOverride
+      ? (model as string)
+      : resolveVendorModel(vendor, llmConfig, "light");
+    if (!isExplicitOverride) {
+      // Tier visibility — mirrors the vendor header's "(light tier)" label.
+      detail(`Commit message model: ${resolvedModel} (light tier)`);
+    }
     const prompt =
       "Write a single-line git commit subject (max 72 chars, conventional-commit " +
       "style, no body, no surrounding quotes or backticks) summarizing these " +
