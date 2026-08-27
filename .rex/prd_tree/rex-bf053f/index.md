@@ -2,11 +2,12 @@
 id: "bf053fb2-509d-4acf-aa61-7243e66027e5"
 level: "epic"
 title: "Rex"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-24T20:09:27.774Z"
-completedAt: "2026-08-25T19:05:43.881Z"
 endedAt: "2026-08-25T19:05:43.881Z"
 description: "PRD management: hierarchical epics/features/tasks/subtasks, smart add from natural language, LLM-powered analysis and recommendations, validation, pruning, reshaping. Stores state in .rex/prd.json."
+lastModified: "2026-08-27T19:04:57.640Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -22,7 +23,7 @@ description: "PRD management: hierarchical epics/features/tasks/subtasks, smart 
 | [Fix suggestion in rex (1 finding)](./fix-suggestion-in-rex-1-finding/index.md) | completed |
 | [Interactive Workflow Shaping and Requirements Integration](./interactive-workflow-shaping-a19a8b/index.md) | completed |
 | [LoE-Calibrated Proposal Generation in rex add](./loe-calibrated-proposal-8feca9/index.md) | completed |
-| [Move file lock to saveDocument for complete write safety](./move-file-lock-to-savedocument-9fa854/index.md) | completed |
+| [Move file lock to saveDocument for complete write safety](./move-file-lock-to-savedocument-9fa854/index.md) | pending |
 | [Natural language PRD authoring](./natural-language-prd-authoring/index.md) | completed |
 | [ndx add CLI Delegation Fix](./ndx-add-cli-delegation-fix/index.md) | completed |
 | [PRD Management Enhancement](./prd-management-enhancement/index.md) | completed |
