@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Centralized Timer Management](./centralized-timer-management-bf9695.md) | completed |
-| [Re-render Optimization](./re-render-optimization-26c670.md) | completed |
+| [Centralized Timer Management](./centralized-timer-management.md) | completed |
+| [Re-render Optimization](./re-render-optimization.md) | completed |

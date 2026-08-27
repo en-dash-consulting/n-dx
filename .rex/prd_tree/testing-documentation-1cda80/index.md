@@ -13,4 +13,4 @@ endedAt: "2026-05-18T13:04:32.881Z"
 
 | Title | Status |
 |-------|--------|
-| [Skills Reference Documentation Page](./skills-reference-documentation-a7eef3/index.md) | completed |
+| [Skills Reference Documentation Page](./skills-reference-documentation-page/index.md) | completed |
