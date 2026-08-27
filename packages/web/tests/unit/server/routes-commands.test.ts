@@ -485,12 +485,20 @@ describe("commands route — ndx binary resolution ladder", () => {
   let server: Server;
   let port: number;
   let savedCliPath: string | undefined;
+  // `ndx` exports NDX_CLI_PATH to every child, so a suite run from inside an
+  // `ndx work` session inherits it. The ladder used to consult it ahead of
+  // every documented rung, which turned these tests red only under that
+  // parent and green everywhere else. Cleared here so the fixture — not the
+  // ambient environment — decides what the ladder sees.
+  let savedLegacyCliPath: string | undefined;
 
   beforeEach(async () => {
     execMock.mockReset();
     spawnManagedMock.mockReset();
     savedCliPath = process.env["N_DX_CLI_PATH"];
+    savedLegacyCliPath = process.env["NDX_CLI_PATH"];
     delete process.env["N_DX_CLI_PATH"];
+    delete process.env["NDX_CLI_PATH"];
     tmpDir = await mkdtemp(join(tmpdir(), "commands-ndxbin-"));
     await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
     ctx = {
@@ -509,6 +517,8 @@ describe("commands route — ndx binary resolution ladder", () => {
   afterEach(async () => {
     if (savedCliPath === undefined) delete process.env["N_DX_CLI_PATH"];
     else process.env["N_DX_CLI_PATH"] = savedCliPath;
+    if (savedLegacyCliPath === undefined) delete process.env["NDX_CLI_PATH"];
+    else process.env["NDX_CLI_PATH"] = savedLegacyCliPath;
     await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
@@ -536,7 +546,37 @@ describe("commands route — ndx binary resolution ladder", () => {
     await wf(join(binDir, "ndx"), "#!/bin/sh\n");
 
     await runRefresh();
+    expect(spawnManagedMock).toHaveBeenCalledTimes(1);
     expect(spawnManagedMock.mock.calls[0][0]).toBe(join(binDir, "ndx"));
+  });
+
+  // An inherited NDX_CLI_PATH must not outrank the analyzed project's own
+  // install. It did: resolveNdxBin consulted it before every documented rung
+  // and without an existence check, so a server started by `ndx start` always
+  // ran the *launching* install's cli.js instead of the project's pinned one.
+  it("ignores an inherited NDX_CLI_PATH so the project-local bin still wins", async () => {
+    const { writeFile: wf, mkdir: md } = await import("node:fs/promises");
+    const binDir = join(tmpDir, "node_modules", ".bin");
+    await md(binDir, { recursive: true });
+    await wf(join(binDir, "ndx"), "#!/bin/sh\n");
+    process.env["NDX_CLI_PATH"] = join(tmpDir, "launching-install-cli.js");
+
+    await runRefresh();
+    expect(spawnManagedMock).toHaveBeenCalledTimes(1);
+    expect(spawnManagedMock.mock.calls[0][0]).toBe(join(binDir, "ndx"));
+  });
+
+  it("ignores an inherited NDX_CLI_PATH in favour of N_DX_CLI_PATH", async () => {
+    const { writeFile: wf } = await import("node:fs/promises");
+    const cliPath = join(tmpDir, "installed-cli.js");
+    await wf(cliPath, "// stand-in for @n-dx/core/cli.js\n");
+    process.env["N_DX_CLI_PATH"] = cliPath;
+    process.env["NDX_CLI_PATH"] = join(tmpDir, "legacy-cli.js");
+
+    await runRefresh();
+    expect(spawnManagedMock).toHaveBeenCalledTimes(1);
+    expect(spawnManagedMock.mock.calls[0][0]).toBe("node");
+    expect((spawnManagedMock.mock.calls[0][1] as string[])[0]).toBe(cliPath);
   });
 
   it("uses N_DX_CLI_PATH when set and no local bin exists", async () => {
@@ -549,6 +589,7 @@ describe("commands route — ndx binary resolution ladder", () => {
     process.env["N_DX_CLI_PATH"] = cliPath;
 
     await runRefresh();
+    expect(spawnManagedMock).toHaveBeenCalledTimes(1);
     expect(spawnManagedMock.mock.calls[0][0]).toBe("node");
     expect((spawnManagedMock.mock.calls[0][1] as string[])[0]).toBe(cliPath);
   });

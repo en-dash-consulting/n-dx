@@ -126,7 +126,6 @@ import {
 } from "./pair-programming.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-process.env.NDX_CLI_PATH = fileURLToPath(import.meta.url);
 const MONOREPO_ROOT = resolve(__dir, "../..");
 
 // Advertise this CLI's own path to every child process. The web server's

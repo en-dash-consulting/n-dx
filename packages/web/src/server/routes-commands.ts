@@ -128,11 +128,17 @@ function resolveRexBin(ctx: ServerContext): { bin: string; args: string[] } {
  *     pnpm layouts won't resolve it.
  *  4. The monorepo dogfood path — valid solely when the analyzed project is
  *     the n-dx repo itself.
+ *
+ * There is deliberately no rung above 1. An earlier `NDX_CLI_PATH` check sat
+ * there — a differently-spelled twin of rung 2's `N_DX_CLI_PATH`, which
+ * `cli.js` set to the same value — and it outranked the project's own install
+ * while skipping the existence check every other rung performs. Because `ndx`
+ * exports it to every child, any server started by `ndx start` silently ran
+ * the *launching* install's cli.js instead of the analyzed project's pinned
+ * one, and a stale value produced a guaranteed spawn failure. Both the read
+ * and the assignment are gone; do not reintroduce a rung above the local bin.
  */
 function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
-  if (process.env.NDX_CLI_PATH) {
-    return { bin: "node", args: [process.env.NDX_CLI_PATH] };
-  }
   const bin = join(ctx.projectDir, "node_modules", ".bin", "ndx");
   if (existsSync(bin)) return { bin, args: [] };
 
