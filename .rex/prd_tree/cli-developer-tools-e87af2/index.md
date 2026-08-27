@@ -18,7 +18,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Adversarial review pass for ndx work (--review)](./adversarial-review-pass-for-ndx-6eb227/index.md) | pending |
 | [Auto-Commit on Completion for File-Modifying Claude Code Skills](./auto-commit-on-completion-for-efac37/index.md) | completed |
 | [Git Repository Detection and Init Prompt in ndx init](./git-repository-detection-and-ba9504/index.md) | completed |
-| [/ndx-adversarial-review skill hardening](./ndx-adversarial-review-skill-hardening/index.md) | completed |
+| [/ndx-adversarial-review skill hardening](./ndx-adversarial-review-skill-75bd9d/index.md) | completed |
 | [Plan-Mode Prevention Skill for LLM Agents](./plan-mode-prevention-skill-for-fe61c7/index.md) | completed |
 | [Target-Repo README Content Template with Required Sections](./target-repo-readme-content-2fa57d/index.md) | completed |
 | [Target-Repo README Generation on ndx init](./target-repo-readme-generation-406b4b/index.md) | completed |
