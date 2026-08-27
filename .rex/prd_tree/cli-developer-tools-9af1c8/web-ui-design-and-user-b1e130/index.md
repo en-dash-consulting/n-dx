@@ -13,8 +13,8 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Brand Identity and Visual Design System](./brand-identity-and-visual-design-system.md) | completed |
-| [Enhanced Navigation Context and Controls](./enhanced-navigation-context-and-controls.md) | completed |
+| [Brand Identity and Visual Design System](./brand-identity-and-visual-f5464d.md) | completed |
+| [Enhanced Navigation Context and Controls](./enhanced-navigation-context-and-c32f6e.md) | completed |
 | [Redesign header layout with integrated controls and repositioned branding](./redesign-header-layout-with-9cf297.md) | completed |
-| [Sidebar Active State on Initial Load](./sidebar-active-state-on-initial-load.md) | completed |
+| [Sidebar Active State on Initial Load](./sidebar-active-state-on-initial-1b9353.md) | completed |
 | [Sidebar Navigation and Layout Optimization](./sidebar-navigation-and-layout-545bde.md) | completed |
