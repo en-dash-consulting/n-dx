@@ -1,0 +1,23 @@
+---
+id: "0ba847e0-e5f4-4e0d-8786-2866cbd283a4"
+level: "task"
+title: "Break token figures into fresh/cache/output in the run summary and hench record"
+status: "pending"
+priority: "medium"
+tags:
+  - "review-pass"
+  - "e2e-finding"
+  - "token-accounting"
+  - "severity:medium"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "The run summary's input figure includes cacheCreationInput and cacheReadInput, or shows them as separate labelled lines"
+  - "A resumed-session review run displays an input total consistent with the stored run record"
+  - "ndx usage and the dashboard per-item rollup are checked for the same omission and fixed if present"
+  - "A unit test asserts the displayed input total equals the sum of all four token fields"
+  - "ndx hench record breaks its reported total into fresh input, cache creation, cache read, and output rather than printing one summed figure"
+  - "A reader can tell from either surface how much of an input total is re-read context versus fresh tokens"
+description: "Run 60c3a951's summary printed:\n\n    tokens_in:      319\n    tokens_out:   42,733\n\nwhile the stored run record held `{\"input\":319,\"output\":42733,\"cacheCreationInput\":553572,\"cacheReadInput\":14740617}`. True input was ~15.29M tokens; the headline said 319. Four orders of magnitude out.\n\nThis matters most for exactly this feature. A resumed reviewer re-reads the whole work session, so its cost is almost entirely cache reads — the 14.7M figure is the review pass's dominant cost and the part a user deciding whether --review is affordable needs to see. Displaying 319 makes review look free, which is the opposite of the intent noted at cli-loop.ts:1159-1161 (\"leaving it out would make --review look free in ndx usage\").\n\nThe charging is correct — cache fields are stored and the review is folded into the run total. Only the display drops them.\n\nCheck whether `ndx usage` and the dashboard's per-item rollup have the same omission, since they read the same records.\n\n---\n\nNOTE (added later): the same field has an opposite failure mode worth fixing in one pass, because a fix for either half can make the other worse.\n\n`ndx hench record` reports the summed figure with no breakdown: \"Token usage read from this session's transcript: 31,578,914 tokens across 103 messages.\" That number is dominated by cache reads which are largely re-reads of the same context, so it reads as implausible for the ~9 minutes of work it covers, and it invites the reader to conclude the attribution is double-counting. It did exactly that during this session — the total was mistaken for a recounting bug and investigated as one before `session-usage.ts` was read and the behaviour confirmed correct.\n\nThe attribution IS correct. `readUsageDelta` is strictly incremental: with a resolvable `cursor.lastUuid` the window starts at `found + 1`, `since` (the `--startedAt` value) filters within that window, and the watermark advances past everything scanned rather than only what was claimed, so `since`-excluded messages cannot resurface. Verified against the cursor: 38 + 103 = 141 messages claimed across two records against `consumed: 420`, the 279-entry gap being precisely the `since`-excluded entries. The module docstring records that a genuine version of this bug was already found and fixed during development (a first record once claimed 549 messages and 127M tokens), which is why `since` exists.\n\nSo both surfaces mislead about the same four fields in opposite directions: the run summary hides cache tokens behind a 319, and `hench record` shows one total in which cache tokens drown everything else. Neither lets a reader distinguish fresh input from re-read context, which is the distinction that makes the number interpretable. A breakdown — fresh input, cache creation, cache read, output — fixes both and is the reason to treat them together rather than raising the summary's number to match."
+lastModified: "2026-08-27T17:21:13.107Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---
