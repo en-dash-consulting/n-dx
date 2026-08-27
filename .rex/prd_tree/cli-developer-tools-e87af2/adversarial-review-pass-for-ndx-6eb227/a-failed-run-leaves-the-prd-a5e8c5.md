@@ -2,13 +2,18 @@
 id: "a5e8c500-8ad8-467f-a6ef-5966ec0070f2"
 level: "task"
 title: "A failed run leaves the PRD claiming success when the agent self-marked the task completed"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "e2e-finding"
   - "prd-correctness"
   - "severity:high"
 source: "ndx-capture"
+startedAt: "2026-08-27T21:00:46.879Z"
+completedAt: "2026-08-27T21:07:35.874Z"
+endedAt: "2026-08-27T21:07:35.874Z"
+resolutionType: "code-change"
+resolutionDetail: "resetInProgressTaskIfFailed now resets from {in_progress, completed} via a named RESETTABLE_ON_FAILURE set, leaving blocked/deferred/failing/cancelled untouched, and reports when it overrides an agent's completion claim. Criterion 2 is met only partially — a concurrent human 'completed' is indistinguishable from the agent's and is also reset; the limitation is documented in the docblock. 8 new tests; clean full validate exit 0."
 acceptanceCriteria:
   - "A run that ends in any FAILURE_STATUS leaves the task not-completed, even when the agent set it to completed mid-run"
   - "The reset does not clobber a terminal status set by something other than this run's agent"
@@ -16,6 +21,6 @@ acceptanceCriteria:
   - "A regression test covers agent-set-completed followed by a failed run for at least one failure status besides 'failed'"
   - "The run output says the status was corrected, so the operator can see the agent's claim was overridden"
 description: "Found while verifying bd3459fc. resetInProgressTaskIfFailed (packages/hench/src/agent/lifecycle/shared.ts:1795, called from finalizeRun at shared.ts:2086) is the safety net that returns a task to pending when a run fails:\n\n    if (!FAILURE_STATUSES.has(run.status) || !run.taskId) return;\n    const item = await store.getItem(run.taskId);\n    if (!item || item.status !== \"in_progress\") return;   // <-- only in_progress\n    await toolRexUpdateStatus(store, run.taskId, { status: \"pending\" });\n\nIt only fires when the item is still in_progress. FAILURE_STATUSES is failed, timeout, budget_exceeded, error_transient, cancelled (shared.ts:842).\n\nTrigger: the spawned agent marks the task completed itself, mid-run, before hench's gates. Then the run fails. The item's status is \"completed\", not \"in_progress\", so the guard returns early and the PRD permanently records a failed task as done. Nothing else corrects it — the run record says failed while the PRD says completed, and get_next_task will never offer the task again.\n\nThis is not hypothetical. Run 60c3a951 shows the executor calling mcp__rex__update_task_status with status=completed at roughly turn 48, well before the Full Test Suite Gate. That run happened to succeed. Had the gate failed — or the run timed out, or exceeded its token budget, or been cancelled with Ctrl-C after the agent's call — the PRD would have been left wrong. The window is the entire span from the agent's call to the end of the run, which includes the adversarial review pass, so it is wide rather than a narrow race.\n\nTwo things make it more likely than it looks. First, an agent learns the rex MCP tools exist by reading the analyzed project's CLAUDE.md/AGENTS.md, so any project that documents its MCP inventory invites this. Second, hench's own test gate was silently skipped on that run when the agent self-committed (fixed in 976d34af), so the failure path that would expose the mismatch was itself not running.\n\nThe fix is a widening, not a rewrite: on a failure status, reset any status the agent may have set rather than only in_progress. Care is needed not to clobber a legitimately terminal status a human set concurrently, and not to resurrect a task that a previous successful run completed — so the condition probably wants to key on \"this run claimed the task\" rather than on the item's current value alone."
-lastModified: "2026-08-27T18:36:47.607Z"
+lastModified: "2026-08-27T21:07:35.907Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

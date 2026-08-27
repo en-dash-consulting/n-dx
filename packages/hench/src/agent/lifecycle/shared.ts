@@ -1782,12 +1782,45 @@ export async function performCommitPromptIfNeeded(
 // ---------------------------------------------------------------------------
 
 /**
- * After a failed run, reset the active task from in_progress back to pending
- * so it reappears as actionable without manual PRD editing.
+ * Statuses a failed run is allowed to reset back to pending.
  *
- * Only resets when the task is still in_progress — specific failure handlers
- * (e.g. handleRunFailure) may have already moved it to pending or deferred,
- * in which case this is a no-op.
+ * `in_progress` is the ordinary case: the run died while holding the task.
+ *
+ * `completed` is the one that bites. The spawned agent can mark the task
+ * complete itself, mid-run, before any of hench's gates have run — run
+ * 60c3a951 shows the executor doing exactly that around turn 48 — and if the
+ * run then fails, a guard keyed only on `in_progress` returns early and the PRD
+ * permanently records a failed task as done. `get_next_task` never offers it
+ * again, so the work silently disappears. The exposure window is the whole
+ * remainder of the run, including the adversarial review pass.
+ *
+ * Everything else is left alone, because everything else is a deliberate
+ * parking decision by something that knew more than this function does:
+ * `blocked` and `deferred` are what the executor prompt tells the agent to set
+ * for an external dependency or a postponement, and `failing`/`cancelled` are
+ * set by specific failure handlers.
+ */
+const RESETTABLE_ON_FAILURE: ReadonlySet<string> = new Set(["in_progress", "completed"]);
+
+/**
+ * After a failed run, reset the active task back to pending so it reappears as
+ * actionable without manual PRD editing.
+ *
+ * Resets only from {@link RESETTABLE_ON_FAILURE}; a task parked at blocked,
+ * deferred, failing or cancelled is left as the thing that parked it intended.
+ *
+ * Safe against resurrecting genuinely finished work: `transitionToInProgress`
+ * runs before the spawn, so any `completed` observed here was written during
+ * *this* run. An earlier successful run's completion was already overwritten
+ * before the agent started.
+ *
+ * Known limitation: a human who marks the task complete concurrently, while a
+ * run that later fails is still going, is indistinguishable from the agent doing
+ * it — there is no attribution to separate them (`lastModifiedBy` carries the
+ * same git identity for both). Such a status is reset too. That is the
+ * deliberate trade: leaving a failed run's task marked complete is the worse
+ * outcome, and the log line below makes the correction visible rather than
+ * silent.
  *
  * Runs independently of rollbackOnFailure so the PRD is always cleaned up
  * even when git rollback is suppressed with --no-rollback.
@@ -1801,12 +1834,21 @@ async function resetInProgressTaskIfFailed(
   }
 
   const item = await store.getItem(run.taskId);
-  if (!item || item.status !== "in_progress") {
+  if (!item || !RESETTABLE_ON_FAILURE.has(item.status as string)) {
     return;
   }
 
+  const wasClaimedComplete = item.status === "completed";
   await toolRexUpdateStatus(store, run.taskId, { status: "pending" });
-  info(`\nTask reset to pending: [${run.taskId}] ${run.taskTitle ?? "unknown"}`);
+
+  const label = `[${run.taskId}] ${run.taskTitle ?? "unknown"}`;
+  info(
+    wasClaimedComplete
+      ? `\nTask reset to pending: ${label}\n` +
+          `  The agent marked this complete, but the run ended as "${run.status}" — ` +
+          "the completion claim was overridden."
+      : `\nTask reset to pending: ${label}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
