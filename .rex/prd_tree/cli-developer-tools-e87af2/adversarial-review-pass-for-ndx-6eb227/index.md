@@ -14,6 +14,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A failed run leaves the PRD claiming success when the agent self-marked the task completed](./a-failed-run-leaves-the-prd-a5e8c5.md) | pending |
 | [Add --review flag and move the diff-approval gate to --approve-diff](./add-review-flag-and-move-the-f7a55c.md) | completed |
 | [Break token figures into fresh/cache/output in the run summary and hench record](./break-token-figures-into-fresh-0ba847.md) | pending |
 | [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-859237.md) | completed |
@@ -24,5 +25,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Review report transport, parsing, and run-record recording](./review-report-transport-parsing-2f0be1.md) | completed |
 | [Run the review pass before the executor's own commit, not after it](./run-the-review-pass-before-the-976d34.md) | completed |
 | [Stop labeling every unresolved finding as must-fix in the review warning](./stop-labeling-every-unresolved-8c5cc2.md) | pending |
-| [The executor's rex MCP calls also depend on the analyzed project's settings.json](./the-executor-s-rex-mcp-calls-bd3459.md) | pending |
+| [Verified: the executor needs no rex MCP grants — its PRD writes are in-process](./verified-the-executor-needs-no-bd3459.md) | completed |
 | [Verify the review pass end-to-end against a real ndx work run](./verify-the-review-pass-end-to-0deece.md) | pending |

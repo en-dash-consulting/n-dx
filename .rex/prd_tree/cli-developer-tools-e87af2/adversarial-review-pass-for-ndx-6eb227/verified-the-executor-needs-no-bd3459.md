@@ -1,0 +1,26 @@
+---
+id: "bd3459fc-fa86-423d-a2f1-e72f7f73fe78"
+level: "task"
+title: "Verified: the executor needs no rex MCP grants — its PRD writes are in-process"
+status: "completed"
+priority: "low"
+tags:
+  - "e2e-finding"
+  - "permissions"
+  - "severity:none"
+  - "verified-no-change"
+source: "ndx-capture"
+startedAt: "2026-08-27T18:35:36.535Z"
+completedAt: "2026-08-27T18:37:48.970Z"
+endedAt: "2026-08-27T18:37:48.970Z"
+resolutionType: "acknowledgment"
+resolutionDetail: "Verified no code change needed: hench's PRD writes are in-process via rex-gateway, never MCP, so the executor requires no grants and completion recording works in any project. The premise this was filed on is retracted in the description. Decision documented in the buildAllowedTools docblock. The real defect found during verification is filed as a5e8c500."
+acceptanceCriteria:
+  - "Established which of the executor's PRD writes go through MCP versus the in-process rex-gateway store — answer: all in-process, none via MCP"
+  - "A hench run in a project with no rex entries in .claude/settings.json completes and records status without permission denials — already true, no MCP dependency exists"
+  - "The executor's granted MCP surface is decided explicitly and documented — decided: none, documented in buildAllowedTools alongside REX_CAPTURE_TOOLS"
+  - "The false premise in the original description is retracted so nobody implements grants on the strength of it"
+description: "RESOLVED BY INVESTIGATION, NO CODE CHANGE. The premise this was filed on was wrong, and the retraction is the useful part.\n\nWHAT I CLAIMED when filing: that in a project without rex entries in .claude/settings.json, the executor's update_task_status and append_log \"would be denied the same way\" as the reviewer's add_item, so a task \"would do its work and then fail to record completion.\"\n\nWHY THAT IS FALSE: hench's own PRD writes never touch MCP. updateCompletedTaskStatus (shared.ts:1427, called from finalizeRun at shared.ts:2026) writes through toolRexUpdateStatus(store, ...) and toolRexAppendLog(store, ...) — in-process, via the rex-gateway PRDStore. The API path likewise exposes rexToolHandlers (tools/rex.ts) as in-process function-calling tools. And hench instructs MCP use nowhere: a grep for `mcp__` across packages/hench/src/agent/planning/ returns nothing. So completion recording has no MCP dependency and works in any project regardless of its permission settings.\n\nCriterion 1 answered: hench's writes are in-process via rex-gateway; NONE go through MCP. Criterion 2 already satisfied, and already covered — tests/unit/agent/task-completion-advancement.test.ts exercises updateCompletedTaskStatus against a mock store, which by construction proves the path involves no MCP. Criterion 3 answered: the executor's granted MCP surface should be EMPTY, and the reason is now documented rather than left implicit.\n\nWHERE THE OBSERVED MCP CALLS CAME FROM: the executor's mcp__rex__update_task_status on run 60c3a951 was the agent's own initiative. The spawned Claude CLI reads the analyzed project's CLAUDE.md/AGENTS.md, which in this repo advertise the rex MCP tool inventory. So the agent learned the tools existed and chose to use them; hench neither asked for nor needs that.\n\nDeliberately NOT granting the executor those tools. Doing so would make the voluntary self-marking below more likely, not less — today's denial in most projects is the only thing suppressing it.\n\nWHAT THIS INVESTIGATION DID FIND, filed separately: resetInProgressTaskIfFailed (shared.ts:1795) only resets a task whose status is still in_progress, so an agent that self-marked the task completed before hench's gates leaves the PRD claiming success on a failed run. That is a real correctness bug and is where the value of this task actually landed."
+lastModified: "2026-08-27T18:37:48.995Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---

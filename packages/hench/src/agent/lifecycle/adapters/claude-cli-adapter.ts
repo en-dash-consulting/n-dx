@@ -88,6 +88,16 @@ const MAX_SUMMARY_LENGTH = 500;
  * fall through to a permission prompt (denied under a non-interactive
  * `acceptEdits` spawn). When the list is omitted/empty, `git` keeps its legacy
  * blanket grant for backward compatibility.
+ *
+ * Note what is deliberately absent: no MCP tool. The executing agent needs
+ * none, because hench records PRD state itself — `updateCompletedTaskStatus`
+ * writes through the in-process rex-gateway store, not through MCP — so
+ * completion recording works in any project regardless of its permission
+ * settings. An executor that calls `mcp__rex__*` is acting on its own
+ * initiative, usually because the analyzed project's CLAUDE.md advertises the
+ * tools; those calls are redundant with hench's own write and are not granted
+ * here on purpose. See {@link REX_CAPTURE_TOOLS} for the one spawn that does
+ * need MCP: the review pass, whose whole job includes filing new items.
  */
 export function buildAllowedTools(
   allowedCommands: ReadonlyArray<string>,
