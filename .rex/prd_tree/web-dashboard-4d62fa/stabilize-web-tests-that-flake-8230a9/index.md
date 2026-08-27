@@ -18,4 +18,4 @@ description: "Four distinct web tests have each failed exactly once during full-
 
 | Title | Status |
 |-------|--------|
-| [Typecheck test files in the web package](./typecheck-test-files-in-the-web-b7553a.md) | completed |
+| [Typecheck test files in the web package](./typecheck-test-files-in-the-web-package.md) | completed |

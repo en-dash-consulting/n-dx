@@ -2,11 +2,12 @@
 id: "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7"
 level: "epic"
 title: "Web Dashboard"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-24T05:27:03.754Z"
-completedAt: "2026-08-20T14:46:29.188Z"
 endedAt: "2026-08-20T14:46:29.188Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
+lastModified: "2026-08-27T16:50:42.050Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -14,16 +15,16 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | Title | Status |
 |-------|--------|
 | [Checkbox multi-select and detail panel UX for PRD tree](./checkbox-multi-select-and-797fa0/index.md) | completed |
-| [CLI Command Aliases and Shortcuts](./cli-command-aliases-and-shortcuts-339476/index.md) | completed |
+| [CLI Command Aliases and Shortcuts](./cli-command-aliases-and-shortcuts/index.md) | completed |
 | [CLI Command Coverage Audit and Dashboard Trigger Controls](./cli-command-coverage-audit-and-749cec/index.md) | completed |
-| [Dashboard Route Ownership Decoupling](./dashboard-route-ownership-f89b6b/index.md) | completed |
+| [Dashboard Route Ownership Decoupling](./dashboard-route-ownership-decoupling/index.md) | completed |
 | [Dedicated Commands Reference Section in Web Dashboard](./dedicated-commands-reference-6f8afa/index.md) | completed |
-| [Fix verified code-review findings on dashboard command triggers](./fix-verified-code-review-868493/index.md) | completed |
-| [Item completion timeline view](./item-completion-timeline-view-577c74/index.md) | completed |
+| [Fix verified code-review findings on dashboard command triggers](./fix-verified-code-review-868493/index.md) | pending |
+| [Item completion timeline view](./item-completion-timeline-view/index.md) | completed |
 | [N-Rex Easter Egg — Triple-Click Dino Takeover](./n-rex-easter-egg-triple-click-331928/index.md) | completed |
-| [ndx as the single CLI interface](./ndx-as-the-single-cli-interface-69eb6b/index.md) | completed |
-| [ndx Dashboard Refresh Orchestration](./ndx-dashboard-refresh-f82b4f/index.md) | completed |
-| [PRD Merge Context Graph View](./prd-merge-context-graph-view-a32f8a/index.md) | completed |
+| [ndx as the single CLI interface](./ndx-as-the-single-cli-interface/index.md) | completed |
+| [ndx Dashboard Refresh Orchestration](./ndx-dashboard-refresh-orchestration/index.md) | completed |
+| [PRD Merge Context Graph View](./prd-merge-context-graph-view/index.md) | completed |
 | [Process Lifecycle Management and Graceful Shutdown](./process-lifecycle-management-f95ede/index.md) | completed |
 | [Runtime Process and Thread Lifecycle Enforcement](./runtime-process-and-thread-8abe3c/index.md) | completed |
 | [Settings Page Completeness and Command-Based Reorganization](./settings-page-completeness-and-dc5e66/index.md) | completed |

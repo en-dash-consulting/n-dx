@@ -16,5 +16,5 @@ description: "Add semantic ANSI color formatting to all CLI log output across re
 |-------|--------|
 | [Apply color formatting to sourcevision CLI output](./apply-color-formatting-to-51364a.md) | completed |
 | [Apply color formatting to hench and ndx orchestrator output](./apply-color-formatting-to-hench-be167d.md) | completed |
-| [Apply color formatting to rex CLI output](./apply-color-formatting-to-rex-0225e4.md) | completed |
+| [Apply color formatting to rex CLI output](./apply-color-formatting-to-rex-cli-output.md) | completed |
 | [Build shared ANSI color formatting utility with TTY and NO_COLOR support](./build-shared-ansi-color-2faf9d.md) | completed |

@@ -18,6 +18,6 @@ description: "Restructure the web dashboard sidebar and navigation so the three 
 
 | Title | Status |
 |-------|--------|
-| [Add Hench section to web UI](./add-hench-section-to-web-ui-94f1e7.md) | completed |
+| [Add Hench section to web UI](./add-hench-section-to-web-ui.md) | completed |
 | [Expand Rex into a full multi-view section](./expand-rex-into-a-full-multi-12e7cf.md) | completed |
 | [Restructure sidebar into SourceVision / Rex / Hench sections](./restructure-sidebar-into-abbf73.md) | completed |

@@ -25,10 +25,10 @@ description: "For each gap identified in the audit, add a dashboard page or sect
 
 | Title | Status |
 |-------|--------|
-| [Adaptive optimization page](./adaptive-optimization-page-e15875.md) | completed |
-| [Add ndx refresh trigger to dashboard](./add-ndx-refresh-trigger-to-87fd01.md) | completed |
-| [Requirements and traceability page](./requirements-and-traceability-5e9dac.md) | completed |
+| [Adaptive optimization page](./adaptive-optimization-page.md) | completed |
+| [Add ndx refresh trigger to dashboard](./add-ndx-refresh-trigger-to-dashboard.md) | completed |
+| [Requirements and traceability page](./requirements-and-traceability-page.md) | completed |
 | [Restore orphaned ZonesView and AnalysisView into navigation](./restore-orphaned-zonesview-and-02333a.md) | completed |
-| [Tier 3 small coverage items](./tier-3-small-coverage-items-9b8640.md) | completed |
+| [Tier 3 small coverage items](./tier-3-small-coverage-items.md) | completed |
 | [Token usage depth and self-heal live view](./token-usage-depth-and-self-heal-c8d17f.md) | completed |
 | [Validation view actions: rex fix, reshape, ndx ci triggers](./validation-view-actions-rex-fix-e1e765.md) | completed |

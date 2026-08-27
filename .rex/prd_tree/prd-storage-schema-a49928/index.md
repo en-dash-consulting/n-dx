@@ -2,11 +2,12 @@
 id: "a4992835-70eb-4d9d-a79f-d0577b8927bc"
 level: "epic"
 title: "PRD Storage & Schema"
-status: "completed"
+status: "pending"
 startedAt: "2026-05-06T13:26:50.051Z"
-completedAt: "2026-05-06T13:26:50.051Z"
 endedAt: "2026-05-06T13:26:50.051Z"
 description: "PRD persistence model: folder-tree storage, markdown serialization, schema evolution, visibility/reporting, branch attribution, and the migration history that produced the current single-source-of-truth tree at .rex/prd_tree/."
+lastModified: "2026-08-27T16:52:43.997Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -15,13 +16,13 @@ description: "PRD persistence model: folder-tree storage, markdown serialization
 |-------|--------|
 | [Automatic prd.json Detection, Backup, and Migration on PRD-Touching Commands](./automatic-prd-json-detection-3f1a60/index.md) | completed |
 | [Branch Attribution Display in PRD Dashboard](./branch-attribution-display-in-9f96a4/index.md) | completed |
-| [Branch Attribution Metadata on PRD Items](./branch-attribution-metadata-on-578686/index.md) | completed |
+| [Branch Attribution Metadata on PRD Items](./branch-attribution-metadata-on-prd-items/index.md) | completed |
 | [CLI and MCP Write Command Integration with Folder Tree](./cli-and-mcp-write-command-ce2ecf/index.md) | completed |
 | [Commit Hash and Author Metadata on PRD Items](./commit-hash-and-author-metadata-78798e/index.md) | completed |
 | [Consolidate PRD Files into Single 'prd' File](./consolidate-prd-files-into-be363d/index.md) | completed |
 | [Cross-PRD Duplicate Detection and Merge-Into-Older Semantics](./cross-prd-duplicate-detection-44c387/index.md) | completed |
 | [Eliminate prd.md from Read and Write Paths in ndx add and Related Commands](./eliminate-prd-md-from-read-and-5ec163/index.md) | completed |
-| [Epic-Scoped Slug Naming Convention for Folder-Tree Directories](./epic-scoped-slug-naming-f9376f/index.md) | completed |
+| [Epic-Scoped Slug Naming Convention for Folder-Tree Directories](./epic-scoped-slug-naming-f9376f/index.md) | pending |
 | [Folder-Based PRD Schema Design and Serialization](./folder-based-prd-schema-design-7286f1/index.md) | completed |
 | [Folder-Level index.md Summary Aggregation](./folder-level-index-md-summary-722b72/index.md) | completed |
 | [Folder Tree Migration, Initialization, and Auto-Trigger](./folder-tree-migration-568a1a/index.md) | completed |

@@ -13,7 +13,7 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Dead Connection Detection and Cleanup](./dead-connection-detection-and-464f3d.md) | completed |
-| [Graceful Shutdown Implementation](./graceful-shutdown-implementation-a766ff.md) | completed |
+| [Dead Connection Detection and Cleanup](./dead-connection-detection-and-cleanup.md) | completed |
+| [Graceful Shutdown Implementation](./graceful-shutdown-implementation.md) | completed |
 | [Lingering Process Investigation and Root Cause Analysis](./lingering-process-investigation-d60d8d.md) | completed |
-| [Refresh Command Process Management](./refresh-command-process-9ac4a6.md) | completed |
+| [Refresh Command Process Management](./refresh-command-process-management.md) | completed |

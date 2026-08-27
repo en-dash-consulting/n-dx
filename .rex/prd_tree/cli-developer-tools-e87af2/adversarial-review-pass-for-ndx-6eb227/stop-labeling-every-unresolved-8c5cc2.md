@@ -1,0 +1,20 @@
+---
+id: "8c5cc23d-6545-48ba-9ab3-6005f08e5788"
+level: "task"
+title: "Stop labeling every unresolved finding as must-fix in the review warning"
+status: "pending"
+priority: "medium"
+tags:
+  - "review-pass"
+  - "e2e-finding"
+  - "severity:medium"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "The warning distinguishes unrepaired must-fix findings from findings whose capture failed, with separate counts"
+  - "A report with zero must-fix verdicts never produces a message claiming must-fix findings exist"
+  - "run.review distinguishes the two counts, or renames unresolvedCount to match what it actually counts"
+  - "A unit test covers a report with capture failures and no must-fix verdicts"
+description: "cli-loop.ts:1187 prints `⚠ ${unresolved.length} must-fix finding(s) were not repaired. Inspect them before trusting this commit.` but unresolvedFindings() (adversarial-review.ts:526-530) returns `action === \"failed\" || (verdict === \"must-fix\" && action !== \"fixed\")` — it deliberately includes capture failures, which are not must-fix.\n\nRun 60c3a951 printed \"⚠ 4 must-fix finding(s) were not repaired\" against a report containing zero must-fix verdicts (2 out-of-scope, 2 should-fix, 1 not-worth-fixing). The four counted items were all action=\"failed\" from the add_item permission denial. Same number lands on run.review.unresolvedCount, so the run record carries the same overstatement.\n\nThe set is the right set — four things did need attention. Only the word \"must-fix\" is wrong, and it conflates \"a required repair did not happen\" with \"a finding could not be filed\", which are different operator actions. Splitting the message by cause would say what actually went wrong."
+lastModified: "2026-08-27T16:48:16.500Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---

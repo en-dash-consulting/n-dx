@@ -14,4 +14,4 @@ endedAt: "2026-05-08T05:46:20.941Z"
 | Title | Status |
 |-------|--------|
 | [Auto-Migration to Folder-Per-Task Schema with Backup](./auto-migration-to-folder-per-6c60e8/index.md) | completed |
-| [Folder-Per-Task Hierarchy Enforcement](./folder-per-task-hierarchy-f8638a/index.md) | completed |
+| [Folder-Per-Task Hierarchy Enforcement](./folder-per-task-hierarchy-enforcement/index.md) | completed |
