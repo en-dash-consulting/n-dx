@@ -51,3 +51,7 @@ export function resolveVendorAdapter(vendor: LLMVendor): VendorAdapter {
 // Re-export adapter instances for direct access
 export { claudeCliAdapter } from "./claude-cli-adapter.js";
 export { codexCliAdapter } from "./codex-cli-adapter.js";
+
+// The review pass grants itself these MCP tools at spawn time; re-exported here
+// so consumers reach it through the barrel rather than the adapter module.
+export { REX_CAPTURE_TOOLS } from "./claude-cli-adapter.js";

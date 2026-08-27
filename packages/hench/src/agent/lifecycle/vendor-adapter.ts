@@ -108,6 +108,22 @@ export interface VendorSpawnOptions {
    * falls back to a fresh session for those vendors.
    */
   readonly resumeSessionId?: string;
+  /**
+   * Additional tool patterns to grant for this spawn, beyond the ones derived
+   * from the execution policy.
+   *
+   * The policy only describes shell and file access, so MCP tools reach a
+   * spawned session solely through the *analyzed project's* own permission
+   * settings — which hench does not control and cannot rely on. A spawn that
+   * needs a specific MCP tool must therefore say so here rather than hope the
+   * project happens to allow it. The adversarial review pass uses this to grant
+   * itself {@link REX_CAPTURE_TOOLS}, without which "capture the rest to the
+   * PRD" silently produces nothing.
+   *
+   * Currently only honored by the Claude CLI adapter, which appends these to
+   * `--allowed-tools`. Other adapters ignore it.
+   */
+  readonly extraAllowedTools?: readonly string[];
 }
 
 // ── VendorAdapter ────────────────────────────────────────────────────────

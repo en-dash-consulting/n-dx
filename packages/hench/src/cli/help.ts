@@ -84,6 +84,13 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "The execution model is never inherited — pinning a cheap executor\n" +
           "must not silently downgrade the reviewer.\n" +
           "\n" +
+          "Tool grants: the reviewer gets the executor's shell and file access\n" +
+          "plus three rex MCP tools — add_item, get_item, get_prd_status — so it\n" +
+          "can file findings without depending on the analyzed project's own\n" +
+          "permission settings. Deliberately not update_task_status: a reviewer\n" +
+          "must not be able to mark the work it is reviewing complete. Findings\n" +
+          "it still cannot file are reported as such, not silently dropped.\n" +
+          "\n" +
           "Requires the CLI provider. A review that cannot complete warns and\n" +
           "leaves the task's own result alone; it never fails a valid task.",
       },

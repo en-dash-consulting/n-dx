@@ -38,6 +38,7 @@ import {
   reviewReportPath,
   formatReviewSummary,
   unresolvedFindings,
+  captureFailedFindings,
 } from "../analysis/adversarial-review.js";
 import type { ReviewPassOutcome } from "../analysis/adversarial-review.js";
 import { mkdir, rm } from "node:fs/promises";
@@ -73,7 +74,7 @@ import {
 } from "./shared.js";
 import type { SharedLoopOptions } from "./shared.js";
 import type { VendorAdapter, SpawnConfig } from "./vendor-adapter.js";
-import { resolveVendorAdapter } from "./adapters/index.js";
+import { resolveVendorAdapter, REX_CAPTURE_TOOLS } from "./adapters/index.js";
 import { EventAccumulator } from "./event-accumulator.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
 import type { PromptSectionDiagnostic, PersistedRuntimeEvent } from "../../schema/index.js";
@@ -1142,6 +1143,10 @@ async function runAdversarialReviewPass(
     model: ctx.reviewModel || undefined,
     permissionMode: ctx.permissionMode,
     resumeSessionId,
+    // Capturing findings to the PRD is half of what this pass is for, and the
+    // execution policy grants no MCP tool, so the grant has to be explicit
+    // here rather than left to the analyzed project's own settings file.
+    extraAllowedTools: REX_CAPTURE_TOOLS,
   });
 
   stream(
@@ -1195,6 +1200,20 @@ async function runAdversarialReviewPass(
   }
 
   for (const line of formatReviewSummary(outcome.report)) info(line);
+
+  // A finding the reviewer could not file is only visible inside the report
+  // file otherwise, so an unattended run would look like it captured
+  // everything. Called out separately from the unrepaired-must-fix warning
+  // below because the operator action is different: re-file these, rather than
+  // distrust the commit.
+  const captureFailed = captureFailedFindings(outcome.report);
+  if (captureFailed.length > 0) {
+    info("");
+    info(
+      `⚠ ${captureFailed.length} finding(s) could not be captured to the PRD. ` +
+        `They are preserved in ${reportPath} — file them before the report is overwritten.`,
+    );
+  }
 
   const unresolved = unresolvedFindings(outcome.report);
   if (unresolved.length > 0) {

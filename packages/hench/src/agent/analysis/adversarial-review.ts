@@ -528,3 +528,20 @@ export function unresolvedFindings(report: ReviewReport): ReviewFinding[] {
     (f) => f.action === "failed" || (f.verdict === "must-fix" && f.action !== "fixed"),
   );
 }
+
+/**
+ * Findings the reviewer meant to file but could not.
+ *
+ * Distinct from {@link unresolvedFindings}, which mixes these together with
+ * unrepaired must-fixes: the two call for different operator actions. A failed
+ * capture means the analysis exists but nothing tracks it, so someone must
+ * re-file it before the report is overwritten by the next review of this run.
+ * An unrepaired must-fix means the commit itself is suspect.
+ *
+ * Worth surfacing on its own because the failure is otherwise invisible — the
+ * report file records it, and an unattended run that nobody reads the file for
+ * looks identical to one that captured everything.
+ */
+export function captureFailedFindings(report: ReviewReport): ReviewFinding[] {
+  return report.findings.filter((f) => f.action === "failed");
+}

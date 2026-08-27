@@ -45,6 +45,30 @@ import type { PermissionMode } from "../../../schema/index.js";
 /** File tools that Claude CLI should auto-approve (scoped to cwd). */
 const CLI_FILE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep"];
 
+/**
+ * Rex MCP tools the adversarial review pass needs to capture a finding.
+ *
+ * `buildAllowedTools` derives grants from the execution policy, which describes
+ * shell and file access only — it names no MCP tool. So MCP permissions reach a
+ * spawned session solely through the analyzed project's own
+ * `.claude/settings.json`, which hench neither owns nor can assume. On run
+ * 60c3a951 the consequence was concrete: the reviewer's `add_item` was denied
+ * while the executor's `update_task_status` succeeded, purely because the n-dx
+ * repo's settings file enumerates the second and not the first. In a project
+ * with no rex entries at all, capture would fail everywhere.
+ *
+ * Scope is deliberately the minimum that lets a finding become an item: the one
+ * write, plus the two reads needed to choose a sensible parent. A reviewer files
+ * findings — it does not restratify the PRD — so no move/merge/reorganize tool
+ * belongs here, and notably not `update_task_status`: a reviewer must never be
+ * able to mark the work it is reviewing complete.
+ */
+export const REX_CAPTURE_TOOLS: readonly string[] = [
+  "mcp__rex__add_item",
+  "mcp__rex__get_item",
+  "mcp__rex__get_prd_status",
+];
+
 const MAX_SUMMARY_LENGTH = 500;
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -377,7 +401,10 @@ export const claudeCliAdapter: VendorAdapter = {
     opts: VendorSpawnOptions,
   ): SpawnConfig {
     const { systemPrompt, taskPrompt } = assemblePrompt(envelope);
-    const allowedTools = buildAllowedTools(policy.allowedCommands, policy.allowedGitSubcommands);
+    const allowedTools = [
+      ...buildAllowedTools(policy.allowedCommands, policy.allowedGitSubcommands),
+      ...(opts.extraAllowedTools ?? []),
+    ];
 
     const { args, stdinContent } = buildClaudeCliArgs({
       systemPrompt,
