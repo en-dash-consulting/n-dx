@@ -17,4 +17,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Define and implement slug generation rules for PRD folder names at all hierarchy levels](./define-and-implement-slug-c9c4ea.md) | completed |
-| [Every PRD write renames hundreds of tree files — slug naming does not round-trip](./every-prd-write-renames-cdca50.md) | pending |
+| [PRD tree slug migration took three full-document saves to converge](./prd-tree-slug-migration-took-cdca50.md) | pending |

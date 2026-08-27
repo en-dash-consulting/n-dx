@@ -45,6 +45,38 @@ function buildGoLanguageContext(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Commit ownership
+// ---------------------------------------------------------------------------
+
+/**
+ * Decide whether the executor owns the commit for this run.
+ *
+ * `hench.autoCommit` lets the agent commit inside its own turn. That is
+ * incompatible with `--review`: the adversarial review pass runs after the
+ * spawn returns, so an agent that has already committed leaves the reviewer
+ * nothing to repair in the commit it was reviewing — the promise that must-fix
+ * repairs ship alongside the work they fix becomes unreachable by construction,
+ * not by a race. Observed on run 60c3a951 (work committed 09:26:19, review
+ * report written 09:34:59).
+ *
+ * Review therefore wins: the executor stages its changes and proposes a
+ * message, and hench commits after the review pass. That path already exists
+ * and is what a run without `autoCommit` has always done, so enabling review
+ * moves the run onto a well-travelled branch rather than a new one.
+ *
+ * @param config        The run's hench config.
+ * @param reviewEnabled True when `--review` is active for this run.
+ * @returns Whether the agent should commit its own work.
+ */
+export function resolveEffectiveAutoCommit(
+  config: HenchConfig,
+  reviewEnabled: boolean,
+): boolean {
+  if (reviewEnabled) return false;
+  return config.autoCommit === true;
+}
+
+// ---------------------------------------------------------------------------
 // System prompt builder
 // ---------------------------------------------------------------------------
 

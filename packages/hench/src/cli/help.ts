@@ -70,6 +70,11 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "and captures the rest to the PRD. Fixes land in the same commit as\n" +
           "the work they repair.\n" +
           "\n" +
+          "That last part requires an uncommitted tree, so --review overrides\n" +
+          "hench.autoCommit for the run: the agent stages and proposes a commit\n" +
+          "message, and the commit happens after the review pass instead of\n" +
+          "inside the agent's turn. Runs where the override applies say so.\n" +
+          "\n" +
           "For the Claude CLI the reviewer resumes the session that did the\n" +
           "work, so it inherits what was tried and rejected — not just the diff.\n" +
           "Other vendors get a fresh reviewer seeded with the task context.\n" +

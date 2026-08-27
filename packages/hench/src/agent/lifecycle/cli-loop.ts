@@ -23,7 +23,8 @@
  */
 
 import type { PRDStore } from "../../prd/rex-gateway.js";
-import type {PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage} from "../../schema/index.js";import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import type {HenchConfig, PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage} from "../../schema/index.js";import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import { resolveEffectiveAutoCommit } from "../planning/prompt.js";
 import { toolRexAppendLog } from "../../tools/rex.js";
 import {checkTokenBudget} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
@@ -1093,6 +1094,22 @@ async function runAdversarialReviewPass(
 ): Promise<ReviewPassOutcome> {
   subsection("Adversarial review");
 
+  // The executor is told not to commit on review-enabled runs (see
+  // resolveEffectiveAutoCommit), but git stays in its allowed commands, so the
+  // instruction is not enforcement. If HEAD moved anyway, the repairs this pass
+  // makes cannot join the commit they repair — say so rather than let the
+  // guarantee lapse silently, which is how this went unnoticed until run
+  // 60c3a951 was inspected by hand.
+  if (inv.startingHead) {
+    const headNow = captureStartingHead(inv.projectDir);
+    if (headNow && headNow !== inv.startingHead) {
+      info(
+        "⚠ HEAD moved before the review pass — the agent committed its own work. " +
+          "Any repair below lands in a separate commit from the work it fixes.",
+      );
+    }
+  }
+
   // Resume only when the adapter can actually honor it. Codex, Google, and
   // local have no `--resume` equivalent here, so they get a fresh reviewer
   // seeded with the full task context instead.
@@ -1437,9 +1454,23 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // Resolve the vendor adapter — replaces the old dispatchVendorSpawn switch
   const adapter = resolveVendorAdapter(vendor);
 
+  // `--review` takes commit ownership back from the executor. Resolved once
+  // here and threaded to both consumers (the prompt below, finalizeRun at the
+  // end) so the run cannot end up telling the agent one thing and the commit
+  // gate another.
+  const reviewEnabled = opts.reviewPass === true;
+  const effectiveAutoCommit = resolveEffectiveAutoCommit(config, reviewEnabled);
+  if (config.autoCommit === true && !effectiveAutoCommit) {
+    info(
+      "hench.autoCommit is on, but --review needs an uncommitted tree to repair. " +
+        "The agent will stage and propose a message; the commit happens after the review pass.",
+    );
+  }
+  const runConfig: HenchConfig = { ...config, autoCommit: effectiveAutoCommit };
+
   // Shared: assemble brief, format, build system prompt + envelope, display task info
   const { brief, taskId, briefText, systemPrompt, envelope: baseEnvelope } = await prepareBrief(
-    store, config, opts.taskId,
+    store, runConfig, opts.taskId,
     { excludeTaskIds: opts.excludeTaskIds, epicId: opts.epicId, tags: opts.tags, projectDir },
     { priorAttempts: opts.priorAttempts, runHistory: opts.runHistory },
     opts.extraContext,
@@ -1770,7 +1801,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     yes: opts.yes,
     autonomous: opts.autonomous,
     store,
-    autoCommit: config.autoCommit === true,
+    autoCommit: effectiveAutoCommit,
     skipFullTestGate: config.skipFullTestGate,
     commitWatcher,
     baselineUntracked,
