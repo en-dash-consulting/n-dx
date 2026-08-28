@@ -48,10 +48,11 @@ export async function cmdShow(
   info(`Started: ${run.startedAt}`);
   if (run.finishedAt) info(`Finished: ${run.finishedAt}`);
   info(`Turns: ${run.turns}`);
+  // formatTokenReport now reports the cache fields itself, with the same
+  // thousands separators and column alignment as the rest of the block. The
+  // ad-hoc `Cache: 503169 created / 14441860 read` line that used to follow it
+  // duplicated that, unformatted.
   info(formatTokenReport(run.tokenUsage));
-  if (run.tokenUsage.cacheCreationInput || run.tokenUsage.cacheReadInput) {
-    info(`  Cache: ${run.tokenUsage.cacheCreationInput ?? 0} created / ${run.tokenUsage.cacheReadInput ?? 0} read`);
-  }
 
   if (run.summary) {
     info(`\nSummary:\n${run.summary}`);

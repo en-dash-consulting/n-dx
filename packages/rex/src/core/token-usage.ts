@@ -17,10 +17,24 @@ import { PROJECT_DIRS } from "@n-dx/llm-client";
 
 /** Aggregated token usage for a single package. */
 export interface PackageTokenUsage {
-  /** Total input tokens. */
+  /** Fresh (uncached) input tokens. */
   inputTokens: number;
   /** Total output tokens. */
   outputTokens: number;
+  /**
+   * Tokens written to the prompt cache, and tokens re-read from it.
+   *
+   * Kept separate from `inputTokens` rather than folded in. They are billed at
+   * different rates — {@link estimateCost} prices `inputTokens` at the full
+   * input rate — and they mean different things: a resumed session re-reads
+   * its whole context, so cache reads can exceed fresh input by four orders of
+   * magnitude while representing far less work and far less money.
+   *
+   * Field names mirror the dashboard's parallel aggregation in
+   * `packages/web/src/server/routes-token-usage.ts`.
+   */
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
   /** Number of LLM calls. */
   calls: number;
 }
@@ -36,6 +50,8 @@ export interface AggregateTokenUsage {
   /** Total tokens across all packages. */
   totalInputTokens: number;
   totalOutputTokens: number;
+  totalCacheCreationTokens: number;
+  totalCacheReadTokens: number;
   totalCalls: number;
 }
 
@@ -82,7 +98,7 @@ export interface TokenUsageLogEntry {
 // ---------------------------------------------------------------------------
 
 function emptyPackageUsage(): PackageTokenUsage {
-  return { inputTokens: 0, outputTokens: 0, calls: 0 };
+  return { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 };
 }
 
 function isInRange(timestamp: string, filter: TokenUsageFilter): boolean {
@@ -146,6 +162,8 @@ export interface TokenEvent {
   package: "rex" | "hench" | "sv";
   inputTokens: number;
   outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
   calls: number;
   vendor?: string;
   model?: string;
@@ -155,10 +173,17 @@ export interface TokenEvent {
 interface HenchRunSummary {
   startedAt: string;
   model?: string;
-  tokenUsage: { input: number; output: number };
+  tokenUsage: {
+    input: number;
+    output: number;
+    cacheCreationInput?: number;
+    cacheReadInput?: number;
+  };
   turnTokenUsage?: Array<{
     input: number;
     output: number;
+    cacheCreationInput?: number;
+    cacheReadInput?: number;
     vendor?: string;
     model?: string;
   }>;
@@ -197,6 +222,8 @@ export async function extractHenchTokenUsage(
       usage.calls += 1; // Each run counts as one aggregate call
       usage.inputTokens += run.tokenUsage.input ?? 0;
       usage.outputTokens += run.tokenUsage.output ?? 0;
+      usage.cacheCreationTokens += run.tokenUsage.cacheCreationInput ?? 0;
+      usage.cacheReadTokens += run.tokenUsage.cacheReadInput ?? 0;
     } catch {
       // Invalid run file — skip
     }
@@ -289,6 +316,10 @@ export function extractRexTokenEvents(
         package: "rex",
         inputTokens: data.inputTokens ?? 0,
         outputTokens: data.outputTokens ?? 0,
+        // rex's own usage log predates cache accounting and records neither
+        // field; zero here is "not reported", not "no cache was used".
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
         calls: data.calls ?? 0,
         vendor: normalizeEventMetadata(data.vendor) ?? "unknown",
         model: normalizeEventMetadata(data.model) ?? "unknown",
@@ -337,6 +368,8 @@ export async function extractHenchTokenEvents(
             package: "hench",
             inputTokens: turn.input ?? 0,
             outputTokens: turn.output ?? 0,
+            cacheCreationTokens: turn.cacheCreationInput ?? 0,
+            cacheReadTokens: turn.cacheReadInput ?? 0,
             calls: 1,
             vendor: turn.vendor,
             model: turn.model ?? run.model,
@@ -351,6 +384,8 @@ export async function extractHenchTokenEvents(
         package: "hench",
         inputTokens: run.tokenUsage.input ?? 0,
         outputTokens: run.tokenUsage.output ?? 0,
+        cacheCreationTokens: run.tokenUsage.cacheCreationInput ?? 0,
+        cacheReadTokens: run.tokenUsage.cacheReadInput ?? 0,
         calls: 1,
         model: run.model,
       });
@@ -386,6 +421,9 @@ export async function extractSvTokenEvents(
       package: "sv",
       inputTokens: manifest.tokenUsage.inputTokens ?? 0,
       outputTokens: manifest.tokenUsage.outputTokens ?? 0,
+      // The sourcevision manifest reports no cache fields either.
+      cacheCreationTokens: 0,
+      cacheReadTokens: 0,
       calls: manifest.tokenUsage.calls ?? 0,
     });
   } catch {
@@ -433,12 +471,16 @@ export function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
         package: ev.package,
         inputTokens: 0,
         outputTokens: 0,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
         calls: 0,
       };
       map.set(key, entry);
     }
     entry.inputTokens += ev.inputTokens;
     entry.outputTokens += ev.outputTokens;
+    entry.cacheCreationTokens += ev.cacheCreationTokens;
+    entry.cacheReadTokens += ev.cacheReadTokens;
     entry.calls += ev.calls;
   }
 
@@ -530,6 +572,8 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
     const pkg = ev.package === "rex" ? rex : ev.package === "hench" ? hench : sv;
     pkg.inputTokens += ev.inputTokens;
     pkg.outputTokens += ev.outputTokens;
+    pkg.cacheCreationTokens += ev.cacheCreationTokens;
+    pkg.cacheReadTokens += ev.cacheReadTokens;
     pkg.calls += ev.calls;
   }
 
@@ -537,6 +581,8 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
     packages: { rex, hench, sv },
     totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
     totalOutputTokens: rex.outputTokens + hench.outputTokens + sv.outputTokens,
+    totalCacheCreationTokens: rex.cacheCreationTokens + hench.cacheCreationTokens + sv.cacheCreationTokens,
+    totalCacheReadTokens: rex.cacheReadTokens + hench.cacheReadTokens + sv.cacheReadTokens,
     totalCalls: rex.calls + hench.calls + sv.calls,
   };
 }
@@ -567,6 +613,8 @@ export async function aggregateTokenUsage(
     packages: { rex, hench, sv },
     totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
     totalOutputTokens: rex.outputTokens + hench.outputTokens + sv.outputTokens,
+    totalCacheCreationTokens: rex.cacheCreationTokens + hench.cacheCreationTokens + sv.cacheCreationTokens,
+    totalCacheReadTokens: rex.cacheReadTokens + hench.cacheReadTokens + sv.cacheReadTokens,
     totalCalls: rex.calls + hench.calls + sv.calls,
   };
 }
@@ -608,6 +656,14 @@ export interface CostEstimate {
  *
  * Uses default Sonnet pricing as a baseline. Cost is approximate since
  * individual calls may use different models or benefit from prompt caching.
+ *
+ * Deliberately prices `totalInputTokens` and `totalOutputTokens` only. Cache
+ * tokens are tracked and displayed but not costed here: cache writes and reads
+ * bill at different rates from fresh input (a read is a small fraction of it),
+ * so adding them to the input figure at the input rate would turn an
+ * understated token count into an overstated dollar figure — a resumed
+ * session's ~15M cache reads would read as tens of dollars. Costing them
+ * properly needs per-rate pricing, which this ballpark estimator does not have.
  */
 export function estimateCost(
   usage: AggregateTokenUsage,

@@ -137,6 +137,8 @@ describe("token usage regression fixtures", () => {
       },
       totalInputTokens: fixtures.budget.usage.input,
       totalOutputTokens: fixtures.budget.usage.output,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 1,
     };
 

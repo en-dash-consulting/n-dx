@@ -28,6 +28,39 @@ function fmt(n: number): string {
 }
 
 /**
+ * Render the token split for one row.
+ *
+ * Cache figures appear only when the source reported them — rex's own usage log
+ * and the sourcevision manifest carry no cache fields, so a zero there means
+ * "not reported" and printing it would be a claim the data cannot support.
+ * Where they are reported they are shown rather than folded into the input
+ * figure: a resumed session's cache reads can dwarf its fresh input, and the
+ * difference is what tells a reader how much of the cost is re-read context.
+ */
+function formatSplit(t: {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+}): string {
+  const parts = [`${fmt(t.inputTokens)} in`, `${fmt(t.outputTokens)} out`];
+  if (t.cacheCreationTokens > 0 || t.cacheReadTokens > 0) {
+    parts.push(`${fmt(t.cacheCreationTokens)} cache write`, `${fmt(t.cacheReadTokens)} cache read`);
+  }
+  return parts.join(" / ");
+}
+
+/** Every token a row accounts for, cache included. */
+function rowTotal(t: {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+}): number {
+  return t.inputTokens + t.outputTokens + t.cacheCreationTokens + t.cacheReadTokens;
+}
+
+/**
  * Format detailed per-package breakdown for tree output.
  * Shows input/output split and call count for each package with usage.
  */
@@ -40,10 +73,10 @@ function formatPackageDetail(usage: AggregateTokenUsage): string[] {
   ];
 
   for (const { name, pkg, unit } of entries) {
-    const total = pkg.inputTokens + pkg.outputTokens;
+    const total = rowTotal(pkg);
     if (total === 0) continue;
     lines.push(
-      `  ${name}: ${fmt(total)} tokens (${fmt(pkg.inputTokens)} in / ${fmt(pkg.outputTokens)} out) — ${pkg.calls} ${unit}`,
+      `  ${name}: ${fmt(total)} tokens (${formatSplit(pkg)}) — ${pkg.calls} ${unit}`,
     );
   }
 
@@ -57,10 +90,10 @@ function formatCommandDetail(commands: CommandTokenUsage[]): string[] {
   const lines: string[] = [];
 
   for (const cmd of commands) {
-    const total = cmd.inputTokens + cmd.outputTokens;
+    const total = rowTotal(cmd);
     const unit = cmd.package === "hench" ? "runs" : "calls";
     lines.push(
-      `  ${cmd.package} ${cmd.command}: ${fmt(total)} tokens (${fmt(cmd.inputTokens)} in / ${fmt(cmd.outputTokens)} out) — ${cmd.calls} ${unit}`,
+      `  ${cmd.package} ${cmd.command}: ${fmt(total)} tokens (${formatSplit(cmd)}) — ${cmd.calls} ${unit}`,
     );
   }
 
@@ -74,9 +107,17 @@ function formatPeriodBuckets(buckets: PeriodBucket[]): string[] {
   const lines: string[] = [];
 
   for (const bucket of buckets) {
-    const total = bucket.usage.totalInputTokens + bucket.usage.totalOutputTokens;
+    const u = bucket.usage;
+    const split = formatSplit({
+      inputTokens: u.totalInputTokens,
+      outputTokens: u.totalOutputTokens,
+      cacheCreationTokens: u.totalCacheCreationTokens,
+      cacheReadTokens: u.totalCacheReadTokens,
+    });
+    const total =
+      u.totalInputTokens + u.totalOutputTokens + u.totalCacheCreationTokens + u.totalCacheReadTokens;
     lines.push(
-      `  ${bucket.period}: ${fmt(total)} tokens (${fmt(bucket.usage.totalInputTokens)} in / ${fmt(bucket.usage.totalOutputTokens)} out) — ${bucket.estimatedCost.total}`,
+      `  ${bucket.period}: ${fmt(total)} tokens (${split}) — ${bucket.estimatedCost.total}`,
     );
   }
 
@@ -144,6 +185,8 @@ export async function cmdUsage(
       command: cmd.command,
       inputTokens: cmd.inputTokens,
       outputTokens: cmd.outputTokens,
+      cacheCreationTokens: cmd.cacheCreationTokens,
+      cacheReadTokens: cmd.cacheReadTokens,
       calls: cmd.calls,
     }));
 
@@ -188,8 +231,13 @@ export async function cmdUsage(
     result(line);
   }
 
-  // Detailed output (only when there is data)
-  const total = usage.totalInputTokens + usage.totalOutputTokens;
+  // Detailed output (only when there is data). Counts cache tokens too: a run
+  // that was all cache reads is still a run with data to show.
+  const total =
+    usage.totalInputTokens +
+    usage.totalOutputTokens +
+    usage.totalCacheCreationTokens +
+    usage.totalCacheReadTokens;
   if (total > 0) {
     // Per-package breakdown
     info("");
@@ -216,9 +264,19 @@ export async function cmdUsage(
       }
     }
 
-    // Cost estimation
+    // Cost estimation. Says what it covers: now that cache figures are on
+    // screen — and they dominate any resumed session — an unqualified dollar
+    // amount sitting under them reads as covering them, which it does not.
+    // Cache writes and reads bill at rates this ballpark estimator has no
+    // figures for, so they are excluded rather than priced as fresh input.
+    const cacheTotal = usage.totalCacheCreationTokens + usage.totalCacheReadTokens;
     info("");
-    info(`Estimated cost: ${cost.total} (based on Sonnet pricing)`);
+    info(
+      cacheTotal > 0
+        ? `Estimated cost: ${cost.total} (input + output at Sonnet pricing; ` +
+          `excludes ${fmt(cacheTotal)} cache tokens, which bill at different rates)`
+        : `Estimated cost: ${cost.total} (based on Sonnet pricing)`,
+    );
   }
 
   // Filter notice

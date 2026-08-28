@@ -265,8 +265,24 @@ async function resolveUsage(
     delta.tokenUsage.cacheCreationInput +
     delta.tokenUsage.cacheReadInput;
 
+  // Break the total down rather than printing one number. On any session that
+  // resumes context — every /ndx-work run of any length — cache reads dominate
+  // by orders of magnitude, so a lone total reads as implausible for the work
+  // it covers and invites the reader to conclude the attribution is
+  // double-counting. It did exactly that during development, before
+  // session-usage.ts was read and the incremental watermark confirmed correct.
+  // The split is also what makes the figure actionable: re-read context and
+  // fresh input are not the same cost.
+  const breakdown =
+    total > 0
+      ? ` (fresh input ${delta.tokenUsage.input.toLocaleString()}` +
+        ` · cache write ${delta.tokenUsage.cacheCreationInput.toLocaleString()}` +
+        ` · cache read ${delta.tokenUsage.cacheReadInput.toLocaleString()}` +
+        ` · output ${delta.tokenUsage.output.toLocaleString()})`
+      : "";
+
   const notes = [
-    `Token usage read from this session's transcript: ${total.toLocaleString()} tokens across ${delta.messages} message${delta.messages === 1 ? "" : "s"}.`,
+    `Token usage read from this session's transcript: ${total.toLocaleString()} tokens across ${delta.messages} message${delta.messages === 1 ? "" : "s"}${breakdown}.`,
   ];
   if (delta.resynced) {
     notes.push(

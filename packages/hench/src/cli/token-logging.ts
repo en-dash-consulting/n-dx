@@ -57,29 +57,78 @@ function formatTokenValue(count: number | null | undefined, width: number = DEFA
   return count.toLocaleString().padStart(width);
 }
 
+/** Cache fields, when the vendor reports them. */
+function cacheFields(tokens: TokenUsage | TokenCount): { write: number; read: number } {
+  const t = tokens as TokenUsage;
+  return { write: t.cacheCreationInput ?? 0, read: t.cacheReadInput ?? 0 };
+}
+
+/**
+ * Render `label: value` rows with both columns aligned.
+ *
+ * The value column is sized to the widest number rather than fixed, because a
+ * resumed run's cache reads run to eight digits while its fresh input is three
+ * — a fixed width would either wrap the large figure or strand the small one.
+ */
+function formatRows(rows: Array<[string, number]>): string {
+  const labelWidth = Math.max(...rows.map(([label]) => label.length)) + 1; // + ":"
+  const valueWidth = Math.max(
+    DEFAULT_FIELD_WIDTH,
+    ...rows.map(([, value]) => value.toLocaleString().length),
+  );
+  return rows
+    .map(([label, value]) => `${`${label}:`.padEnd(labelWidth)} ${formatTokenValue(value, valueWidth)}`)
+    .join("\n");
+}
+
 /**
  * Format a complete token usage report for a run.
  *
- * Returns a formatted block with two lines: tokens_in and tokens_out.
- * Both vendors (Codex and Claude) produce identical format and structure.
+ * Without cache activity — Codex, or a Claude run that never hit the cache —
+ * this is the historical two lines, `tokens_in` and `tokens_out`.
+ *
+ * When the vendor reports cache tokens, they get their own labelled lines plus
+ * a total. They are not folded into `tokens_in`, because fresh input and
+ * re-read context are neither priced the same nor interpreted the same: a
+ * resumed `--review` session re-reads the whole work session, so almost all of
+ * its cost is cache reads. Run 60c3a951 printed `tokens_in: 319` against a real
+ * input of ~15.29M, which made the review pass look free — the opposite of what
+ * charging the review to the run was for.
  *
  * @param tokens Token usage (input/output counts, or null for unavailable)
  * @returns Multi-line formatted string suitable for info() output
  *
  * @example
  * formatTokenReport({ input: 1500, output: 300 })
- * // Returns:
- * // "tokens_in:       1,500\ntokens_out:        300"
+ * // "tokens_in:     1,500\ntokens_out:      300"
+ *
+ * @example
+ * formatTokenReport({ input: 319, output: 42733, cacheCreationInput: 553572, cacheReadInput: 14740617 })
+ * // "tokens_in:          319
+ * //  cache_write:    553,572
+ * //  cache_read:  14,740,617
+ * //  tokens_out:      42,733
+ * //  total:       15,337,241"
  */
 export function formatTokenReport(tokens: TokenUsage | TokenCount | null): string {
   if (!tokens || getTokenAvailability(tokens) === "unavailable") {
     return `tokens_in: ${formatTokenValue(null)}\ntokens_out: ${formatTokenValue(null)}`;
   }
 
-  const inputFormatted = formatTokenValue(tokens.input);
-  const outputFormatted = formatTokenValue(tokens.output);
+  const { write, read } = cacheFields(tokens);
+  if (write === 0 && read === 0) {
+    const inputFormatted = formatTokenValue(tokens.input);
+    const outputFormatted = formatTokenValue(tokens.output);
+    return `tokens_in: ${inputFormatted}\ntokens_out: ${outputFormatted}`;
+  }
 
-  return `tokens_in: ${inputFormatted}\ntokens_out: ${outputFormatted}`;
+  return formatRows([
+    ["tokens_in", tokens.input],
+    ["cache_write", write],
+    ["cache_read", read],
+    ["tokens_out", tokens.output],
+    ["total", tokens.input + tokens.output + write + read],
+  ]);
 }
 
 /**

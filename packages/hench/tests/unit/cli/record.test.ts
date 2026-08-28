@@ -286,6 +286,74 @@ describe("hench record", () => {
    * silence here once attributed 549 messages and 127M cache-read tokens,
    * four earlier tasks' spend included, to a single PRD item.
    */
+  describe("reported usage breakdown", () => {
+    /**
+     * One summed figure is unreadable for a session dominated by cache reads,
+     * which is every session that resumes context. A total of ~31M for nine
+     * minutes of work reads as a double-counting bug — during development it
+     * was mistaken for one and investigated as one before session-usage.ts was
+     * read and the attribution confirmed correct. Splitting the number into
+     * fresh input, cache write, cache read and output is what makes it
+     * interpretable, and it is the same distinction the run summary now draws.
+     */
+    function message(uuid: string, cacheRead: number): string {
+      return JSON.stringify({
+        type: "assistant",
+        uuid,
+        message: {
+          model: "claude-opus-5",
+          usage: {
+            input_tokens: 11,
+            output_tokens: 22,
+            cache_creation_input_tokens: 33,
+            cache_read_input_tokens: cacheRead,
+          },
+        },
+      });
+    }
+
+    it("breaks the reported total into fresh, cache and output figures", async () => {
+      const lines: string[] = [];
+      const log = console.log.bind(console);
+      console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+
+      const transcript = join(projectDir, "breakdown.jsonl");
+      await writeFile(transcript, message("a", 5_000_000), "utf-8");
+
+      try {
+        await cmdRecord(projectDir, { task: "T1", transcript, session: "s-breakdown" });
+      } finally {
+        console.log = log;
+      }
+
+      const output = lines.join("\n");
+      expect(output).toContain("5,000,066 tokens");        // the total, as before
+      expect(output).toMatch(/fresh input[^\d]*11\b/);
+      expect(output).toMatch(/cache write[^\d]*33\b/);
+      expect(output).toMatch(/cache read[^\d]*5,000,000\b/);
+      expect(output).toMatch(/output[^\d]*22\b/);
+    });
+
+    it("omits the breakdown when there is nothing to break down", async () => {
+      const lines: string[] = [];
+      const log = console.log.bind(console);
+      console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+
+      const transcript = join(projectDir, "empty.jsonl");
+      await writeFile(transcript, "", "utf-8");
+
+      try {
+        await cmdRecord(projectDir, { task: "T1", transcript, session: "s-empty" });
+      } finally {
+        console.log = log;
+      }
+
+      const output = lines.join("\n");
+      expect(output).toContain("0 tokens");
+      expect(output).not.toContain("fresh input");
+    });
+  });
+
   describe("usage window validation", () => {
     function message(uuid: string, output: number): string {
       return JSON.stringify({

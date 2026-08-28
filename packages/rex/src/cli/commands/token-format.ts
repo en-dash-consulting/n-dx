@@ -14,6 +14,7 @@ import { loadTokenUsageConfig, readTokenUsageLog } from "../../core/token-store.
 import type {
   AggregateTokenUsage,
   BudgetCheckResult,
+  PackageTokenUsage,
 } from "../../core/token-usage.js";
 
 /** Format a number with locale-aware commas. */
@@ -26,7 +27,8 @@ function fmt(n: number): string {
  * Returns an array of lines (without trailing newlines).
  */
 export function formatAggregateTokenUsage(usage: AggregateTokenUsage): string[] {
-  const total = usage.totalInputTokens + usage.totalOutputTokens;
+  const cacheTotal = usage.totalCacheCreationTokens + usage.totalCacheReadTokens;
+  const total = usage.totalInputTokens + usage.totalOutputTokens + cacheTotal;
 
   if (total === 0) {
     return ["Token usage: none recorded"];
@@ -34,27 +36,36 @@ export function formatAggregateTokenUsage(usage: AggregateTokenUsage): string[] 
 
   const lines: string[] = [];
 
-  lines.push(
-    `Token usage: ${fmt(total)} tokens (${fmt(usage.totalInputTokens)} in / ${fmt(usage.totalOutputTokens)} out)`,
-  );
+  // Cache figures ride alongside the in/out split rather than inside the input
+  // number. A resumed session re-reads its whole context, so its cache reads
+  // can exceed fresh input by orders of magnitude while costing a fraction as
+  // much — fusing them would misstate both the work and the money.
+  const split = cacheTotal > 0
+    ? `${fmt(usage.totalInputTokens)} in / ${fmt(usage.totalOutputTokens)} out / ` +
+      `${fmt(usage.totalCacheCreationTokens)} cache write / ${fmt(usage.totalCacheReadTokens)} cache read`
+    : `${fmt(usage.totalInputTokens)} in / ${fmt(usage.totalOutputTokens)} out`;
+
+  lines.push(`Token usage: ${fmt(total)} tokens (${split})`);
 
   // Per-package breakdown — only show packages with usage
   const { rex, hench, sv } = usage.packages;
   const parts: string[] = [];
 
-  if (sv.inputTokens + sv.outputTokens > 0) {
-    const svTotal = sv.inputTokens + sv.outputTokens;
-    parts.push(`sv: ${fmt(svTotal)} (${sv.calls} calls)`);
+  // Per-package figures count the same four fields as the headline, so the
+  // parts add up to the total a reader just saw.
+  const pkgTotal = (p: PackageTokenUsage): number =>
+    p.inputTokens + p.outputTokens + p.cacheCreationTokens + p.cacheReadTokens;
+
+  if (pkgTotal(sv) > 0) {
+    parts.push(`sv: ${fmt(pkgTotal(sv))} (${sv.calls} calls)`);
   }
 
-  if (rex.inputTokens + rex.outputTokens > 0) {
-    const rexTotal = rex.inputTokens + rex.outputTokens;
-    parts.push(`rex: ${fmt(rexTotal)} (${rex.calls} calls)`);
+  if (pkgTotal(rex) > 0) {
+    parts.push(`rex: ${fmt(pkgTotal(rex))} (${rex.calls} calls)`);
   }
 
-  if (hench.inputTokens + hench.outputTokens > 0) {
-    const henchTotal = hench.inputTokens + hench.outputTokens;
-    parts.push(`hench: ${fmt(henchTotal)} (${hench.calls} runs)`);
+  if (pkgTotal(hench) > 0) {
+    parts.push(`hench: ${fmt(pkgTotal(hench))} (${hench.calls} runs)`);
   }
 
   if (parts.length > 0) {

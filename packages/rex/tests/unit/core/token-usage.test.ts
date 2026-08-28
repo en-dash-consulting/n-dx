@@ -589,7 +589,7 @@ describe("aggregateTokenUsage", () => {
 // ---------------------------------------------------------------------------
 
 describe("formatAggregateTokenUsage", () => {
-  const EMPTY_PKG = { inputTokens: 0, outputTokens: 0, calls: 0 };
+  const EMPTY_PKG = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 };
 
   it("formats zero usage as 'none recorded'", () => {
     const usage: AggregateTokenUsage = {
@@ -600,6 +600,8 @@ describe("formatAggregateTokenUsage", () => {
       },
       totalInputTokens: 0,
       totalOutputTokens: 0,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 0,
     };
 
@@ -612,12 +614,14 @@ describe("formatAggregateTokenUsage", () => {
   it("formats total usage with input/output breakdown", () => {
     const usage: AggregateTokenUsage = {
       packages: {
-        rex: { inputTokens: 3000, outputTokens: 500, calls: 2 },
-        hench: { inputTokens: 5000, outputTokens: 1500, calls: 1 },
+        rex: { inputTokens: 3000, outputTokens: 500, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 2 },
+        hench: { inputTokens: 5000, outputTokens: 1500, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 1 },
         sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 8000,
       totalOutputTokens: 2000,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 3,
     };
 
@@ -631,12 +635,14 @@ describe("formatAggregateTokenUsage", () => {
   it("shows per-package breakdown", () => {
     const usage: AggregateTokenUsage = {
       packages: {
-        rex: { inputTokens: 3000, outputTokens: 500, calls: 2 },
-        hench: { inputTokens: 5000, outputTokens: 1500, calls: 1 },
+        rex: { inputTokens: 3000, outputTokens: 500, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 2 },
+        hench: { inputTokens: 5000, outputTokens: 1500, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 1 },
         sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 8000,
       totalOutputTokens: 2000,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 3,
     };
 
@@ -654,12 +660,14 @@ describe("formatAggregateTokenUsage", () => {
   it("shows all three packages when all have usage", () => {
     const usage: AggregateTokenUsage = {
       packages: {
-        rex: { inputTokens: 3000, outputTokens: 500, calls: 2 },
-        hench: { inputTokens: 5000, outputTokens: 1500, calls: 1 },
-        sv: { inputTokens: 2000, outputTokens: 600, calls: 3 },
+        rex: { inputTokens: 3000, outputTokens: 500, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 2 },
+        hench: { inputTokens: 5000, outputTokens: 1500, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 1 },
+        sv: { inputTokens: 2000, outputTokens: 600, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 3 },
       },
       totalInputTokens: 10000,
       totalOutputTokens: 2600,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 6,
     };
 
@@ -677,12 +685,14 @@ describe("formatAggregateTokenUsage", () => {
   it("omits packages with zero usage from breakdown", () => {
     const usage: AggregateTokenUsage = {
       packages: {
-        rex: { inputTokens: 3000, outputTokens: 500, calls: 2 },
+        rex: { inputTokens: 3000, outputTokens: 500, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 2 },
         hench: { ...EMPTY_PKG },
         sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 3000,
       totalOutputTokens: 500,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 2,
     };
 
@@ -698,11 +708,13 @@ describe("formatAggregateTokenUsage", () => {
     const usage: AggregateTokenUsage = {
       packages: {
         rex: { ...EMPTY_PKG },
-        hench: { inputTokens: 10000, outputTokens: 3000, calls: 5 },
+        hench: { inputTokens: 10000, outputTokens: 3000, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 5 },
         sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 10000,
       totalOutputTokens: 3000,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 5,
     };
 
@@ -718,10 +730,12 @@ describe("formatAggregateTokenUsage", () => {
       packages: {
         rex: { ...EMPTY_PKG },
         hench: { ...EMPTY_PKG },
-        sv: { inputTokens: 4000, outputTokens: 1000, calls: 2 },
+        sv: { inputTokens: 4000, outputTokens: 1000, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 2 },
       },
       totalInputTokens: 4000,
       totalOutputTokens: 1000,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 2,
     };
 
@@ -738,17 +752,19 @@ describe("formatAggregateTokenUsage", () => {
 // ---------------------------------------------------------------------------
 
 describe("estimateCost", () => {
-  const EMPTY_PKG = { inputTokens: 0, outputTokens: 0, calls: 0 };
+  const EMPTY_PKG = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 };
 
   it("estimates cost with default Sonnet pricing", () => {
     const usage: AggregateTokenUsage = {
       packages: {
         rex: { ...EMPTY_PKG },
-        hench: { inputTokens: 1000000, outputTokens: 1000000, calls: 1 },
+        hench: { inputTokens: 1000000, outputTokens: 1000000, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 1 },
         sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 1000000,
       totalOutputTokens: 1000000,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 1,
     };
 
@@ -770,6 +786,8 @@ describe("estimateCost", () => {
       },
       totalInputTokens: 0,
       totalOutputTokens: 0,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 0,
     };
 
@@ -783,11 +801,13 @@ describe("estimateCost", () => {
     const usage: AggregateTokenUsage = {
       packages: {
         rex: { ...EMPTY_PKG },
-        hench: { inputTokens: 1000000, outputTokens: 1000000, calls: 1 },
+        hench: { inputTokens: 1000000, outputTokens: 1000000, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 1 },
         sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 1000000,
       totalOutputTokens: 1000000,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 1,
     };
 
@@ -805,12 +825,14 @@ describe("estimateCost", () => {
   it("handles fractional token counts", () => {
     const usage: AggregateTokenUsage = {
       packages: {
-        rex: { inputTokens: 500, outputTokens: 100, calls: 1 },
+        rex: { inputTokens: 500, outputTokens: 100, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 1 },
         hench: { ...EMPTY_PKG },
         sv: { ...EMPTY_PKG },
       },
       totalInputTokens: 500,
       totalOutputTokens: 100,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 1,
     };
 
@@ -1312,7 +1334,7 @@ describe("groupByTimePeriod", () => {
 // ---------------------------------------------------------------------------
 
 describe("checkBudget", () => {
-  const EMPTY_PKG = { inputTokens: 0, outputTokens: 0, calls: 0 };
+  const EMPTY_PKG = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 };
 
   function makeUsage(input: number, output: number): AggregateTokenUsage {
     return {
@@ -1323,6 +1345,8 @@ describe("checkBudget", () => {
       },
       totalInputTokens: input,
       totalOutputTokens: output,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
       totalCalls: 1,
     };
   }
