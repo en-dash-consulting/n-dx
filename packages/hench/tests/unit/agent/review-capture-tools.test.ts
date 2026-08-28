@@ -162,4 +162,31 @@ describe("captureFailedFindings", () => {
     expect(unresolvedFindings(r)).toHaveLength(0);
     expect(r.findings.filter((f) => f.verdict === "must-fix")).toHaveLength(0);
   });
+
+  it("excludes a must-fix whose own repair attempt failed", () => {
+    // `action: "failed"` has two producers. The brief tells the reviewer to use
+    // it when a FIX does not work ("Record the finding as `failed` with what
+    // you tried"), not only when a capture is denied. Counting the first kind
+    // as a capture failure tells the operator to re-file something that was
+    // never meant to be filed, and fires two warnings for one finding — one of
+    // them pointing at the wrong remedy.
+    const r = report([
+      finding({ title: "repair failed", verdict: "must-fix", action: "failed", note: "tried X, broke Y" }),
+    ]);
+
+    expect(captureFailedFindings(r)).toHaveLength(0);
+    // It is still unrepaired, so the commit is still suspect — that warning
+    // must keep firing.
+    expect(unresolvedFindings(r).map((f) => f.title)).toEqual(["repair failed"]);
+  });
+
+  it("keeps both kinds separate when a report contains one of each", () => {
+    const r = report([
+      finding({ title: "capture denied", verdict: "should-fix", action: "failed" }),
+      finding({ title: "repair failed", verdict: "must-fix", action: "failed" }),
+    ]);
+
+    expect(captureFailedFindings(r).map((f) => f.title)).toEqual(["capture denied"]);
+    expect(unresolvedFindings(r).map((f) => f.title)).toEqual(["repair failed"]);
+  });
 });

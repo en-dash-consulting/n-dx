@@ -17,7 +17,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A failed run leaves the PRD claiming success when the agent self-marked the task completed](./a-failed-run-leaves-the-prd-a5e8c5.md) | completed |
 | [Add --review flag and move the diff-approval gate to --approve-diff](./add-review-flag-and-move-the-f7a55c.md) | completed |
 | [Break token figures into fresh/cache/output in the run summary and hench record](./break-token-figures-into-fresh-0ba847.md) | completed |
-| [captureFailedFindings mislabels a must-fix whose own repair attempt failed as a capture failure](./capturefailedfindings-mislabels-0c5870.md) | pending |
+| [captureFailedFindings mislabels a must-fix whose own repair attempt failed as a capture failure](./capturefailedfindings-mislabels-0c5870.md) | completed |
 | [Commit-message watcher auto-commits mid-review, splitting or dropping the reviewer's repairs](./commit-message-watcher-auto-8b7df3.md) | completed |
 | [commitWatcher.cancel() cannot stop an auto-commit already in flight, so the review-pass suspension has a silent hole](./commitwatcher-cancel-cannot-63cbcc.md) | pending |
 | [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-859237.md) | completed |

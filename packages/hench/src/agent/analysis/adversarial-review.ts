@@ -526,10 +526,15 @@ export function formatReviewSummary(report: ReviewReport): string[] {
 /**
  * Must-fix findings the pass did not repair.
  *
- * A non-empty list means the commit is suspect. Capture failures
- * (`action === "failed"`) are excluded — they are surfaced separately by
- * {@link captureFailedFindings} and call for re-filing rather than distrusting
- * the commit.
+ * A non-empty list means the commit is suspect: something the reviewer judged
+ * mandatory is not in it. Includes a must-fix whose repair was *attempted and
+ * failed* (`action === "failed"`), which the brief asks the reviewer to record
+ * that way — an attempted-and-failed repair leaves the defect exactly as
+ * unrepaired as one never attempted.
+ *
+ * Findings of other verdicts are never here, whatever their action; a
+ * should-fix that could not be captured is {@link captureFailedFindings}'s
+ * business.
  */
 export function unresolvedFindings(report: ReviewReport): ReviewFinding[] {
   return report.findings.filter(
@@ -540,16 +545,22 @@ export function unresolvedFindings(report: ReviewReport): ReviewFinding[] {
 /**
  * Findings the reviewer meant to file but could not.
  *
- * Distinct from {@link unresolvedFindings}, which mixes these together with
- * unrepaired must-fixes: the two call for different operator actions. A failed
- * capture means the analysis exists but nothing tracks it, so someone must
- * re-file it before the report is overwritten by the next review of this run.
- * An unrepaired must-fix means the commit itself is suspect.
+ * `action === "failed"` has two producers, and only one of them belongs here.
+ * The brief uses it both for a capture that was denied and for a must-fix
+ * whose repair was tried and did not work ("If a fix does not work, stop and
+ * report it. Record the finding as `failed` with what you tried"). Filtering on
+ * the action alone swept the second kind in, so a failed repair produced a
+ * "could not be captured to the PRD — file them" warning for something that was
+ * never meant to be filed, alongside the correct unrepaired-must-fix warning
+ * for the same finding. Two warnings, one finding, one of them pointing at the
+ * wrong remedy. Must-fixes are therefore excluded: they are
+ * {@link unresolvedFindings}'s business, and the operator action there is to
+ * inspect the commit, not to re-file anything.
  *
  * Worth surfacing on its own because the failure is otherwise invisible — the
  * report file records it, and an unattended run that nobody reads the file for
  * looks identical to one that captured everything.
  */
 export function captureFailedFindings(report: ReviewReport): ReviewFinding[] {
-  return report.findings.filter((f) => f.action === "failed");
+  return report.findings.filter((f) => f.action === "failed" && f.verdict !== "must-fix");
 }
