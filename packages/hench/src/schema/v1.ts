@@ -749,6 +749,15 @@ export type RunReviewRecord =
       fixesApplied: boolean;
       /** Absolute path of the JSON report the reviewer wrote. */
       reportPath: string;
+      /**
+       * Repo-relative paths the review pass changed, computed from
+       * working-tree snapshots taken around the reviewer spawn. Excludes
+       * `.rex/` (committed as completion metadata) and `.hench/` (the report
+       * itself). Absent when the snapshot could not be taken.
+       */
+      repairedFiles?: string[];
+      /** Commit that captured the repairs on the autoCommit path. */
+      repairCommit?: string;
       failed?: undefined;
     }
   | {

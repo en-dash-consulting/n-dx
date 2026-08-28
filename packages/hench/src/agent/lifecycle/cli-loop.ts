@@ -39,6 +39,8 @@ import {
   unresolvedFindings,
 } from "../analysis/adversarial-review.js";
 import type { ReviewPassOutcome } from "../analysis/adversarial-review.js";
+import { snapshotDirtyState, diffDirtyState } from "../analysis/review-repairs.js";
+import type { DirtySnapshot } from "../analysis/review-repairs.js";
 import { mkdir, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
@@ -1133,6 +1135,16 @@ async function runAdversarialReviewPass(
       `${ctx.reviewModel || "the loaded model"}...`,
   );
 
+  // Bracket the reviewer spawn with working-tree snapshots so its repairs can
+  // be identified — and committed — without sweeping pre-existing dirt. A
+  // failed snapshot degrades to "repairs unknown", never to a failed review.
+  let preReviewState: DirtySnapshot | undefined;
+  try {
+    preReviewState = await snapshotDirtyState(inv.projectDir);
+  } catch {
+    preReviewState = undefined;
+  }
+
   let result: SpawnResult;
   try {
     result = await withHeartbeat(
@@ -1188,6 +1200,22 @@ async function runAdversarialReviewPass(
     );
   }
 
+  // What the reviewer actually changed, from the snapshot pair. `.rex/` is
+  // the completion-metadata commit's territory and `.hench/` holds the report
+  // itself; neither is a repair. Computed even when the report claims
+  // `fixesApplied: false` — the tree, not the report, is the authority.
+  let repairedFiles: string[] | undefined;
+  if (preReviewState) {
+    try {
+      const postReviewState = await snapshotDirtyState(inv.projectDir);
+      repairedFiles = diffDirtyState(preReviewState, postReviewState).filter(
+        (path) => !path.startsWith(".rex/") && !path.startsWith(".hench/"),
+      );
+    } catch {
+      repairedFiles = undefined;
+    }
+  }
+
   inv.run.review = {
     model: ctx.reviewModel,
     resumedSession: !!resumeSessionId,
@@ -1195,6 +1223,7 @@ async function runAdversarialReviewPass(
     unresolvedCount: unresolved.length,
     fixesApplied: outcome.report.fixesApplied,
     reportPath,
+    repairedFiles,
   };
 
   return outcome;
