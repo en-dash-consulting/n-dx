@@ -8,6 +8,8 @@ export * from "./use-file-edges.js";
 export * from "./use-focus-trap.js";
 export * from "./use-graceful-degradation.js";
 export * from "./use-graph-arrow-nav.js";
+export * from "./use-active-operations.js";
+export * from "./use-hench-runs-live-refresh.js";
 export * from "./use-index-md.js";
 export * from "./use-item-selection.js";
 export * from "./use-memory-monitor.js";

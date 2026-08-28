@@ -13,6 +13,7 @@ import {
   DegradationBanner,
   RefreshQueueStatus,
   PollingSuspensionIndicator,
+  ActiveOperationsTray,
   SearchOverlay,
   useSearchOverlay,
   NeolithicOverlay,
@@ -28,6 +29,7 @@ import {
   useCrashRecovery,
   useGracefulDegradation,
   useRefreshThrottle,
+  useActiveOperations,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
 import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
@@ -93,6 +95,7 @@ function App({ scope }: { scope: string | null }) {
   } = useGracefulDegradation();
   const { state: refreshQueueState } = useRefreshThrottle();
   const { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount } = usePollingSuspension();
+  const activeOperations = useActiveOperations();
   const [searchOpen, , closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const handleTripleClick = useMemo(
@@ -209,6 +212,7 @@ function App({ scope }: { scope: string | null }) {
       : null,
     h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
+    h(ActiveOperationsTray, { operations: activeOperations }),
     (showDrop && !hasData)
       ? h("div", { class: "drop-overlay", role: "dialog", "aria-label": "File drop zone" },
           h("div", { class: "drop-box" },

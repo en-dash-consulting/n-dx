@@ -48,6 +48,8 @@ export { NdxLogoPng, ProductLogoPng, BrandedHeader } from "./logos.js";
 export { EnrichmentGate } from "./enrichment-gate.js";
 export { PollingSuspensionIndicator } from "./polling-suspension-indicator.js";
 export { RefreshQueueStatus } from "./refresh-queue-status.js";
+export { ActiveOperationsTray } from "./active-operations-tray.js";
+export type { ActiveOperationsTrayProps } from "./active-operations-tray.js";
 
 // ── Status indicators ───────────────────────────────────────────────
 

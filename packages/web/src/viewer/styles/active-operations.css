@@ -1,0 +1,179 @@
+/* Active operations tray — persistent, floating indicator for every
+ * long-running dashboard action (hench task execution, sourcevision full
+ * analysis, self-heal, ndx ci, rex reshape, refresh, Project Scan),
+ * regardless of which view is active.
+ *
+ * Bottom-right, stacked above .refresh-queue-status (bottom: 1rem; right:
+ * 1rem). Deliberately NOT bottom-left: .sidebar is a normal-flow flex
+ * column spanning the full viewport height, so a fixed bottom-left
+ * element sits on top of its nav items and intercepts their clicks —
+ * confirmed live while verifying this component. Bottom-right stays clear
+ * since neither the sidebar nor (in practice) the detail panel occupies
+ * that corner.
+ *
+ * Uses CSS variables from tokens.css for theme compatibility.
+ */
+
+.active-operations-tray {
+  position: fixed;
+  bottom: 4.5rem;
+  right: 1rem;
+  z-index: 998;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+  max-width: 340px;
+  animation: active-operations-fade-in 0.2s ease-out;
+}
+
+.active-operations-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] .active-operations-toggle,
+:root:not([data-theme="dark"]) .active-operations-toggle {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.active-operations-toggle:hover {
+  border-color: var(--accent);
+}
+
+.active-operations-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.active-operations-toggle-error {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.active-operations-badge-icon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.active-operations-toggle-error .active-operations-badge-icon {
+  color: var(--red);
+}
+
+.active-operations-badge-icon.spinning {
+  animation: active-operations-pulse 1.2s ease-in-out infinite;
+}
+
+.active-operations-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem;
+  border-radius: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  width: 320px;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+[data-theme="light"] .active-operations-list,
+:root:not([data-theme="dark"]) .active-operations-list {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.active-op-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+}
+
+.active-op-icon {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--accent);
+}
+
+.active-op-row-done .active-op-icon {
+  color: var(--green);
+}
+
+.active-op-row-failed .active-op-icon {
+  color: var(--red);
+}
+
+.active-op-row-running .active-op-icon {
+  animation: active-operations-pulse 1.2s ease-in-out infinite;
+}
+
+.active-op-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.active-op-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.active-op-detail {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.active-op-row-failed .active-op-detail {
+  color: var(--red);
+}
+
+@keyframes active-operations-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes active-operations-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .active-operations-tray {
+    animation: none;
+  }
+  .active-operations-badge-icon.spinning,
+  .active-op-row-running .active-op-icon {
+    animation: none;
+  }
+}

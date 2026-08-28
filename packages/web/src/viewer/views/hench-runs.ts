@@ -27,6 +27,8 @@ import { CollapsibleSection } from "../components/data-display/collapsible-secti
 import type { ActiveRun } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import { usePolling } from "../hooks/index.js";
+import { useHenchRunsLiveRefresh } from "../hooks/index.js";
+import type { HenchExecutionProgress } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { fmtDuration } from "../utils/format.js";
 
@@ -832,6 +834,28 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
   // Visibility-aware polling via polling manager
   usePolling("hench-runs", fetchRuns, 10_000);
 
+  // Live execution feedback for the empty state (see below): tracks the
+  // most recent hench:task-execution-progress broadcast for the task we
+  // just started. If the agent process fails before its first `saveRun`
+  // call (unreachable LLM vendor, auth error, etc.), no run file is ever
+  // written — `fetchRuns()` alone would leave this view stuck on "No runs
+  // yet" forever with zero indication anything happened.
+  const [liveProgress, setLiveProgress] = useState<HenchExecutionProgress | null>(null);
+  const onExecutionProgress = useCallback((state: HenchExecutionProgress) => {
+    setLiveProgress(state);
+  }, []);
+
+  // Instant refresh when a run is created/updated on disk, rather than
+  // waiting for the next poll tick — closes the gap between clicking
+  // "Start Working" and the newly-spawned run actually appearing.
+  useHenchRunsLiveRefresh(fetchRuns, onExecutionProgress);
+
+  // Once a run shows up in the persisted list, the full view (with its own
+  // ActiveTasksPanel) takes over live status — drop the empty-state overlay.
+  useEffect(() => {
+    if (runs.length > 0) setLiveProgress(null);
+  }, [runs.length]);
+
   // ── Next-task lookup for the empty state ──────────────────────────────
   // Once there are no runs at all, this view previously just told the
   // operator to run `${cliName} work` in a terminal. Fetched once (not on
@@ -1105,6 +1129,21 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
               nextTask.status === "pending"
                 ? h(StartTaskButton, { taskId: nextTask.id, onStarted: fetchRuns, label: "Start Working" })
                 : h("p", { class: "hench-empty-hint" }, `Already ${nextTask.status.replace(/_/g, " ")}.`),
+              liveProgress && liveProgress.taskId === nextTask.id
+                ? h("div", {
+                    class: "hench-empty-live-progress",
+                    role: liveProgress.status === "failed" ? "alert" : "status",
+                  },
+                    liveProgress.status === "failed"
+                      ? h("p", { class: "hench-empty-live-error" },
+                          "Failed to start: ", liveProgress.error || "unknown error",
+                        )
+                      : h("p", { class: "hench-empty-hint" },
+                          liveProgress.status === "starting" ? "Starting…" : "Running…",
+                          liveProgress.lastOutput ? ` ${liveProgress.lastOutput}` : "",
+                        ),
+                  )
+                : null,
             )
           : h("p", { class: "hench-empty-hint" },
               "Nothing pending. ",

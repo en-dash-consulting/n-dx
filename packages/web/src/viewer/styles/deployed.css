@@ -86,6 +86,7 @@
 .ndx-deployed .refresh-toast,
 .ndx-deployed .polling-suspension-indicator,
 .ndx-deployed .refresh-queue-status,
+.ndx-deployed .active-operations-tray,
 .ndx-deployed .memory-warning-banner,
 .ndx-deployed .degradation-banner {
   display: none !important;
