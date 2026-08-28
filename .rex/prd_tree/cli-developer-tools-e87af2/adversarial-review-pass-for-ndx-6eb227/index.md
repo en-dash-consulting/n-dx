@@ -15,8 +15,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Add --review flag and move the diff-approval gate to --approve-diff](./add-review-flag-and-move-the-f7a55c.md) | completed |
-| [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-859237.md) | pending |
+| [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-859237.md) | completed |
 | [Give review its own model tier with a review-model override](./give-review-its-own-model-tier-b889a2.md) | completed |
 | [Resume the work session for the reviewer on --resume](./resume-the-work-session-for-the-2eb560.md) | completed |
 | [Review report transport, parsing, and run-record recording](./review-report-transport-parsing-2f0be1.md) | completed |
-| [Verify the review pass end-to-end against a real ndx work run](./verify-the-review-pass-end-to-0deece.md) | pending |
+| [Verify the review pass end-to-end against a real ndx work run](./verify-the-review-pass-end-to-0deece.md) | in_progress |
