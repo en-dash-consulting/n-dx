@@ -27,7 +27,7 @@ Zero circular dependencies. The web package sits alongside orchestration — it 
 
 #### Web package internal zone layering
 
-Within the web package, four internal zones form a hub topology with `web-viewer` at the center:
+The web package forms a hub topology with `web-viewer` at the centre:
 
 ```
   web-server          (composition root — Express routes, gateways, MCP handlers)
@@ -36,10 +36,12 @@ Within the web package, four internal zones form a hub topology with `web-viewer
        ↑ ↓                  ↓
   viewer-message-pipeline  (messaging middleware — coalescer, throttle, rate-limiter, request-dedup)
        ↓                    ↓
-  web-shared          (framework-agnostic utilities — data-files, node-culler, view-id)
+  src/shared/         (framework-agnostic utilities — data-files, features, view-id, view-routing)
 ```
 
-`web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `web-shared`, while also receiving imports from sub-zones like `crash/` and `hench-agent-monitor`. The actual import graph has 11+ distinct cross-zone edges radiating from `web-viewer`, making it a hub rather than a linear stack. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `web-shared` is the foundation layer with zero upward dependencies (enforced by `boundary-check.test.ts`).
+`web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `src/shared/`, while also receiving imports from sub-directories such as `crash/`. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `src/shared/` is the foundation layer with zero upward dependencies, enforced by `boundary-check.test.ts`.
+
+Measured zone metrics are not reproduced here — they change with every analysis. Run `ndx analyze --deep .` and read `.sourcevision/zones.json`; per-package policies live in `packages/*/CLAUDE.md`.
 
 <!-- ADDENDUM -->
 
@@ -47,7 +49,7 @@ Within the web package, four internal zones form a hub topology with `web-viewer
 
 | Convention | Pattern | Notes |
 |-----------|---------|-------|
-| Naming | All packages are `@n-dx/` scoped: `@n-dx/core`, `@n-dx/rex`, `@n-dx/hench`, `@n-dx/sourcevision`, `@n-dx/web`, `@n-dx/llm-client` | Short CLI invocation (`ndx`, `rex`, `hench`, `sv`) comes from `bin` entries, not from unscoped package names. Changesets must use the scoped name — an unscoped name fails `changeset status` with "not in the workspace" |
+| Naming | All packages are `@n-dx/` scoped (`@n-dx/core`, `@n-dx/rex`, `@n-dx/sourcevision`, `@n-dx/hench`, `@n-dx/llm-client`, `@n-dx/web`) | The unscoped `rex` / `hench` / `sourcevision` / `sv` names are **bin aliases**, not package names — they exist so the CLIs can be invoked directly after install, not for `npx <name>`. Changesets must use the scoped name — an unscoped name fails `changeset status` with "not in the workspace" |
 | Subpath exports | `"./dist/*": "./dist/*"` | Intentional escape hatch — not public API, no stability guarantee. See `PACKAGE_GUIDELINES.md` for acceptable/prohibited uses |
 
 ## Assistant Instruction Files

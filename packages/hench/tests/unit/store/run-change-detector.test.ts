@@ -241,12 +241,16 @@ describe("RunChangeDetector", () => {
       // Pin BEFORE the first read as well as after the rewrite: a fresh write leaves
       // a fractional mtimeMs while utimes stores whole milliseconds, so pinning only
       // the second write would leave the snapshots different and the change would be
-      // detected for the wrong reason. The pin sits slightly in the future so the
-      // file is inside the mtime-granularity window at scan time no matter how
-      // slowly the test host schedules the intervening awaits — the detector
-      // treats "written during or after scan start" as fresh, so a future mtime
-      // is deterministically fresh while "just written" is a race.
-      const pinned = new Date(Math.floor(Date.now()) + 5000);
+      // detected for the wrong reason.
+      //
+      // The instant is fixed rather than read back from the file so it also sits
+      // inside the granularity window deterministically. Detecting this rewrite
+      // needs the FIRST scan to carry a hash (mtime and size are equal, so the hash
+      // is the only thing left to compare), and that only happens within
+      // MTIME_GRANULARITY_MS (16ms) of the write — a bound a loaded CI runner
+      // misses. When it did, `second.changes` came back empty and the failure read
+      // as a broken detector rather than a missed deadline.
+      const pinned = new Date(Date.now() + 60_000);
       await utimes(runFile, pinned, pinned);
 
       const det = detector();
@@ -280,9 +284,16 @@ describe("RunChangeDetector", () => {
       // this scan could not check.
       const runFile = join(runsDir, "run-a.json");
       await writeRunFile("run-a.json", '{"id":"aaa"}');
-      // Future pin: keeps the file inside the mtime-granularity window at scan
-      // time (so the checkpoint carries a hash) regardless of host scheduling.
-      const pinned = new Date(Math.floor(Date.now()) + 5000);
+      // Pin the mtime deterministically INSIDE the granularity window rather than
+      // relying on the scan landing within MTIME_GRANULARITY_MS (16ms) of the
+      // write. Racing that bound made this case flaky on loaded CI runners — the
+      // write-to-scan gap already reaches ~9ms on an idle machine, and once it
+      // exceeds 16ms no hash is carried and the precondition below fails with
+      // `expected 'undefined' to be 'string'`. A fixed instant is also stable
+      // across all three scans, which this case needs (the comparison comes down
+      // to mtime/size equality, so only the freshness check reads it relationally).
+      // Counterpart of the `Date.now() - 60_000` ageing trick in the case below.
+      const pinned = new Date(Date.now() + 60_000);
       await utimes(runFile, pinned, pinned);
 
       const det = detector();
@@ -323,6 +334,14 @@ describe("RunChangeDetector", () => {
       // scan starts within milliseconds, which a busy host does not guarantee.
       const future = new Date(Date.now() + 5000);
       await utimes(runFile, future, future);
+
+      // Pin forward instead of trusting "just written": the write-to-scan gap has
+      // to stay under MTIME_GRANULARITY_MS (16ms) for a hash to be carried, and a
+      // loaded CI runner misses that. Both phases are now driven by utimes rather
+      // than by elapsed real time — forward for the in-window phase, backward for
+      // the aged phase below.
+      const inWindow = new Date(Date.now() + 60_000);
+      await utimes(runFile, inWindow, inWindow);
 
       const det = detector();
       const fresh = await det.detectChanges();

@@ -37,12 +37,14 @@ export interface LocalVendorConfig {
 
 /** Shape returned by GET /api/llm/config. */
 export interface LlmConfigResponse {
-  /** Active LLM vendor: "claude", "codex", "local", or null if unset. */
+  /** Active LLM vendor: "claude", "codex", "google", "local", or null if unset. */
   vendor: string | null;
   /** Claude-specific settings from llm.claude.* */
   claude: VendorConfig;
   /** Codex-specific settings from llm.codex.* */
   codex: VendorConfig;
+  /** Google Gemini settings from llm.google.* */
+  google: VendorConfig;
   /** Local server settings from llm.local.* */
   local: LocalVendorConfig;
   /**
@@ -68,6 +70,7 @@ const NDX_CONFIG = ".n-dx.json";
 const VALID_VENDORS: ReadonlySet<string> = new Set([
   LLM_VENDOR.CLAUDE,
   LLM_VENDOR.CODEX,
+  LLM_VENDOR.GOOGLE,
   LLM_VENDOR.LOCAL,
 ]);
 
@@ -78,6 +81,8 @@ const VALID_PATHS = new Set([
   "llm.claude.lightModel",
   "llm.codex.model",
   "llm.codex.lightModel",
+  "llm.google.model",
+  "llm.google.lightModel",
   "llm.local.model",
   "llm.local.lightModel",
   "llm.local.host",
@@ -147,6 +152,7 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmClaude = (llm["claude"] ?? {}) as Record<string, unknown>;
   const llmCodex = (llm["codex"] ?? {}) as Record<string, unknown>;
+  const llmGoogle = (llm["google"] ?? {}) as Record<string, unknown>;
   const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
   const legacyClaude = (config["claude"] ?? {}) as Record<string, unknown>;
 
@@ -159,6 +165,10 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
     codex: {
       model: getString(llmCodex, "model"),
       lightModel: getString(llmCodex, "lightModel"),
+    },
+    google: {
+      model: getString(llmGoogle, "model"),
+      lightModel: getString(llmGoogle, "lightModel"),
     },
     local: {
       model: getString(llmLocal, "model"),

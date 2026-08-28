@@ -147,7 +147,7 @@ export class ProviderSession {
    * @example
    * ```ts
    * // Config update that keeps the same vendor — provider reused
-   * session.updateConfig({ ...session.config, claude: { model: "claude-opus-4-20250514" } });
+   * session.updateConfig({ ...session.config, claude: { model: "claude-opus-5" } });
    *
    * // Config update that changes vendor — new provider created
    * session.updateConfig({ vendor: "codex", codex: { cli_path: "/usr/local/bin/codex" } });

@@ -1227,7 +1227,7 @@ function emitPrdPaths(prdPaths: string[]): void {
 
 /**
  * Resolve the vendor's light/fast tier model (haiku for claude,
- * gpt-5.4-mini for codex) for `--fast`/preview smart-add runs where
+ * gpt-5.6-luna for codex) for `--fast`/preview smart-add runs where
  * generation latency matters more than top-tier proposal quality.
  */
 async function resolveLightSmartAddModel(dir: string): Promise<string | undefined> {

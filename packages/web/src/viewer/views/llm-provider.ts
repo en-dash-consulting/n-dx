@@ -1,7 +1,7 @@
 /**
  * LLM Provider view — configure active vendor and per-vendor model selection.
  *
- * Surfaces llm.vendor (claude/codex/local), per-vendor model fields, and
+ * Surfaces llm.vendor (claude/codex/google/local), per-vendor model fields, and
  * local server connection settings from `.n-dx.json`.
  *
  * Data: GET /api/llm/config (read) · PUT /api/llm/config (update)
@@ -30,6 +30,7 @@ interface LlmConfigResponse {
   vendor: string | null;
   claude: VendorConfig;
   codex: VendorConfig;
+  google: VendorConfig;
   local: LocalVendorConfig;
   legacyClaude: VendorConfig;
   autoFailover?: boolean;
@@ -64,21 +65,38 @@ interface LocalProfile {
 const VIEWER_LLM_VENDOR = {
   CLAUDE: "claude",
   CODEX: "codex",
+  GOOGLE: "google",
   LOCAL: "local",
 } as const;
 
 type ViewerLLMVendor = typeof VIEWER_LLM_VENDOR[keyof typeof VIEWER_LLM_VENDOR];
-type CloudViewerVendor = typeof VIEWER_LLM_VENDOR.CLAUDE | typeof VIEWER_LLM_VENDOR.CODEX;
+type CloudViewerVendor =
+  | typeof VIEWER_LLM_VENDOR.CLAUDE
+  | typeof VIEWER_LLM_VENDOR.CODEX
+  | typeof VIEWER_LLM_VENDOR.GOOGLE;
+
+/** Vendors configured through the generic cloud VendorSection (model + lightModel). */
+const CLOUD_VENDORS: ReadonlySet<string> = new Set<string>([
+  VIEWER_LLM_VENDOR.CLAUDE,
+  VIEWER_LLM_VENDOR.CODEX,
+  VIEWER_LLM_VENDOR.GOOGLE,
+]);
 
 const VENDORS = [
   { id: VIEWER_LLM_VENDOR.CLAUDE, label: "Claude", subtitle: "Anthropic" },
   { id: VIEWER_LLM_VENDOR.CODEX, label: "Codex", subtitle: "OpenAI" },
+  { id: VIEWER_LLM_VENDOR.GOOGLE, label: "Gemini", subtitle: "Google" },
   { id: VIEWER_LLM_VENDOR.LOCAL, label: "Local", subtitle: "LM Studio / Ollama" },
 ] satisfies ReadonlyArray<{ id: ViewerLLMVendor; label: string; subtitle: string }>;
 
+// Keep in sync with packages/core/llm-model-catalog.js (the `ndx init`
+// selector). These are display-only suggestions; any model ID the vendor
+// accepts can still be typed in.
+//
 const MODEL_SUGGESTIONS: Record<ViewerLLMVendor, string[]> = {
-  [VIEWER_LLM_VENDOR.CLAUDE]: ["claude-sonnet-4-5", "claude-opus-4-5", "claude-haiku-3-5", "claude-3-7-sonnet-20250219"],
-  [VIEWER_LLM_VENDOR.CODEX]: ["codex-mini", "o4-mini", "o3"],
+  [VIEWER_LLM_VENDOR.CLAUDE]: ["claude-sonnet-5", "claude-opus-5", "claude-fable-5", "claude-haiku-4-5"],
+  [VIEWER_LLM_VENDOR.CODEX]: ["gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.5"],
+  [VIEWER_LLM_VENDOR.GOOGLE]: ["gemini-2.5-pro", "gemini-3.7-flash", "gemini-3.5-flash-lite"],
   [VIEWER_LLM_VENDOR.LOCAL]: [],
 };
 
@@ -890,11 +908,11 @@ export function LlmProviderView() {
     }),
 
     // Active vendor settings
-    (effectiveVendor === VIEWER_LLM_VENDOR.CLAUDE || effectiveVendor === VIEWER_LLM_VENDOR.CODEX)
+    (effectiveVendor && CLOUD_VENDORS.has(effectiveVendor))
       ? h(VendorSection, {
           key: effectiveVendor,
-          vendorId: effectiveVendor,
-          config: data![effectiveVendor],
+          vendorId: effectiveVendor as CloudViewerVendor,
+          config: data![effectiveVendor as CloudViewerVendor] ?? { model: null, lightModel: null },
           editValues,
           onChange: handleField,
           dirtyKeys,

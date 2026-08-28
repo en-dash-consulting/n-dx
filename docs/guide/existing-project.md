@@ -10,7 +10,7 @@ If your project is brand new or empty, use the [Quickstart](./quickstart) instea
 
 ## Prerequisites
 
-- **Node.js ≥ 18** (Node 22 LTS recommended)
+- **Node.js ≥ 22** (22 LTS)
 - **pnpm ≥ 10** — [install pnpm](https://pnpm.io/installation)
 - **A clean working tree.** Commit or stash any in-progress work first — `ndx init` writes new files at the repo root and inside a few dot-directories.
 

@@ -36,6 +36,8 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 |---------|-------------|
 | `ndx status [dir]` | Show PRD status tree |
 | `ndx next [dir]` | Print next actionable task |
+| `ndx tree [dir]` | Show full PRD hierarchy with color-coded status |
+| `ndx report [dir]` | Generate a JSON health report |
 | `ndx update <id> [dir]` | Update item status, priority, or title |
 | `ndx remove <id> [dir]` | Remove an item and its children |
 | `ndx move <id> [dir]` | Reparent an item under a new parent |
@@ -51,6 +53,7 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | `ndx usage [dir]` | Token usage analytics |
 | `ndx sync [dir]` | Sync PRD with remote adapter |
 | `ndx ci [dir]` | Run analysis pipeline and validate PRD health |
+| `ndx auth [dir]` | Check and configure LLM provider credentials |
 
 ## Serve
 
@@ -60,6 +63,21 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | `ndx dev [dir]` | Start dev server with live reload |
 | `ndx refresh [dir]` | Refresh dashboard artifacts |
 | `ndx export [dir]` | Export static deployable dashboard |
+| `ndx web [dir]` | Dashboard server control (lower-level counterpart to `ndx start`) |
+
+## Try it out
+
+| Command | Description |
+|---------|-------------|
+| `ndx install-sample [dir]` | Install a sandboxed sample app with a pre-populated PRD |
+| `ndx destroy-sample [dir]` | Remove the sample app and its PRD items |
+
+## Cross-vendor review
+
+| Command | Description |
+|---------|-------------|
+| `ndx pair-programming "<desc>" [dir]` | Run two vendors against one task — primary implements, reviewer checks |
+| `ndx bicker [dir]` | Adversarial cross-vendor review of a change |
 
 ---
 
@@ -140,7 +158,7 @@ ndx work --auto --iterations=4 .       # run 4 tasks sequentially
 ndx work --task=abc123 .               # specific task
 ndx work --epic="Auth System" --auto . # scope to epic
 ndx work --dry-run .                   # preview without executing
-ndx work --model=claude-opus-4-20250514 .  # override model
+ndx work --model=claude-opus-5 .          # override model
 ndx work --auto --loop .               # run continuously until done
 ```
 

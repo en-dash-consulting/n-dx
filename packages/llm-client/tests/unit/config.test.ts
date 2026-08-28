@@ -276,8 +276,8 @@ describe("TIER_MODELS", () => {
     expect(TIER_MODELS.claude.light).toBe("claude-haiku-4-5");
   });
 
-  it("codex.light maps to gpt-5.4-mini", () => {
-    expect(TIER_MODELS.codex.light).toBe("gpt-5.4-mini");
+  it("codex.light maps to gpt-5.6-luna", () => {
+    expect(TIER_MODELS.codex.light).toBe("gpt-5.6-luna");
   });
 
   it("defines all three tiers for all vendors", () => {
@@ -289,7 +289,7 @@ describe("TIER_MODELS", () => {
   });
 
   it("claude.heavy maps to opus", () => {
-    expect(TIER_MODELS.claude.heavy).toBe("claude-opus-4-7");
+    expect(TIER_MODELS.claude.heavy).toBe("claude-opus-5");
   });
 
   it("google tiers match GOOGLE_MODELS", () => {
@@ -319,7 +319,7 @@ describe("normalizeCodexModel", () => {
   });
 
   it("passes through current catalog model IDs unchanged", () => {
-    for (const id of ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex"]) {
+    for (const id of ["gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]) {
       expect(normalizeCodexModel(id)).toBe(id);
     }
   });
@@ -337,12 +337,12 @@ describe("GOOGLE_MODELS", () => {
     expect(ids.size).toBe(3);
   });
 
-  it("light tier is gemini-2.0-flash", () => {
-    expect(GOOGLE_MODELS.light).toBe("gemini-2.0-flash");
+  it("light tier is gemini-3.5-flash-lite", () => {
+    expect(GOOGLE_MODELS.light).toBe("gemini-3.5-flash-lite");
   });
 
-  it("standard tier is gemini-2.5-flash", () => {
-    expect(GOOGLE_MODELS.standard).toBe("gemini-2.5-flash");
+  it("standard tier is gemini-3.7-flash", () => {
+    expect(GOOGLE_MODELS.standard).toBe("gemini-3.7-flash");
   });
 
   it("heavy tier is gemini-2.5-pro", () => {
@@ -372,7 +372,7 @@ describe("resolveVendorModel", () => {
   it("expands claude model aliases from config", () => {
     expect(
       resolveVendorModel("claude", { claude: { model: "opus" } }),
-    ).toBe("claude-opus-4-8");
+    ).toBe("claude-opus-5");
   });
 
   it("expands 'sonnet' alias to full claude model ID", () => {
@@ -507,8 +507,8 @@ describe("resolveVendorModel", () => {
 
     it("uses lightModel config for google light tier", () => {
       expect(
-        resolveVendorModel("google", { google: { lightModel: "gemini-2.0-flash" } }, "light"),
-      ).toBe("gemini-2.0-flash");
+        resolveVendorModel("google", { google: { lightModel: "gemini-3.5-flash-lite" } }, "light"),
+      ).toBe("gemini-3.5-flash-lite");
     });
 
     it("uses google.model config for standard tier", () => {
@@ -518,15 +518,15 @@ describe("resolveVendorModel", () => {
     });
 
     it("uses top-level model for google standard tier", () => {
-      expect(resolveVendorModel("google", { model: "gemini-2.0-flash" }, "standard")).toBe(
-        "gemini-2.0-flash",
+      expect(resolveVendorModel("google", { model: "gemini-3.7-flash" }, "standard")).toBe(
+        "gemini-3.7-flash",
       );
     });
 
     it("heavy tier ignores config model overrides", () => {
       // heavy always uses TIER_MODELS.heavy; no config override path
       expect(
-        resolveVendorModel("google", { google: { model: "gemini-2.0-flash" } }, "heavy"),
+        resolveVendorModel("google", { google: { model: "gemini-3.7-flash" } }, "heavy"),
       ).toBe(GOOGLE_MODELS.heavy);
     });
   });
@@ -534,13 +534,13 @@ describe("resolveVendorModel", () => {
   // Heavy weight tests for all vendors
   describe("heavy weight", () => {
     it("returns claude opus for heavy weight", () => {
-      expect(resolveVendorModel("claude", {}, "heavy")).toBe("claude-opus-4-7");
+      expect(resolveVendorModel("claude", {}, "heavy")).toBe("claude-opus-5");
     });
 
     it("heavy weight for claude ignores model config", () => {
       expect(
         resolveVendorModel("claude", { claude: { model: "claude-haiku-4-5" } }, "heavy"),
-      ).toBe("claude-opus-4-7");
+      ).toBe("claude-opus-5");
     });
 
     it("heavy weight for codex returns TIER_MODELS.codex.heavy", () => {
@@ -578,7 +578,7 @@ describe("resolveVendorModel", () => {
 
     it("expands shorthand alias from top-level model for claude", () => {
       const config = { model: "opus" };
-      expect(resolveVendorModel("claude", config)).toBe("claude-opus-4-8");
+      expect(resolveVendorModel("claude", config)).toBe("claude-opus-5");
     });
 
     it("uses top-level model for codex over vendor-pinned", () => {

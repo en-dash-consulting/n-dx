@@ -174,6 +174,42 @@ still parses.
 A: Phantom wrappers from a buggy intermediate migration. `ndx reshape`
 detects and merges them back into their parent folder.
 
+## Worked example: n-dx's own PRD
+
+n-dx dogfoods its own PRD system, so this repository ships two real artifacts
+worth reading before you build your own. They are the fastest way to see what
+the format looks like in practice and how you are expected to interact with it.
+
+| Artifact | What it is | Read it to learn |
+|----------|-----------|------------------|
+| [`prd.md`](https://github.com/en-dash-consulting/n-dx/blob/main/prd.md) | n-dx's hand-written v1 product spec — vision, then epics broken into features and bullet-level requirements | What a PRD looks like **before** the tool touches it. This is the shape `ndx add --file=` and `ndx plan --file=` expect when you import an existing spec. |
+| [`.rex/prd_tree/`](https://github.com/en-dash-consulting/n-dx/tree/main/.rex/prd_tree) | The live tree the tool actually manages — 42 top-level items covering the work in flight | What the same information looks like **after** ndx structures it: slug-named folders, YAML front-matter, generated child tables. |
+
+Reading them side by side shows the whole loop: `prd.md` is the input a human
+writes, `.rex/prd_tree/` is the state the agent reads from and writes back to.
+
+### How to interact with it
+
+You rarely edit `.rex/prd_tree/` by hand — the point of the tree is that both
+you and the agent can. Pick whichever surface fits:
+
+```sh
+ndx status .          # completion tree, top-down
+ndx tree .            # full hierarchy with colour-coded status
+ndx next .            # the next actionable task
+ndx add "..." .       # add items from a plain-English description
+ndx work .            # let the agent pick up the next task
+```
+
+From an assistant session, the same operations are available as MCP tools
+(`get_prd_status`, `get_next_task`, `add_item`, `update_task_status`, …) and as
+the `/ndx-plan`, `/ndx-capture`, `/ndx-work` and `/ndx-status` skills. See
+[MCP Integration](./mcp) and the [Skills Reference](./skills).
+
+Hand-editing is supported and safe — every item is plain Markdown with YAML
+front-matter, so `git diff` and code review work normally. Keep the `id` field
+intact; everything else is fair game.
+
 ## Related references
 
 - Normative schema: [`docs/architecture/prd-folder-tree-schema.md`](../architecture/prd-folder-tree-schema.md)
@@ -182,3 +218,4 @@ detects and merges them back into their parent folder.
 - Migration source: `packages/rex/src/core/folder-per-task-migration.ts`
 - Backup source: `packages/rex/src/core/backup-snapshots.ts`
 - Workflow skills for interacting with the PRD: [Skills Reference](./skills)
+- Worked example — n-dx's own spec and live tree: [`prd.md`](https://github.com/en-dash-consulting/n-dx/blob/main/prd.md) · [`.rex/prd_tree/`](https://github.com/en-dash-consulting/n-dx/tree/main/.rex/prd_tree)

@@ -53,11 +53,11 @@ describe("analyze token usage metadata", () => {
   });
 
   it("reflects configured codex model from .n-dx.json", () => {
-    const llmConfig = { vendor: "codex", codex: { model: "gpt-5.4-mini" } } as const;
+    const llmConfig = { vendor: "codex", codex: { model: "gpt-5.6-luna" } } as const;
     setLLMConfig(llmConfig);
 
     const metadata = resolveAnalyzeTokenEventMetadata(llmConfig);
-    expect(metadata.model).toBe("gpt-5.4-mini");
+    expect(metadata.model).toBe("gpt-5.6-luna");
   });
 
   it("vendor switch changes resolved model", () => {

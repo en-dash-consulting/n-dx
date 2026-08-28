@@ -1,5 +1,19 @@
 # n-dx v1 PRD
 
+> **What this file is.** n-dx's own product requirements document, written by
+> hand before the tool existed. It is kept in the repo deliberately: together
+> with [`.rex/prd_tree/`](.rex/prd_tree) it is the worked example of the PRD
+> workflow — this file is what a human writes, the tree is what ndx turns it
+> into and what the agent then works from.
+>
+> It is **not** the live PRD. The authoritative, tool-managed state is
+> `.rex/prd_tree/`; read it with `ndx status .` or `ndx tree .`. Nothing reads
+> this file at runtime, and no command writes to it.
+>
+> New to the format? Start with the
+> [PRD storage layout guide](docs/guide/prd-storage.md), which walks through
+> both artifacts.
+
 ## Vision
 
 n-dx is a CLI toolkit that lets a developer point it at a codebase, generate a structured plan, and execute tasks autonomously — in a loop. The three packages (sourcevision, rex, hench) should feel like one cohesive tool, not three bolted-together CLIs.

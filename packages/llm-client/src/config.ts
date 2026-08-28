@@ -34,7 +34,10 @@ export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5";
  */
 export const NEWEST_MODELS: Record<LLMVendor, string> = {
   [LLM_VENDOR.CLAUDE]: "claude-sonnet-5",
-  [LLM_VENDOR.CODEX]: "gpt-5.5",
+  [LLM_VENDOR.CODEX]: "gpt-5.6-terra",
+  // Google: newest *stable* Pro model. `gemini-3.1-pro-preview` is newer but
+  // is a preview release — preview IDs can be renamed or withdrawn, so it is
+  // not shipped as a default. Users can still select it via llm.google.model.
   [LLM_VENDOR.GOOGLE]: "gemini-2.5-pro",
   // Local (LM Studio): no canonical model — depends on whatever is loaded.
   [LLM_VENDOR.LOCAL]: "",
@@ -53,8 +56,8 @@ export const NEWEST_MODELS: Record<LLMVendor, string> = {
  * resolveVendorModel("google", config, "standard").
  */
 export const GOOGLE_MODELS: Record<TaskWeight, string> = {
-  light: "gemini-2.0-flash",
-  standard: "gemini-2.5-flash",
+  light: "gemini-3.5-flash-lite",
+  standard: "gemini-3.7-flash",
   heavy: "gemini-2.5-pro",
 };
 
@@ -72,12 +75,12 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
   [LLM_VENDOR.CLAUDE]: {
     light: "claude-haiku-4-5",
     standard: NEWEST_MODELS.claude,
-    heavy: "claude-opus-4-7",
+    heavy: "claude-opus-5",
   },
   [LLM_VENDOR.CODEX]: {
-    light: "gpt-5.4-mini",
-    standard: NEWEST_MODELS.codex,
-    heavy: NEWEST_MODELS.codex, // no ultra-codex tier yet — same as standard
+    light: "gpt-5.6-luna",
+    standard: NEWEST_MODELS.codex, // gpt-5.6-terra
+    heavy: "gpt-5.6-sol",
   },
   [LLM_VENDOR.GOOGLE]: GOOGLE_MODELS,
   // Local: no catalog — model is whatever LM Studio has loaded.
@@ -88,8 +91,19 @@ export const TIER_MODELS: Record<LLMVendor, Record<TaskWeight, string>> = {
  * Legacy Codex model IDs that map to current canonical models.
  *
  * Keys are model IDs shipped by prior versions (the old `gpt-5-codex` /
- * `gpt-5.1-codex-*` brand names); values are the current model they resolve to.
- * `normalizeCodexModel()` applies this mapping when reading config.
+ * `gpt-5.1-codex-*` brand names) or since retired by OpenAI; values are the
+ * current model they resolve to. `normalizeCodexModel()` applies this mapping
+ * when reading config, so an existing `.n-dx.json` pinned to a dead model keeps
+ * working after an upgrade instead of failing at request time.
+ *
+ * `gpt-5.4` and `gpt-5.4-mini` retire from Codex on 2026-08-31 for
+ * ChatGPT-authenticated sessions (they remain on the OpenAI API and on Codex
+ * sessions authenticated with an API key). OpenAI's documented replacements are
+ * `gpt-5.6-terra` and `gpt-5.6-luna` respectively. `gpt-5.3-codex` and
+ * `gpt-5.2` are already unavailable when signing in with ChatGPT.
+ *
+ * `gpt-5.5` is deliberately absent — it is still supported and remains a
+ * selectable catalog entry rather than being silently rewritten.
  *
  * Keep in sync with the orchestration-tier legacy list in
  * `packages/core/init-llm.js` (`LEGACY_CATALOG_MODEL_ALIASES.codex`), which
@@ -100,6 +114,11 @@ const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
   "gpt-5-codex": NEWEST_MODELS.codex,
   "gpt-5.1-codex-max": NEWEST_MODELS.codex,
   "gpt-5.1-codex-mini": TIER_MODELS.codex.light,
+  // Retired / retiring from Codex — remap to OpenAI's stated replacements.
+  "gpt-5.4": NEWEST_MODELS.codex,
+  "gpt-5.4-mini": TIER_MODELS.codex.light,
+  "gpt-5.3-codex": NEWEST_MODELS.codex,
+  "gpt-5.2": NEWEST_MODELS.codex,
 };
 
 /**
@@ -110,9 +129,11 @@ const LEGACY_CODEX_MODEL_ALIASES: Record<string, string> = {
  * Values are conservative — set well below the true context window limit
  * to leave room for the system prompt, retry notices, and model overhead.
  *
- * Approximate derivation (~4 chars per token):
- *   claude  200K-token window → ~800K chars; cap at 640K (80% utilisation)
- *   codex   128K-token window → ~512K chars; cap at 400K (78% utilisation)
+ * These caps are deliberately conservative and are NOT derived from the current
+ * models' context windows — current Claude, Codex, and Gemini models all expose
+ * 1M+ token windows (see MODEL_CONTEXT_WINDOWS). The caps bound CLI prompt size
+ * for cost and latency reasons, so raising a model's window does not
+ * automatically raise the cap here.
  */
 export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
   [LLM_VENDOR.CLAUDE]: 640_000,
@@ -137,18 +158,22 @@ export const VENDOR_CONTEXT_CHAR_LIMITS: Record<LLMVendor, number> = {
  */
 export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
   // Google Gemini
-  "gemini-2.0-flash": 1_000_000,
+  "gemini-3.7-flash": 1_000_000,
+  "gemini-3.5-flash-lite": 1_000_000,
   "gemini-2.5-flash": 1_000_000,
   "gemini-2.5-pro": 1_000_000,
   // Claude
   "claude-haiku-4-5": 200_000,
   "claude-fable-5": 1_000_000,
-  "claude-sonnet-5": 1_000_000,
-  "claude-sonnet-4-6": 200_000,
   "claude-opus-5": 1_000_000,
   "claude-opus-4-8": 1_000_000,
-  "claude-opus-4-7": 200_000,
+  "claude-sonnet-5": 1_000_000,
+  "claude-sonnet-4-6": 1_000_000,
+  "claude-opus-4-7": 1_000_000,
   // Codex / OpenAI
+  "gpt-5.6-sol": 1_050_000,
+  "gpt-5.6-terra": 1_050_000,
+  "gpt-5.6-luna": 1_050_000,
   "gpt-5.4-mini": 128_000,
   "gpt-5.5": 200_000,
 };
@@ -157,24 +182,30 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
  * Per-model cost constants (USD per million tokens).
  *
  * Used by budget preflight to estimate request cost. Values are approximate
- * public pricing as of mid-2026 and should be updated when vendors change rates.
+ * public list pricing as of 2026-08 and should be updated when vendors change
+ * rates. Gemini Pro and Claude Sonnet 5 have tiered/introductory rates; the
+ * values here are the standard (higher) tier so estimates never under-report.
  */
 export const MODEL_COSTS: Readonly<
   Record<string, { inputPerMToken: number; outputPerMToken: number }>
 > = {
   // Google Gemini
-  "gemini-2.0-flash": { inputPerMToken: 0.10, outputPerMToken: 0.40 },
-  "gemini-2.5-flash": { inputPerMToken: 0.15, outputPerMToken: 0.60 },
+  "gemini-3.7-flash": { inputPerMToken: 0.75, outputPerMToken: 3.75 },
+  "gemini-3.5-flash-lite": { inputPerMToken: 0.30, outputPerMToken: 2.50 },
+  "gemini-2.5-flash": { inputPerMToken: 0.30, outputPerMToken: 2.50 },
   "gemini-2.5-pro": { inputPerMToken: 1.25, outputPerMToken: 10.00 },
   // Claude
-  "claude-haiku-4-5": { inputPerMToken: 0.80, outputPerMToken: 4.00 },
+  "claude-haiku-4-5": { inputPerMToken: 1.00, outputPerMToken: 5.00 },
   "claude-fable-5": { inputPerMToken: 10.00, outputPerMToken: 50.00 },
-  "claude-sonnet-5": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
-  "claude-sonnet-4-6": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
   "claude-opus-5": { inputPerMToken: 5.00, outputPerMToken: 25.00 },
   "claude-opus-4-8": { inputPerMToken: 5.00, outputPerMToken: 25.00 },
-  "claude-opus-4-7": { inputPerMToken: 15.00, outputPerMToken: 75.00 },
+  "claude-sonnet-5": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
+  "claude-sonnet-4-6": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
+  "claude-opus-4-7": { inputPerMToken: 5.00, outputPerMToken: 25.00 },
   // Codex / OpenAI
+  "gpt-5.6-sol": { inputPerMToken: 4.00, outputPerMToken: 20.00 },
+  "gpt-5.6-terra": { inputPerMToken: 2.00, outputPerMToken: 12.00 },
+  "gpt-5.6-luna": { inputPerMToken: 0.20, outputPerMToken: 1.20 },
   "gpt-5.4-mini": { inputPerMToken: 0.40, outputPerMToken: 1.60 },
   "gpt-5.5": { inputPerMToken: 7.00, outputPerMToken: 21.00 },
 };
@@ -185,8 +216,9 @@ export const MODEL_COSTS: Readonly<
  */
 const MODEL_ALIASES: Record<string, string> = {
   sonnet: NEWEST_MODELS.claude,
-  opus: "claude-opus-4-8",
+  opus: "claude-opus-5",
   haiku: "claude-haiku-4-5",
+  fable: "claude-fable-5",
 };
 
 /**
@@ -217,9 +249,9 @@ export function normalizeCodexModel(model: string): string {
  * 3. Tier-appropriate model from `TIER_MODELS` based on `weight` parameter
  *
  * The `weight` parameter enables task-weight-aware model tiering:
- * - `'light'` — cheaper/faster models (haiku, gemini-flash, gpt-5.4-mini)
- * - `'standard'` or omitted — full-capability balanced models (sonnet, gemini-2.5-flash)
- * - `'heavy'` — most capable models (opus, gemini-2.5-pro); always uses TIER_MODELS.heavy
+ * - `'light'` — cheaper/faster models (haiku, gemini-flash-lite, gpt-5.6-luna)
+ * - `'standard'` or omitted — full-capability balanced models (sonnet, gemini-3.7-flash, gpt-5.6-terra)
+ * - `'heavy'` — most capable models (opus, gemini-2.5-pro, gpt-5.6-sol); always uses TIER_MODELS.heavy
  *
  * For the 'light' weight, if `lightModel` is configured, it takes precedence
  * over both `model` and `TIER_MODELS`. This allows users to customize which
@@ -341,9 +373,11 @@ export function resolveVendorModel(
  *   price of the Sonnet 5 execution default. `claude-fable-5` is stronger
  *   still but costs 2x Opus ($10/$50) — available via override, not worth it
  *   as the default for a single-pass review.
- * - **codex → `gpt-5.5`.** The Codex catalog has no tier above standard, so
- *   the review model equals the execution model.
- * - **google → `gemini-2.5-pro`.** The heavy tier; `gemini-2.5-flash` is the
+ * - **codex → `gpt-5.6-terra`** (`NEWEST_MODELS.codex`). The review model
+ *   equals the execution model. `gpt-5.6-sol` is the heavy tier ($4/$20 vs
+ *   terra's $2/$12) — available via override or `reviewModel` config, but not
+ *   the default pending evidence its review quality justifies 2x the price.
+ * - **google → `gemini-2.5-pro`.** The heavy tier; `gemini-3.7-flash` is the
  *   balanced execution default.
  * - **local → `""`.** LM Studio serves whichever model is loaded; there is no
  *   second model to escalate to.

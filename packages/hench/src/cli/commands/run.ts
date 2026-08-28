@@ -990,7 +990,7 @@ export async function cmdRun(
     ) {
       throw new CLIError(
         `Configured model "${activeConfiguredModel}" is not compatible with vendor="codex".`,
-        `Either use a Codex/GPT model (e.g., gpt-5.5, gpt-5.4-mini) or switch vendor: 'n-dx config llm.vendor claude'`,
+        `Either use a Codex/GPT model (e.g., gpt-5.6-terra, gpt-5.6-luna) or switch vendor: 'n-dx config llm.vendor claude'`,
       );
     }
     if (
@@ -999,7 +999,7 @@ export async function cmdRun(
     ) {
       throw new CLIError(
         `Configured model "${activeConfiguredModel}" is not compatible with vendor="google".`,
-        `Either use a Gemini model (e.g., gemini-2.5-pro, gemini-2.0-flash) or switch vendor: 'n-dx config llm.vendor claude'`,
+        `Either use a Gemini model (e.g., gemini-2.5-pro, gemini-3.7-flash) or switch vendor: 'n-dx config llm.vendor claude'`,
       );
     }
   }

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Node.js ≥ 18** (Node 22 LTS recommended) — [nodejs.org](https://nodejs.org/)
+- **Node.js ≥ 22** (22 LTS) — [nodejs.org](https://nodejs.org/)
 - **pnpm ≥ 10** — [pnpm.io/installation](https://pnpm.io/installation)
 
 ## Installation
@@ -74,8 +74,8 @@ ndx config llm.claude.api_key sk-ant-... .
 # or set the environment variable:
 export ANTHROPIC_API_KEY=sk-ant-...
 
-# Optionally pin a model (default: claude-sonnet-4-6)
-ndx config llm.claude.model claude-opus-4-20250514 .
+# Optionally pin a model (default: claude-sonnet-5)
+ndx config llm.claude.model claude-opus-5 .
 ```
 
 ```sh

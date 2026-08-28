@@ -1,19 +1,22 @@
 ##### Monorepo-wide zone fragility governance
 
-Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragility zone requiring active governance. The following zones currently meet both thresholds:
+Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragility zone requiring active governance.
 
-| Zone | Package | Cohesion | Coupling | Notes |
-|------|---------|----------|----------|-------|
-| `web-shared` | web | 0.36 | 0.64 | Foundation layer; 5 files (metrics unreliable at this size); two-consumer rule enforced by `boundary-check.test.ts` |
-| `rex-cli` | rex | 0.25 | 0.75 | 27+ command files in flat directory; high coupling to core |
-| `prd-fix-command` | rex | 0.25 | 0.75 | Satellite CLI zone; 2 files with tight core coupling |
-| `crash` | web | 0.50 | unidirectional (web-viewer → crash) | At threshold boundary — crash imports web-shared directly (documented bypass), not web-viewer |
-| `viewer-ui-hub` | web | 0.38 | 0.63 | Viewer composition hub; 5 files; structurally expected for a UI composition root — documented in `viewer-ui-hub` governance section |
+**Do not treat a zone list in this file as current.** Zone IDs and metrics are outputs of Louvain community detection and change between analyses — zones merge, split, and get renamed as the import graph moves. Read the live values instead:
 
-**Universal governance rules** (apply to all dual-fragility zones):
+```sh
+ndx analyze --deep .        # refresh .sourcevision/
+ndx zone <zone-id>          # or the /ndx-zone skill for a single zone
+```
+
+Then filter `.sourcevision/zones.json` on the threshold above. A zone named in a governance doc but absent from the current analysis has usually been renamed or merged, not deleted — check the directory before concluding a boundary is gone.
+
+**Universal governance rules** (apply to any zone that meets the threshold):
 - **Two-consumer rule:** A new module must have at least two distinct consumer zones before being added. Single-consumer utilities belong closer to their dominant use site.
 - **Addition review required:** Treat these as risk zones requiring active review on additions. Changes have a wide blast radius.
 - **Cohesion monitoring:** If a zone's cohesion drops below its current value after a change, the change needs explicit justification.
+
+**Directory policies outlive zone detection.** Rules tied to a directory (barrel imports, framework-agnostic constraints, CLI-only content) stay in force whether or not Louvain currently emits a zone for it, because they are enforced by tests rather than by the analyser. Correct a stale metric; do not delete a policy just because its zone stopped appearing.
 
 Package-specific zone governance for `web`, `rex`, and `hench` now lives in each package's own `CLAUDE.md` (`packages/web/CLAUDE.md`, `packages/rex/CLAUDE.md`, `packages/hench/CLAUDE.md`), which loads only when working under that directory.
 

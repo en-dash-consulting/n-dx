@@ -1,59 +1,61 @@
 import { describe, it, expect } from "vitest";
 import { budgetPreflight } from "../../src/budget-preflight.js";
-import { MODEL_CONTEXT_WINDOWS, MODEL_COSTS } from "../../src/config.js";
+import { MODEL_CONTEXT_WINDOWS, MODEL_COSTS, GOOGLE_MODELS } from "../../src/config.js";
 
 describe("budgetPreflight", () => {
-  // ── gemini-2.0-flash ───────────────────────────────────────────────────────
+  // ── gemini-3.5-flash-lite ───────────────────────────────────────────────────────
 
-  describe("gemini-2.0-flash (light tier)", () => {
+  describe("gemini-3.5-flash-lite (light tier)", () => {
     it("returns modelId in result", () => {
-      const result = budgetPreflight("gemini-2.0-flash", 1000);
-      expect(result.modelId).toBe("gemini-2.0-flash");
+      const result = budgetPreflight("gemini-3.5-flash-lite", 1000);
+      expect(result.modelId).toBe("gemini-3.5-flash-lite");
     });
 
     it("estimates token count as ceil(charCount / 4)", () => {
-      const result = budgetPreflight("gemini-2.0-flash", 100);
+      const result = budgetPreflight("gemini-3.5-flash-lite", 100);
       expect(result.tokenEstimate).toBe(25); // ceil(100/4)
     });
 
     it("rounds up fractional token estimate", () => {
-      const result = budgetPreflight("gemini-2.0-flash", 101);
+      const result = budgetPreflight("gemini-3.5-flash-lite", 101);
       expect(result.tokenEstimate).toBe(26); // ceil(101/4) = ceil(25.25)
     });
 
     it("reports contextWindow from MODEL_CONTEXT_WINDOWS", () => {
-      const result = budgetPreflight("gemini-2.0-flash", 1000);
-      expect(result.contextWindow).toBe(MODEL_CONTEXT_WINDOWS["gemini-2.0-flash"]);
+      const result = budgetPreflight("gemini-3.5-flash-lite", 1000);
+      expect(result.contextWindow).toBe(MODEL_CONTEXT_WINDOWS["gemini-3.5-flash-lite"]);
       expect(result.contextWindow).toBe(1_000_000);
     });
 
     it("fits is true for a small prompt", () => {
-      const result = budgetPreflight("gemini-2.0-flash", 1000);
+      const result = budgetPreflight("gemini-3.5-flash-lite", 1000);
       expect(result.fits).toBe(true);
     });
 
     it("fits is false when prompt exceeds 90% of context window", () => {
       // 90% of 1_000_000 tokens = 900_000 tokens = 3_600_000 chars
       // Use 3_600_001 chars → tokenEstimate = 900_001 > 900_000 threshold
-      const result = budgetPreflight("gemini-2.0-flash", 3_600_001);
+      const result = budgetPreflight("gemini-3.5-flash-lite", 3_600_001);
       expect(result.fits).toBe(false);
     });
 
     it("computes utilizationPercent correctly", () => {
       // 1000 chars → 250 tokens, context = 1_000_000
-      const result = budgetPreflight("gemini-2.0-flash", 1000);
+      const result = budgetPreflight("gemini-3.5-flash-lite", 1000);
       expect(result.utilizationPercent).toBeCloseTo(0.025);
     });
 
     it("computes estimatedCostUsd using inputPerMToken", () => {
-      // 1_000_000 chars → 250_000 tokens → 0.25 MTok × $0.10 = $0.025
-      const result = budgetPreflight("gemini-2.0-flash", 1_000_000);
-      expect(result.estimatedCostUsd).toBeCloseTo(0.025, 5);
+      // 1_000_000 chars → 250_000 tokens → 0.25 MTok × the model's input rate.
+      // Derived from MODEL_COSTS so a price change doesn't require editing this.
+      const rate = MODEL_COSTS["gemini-3.5-flash-lite"].inputPerMToken;
+      const result = budgetPreflight("gemini-3.5-flash-lite", 1_000_000);
+      expect(result.estimatedCostUsd).toBeCloseTo(0.25 * rate, 5);
     });
 
     it("estimatedCostUsd reflects MODEL_COSTS entry", () => {
-      const cost = MODEL_COSTS["gemini-2.0-flash"];
-      const result = budgetPreflight("gemini-2.0-flash", 4_000_000); // 1M tokens
+      const cost = MODEL_COSTS["gemini-3.5-flash-lite"];
+      const result = budgetPreflight("gemini-3.5-flash-lite", 4_000_000); // 1M tokens
       expect(result.estimatedCostUsd).toBeCloseTo(cost.inputPerMToken, 5);
     });
   });
@@ -71,8 +73,8 @@ describe("budgetPreflight", () => {
       expect(result.contextWindow).toBe(MODEL_CONTEXT_WINDOWS["gemini-2.5-pro"]);
     });
 
-    it("computes higher estimated cost than gemini-2.0-flash for same input", () => {
-      const flash = budgetPreflight("gemini-2.0-flash", 100_000);
+    it("computes higher estimated cost than gemini-3.5-flash-lite for same input", () => {
+      const flash = budgetPreflight("gemini-3.5-flash-lite", 100_000);
       const pro = budgetPreflight("gemini-2.5-pro", 100_000);
       expect(pro.estimatedCostUsd).toBeGreaterThan(flash.estimatedCostUsd!);
     });
@@ -89,13 +91,13 @@ describe("budgetPreflight", () => {
     });
   });
 
-  // ── gemini-2.5-flash ───────────────────────────────────────────────────────
+  // ── gemini-3.7-flash ───────────────────────────────────────────────────────
 
-  describe("gemini-2.5-flash (standard tier)", () => {
-    it("computes cost between gemini-2.0-flash and gemini-2.5-pro", () => {
+  describe("gemini-3.7-flash (standard tier)", () => {
+    it("computes cost between gemini-3.5-flash-lite and gemini-2.5-pro", () => {
       const charCount = 4_000_000; // 1M tokens
-      const light = budgetPreflight("gemini-2.0-flash", charCount);
-      const standard = budgetPreflight("gemini-2.5-flash", charCount);
+      const light = budgetPreflight("gemini-3.5-flash-lite", charCount);
+      const standard = budgetPreflight("gemini-3.7-flash", charCount);
       const heavy = budgetPreflight("gemini-2.5-pro", charCount);
       expect(standard.estimatedCostUsd).toBeGreaterThan(light.estimatedCostUsd!);
       expect(standard.estimatedCostUsd).toBeLessThan(heavy.estimatedCostUsd!);
@@ -112,9 +114,9 @@ describe("budgetPreflight", () => {
       expect(opus.estimatedCostUsd).toBeGreaterThan(haiku.estimatedCostUsd!);
     });
 
-    it("claude-sonnet-4-6 reports 200_000 token context window", () => {
+    it("claude-sonnet-4-6 reports 1M token context window", () => {
       const result = budgetPreflight("claude-sonnet-4-6", 1000);
-      expect(result.contextWindow).toBe(200_000);
+      expect(result.contextWindow).toBe(1_000_000);
     });
   });
 
@@ -145,9 +147,11 @@ describe("budgetPreflight", () => {
 
 describe("MODEL_CONTEXT_WINDOWS", () => {
   it("covers all three Google Gemini tiers", () => {
-    expect(MODEL_CONTEXT_WINDOWS["gemini-2.0-flash"]).toBeDefined();
-    expect(MODEL_CONTEXT_WINDOWS["gemini-2.5-flash"]).toBeDefined();
-    expect(MODEL_CONTEXT_WINDOWS["gemini-2.5-pro"]).toBeDefined();
+    // Derived from GOOGLE_MODELS rather than hardcoded IDs so a model bump
+    // cannot leave a configured tier without context-window data.
+    for (const tier of ["light", "standard", "heavy"] as const) {
+      expect(MODEL_CONTEXT_WINDOWS[GOOGLE_MODELS[tier]], tier).toBeDefined();
+    }
   });
 
   it("all values are positive integers", () => {
@@ -162,9 +166,9 @@ describe("MODEL_CONTEXT_WINDOWS", () => {
 
 describe("MODEL_COSTS", () => {
   it("covers all three Google Gemini tiers", () => {
-    expect(MODEL_COSTS["gemini-2.0-flash"]).toBeDefined();
-    expect(MODEL_COSTS["gemini-2.5-flash"]).toBeDefined();
-    expect(MODEL_COSTS["gemini-2.5-pro"]).toBeDefined();
+    for (const tier of ["light", "standard", "heavy"] as const) {
+      expect(MODEL_COSTS[GOOGLE_MODELS[tier]], tier).toBeDefined();
+    }
   });
 
   it("all entries have inputPerMToken and outputPerMToken", () => {

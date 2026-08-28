@@ -68,7 +68,7 @@ export function buildCoAuthoredByTrailerLine(): string {
 /**
  * Shorten a model ID for stream-log labels by dropping numeric version
  * identifiers. Examples: "claude-sonnet-4-6" → "claude-sonnet",
- * "claude-haiku-4-20250414" → "claude-haiku", "gpt-5.4-mini" →
+ * "claude-haiku-4-5" → "claude-haiku", "gpt-5.6-luna" →
  * "gpt-mini". Falls back to the fallback label when model is empty.
  */
 export function formatModelLabel(model?: string, fallback = "Agent"): string {

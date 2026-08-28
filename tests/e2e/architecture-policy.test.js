@@ -1600,7 +1600,7 @@ describe("architecture policy: PRD storage invariant (prd.md migration-helper-on
           "  2. Or add the file to PRD_MD_MIGRATION_HELPER_FILES if it is part of the migration pipeline",
           "     (with a clear justification comment)",
           "",
-          "See CLAUDE.md 'PRD file layout' and AUDIT-prd-md-calls.md for context.",
+          "See docs/architecture/prd-folder-tree-schema.md and docs/guide/prd-storage.md for context.",
         ].join("\n"),
       );
     }

@@ -35,7 +35,7 @@ const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_TOKENS = 8192;
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
-const DEFAULT_MODEL = "gpt-4o";
+const DEFAULT_MODEL = "gpt-5.6-terra";
 
 // ── Options ───────────────────────────────────────────────────────────────
 
