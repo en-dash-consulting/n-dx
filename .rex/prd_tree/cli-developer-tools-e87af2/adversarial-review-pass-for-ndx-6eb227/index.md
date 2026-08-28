@@ -16,7 +16,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add .hench/reviews/ to .gitignore](./add-hench-reviews-to-gitignore-4c7328.md) | pending |
 | [Add --review flag and move the diff-approval gate to --approve-diff](./add-review-flag-and-move-the-f7a55c.md) | completed |
-| [autoCommit leaves reviewer must-fix repairs uncommitted when the executor self-commits](./autocommit-leaves-reviewer-must-0e5993.md) | pending |
+| [autoCommit leaves reviewer must-fix repairs uncommitted when the executor self-commits](./autocommit-leaves-reviewer-must-0e5993.md) | completed |
 | [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-859237.md) | completed |
 | [Give review its own model tier with a review-model override](./give-review-its-own-model-tier-b889a2.md) | completed |
 | [Post-review full-suite gate skips because filesChanged misses executor and reviewer modifications](./post-review-full-suite-gate-3ff761.md) | pending |

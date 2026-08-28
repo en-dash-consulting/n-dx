@@ -33,6 +33,7 @@ import { persistRunLog } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
+import { commitReviewRepairs } from "../analysis/review-repairs.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
@@ -1213,6 +1214,40 @@ async function commitPreRunChanges(projectDir: string, message: string): Promise
 }
 
 /**
+ * Commit the files the adversarial review pass changed, when there are any.
+ * Called on the autoCommit path only: the interactive commit prompt already
+ * sweeps repairs into the task's commit, but on autoCommit the executor
+ * committed its own work before the review ran, so the repairs have no other
+ * owner. A failure here is reported, never thrown — an uncommitted repair is
+ * an inspection burden, not a broken task.
+ */
+export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRecord): Promise<void> {
+  const review = run.review;
+  if (!review || review.failed !== undefined) return;
+  if (!review.repairedFiles || review.repairedFiles.length === 0) return;
+
+  try {
+    const sha = await commitReviewRepairs(projectDir, {
+      paths: review.repairedFiles,
+      runId: run.id,
+      taskId: run.taskId,
+      trailer: buildCoAuthoredByTrailerLine(),
+    });
+    if (sha) {
+      review.repairCommit = sha;
+      detail(
+        `Committed review repairs (${review.repairedFiles.length} file(s), ${sha.slice(0, 8)})`,
+      );
+    }
+  } catch (err) {
+    info(
+      `⚠ Review repairs could not be committed (${(err as Error).message}). ` +
+        `They remain in the working tree: ${review.repairedFiles.join(", ")}`,
+    );
+  }
+}
+
+/**
  * Commit any uncommitted .rex/prd_tree changes produced by the task-completion
  * status update. Called on the autoCommit path only, where
  * performCommitPromptIfNeeded is a no-op and would otherwise leave the
@@ -2063,7 +2098,12 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // On the autoCommit path performCommitPromptIfNeeded is a no-op, so the
   // completion metadata written by updateCompletedTaskStatus would otherwise
   // be left uncommitted. Commit it now in a small dedicated second commit.
+  // Review repairs go first: the executor committed its own work before the
+  // review pass ran and the reviewer is barred from committing, so without
+  // this commit its must-fix repairs would be orphaned in the working tree
+  // and swept into whatever commit happens next.
   if (opts.autoCommit === true && run.status === "completed" && run.taskId) {
+    await commitReviewRepairsIfNeeded(projectDir, run);
     await commitCompletionMetadata(projectDir, run.taskId);
   }
 
