@@ -17,6 +17,7 @@ import {
   ClaudeClientError,
   NEWEST_MODELS,
   resolveVendorModel,
+  resolveTaskModel,
 } from "@n-dx/llm-client";
 import type { TokenUsage } from "../schema/index.js";
 
@@ -45,11 +46,14 @@ function resolveModel(override?: string): string {
  * Resolve the configured "light" tier model for the active vendor. Used by
  * enrichment to send naming-dominant pass 1 prompts to a cheaper/faster
  * model (Haiku for Claude) while keeping analytical pass 2+ on the
- * standard tier. Respects `claude.lightModel` / `codex.lightModel`
- * overrides in `.n-dx.json` so users can pin a specific cheap model.
+ * standard tier. Now a thin wrapper over the `zone.enrich-scan` task class,
+ * so `llm.routes`/`llm.tiers` config reroutes it; the legacy
+ * `claude.lightModel` / `codex.lightModel` overrides keep working.
  */
 export function resolveLightModel(): string {
-  return resolveVendorModel(resolveVendor(), _llmConfig ?? {}, "light");
+  return resolveTaskModel("zone.enrich-scan", _llmConfig ?? {}, {
+    vendor: resolveVendor(),
+  }).model;
 }
 
 /**
@@ -142,12 +146,25 @@ export interface CallClaudeResult {
  *
  * @param prompt  The prompt to send to Claude
  * @param model   The model to use (defaults to DEFAULT_MODEL)
+ * @param opts    `taskClass` routes the call through the class→tier→model
+ *                registry (`llm.routes` config included); an explicit `model`
+ *                still wins. Callers without a class get the standard tier.
  */
-export async function callClaude(prompt: string, model?: string): Promise<CallClaudeResult> {
+export async function callClaude(
+  prompt: string,
+  model?: string,
+  opts?: { taskClass?: string },
+): Promise<CallClaudeResult> {
   const client = getClient();
+  const resolved = opts?.taskClass
+    ? resolveTaskModel(opts.taskClass, _llmConfig ?? {}, {
+        model,
+        vendor: resolveVendor(),
+      }).model
+    : resolveModel(model);
   const result: CompletionResult = await client.complete({
     prompt,
-    model: resolveModel(model),
+    model: resolved,
   });
   return {
     text: result.text,

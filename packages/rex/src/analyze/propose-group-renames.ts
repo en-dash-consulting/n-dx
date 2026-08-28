@@ -167,7 +167,7 @@ export async function proposeGroupRenames(
 
   const subgroup: GroupRenameInput = { ...group, members: membersToRename };
   const prompt = buildGroupRenamePrompt(subgroup);
-  const resolvedModel = resolveConfiguredModel(model, "light");
+  const resolvedModel = resolveConfiguredModel(model, { taskClass: "prd.rename" });
 
   const llmResult = await spawnClaude(prompt, resolvedModel);
   const jsonText = extractJson(llmResult.text);

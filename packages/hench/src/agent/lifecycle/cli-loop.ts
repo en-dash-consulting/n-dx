@@ -51,7 +51,7 @@ import {
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
-import { LLM_VENDOR, resolveVendorModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -1524,6 +1524,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     approvals: policy.approvals,
     parseMode: adapter.parseMode,
     invocationContext: "cli",
+    // The routed tier for the agent loop — "standard" unless llm.routes
+    // reroutes agent.execute — so `ndx usage` can report spend per tier.
+    weight: resolveTaskModel("agent.execute", llmConfig, { vendor }).tier,
   });
 
   // CLI-specific: load config for CLI path and env resolution

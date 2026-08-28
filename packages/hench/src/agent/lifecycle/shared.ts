@@ -35,7 +35,7 @@ import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/g
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
 import type { ReviewDiff } from "../analysis/review.js";
-import { LLM_VENDOR, defaultRegistry, resolveVendorModel } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
@@ -1179,12 +1179,11 @@ export async function proposePreRunCommitMessage(
     const vendor = resolveLLMVendor(llmConfig);
     const standardModel = resolveVendorModel(vendor, llmConfig);
     const isExplicitOverride = Boolean(model) && model !== standardModel;
-    const resolvedModel = isExplicitOverride
-      ? (model as string)
-      : resolveVendorModel(vendor, llmConfig, "light");
+    const commitResolution = resolveTaskModel("git.commit-message", llmConfig, { vendor });
+    const resolvedModel = isExplicitOverride ? (model as string) : commitResolution.model;
     if (!isExplicitOverride) {
       // Tier visibility — mirrors the vendor header's "(light tier)" label.
-      detail(`Commit message model: ${resolvedModel} (light tier)`);
+      detail(`Commit message model: ${resolvedModel} (${commitResolution.tier} tier)`);
     }
     const prompt =
       "Write a single-line git commit subject (max 72 chars, conventional-commit " +

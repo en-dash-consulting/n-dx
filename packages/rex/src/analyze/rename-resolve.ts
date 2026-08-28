@@ -103,7 +103,7 @@ export async function proposeSiblingRenames(
   model?: string,
 ): Promise<SiblingRenameProposal> {
   const prompt = buildRenamePrompt(itemA, itemB);
-  const resolvedModel = resolveConfiguredModel(model, "light");
+  const resolvedModel = resolveConfiguredModel(model, { taskClass: "prd.rename" });
 
   const llmResult = await spawnClaude(prompt, resolvedModel);
   const jsonText = extractJson(llmResult.text);

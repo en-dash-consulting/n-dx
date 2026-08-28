@@ -139,7 +139,7 @@ export async function applyConsolidationGuard(
     originalTaskCount,
   );
 
-  const result = await spawnClaude(prompt, model, undefined, "light");
+  const result = await spawnClaude(prompt, model, undefined, { taskClass: "prd.consolidate-check" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
   const consolidated = parseProposalResponse(result.text);

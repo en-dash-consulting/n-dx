@@ -216,7 +216,7 @@ export async function modifyProposals(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const result = await spawnClaude(prompt, options.model);
+      const result = await spawnClaude(prompt, options.model, undefined, { taskClass: "prd.modify" });
       accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
       const modified = parseProposalResponse(result.text);

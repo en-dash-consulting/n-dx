@@ -81,6 +81,47 @@ function extractCodexConfig(value: unknown): CodexConfig | undefined {
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
+/** Extract a flat string→string map, dropping non-string or empty values. */
+function extractStringMap(value: unknown): Record<string, string> | undefined {
+  const v = asRecord(value);
+  if (!v) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(v)) {
+    if (typeof entry === "string" && entry) out[key] = entry;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+const TASK_TIER_KEYS = new Set(["light", "standard", "heavy", "free"]);
+
+function extractTiers(value: unknown): LLMConfig["tiers"] {
+  const v = asRecord(value);
+  if (!v) return undefined;
+  const out: NonNullable<LLMConfig["tiers"]> = {};
+  for (const [vendor, tierValue] of Object.entries(v)) {
+    if (!isLLMVendor(vendor)) continue;
+    const tierMap = extractStringMap(tierValue);
+    if (!tierMap) continue;
+    const tiers: Record<string, string> = {};
+    for (const [tier, model] of Object.entries(tierMap)) {
+      if (TASK_TIER_KEYS.has(tier)) tiers[tier] = model;
+    }
+    if (Object.keys(tiers).length > 0) {
+      out[vendor] = tiers as NonNullable<LLMConfig["tiers"]>[LLMVendor];
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function extractEscalation(value: unknown): LLMConfig["escalation"] {
+  const v = asRecord(value);
+  if (!v) return undefined;
+  const out: NonNullable<LLMConfig["escalation"]> = {};
+  if (typeof v.enabled === "boolean") out.enabled = v.enabled;
+  if (typeof v.maxSteps === "number" && v.maxSteps >= 0) out.maxSteps = v.maxSteps;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /**
  * Load and parse a JSON file, returning null on failure.
  */
@@ -125,6 +166,18 @@ function extractLLMConfig(root: Record<string, unknown>): LLMConfig {
   if (llmGoogle) config.google = llmGoogle;
   if (llmLocal) config.local = llmLocal;
   if (autoFailover !== undefined) config.autoFailover = autoFailover;
+
+  // Routing surfaces for resolveTaskModel. Extracted explicitly — this
+  // function whitelists keys, and a key it does not copy never reaches
+  // runtime no matter what .n-dx.json says.
+  const tiers = extractTiers(llm?.tiers);
+  if (tiers) config.tiers = tiers;
+  const routes = extractStringMap(llm?.routes);
+  if (routes) config.routes = routes;
+  const effort = extractStringMap(llm?.effort);
+  if (effort) config.effort = effort;
+  const escalation = extractEscalation(llm?.escalation);
+  if (escalation) config.escalation = escalation;
   return config;
 }
 
