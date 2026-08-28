@@ -352,4 +352,60 @@ describe("buildProposals", () => {
     expect(proposals[0].epic.title).toBe("High");
     expect(proposals[1].epic.title).toBe("Low");
   });
+
+  it("never surfaces an internal finding: tag as the epic title", () => {
+    // Regression: scanners.ts pushes `finding:<hash>` (and, when present,
+    // `finding-category:<category>`) onto a result's tags purely for the
+    // accept/re-analyze feedback loop. A global-scope finding with no zone
+    // has an empty tags array before that push, so `finding:<hash>` lands
+    // at tags[0] — and inferEpic's "use the first tag" fallback used to
+    // take it literally, producing an epic titled e.g. "finding:c508fa330029"
+    // in the Project Scan UI (confirmed live against a real project).
+    const results: ScanResult[] = [
+      makeScanResult({
+        name: "Circular dependency between modules",
+        kind: "task",
+        source: "sourcevision",
+        tags: ["finding:c508fa330029", "finding-category:circular-dep"],
+        sourceFile: "src/app.ts",
+      }),
+    ];
+
+    const proposals = buildProposals(results);
+    expect(proposals.length).toBe(1);
+    expect(proposals[0].epic.title).not.toContain("finding:");
+    expect(proposals[0].epic.title).not.toContain("finding-category:");
+    // No zone/scope tag survives filtering, so it falls through to the
+    // source-based default rather than any tag at all.
+    expect(proposals[0].epic.title).toBe("SourceVision");
+  });
+
+  it("groups multiple zone-less findings under the same shared epic instead of one epic each", () => {
+    // Before the fix, each finding's unique hash tag made it its own
+    // grouping key, so N unrelated global findings produced N separate
+    // single-item epics instead of the one shared bucket the "fall back to
+    // source type" branch of inferEpic was always meant to produce.
+    const results: ScanResult[] = [
+      makeScanResult({ name: "Finding A", kind: "task", source: "sourcevision", tags: ["finding:aaa111"], sourceFile: "a.ts" }),
+      makeScanResult({ name: "Finding B", kind: "task", source: "sourcevision", tags: ["finding:bbb222"], sourceFile: "b.ts" }),
+    ];
+
+    const proposals = buildProposals(results);
+    expect(proposals.length).toBe(1);
+    expect(proposals[0].epic.title).toBe("SourceVision");
+  });
+
+  it("still prefers a genuine display tag over a finding: marker when both are present", () => {
+    const results: ScanResult[] = [
+      makeScanResult({
+        name: "Refactor auth flow",
+        kind: "task",
+        tags: ["finding:zzz999", "Auth"],
+        sourceFile: "auth.ts",
+      }),
+    ];
+
+    const proposals = buildProposals(results);
+    expect(proposals[0].epic.title).toBe("Auth");
+  });
 });

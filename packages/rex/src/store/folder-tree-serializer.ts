@@ -333,9 +333,14 @@ const ORDERED_FIELDS: ReadonlyArray<string> = [
  * current serializer never emits; they are filtered here as defense-in-depth
  * so an in-memory item carrying stale shims (e.g. just-loaded from a legacy
  * tree) round-trips clean.
+ *
+ * `requirements` is deliberately NOT in this set — it is item content (like
+ * `acceptanceCriteria`) and round-trips through the generic "unknown extra
+ * fields" path in {@link emitFrontmatter}/the parser's `buildItem`, which
+ * already supports array-of-object fields via inline JSON flow mappings.
  */
 const STORAGE_FIELDS = new Set([
-  "children", "branch", "sourceFile", "requirements",
+  "children", "branch", "sourceFile",
   "activeIntervals", "mergedProposals",
   "tokenUsage", "duration", "loeRationale", "loeConfidence",
 ]);
