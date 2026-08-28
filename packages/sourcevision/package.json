@@ -47,6 +47,7 @@
   "devDependencies": {
     "@types/node": "^25.1.0",
     "@types/pdfkit": "^0.17.5",
+    "jsdom": "^27.4.0",
     "vitest": "^4.0.18"
   }
 }

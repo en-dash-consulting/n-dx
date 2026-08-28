@@ -155,8 +155,10 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
 .stage{position:relative;overflow:hidden;cursor:grab;touch-action:none}
 .stage.dragging{cursor:grabbing}
 .stage svg{display:block;width:100%;height:100%;min-height:60vh}
-.node{cursor:pointer}
+.node,.edge{cursor:pointer}
 .node polygon{transition:opacity .12s ease}
+.edge polyline{transition:opacity .12s ease}
+.edge:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .legend{
   position:absolute;left:.9rem;bottom:.9rem;display:flex;flex-wrap:wrap;gap:.35rem;
@@ -283,9 +285,21 @@ for (var gv = vMin; gv <= vMax; gv += 3) {
 }
 
 /* ---------- edges ---------- */
+// Each edge gets a fat transparent hit line under the visible one: a 2-4px
+// stroke is close to unclickable, and the connectors carry real information.
 var edgeEls = [];
-EDGES.forEach(function(e){
+EDGES.forEach(function(e, index){
   var projected = e.points.map(function(q){ return P(q[0], q[1], 0); });
+  var from = BY[e.from], to = BY[e.to];
+  var g = el("g", {
+    "class": "edge", tabindex: "0", role: "button",
+    "aria-label": "Dependency: " + (from ? from.name : e.from) + " imports " +
+      (to ? to.name : e.to) + ", " + e.weight + " references"
+  });
+  var hit = el("polyline", {
+    points: pts(projected), fill: "none", stroke: "transparent",
+    "stroke-width": "14", "stroke-linejoin": "round", "stroke-linecap": "round"
+  });
   var line = el("polyline", {
     points: pts(projected), fill: "none", stroke: "#4A4990",
     "stroke-width": Math.min(4.5, 1.6 + Math.log(e.weight + 1)),
@@ -293,8 +307,19 @@ EDGES.forEach(function(e){
     "marker-end": "url(#arw0)"
   });
   if (e.back) line.setAttribute("stroke-dasharray", "7 6");
-  gEdge.appendChild(line);
-  edgeEls.push({ e: e, node: line });
+  g.appendChild(hit); g.appendChild(line);
+  gEdge.appendChild(g);
+  edgeEls.push({ e: e, g: g, node: line });
+
+  g.addEventListener("click", function(ev){
+    if (dragMoved) return;
+    ev.stopPropagation();
+    lastPick = Date.now();
+    selectEdge(index);
+  });
+  g.addEventListener("keydown", function(ev){
+    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectEdge(index); }
+  });
 });
 
 /* ---------- blocks ---------- */
@@ -349,19 +374,17 @@ order.forEach(function(n){
 
   blockEls[n.id] = { g: g, tag: tg, rect: rect, text: t, top: top, base: base };
 
+  // Only "click" — listening on pointerup as well fires pick twice per press.
   function pick(ev){
     if (dragMoved) return;
-    // Stop the click only; swallowing pointerup would strand the pan state.
-    if (ev.type === "click") ev.stopPropagation();
+    ev.stopPropagation();
     lastPick = Date.now();
-    select(n.id);
+    selectNode(n.id);
   }
-  g.addEventListener("pointerup", pick);
   g.addEventListener("click", pick);
-  tg.addEventListener("pointerup", pick);
   tg.addEventListener("click", pick);
   g.addEventListener("keydown", function(ev){
-    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n.id); }
+    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectNode(n.id); }
   });
 });
 
@@ -389,8 +412,9 @@ var INTRO =
   'to what it imports; dashed lines run backwards through the layering and mark a dependency cycle.</div>' +
   '<h4>Try this</h4><ul>' +
   '<li>Click a block to see its files, findings and cross-zone edges.</li>' +
+  '<li>Click a connector to see what the dependency is made of.</li>' +
   '<li>Use the legend to isolate one kind of zone.</li>' +
-  '<li>Drag to pan, scroll to zoom, <b>Reset view</b> to recentre.</li>' +
+  '<li>Drag to pan, scroll to zoom, <b>Reset view</b> to recentre. <b>Esc</b> clears.</li>' +
   '</ul>';
 
 function linkList(items){
@@ -401,8 +425,7 @@ function linkList(items){
   }).join("") + '</ul>';
 }
 
-function render(n){
-  if (!n) { dossier.innerHTML = INTRO; bindLinks(); return; }
+function renderNode(n){
   var color = COLOR[n.kind] || "#6F7BA6";
   var h = '<div class="kind"><i style="background:' + esc(color) + '"></i>' +
     esc(n.stage) + ' &middot; ' + esc(LABEL[n.kind] || n.kind) + '</div>';
@@ -417,51 +440,64 @@ function render(n){
       (n.metrics.routes ? '<span>routes <b>' + num(n.metrics.routes) + '</b></span>' : '') +
       '</div>';
   }
-
   if (n.body) h += '<div class="body">' + esc(n.body) + '</div>';
-
   if (n.archetypes.length) {
     h += '<h4>Archetype mix</h4><div class="mx">' + n.archetypes.map(function(a){
       return '<span>' + esc(a[0]) + ' <b>' + num(a[1]) + '</b></span>';
     }).join("") + '</div>';
   }
-
   if (n.insights.length) {
     h += '<h4>Insights</h4><ul>' + n.insights.map(function(i){
       return '<li>' + esc(i) + '</li>';
     }).join("") + '</ul>';
   }
-
   if (n.findings.length) {
     h += '<h4>Findings</h4><ul>' + n.findings.map(function(f){
       return '<li class="sev-' + esc(f.severity) + '">' + esc(f.text) + '</li>';
     }).join("") + '</ul>';
   }
-
   if (n.keyFiles.length) {
     h += '<h4>Key files</h4><ul class="files">' + n.keyFiles.map(function(f){
       return '<li>' + esc(f) + '</li>';
     }).join("") + '</ul>';
   }
-
   h += '<h4>Imported by</h4>' + linkList(n.inbound);
   h += '<h4>Imports</h4>' + linkList(n.outbound);
+  return h;
+}
 
-  dossier.innerHTML = h;
-  bindLinks();
+function renderEdge(e){
+  var from = BY[e.from], to = BY[e.to];
+  var fromName = from ? from.name : e.from, toName = to ? to.name : e.to;
+  var h = '<div class="kind">Dependency</div>';
+  h += '<h3>' + esc(fromName) + ' &rarr; ' + esc(toName) + '</h3>';
+  h += '<div class="sub">' + num(e.weight) + ' cross-zone import ' +
+    (e.weight === 1 ? 'reference' : 'references') + '</div>';
+  h += '<div class="body">' + esc(fromName) + ' imports from ' + esc(toName) + '. ' +
+    (e.back
+      ? 'This edge runs backwards through the layering, so these two zones sit in a dependency cycle &mdash; the arrow is drawn through the return lane below the scene.'
+      : 'The arrow points from the importer to what it imports.') +
+    '</div>';
+  h += '<h4>Both ends</h4><ul>' +
+    '<li><button type="button" class="link" data-goto="' + esc(e.from) + '">' + esc(fromName) + '</button>' +
+    (from ? ' <span class="sub">' + esc(from.sub) + '</span>' : '') + '</li>' +
+    '<li><button type="button" class="link" data-goto="' + esc(e.to) + '">' + esc(toName) + '</button>' +
+    (to ? ' <span class="sub">' + esc(to.sub) + '</span>' : '') + '</li>' +
+    '</ul>';
+  return h;
 }
 
 function bindLinks(){
   var links = dossier.querySelectorAll("[data-goto]");
   for (var i = 0; i < links.length; i++) {
     links[i].addEventListener("click", function(ev){
-      select(ev.currentTarget.getAttribute("data-goto"));
+      selectNode(ev.currentTarget.getAttribute("data-goto"));
     });
   }
 }
 
 /* ---------- selection & filtering ---------- */
-var current = null;
+var curNode = null, curEdge = null;
 var activeKinds = {};
 
 function kindVisible(kind){
@@ -470,27 +506,31 @@ function kindVisible(kind){
   return !any || !!activeKinds[kind];
 }
 
-function related(id){
+function highlighted(){
   var set = {};
-  if (!id) return set;
-  set[id] = true;
-  EDGES.forEach(function(e){
-    if (e.from === id) set[e.to] = true;
-    if (e.to === id) set[e.from] = true;
-  });
+  if (curNode) {
+    set[curNode] = true;
+    EDGES.forEach(function(e){
+      if (e.from === curNode) set[e.to] = true;
+      if (e.to === curNode) set[e.from] = true;
+    });
+  } else if (curEdge !== null) {
+    var e = EDGES[curEdge];
+    set[e.from] = true; set[e.to] = true;
+  }
   return set;
 }
 
-function refresh(){
-  var near = related(current);
+function refresh(scrollPanel){
+  var focused = (curNode !== null || curEdge !== null);
+  var near = highlighted();
 
   NODES.forEach(function(n){
     var b = blockEls[n.id];
     var shown = kindVisible(n.kind);
-    var on = (n.id === current);
-    var linked = current ? !!near[n.id] : true;
-    var opacity = !shown ? 0.08 : (on ? 1 : (linked ? 0.85 : 0.28));
-    b.g.setAttribute("opacity", String(opacity));
+    var on = (n.id === curNode);
+    var linked = focused ? !!near[n.id] : true;
+    b.g.setAttribute("opacity", String(!shown ? 0.08 : (on ? 1 : (linked ? 0.85 : 0.28))));
     b.tag.setAttribute("opacity", String(!shown ? 0.05 : (on ? 1 : (linked ? 0.8 : 0.22))));
     b.rect.setAttribute("fill", on ? b.base : "#1B1A45");
     b.text.setAttribute("fill", on ? "#12122B" : "#EFEFF7");
@@ -499,29 +539,43 @@ function refresh(){
     b.g.setAttribute("tabindex", shown ? "0" : "-1");
   });
 
-  edgeEls.forEach(function(x){
-    var hot = current && (x.e.from === current || x.e.to === current);
+  edgeEls.forEach(function(x, i){
+    var hot = (i === curEdge) ||
+      (curNode !== null && (x.e.from === curNode || x.e.to === curNode));
     var ends = kindVisible((BY[x.e.from] || {}).kind) && kindVisible((BY[x.e.to] || {}).kind);
     x.node.setAttribute("stroke", hot ? "#7FAE33" : "#4A4990");
     x.node.setAttribute("marker-end", hot ? "url(#arw1)" : "url(#arw0)");
-    x.node.setAttribute("opacity", !ends ? "0.05" : (current ? (hot ? "1" : "0.18") : "0.85"));
+    x.node.setAttribute("opacity", !ends ? "0.05" : (focused ? (hot ? "1" : "0.18") : "0.85"));
+    x.g.setAttribute("tabindex", ends ? "0" : "-1");
   });
 
-  render(current ? BY[current] : null);
+  if (curNode !== null && BY[curNode]) dossier.innerHTML = renderNode(BY[curNode]);
+  else if (curEdge !== null) dossier.innerHTML = renderEdge(EDGES[curEdge]);
+  else dossier.innerHTML = INTRO;
+  bindLinks();
   dossier.scrollTop = 0;
+
+  // On a narrow layout the panel sits below the map, so a selection would
+  // otherwise update off-screen and read as "clicking does nothing".
+  if (scrollPanel && window.innerWidth <= 1020 && dossier.scrollIntoView) {
+    try { dossier.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (err) { /* older browsers */ }
+  }
 }
 
-/** Focus a node. Clicking the focused node again returns to the overview. */
-function select(id){
-  current = (current === id) ? null : id;
-  refresh();
+function selectNode(id){
+  if (!BY[id]) return;
+  curNode = id; curEdge = null;
+  refresh(true);
 }
-
-/** Return to the overview without toggling anything on. */
+function selectEdge(index){
+  if (!EDGES[index]) return;
+  curEdge = index; curNode = null;
+  refresh(true);
+}
 function clearSelection(){
-  if (!current) return;
-  current = null;
-  refresh();
+  if (curNode === null && curEdge === null) return;
+  curNode = null; curEdge = null;
+  refresh(false);
 }
 
 var legendButtons = document.querySelectorAll(".lg");
@@ -530,7 +584,7 @@ for (var li = 0; li < legendButtons.length; li++) {
     var btn = ev.currentTarget, kind = btn.getAttribute("data-kind");
     activeKinds[kind] = !activeKinds[kind];
     btn.setAttribute("aria-pressed", activeKinds[kind] ? "true" : "false");
-    refresh();
+    refresh(false);
   });
 }
 
@@ -541,6 +595,7 @@ var stage = document.getElementById("stage");
 
 function apply(){ camera.setAttribute("transform", "translate(" + tx + " " + ty + ") scale(" + k + ")"); }
 function toVB(ev){
+  if (!svg.createSVGPoint) return { x: ev.clientX, y: ev.clientY };
   var pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
   var m = svg.getScreenCTM(); if (!m) return { x: 0, y: 0 };
   var p = pt.matrixTransform(m.inverse()); return { x: p.x, y: p.y };
@@ -577,7 +632,7 @@ window.addEventListener("pointercancel", function(){
 });
 stage.addEventListener("click", function(){
   if (dragMoved) return;
-  if (Date.now() - lastPick < 350) return; // a block already handled this
+  if (Date.now() - lastPick < 350) return; // a block or edge already handled this
   clearSelection();
 });
 
@@ -597,5 +652,5 @@ document.addEventListener("keydown", function(ev){
 });
 
 apply();
-refresh();
+refresh(false);
 `;

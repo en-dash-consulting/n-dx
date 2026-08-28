@@ -160,6 +160,9 @@ importers:
       '@types/pdfkit':
         specifier: ^0.17.5
         version: 0.17.5
+      jsdom:
+        specifier: ^27.4.0
+        version: 27.4.0(@noble/hashes@1.8.0)
       vitest:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@25.2.0)(jsdom@27.4.0(@noble/hashes@1.8.0))
@@ -3501,6 +3504,14 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
+  '@vitest/mocker@4.0.18(vite@7.3.2(@types/node@22.19.8))':
+    dependencies:
+      '@vitest/spy': 4.0.18
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 7.3.2(@types/node@22.19.8)
+
   '@vitest/mocker@4.0.18(vite@7.3.2(@types/node@25.2.0))':
     dependencies:
       '@vitest/spy': 4.0.18
@@ -5050,7 +5061,7 @@ snapshots:
   vitest@4.0.18(@types/node@22.19.8)(jsdom@27.4.0(@noble/hashes@1.8.0)):
     dependencies:
       '@vitest/expect': 4.0.18
-      '@vitest/mocker': 4.0.18(vite@7.3.2(@types/node@25.2.0))
+      '@vitest/mocker': 4.0.18(vite@7.3.2(@types/node@22.19.8))
       '@vitest/pretty-format': 4.0.18
       '@vitest/runner': 4.0.18
       '@vitest/snapshot': 4.0.18
