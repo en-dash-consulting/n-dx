@@ -55,6 +55,7 @@ import type {
   ItemDurationTotals,
 } from "./rex-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
+import { resolveNdxBin } from "./routes-commands.js";
 import { ProcessMemoryTracker } from "./process-memory-tracker.js";
 import { ConcurrentExecutionMetrics } from "./concurrent-execution-metrics.js";
 
@@ -1180,16 +1181,24 @@ async function handleExecute(
     return true;
   }
 
-  // Resolve hench binary
-  const henchBin = join(ctx.projectDir, "node_modules", ".bin", "hench");
-  const henchFallback = join(ctx.projectDir, "packages", "hench", "dist", "cli", "index.js");
+  // Go through the `ndx` orchestrator's `work` command rather than spawning
+  // hench directly. `ndx work` forwards flags straight to `hench run` (see
+  // handleWork in packages/core/cli.js) but also does the vendor-config
+  // validation "Start Working" needs — and, critically, resolveNdxBin has a
+  // real cross-install resolution ladder (NDX_CLI_PATH env var set by the
+  // launching CLI, project-local node_modules/.bin/ndx, this server's own
+  // module graph, then the monorepo dogfood path). The hench-specific
+  // equivalent this replaced (`<projectDir>/node_modules/.bin/hench`,
+  // falling back to `<projectDir>/packages/hench/dist/cli/index.js`) only
+  // works for the n-dx monorepo dogfooding itself — every other analyzed
+  // project has no packages/hench directory, so "Start Working" failed
+  // immediately with MODULE_NOT_FOUND.
+  const { bin: binPath, args: prefixArgs } = resolveNdxBin(ctx);
   // Pass --reset-deferred when executing a deferred task so hench resets it to pending before running
-  const args = status === "deferred"
-    ? ["run", `--task=${taskId}`, "--auto", "--reset-deferred", ctx.projectDir]
-    : ["run", `--task=${taskId}`, "--auto", ctx.projectDir];
-
-  const binPath = existsSync(henchBin) ? henchBin : "node";
-  const binArgs = existsSync(henchBin) ? args : [henchFallback, ...args];
+  const workArgs = status === "deferred"
+    ? ["work", `--task=${taskId}`, "--auto", "--reset-deferred", ctx.projectDir]
+    : ["work", `--task=${taskId}`, "--auto", ctx.projectDir];
+  const binArgs = [...prefixArgs, ...workArgs];
 
   // Generate a run ID for tracking (hench will generate its own, but we
   // need one to correlate the response before the process starts writing)
