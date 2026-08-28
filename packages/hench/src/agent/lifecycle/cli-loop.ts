@@ -68,6 +68,7 @@ import {
   captureStartingHead,
   captureBaselineUntracked,
   runReviewGate,
+  restageTrackedModifications,
   finalizeRun,
   handleRunFailure,
   formatModelLabel,
@@ -1366,13 +1367,25 @@ export async function processSuccessfulResult(ctx: SuccessContext): Promise<Succ
       // review: a reviewer crash leaves staged work plus the message file,
       // which the pre-run commit gate already recovers on the next run.
       ctx.commitWatcher?.cancel();
-      await runAdversarialReviewPass(ctx.reviewPass, {
+      const reviewOutcome = await runAdversarialReviewPass(ctx.reviewPass, {
         run,
         taskId,
         projectDir,
         startingHead: ctx.startingHead,
         sessionId: result.sessionId,
       });
+
+      // The reviewer is told to stage what it repairs, but the commit below is
+      // `git commit -F` — index only — so an instruction that goes unheeded
+      // silently drops the repair from the commit while the report claims it
+      // was applied. Restage tracked modifications so the repairs actually
+      // reach the diff gate and the commit.
+      if (reviewOutcome.ok && reviewOutcome.report.fixesApplied) {
+        const restaged = await restageTrackedModifications(projectDir);
+        if (restaged.length > 0) {
+          info(`Staged ${restaged.length} file(s) modified by the review pass.`);
+        }
+      }
     }
 
     // Diff-approval gate

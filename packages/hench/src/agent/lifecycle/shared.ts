@@ -1094,6 +1094,45 @@ async function countStagedFiles(projectDir: string): Promise<number> {
   }
 }
 
+/**
+ * Stage tracked modifications that are not yet in the index.
+ *
+ * The review pass runs after the executor's `git add -A`, so a repair the
+ * reviewer edits but never stages is invisible to the run's `git commit -F`
+ * (index only). The report still says `fixed`, and the dirty repair is swept
+ * into the *next* run's `git add -A`, attributing it to unrelated work. The
+ * prompt now tells the reviewer to stage its repairs; this is the belt to that
+ * braces, because an instruction is not enforcement.
+ *
+ * `git add -u` restricts itself to files git already tracks, so it cannot
+ * sweep in unrelated untracked files (build output, scratch notes) the way
+ * `git add -A` would. Best-effort: a staging failure must not block the commit
+ * of what *is* staged.
+ *
+ * @returns the paths newly staged, empty when there was nothing to restage.
+ */
+export async function restageTrackedModifications(projectDir: string): Promise<string[]> {
+  let unstaged: string[] = [];
+  try {
+    const output = await execStdout("git", ["diff", "--name-only"], {
+      cwd: projectDir,
+      timeout: 15_000,
+    });
+    unstaged = output.trim().split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+  if (unstaged.length === 0) return [];
+
+  try {
+    await execStdout("git", ["add", "-u"], { cwd: projectDir, timeout: 15_000 });
+  } catch (err) {
+    detail(`Warning: could not restage tracked modifications: ${(err as Error).message}`);
+    return [];
+  }
+  return unstaged;
+}
+
 // ---------------------------------------------------------------------------
 // Pre-run commit gate
 // ---------------------------------------------------------------------------
