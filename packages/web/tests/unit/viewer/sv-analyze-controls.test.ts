@@ -55,7 +55,7 @@ describe("AnalyzeControls (SourceVision full-flow trigger)", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/commands/sv-analyze", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ full: true }),
+      body: JSON.stringify({ full: true, deep: false }),
     }));
     const running = buttons().find((b) => b.textContent?.includes("Running full analysis"));
     expect(running).toBeTruthy();
@@ -91,6 +91,27 @@ describe("AnalyzeControls (SourceVision full-flow trigger)", () => {
     });
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(String(init.body))).toEqual({});
+    expect(JSON.parse(String(init.body))).toEqual({ deep: false });
+  });
+
+  it("checking the deep toggle sends deep: true on both quick and full runs", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { ok: true, output: "done" }));
+
+    act(() => {
+      render(h(AnalyzeControls, null), root);
+    });
+    const deepToggle = root.querySelector<HTMLInputElement>(".overview-deep-toggle input[type=checkbox]")!;
+    await act(async () => {
+      deepToggle.click();
+    });
+
+    const quickBtn = buttons().find((b) => b.textContent?.includes("Re-analyze"))!;
+    await act(async () => {
+      quickBtn.click();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ deep: true });
   });
 });

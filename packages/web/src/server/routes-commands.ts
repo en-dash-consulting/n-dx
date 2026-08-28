@@ -35,6 +35,7 @@ import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { readCliName } from "./cli-name.js";
+import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 
 const CMD_PREFIX = "/api/commands/";
@@ -170,7 +171,7 @@ function resolveRexBin(ctx: ServerContext): { bin: string; args: string[] } {
  *  4. The monorepo dogfood path — valid solely when the analyzed project is
  *     the n-dx repo itself.
  */
-function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
+export function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
   if (process.env.NDX_CLI_PATH) {
     return { bin: "node", args: [process.env.NDX_CLI_PATH] };
   }
@@ -281,13 +282,15 @@ async function handleSvAnalyze(
 ): Promise<boolean> {
   let lite = false;
   let full = false;
+  let deep = false;
   let targetPass: number | undefined;
   try {
     const body = await readBody(req);
     if (body) {
-      const input = JSON.parse(body) as { lite?: boolean; full?: boolean; targetPass?: number };
+      const input = JSON.parse(body) as { lite?: boolean; full?: boolean; deep?: boolean; targetPass?: number };
       lite = !!input.lite;
       full = !!input.full;
+      deep = !!input.deep;
       if (input.targetPass !== undefined) {
         if (!Number.isInteger(input.targetPass) || input.targetPass < 2 || input.targetPass > 4) {
           errorResponse(res, 400, "targetPass must be an integer between 2 and 4");
@@ -305,6 +308,10 @@ async function handleSvAnalyze(
   if (lite) cmdArgs.push("--lite");
   if (full) cmdArgs.push("--full");
   else if (targetPass !== undefined) cmdArgs.push(`--target-pass=${targetPass}`);
+  // Re-analyzes detected sub-packages before the root analysis — combinable
+  // with lite/full/targetPass, and does not itself trigger LLM enrichment
+  // passes, so it doesn't change whether this runs sync vs. as the async job.
+  if (deep) cmdArgs.push("--deep");
   const verboseFlag = serverVerbosityFlag();
   if (verboseFlag) cmdArgs.push(verboseFlag);
   cmdArgs.push(ctx.projectDir);
@@ -343,7 +350,10 @@ async function handleSvAnalyze(
     // spawnManaged with piped stdio streams stdout chunk-by-chunk, so the
     // status endpoint shows live progress while the passes run — the
     // buffered exec() only hands output over after the child exits.
-    const analyzeTimeout = 1_800_000; // 30 minutes — four LLM enrichment passes
+    // Honors the "CLI Timeouts" settings page's "analyze" entry (30 min
+    // default) instead of hardcoding that default directly, so a user's
+    // explicit cli.timeouts.analyze override actually takes effect here.
+    const analyzeTimeout = resolveEffectiveCliTimeoutMs(ctx.projectDir, "analyze");
     const child = spawnManaged(bin, cmdArgs, {
       cwd: ctx.projectDir,
       timeout: analyzeTimeout,
@@ -513,20 +523,40 @@ async function handleRecommend(
   return true;
 }
 
-/** POST /api/commands/export — ndx export static dashboard */
+/**
+ * POST /api/commands/export — ndx export static dashboard
+ *
+ * `deploy: "github"` additionally pushes the exported output to the
+ * `n-dx-dashboard` branch on the project's git remote (force-push — see
+ * `deployToGitHubPages` in packages/core/export.js). That's a real,
+ * user-visible remote write, so the trigger is opt-in via the request body
+ * and the viewer gates it behind an explicit confirmation step; this route
+ * does not add its own extra confirmation, matching every other
+ * spawn-and-report trigger in this file.
+ */
 async function handleExport(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
   let outDir: string | undefined;
+  let basePath: string | undefined;
+  let cname: string | undefined;
+  let deployGithub = false;
   try {
     const body = await readBody(req);
     if (body) {
-      const input = JSON.parse(body) as { outDir?: string };
+      const input = JSON.parse(body) as { outDir?: string; basePath?: string; cname?: string; deploy?: string };
       if (input.outDir && typeof input.outDir === "string") {
         outDir = input.outDir.trim();
       }
+      if (input.basePath && typeof input.basePath === "string") {
+        basePath = input.basePath.trim();
+      }
+      if (input.cname && typeof input.cname === "string") {
+        cname = input.cname.trim();
+      }
+      deployGithub = input.deploy === "github";
     }
   } catch {
     // Use defaults
@@ -535,12 +565,17 @@ async function handleExport(
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
   const cmdArgs = [...prefixArgs, "export"];
   if (outDir) cmdArgs.push(`--out-dir=${outDir}`);
+  if (basePath) cmdArgs.push(`--base-path=${basePath}`);
+  if (cname) cmdArgs.push(`--cname=${cname}`);
+  if (deployGithub) cmdArgs.push("--deploy=github");
   cmdArgs.push(ctx.projectDir);
 
   try {
     const result = await foundationExec(bin, cmdArgs, {
       cwd: ctx.projectDir,
-      timeout: 120_000,
+      // Deploy pushes to a remote over the network (git worktree + push),
+      // which can run longer than a local-only export.
+      timeout: deployGithub ? 180_000 : 120_000,
       maxBuffer: 10 * 1024 * 1024,
     });
 
@@ -1079,7 +1114,7 @@ function handleRefreshStatus(
  * `ci` and `reshape` both run a long CLI pass and return JSON, so they share
  * one shape rather than each growing its own near-identical singleton.
  */
-interface AsyncJobStatus {
+export interface AsyncJobStatus {
   running: boolean;
   startedAt: string | null;
   finishedAt: string | null;
@@ -1090,7 +1125,7 @@ interface AsyncJobStatus {
   error: string | null;
 }
 
-function newJobStatus(): AsyncJobStatus {
+export function newJobStatus(): AsyncJobStatus {
   return { running: false, startedAt: null, finishedAt: null, report: null, output: "", error: null };
 }
 
@@ -1101,7 +1136,7 @@ const reshapeStatus = newJobStatus();
  * Start a background CLI job that reports through `status`, or answer 409 when
  * one is already in flight. Returns 202 immediately; the caller polls.
  */
-function startAsyncJob(
+export function startAsyncJob(
   res: ServerResponse,
   status: AsyncJobStatus,
   label: string,

@@ -32,6 +32,7 @@ export function AnalyzeControls() {
   const [state, setState] = useState<"idle" | "running" | "running-full" | "done" | "done-full" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
+  const [deep, setDeep] = useState(false);
 
   // Poll full-analysis status while running
   useEffect(() => {
@@ -71,7 +72,7 @@ export function AnalyzeControls() {
       const res = await fetch("/api/commands/sv-analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ deep }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({ error: "Analysis failed" })) as { error?: string };
@@ -84,7 +85,7 @@ export function AnalyzeControls() {
       setState("error");
       setTimeout(() => setState("idle"), 6000);
     }
-  }, []);
+  }, [deep]);
 
   const handleFull = useCallback(async () => {
     setState("running-full");
@@ -94,7 +95,7 @@ export function AnalyzeControls() {
       const res = await fetch("/api/commands/sv-analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ full: true }),
+        body: JSON.stringify({ full: true, deep }),
       });
       if (res.status === 409) {
         // Already running \u2014 the polling loop will track it
@@ -110,11 +111,23 @@ export function AnalyzeControls() {
       setState("error");
       setTimeout(() => setState("idle"), 10000);
     }
-  }, []);
+  }, [deep]);
 
   const busy = state === "running" || state === "running-full";
 
   return h("div", { class: "overview-reanalyze cmd-panel-actions" },
+    h("label", {
+      class: "overview-deep-toggle",
+      title: "Re-analyze detected sub-packages before the root analysis (sourcevision analyze --deep). Slower; useful for monorepos.",
+    },
+      h("input", {
+        type: "checkbox",
+        checked: deep,
+        disabled: busy,
+        onChange: (e: Event) => setDeep((e.target as HTMLInputElement).checked),
+      }),
+      " Deep (sub-packages)",
+    ),
     h("button", {
       class: "cmd-btn cmd-btn-primary",
       onClick: handleQuick,
