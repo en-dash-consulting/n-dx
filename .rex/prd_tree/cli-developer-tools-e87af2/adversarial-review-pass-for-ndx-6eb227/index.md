@@ -23,6 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Give review its own model tier with a review-model override](./give-review-its-own-model-tier-b889a2.md) | completed |
 | [Grant the reviewer PRD-write permission so findings can be captured in non-interactive runs](./grant-the-reviewer-prd-write-120b14.md) | completed |
 | [Resume the work session for the reviewer on --resume](./resume-the-work-session-for-the-2eb560.md) | completed |
+| [--review leaves the PRD completion metadata uncommitted when the agent commits its own work anyway](./review-leaves-the-prd-544d93.md) | pending |
 | [Review report transport, parsing, and run-record recording](./review-report-transport-parsing-2f0be1.md) | completed |
 | [Reviewer repairs join the run's commit only if the reviewer voluntarily stages them](./reviewer-repairs-join-the-run-s-e168b8.md) | pending |
 | [run --help promises reviewer MCP capture grants unconditionally, but extraAllowedTools is Claude-only](./run-help-promises-reviewer-mcp-f6a94c.md) | pending |
