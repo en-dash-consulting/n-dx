@@ -322,7 +322,7 @@ interface WSClient {
  */
 export const PING_INTERVAL_MS = 5_000;
 
-const WS_MAGIC = "258EAFA5-E914-47DA-95CA-5AB9DC65B11D";
+const WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 /** Compute the Sec-WebSocket-Accept header value. */
 function computeAcceptKey(key: string): string {
