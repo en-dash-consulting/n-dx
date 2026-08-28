@@ -1230,6 +1230,7 @@ async function runAdversarialReviewPass(
     resumedSession: !!resumeSessionId,
     findingCount: outcome.report.findings.length,
     unresolvedCount: unresolved.length,
+    captureFailedCount: captureFailed.length,
     fixesApplied: outcome.report.fixesApplied,
     reportPath,
   };

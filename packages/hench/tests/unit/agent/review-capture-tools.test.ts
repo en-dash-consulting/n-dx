@@ -159,7 +159,7 @@ describe("captureFailedFindings", () => {
     const r = report([finding({ verdict: "out-of-scope", action: "failed" })]);
 
     expect(captureFailedFindings(r)).toHaveLength(1);
-    expect(unresolvedFindings(r)).toHaveLength(1);
+    expect(unresolvedFindings(r)).toHaveLength(0);
     expect(r.findings.filter((f) => f.verdict === "must-fix")).toHaveLength(0);
   });
 });

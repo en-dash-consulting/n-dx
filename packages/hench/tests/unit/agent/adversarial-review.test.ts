@@ -277,12 +277,26 @@ describe("unresolvedFindings", () => {
     expect(unresolved).toHaveLength(1);
   });
 
-  it("flags any finding recorded as failed, whatever its verdict", () => {
+  it("does not flag a capture-failed finding whose verdict is not must-fix", () => {
     const unresolved = unresolvedFindings(
       report({ findings: [finding({ verdict: "should-fix", action: "failed" })] }),
     );
 
-    expect(unresolved).toHaveLength(1);
+    expect(unresolved).toHaveLength(0);
+  });
+
+  it("does not produce unresolved findings for a report with only capture failures and no must-fix verdicts", () => {
+    const unresolved = unresolvedFindings(
+      report({
+        findings: [
+          finding({ verdict: "out-of-scope", action: "failed" }),
+          finding({ verdict: "should-fix", action: "failed" }),
+          finding({ verdict: "not-worth-fixing", action: "failed" }),
+        ],
+      }),
+    );
+
+    expect(unresolved).toHaveLength(0);
   });
 
   it("leaves fixed, captured, and deliberately dropped findings alone", () => {

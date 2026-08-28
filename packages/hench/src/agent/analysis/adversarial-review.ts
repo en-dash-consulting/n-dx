@@ -524,13 +524,16 @@ export function formatReviewSummary(report: ReviewReport): string[] {
 }
 
 /**
- * Findings the pass tried to fix but could not, plus any it recorded as
- * `failed`. These are the ones a human must look at before trusting the
- * commit — everything else is either repaired, tracked, or reasoned away.
+ * Must-fix findings the pass did not repair.
+ *
+ * A non-empty list means the commit is suspect. Capture failures
+ * (`action === "failed"`) are excluded — they are surfaced separately by
+ * {@link captureFailedFindings} and call for re-filing rather than distrusting
+ * the commit.
  */
 export function unresolvedFindings(report: ReviewReport): ReviewFinding[] {
   return report.findings.filter(
-    (f) => f.action === "failed" || (f.verdict === "must-fix" && f.action !== "fixed"),
+    (f) => f.verdict === "must-fix" && f.action !== "fixed",
   );
 }
 

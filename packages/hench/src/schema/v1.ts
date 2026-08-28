@@ -743,8 +743,10 @@ export type RunReviewRecord =
       resumedSession: boolean;
       /** Findings surviving both passes, including the ones deliberately dropped. */
       findingCount: number;
-      /** Must-fix findings the pass could not repair. Non-zero needs a human. */
+      /** Unrepaired must-fix findings. Non-zero means the commit is suspect. */
       unresolvedCount: number;
+      /** Findings the reviewer tried to capture but could not file. Non-zero means re-filing is needed. */
+      captureFailedCount: number;
       /** True when the reviewer edited a file. */
       fixesApplied: boolean;
       /** Absolute path of the JSON report the reviewer wrote. */
