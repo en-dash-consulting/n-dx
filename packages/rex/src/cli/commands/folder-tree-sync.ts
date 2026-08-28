@@ -10,7 +10,7 @@
  */
 
 import { join } from "node:path";
-import { serializeFolderTree, parseFolderTree, PRD_TREE_DIRNAME } from "../../store/index.js";
+import { serializeFolderTree, parseFolderTree, withLock, PRD_TREE_DIRNAME, PRD_TREE_LOCK_FILENAME } from "../../store/index.js";
 import { walkTree } from "../../core/tree.js";
 import type { PRDStore } from "../../store/index.js";
 import type { PRDItem } from "../../schema/index.js";
@@ -28,11 +28,33 @@ export const FOLDER_TREE_SUBDIR = PRD_TREE_DIRNAME;
  *
  * Loads the current document state from the store and writes it to the
  * folder structure. Errors propagate to the caller.
+ *
+ * This is a read-modify-write, so it holds the folder-tree lock across both
+ * halves. Callers reach it after their own transaction has committed and
+ * released the lock, at which point any writer that was queued behind that
+ * transaction is free to run: loading outside the lock would hand this sync a
+ * document taken before that writer's insert, and `serializeFolderTree`
+ * deletes on-disk items absent from the document it is given. An acknowledged
+ * write would vanish with no error.
+ *
+ * `loadedAt` is passed for the same reason — without it `guardStaleEntries` is
+ * disabled and deletions are applied silently. With the lock held the guard
+ * should never fire; if it does, some writer reached the tree without taking
+ * the lock, and failing loudly is the correct outcome.
+ *
+ * Never call this from inside `store.withTransaction` — the lock is not
+ * reentrant, and the nested acquisition would block until its timeout.
  */
 export async function syncFolderTree(rexDir: string, store: PRDStore): Promise<void> {
-  const doc = await store.loadDocument();
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
-  await serializeFolderTree(doc.items, treeRoot);
+  await withLock(join(rexDir, PRD_TREE_LOCK_FILENAME), async () => {
+    // Stamped before the load, not after: the guard compares on-disk mtimes
+    // against "when this snapshot was taken", and a stamp taken after the read
+    // would vouch for writes the read never saw.
+    const loadedAt = Date.now();
+    const doc = await store.loadDocument();
+    await serializeFolderTree(doc.items, treeRoot, { loadedAt });
+  });
 }
 
 /**

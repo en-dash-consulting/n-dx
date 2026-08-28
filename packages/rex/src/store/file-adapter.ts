@@ -19,7 +19,7 @@ import { parseFolderTree } from "./folder-tree-parser.js";
 import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
-import { PRD_TREE_DIRNAME } from "./paths.js";
+import { PRD_TREE_DIRNAME, PRD_TREE_LOCK_FILENAME } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
@@ -249,12 +249,21 @@ export class FileStore implements PRDStore {
    *
    * Title renames are handled by the cleanup step in serializeFolderTree,
    * which removes orphaned markdown files within item directories.
+   *
+   * Every single-item mutation (`addItem`, `updateItem`, `removeItem`) runs
+   * through here, so each holds the folder-tree lock across its own
+   * read-modify-write. Launched while another writer holds the lock — an
+   * `addItem` racing an open `withTransaction`, say — the call **waits** for
+   * the holder rather than failing, then reads the post-release state, so it
+   * never mutates a snapshot the holder has already replaced. It rejects only
+   * if the holder outlasts the acquire timeout; see `acquireLock` in
+   * `./file-lock.ts` for both layers' behaviour under contention.
    */
   private async withFileTransaction<T>(
     _filename: string,
     fn: (doc: PRDDocument) => Promise<T>,
   ): Promise<T> {
-    const folderTreeLockPath = this.path("tree.lock");
+    const folderTreeLockPath = this.path(PRD_TREE_LOCK_FILENAME);
     return withLock(folderTreeLockPath, async () => {
       const doc = await this.loadDocument();
       const result = await fn(doc);
@@ -506,12 +515,12 @@ export class FileStore implements PRDStore {
     }
 
     // Use folder-tree lock path (not markdown lock)
-    const folderTreeLockPath = this.path("tree.lock");
+    const folderTreeLockPath = this.path(PRD_TREE_LOCK_FILENAME);
     await withLock(folderTreeLockPath, () => this.writeFolderTree(doc));
   }
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
-    const folderTreeLockPath = this.path("tree.lock");
+    const folderTreeLockPath = this.path(PRD_TREE_LOCK_FILENAME);
     return withLock(folderTreeLockPath, async () => {
       const doc = await this.loadDocument();
       const result = await fn(doc);

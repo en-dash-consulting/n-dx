@@ -195,6 +195,24 @@ function sleep(ms: number): Promise<void> {
  * retries with a short delay until the timeout expires. Stale locks (dead
  * process or expired) are automatically cleaned up.
  *
+ * ## Behaviour under contention
+ *
+ * A writer that finds the lock held **waits — it does not fail fast.** Both
+ * layers are bounded by the same `acquireTimeoutMs` (default
+ * {@link ACQUIRE_TIMEOUT_MS}, 10s):
+ *
+ * - **Same process** (e.g. an `addItem` launched while a `withTransaction` is
+ *   open): the caller joins the in-process queue and resumes as soon as the
+ *   holder releases, no matter how long the holder's critical section runs, up
+ *   to the timeout. Past it, the wait rejects with "Held by this process" and
+ *   the abandoned queue slot is freed so later waiters are not stuck behind it.
+ * - **Another process**: retries every `retryDelayMs` until the timeout, then
+ *   rejects with an error naming the holder's PID and the lock's age.
+ *
+ * So a rejection means the lock was held for the whole timeout, never that the
+ * caller declined to wait. Callers must treat that rejection as a failed write:
+ * nothing was written, and retrying is the caller's decision, not the lock's.
+ *
  * @param lockPath - Path to the lock file (e.g., `.rex/prd.json.lock`)
  * @throws If the lock cannot be acquired within the timeout
  */
