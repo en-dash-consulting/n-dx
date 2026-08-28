@@ -126,6 +126,7 @@ export type {
   LLMConfig,
   LLMClient,
   TaskWeight,
+  TaskTier,
 } from "./llm-types.js";
 
 // Types
@@ -160,6 +161,8 @@ export {
   resolveModel,
   resolveVendorModel,
   resolveReviewModel,
+  resolveTaskModel,
+  DEFAULT_ROUTES,
   NEWEST_MODELS,
   TIER_MODELS,
   REVIEW_MODELS,
@@ -168,6 +171,7 @@ export {
   MODEL_CONTEXT_WINDOWS,
   MODEL_COSTS,
 } from "./config.js";
+export type { TaskModelResolution } from "./config.js";
 
 // Budget preflight
 export { budgetPreflight } from "./budget-preflight.js";
