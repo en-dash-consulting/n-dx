@@ -48,7 +48,7 @@ describe("resolveReviewModel — precedence", () => {
   });
 
   it("expands a shorthand alias in the override", () => {
-    expect(resolveReviewModel("claude", undefined, "opus")).toBe("claude-opus-4-8");
+    expect(resolveReviewModel("claude", undefined, "opus")).toBe("claude-opus-5");
   });
 
   it("normalizes a legacy codex id rather than passing it through", () => {
