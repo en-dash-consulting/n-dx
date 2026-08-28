@@ -1499,7 +1499,21 @@ export async function performCommitPromptIfNeeded(
   // The timer fires asynchronously and deletes the message file, so when we reach
   // this point, the file may be gone. Check the watcher's flag to detect this case.
   if (commitWatcher?.didAutoCommit()) {
-    detail("Auto-commit: timer-expiry auto-commit acknowledged — proceeding to next task.");
+    // The auto-commit consumed the message file, so anything staged after it
+    // fired — typically review-pass repairs, when the timer beat the watcher
+    // suspension — cannot be committed here. Say so instead of implying the
+    // auto-commit covered everything: left silent, the staged files ride the
+    // NEXT run's `git add -A` and get attributed to unrelated work.
+    const stagedAfterAuto = await countStagedFiles(projectDir);
+    if (stagedAfterAuto > 0) {
+      info(
+        `\n⚠ The timer-expiry auto-commit already fired, but ${stagedAfterAuto} file(s) are ` +
+          "staged on top of it. They are left staged — commit them deliberately before the " +
+          "next run sweeps them into unrelated work.",
+      );
+    } else {
+      detail("Auto-commit: timer-expiry auto-commit acknowledged — proceeding to next task.");
+    }
     return;
   }
 

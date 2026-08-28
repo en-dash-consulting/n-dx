@@ -1273,6 +1273,14 @@ interface SuccessContext {
    * so the "review is off" case is a single absent field.
    */
   reviewPass?: ReviewPassContext;
+  /**
+   * The run's commit-message watcher, so the review pass can disarm it.
+   * Its auto-commit timer arms the moment the executor writes
+   * `.hench-commit-msg.txt` and would otherwise fire mid-review (the pass
+   * routinely outlives the default 5-minute timeout), committing the staged
+   * work while the reviewer is still repairing it.
+   */
+  commitWatcher?: CommitMsgWatcher;
   selfHeal?: boolean;
   /** Automatically revert on review rejection. Default: true; false via --no-rollback. */
   rollbackOnFailure?: boolean;
@@ -1295,8 +1303,11 @@ interface SuccessContext {
  * When `attemptAccumulator` and `runAccumulator` are provided (event pipeline
  * path), spin detection and budget checking operate directly on the
  * RuntimeEvent stream via the accumulators instead of the legacy SpawnResult.
+ *
+ * Exported for testing (review-watcher-suspension.test.ts); production callers
+ * stay inside this module.
  */
-async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessAction> {
+export async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessAction> {
   const { run, result, accumulated, attempt, store, taskId, projectDir } = ctx;
 
   // Post-run spin detection: many turns with zero tool calls
@@ -1346,6 +1357,15 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     // commit prompt, so any must-fix repairs it makes are part of what the
     // human approves and part of the commit the run produces.
     if (ctx.reviewPass) {
+      // Disarm the auto-commit timer for the whole review window. The executor
+      // wrote `.hench-commit-msg.txt` at the end of its turn, so the timer is
+      // armed and the review pass routinely outlives it; a fire here would
+      // commit the staged work mid-review, split the repairs from the commit
+      // they repair, and make performCommitPromptIfNeeded skip via
+      // didAutoCommit(). The crash-net is deliberately absent during the
+      // review: a reviewer crash leaves staged work plus the message file,
+      // which the pre-run commit gate already recovers on the next run.
+      ctx.commitWatcher?.cancel();
       await runAdversarialReviewPass(ctx.reviewPass, {
         run,
         taskId,
@@ -1748,6 +1768,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           tokenBudget: config.tokenBudget,
           approveDiff: opts.approveDiff,
           reviewPass: reviewPassContext,
+          commitWatcher,
           selfHeal: config.selfHeal,
           rollbackOnFailure: opts.rollbackOnFailure,
           yes: opts.yes,
