@@ -18,6 +18,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add --review flag and move the diff-approval gate to --approve-diff](./add-review-flag-and-move-the-f7a55c.md) | completed |
 | [Break token figures into fresh/cache/output in the run summary and hench record](./break-token-figures-into-fresh-0ba847.md) | pending |
 | [Commit-message watcher auto-commits mid-review, splitting or dropping the reviewer's repairs](./commit-message-watcher-auto-8b7df3.md) | completed |
+| [commitWatcher.cancel() cannot stop an auto-commit already in flight, so the review-pass suspension has a silent hole](./commitwatcher-cancel-cannot-63cbcc.md) | pending |
 | [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-859237.md) | completed |
 | [Don't skip the full test suite gate when the agent has already committed its work](./don-t-skip-the-full-test-suite-c97114.md) | pending |
 | [Give review its own model tier with a review-model override](./give-review-its-own-model-tier-b889a2.md) | completed |
@@ -29,5 +30,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [run --help promises reviewer MCP capture grants unconditionally, but extraAllowedTools is Claude-only](./run-help-promises-reviewer-mcp-f6a94c.md) | pending |
 | [Run the review pass before the executor's own commit, not after it](./run-the-review-pass-before-the-976d34.md) | completed |
 | [Stop labeling every unresolved finding as must-fix in the review warning](./stop-labeling-every-unresolved-8c5cc2.md) | pending |
+| [The "keeps the quiet acknowledgment" test asserts nothing about the acknowledgment it names](./the-keeps-the-quiet-234090.md) | pending |
 | [Verified: the executor needs no rex MCP grants — its PRD writes are in-process](./verified-the-executor-needs-no-bd3459.md) | completed |
 | [Verify the review pass end-to-end against a real ndx work run](./verify-the-review-pass-end-to-0deece.md) | pending |
