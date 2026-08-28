@@ -1252,10 +1252,31 @@ async function commitPreRunChanges(projectDir: string, message: string): Promise
 }
 
 /**
+ * What {@link performCommitPromptIfNeeded} did, so `finalizeRun` can tell
+ * whether this finalize produced a commit.
+ *
+ * - `committed` — a commit was created here; the PRD metadata went in with it.
+ * - `declined` — the user answered no at the approval prompt. Nothing was
+ *   committed and nothing should be: committing the metadata anyway would work
+ *   around the answer.
+ * - `failed` — `git commit` itself errored (a hook, a broken index). The tree
+ *   needs a human, not another commit on top.
+ * - `no-commit` — no commit was attempted: autoCommit, no message file,
+ *   nothing staged, or the watcher's timer already committed. The completion
+ *   metadata is dirty and nothing else will pick it up.
+ */
+export type CommitPromptOutcome = "committed" | "declined" | "failed" | "no-commit";
+
+/**
  * Commit any uncommitted .rex/prd_tree changes produced by the task-completion
- * status update. Called on the autoCommit path only, where
- * performCommitPromptIfNeeded is a no-op and would otherwise leave the
- * metadata dirty in the working tree.
+ * status update, when nothing else in this finalize committed them.
+ *
+ * `updateCompletedTaskStatus` writes the completion to disk before the commit
+ * step, expecting that step to pick it up. Every route where the commit step
+ * returns without committing — autoCommit, a `--review` run whose agent
+ * self-committed and left no message file, a timer-expiry auto-commit that
+ * already fired — leaves that write dirty, to be swept into the next run's
+ * `git add -A` and attributed to unrelated work.
  *
  * Skips silently when there are no staged changes or when not in a git repo.
  */
@@ -1517,6 +1538,11 @@ export async function updateCompletedTaskStatus(
  *
  * Exported for direct unit-testing of the approval gate; callers in the
  * lifecycle pipeline reach it via `finalizeRun`.
+ *
+ * @returns what happened, so the caller can tell "this finalize produced a
+ * commit" from "it did not" — see {@link CommitPromptOutcome}. Every early
+ * return here leaves the PRD completion metadata written but uncommitted, and
+ * `finalizeRun` uses this to clean that up.
  */
 export async function performCommitPromptIfNeeded(
   run: RunRecord,
@@ -1527,8 +1553,8 @@ export async function performCommitPromptIfNeeded(
   store?: PRDStore,
   taskId?: string,
   commitWatcher?: CommitMsgWatcher,
-): Promise<void> {
-  if (autoCommit || run.status !== "completed") return;
+): Promise<CommitPromptOutcome> {
+  if (autoCommit || run.status !== "completed") return "no-commit";
 
   const { join } = await import("node:path");
   const { readFileSync, existsSync, unlinkSync } = await import("node:fs");
@@ -1538,42 +1564,47 @@ export async function performCommitPromptIfNeeded(
   // The timer fires asynchronously and deletes the message file, so when we reach
   // this point, the file may be gone. Check the watcher's flag to detect this case.
   if (commitWatcher?.didAutoCommit()) {
-    // The auto-commit consumed the message file, so anything staged after it
+    // The auto-commit consumed the message file, so anything left after it
     // fired — typically review-pass repairs, when the timer beat the watcher
     // suspension — cannot be committed here. Say so instead of implying the
-    // auto-commit covered everything: left silent, the staged files ride the
-    // NEXT run's `git add -A` and get attributed to unrelated work.
-    const stagedAfterAuto = await countStagedFiles(projectDir);
-    if (stagedAfterAuto > 0) {
+    // auto-commit covered everything: left silent, those files ride the NEXT
+    // run's `git add -A` and get attributed to unrelated work.
+    //
+    // Counts the whole working tree, not the index. Nothing on this path
+    // stages anything — the PRD completion write runs without a `git add`, and
+    // the reviewer's brief forbids committing — so an index-only count reports
+    // a dirty tree as clean and prints the quiet acknowledgment over real work.
+    const leftovers = await listDirtyPaths(projectDir);
+    if (leftovers.length > 0) {
       info(
-        `\n⚠ The timer-expiry auto-commit already fired, but ${stagedAfterAuto} file(s) are ` +
-          "staged on top of it. They are left staged — commit them deliberately before the " +
-          "next run sweeps them into unrelated work.",
+        `\n⚠ The timer-expiry auto-commit already fired, but ${leftovers.length} file(s) are ` +
+          "still uncommitted (staged, modified, or untracked). They are left as they are — " +
+          "commit them deliberately before the next run sweeps them into unrelated work.",
       );
     } else {
       detail("Auto-commit: timer-expiry auto-commit acknowledged — proceeding to next task.");
     }
-    return;
+    return "no-commit";
   }
 
-  if (!existsSync(msgPath)) return;
+  if (!existsSync(msgPath)) return "no-commit";
 
   let message = "";
   try {
     message = readFileSync(msgPath, "utf-8").trim();
   } catch {
-    return;
+    return "no-commit";
   }
   if (!message) {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "no-commit";
   }
 
   const stagedCount = await countStagedFiles(projectDir);
   if (stagedCount === 0) {
     info("\nPending commit message found but no staged changes — skipping commit.");
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    return "no-commit";
   }
 
   subsection("Proposed Commit");
@@ -1593,7 +1624,9 @@ export async function performCommitPromptIfNeeded(
   if (!confirmed) {
     info(`Commit declined — ${stagedCount} file(s) left staged.`);
     try { unlinkSync(msgPath); } catch { /* ignore */ }
-    return;
+    // Distinct from "no-commit": the user said no. Committing the PRD
+    // metadata behind that answer would be its own surprise.
+    return "declined";
   }
 
   // Task completion criteria gate: verify code-classified tasks have code file changes.
@@ -1607,7 +1640,7 @@ export async function performCommitPromptIfNeeded(
       run.error = gateResult.reason;
       info(`\n${gateResult.reason}`);
       try { unlinkSync(msgPath); } catch { /* ignore */ }
-      return;
+      return "no-commit";
     }
   }
 
@@ -1756,11 +1789,13 @@ export async function performCommitPromptIfNeeded(
     detail(`Warning: could not add co-authorship trailer: ${(err as Error).message}`);
   }
 
+  let outcome: CommitPromptOutcome = "failed";
   try {
     await execStdout("git", ["commit", "-F", PENDING_COMMIT_FILE], {
       cwd: projectDir,
       timeout: 30_000,
     });
+    outcome = "committed";
     info(`Commit created — ${stagedCount} file(s).`);
 
     // Capture commit attribution and changed files after successful commit
@@ -1828,6 +1863,8 @@ export async function performCommitPromptIfNeeded(
   } finally {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
   }
+
+  return outcome;
 }
 
 // ---------------------------------------------------------------------------
@@ -2144,7 +2181,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // staged alongside code changes and included in the same commit.
   // The commitWatcher is checked to detect if the timer-expiry auto-commit
   // already fired and committed changes.
-  await performCommitPromptIfNeeded(
+  const commitOutcome = await performCommitPromptIfNeeded(
     run,
     projectDir,
     opts.autoCommit === true,
@@ -2155,10 +2192,19 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     opts.commitWatcher,
   );
 
-  // On the autoCommit path performCommitPromptIfNeeded is a no-op, so the
-  // completion metadata written by updateCompletedTaskStatus would otherwise
-  // be left uncommitted. Commit it now in a small dedicated second commit.
-  if (opts.autoCommit === true && run.status === "completed" && run.taskId) {
+  // Whenever that produced no commit, the completion metadata written by
+  // updateCompletedTaskStatus is still dirty. Commit it now in a small
+  // dedicated second commit.
+  //
+  // The gate is the outcome, not opts.autoCommit. It used to be the flag,
+  // which covered the autoCommit path and missed every other route to the same
+  // residue — most importantly `--review`, which forces autoCommit off so the
+  // reviewer has an uncommitted tree to repair, and whose agent may commit its
+  // own work anyway and leave nothing for the prompt to find.
+  //
+  // A declined commit and a failed one are deliberately excluded: the first is
+  // the user's answer and the second wants a human, not another commit.
+  if (commitOutcome === "no-commit" && run.status === "completed" && run.taskId) {
     await commitCompletionMetadata(projectDir, run.taskId);
   }
 

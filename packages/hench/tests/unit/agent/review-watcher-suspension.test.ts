@@ -275,6 +275,49 @@ describe("performCommitPromptIfNeeded after a pre-review auto-commit", () => {
     expect(await git(projectDir, "diff", "--cached", "--name-only")).toBe("a.txt");
   });
 
+  it("warns when the leftovers are unstaged — the reviewer stages nothing by default", async () => {
+    // The leftover check used to count only the index (`git diff --cached`),
+    // but nothing on this path stages anything: the PRD completion write runs
+    // without a `git add`, and the reviewer's brief forbids committing without
+    // instructing staging. So the realistic leftover is dirty, not staged, and
+    // counting the index alone reports a dirty tree as clean.
+    await writeFile(join(projectDir, "a.txt"), "review repair, never staged\n", "utf-8");
+
+    const lines: string[] = [];
+    const write = process.stdout.write.bind(process.stdout);
+    const log = console.log.bind(console);
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      lines.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    console.log = (...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    };
+
+    try {
+      await performCommitPromptIfNeeded(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { id: "r1", taskId: "t1", status: "completed", tokenUsage: { input: 0, output: 0 }, toolCalls: [], turns: 1 } as any,
+        projectDir,
+        false,
+        true,
+        true,
+        undefined,
+        "t1",
+        { cancel: () => {}, didAutoCommit: () => true },
+      );
+    } finally {
+      process.stdout.write = write;
+      console.log = log;
+    }
+
+    const output = lines.join("");
+    expect(output).toContain("uncommitted");
+    expect(output).not.toContain("proceeding to next task");
+    // Still nothing committed on its behalf — the warning is the whole action.
+    expect(await git(projectDir, "rev-list", "--count", "HEAD")).toBe("1");
+  });
+
   it("keeps the quiet acknowledgment when the auto-commit left nothing staged", async () => {
     const lines: string[] = [];
     const write = process.stdout.write.bind(process.stdout);

@@ -177,7 +177,26 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
     expect(dirty).toHaveLength(0);
   });
 
-  it("does not commit metadata on non-autoCommit path (no double-commit)", async () => {
+  /**
+   * This case used to assert the opposite — that the non-autoCommit path must
+   * NOT produce a metadata commit — back when the cleanup was gated on the
+   * autoCommit flag and "not autoCommit" was taken to mean "the commit prompt
+   * will handle it".
+   *
+   * `--review` broke that assumption: it forces autoCommit off precisely so
+   * the tree stays uncommitted for the reviewer, and the agent may commit its
+   * own work anyway (the prompt forbids it, but `git commit` remains in its
+   * allowed commands, and the HEAD-move warning in runAdversarialReviewPass
+   * exists because the path is anticipated). Then there is no pending message
+   * file and nothing staged, the commit prompt returns early, and the
+   * completion metadata `updateCompletedTaskStatus` already wrote sits dirty
+   * until the next run's `git add -A` sweeps it into unrelated work.
+   *
+   * The double-commit this case was guarding against cannot happen: the gate
+   * is now the commit prompt's own outcome, so a finalize that committed never
+   * commits again.
+   */
+  it("commits metadata on the non-autoCommit path when nothing else committed", async () => {
     const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
 
     const mockStore = {
@@ -195,23 +214,68 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
       loadDocument: vi.fn(async () => ({ items: [] })),
     };
 
+    // The agent committed its own work mid-run, the way a --review run's
+    // executor can: HEAD moved, nothing is staged, no .hench-commit-msg.txt.
+    await writeFile(join(projectDir, "app.js"), "// the agent's own work\n", "utf-8");
+    await execAsync("git add .", { cwd: projectDir });
+    await execAsync('git commit -m "feat: the agent committed this itself"', { cwd: projectDir });
+
     const run = buildCompletedRun(taskId);
 
-    // On the non-autoCommit path there is no pending commit file, so
-    // performCommitPromptIfNeeded is a no-op (existsSync returns false).
-    // commitCompletionMetadata must NOT be called — the test verifies there
-    // is exactly one commit (the initial one) after finalizeRun.
     await (finalizeRun as Function)({
       run,
       henchDir,
       projectDir,
-      autoCommit: false,   // non-autoCommit path
+      autoCommit: false,   // what --review forces
       skipFullTestGate: true,
       store: mockStore,
     });
 
-    const { stdout: log } = await execAsync("git log --oneline", { cwd: projectDir });
-    // Only the initial commit: commitCompletionMetadata must not create a commit
-    expect(log.trim().split("\n")).toHaveLength(1);
+    // Not left for the next run to sweep up.
+    expect(await getRexDirtyLines(projectDir)).toHaveLength(0);
+
+    // And committed as itself, naming the task, rather than discarded.
+    const { stdout: committed } = await execAsync(
+      `git show HEAD:.rex/${PRD_TREE_DIRNAME}/task-slug-abc/index.md`,
+      { cwd: projectDir },
+    );
+    expect(committed).toContain("status: completed");
+    const { stdout: subject } = await execAsync("git log -1 --format='%s'", { cwd: projectDir });
+    expect(subject).toContain(taskId);
+  });
+
+  it("leaves the PRD tree alone when the run did not complete", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+
+    const mockStore = {
+      getItem: vi.fn(async (id: string) => {
+        if (id !== taskId) return null;
+        return { id: taskId, status: "in_progress", title: "Test task", level: "task" };
+      }),
+      updateItem: vi.fn(async () => {}),
+      appendLog: vi.fn(async () => {}),
+      loadDocument: vi.fn(async () => ({ items: [] })),
+    };
+
+    // A failed run writes no completion status, so anything dirty in the tree
+    // belongs to someone else. Committing it would attribute a stranger's edit
+    // to this task.
+    const current = readFileSync(taskIndexPath, "utf-8").replace(/\r\n/g, "\n");
+    await writeFile(taskIndexPath, `${current}edited-by: someone-else\n`, "utf-8");
+
+    const run = buildCompletedRun(taskId);
+    run.status = "failed";
+
+    await (finalizeRun as Function)({
+      run,
+      henchDir,
+      projectDir,
+      autoCommit: false,
+      skipFullTestGate: true,
+      rollbackOnFailure: false,
+      store: mockStore,
+    });
+
+    expect(await getRexDirtyLines(projectDir)).not.toHaveLength(0);
   });
 });
