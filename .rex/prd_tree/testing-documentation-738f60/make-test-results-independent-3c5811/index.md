@@ -36,7 +36,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [merge-driver-git test fails misleadingly on a stale dist instead of saying to rebuild](./merge-driver-git-test-fails-e8d102.md) | completed |
 | [Neutralize ambient color env so FORCE_COLOR does not fail 24 tests](./neutralize-ambient-color-env-so-4afde0.md) | completed |
 | [packages/hench/tests/unit/tools/git.test.ts spawns `sh` unguarded, so 7 cases fail from PowerShell](./packages-hench-tests-unit-tools-9a38b7.md) | completed |
-| [routes-hench-execute broadcast test waits a fixed 200ms for a spawned process and fails under load](./routes-hench-execute-broadcast-8c4e8e.md) | pending |
+| [routes-hench-execute broadcast test waits a fixed 200ms for a spawned process and fails under load](./routes-hench-execute-broadcast-8c4e8e.md) | completed |
 | [Stabilize rex's load-sensitive performance assertions](./stabilize-rex-s-load-sensitive-676af1.md) | completed |
 | [Triage the 39 hench/web failures now that the run no longer hides them](./triage-the-39-hench-web-741bac.md) | completed |
 | [vi.stubEnv in child-lifecycle.test.js leaks NDX_DEBUG_LIFECYCLE into sibling e2e children](./vi-stubenv-in-child-lifecycle-afec81.md) | completed |

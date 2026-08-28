@@ -28,6 +28,60 @@ function startTestServer(
   return startRouteTestServer((req, res) => Promise.resolve(handleHenchRoute(req, res, ctx, broadcast)));
 }
 
+/** Execution states that mean the spawned process is done, one way or another. */
+const TERMINAL_STATUSES = ["completed", "failed"];
+
+/**
+ * How long the broadcast wait allows before failing, and the test budget that
+ * contains it. Both are far above what a spawn-and-fail needs on an idle
+ * machine; the headroom is for a loaded one, which is the whole point. Vitest's
+ * default test timeout is 5s, low enough to become the next flake threshold
+ * under the parallel load that motivated this, so the test carries its own.
+ */
+const TERMINAL_BROADCAST_TIMEOUT_MS = 15_000;
+const EXEC_TEST_TIMEOUT_MS = 20_000;
+
+/** The `state` payload carried by a `hench:task-execution-progress` broadcast. */
+function broadcastState(message: unknown): Record<string, unknown> | undefined {
+  return (message as Record<string, unknown> | undefined)?.state as Record<string, unknown> | undefined;
+}
+
+/**
+ * Wait until the execution broadcasts a terminal state.
+ *
+ * The route spawns a real child process (there is no hench binary in the test
+ * environment, so it fails almost immediately) and broadcasts `starting` before
+ * it and `completed`/`failed` after. How long that round trip takes is a
+ * property of the machine, not of the code under test: a fixed sleep asserts a
+ * speed, and under parallel load — two vitest runs over packages/web is enough
+ * — only the `starting` broadcast has landed when the assertions run.
+ *
+ * Bounded and throwing rather than open-ended: a route that stops emitting a
+ * terminal state at all must fail this test, not hang it. Mirrors
+ * `waitForFinish` in routes-commands.test.ts.
+ *
+ * The ceiling sits below the caller's own test timeout ({@link EXEC_TEST_TIMEOUT_MS})
+ * on purpose. Left above it, vitest's timeout fires first and reports a bare
+ * "test timed out" — the diagnostic below, which says how many broadcasts
+ * arrived and what their statuses were, would never print.
+ */
+async function waitForTerminalBroadcast(
+  messages: unknown[],
+  timeoutMs = TERMINAL_BROADCAST_TIMEOUT_MS,
+): Promise<Record<string, unknown>> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const last = broadcastState(messages[messages.length - 1]);
+    if (last && TERMINAL_STATUSES.includes(last.status as string)) return last;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  const seen = messages.map((m) => broadcastState(m)?.status ?? "(no state)").join(", ");
+  throw new Error(
+    `No terminal execution broadcast within ${timeoutMs}ms. ` +
+    `Saw ${messages.length} broadcast(s): [${seen}].`,
+  );
+}
+
 describe("POST /api/hench/execute", () => {
   let tmpDir: string;
   let rexDir: string;
@@ -376,8 +430,10 @@ describe("broadcast on execute", () => {
     });
     expect(res.status).toBe(202);
 
-    // Wait for process to spawn and complete/fail (no real hench binary in test env)
-    await new Promise((r) => setTimeout(r, 200));
+    // Wait for the spawn to reach a terminal state (there is no real hench
+    // binary in the test env, so it fails). Bounded by the broadcast arriving,
+    // not by a duration — see waitForTerminalBroadcast.
+    const lastState = await waitForTerminalBroadcast(broadcastMessages);
 
     expect(broadcastFn).toHaveBeenCalled();
 
@@ -394,11 +450,10 @@ describe("broadcast on execute", () => {
     }
 
     // First broadcast should be "starting", last should be terminal
-    const firstState = (broadcastMessages[0] as Record<string, unknown>).state as Record<string, unknown>;
-    expect(firstState.status).toBe("starting");
+    const firstState = broadcastState(broadcastMessages[0]);
+    expect(firstState?.status).toBe("starting");
 
-    const lastState = (broadcastMessages[broadcastMessages.length - 1] as Record<string, unknown>).state as Record<string, unknown>;
-    expect(["completed", "failed"]).toContain(lastState.status);
+    expect(TERMINAL_STATUSES).toContain(lastState.status);
     expect(lastState.finishedAt).toBeDefined();
-  });
+  }, EXEC_TEST_TIMEOUT_MS);
 });
