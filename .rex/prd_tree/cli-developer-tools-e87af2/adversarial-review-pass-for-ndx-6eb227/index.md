@@ -33,4 +33,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Stop labeling every unresolved finding as must-fix in the review warning](./stop-labeling-every-unresolved-8c5cc2.md) | completed |
 | [The "keeps the quiet acknowledgment" test asserts nothing about the acknowledgment it names](./the-keeps-the-quiet-234090.md) | pending |
 | [Verified: the executor needs no rex MCP grants — its PRD writes are in-process](./verified-the-executor-needs-no-bd3459.md) | completed |
-| [Verify the review pass end-to-end against a real ndx work run](./verify-the-review-pass-end-to-0deece.md) | in_progress |
+| [Verify a reviewer must-fix repair reaches the run's commit on a live run](./verify-a-reviewer-must-fix-f29a55.md) | pending |
+| [Verify the review pass end-to-end against a real ndx work run](./verify-the-review-pass-end-to-0deece.md) | completed |
