@@ -2,7 +2,7 @@
 id: "3c6d087b-3aa3-4bb3-bfae-aac23aa56fe6"
 level: "task"
 title: "Thread taskClass through rex, sourcevision, and hench call sites"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "rex"
@@ -10,6 +10,9 @@ tags:
   - "hench"
   - "model-routing"
 source: "ndx-work"
+startedAt: "2026-08-28T19:32:02.972Z"
+completedAt: "2026-08-28T23:02:22.558Z"
+endedAt: "2026-08-28T23:02:22.558Z"
 acceptanceCriteria:
   - "rex spawnClaude accepts taskClass and resolves through resolveTaskModel; existing weight-passing call sites keep working"
   - "sourcevision callClaude accepts taskClass and resolveLightModel is replaced by resolveTaskModel('zone.enrich-scan')"
@@ -17,6 +20,6 @@ acceptanceCriteria:
   - "Package LLMConfig extractors preserve llm.tiers, llm.routes, llm.effort, and llm.escalation"
   - "A test walks LLM call sites and fails when a call site declares no task class or an unknown one"
 description: "Consume resolveTaskModel at the three package choke points. rex: spawnClaude gains a taskClass option (existing weight parameter stays as compatibility, taskClass wins when both given) so all rex call sites resolve through the registry. sourcevision: callClaude gains the same option; resolveLightModel() is replaced by resolveTaskModel('zone.enrich-scan'). hench: the agent loop resolves via agent.execute, the pre-run commit-message generator via git.commit-message, and the run-record weight field records the resolved tier instead of always 'standard'. The per-package .n-dx.json→LLMConfig extractors must pass the new llm.tiers/routes/effort/escalation keys through (the audit-C6 dropped-keys trap). Add a registry test that walks spawnClaude/callClaude call sites and asserts each declares a task class known to DEFAULT_ROUTES."
-lastModified: "2026-08-28T19:23:05.322Z"
+lastModified: "2026-08-28T23:02:22.563Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---

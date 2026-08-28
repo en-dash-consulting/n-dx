@@ -166,6 +166,10 @@ export async function decomposeTask(
   const prompt = buildDecompositionPrompt(task, thresholdWeeks);
   const tokenUsage = emptyAnalyzeTokenUsage();
 
+  // Deliberately not declaring `taskClass: "prd.decompose"` yet: the registry
+  // routes that class light, and flipping this recursive fan-out to the light
+  // tier belongs to the light-tier routing feature, gated on the escalation
+  // ladder validating decomposition output.
   const result: ClaudeResult = await spawnClaude(
     prompt,
     model,

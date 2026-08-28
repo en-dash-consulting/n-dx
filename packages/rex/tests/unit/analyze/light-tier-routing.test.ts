@@ -167,14 +167,14 @@ describe("proposeGroupRenames light-tier routing", () => {
 // ── Body merges (reshape-reason.ts) ────────────────────────────────────────────
 
 describe("reasonForBodyMerge light-tier routing", () => {
-  it("passes the light weight to spawnClaude when no model is given", async () => {
+  it("declares the prd.merge task class (light by registry default)", async () => {
     mockSpawnClaude.mockResolvedValue({ text: "Merged description." });
 
     await reasonForBodyMerge([makeItem("a", "Dup (abc123)"), makeItem("b", "Dup (def456)")]);
 
     expect(mockSpawnClaude).toHaveBeenCalledTimes(1);
     expect(mockSpawnClaude.mock.calls[0][1]).toBeUndefined();
-    expect(mockSpawnClaude.mock.calls[0][3]).toBe("light");
+    expect(mockSpawnClaude.mock.calls[0][3]).toEqual({ taskClass: "prd.merge" });
   });
 
   it("forwards an explicit model, which wins over the weight", async () => {
@@ -189,7 +189,7 @@ describe("reasonForBodyMerge light-tier routing", () => {
 // ── Consolidation guard (consolidation-guard.ts) ───────────────────────────────
 
 describe("applyConsolidationGuard light-tier routing", () => {
-  it("passes the light weight to spawnClaude when triggered without a model", async () => {
+  it("declares the prd.consolidate-check task class when triggered without a model", async () => {
     mockSpawnClaude.mockResolvedValue({
       text: JSON.stringify([makeProposal("Auth", 1)]),
       tokenUsage: { input: 10, output: 5 },
@@ -199,7 +199,7 @@ describe("applyConsolidationGuard light-tier routing", () => {
 
     expect(mockSpawnClaude).toHaveBeenCalledTimes(1);
     expect(mockSpawnClaude.mock.calls[0][1]).toBeUndefined();
-    expect(mockSpawnClaude.mock.calls[0][3]).toBe("light");
+    expect(mockSpawnClaude.mock.calls[0][3]).toEqual({ taskClass: "prd.consolidate-check" });
   });
 
   it("forwards an explicit model, which wins over the weight", async () => {
@@ -223,14 +223,14 @@ describe("assessGranularity light-tier routing", () => {
     ]),
   };
 
-  it("passes the light weight to spawnClaude when no model is given", async () => {
+  it("declares the prd.assess task class when no model is given", async () => {
     mockSpawnClaude.mockResolvedValue(assessmentResponse);
 
     await assessGranularity([makeProposal("Auth", 2)]);
 
     expect(mockSpawnClaude).toHaveBeenCalledTimes(1);
     expect(mockSpawnClaude.mock.calls[0][1]).toBeUndefined();
-    expect(mockSpawnClaude.mock.calls[0][3]).toBe("light");
+    expect(mockSpawnClaude.mock.calls[0][3]).toEqual({ taskClass: "prd.assess" });
   });
 
   it("forwards an explicit model, which wins over the weight", async () => {

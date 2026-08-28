@@ -811,7 +811,7 @@ ${content}
 
 ${OUTPUT_INSTRUCTION}`;
 
-  const result = await spawnClaude(prompt, model);
+  const result = await spawnClaude(prompt, model, undefined, { taskClass: "prd.propose" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
   return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
@@ -998,7 +998,7 @@ ${scanSummary}
 
 ${OUTPUT_INSTRUCTION}`;
 
-    const claudeResult = await spawnClaude(prompt, model);
+    const claudeResult = await spawnClaude(prompt, model, undefined, { taskClass: "prd.propose" });
     accumulateTokenUsage(tokenUsage, claudeResult.tokenUsage);
     allProposals.push(...parseProposalResponse(claudeResult.text));
   }
@@ -1292,7 +1292,7 @@ export async function adjustGranularity(
     : buildConsolidatePrompt(proposals);
 
   const tokenUsage = emptyAnalyzeTokenUsage();
-  const result = await spawnClaude(prompt, model);
+  const result = await spawnClaude(prompt, model, undefined, { taskClass: "prd.restructure" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
   return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
@@ -1493,7 +1493,7 @@ export async function assessGranularity(
   }
 
   const prompt = buildAssessmentPrompt(proposals);
-  const result = await spawnClaude(prompt, model, undefined, "light");
+  const result = await spawnClaude(prompt, model, undefined, { taskClass: "prd.assess" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
   const assessments = parseAssessmentResponse(result.text, proposals);

@@ -255,7 +255,7 @@ export async function reasonForReshape(
     RESHAPE_FEW_SHOT,
   ].filter(Boolean).join("\n");
 
-  const result = await spawnClaude(prompt, options.model);
+  const result = await spawnClaude(prompt, options.model, undefined, { taskClass: "prd.restructure" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
   const proposals = parseReshapeResponse(result.text);
@@ -400,7 +400,7 @@ export async function reasonForBodyMerge(
     itemSummary,
   ].join("\n");
 
-  const llmResult = await spawnClaude(prompt, model, undefined, "light");
+  const llmResult = await spawnClaude(prompt, model, undefined, { taskClass: "prd.merge" });
   accumulateTokenUsage(tokenUsage, llmResult.tokenUsage);
 
   return {

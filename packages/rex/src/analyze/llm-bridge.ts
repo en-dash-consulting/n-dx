@@ -25,6 +25,7 @@ import {
   createLLMClient,
   detectLLMAuthMode,
   resolveVendorModel,
+  resolveTaskModel,
 } from "@n-dx/llm-client";
 import type { ClaudeResult } from "./analyze-shared.js";
 
@@ -47,8 +48,24 @@ function resolveVendor(): LLMVendor {
   return _llmConfig?.vendor ?? DEFAULT_LLM_VENDOR;
 }
 
-export function resolveConfiguredModel(model?: string, weight: TaskWeight = "standard"): string {
+/**
+ * How a call site describes the work it is asking for: a bare
+ * {@link TaskWeight} (legacy — names a tier directly) or a task class
+ * (`{ taskClass: "prd.rename" }`), which resolves through the
+ * class→tier→model registry and the project's `llm.routes` config.
+ * The task class wins when a caller supplies both.
+ */
+export type SpawnRoute = TaskWeight | { taskClass: string; weight?: TaskWeight };
+
+export function resolveConfiguredModel(model?: string, route: SpawnRoute = "standard"): string {
+  if (typeof route === "object" && route.taskClass) {
+    return resolveTaskModel(route.taskClass, _llmConfig ?? {}, {
+      model,
+      vendor: resolveVendor(),
+    }).model;
+  }
   if (model?.trim()) return model;
+  const weight = typeof route === "object" ? (route.weight ?? "standard") : route;
   return resolveVendorModel(resolveVendor(), _llmConfig ?? {}, weight);
 }
 
@@ -132,17 +149,18 @@ function getClient(): ClaudeClient {
  * @param model   Optional model override. When omitted, resolves from the
  *                active vendor via the centralized vendor/model resolver.
  * @param claudeConfig  Optional config override (creates a one-off client)
- * @param weight  Task weight for tier-based model selection when no explicit
- *                model is given. Mechanical single-shot calls (renames, body
- *                merges, granularity assessment) pass "light" to route to the
- *                vendor's light tier. Defaults to "standard" so untouched
- *                call sites are unaffected. An explicit `model` always wins.
+ * @param route  What kind of work this call is. Prefer a task class
+ *               (`{ taskClass: "prd.rename" }`) so the call resolves through
+ *               the routing registry and `llm.routes` config; a bare
+ *               {@link TaskWeight} names a tier directly (legacy call sites).
+ *               Defaults to "standard" so untouched call sites are
+ *               unaffected. An explicit `model` always wins.
  */
 export async function spawnClaude(
   prompt: string,
   model?: string,
   claudeConfig?: ClaudeConfig,
-  weight: TaskWeight = "standard",
+  route: SpawnRoute = "standard",
 ): Promise<ClaudeResult> {
   // When an explicit config is passed, create a one-off client for it
   // instead of using the module-level client.
@@ -156,7 +174,7 @@ export async function spawnClaude(
     })
     : getClient();
 
-  const result = await client.complete({ prompt, model: resolveConfiguredModel(model, weight) });
+  const result = await client.complete({ prompt, model: resolveConfiguredModel(model, route) });
   return {
     text: result.text,
     tokenUsage: result.tokenUsage,

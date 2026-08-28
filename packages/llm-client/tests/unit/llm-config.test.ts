@@ -245,4 +245,46 @@ describe("loadLLMConfig", () => {
     );
     expect((await loadLLMConfig(tmpDir)).model).toBeUndefined();
   });
+
+  it("passes the routing surfaces (tiers, routes, effort, escalation) through", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          vendor: "claude",
+          tiers: {
+            claude: { light: "claude-haiku-4-5", free: "" },
+            local: { free: "qwen2.5-coder-14b" },
+            notavendor: { light: "x" },
+          },
+          routes: { "agent.execute": "heavy", "prd.*": "standard", bad: 3 },
+          effort: { "agent.execute": "high" },
+          escalation: { enabled: true, maxSteps: 1, junk: "dropped" },
+        },
+      }),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.tiers).toEqual({
+      claude: { light: "claude-haiku-4-5" },
+      local: { free: "qwen2.5-coder-14b" },
+    });
+    expect(cfg.routes).toEqual({ "agent.execute": "heavy", "prd.*": "standard" });
+    expect(cfg.effort).toEqual({ "agent.execute": "high" });
+    expect(cfg.escalation).toEqual({ enabled: true, maxSteps: 1 });
+  });
+
+  it("omits routing surfaces that are absent or empty", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ llm: { vendor: "claude", routes: {}, tiers: { claude: {} } } }),
+      "utf-8",
+    );
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.tiers).toBeUndefined();
+    expect(cfg.routes).toBeUndefined();
+    expect(cfg.effort).toBeUndefined();
+    expect(cfg.escalation).toBeUndefined();
+  });
 });

@@ -20,7 +20,7 @@ import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { section } from "../../types/output.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { LLM_VENDOR, printVendorModelHeader, resolveModel, resolveVendorModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, printVendorModelHeader, resolveModel, resolveTaskModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
 import { formatQueueStatus } from "../../queue/format.js";
 import { resolveSchedulingPriority } from "../../queue/priority-scheduler.js";
@@ -948,7 +948,12 @@ export async function cmdRun(
       : llmVendor === LLM_VENDOR.CODEX
         ? flags["codex-model"]
         : flags["google-model"]);
-  const configuredModel = resolveVendorModel(llmVendor, llmConfig);
+  // The agent loop is the `agent.execute` task class: standard tier by
+  // default (identical to the previous resolveVendorModel result), but
+  // routable — `llm.routes["agent.execute"] = "heavy"` reaches the heavy
+  // tier with no code change. The resolved tier is recorded on the run.
+  const agentResolution = resolveTaskModel("agent.execute", llmConfig, { vendor: llmVendor });
+  const configuredModel = agentResolution.model;
   const resolvedModel = cliModelOverride ? resolveModel(cliModelOverride) : configuredModel;
   const hasConfiguredModel =
     !!llmConfig?.model
