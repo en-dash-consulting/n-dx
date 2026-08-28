@@ -16,4 +16,4 @@ description: "Rework the PRD tree row interaction model. Hovering a row reveals 
 |-------|--------|
 | [Click row opens detail panel, show checkbox without auto-selecting](./click-row-opens-detail-panel-914d54.md) | completed |
 | [Hover reveals checkbox, click checkbox enters multi-select](./hover-reveals-checkbox-click-810192.md) | completed |
-| [Remove Edit icon from PRD tree rows](./remove-edit-icon-from-prd-tree-rows.md) | completed |
+| [Remove Edit icon from PRD tree rows](./remove-edit-icon-from-prd-tree-c243c0.md) | completed |

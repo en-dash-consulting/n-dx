@@ -1,7 +1,7 @@
 /**
  * LLM Provider view — configure active vendor and per-vendor model selection.
  *
- * Surfaces llm.vendor (claude/codex/local), per-vendor model fields, and
+ * Surfaces llm.vendor (claude/codex/google/local), per-vendor model fields, and
  * local server connection settings from `.n-dx.json`.
  *
  * Data: GET /api/llm/config (read) · PUT /api/llm/config (update)
@@ -17,13 +17,6 @@ import { useCliName } from "../hooks/index.js";
 interface VendorConfig {
   model: string | null;
   lightModel: string | null;
-}
-
-interface GoogleVendorConfig {
-  model: string | null;
-  lightModel: string | null;
-  /** Whether an API key is already saved. The key itself is never returned. */
-  hasApiKey: boolean;
 }
 
 interface LocalVerifierVendorConfig {
@@ -46,7 +39,7 @@ interface LlmConfigResponse {
   vendor: string | null;
   claude: VendorConfig;
   codex: VendorConfig;
-  google: GoogleVendorConfig;
+  google: VendorConfig;
   local: LocalVendorConfig;
   legacyClaude: VendorConfig;
   autoFailover?: boolean;
@@ -86,19 +79,33 @@ const VIEWER_LLM_VENDOR = {
 } as const;
 
 type ViewerLLMVendor = typeof VIEWER_LLM_VENDOR[keyof typeof VIEWER_LLM_VENDOR];
-type CloudViewerVendor = typeof VIEWER_LLM_VENDOR.CLAUDE | typeof VIEWER_LLM_VENDOR.CODEX;
+type CloudViewerVendor =
+  | typeof VIEWER_LLM_VENDOR.CLAUDE
+  | typeof VIEWER_LLM_VENDOR.CODEX
+  | typeof VIEWER_LLM_VENDOR.GOOGLE;
+
+/** Vendors configured through the generic cloud VendorSection (model + lightModel). */
+const CLOUD_VENDORS: ReadonlySet<string> = new Set<string>([
+  VIEWER_LLM_VENDOR.CLAUDE,
+  VIEWER_LLM_VENDOR.CODEX,
+  VIEWER_LLM_VENDOR.GOOGLE,
+]);
 
 const VENDORS = [
   { id: VIEWER_LLM_VENDOR.CLAUDE, label: "Claude", subtitle: "Anthropic" },
   { id: VIEWER_LLM_VENDOR.CODEX, label: "Codex", subtitle: "OpenAI" },
-  { id: VIEWER_LLM_VENDOR.GOOGLE, label: "Google", subtitle: "Gemini" },
+  { id: VIEWER_LLM_VENDOR.GOOGLE, label: "Gemini", subtitle: "Google" },
   { id: VIEWER_LLM_VENDOR.LOCAL, label: "Local", subtitle: "LM Studio / Ollama" },
 ] satisfies ReadonlyArray<{ id: ViewerLLMVendor; label: string; subtitle: string }>;
 
+// Keep in sync with packages/core/llm-model-catalog.js (the `ndx init`
+// selector). These are display-only suggestions; any model ID the vendor
+// accepts can still be typed in.
+//
 const MODEL_SUGGESTIONS: Record<ViewerLLMVendor, string[]> = {
-  [VIEWER_LLM_VENDOR.CLAUDE]: ["claude-sonnet-4-5", "claude-opus-4-5", "claude-haiku-3-5", "claude-3-7-sonnet-20250219"],
-  [VIEWER_LLM_VENDOR.CODEX]: ["codex-mini", "o4-mini", "o3"],
-  [VIEWER_LLM_VENDOR.GOOGLE]: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
+  [VIEWER_LLM_VENDOR.CLAUDE]: ["claude-sonnet-5", "claude-opus-5", "claude-fable-5", "claude-haiku-4-5"],
+  [VIEWER_LLM_VENDOR.CODEX]: ["gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.5"],
+  [VIEWER_LLM_VENDOR.GOOGLE]: ["gemini-2.5-pro", "gemini-3.7-flash", "gemini-3.5-flash-lite"],
   [VIEWER_LLM_VENDOR.LOCAL]: [],
 };
 
@@ -309,72 +316,6 @@ function VendorSection({
       onChange,
       dirty: dirtyKeys.has(lightKey),
     }),
-  );
-}
-
-// ── Google (Gemini) settings card ──────────────────────────────────────
-
-function GoogleSection({
-  config,
-  editValues,
-  onChange,
-  dirtyKeys,
-}: {
-  config: GoogleVendorConfig;
-  editValues: Record<string, string>;
-  onChange: (key: string, v: string) => void;
-  dirtyKeys: Set<string>;
-}) {
-  const cliName = useCliName();
-  const suggestions = MODEL_SUGGESTIONS[VIEWER_LLM_VENDOR.GOOGLE];
-  const apiKeyDirty = dirtyKeys.has("google.api_key");
-
-  return h("div", { class: "llm-vendor-section" },
-    h(ModelField, {
-      fieldKey: "google.model",
-      label: "Primary model",
-      description: `Used for agentic tasks (${cliName} work, ${cliName} plan). Must be a Gemini model ID. Leave blank for the CLI default.`,
-      value: editValues["google.model"] ?? config.model ?? "",
-      suggestions,
-      onChange,
-      dirty: dirtyKeys.has("google.model"),
-    }),
-    h(ModelField, {
-      fieldKey: "google.lightModel",
-      label: "Light model",
-      description: "Cheaper Gemini model for recommendations and summaries. Falls back to primary if blank.",
-      value: editValues["google.lightModel"] ?? config.lightModel ?? "",
-      suggestions,
-      onChange,
-      dirty: dirtyKeys.has("google.lightModel"),
-    }),
-
-    h("hr", { class: "llm-rule" }),
-
-    h("div", { class: `llm-field${apiKeyDirty ? " llm-field-dirty" : ""}` },
-      h("label", { class: "llm-field-label", htmlFor: "google.api_key" },
-        "Gemini API key",
-        apiKeyDirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
-      ),
-      h("p", { class: "llm-field-desc" },
-        config.hasApiKey
-          ? "A key is already saved (not shown here). Enter a new key to replace it, or type then clear this field to remove it."
-          : h("span", null,
-              "Required for the Google vendor to work. Get a key at ",
-              h("a", { href: "https://aistudio.google.com/apikey", target: "_blank", rel: "noreferrer" }, "aistudio.google.com/apikey"),
-              ".",
-            ),
-      ),
-      h("input", {
-        id: "google.api_key",
-        type: "password",
-        class: "llm-text-input",
-        autocomplete: "off",
-        value: editValues["google.api_key"] ?? "",
-        placeholder: config.hasApiKey ? "•••••••• (saved — leave blank to keep)" : "AIza…",
-        onInput: (e: Event) => onChange("google.api_key", (e.target as HTMLInputElement).value),
-      }),
-    ),
   );
 }
 
@@ -954,22 +895,13 @@ export function LlmProviderView() {
   // silently included in an unrelated save.
   const dirtyKeys = new Set<string>();
   if (data) {
-    if (effectiveVendor === VIEWER_LLM_VENDOR.CLAUDE || effectiveVendor === VIEWER_LLM_VENDOR.CODEX) {
-      const vid = effectiveVendor;
+    for (const vid of [VIEWER_LLM_VENDOR.CLAUDE, VIEWER_LLM_VENDOR.CODEX] as const) {
       for (const f of ["model", "lightModel"] as const) {
         const k = `${vid}.${f}`;
         if (k in editValues && editValues[k] !== (data[vid][f] ?? "")) dirtyKeys.add(k);
       }
-    } else if (effectiveVendor === VIEWER_LLM_VENDOR.GOOGLE) {
-      for (const f of ["model", "lightModel"] as const) {
-        const k = `google.${f}`;
-        if (k in editValues && editValues[k] !== (data.google[f] ?? "")) dirtyKeys.add(k);
-      }
-      // api_key is write-only (never echoed back by GET), so there's no saved
-      // value to diff against — any interaction with the field at all (typed
-      // then possibly cleared again) is the user's explicit signal to change it.
-      if ("google.api_key" in editValues) dirtyKeys.add("google.api_key");
-    } else if (effectiveVendor === VIEWER_LLM_VENDOR.LOCAL) {
+    }
+    if (effectiveVendor === VIEWER_LLM_VENDOR.LOCAL) {
       for (const f of ["model", "lightModel", "host"] as const) {
         const k = `local.${f}`;
         if (k in editValues && editValues[k] !== (data.local[f] ?? "")) dirtyKeys.add(k);
@@ -1102,20 +1034,11 @@ export function LlmProviderView() {
     }),
 
     // Active vendor settings
-    (effectiveVendor === VIEWER_LLM_VENDOR.CLAUDE || effectiveVendor === VIEWER_LLM_VENDOR.CODEX)
+    (effectiveVendor && CLOUD_VENDORS.has(effectiveVendor))
       ? h(VendorSection, {
           key: effectiveVendor,
-          vendorId: effectiveVendor,
-          config: data![effectiveVendor],
-          editValues,
-          onChange: handleField,
-          dirtyKeys,
-        })
-      : null,
-    effectiveVendor === VIEWER_LLM_VENDOR.GOOGLE
-      ? h(GoogleSection, {
-          key: VIEWER_LLM_VENDOR.GOOGLE,
-          config: data!.google ?? { model: null, lightModel: null, hasApiKey: false },
+          vendorId: effectiveVendor as CloudViewerVendor,
+          config: data![effectiveVendor as CloudViewerVendor] ?? { model: null, lightModel: null },
           editValues,
           onChange: handleField,
           dirtyKeys,

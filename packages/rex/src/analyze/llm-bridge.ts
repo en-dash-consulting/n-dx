@@ -132,8 +132,18 @@ function getClient(): ClaudeClient {
  * @param model   Optional model override. When omitted, resolves from the
  *                active vendor via the centralized vendor/model resolver.
  * @param claudeConfig  Optional config override (creates a one-off client)
+ * @param weight  Task weight for tier-based model selection when no explicit
+ *                model is given. Mechanical single-shot calls (renames, body
+ *                merges, granularity assessment) pass "light" to route to the
+ *                vendor's light tier. Defaults to "standard" so untouched
+ *                call sites are unaffected. An explicit `model` always wins.
  */
-export async function spawnClaude(prompt: string, model?: string, claudeConfig?: ClaudeConfig): Promise<ClaudeResult> {
+export async function spawnClaude(
+  prompt: string,
+  model?: string,
+  claudeConfig?: ClaudeConfig,
+  weight: TaskWeight = "standard",
+): Promise<ClaudeResult> {
   // When an explicit config is passed, create a one-off client for it
   // instead of using the module-level client.
   const client = claudeConfig
@@ -146,7 +156,7 @@ export async function spawnClaude(prompt: string, model?: string, claudeConfig?:
     })
     : getClient();
 
-  const result = await client.complete({ prompt, model: resolveConfiguredModel(model) });
+  const result = await client.complete({ prompt, model: resolveConfiguredModel(model, weight) });
   return {
     text: result.text,
     tokenUsage: result.tokenUsage,

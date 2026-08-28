@@ -2,13 +2,16 @@
 id: "856e89fb-302f-4079-941f-a623bf591a31"
 level: "task"
 title: "Stale node_modules makes `pnpm typecheck` report type errors that CI does not have"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "tooling"
   - "developer-experience"
   - "dependencies"
 source: "ndx-capture"
+startedAt: "2026-08-25T19:32:04.388Z"
+completedAt: "2026-08-25T19:38:31.045Z"
+endedAt: "2026-08-25T19:38:31.045Z"
 acceptanceCriteria:
   - "A documented command reports any workspace dependency whose installed version does not satisfy the range declared in its package.json"
   - "Given a tree where typescript resolves to 5.9.3 while package.json declares ^6.0.3, the check names the package, the declared range, and the installed version"

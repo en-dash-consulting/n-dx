@@ -39,9 +39,21 @@ const SUPPORTED_PROVIDERS = Object.values(LLM_PROVIDER);
  * layer, so the sets are duplicated by design.
  */
 const LEGACY_CATALOG_MODEL_ALIASES = {
-  [LLM_PROVIDER.CODEX]: ["gpt-5-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"],
-  [LLM_PROVIDER.CLAUDE]: ["claude-sonnet-4-6"],
-  [LLM_PROVIDER.GOOGLE]: [],
+  [LLM_PROVIDER.CODEX]: [
+    "gpt-5-codex",
+    "gpt-5.1-codex-max",
+    "gpt-5.1-codex-mini",
+    // Retired / retiring from Codex — see LEGACY_CODEX_MODEL_ALIASES.
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.3-codex",
+    "gpt-5.2",
+  ],
+  [LLM_PROVIDER.CLAUDE]: ["claude-sonnet-4-6", "claude-opus-4-8", "claude-opus-4-7"],
+  // gemini-2.0-flash and gemini-2.0-flash-lite are shut down by Google, but
+  // are still recognised here so upgrading projects get a clean swap rather
+  // than an "unknown model" warning on top of the request failure.
+  [LLM_PROVIDER.GOOGLE]: ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.5-flash"],
   [LLM_PROVIDER.LOCAL]: [],
 };
 

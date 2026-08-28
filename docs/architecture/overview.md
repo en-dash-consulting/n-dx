@@ -31,15 +31,16 @@ The web package sits alongside orchestration — it imports domain packages thro
 
 ```
 packages/
+  core/            # CLI orchestrator (published as @n-dx/core)
+    cli.js         #   n-dx entry point (orchestration + delegation)
+    ci.js          #   CI pipeline (analysis + PRD health validation)
+    web.js         #   server orchestration (start/stop/status)
+    config.js      #   unified config command (view/edit all package settings)
   sourcevision/    # analysis engine
   rex/             # PRD + task tracker
   hench/           # autonomous agent
   llm-client/      # vendor-neutral LLM foundation
   web/             # dashboard + MCP HTTP server
-cli.js             # n-dx entry point (orchestration + delegation)
-ci.js              # CI pipeline (analysis + PRD health validation)
-web.js             # server orchestration (start/stop/status)
-config.js          # unified config command (view/edit all package settings)
 ```
 
 ## Cross-Tier Communication

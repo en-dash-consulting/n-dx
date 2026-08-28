@@ -48,6 +48,23 @@ export interface AttemptTracker {
   hasReachedMaxAttempts(taskId: string): boolean;
 }
 
+/**
+ * The two independent review controls, bundled so the run functions keep a
+ * single positional slot for them.
+ *
+ * They are genuinely independent and may both be on. The adversarial pass runs
+ * first, so its must-fix repairs are already in the tree when the diff gate
+ * shows a human what they are approving.
+ */
+export interface ReviewOptions {
+  /** `--approve-diff` — show the diff and prompt before finalizing. */
+  approveDiff: boolean;
+  /** `--review` — run the adversarial review pass after validation. */
+  reviewPass: boolean;
+  /** `--review-model` — override the model the reviewer runs on. */
+  reviewModel?: string;
+}
+
 const MAX_TASK_ATTEMPTS = 3;
 
 /**
@@ -709,7 +726,7 @@ async function runOne(
   spawnModel: string | undefined,
   maxTurns: number | undefined,
   tokenBudget: number | undefined,
-  review: boolean,
+  reviewOpts: ReviewOptions,
   excludeTaskIds?: Set<string>,
   epicId?: string,
   tags?: string[],
@@ -743,7 +760,9 @@ async function runOne(
         dryRun,
         model,
         spawnModel,
-        review,
+        approveDiff: reviewOpts.approveDiff,
+        reviewPass: reviewOpts.reviewPass,
+        reviewModel: reviewOpts.reviewModel,
         excludeTaskIds,
         epicId,
         tags,
@@ -765,7 +784,9 @@ async function runOne(
         maxTurns,
         tokenBudget,
         model,
-        review,
+        approveDiff: reviewOpts.approveDiff,
+        reviewPass: reviewOpts.reviewPass,
+        reviewModel: reviewOpts.reviewModel,
         excludeTaskIds,
         epicId,
         tags,
@@ -969,7 +990,7 @@ export async function cmdRun(
     ) {
       throw new CLIError(
         `Configured model "${activeConfiguredModel}" is not compatible with vendor="codex".`,
-        `Either use a Codex/GPT model (e.g., gpt-5.5, gpt-5.4-mini) or switch vendor: 'n-dx config llm.vendor claude'`,
+        `Either use a Codex/GPT model (e.g., gpt-5.6-terra, gpt-5.6-luna) or switch vendor: 'n-dx config llm.vendor claude'`,
       );
     }
     if (
@@ -978,7 +999,7 @@ export async function cmdRun(
     ) {
       throw new CLIError(
         `Configured model "${activeConfiguredModel}" is not compatible with vendor="google".`,
-        `Either use a Gemini model (e.g., gemini-2.5-pro, gemini-2.0-flash) or switch vendor: 'n-dx config llm.vendor claude'`,
+        `Either use a Gemini model (e.g., gemini-2.5-pro, gemini-3.7-flash) or switch vendor: 'n-dx config llm.vendor claude'`,
       );
     }
   }
@@ -999,7 +1020,28 @@ export async function cmdRun(
 
   let provider = (flags.provider as "cli" | "api") ?? config.provider;
   const dryRun = flags["dry-run"] === "true";
-  const review = flags.review === "true";
+  // `--review` now selects the adversarial review pass. The interactive
+  // diff-approval gate that used to own this flag moved to `--approve-diff`.
+  const reviewPass = flags.review === "true";
+  const approveDiff = flags["approve-diff"] === "true";
+  const reviewModelFlag = flags["review-model"];
+  if (reviewModelFlag !== undefined && !reviewModelFlag.trim()) {
+    throw new CLIError(
+      "--review-model requires a model id.",
+      "Example: --review-model=claude-opus-5. Omit the flag to use the recommended default for your vendor.",
+    );
+  }
+  if (reviewModelFlag && !reviewPass) {
+    throw new CLIError(
+      "--review-model was passed without --review.",
+      "The review model only applies to the adversarial review pass. Add --review, or drop --review-model.",
+    );
+  }
+  const reviewOpts: ReviewOptions = {
+    approveDiff,
+    reviewPass,
+    reviewModel: reviewModelFlag?.trim() || undefined,
+  };
   // --no-rollback always wins; otherwise read config (defaults to true).
   // Note: the failure rollback is prompt-only — it never runs without an
   // interactive confirmation, so this flag only governs whether that prompt
@@ -1057,6 +1099,25 @@ export async function cmdRun(
   // branch is a safety net for projects configured outside of those flows.
   if ((llmVendor === LLM_VENDOR.GOOGLE || llmVendor === LLM_VENDOR.LOCAL) && provider === "cli" && !dryRun) {
     provider = "api";
+  }
+
+  // The adversarial review pass spawns a second vendor CLI session, so it
+  // exists only on the CLI provider. Fail loudly rather than accepting the
+  // flag and doing nothing: a silent no-op here would report "reviewed" runs
+  // that were never reviewed, which is worse than not offering the flag.
+  if (reviewOpts.reviewPass && provider === "api" && !dryRun) {
+    throw new CLIError(
+      `--review requires the CLI provider, but this run resolved to provider="api"` +
+        `${llmVendor === LLM_VENDOR.GOOGLE || llmVendor === LLM_VENDOR.LOCAL ? ` (vendor="${llmVendor}" has no CLI binary)` : ""}.`,
+      "Switch with 'ndx config hench.provider cli' on a vendor that has a CLI (claude, codex), or drop --review.",
+    );
+  }
+
+  if (reviewOpts.reviewPass) {
+    info(
+      "\nAdversarial review enabled — a reviewer runs after each task validates, " +
+        "before the commit.\n(The diff-approval gate that used to be --review is now --approve-diff.)",
+    );
   }
 
   // --reset-deferred: reset all deferred/failing tasks to pending before running.
@@ -1325,7 +1386,7 @@ export async function cmdRun(
     }
 
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode);
+      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode);
       return;
     }
 
@@ -1339,9 +1400,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, review, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode);
+      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode);
     } else {
-      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, review, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode);
+      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode);
     }
   } finally {
     await limiter.release();
@@ -1365,7 +1426,7 @@ async function runIterations(
   tokenBudget: number | undefined,
   iterations: number,
   maxFailedAttempts: number,
-  review: boolean,
+  reviewOpts: ReviewOptions,
   epicId?: string,
   tags?: string[],
   rollbackOnFailure?: boolean,
@@ -1404,7 +1465,7 @@ async function runIterations(
       // subsequent iterations autoselect the next task
       i === 0 ? taskId : undefined,
       dryRun, model, spawnModel, maxTurns, tokenBudget,
-      review,
+      reviewOpts,
       combinedExcludedIds,
       epicId,
       tags,
@@ -1462,7 +1523,7 @@ async function runLoop(
   tokenBudget: number | undefined,
   pauseMs: number,
   maxFailedAttempts: number,
-  review: boolean,
+  reviewOpts: ReviewOptions,
   epicId?: string,
   tags?: string[],
   queue?: ExecutionQueue,
@@ -1557,7 +1618,7 @@ async function runLoop(
             // Only use explicit taskId on the very first iteration
             effectiveTaskId,
             dryRun, model, spawnModel, maxTurns, tokenBudget,
-            review,
+            reviewOpts,
             combinedExcludedIds,
             epicId,
             tags,
@@ -1723,7 +1784,7 @@ async function runEpicByEpic(
   tokenBudget: number | undefined,
   pauseMs: number,
   maxFailedAttempts: number,
-  review: boolean,
+  reviewOpts: ReviewOptions,
   queue?: ExecutionQueue,
   priorityOverride?: string,
   rollbackOnFailure?: boolean,
@@ -1858,7 +1919,7 @@ async function runEpicByEpic(
               dir, henchDir, rexDir, provider,
               undefined, // autoselect within epic
               dryRun, model, spawnModel, maxTurns, tokenBudget,
-              review,
+              reviewOpts,
               stuckIds,
               epic.id,
               undefined, // tags (epic-by-epic doesn't apply a tag filter)

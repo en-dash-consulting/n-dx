@@ -11,7 +11,7 @@ The necessity pass is not optional and is not a formality. A review that lists t
 
 ## Step 1 — Note the time, then resolve the target
 
-**Before reading anything, record the current time in ISO-8601.** Use whatever your shell provides — `date -Is` on POSIX shells, `Get-Date -Format o` in PowerShell, or a timestamp your environment already exposes. Step 7 passes it as `--startedAt`, which is what stops the run record from claiming every token the session spent before the review began.
+**Before reading anything, record the current time in ISO-8601.** Use whatever your shell provides — `date -Iseconds` on POSIX shells, `Get-Date -Format o` in PowerShell, or a timestamp your environment already exposes. Step 7 passes it as `--startedAt`, which is what stops the run record from claiming every token the session spent before the review began.
 
 Then read the argument, if any:
 
@@ -137,17 +137,16 @@ In claim mode, if the review disproved a completion claim, also call `update_tas
 
 Then close out the run:
 
-1. **Commit.** `add_item`, `edit_item`, and `update_task_status` write to `.rex/prd_tree/<slug>/index.md` even though you edited no file directly, so there are changes to commit. Run `git status --porcelain -- .rex/prd_tree/`; if it is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage only what the review wrote with `git add .rex/prd_tree/` — never `git add -A` here: in diff mode the dirty working tree is the very thing under review, and staging everything would sweep the user's in-progress work into a commit attributed to the review. Commit with the n-dx authorship + model audit trailer block via a HEREDOC:
+1. **Commit.** `add_item`, `edit_item`, and `update_task_status` write to `.rex/prd_tree/<slug>/index.md` even though you edited no file directly, so there are changes to commit. Run `git status --porcelain -- .rex/prd_tree/`; if it is empty, print "Working tree clean — nothing to commit." and stop. Otherwise stage only what the review wrote with `git add .rex/prd_tree/` — never `git add -A` here: in diff mode the dirty working tree is the very thing under review, and staging everything would sweep the user's in-progress work into a commit attributed to the review. Commit with the n-dx authorship + model audit trailer block . Build the message with your file-writing tool, never with shell quoting: heredocs and `$(...)` are POSIX-only and fail in PowerShell/cmd.exe (Git Bash is not part of Windows), and repeated `-m` flags insert blank lines that split the trailer block so git stops parsing it. Write exactly this message to a scratch file such as `.git/NDX_COMMIT_MSG`:
 
-   ```sh
-   git commit -m "$(cat <<'EOF'
+   ```
    ndx-adversarial-review: capture <n> findings from <target>
 
    N-DX: skill/ndx-adversarial-review
    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
-   EOF
-   )"
    ```
+
+   Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
 
    Substitute `<n>` with the number of items created and `<target>` with what was reviewed. Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
 2. **Record.** Run `ndx hench record --task=skill:ndx-adversarial-review --status=completed --startedAt=<the time from Step 1> --title="Adversarial review: <target>" --summary="<n findings, m captured>"`. The `skill:` form puts the cost in the orphans bucket of `get_token_usage`, which is right for a review that produced several items rather than advancing one. `--startedAt` is not optional: without it the first record in a session has no watermark to work back from, so it claims everything the session spent before the review started.

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { SCHEMA_VERSION, isCompatibleSchema } from "../../schema/index.js";
 import { validateDocument, validateConfig } from "../../schema/validate.js";
 import { validateDAG } from "../../core/dag.js";
+import { detectPostMergeIssues, repairPostMergeIssues } from "../../core/post-merge-validate.js";
 import { validateStructure, findEpiclessFeatures } from "../../core/structural.js";
 import {
   resolveEpiclessFeatures,
@@ -40,6 +41,14 @@ export async function cmdValidate(
   flags: Record<string, string>,
   options?: ValidateOptions,
 ): Promise<void> {
+  // --post-merge is a standalone raw-tree scan: a freshly merged tree may not
+  // parse through the store at all (duplicate ids, conflict markers), so it
+  // must not share the document-loading pipeline below. Exit codes are
+  // hook-friendly: 0 clean (including "no PRD tree here"), 1 issues remain.
+  if (flags["post-merge"] === "true") {
+    await runPostMergeValidation(join(dir, REX_DIR), flags);
+    return;
+  }
   // Ensure legacy .rex/prd.json is migrated to folder-tree format before reading PRD.
   // A migration error (typically a malformed legacy prd.json) is surfaced as a
   // failed PRD schema check rather than an uncaught throw — the rest of the
@@ -313,4 +322,58 @@ export async function cmdValidate(
     result(red("Validation failed."));
     process.exit(1);
   }
+}
+
+// ── Post-merge structural validation ─────────────────────────────────────────
+
+/**
+ * `rex validate --post-merge [--repair] [--format=json]`
+ *
+ * Raw-tree scan for corruption a git merge of `.rex/prd_tree/` can leave
+ * behind: duplicate ids, orphaned directories, level/nesting mismatches,
+ * dangling blockedBy references, unresolved conflict markers. `--repair`
+ * fixes the deterministic classes (see core/post-merge-validate.ts for the
+ * per-class policy) and refuses the ambiguous ones.
+ *
+ * Suitable as a git post-merge hook:
+ *
+ *   #!/bin/sh
+ *   # .git/hooks/post-merge
+ *   rex validate --post-merge || echo "PRD tree needs attention: rex validate --post-merge --repair"
+ *
+ * Exit codes: 0 = clean (including "no PRD tree in this repo"); 1 = issues remain.
+ */
+async function runPostMergeValidation(rexDir: string, flags: Record<string, string>): Promise<void> {
+  const treeRoot = join(rexDir, "prd_tree");
+  const isJson = flags.format === "json";
+
+  let report = await detectPostMergeIssues(treeRoot);
+  let repairedCount = 0;
+
+  if (flags.repair === "true" && report.issues.some((i) => i.repairable)) {
+    const { repaired } = await repairPostMergeIssues(treeRoot, report.issues);
+    repairedCount = repaired.length;
+    // Re-detect: the repaired tree is the authoritative state.
+    report = await detectPostMergeIssues(treeRoot);
+  }
+
+  if (isJson) {
+    result(JSON.stringify({ issues: report.issues, repaired: repairedCount, scannedFiles: report.scannedFiles }, null, 2));
+  } else if (report.issues.length === 0) {
+    result(green(repairedCount > 0
+      ? `Post-merge check passed after repairing ${repairedCount} issue${repairedCount === 1 ? "" : "s"} (${report.scannedFiles} files scanned).`
+      : `Post-merge check passed (${report.scannedFiles} files scanned).`));
+  } else {
+    if (repairedCount > 0) info(`Repaired ${repairedCount} issue${repairedCount === 1 ? "" : "s"}.`);
+    result(red(`Post-merge check found ${report.issues.length} issue${report.issues.length === 1 ? "" : "s"}:`));
+    for (const issue of report.issues) {
+      const tag = issue.repairable ? yellow("[repairable]") : red("[manual]");
+      result(`  ${tag} ${issue.class} ${issue.path}: ${issue.message}`);
+    }
+    if (!flags.repair && report.issues.some((i) => i.repairable)) {
+      info("Run with --repair to fix the repairable issues.");
+    }
+  }
+
+  if (report.issues.length > 0) process.exit(1);
 }

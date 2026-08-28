@@ -20,6 +20,10 @@ Which rules are enforced, where, and how. Prevents duplicate or conflicting enfo
 | Hench guard policy limits | `packages/hench/tests/unit/guard/policy.test.ts` | Rate limits, session limits, audit trail | Test failure |
 | Server/viewer boundary | `ci.js` (boundary rules) | `server/` cannot import `../viewer/` | CI failure |
 | Community files | `ci.js` | Requires `CODE_OF_CONDUCT.md` | CI failure |
+| Required test annotations | `tests/e2e/architecture-policy.test.js` | `REQUIRED TEST` annotation must exist in required test files | Test failure |
+| Integration test growth | `tests/e2e/integration-coverage-policy.test.js` | Integration files ≥ 15% of e2e count | Test failure |
+| Assistant instruction drift | `tests/e2e/assistant-body-drift.test.js` | `CLAUDE.md` / `AGENTS.md` must equal the generator output from `packages/core/assistant-assets/` | Test failure |
+| Catalog ↔ runtime model defaults | `tests/e2e/catalog-runtime-contract.test.js` | `llm-model-catalog.js` recommended model equals `DEFAULT_CLAUDE_MODEL` / `DEFAULT_CODEX_MODEL` | Test failure |
 
 ## Configuration
 

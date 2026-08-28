@@ -999,8 +999,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 153,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; Windows-safe CLI spawn surface — quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation + SpawnCliOptions/CliInvocationDiagnosis types added for the GH #37/#68/#69 spawn hardening so cli-loop can route .cmd shims through cmd.exe; diagnoseCliNotFound added so cli-loop's close/non-zero-exit path surfaces the Windows 'not recognized' missing-CLI diagnosis; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries; parseLmStudioError added so the local-LLM provider can classify LM Studio server errors; LLM_VENDOR/LLMVendor helpers added so hench uses the canonical vendor literal set through the approved gateway)",
+    maxExports: 155,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; Windows-safe CLI spawn surface — quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation + SpawnCliOptions/CliInvocationDiagnosis types added for the GH #37/#68/#69 spawn hardening so cli-loop can route .cmd shims through cmd.exe; diagnoseCliNotFound added so cli-loop's close/non-zero-exit path surfaces the Windows 'not recognized' missing-CLI diagnosis; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries; parseLmStudioError added so the local-LLM provider can classify LM Studio server errors; LLM_VENDOR/LLMVendor helpers added so hench uses the canonical vendor literal set through the approved gateway; resolveReviewModel + REVIEW_MODELS added so the adversarial review pass resolves its own model tier through the gateway instead of hardcoding a model in cli-loop)",
   },
 ];
 
@@ -1600,7 +1600,7 @@ describe("architecture policy: PRD storage invariant (prd.md migration-helper-on
           "  2. Or add the file to PRD_MD_MIGRATION_HELPER_FILES if it is part of the migration pipeline",
           "     (with a clear justification comment)",
           "",
-          "See CLAUDE.md 'PRD file layout' and AUDIT-prd-md-calls.md for context.",
+          "See docs/architecture/prd-folder-tree-schema.md and docs/guide/prd-storage.md for context.",
         ].join("\n"),
       );
     }

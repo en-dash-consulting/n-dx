@@ -173,7 +173,7 @@ describe("WebSocket manager", () => {
         );
       });
       let buf = Buffer.alloc(0);
-      socket.on("data", (chunk) => {
+      socket.on("data", (chunk: Buffer) => {
         buf = Buffer.concat([buf, chunk]);
         if (buf.toString("utf-8").includes("\r\n\r\n")) {
           socket.destroy();

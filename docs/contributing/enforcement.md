@@ -1,5 +1,8 @@
 # Enforcement Map
 
+> Condensed from the canonical [`ENFORCEMENT.md`](https://github.com/en-dash-consulting/n-dx/blob/main/ENFORCEMENT.md)
+> in the repository root.
+
 Which architectural rules are enforced, where, and how. Check this table before adding new rules.
 
 ## Enforcement Mechanisms
@@ -19,6 +22,11 @@ Which architectural rules are enforced, where, and how. Check this table before 
 | Server/viewer boundary | `ci.js` | `server/` cannot import `../viewer/` | CI failure |
 | Required test annotations | `architecture-policy.test.js` | `REQUIRED TEST` annotation must exist in required test files | Test failure |
 | Integration test growth | `integration-coverage-policy.test.js` | Integration files >= 15% of e2e count | Test failure |
+| Zone ID consistency | `ci.js` (step 3a) | Zone IDs in `zones.json` match directory names | CI failure |
+| Zone size distribution | `zone-size-policy.test.ts` | Max 30% zone size | Test failure |
+| Community files | `ci.js` | Requires `CODE_OF_CONDUCT.md` | CI failure |
+| Assistant instruction drift | `assistant-body-drift.test.js` | `CLAUDE.md` / `AGENTS.md` must equal the generator output | Test failure |
+| Catalog <-> runtime model defaults | `catalog-runtime-contract.test.js` | Catalog recommended model equals the runtime default | Test failure |
 
 ## Configuration
 

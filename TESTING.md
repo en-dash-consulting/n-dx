@@ -1,5 +1,20 @@
 # Testing Conventions
 
+> **Canonical.** A condensed version of this page is published at
+> [`docs/contributing/testing.md`](docs/contributing/testing.md) for the docs site.
+> Make changes here first, then reflect anything user-facing in the site copy.
+
+## Before Trusting a Red Result
+
+A stale `node_modules` produces failures that look exactly like real defects —
+observed 2026-08-24, a typescript installed at 5.9.3 against a declared ^6.0.3
+failed `pnpm typecheck` on a correct test while CI was green on the same commit.
+`pnpm typecheck` therefore runs `pnpm deps:check` first
+(`scripts/check-dependency-drift.mjs`): it compares every workspace dependency's
+installed version against its declared range and fails with a per-package report
+when they disagree. If it fires, run `pnpm install` — do not debug the red
+typecheck or test result until the tree is in line.
+
 ## Test Directory Structure
 
 Every package must maintain three test tiers:
@@ -22,7 +37,7 @@ tests that exercise in-process contract scenarios.
 
 | Package | Required integration scenarios |
 |---------|-------------------------------|
-| rex | Store mutation correctness, tree traversal pipeline, task selection with real PRDStore, legacy multi-file PRD migration into the canonical `prd.md` + `prd.json` pair (and JSON-only → markdown migration on first load), markdown dual-write invariants, cross-vendor authoring regression (smart-add / recommend / reshape / reorganize / prune across Claude and Codex) |
+| rex | Store mutation correctness, tree traversal pipeline, task selection with real PRDStore, legacy PRD migration into the folder tree (`prd.md`, branch-scoped files, and JSON-only sources via `ensureLegacyPrdMigrated`), folder-tree serializer/parser round-trips, cross-vendor authoring regression (smart-add / recommend / reshape / reorganize / prune across Claude and Codex) |
 | sourcevision | Analyzer pipeline phases in-process, zone detection with real file inventory |
 | hench | Gateway re-export validation, agent loop with mocked LLM responses, self-heal test gate (`runTestGate` succeeds on green, fails fast on red), Codex-batch self-heal fallback |
 | web | Cross-zone boundary checks, gateway re-export validation, messaging pipeline integration, cross-vendor pair-programming review (primary→reviewer direction, test-command pass/fail, reviewer-unavailable fallback) |

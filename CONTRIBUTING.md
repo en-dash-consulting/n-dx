@@ -7,7 +7,7 @@ contributor needs beyond what a regular user installs.
 
 ## Prerequisites
 
-- **Node.js ≥ 18** (Node 22 LTS recommended) — use the version in `.nvmrc` (`nvm use` / `fnm use`)
+- **Node.js ≥ 22** (22 LTS) — use the version in `.nvmrc` (`nvm use` / `fnm use`)
 - **pnpm ≥ 10** — enabled via `corepack enable` (version locked in `package.json`)
 
 See [Platform-specific notes](#platform-specific-notes) for Windows/macOS/Linux setup details.
@@ -18,7 +18,7 @@ See [Platform-specific notes](#platform-specific-notes) for Windows/macOS/Linux 
 
 | Requirement | User | Contributor |
 |-------------|:----:|:-----------:|
-| Node.js ≥ 18 (22 LTS recommended) | ✅ | ✅ |
+| Node.js ≥ 22 (22 LTS) | ✅ | ✅ |
 | pnpm ≥ 10 | ✅ | ✅ |
 | An LLM API key (Anthropic or OpenAI) | ✅ | optional |
 | Git | – | ✅ |
@@ -108,7 +108,7 @@ nvm use
 fnm use              # also reads .nvmrc
 ```
 
-Any Node ≥ 18 works, but Node 22 LTS is what CI runs.
+Node 22 is the floor declared in every `package.json` `engines` field, and is what CI runs.
 
 ### 2. pnpm
 

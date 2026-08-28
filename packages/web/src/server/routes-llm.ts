@@ -51,17 +51,6 @@ export interface LocalVendorConfig {
   verifier: LocalVerifierVendorConfig;
 }
 
-/**
- * Google (Gemini) config shape returned by GET /api/llm/config.
- * `apiKey` is intentionally never returned (write-only, like a password) —
- * `hasApiKey` tells the UI whether a key is configured without exposing it.
- */
-export interface GoogleVendorConfig {
-  model: string | null;
-  lightModel: string | null;
-  hasApiKey: boolean;
-}
-
 /** Shape returned by GET /api/llm/config. */
 export interface LlmConfigResponse {
   /** Active LLM vendor: "claude", "codex", "google", "local", or null if unset. */
@@ -70,8 +59,8 @@ export interface LlmConfigResponse {
   claude: VendorConfig;
   /** Codex-specific settings from llm.codex.* */
   codex: VendorConfig;
-  /** Google (Gemini)-specific settings from llm.google.* */
-  google: GoogleVendorConfig;
+  /** Google Gemini settings from llm.google.* */
+  google: VendorConfig;
   /** Local server settings from llm.local.* */
   local: LocalVendorConfig;
   /**
@@ -102,14 +91,7 @@ const VALID_VENDORS: ReadonlySet<string> = new Set([
   LLM_VENDOR.LOCAL,
 ]);
 
-/**
- * Writable paths. Auth fields are excluded EXCEPT `llm.google.api_key` —
- * unlike Claude/Codex (which authenticate via their own CLI), the Google
- * vendor has no CLI/OAuth path and cannot function without a key, so it must
- * be settable from this route. Its value is still never echoed back by GET
- * (see `extractLlmConfig`'s `hasApiKey` boolean instead of a `google.apiKey`
- * field) — writable but not readable, same as a password field.
- */
+/** Writable paths. Auth fields (api_key, api_endpoint, cli_path) are excluded. */
 const VALID_PATHS = new Set([
   "llm.vendor",
   "llm.claude.model",
@@ -118,7 +100,6 @@ const VALID_PATHS = new Set([
   "llm.codex.lightModel",
   "llm.google.model",
   "llm.google.lightModel",
-  "llm.google.api_key",
   "llm.local.model",
   "llm.local.lightModel",
   "llm.local.host",
@@ -244,7 +225,6 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
     google: {
       model: getString(llmGoogle, "model"),
       lightModel: getString(llmGoogle, "lightModel"),
-      hasApiKey: getString(llmGoogle, "api_key") !== null,
     },
     local: {
       model: getString(llmLocal, "model"),

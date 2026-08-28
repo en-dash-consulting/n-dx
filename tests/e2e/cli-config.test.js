@@ -180,6 +180,34 @@ describe("n-dx config", () => {
       expect(output).toContain("test-project");
     });
 
+    it("pre-dispatch does not report an initialized project stale when a key shadows a directory", async () => {
+      // The handler already resolved the key correctly; the PRE-DISPATCH layer
+      // (config reads, staleness check) used disk existence alone and pointed
+      // at ./hench, printing "Project setup incomplete" for a fully
+      // initialized project. Both layers must apply the same key-beats-
+      // directory tiebreaker.
+      await mkdir(join(tmpDir, "hench"), { recursive: true });
+      await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+      const res = spawnSync("node", [CLI_PATH, "config", "hench"], {
+        cwd: tmpDir,
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+      });
+      expect(res.stderr ?? "").not.toContain("Project setup incomplete");
+      expect(res.stdout).toContain("hench");
+    });
+
+    it("pre-dispatch applies the same tiebreaker to a dotted key with a same-named directory", async () => {
+      await mkdir(join(tmpDir, "rex.project"), { recursive: true });
+      await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+      const res = spawnSync("node", [CLI_PATH, "config", "rex.project"], {
+        cwd: tmpDir,
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+      });
+      expect(res.stderr ?? "").not.toContain("Project setup incomplete");
+    });
+
     it("still resolves an explicit ./ path as a directory", async () => {
       await mkdir(join(tmpDir, "hench"), { recursive: true });
       const stderr = runFail(["./hench"], { cwd: tmpDir });
@@ -989,7 +1017,7 @@ describe("n-dx config", () => {
     it("shows model examples", () => {
       const output = run(["--help"]);
       expect(output).toContain("claude-sonnet-5");
-      expect(output).toContain("claude-opus-4-8");
+      expect(output).toContain("claude-opus-5");
     });
 
     it("includes api_endpoint example", () => {

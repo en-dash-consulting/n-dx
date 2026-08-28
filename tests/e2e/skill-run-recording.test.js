@@ -56,3 +56,22 @@ describe("skills that record runs pass --startedAt", () => {
 // Platform neutrality of the timestamp instruction is asserted in
 // tests/e2e/skill-portability.test.js, alongside the other "does this skill
 // assume one environment?" guards. This file covers recording discipline only.
+
+// ── The timestamp example must work on BSD date too ──────────────────────────
+
+describe("the POSIX timestamp example is not GNU-only", () => {
+  for (const name of RECORDING_SKILLS) {
+    it(`${name}: prescribes 'date -Iseconds', never bare 'date -Is'`, () => {
+      // BSD date (macOS — this project's primary development platform)
+      // rejects the short form: `date -Is` exits 1 with "invalid argument
+      // 's' for -I". `date -Iseconds` is valid on BOTH GNU and BSD date.
+      // The lookahead matters: 'date -Iseconds' contains 'date -Is' as a
+      // substring, so a plain contains-check would reject the fix itself.
+      expect(
+        getSkillBody(name),
+        `${name} prescribes bare 'date -Is', which BSD date rejects — ` +
+          `use 'date -Iseconds' (valid on GNU and BSD).`,
+      ).not.toMatch(/date -Is(?!econds)/);
+    });
+  }
+});

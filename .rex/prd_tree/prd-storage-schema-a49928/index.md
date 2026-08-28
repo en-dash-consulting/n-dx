@@ -15,7 +15,7 @@ description: "PRD persistence model: folder-tree storage, markdown serialization
 |-------|--------|
 | [Automatic prd.json Detection, Backup, and Migration on PRD-Touching Commands](./automatic-prd-json-detection-3f1a60/index.md) | completed |
 | [Branch Attribution Display in PRD Dashboard](./branch-attribution-display-in-9f96a4/index.md) | completed |
-| [Branch Attribution Metadata on PRD Items](./branch-attribution-metadata-on-prd-items/index.md) | completed |
+| [Branch Attribution Metadata on PRD Items](./branch-attribution-metadata-on-578686/index.md) | completed |
 | [CLI and MCP Write Command Integration with Folder Tree](./cli-and-mcp-write-command-ce2ecf/index.md) | completed |
 | [Commit Hash and Author Metadata on PRD Items](./commit-hash-and-author-metadata-78798e/index.md) | completed |
 | [Consolidate PRD Files into Single 'prd' File](./consolidate-prd-files-into-be363d/index.md) | completed |

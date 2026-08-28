@@ -1,19 +1,22 @@
 ##### Monorepo-wide zone fragility governance
 
-Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragility zone requiring active governance. The following zones currently meet both thresholds:
+Any production zone with **cohesion < 0.5 AND coupling > 0.5** is a dual-fragility zone requiring active governance.
 
-| Zone | Package | Cohesion | Coupling | Notes |
-|------|---------|----------|----------|-------|
-| `web-shared` | web | 0.36 | 0.64 | Foundation layer; 5 files (metrics unreliable at this size); two-consumer rule enforced by `boundary-check.test.ts` |
-| `rex-cli` | rex | 0.25 | 0.75 | 27+ command files in flat directory; high coupling to core |
-| `prd-fix-command` | rex | 0.25 | 0.75 | Satellite CLI zone; 2 files with tight core coupling |
-| `crash` | web | 0.50 | unidirectional (web-viewer → crash) | At threshold boundary — crash imports web-shared directly (documented bypass), not web-viewer |
-| `viewer-ui-hub` | web | 0.38 | 0.63 | Viewer composition hub; 5 files; structurally expected for a UI composition root — documented in `viewer-ui-hub` governance section |
+**Do not treat a zone list in this file as current.** Zone IDs and metrics are outputs of Louvain community detection and change between analyses — zones merge, split, and get renamed as the import graph moves. Read the live values instead:
 
-**Universal governance rules** (apply to all dual-fragility zones):
+```sh
+ndx analyze --deep .        # refresh .sourcevision/
+ndx zone <zone-id>          # or the /ndx-zone skill for a single zone
+```
+
+Then filter `.sourcevision/zones.json` on the threshold above. A zone named in a governance doc but absent from the current analysis has usually been renamed or merged, not deleted — check the directory before concluding a boundary is gone.
+
+**Universal governance rules** (apply to any zone that meets the threshold):
 - **Two-consumer rule:** A new module must have at least two distinct consumer zones before being added. Single-consumer utilities belong closer to their dominant use site.
 - **Addition review required:** Treat these as risk zones requiring active review on additions. Changes have a wide blast radius.
 - **Cohesion monitoring:** If a zone's cohesion drops below its current value after a change, the change needs explicit justification.
+
+**Directory policies outlive zone detection.** Rules tied to a directory (barrel imports, framework-agnostic constraints, CLI-only content) stay in force whether or not Louvain currently emits a zone for it, because they are enforced by tests rather than by the analyser. Correct a stale metric; do not delete a policy just because its zone stopped appearing.
 
 Package-specific zone governance for `web`, `rex`, and `hench` now lives in each package's own `CLAUDE.md` (`packages/web/CLAUDE.md`, `packages/rex/CLAUDE.md`, `packages/hench/CLAUDE.md`), which loads only when working under that directory.
 
@@ -73,7 +76,11 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **General rule:** Commands that write to the PRD backend (`.rex/prd_tree/`), `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
-**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) write only to the folder tree (`.rex/prd_tree/`). No JSON files are produced. Never invoke MCP write tools while a CLI command that writes to the PRD is running in the background (e.g., `reorganize`, `prune`, `reshape`, `analyze`, `plan`). The last writer wins silently — no error, just data loss. Always wait for the background command to complete before making MCP writes.
+**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) write only to the folder tree (`.rex/prd_tree/`). No JSON files are produced.
+
+**What the code enforces:** the MCP write tools and the bulk restructurers `reorganize`, `prune`, and `reshape` perform their read-modify-write inside `store.withTransaction`, which holds the PRD file lock across the whole span — a concurrent writer's item is no longer silently dropped by their full-document save. Their LLM analysis runs on an unlocked snapshot; accepted proposals are re-applied against a freshly loaded document under the lock. `saveDocument` itself always takes the lock, so writes cannot interleave, and a writer that cannot acquire the lock within its timeout fails loudly with an error naming the holder PID rather than proceeding.
+
+**What remains operator discipline:** other CLI write paths (`analyze`/`plan` imports, `update`, `move`, `remove`, `fix`, and similar) still do their own load→mutate→save — the lock serializes their write but does not merge concurrent changes, so for those commands the last full-document writer still wins. Do not run them concurrently with other PRD writers, and prefer waiting for a background PRD-writing command to finish before making MCP writes: a restructure computed on a stale snapshot can turn individual proposals into no-ops (reported, not silent).
 
 **PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/prd_tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
 

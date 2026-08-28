@@ -1,0 +1,22 @@
+---
+id: "6eb227af-ffb2-4f39-8f62-d4afbad09a57"
+level: "feature"
+title: "Adversarial review pass for ndx work (--review)"
+status: "pending"
+priority: "high"
+acceptanceCriteria: []
+description: "After a task's changes pass completion validation and before the commit prompt, a second agent attacks the change, triages each finding for severity and necessity, repairs must-fix findings in-session, and captures the rest to the PRD. On the Claude CLI the reviewer resumes the work session on a stronger model so it inherits the implementation context; other vendors get a fresh reviewer. Taking the --review flag moves the existing interactive diff-approval gate to --approve-diff."
+lastModified: "2026-08-26T04:37:26.277Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Add --review flag and move the diff-approval gate to --approve-diff](./add-review-flag-and-move-the-f7a55c.md) | completed |
+| [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-859237.md) | pending |
+| [Give review its own model tier with a review-model override](./give-review-its-own-model-tier-b889a2.md) | completed |
+| [Resume the work session for the reviewer on --resume](./resume-the-work-session-for-the-2eb560.md) | completed |
+| [Review report transport, parsing, and run-record recording](./review-report-transport-parsing-2f0be1.md) | completed |
+| [Verify the review pass end-to-end against a real ndx work run](./verify-the-review-pass-end-to-0deece.md) | pending |

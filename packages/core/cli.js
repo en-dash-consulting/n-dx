@@ -40,7 +40,7 @@ import { createRequire } from "module";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv } from "./config.js";
+import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv, isConfigKey } from "./config.js";
 import {
   parseRecommendationsJson,
   formatQueuedTaskSummary,
@@ -80,7 +80,7 @@ import {
   formatOrchestratorCommandHelp,
 } from "./help.js";
 import { setupAssistantIntegrations, formatInitReport, checkSkillTracking, formatSkillTrackingHints } from "./assistant-integration.js";
-import { ensureGitattributesRules } from "./gitattributes-pins.js";
+import { ensureGitattributesRules, MERGE_DRIVER_CONFIG } from "./gitattributes-pins.js";
 import { recordCliName } from "./cli-identity.js";
 import { generateTargetReadme } from "./readme-generator.js";
 import {
@@ -943,6 +943,42 @@ function ensureGitignoreEntry(dir, entry) {
   writeFileSync(gitignorePath, content + suffix, "utf-8");
 }
 
+/**
+ * Register the rex-prd merge driver in the repository's git config, so the
+ * `.rex/prd_tree/** merge=rex-prd` attribute (pinned by
+ * `ensureGitattributesRules`) resolves to `rex merge-driver` — the three-way,
+ * frontmatter-aware merge for PRD markdown.
+ *
+ * Idempotent and respectful: an already-set `merge.rex-prd.driver` (including
+ * a user-customized command) is left untouched. Outside a git repository, or
+ * with git unavailable, this is a silent no-op — init must not fail over an
+ * optional registration.
+ */
+function ensureMergeDriverRegistered(dir) {
+  const gitOpts = { cwd: dir, stdio: "pipe", timeout: 15_000 };
+  try {
+    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], gitOpts);
+  } catch {
+    return; // not a git repo (or no git) — nothing to register
+  }
+
+  try {
+    const existing = execFileSync("git", ["config", "--get", MERGE_DRIVER_CONFIG.driver.key], gitOpts)
+      .toString()
+      .trim();
+    if (existing) return; // already registered — a customized command wins
+  } catch {
+    // Unset — register below.
+  }
+
+  try {
+    execFileSync("git", ["config", MERGE_DRIVER_CONFIG.name.key, MERGE_DRIVER_CONFIG.name.value], gitOpts);
+    execFileSync("git", ["config", MERGE_DRIVER_CONFIG.driver.key, MERGE_DRIVER_CONFIG.driver.value], gitOpts);
+  } catch {
+    // Best-effort: a failed git config write must not fail init.
+  }
+}
+
 // ── Command handlers ─────────────────────────────────────────────────────────
 
 function handleVersion(rest) {
@@ -1366,6 +1402,7 @@ async function handleInit(rest) {
   const henchExists = existsSync(join(dir, ".hench"));
   ensureGitignoreEntry(dir, ".n-dx.local.json");
   ensureGitattributesRules(dir);
+  ensureMergeDriverRegistered(dir);
 
   // ── Ink animated UI (TTY, non-quiet) vs static fallback ───────────
   // Ink owns sub-package inits, LLM config writes, assistant integrations,
@@ -2765,8 +2802,12 @@ async function main() {
   // positional is a config key rather than a directory. This dir only says
   // where to LOOK — it is never an operation target — so requiring the
   // positional to be a real directory is safe here and wrong for the handler
-  // call sites.
-  const dir = resolveExistingDir(rest);
+  // call sites. For `config`, a positional that names a known config key is
+  // never a directory even when one of that name exists on disk — the same
+  // key-beats-directory tiebreaker the config handler itself applies
+  // (isConfigKey); disagreeing here made `ndx config hench` read config from
+  // ./hench and report an initialized project as stale.
+  const dir = resolveExistingDir(rest, undefined, command === "config" ? { skip: isConfigKey } : undefined);
   const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
   const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
 

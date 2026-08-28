@@ -99,7 +99,7 @@ Configure in your MCP client:
 }
 ```
 
-**Tools**: `get_overview`, `get_zone`, `get_file_info`, `get_imports`, `get_route_tree`, `search_files`, `get_findings`
+**Tools**: `get_overview`, `get_next_steps`, `get_zone`, `get_findings`, `get_file_info`, `search_files`, `get_imports`, `get_classifications`, `set_file_archetype`, `get_route_tree`
 
 **Resources**: `sourcevision://summary`, `sourcevision://zones`, `sourcevision://routes`
 

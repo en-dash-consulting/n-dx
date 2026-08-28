@@ -198,7 +198,7 @@ Start an MCP (Model Context Protocol) server on stdio. This is how AI agents int
 
 ## MCP server
 
-The MCP server exposes seven tools and three resources.
+The MCP server exposes seventeen tools and three resources.
 
 ### Tools
 
@@ -209,6 +209,16 @@ The MCP server exposes seven tools and three resources.
 | `update_task_status` | Change item status (`id`, `status`) |
 | `add_item` | Create a new PRD item with full metadata |
 | `get_item` | Get item details and parent chain by ID |
+| `edit_item` | Edit item content (title, description, priority, tags) |
+| `move_item` | Reparent an item in the PRD tree |
+| `merge_items` | Consolidate duplicate sibling items |
+| `get_recommendations` | SourceVision-based recommendations |
+| `verify_criteria` | Map acceptance criteria to test files |
+| `reorganize` | Detect and fix structural issues |
+| `health` | PRD structure health score |
+| `facets` | List configured facets with distribution |
+| `sync_with_remote` | Sync with a remote adapter (e.g. Notion) |
+| `get_token_usage` | Roll up hench run token totals per PRD item |
 | `append_log` | Write to the execution log |
 | `get_capabilities` | Schema version, adapter info, feature flags |
 
@@ -254,130 +264,68 @@ See `docs/prd-markdown-schema.md` for the full list of rex/v1 fields (timestamps
 
 ## Storage
 
-### `prd.md` is primary
+The PRD lives in `.rex/prd_tree/` — a folder tree of plain Markdown files, one
+directory per epic/feature/task, each containing an `index.md`. Subtasks are
+sections inside their parent task's `index.md`.
 
-The canonical, human-editable PRD document is `.rex/prd.md`. It uses the **rex/v1 markdown schema** defined in `packages/rex/docs/prd-markdown-schema.md`: a YAML front-matter block, an H1 document title, and one heading per item (H2 = epic, H3 = feature, H4 = task, H5 = subtask). Each item carries a fenced ```` ```rex-meta ```` YAML block with its structured fields, followed by prose that becomes the item's `description`.
+This is the **sole writable PRD surface**. No rex command, MCP tool, or
+`rex update` writes `prd.md` or `prd.json`; earlier versions dual-wrote a
+`.rex/prd.md` + `.rex/prd.json` pair, and that is no longer the case.
+
+Each `index.md` carries YAML front-matter with the item's structured fields and
+a generated child table:
 
 ```markdown
 ---
-schema: rex/v1
+id: "021e305b-d4d2-43cf-b90d-137dd203f1de"
+level: "epic"
+title: "CLI & Developer Tools"
+status: "completed"
+source: "smart-add"
 ---
 
-# My Project
+## Children
 
-## Authentication
-
-​```rex-meta
-id: "550e8400-e29b-41d4-a716-446655440000"
-level: epic
-status: pending
-priority: high
-tags:
-  - backend
-  - auth
-​```
-
-Short prose description for the epic.
-
-### Login UI
-
-​```rex-meta
-id: "..."
-level: feature
-status: in_progress
-priority: high
-​```
+| Title | Status |
+|-------|--------|
+| [Pre-Execution Confirmation Prompt](./pre-execution-confirmation-4899a4/index.md) | completed |
 ```
 
-### Dual-write to `prd.json`
+Because every item is plain Markdown, `git diff`, blame, and code review work
+without custom tooling. Hand-editing is supported — keep the `id` field intact.
 
-Every write goes through `FileStore.saveDocument()`, which writes **both** files atomically:
+- Normative schema: [`docs/architecture/prd-folder-tree-schema.md`](../../docs/architecture/prd-folder-tree-schema.md)
+- User guide: [`docs/guide/prd-storage.md`](../../docs/guide/prd-storage.md)
+- Worked example: this repo's own [`.rex/prd_tree/`](../../.rex/prd_tree)
 
-1. `.rex/prd.json` — canonical JSON tree (written first, via `atomicWriteJSON`).
-2. `.rex/prd.md` — rex/v1 markdown (written second, via `atomicWrite` + `serializeDocument`).
+### Legacy migration
 
-`prd.md` is the **primary read surface**. `loadDocument()` reads `prd.md` first when it exists; `prd.json` is retained as a derived sync artifact for consumers that still expect structured JSON (e.g., legacy tools, external dashboards) and as a fallback when `prd.md` is absent.
+Projects created before the folder tree may still have `.rex/prd.md` (flat
+Markdown, the **rex/v1** schema documented in
+[`docs/prd-markdown-schema.md`](docs/prd-markdown-schema.md)) or `.rex/prd.json`.
+Convert with:
 
-### Automatic migration
-
-When a project is upgraded from a prior JSON-only layout, no manual step is required:
-
-1. The first `loadDocument()` call sees only `.rex/prd.json`.
-2. It validates the JSON, serializes it with the markdown writer, and saves the result to `.rex/prd.md`.
-3. Subsequent reads load directly from `.rex/prd.md`; writes dual-write to both files.
-
-The migration is idempotent. Any read-only command (`rex status`, `ndx status`) triggers it cleanly on first upgrade.
-
-### Manual migration (`rex migrate-to-md`)
-
-If you want to generate `prd.md` explicitly — for example to inspect the markdown before enabling dual-write writers in parallel — run:
-
-```bash
-rex migrate-to-md              # current directory
-rex migrate-to-md ./myproject
+```sh
+rex migrate-to-folder-tree .
 ```
 
-The command:
-
-- Reads `.rex/prd.json`, validates it, and serializes to rex/v1 markdown.
-- Re-parses the generated markdown and cross-checks it round-trips back to the source tree. If any field fails to round-trip (timestamps, empty arrays, passthrough) the command aborts with an actionable error and writes nothing.
-- Leaves `prd.json` untouched.
-- Refuses to overwrite an existing `prd.md` (rename or delete it first to regenerate).
-
-### Reading and editing `prd.md` by hand
-
-`prd.md` is designed to be diffed, reviewed, and edited in the same tools you use for the rest of the repository. When editing by hand:
-
-- **Heading depth is authoritative** for the item level. The `level:` key inside `rex-meta` is written for validation but the parser trusts the heading depth. Moving a heading between levels reparents the item in the tree.
-- **Required fields per item:** `id` (UUID, quoted), `level`, `status`, plus a title in the heading text. Everything else is optional and may be omitted when absent.
-- **Optional fields** include `priority`, `tags`, `source`, `blockedBy`, `branch`, `sourceFile`, timestamp fields (`startedAt`, `completedAt`, `endedAt`), `activeIntervals`, `acceptanceCriteria`, `loe*`, `tokenUsage`, `duration`, resolution metadata, `requirements`, `overrideMarker`, and `mergedProposals`. Omit a key entirely rather than writing `null`.
-- **Description prose** is the markdown text between the `rex-meta` block and the next heading at the same or shallower depth. Leading and trailing blank lines are stripped on parse.
-- **Unknown item fields** are preserved under `_passthrough` inside the `rex-meta` block. Do not promote them to top-level keys by hand.
-- After editing, run `rex validate` to confirm the document still satisfies the schema, then `rex status` to view the resulting tree.
-
-See `packages/rex/docs/prd-markdown-schema.md` for the full field reference, YAML quoting rules, and round-trip invariants.
+The command reads `prd.md`, falls back to branch-scoped `prd_*_*.md` files and
+then `prd.json`, writes the tree, and offers to delete the legacy sources. It is
+idempotent — re-running on an already-migrated project is a no-op. Every
+PRD-touching command also calls `ensureLegacyPrdMigrated()` on entry, so an
+un-migrated project is converted on first use rather than failing.
 
 ## Project structure
 
 ```
 .rex/
   config.json           Project configuration
-  prd.md                PRD tree (primary, human-editable)
-  prd.json              Derived JSON sync artifact (dual-written on every save)
+  prd_tree/             PRD folder tree (sole writable PRD surface)
+  archive.json          Pruned/reshaped item archive
   execution-log.jsonl   Append-only structured log (current)
   execution-log.1.jsonl Rotated backup (older entries)
   workflow.md           Agent workflow instructions
 ```
-
-### PRD file layout
-
-`.rex/prd.md` is the primary PRD document. `.rex/prd.json` is generated from the same in-memory tree on every save and kept in lockstep for compatibility readers. There are no branch-scoped or multi-file writers in the current layout.
-
-![img_here](img_here)
-
-*Figure placeholder — replace `img_here` with the final image path. The diagram should depict the dual-write relationship: rex's `FileStore.saveDocument()` emits both `.rex/prd.md` (primary, human-editable) and `.rex/prd.json` (derived sync artifact) from a single in-memory `PRDDocument`, with `loadDocument()` preferring `prd.md` and falling back to migrating `prd.json` when only JSON is present.*
-
-**Legacy migration.** If the directory still contains branch-scoped files from a very early layout:
-
-```
-.rex/
-  prd_main_2025-11-02.json
-  prd_feature-auth_2025-11-08.json
-```
-
-the first store resolution after upgrade merges their items into `prd.json` in source order, renames the originals to `<name>.backup.<timestamp>`, and then generates `prd.md` on the next read:
-
-```
-.rex/
-  prd.md                                          (generated)
-  prd.json                                        (merged)
-  prd_main_2025-11-02.json.backup.1729728000000
-  prd_feature-auth_2025-11-08.json.backup.1729728000000
-```
-
-The migration is idempotent — subsequent reads are no-ops once only `prd.md` + `prd.json` remain. ID collisions across legacy files surface as an error for manual resolution. No user action is required; delete the `.backup.*` files once the merged tree looks correct.
-
-To settle the migration cleanly on first upgrade, run a read-only command (e.g. `rex status` or `ndx status`) once before kicking off parallel PRD writers.
 
 ### Execution log rotation
 

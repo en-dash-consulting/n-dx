@@ -1,6 +1,6 @@
 ## Web package internal zone layering
 
-Within the web package, four internal zones form a hub topology with `web-viewer` at the center:
+The web package decomposes into a hub topology with `web-viewer` at the centre:
 
 ```
   web-server          (composition root — Express routes, gateways, MCP handlers)
@@ -9,32 +9,33 @@ Within the web package, four internal zones form a hub topology with `web-viewer
        ↑ ↓                  ↓
   viewer-message-pipeline  (messaging middleware — coalescer, throttle, rate-limiter, request-dedup)
        ↓                    ↓
-  web-shared          (framework-agnostic utilities — data-files, node-culler, view-id)
+  src/shared/         (framework-agnostic utilities — data-files, features, view-id, view-routing)
 ```
 
-`web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `web-shared`, while also receiving imports from sub-zones like `crash/` and `hench-agent-monitor`. The actual import graph has 11+ distinct cross-zone edges radiating from `web-viewer`, making it a hub rather than a linear stack. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `web-shared` is the foundation layer with zero upward dependencies (enforced by `boundary-check.test.ts`).
+`web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `src/shared/`, while also receiving imports from sub-zones like `crash/`. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `src/shared/` is the foundation layer with zero upward dependencies, enforced by `boundary-check.test.ts`.
 
-See the root `CLAUDE.md`'s "Monorepo-wide zone fragility governance" section for the cohesion/coupling thresholds and universal governance rules referenced below.
+Latest analysis (2026-08-24, `main`): `web-viewer` 205 files (cohesion 0.98 / coupling 0.02), `web-server` 62 (0.96 / 0.04), `viewer-message-pipeline` 7 (1.00 / 0.00), `web-composition-layer` 4 (0.65 / 0.35). No web zone currently meets the dual-fragility threshold. Re-run `ndx analyze --deep .` rather than trusting these numbers.
 
-## web-shared addition policy
+**The sections below are directory policies, not zone policies.** Louvain does not currently emit standalone `web-shared`, `crash`, or `viewer-ui-hub` zones, but the directories exist and the rules are enforced by `boundary-check.test.ts` — so they remain in force. See the root `CLAUDE.md` for the threshold definition and universal rules.
 
-`web-shared` has low cohesion (0.36) and high coupling (0.64). The zone contains 5 files (below the 5-file threshold for reliable metrics), so the measured values reflect the inherent low internal relationship between its modules (data-file constants, feature flags, view identifiers, routing helpers) rather than structural decay. Note: Louvain may merge this zone into `web-viewer` when shared imports create a strong bridge to viewer files — if that happens, pin the shared files back to `web-shared` on the next analysis. In addition to the universal governance rules:
+## `src/shared/` addition policy
 
-- **Framework-agnostic only:** `web-shared` must not contain Preact/React imports or server-only (`node:*`) imports. If a utility needs framework APIs, it belongs in the consuming zone.
+`src/shared/` holds 5 framework-neutral modules (`data-files.ts`, `features.ts`, `index.ts`, `view-id.ts`, `view-routing.ts`). Because both server and viewer files import it, Louvain typically absorbs it into `web-viewer` rather than emitting a separate `web-shared` zone — that is a detection artifact, not a boundary violation, and the rules below apply regardless:
+
+- **Framework-agnostic only:** `src/shared/` must not contain Preact/React imports or server-only (`node:*`) imports. If a utility needs framework APIs, it belongs in the consuming zone.
 - **Barrel import enforcement:** Consumers must import through `shared/index.ts` rather than directly from leaf files (`data-files.ts`, `view-id.ts`). Enforced by `boundary-check.test.ts`.
 - **Two-consumer rule (automated):** Every module in `shared/` must have at least two distinct consumer zones. Enforced by the "shared/ modules have at least two consumer zones" assertion in `boundary-check.test.ts`.
 
-## crash zone proactive governance
+## `crash/` proactive governance
 
-`crash` (cohesion 0.5, unidirectional coupling: web-viewer → crash) sits at the dual-fragility threshold boundary. Crash imports web-shared directly (documented bypass) rather than web-viewer. Apply the two-consumer rule proactively to new crash zone additions before cohesion degrades further.
+`crash/` (`crash-detector.ts` + `index.ts`) is imported unidirectionally by `web-viewer` and reaches into `src/shared/` directly — a documented bypass. Barrel enforcement (imports must enter through `crash/index.ts`) is asserted by `boundary-check.test.ts`. Apply the two-consumer rule proactively to new additions here.
 
-## viewer-ui-hub governance
+## UI composition governance
 
-`viewer-ui-hub` (cohesion 0.38, coupling 0.63) is the intentional Preact UI composition hub — it assembles sidebar, config-footer, faq, and logos components. Its dual-fragility metrics are **structurally expected** for a UI composition root: it imports broadly from `web-viewer` (high coupling) while its internal files serve distinct UI concerns (low cohesion). In addition to the universal governance rules:
+The viewer's UI composition layer (sidebar, config-footer, faq, logos) is a composition root: it imports broadly from `web-viewer` while its internal files serve distinct UI concerns. Louvain currently reports this as `web-composition-layer` (4 files, cohesion 0.65 / coupling 0.35); earlier revisions called it `viewer-ui-hub` with different metrics. Low cohesion here is **structurally expected** and not by itself a defect.
 
-- **No domain logic:** This zone must contain only UI composition components and their direct rendering helpers. Data fetching and state management belong in hooks or views.
-- **Monitor fan-out:** The bidirectional 74-edge coupling with the web dashboard platform zone is the largest cross-zone relationship in the web package — audit import direction periodically to ensure inbound imports enter through `api.ts` or composition-root wiring rather than ad-hoc leaf reach-ins.
-- **Satellite consolidation:** Three micro-zones (theme-toggle, search-overlay, graph-view-tests) are community-detection artifacts pointing at this hub — consolidating them reduces zone noise without losing architectural boundaries.
+- **No domain logic:** This layer must contain only UI composition components and their direct rendering helpers. Data fetching and state management belong in hooks or views.
+- **Monitor fan-out:** Its coupling with the dashboard platform zone is the largest cross-zone relationship in the web package — audit import direction periodically to ensure inbound imports enter through `api.ts` or composition-root wiring rather than ad-hoc leaf reach-ins.
 
 ## web-server zone stability
 

@@ -18,6 +18,7 @@ export {
   result,
   verbose,
   debug,
+  warn,
   withHeartbeat,
   section,
   subsection,

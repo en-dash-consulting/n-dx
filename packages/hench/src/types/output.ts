@@ -35,7 +35,7 @@ export {
   setQuiet, isQuiet,
   setVerbose, isVerbose,
   setDebug, isDebug,
-  info, result, verbose, debug,
+  info, result, verbose, debug, warn,
 } from "../prd/llm-gateway.js";
 
 import { isQuiet, isVerbose, verbose, bold, dim, yellow, colorDim, colorWarn, colorPink, isColorEnabled } from "../prd/llm-gateway.js";

@@ -9,13 +9,15 @@
  *
  * ## Why this lives in the ROOT suite
  *
- * This is real-process, platform-divergent behaviour, and the root suite is the
- * only place CI runs that on both families: `smoke-macos` and `smoke-windows`
- * both run `tests/**`, while the per-package suites run on Windows only (the
- * ubuntu `validate` job builds and runs `pr-check`, which is build + rex
- * validate — no tests). A POSIX-gated case under `packages/llm-client/tests/`
- * would therefore never execute anywhere. The injected-seam unit coverage lives
- * next to the module, in packages/llm-client/tests/unit/interrupt-forwarding.test.ts.
+ * This is real-process, platform-divergent behaviour, and the root suite is
+ * the only suite every CI job runs: the ubuntu `validate` job runs BOTH the
+ * per-package suites (`run-all-tests.mjs packages`) and the root suite, while
+ * `smoke-macos` deliberately runs the root suite only and `smoke-windows`
+ * runs both (see the SCOPE comments in .github/workflows/ci.yml). Under
+ * `packages/llm-client/tests/` this file would run on ubuntu and Windows but
+ * never on macOS; here it runs on all three families. The injected-seam unit
+ * coverage lives next to the module, in
+ * packages/llm-client/tests/unit/interrupt-forwarding.test.ts.
  *
  * ## Why the signal source is injected
  *
@@ -31,7 +33,7 @@
  * @see packages/llm-client/src/interrupt-forwarding.ts
  */
 
-import { it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, readdir } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -40,6 +42,49 @@ import { execFileSync } from "node:child_process";
 import { describeNeedsPosixShell } from "../helpers/posix-shell.js";
 
 const isWindows = process.platform === "win32";
+
+// ── Listener registration: every host, no shell required ─────────────────────
+//
+// The registration is observable without raising anything, and it is the
+// assertion that differs by platform — so it must genuinely run on every host,
+// including a Windows shell with no `sh` on PATH. It therefore spawns node
+// directly (no shell intermediate) and lives OUTSIDE the `sh`-gated suite
+// below; the cases that follow the signal into a real process GROUP are the
+// ones that need the non-libuv intermediate.
+
+describe("exec's interrupt listener registration (all hosts)", () => {
+  it("registers a listener only while a detached child runs — and never on Windows", async () => {
+    const { exec } = await import("../../packages/llm-client/dist/exec.js");
+    const before = process.listenerCount("SIGINT");
+
+    const pending = exec(process.execPath, ["-e", "setTimeout(() => {}, 1500)"], {
+      timeout: 10000,
+    });
+
+    if (isWindows) {
+      // Windows never detaches for tree-kill (taskkill walks by pid), so there
+      // is no group gap to bridge and exec must not touch the signal at all.
+      // Proving a negative needs a settle window: give any (wrong) registration
+      // time to happen before asserting it did not.
+      await new Promise((r) => setTimeout(r, 300));
+      expect(process.listenerCount("SIGINT")).toBe(before);
+    } else {
+      // The listener appears once the child is spawned; poll rather than sleep
+      // so a slow host cannot turn this into a race.
+      const deadline = Date.now() + 5000;
+      while (process.listenerCount("SIGINT") !== before + 1 && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      expect(process.listenerCount("SIGINT")).toBe(before + 1);
+    }
+
+    await pending;
+
+    // Either way nothing is left behind: a listener outliving its child would
+    // go on suppressing this process's default SIGINT action for good.
+    expect(process.listenerCount("SIGINT")).toBe(before);
+  });
+});
 
 describeNeedsPosixShell("exec forwards interrupts to detached children", () => {
   let dir;
@@ -135,31 +180,6 @@ describeNeedsPosixShell("exec forwards interrupts to detached children", () => {
   function runTree(timeout) {
     return exec("sh", ["-c", "node grandchild.js"], { cwd: dir, timeout });
   }
-
-  /**
-   * The registration is observable without raising anything, and this is the
-   * assertion that differs by platform — so it runs on every host.
-   */
-  it("registers a listener only while a detached child runs", async () => {
-    const before = process.listenerCount("SIGINT");
-
-    const pending = runTree(1500);
-    await waitForGrandchild();
-
-    if (isWindows) {
-      // Windows never detaches for tree-kill (taskkill walks by pid), so there
-      // is no group gap to bridge and exec must not touch the signal at all.
-      expect(process.listenerCount("SIGINT")).toBe(before);
-    } else {
-      expect(process.listenerCount("SIGINT")).toBe(before + 1);
-    }
-
-    await pending;
-
-    // Either way nothing is left behind: a listener outliving its child would go
-    // on suppressing this process's default SIGINT action for good.
-    expect(process.listenerCount("SIGINT")).toBe(before);
-  });
 
   it.skipIf(isWindows)("puts the child in a group the terminal would miss", async () => {
     const pending = runTree(3000);

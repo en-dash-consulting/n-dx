@@ -119,3 +119,16 @@ Each skill below maps to a step in this loop. Edit the linked file in your proje
 Related guides that share these skills: [Spec-Driven Development](./spec-driven), [Codebase Onboarding](./onboarding), [Run While You Sleep](./overnight), [Self-Heal Loop](./self-heal).
 
 For the full skill inventory and customization guidance, see the [Skills Reference](./skills).
+
+## See it on a real project
+
+n-dx runs this loop on itself. Two artifacts in the repository show both ends
+of it:
+
+- [`prd.md`](https://github.com/en-dash-consulting/n-dx/blob/main/prd.md) — the
+  hand-written spec that seeded the project
+- [`.rex/prd_tree/`](https://github.com/en-dash-consulting/n-dx/tree/main/.rex/prd_tree)
+  — the live tree the agent reads from and writes back to
+
+The [PRD storage layout guide](./prd-storage) walks through how one becomes the
+other, and which commands and MCP tools you use to interact with the result.

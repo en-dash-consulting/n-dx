@@ -707,13 +707,13 @@ function validateModel(value) {
  * Validate llm.google.model: must be a non-empty string starting with "gemini-".
  *
  * Gemini model IDs all start with "gemini-" (e.g. "gemini-2.5-pro",
- * "gemini-2.0-flash"). IDs from other vendors (e.g. "gpt-4o", "claude-sonnet-*")
+ * "gemini-3.7-flash"). IDs from other vendors (e.g. "gpt-5.6-terra", "claude-sonnet-*")
  * are rejected immediately.
  *
  * Canonical known models (from @n-dx/llm-client GOOGLE_MODELS):
- *   gemini-2.0-flash  (light tier)
- *   gemini-2.5-flash  (standard tier)
- *   gemini-2.5-pro    (heavy tier)
+ *   gemini-3.5-flash-lite  (light tier)
+ *   gemini-3.7-flash       (standard tier)
+ *   gemini-2.5-pro         (heavy tier)
  *
  * This list will grow as Google releases new models. The prefix check ("gemini-")
  * allows unknown future models while still catching clearly wrong values.
@@ -722,14 +722,14 @@ function validateGeminiModelField(value, fieldKey) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(
       `Invalid value for llm.google.${fieldKey}: model ID must be a non-empty string.\n` +
-        "  Known models: gemini-2.0-flash (light), gemini-2.5-flash (standard), gemini-2.5-pro (heavy)",
+        "  Known models: gemini-3.5-flash-lite (light), gemini-3.7-flash (standard), gemini-2.5-pro (heavy)",
     );
   }
   if (!value.startsWith("gemini-")) {
     throw new Error(
       `Invalid value for llm.google.${fieldKey}: "${value}" is not a Gemini model ID.\n` +
-        '  Gemini model IDs must start with "gemini-" (e.g. "gemini-2.5-pro", "gemini-2.0-flash").\n' +
-        "  Known models: gemini-2.0-flash (light), gemini-2.5-flash (standard), gemini-2.5-pro (heavy)",
+        '  Gemini model IDs must start with "gemini-" (e.g. "gemini-2.5-pro", "gemini-3.7-flash").\n' +
+        "  Known models: gemini-3.5-flash-lite (light), gemini-3.7-flash (standard), gemini-2.5-pro (heavy)",
     );
   }
 }
@@ -1380,7 +1380,7 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     Validated: must be a valid HTTP(S) URL.
   claude.model             string    Default Claude model for API calls (optional)
                                     Override the default model used by all packages.
-                                    Examples: claude-sonnet-5, claude-opus-4-8
+                                    Examples: claude-sonnet-5, claude-opus-5
                                     Default: claude-sonnet-5
   claude.lightModel        string    Model override for light-weight tasks (optional)
                                     When set, light-tier tasks use this model instead of
@@ -1407,7 +1407,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.codex.lightModel     string    Codex model for light-weight tasks (optional)
                                     When set, commands that explicitly opt into the
                                     light tier use this model.
-                                    Falls back to gpt-5.4-mini if not set.
+                                    Falls back to gpt-5.6-luna if not set.
   llm.google.api_key       string    Google Gemini API key (optional; validated format)
                                     Preflight validates the key against the Gemini API.
                                     Set GEMINI_API_KEY env var as an alternative.
@@ -1419,9 +1419,9 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.google.api_endpoint  string    Gemini API endpoint (optional; validated URL)
   llm.google.model         string    Gemini default model (optional)
                                     Must be a valid Gemini model ID starting with "gemini-".
-                                    Known models: gemini-2.0-flash (light),
-                                    gemini-2.5-flash (standard), gemini-2.5-pro (heavy)
-                                    Validation: rejects non-Gemini model IDs (e.g. "gpt-4o")
+                                    Known models: gemini-3.5-flash-lite (light),
+                                    gemini-3.7-flash (standard), gemini-2.5-pro (heavy)
+                                    Validation: rejects non-Gemini model IDs (e.g. "gpt-5.6-terra")
   llm.local.host           string    Hostname of the local LM Studio server (default: localhost)
   llm.local.port           number    Port of the local LM Studio server (default: 1234)
   llm.local.model          string    Model ID to request from the local server (optional)
@@ -1611,18 +1611,16 @@ Examples:
   n-dx config claude.api_key sk-ant-...        Set Anthropic API key (validates format)
   n-dx config claude.api_endpoint https://proxy.example.com
                                                Set custom API endpoint
-  n-dx config claude.model claude-opus-4-20250514
-                                               Set default model for API calls
+  n-dx config claude.model claude-opus-5       Set default model for API calls
   n-dx config llm.vendor claude                Set active LLM vendor to Claude
   n-dx config llm.vendor codex                 Set active LLM vendor to Codex
   n-dx config llm.vendor google                Set active LLM vendor to Google (Gemini)
   n-dx config llm.vendor local                 Set active LLM vendor to local (LM Studio)
   n-dx config llm.local.host 192.168.1.10      Set local server host (default: localhost)
-  n-dx config llm.local.port 1234             Set local server port (default: 1234)
-  n-dx config llm.local.model qwen2.5-14b     Set local model ID (optional)
+  n-dx config llm.local.port 1234              Set local server port (default: 1234)
+  n-dx config llm.local.model qwen2.5-14b      Set local model ID (optional)
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
-  n-dx config llm.claude.model claude-opus-4-20250514
-                                               Set Claude model (llm namespace)
+  n-dx config llm.claude.model claude-opus-5   Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex
                                                Set Codex CLI path
   n-dx config llm.autoFailover true            Enable automatic model/vendor failover
@@ -1681,7 +1679,7 @@ function parseArgs(args) {
  * @param {string} arg
  * @returns {boolean}
  */
-function isConfigKey(arg) {
+export function isConfigKey(arg) {
   if (arg === "language") return true;
   const dotIdx = arg.indexOf(".");
   const root = dotIdx === -1 ? arg : arg.slice(0, dotIdx);

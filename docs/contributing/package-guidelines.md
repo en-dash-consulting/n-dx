@@ -1,5 +1,8 @@
 # Package Guidelines
 
+> Condensed from the canonical [`PACKAGE_GUIDELINES.md`](https://github.com/en-dash-consulting/n-dx/blob/main/PACKAGE_GUIDELINES.md)
+> in the repository root.
+
 Standards for creating and maintaining packages in the n-dx monorepo.
 
 ## Public API

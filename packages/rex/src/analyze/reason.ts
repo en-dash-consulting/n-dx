@@ -1478,6 +1478,9 @@ export function formatAssessment(assessments: GranularityAssessment[]): string {
 /**
  * Assess the granularity of proposals by calling the LLM.
  * Returns assessments with recommendations and reasoning for each proposal.
+ *
+ * Mechanical single-shot call: when no explicit model is given, routes to the
+ * vendor's light-tier model (e.g. haiku) instead of the standard tier.
  */
 export async function assessGranularity(
   proposals: Proposal[],
@@ -1490,7 +1493,7 @@ export async function assessGranularity(
   }
 
   const prompt = buildAssessmentPrompt(proposals);
-  const result = await spawnClaude(prompt, model);
+  const result = await spawnClaude(prompt, model, undefined, "light");
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
   const assessments = parseAssessmentResponse(result.text, proposals);

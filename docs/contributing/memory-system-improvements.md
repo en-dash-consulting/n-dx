@@ -273,3 +273,13 @@ Verify that all `setInterval` timers used by schedulers (retention, cleanup, bro
 | 15 | Unref timer audit | Low | Low | Process exit cleanliness |
 
 **Recommended order:** Items 5-7 (low effort, high reliability gain), then 1-2 (platform accuracy), then 3-4 (event loop and completeness), then 8-15 as capacity allows.
+
+---
+
+**Related memory documentation**
+
+- [Memory Management Architecture](/architecture/memory-architecture) — system overview across the three tiers
+- [Risks and Flaws](/contributing/memory-system-risks) — known issues by severity
+- [Areas of Improvement](/contributing/memory-system-improvements) — prioritized fixes, each referencing a risk
+- [Refresh Memory Analysis](/contributing/refresh-memory-analysis) — dated profiling of `ndx refresh`
+- [Memory OS Behavior](/process/memory-os-behavior) — platform-specific reporting caveats

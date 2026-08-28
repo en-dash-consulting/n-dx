@@ -13,7 +13,7 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Incremental Aggregation System](./incremental-aggregation-system.md) | completed |
-| [Message Throttling and Coalescing](./message-throttling-and-coalescing.md) | completed |
-| [Run History Management](./run-history-management.md) | completed |
-| [Stale Data Cleanup](./stale-data-cleanup.md) | completed |
+| [Incremental Aggregation System](./incremental-aggregation-system-baf1a8.md) | completed |
+| [Message Throttling and Coalescing](./message-throttling-and-coalescing-4a3924.md) | completed |
+| [Run History Management](./run-history-management-cebbe8.md) | completed |
+| [Stale Data Cleanup](./stale-data-cleanup-8d286e.md) | completed |

@@ -217,8 +217,8 @@ function extractTextFromCandidates(
  * Validate a Gemini model ID.
  *
  * Accepts model IDs starting with "gemini-" (e.g. "gemini-2.5-pro",
- * "gemini-2.0-flash"). Rejects IDs that belong to other vendors
- * (e.g. "gpt-4o", "claude-sonnet-4-6").
+ * "gemini-3.7-flash"). Rejects IDs that belong to other vendors
+ * (e.g. "gpt-5.6-terra", "claude-sonnet-5").
  *
  * @throws {ClaudeClientError} with reason "not-found" when the model ID
  *   is non-empty and does not start with "gemini-".
@@ -226,7 +226,7 @@ function extractTextFromCandidates(
 export function validateGeminiModelId(model: string): void {
   if (model && !model.startsWith(GEMINI_MODEL_PREFIX)) {
     throw new ClaudeClientError(
-      `Invalid Gemini model ID "${model}". Gemini model IDs must start with "${GEMINI_MODEL_PREFIX}" (e.g. "gemini-2.5-pro", "gemini-2.0-flash").`,
+      `Invalid Gemini model ID "${model}". Gemini model IDs must start with "${GEMINI_MODEL_PREFIX}" (e.g. "gemini-2.5-pro", "gemini-3.7-flash").`,
       "not-found",
       false,
     );
