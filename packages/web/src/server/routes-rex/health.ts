@@ -6,7 +6,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { loadPRDSync, savePRDSync } from "../prd-io.js";
+import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
+import { resolveStore } from "../rex-gateway.js";
 
 import {
   computeHealthScore,
@@ -88,12 +89,6 @@ export function routeHealthReorganize(
   // Body: { proposalIds?: number[], llmProposalIds?: string[] }
   if (path === "reorganize/apply" && method === "POST") {
     return (async () => {
-      const doc = loadPRDSync(ctx.rexDir);
-      if (!doc) {
-        errorResponse(res, 404, "No PRD data found");
-        return true;
-      }
-
       const body = await readBody(req);
       let proposalIds: number[];
       let llmProposalIds: string[];
@@ -106,44 +101,54 @@ export function routeHealthReorganize(
         return true;
       }
 
+      // Use the PRDStore's transaction so writes go to the correct backend
+      // (prd_tree/ or prd.md) rather than always writing to prd.md via
+      // savePRDSync — this is a bulk load->mutate->save operation, exactly
+      // what withTransaction is documented for.
+      const store = await resolveStore(ctx.rexDir);
+
       let structuralApplied = 0;
       let structuralFailed = 0;
-
-      // Apply structural proposals
-      if (proposalIds.length > 0 || (llmProposalIds.length === 0 && proposalIds.length === 0)) {
-        const plan = detectReorganizations(doc.items);
-        const toApply = proposalIds.length > 0
-          ? plan.proposals.filter((p) => proposalIds.includes(p.id))
-          : plan.proposals.filter((p) => p.risk === "low");
-
-        if (toApply.length > 0) {
-          const result = applyProposals(doc.items, toApply);
-          structuralApplied = result.applied;
-          structuralFailed = result.failed;
-        }
-      }
-
-      // Apply LLM proposals
       let llmApplied = 0;
       let llmFailed = 0;
-      if (llmProposalIds.length > 0) {
-        try {
-          const { reasonForReshape } = await import("../rex-gateway.js");
-          const { proposals } = await reasonForReshape(doc.items, { dir: ctx.projectDir });
-          const toApply = proposals.filter((p: ReshapeProposal) => llmProposalIds.includes(p.id));
+
+      const updatedDoc = await store.withTransaction(async (doc) => {
+        // Apply structural proposals
+        if (proposalIds.length > 0 || (llmProposalIds.length === 0 && proposalIds.length === 0)) {
+          const plan = detectReorganizations(doc.items);
+          const toApply = proposalIds.length > 0
+            ? plan.proposals.filter((p) => proposalIds.includes(p.id))
+            : plan.proposals.filter((p) => p.risk === "low");
+
           if (toApply.length > 0) {
-            const reshapeResult = applyReshape(doc.items, toApply);
-            llmApplied = reshapeResult.applied.length;
-            llmFailed = reshapeResult.errors.length;
+            const result = applyProposals(doc.items, toApply);
+            structuralApplied = result.applied;
+            structuralFailed = result.failed;
           }
-        } catch {
-          // LLM unavailable
         }
-      }
+
+        // Apply LLM proposals
+        if (llmProposalIds.length > 0) {
+          try {
+            const { reasonForReshape } = await import("../rex-gateway.js");
+            const { proposals } = await reasonForReshape(doc.items, { dir: ctx.projectDir });
+            const toApply = proposals.filter((p: ReshapeProposal) => llmProposalIds.includes(p.id));
+            if (toApply.length > 0) {
+              const reshapeResult = applyReshape(doc.items, toApply);
+              llmApplied = reshapeResult.applied.length;
+              llmFailed = reshapeResult.errors.length;
+            }
+          } catch {
+            // LLM unavailable
+          }
+        }
+
+        return doc;
+      });
 
       const totalApplied = structuralApplied + llmApplied;
       if (totalApplied > 0) {
-        savePRDSync(ctx.rexDir, doc);
+        refreshPRDCache(ctx.rexDir, updatedDoc);
         if (broadcast) broadcast({ type: "rex:prd-changed", source: "reorganize" });
       }
       jsonResponse(res, 200, {

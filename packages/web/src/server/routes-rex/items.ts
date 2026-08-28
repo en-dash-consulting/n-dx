@@ -13,8 +13,8 @@ import {
   findItemById, updateInTree,
   appendLog, API_SETTABLE_STATUSES,
 } from "./rex-route-helpers.js";
-import { loadPRDSync, savePRDSync, refreshPRDCache } from "../prd-io.js";
-import { insertChild as rexInsertChild, resolveStore } from "../rex-gateway.js";
+import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
+import { resolveStore } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
@@ -27,7 +27,6 @@ import {
   CHILD_LEVEL,
   isPriority,
   isItemLevel,
-  removeFromTree,
   validateMerge,
   previewMerge,
   mergeItems,
@@ -170,19 +169,16 @@ async function handleItemPatch(
 }
 
 /** Handle DELETE /api/rex/items/:id — remove item and all descendants */
-function handleItemDelete(
+async function handleItemDelete(
   res: ServerResponse,
   ctx: ServerContext,
   itemId: string,
   broadcast?: WebSocketBroadcaster,
-): boolean {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
-
-  const item = findItemById(doc.items, itemId);
+): Promise<boolean> {
+  // Use the PRDStore so writes go to the correct backend (prd_tree/ or
+  // prd.md) rather than always writing to prd.md via savePRDSync.
+  const store = await resolveStore(ctx.rexDir);
+  const item = await store.getItem(itemId);
   if (!item) {
     errorResponse(res, 404, `Item "${itemId}" not found`);
     return true;
@@ -190,13 +186,15 @@ function handleItemDelete(
 
   const title = item.title;
   const level = item.level;
-  const removed = removeFromTree(doc.items, itemId);
-  if (!removed) {
-    errorResponse(res, 404, `Item "${itemId}" could not be removed`);
+  try {
+    await store.removeItem(itemId);
+  } catch (err) {
+    errorResponse(res, 404, `Item "${itemId}" could not be removed: ${String(err)}`);
     return true;
   }
 
-  savePRDSync(ctx.rexDir, doc);
+  const updatedDoc = await store.loadDocument();
+  refreshPRDCache(ctx.rexDir, updatedDoc);
 
   // Append log entry
   const logPath = join(ctx.rexDir, "execution-log.jsonl");
@@ -240,12 +238,6 @@ async function handleItemAdd(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
-
   try {
     const body = await readBody(req);
     const input = JSON.parse(body) as {
@@ -263,18 +255,30 @@ async function handleItemAdd(
       return true;
     }
 
+    // Use the PRDStore so writes go to the correct backend (prd_tree/ or
+    // prd.md) rather than always writing to prd.md via savePRDSync — the
+    // same fix already applied to handleItemPatch below. Writing only
+    // through savePRDSync left the real folder tree untouched, so the next
+    // folder-tree-watcher-triggered cache refresh (start.ts's
+    // refreshPRDCache) silently reverted the addition — the item vanished
+    // on reload.
+    const store = await resolveStore(ctx.rexDir);
+
     const parentId = input.parentId;
+    let parent: PRDItem | null = null;
+    if (parentId) {
+      parent = await store.getItem(parentId);
+      if (!parent) {
+        errorResponse(res, 400, `Parent "${parentId}" not found`);
+        return true;
+      }
+    }
 
     // Resolve level: explicit > inferred from parent > default to epic
     let level: ItemLevel;
     if (input.level && isItemLevel(input.level)) {
       level = input.level;
-    } else if (parentId) {
-      const parent = findItemById(doc.items, parentId);
-      if (!parent) {
-        errorResponse(res, 400, `Parent "${parentId}" not found`);
-        return true;
-      }
+    } else if (parent) {
       const parentLevel = parent.level;
       const inferred = isItemLevel(parentLevel) ? CHILD_LEVEL[parentLevel] : undefined;
       if (!inferred) {
@@ -300,12 +304,7 @@ async function handleItemAdd(
       return true;
     }
 
-    if (parentId) {
-      const parent = findItemById(doc.items, parentId);
-      if (!parent) {
-        errorResponse(res, 400, `Parent "${parentId}" not found`);
-        return true;
-      }
+    if (parent) {
       const allowedParentLevels = allowedParents.filter((p): p is ItemLevel => p !== null);
       if (allowedParentLevels.length > 0 && !allowedParentLevels.includes(parent.level)) {
         errorResponse(res, 400, `A ${level} must be a child of a ${allowedParentLevels.join(" or ")}, not a ${parent.level}`);
@@ -328,13 +327,13 @@ async function handleItemAdd(
       item.acceptanceCriteria = input.acceptanceCriteria;
     }
 
-    if (parentId) {
-      rexInsertChild(doc.items, parentId, item);
-    } else {
-      doc.items.push(item);
-    }
+    await store.addItem(item, parentId);
 
-    savePRDSync(ctx.rexDir, doc);
+    // Refresh the in-process cache immediately so subsequent loadPRDSync
+    // calls (including this same request's response and any fetch before
+    // the watcher fires) see the change right away.
+    const updatedDoc = await store.loadDocument();
+    refreshPRDCache(ctx.rexDir, updatedDoc);
 
     // Log the addition
     appendLog(ctx, {
@@ -365,12 +364,6 @@ async function handleBulkUpdate(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
-
   try {
     const body = await readBody(req);
     const input = JSON.parse(body) as {
@@ -393,18 +386,24 @@ async function handleBulkUpdate(
       return true;
     }
 
+    // Use the PRDStore's transaction so writes go to the correct backend
+    // (prd_tree/ or prd.md) rather than always writing to prd.md via
+    // savePRDSync.
+    const store = await resolveStore(ctx.rexDir);
     const results: Array<{ id: string; ok: boolean; error?: string }> = [];
-    for (const id of input.ids) {
-      // Clone updates for each item to get independent timestamps
-      const itemUpdates = { ...input.updates };
-      if (updateInTree(doc.items, id, itemUpdates)) {
-        results.push({ id, ok: true });
-      } else {
-        results.push({ id, ok: false, error: "not found" });
+    const updatedDoc = await store.withTransaction(async (doc) => {
+      for (const id of input.ids) {
+        // Clone updates for each item to get independent timestamps
+        const itemUpdates = { ...input.updates };
+        if (updateInTree(doc.items, id, itemUpdates)) {
+          results.push({ id, ok: true });
+        } else {
+          results.push({ id, ok: false, error: "not found" });
+        }
       }
-    }
-
-    savePRDSync(ctx.rexDir, doc);
+      return doc;
+    });
+    refreshPRDCache(ctx.rexDir, updatedDoc);
 
     // Log the bulk update
     const successCount = results.filter((r) => r.ok).length;
@@ -435,12 +434,6 @@ async function handleItemMerge(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
-
   try {
     const body = await readBody(req);
     const input = JSON.parse(body) as {
@@ -460,27 +453,54 @@ async function handleItemMerge(
       return true;
     }
 
-    const validation = validateMerge(doc.items, input.sourceIds, input.targetId);
-    if (!validation.valid) {
-      errorResponse(res, 400, validation.error!);
-      return true;
-    }
+    const store = await resolveStore(ctx.rexDir);
 
-    const options = {
-      ...(input.title ? { title: input.title } : {}),
-      ...(input.description !== undefined ? { description: input.description } : {}),
-    };
-
-    // Preview mode
+    // Preview mode — read-only, no store mutation needed.
     if (input.preview) {
+      const doc = await store.loadDocument();
+      const validation = validateMerge(doc.items, input.sourceIds, input.targetId);
+      if (!validation.valid) {
+        errorResponse(res, 400, validation.error!);
+        return true;
+      }
+      const options = {
+        ...(input.title ? { title: input.title } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+      };
       const preview = previewMerge(doc.items, input.sourceIds, input.targetId, options);
       jsonResponse(res, 200, { ok: true, preview });
       return true;
     }
 
-    // Execute merge
-    const result = mergeItems(doc.items, input.sourceIds, input.targetId, options);
-    savePRDSync(ctx.rexDir, doc);
+    // Execute merge via the PRDStore's transaction so writes go to the
+    // correct backend (prd_tree/ or prd.md) rather than always writing to
+    // prd.md via savePRDSync.
+    let result: ReturnType<typeof mergeItems> | undefined;
+    let validationError: string | undefined;
+    const updatedDoc = await store.withTransaction(async (doc) => {
+      const validation = validateMerge(doc.items, input.sourceIds, input.targetId);
+      if (!validation.valid) {
+        validationError = validation.error!;
+        return doc;
+      }
+      const options = {
+        ...(input.title ? { title: input.title } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+      };
+      result = mergeItems(doc.items, input.sourceIds, input.targetId, options);
+      return doc;
+    });
+
+    if (validationError) {
+      errorResponse(res, 400, validationError);
+      return true;
+    }
+    if (!result) {
+      errorResponse(res, 500, "Merge did not produce a result");
+      return true;
+    }
+
+    refreshPRDCache(ctx.rexDir, updatedDoc);
 
     // Log the merge
     appendLog(ctx, {
