@@ -147,7 +147,12 @@ sv <command> [args]               # alias for sourcevision
 
 ### Sourcevision commands
 
-`init`, `analyze`, `serve`, `validate`, `reset`, `mcp`
+`init`, `analyze`, `serve`, `validate`, `reset`, `iso`, `mcp`
+
+`sv iso` renders `.sourcevision/iso-map.html`: a standalone isometric map of the
+codebase's architectural zones. Opt-in only — `analyze` never generates it.
+See [`docs/architecture/iso-map-data-flow.md`](docs/architecture/iso-map-data-flow.md)
+for what the map can and cannot show.
 
 ### Hench commands
 

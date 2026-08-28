@@ -2,7 +2,7 @@
 id: "f666d3ed-3625-4468-8048-b9cd6b5fe011"
 level: "feature"
 title: "Optional 3D isometric architecture map generator"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "sourcevision"
@@ -10,6 +10,11 @@ tags:
   - "isometric"
   - "cli"
 source: "ndx-capture: user request referencing /Users/nick/Downloads/anchorpay-map.html isometric SVG technique"
+startedAt: "2026-08-28T03:52:19.642Z"
+completedAt: "2026-08-28T04:11:49.463Z"
+endedAt: "2026-08-28T04:11:49.463Z"
+resolutionType: "code-change"
+resolutionDetail: "Added opt-in `sourcevision iso` command rendering a standalone isometric architecture map. Model builder (src/export/iso-model.ts) computes layered layout, box geometry and edge routing in grid units; renderer (src/export/iso-map.ts) emits dependency-free HTML with pan/zoom, legend filtering and click-to-inspect panels. Gap analysis documented in docs/architecture/iso-map-data-flow.md. 41 new tests (28 unit + 13 e2e)."
 acceptanceCriteria:
   - "Opt-in command or flag (e.g. `sv iso`) produces a standalone HTML file such as `.sourcevision/iso-map.html` with zero external runtime dependencies"
   - "Nodes are derived from zones/packages with dimensions mapped from metrics (file count/LOC → height) and color mapped from archetype/tier"

@@ -1240,6 +1240,8 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/commands/smart-add.ts", "Lazy-loads LLM client for smart add proposals"],
   ["packages/rex/src/cli/commands/validate-interactive.ts", "Lazy-loads LLM client for interactive validation"],
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
+  // Sourcevision CLI — lazy-loads the isometric renderer
+  ["packages/sourcevision/src/cli/commands/iso.ts", "Lazy-loads the iso model builder and HTML renderer — only needed for the opt-in `sv iso` command, never during analyze"],
   // Core — lazy-loads utilities
   ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers when the vendor changes, plus the shared auth-failure guidance and the cli-brand color palette on the preflight-failure error path"],
   ["packages/core/cli.js", "Lazy-loads cli-ink.js (Ink + React TUI renderer) only during `ndx init` when stdout is a TTY and --quiet is unset — avoids React/Ink import cost on every CLI invocation and in non-interactive environments"],
