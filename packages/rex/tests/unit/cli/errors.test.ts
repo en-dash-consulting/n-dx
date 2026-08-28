@@ -211,4 +211,30 @@ describe("requireRexDir", () => {
       rmSync(tmp, { recursive: true });
     }
   });
+
+  // Git invokes the merge driver with three temp-file paths (%O %A %B) from
+  // any cwd, so a build that predates merge-driver's SKIP_DIR_CHECK exemption
+  // resolves one of those temp files as the project dir and reports a missing
+  // .rex/. The message is true and useless: nothing about it says "your rex is
+  // out of date". Callers hitting it are a stale local build or a stale global
+  // install, and both are fixed by rebuilding rather than by `n-dx init`.
+  it("points at the merge driver when the path is a git merge temp file", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "rex-test-"));
+    const mergeTemp = join(tmp, ".merge_file_a1B2c3");
+    try {
+      let caught: CLIError | undefined;
+      try {
+        requireRexDir(mergeTemp);
+      } catch (err) {
+        caught = err as CLIError;
+      }
+      expect(caught).toBeInstanceOf(CLIError);
+      expect(caught!.suggestion).toMatch(/merge driver/i);
+      expect(caught!.suggestion).toMatch(/rebuild|out of date|update/i);
+      // The generic advice would send the user to init a temp file's directory.
+      expect(caught!.suggestion).not.toContain("n-dx init");
+    } finally {
+      rmSync(tmp, { recursive: true });
+    }
+  });
 });

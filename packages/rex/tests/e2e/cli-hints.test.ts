@@ -11,6 +11,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
+import { requireFreshBuiltCli } from "../helpers/built-cli.js";
 
 const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
 
@@ -48,6 +49,10 @@ function runResult(
 
 describe("rex CLI hint surfacing and follow-through", () => {
   beforeEach(async () => {
+    // These spawn the compiled CLI, so a missing or stale build would fail
+    // them on last week's hint text rather than on the build.
+    requireFreshBuiltCli({ cliPath: CLI_PATH });
+
     tmpDir = await mkdtemp(join(tmpdir(), "rex-hints-"));
     // Initialize so unknown-command hints are reachable (see runResult docs).
     execFileSync("node", [CLI_PATH, "init", tmpDir], {

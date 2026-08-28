@@ -192,14 +192,34 @@ export function handleCLIError(err: unknown, debug = false): never {
 }
 
 /**
+ * Git writes the three sides of a merge to temp files named `.merge_file_XXXXXX`
+ * and passes those paths to the merge driver. One of them reaching a directory
+ * check means the driver ran without its `SKIP_DIR_CHECK` exemption — i.e. the
+ * rex being executed predates that exemption.
+ */
+const GIT_MERGE_TEMP_FILE = /[\\/]\.merge_file_[^\\/]*$/;
+
+/**
  * Check that .rex/ exists in the given directory.
  * Throws a CLIError with an init suggestion if missing.
+ *
+ * A path that is really a git merge temp file gets a different suggestion.
+ * "Run 'n-dx init'" is technically true and actively unhelpful there: the
+ * directory is git's scratch file, not a project, and the actual cause is an
+ * out-of-date rex — a local `dist/` that predates the merge-driver exemption,
+ * or a stale global install. Saying so turns an opaque failure into a one-line
+ * fix, for the merge-driver integration test and for a real user alike.
  */
 export function requireRexDir(dir: string): void {
   if (!existsSync(join(dir, REX_DIR))) {
+    const suggestion = GIT_MERGE_TEMP_FILE.test(dir)
+      ? "This path is a git merge temp file, so rex is running as the rex-prd merge driver " +
+        "with a build that predates the merge-driver directory-check exemption. Rebuild rex " +
+        "('pnpm build' in a checkout) or update the installed version, then retry the merge."
+      : "Run 'n-dx init' to set up the project, or 'rex init' if using rex standalone.";
     throw new CLIError(
       `Rex directory not found in ${dir}`,
-      "Run 'n-dx init' to set up the project, or 'rex init' if using rex standalone.",
+      suggestion,
       CLI_ERROR_CODES.NOT_INITIALIZED,
     );
   }

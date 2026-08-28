@@ -31,8 +31,9 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [exec-interrupt-forwarding.test.js justifies its location with a false claim about where CI runs tests](./exec-interrupt-forwarding-test-270b14.md) | completed |
 | [Fake-CLI fixtures write .args into the repo root instead of a temp dir](./fake-cli-fixtures-write-args-76a37b.md) | completed |
 | [Give add-auto-reshape's scaling gate a min-of-N, and fix its shared-tree confound](./give-add-auto-reshape-s-scaling-5980e3.md) | completed |
+| [hench and sourcevision tests spawn dist/ with no build guard at all](./hench-and-sourcevision-tests-493fb8.md) | pending |
 | [Make the tests' sh-on-PATH dependency explicit instead of failing opaquely](./make-the-tests-sh-on-path-be8e19.md) | completed |
-| [merge-driver-git test fails misleadingly on a stale dist instead of saying to rebuild](./merge-driver-git-test-fails-e8d102.md) | pending |
+| [merge-driver-git test fails misleadingly on a stale dist instead of saying to rebuild](./merge-driver-git-test-fails-e8d102.md) | completed |
 | [Neutralize ambient color env so FORCE_COLOR does not fail 24 tests](./neutralize-ambient-color-env-so-4afde0.md) | completed |
 | [packages/hench/tests/unit/tools/git.test.ts spawns `sh` unguarded, so 7 cases fail from PowerShell](./packages-hench-tests-unit-tools-9a38b7.md) | completed |
 | [Stabilize rex's load-sensitive performance assertions](./stabilize-rex-s-load-sensitive-676af1.md) | completed |

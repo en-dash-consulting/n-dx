@@ -12,10 +12,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile, readFile, access } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
+import { requireFreshBuiltCli } from "../helpers/built-cli.js";
 
 const CLI_DIST = resolve(import.meta.dirname, "../../dist/cli/index.js");
 
@@ -46,9 +47,10 @@ describe("rex-prd merge driver in a real repository", () => {
   let repo: string;
 
   beforeEach(async () => {
-    await access(CLI_DIST).catch(() => {
-      throw new Error(`Built CLI not found at ${CLI_DIST} — run 'pnpm build' before this test.`);
-    });
+    // Existence is not enough: a dist that predates merge-driver's
+    // SKIP_DIR_CHECK exemption fails these tests with NDX_CLI_NOT_INITIALIZED
+    // against a git temp path, which names everything except the build.
+    requireFreshBuiltCli({ cliPath: CLI_DIST });
 
     repo = await mkdtemp(join(tmpdir(), "rex-merge-driver-"));
     git(repo, "init", "-b", "main");
