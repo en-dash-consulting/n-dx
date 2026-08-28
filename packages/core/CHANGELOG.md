@@ -1,5 +1,394 @@
 # @n-dx/core
 
+## 0.5.1
+
+### Patch Changes
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Assisted skill runs now record what they cost, instead of zero.
+  
+  `hench record` writes the run entry for work driven through a skill rather than a spawned agent. Those entries carried empty token usage, on the stated grounds that "Claude Code does not expose its own token consumption to the running skill". That holds for the tool surface and not for the filesystem: Claude Code writes a JSONL transcript per session in which every assistant message carries the API's `usage` object, and it exports `CLAUDE_CODE_SESSION_ID` to the tools it runs. So the numbers were readable all along, and `ndx usage` plus the dashboard's per-item rollup were under-reporting every skill-driven task by its entire cost.
+  
+  Usage is now read from that transcript by default. Two things make the attribution honest rather than merely non-zero:
+  
+  - **Only the delta.** One session routinely completes several tasks — the session this was built in completed four — so a per-record session total would count the same tokens once per task. A watermark per session lives in `.hench/usage-cursors/`, and each record claims only what accumulated since the last one. It survives transcript compaction by falling back from message uuid to a count, and says when it did.
+  - **Only after the work started.** The watermark cannot help the FIRST record in a session, which would otherwise claim everything spent before the task began. Measured against a live session: 549 messages and 127M cache-read tokens for one task. `--startedAt` now doubles as the earliest spend a record may claim, and `/ndx-work` captures it when it marks the task in progress.
+  
+  Precedence is explicit `--input-tokens`/`--output-tokens`/`--cache-*-tokens` flags, then the transcript, then zeros. A missing or unreadable transcript never fails the record — an unrecorded run is worse than one missing its tokens — and the command reports which happened. `--no-tokens` opts out; `--session` and `--transcript` override discovery.
+  
+  The `assisted` flag keeps its meaning as provenance (skill vs agent) rather than "no usage", and `turns` is now the transcript's message count, which is a real API-call count.
+  
+  Skills that mutate state — `/ndx-work`, `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-config` — record their runs as a documented step. Planning-style skills record against `skill:<name>`, which `get_token_usage` reports in its existing `orphans` bucket: work that produced many items should not be charged to one of them.
+  
+  Also fixes a test-isolation hazard this created. `CLAUDE_CODE_SESSION_ID` is exported to `pnpm test` as well, so the suite began reading the ambient live transcript and asserting against numbers that change between runs — green in CI, unreproducible locally. `tests/setup-session-env.js` clears it in every worker, the same shape as the existing `setup-color-env.js` and for the same reason.
+
+- [#343](https://github.com/en-dash-consulting/n-dx/pull/343) [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx config <key>` no longer lets a same-named directory shadow the key at the pre-dispatch layer.
+  
+  The config handler already resolved the ambiguity correctly — a known config key beats a directory, because a key is an exact match against a closed set while a directory name is arbitrary — but the pre-dispatch resolver (`resolveExistingDir`, which decides where to read `.n-dx.json` and check initialization) still used disk existence alone. In a project containing a `hench/` subdirectory, `ndx config hench` read config from `./hench` (silently dropping command timeouts and experimental flags, since the missing `.n-dx.json` falls back to `{}`) and printed "Project setup incomplete" for a fully initialized project.
+  
+  `resolveExistingDir` now accepts a skip predicate and, for the `config` command, applies the handler's own exported `isConfigKey` tiebreaker — so both layers agree. `./hench` and `../hench` remain unambiguous ways to name the directory, and a trailing directory argument in `ndx config <key> <value> <dir>` still resolves.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop a directory from shadowing a config key in `ndx config`
+  
+  `n-dx config [dir]` and `n-dx config <key>` occupy the same positional slot, and
+  the tie was broken by asking the filesystem: if the argument named something that
+  existed, it became the directory. In a project that happened to contain a
+  subdirectory named after a config section, that silently discarded the key —
+  `ndx config hench` in a project with a `hench/` directory read the config of
+  `./hench`, found none, and reported a fully-initialized project as uninitialized.
+  
+  A known key now wins, because a key is an exact match against a closed set
+  (`PROJECT_SECTIONS`, the package names, and `language`) while a directory name is
+  arbitrary. `./hench` and `../hench` still unambiguously mean the directory: their
+  first dot sits at index 0, so the root segment is empty and never matches a
+  section. A positional that is not a known key is resolved as a directory exactly
+  as before, so `ndx config ./some/project` is unaffected.
+
+- [#339](https://github.com/en-dash-consulting/n-dx/pull/339) [`a1ab6cc`](https://github.com/en-dash-consulting/n-dx/commit/a1ab6cc90d5ae171fddcc623c670a1e1c0df2a12) Thanks [@endash-shal](https://github.com/endash-shal)! - Correct stale zone-governance documentation and stop leaking n-dx internals into generated instruction files
+  
+  The zone fragility tables named six zones that no longer exist under those IDs
+  (`web-shared`, `crash`, `viewer-ui-hub`, `prd-fix-command`, `chunked-review`,
+  `hench-agent`) with metrics that no longer match any analysis. Because
+  `CLAUDE.md` is generated from `assistant-assets/`, those n-dx-specific zone
+  names and numbers also shipped into every `ndx init` target.
+  
+  The generated surfaces now carry only the threshold rule plus instructions to
+  read live values; n-dx's own measured inventory moved to `ZONES.md`, which is
+  repo-internal and not templated downstream.
+
+- [#339](https://github.com/en-dash-consulting/n-dx/pull/339) [`a1ab6cc`](https://github.com/en-dash-consulting/n-dx/commit/a1ab6cc90d5ae171fddcc623c670a1e1c0df2a12) Thanks [@endash-shal](https://github.com/endash-shal)! - Add Gemini support to the dashboard LLM Provider view, and complete the documentation cleanup
+  
+  The dashboard offered claude / codex / local only, so a project configured with
+  `llm.vendor google` could not see or edit its model settings there and
+  `llm.google.*` was absent from the config API response. Gemini is now a
+  first-class vendor in that view.
+  
+  Also completes the outstanding documentation findings: removes the removed
+  `prd.md` + `prd.json` dual-write architecture from the rex README (including an
+  unreplaced `![img_here](img_here)` placeholder that shipped to npm), corrects
+  the Node floor to match `engines: >=22`, completes the command references, and
+  deletes or archives superseded docs.
+
+- [#343](https://github.com/en-dash-consulting/n-dx/pull/343) [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558) Thanks [@endash-shal](https://github.com/endash-shal)! - The skill bodies' POSIX timestamp example works on BSD date now.
+  
+  Every recording skill's first step named `date -Is` as the POSIX example — GNU-only. On macOS (BSD date), the platform this project is primarily developed on, it exits 1 with `invalid argument 's' for -I`. All 18 skill-body copies now prescribe `date -Iseconds`, valid on both GNU and BSD date, and `tests/e2e/skill-run-recording.test.js` rejects the bare form so it cannot return (with the lookahead that keeps `date -Iseconds` itself legal).
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Document what the assisted-run token capture added, and the flake family it exposed.
+  
+  `.hench/usage-cursors/` now appears in the key-files table (`project-guidance.md`, so both `CLAUDE.md` and `AGENTS.md` carry it) and in the gitignore guide's copy-paste block and per-path table — it is machine- and session-local, and committing one collides between machines and puts a session id in history.
+  
+  The skills guide gains a shared section on what every state-mutating skill does at the end. The per-skill step lists are summaries that omit the commit step, so adding a lone "record the run" step to each would have implied they were exhaustive; the shared note covers both, including why planning-style skills record against `skill:<name>` and land in `get_token_usage`'s `orphans` bucket.
+  
+  TESTING.md gains **Family 4 — Ambient environment leaking into the suite**, which is the pattern behind three separate defects rather than one: `FORCE_COLOR` (24 failures across 8 files), whether `sh` resolves on PATH (21 failures across 5 files **plus 5 vacuous passes**), and `CLAUDE_CODE_SESSION_ID` (the suite reading a live, growing transcript). CI set none of them, so all three were green in CI and red only for humans. The rules record the setupFile mechanism, why a genuine environment dependency gets guarded rather than removed, and that an ambient dependency which breaks assertions usually also satisfies some for the wrong reason — so an audit should look for the vacuous passes too. The section intro said "Two failure families" while three were documented below it.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Attribute every commit n-dx creates.
+  
+  Three commit sources omitted the `Co-Authored-By: En Dash's n-dx <n-dx@endash.us>`
+  trailer: `/ndx-adversarial-review`'s commit step, the dashboard deploy commit in
+  `export.js`, and the `chore: n-dx init` baseline commit in `git-preflight.js`.
+  The trailer is what routes a commit to the n-dx identity — `merge-history.ts`
+  parses it for the dashboard's merge graph and GitHub reads it for the
+  contribution graph — so those commits were invisible to both, silently.
+  
+  The two source-level commits now build their message with `buildCommitMessage()`
+  from the new `packages/core/commit-trailers.js`, tagged `export/dashboard` and
+  `init/baseline`. The skill gained the same HEREDOC commit step the other
+  file-modifying skills use.
+  
+  The root cause was documentation: SKILLS.md rule 2 showed a bare
+  `git commit -m "<skill>: <desc>"` with no trailers, so a skill written against
+  the documented rule came out wrong. Rule 2 now shows the trailer-bearing HEREDOC
+  as the canonical template, and the `N-DX*` namespace is documented — `N-DX:` for
+  what produced the commit, `N-DX-Item:` for which item, `N-DX-Status:` for what
+  changed. They are three keys with distinct meanings, not variants to unify.
+  
+  Skills now declare `"commits": true` in the manifest, and
+  `tests/e2e/skill-commit-isolation.test.js` classifies on that flag instead of a
+  hardcoded array. Deriving the classification from body content would have made
+  the read-only assertion tautological; reading declared intent means a skill that
+  commits without declaring it fails loudly. A further assertion pins core's
+  trailer string byte-identical to hench's, since the orchestration tier cannot
+  import from packages and the string is necessarily duplicated.
+
+- [#343](https://github.com/en-dash-consulting/n-dx/pull/343) [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx init` now registers the rex-prd merge driver.
+  
+  Alongside the existing `.gitattributes` EOL pins, init appends `.rex/prd_tree/** merge=rex-prd` (same idempotent pattern-keyed mechanism — a user's own line for the pattern wins) and, inside a git repository, registers `merge.rex-prd.name` and `merge.rex-prd.driver` (`rex merge-driver %O %A %B`) in git config. An already-set driver — including a user-customized command — is left untouched, re-running init changes nothing, and outside a git repo the registration is silently skipped: init never fails over it. Together with the `rex merge-driver` command this makes PRD tree merges three-way and frontmatter-aware out of the box.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Add the `/ndx-adversarial-review` skill: review by attack rather than by inspection.
+  
+  Invoked bare it attacks the working or branch diff; given a task ID it attacks
+  the claim that the task is done, criterion by criterion; given a name or topic it
+  finds the matching PRD item and confirms it with the user before starting. Since
+  rex exposes no search tool, that resolution enumerates `.rex/prd_tree/` — whose
+  directory names are the item slugs — rather than guessing IDs, the same technique
+  the duplicate check uses.
+  
+  The skill runs two passes. Pass 1 works a fixed rubric — unimagined inputs,
+  failure paths, concurrency, platform, contract drift, test quality, the
+  acceptance criteria themselves — and drops any finding it cannot give a concrete
+  trigger or cannot defend against its own refutation attempt. Pass 2 then asks
+  whether each survivor is worth acting on at all: reachable by a real caller,
+  already covered upstream, worth what the fix costs, and in scope for this change.
+  A real defect that lands on "not worth fixing" is reported as such rather than
+  inflated into work.
+  
+  Ground truth includes the project's own checks, discovered rather than assumed —
+  `.rex/workflow.md`, the manifest scripts, or the CI config name them, and only
+  read-only ones are run. A red result is a finding whose repro is already written;
+  a green one bounds the review without ending it.
+  
+  Nothing is written until the user rules on the findings. Approved findings are
+  then checked against what the PRD already tracks — matched on the defect rather
+  than the wording — so a repeated review does not bury the original item under
+  near-duplicates: an already-tracked finding is either extended via `edit_item`,
+  when the review has something new to say, or skipped with the existing item's ID
+  reported. Genuinely new findings become items carrying the failure scenario,
+  candidate solutions, and failing acceptance criteria.
+  
+  The skill never edits source or applies a fix. Fixing an approved item is a
+  separate `/ndx-work` run.
+  
+  The run it records is scoped to itself: Step 1 notes an ISO-8601 timestamp
+  before reading anything and Step 7 passes it as `--startedAt`, so a review
+  invoked partway through a long session claims only what the review spent rather
+  than everything that came before it.
+  
+  Captured items are filed against `add_item`'s real parameters rather than
+  described in prose, so acceptance criteria reach the `acceptanceCriteria` array
+  where `verify_criteria` and the dashboard can read them, and severity maps
+  one-to-one onto `priority` instead of being buried in the description.
+  
+  Claim mode calls `verify_criteria` with `runTests: false`, so resolving the
+  target reads the criteria-to-test mapping without spawning the project's
+  configured test command — a command that step has not discovered or vetted. The
+  checks discovered in Step 2 are stated to be the only ones permitted to execute
+  tests.
+  
+  Diff mode resolves the default branch with
+  `git symbolic-ref --short refs/remotes/origin/HEAD` rather than assuming `main`,
+  and asks which branch to compare against when `origin/HEAD` is unset — so the
+  skill's primary entry mode works in a repo on `master` or `develop` instead of
+  failing with "fatal: ambiguous argument".
+
+- [#342](https://github.com/en-dash-consulting/n-dx/pull/342) [`a7b3227`](https://github.com/en-dash-consulting/n-dx/commit/a7b3227e42f778bedb0e19343cf42443f545c167) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `ndx work --review`: an adversarial review pass that runs after a task's
+  changes validate and before the commit prompt, so must-fix repairs ship in the
+  same commit as the work they repair.
+  
+  **`--review` changes meaning; the old gate is now `--approve-diff`.** The flag
+  previously showed the diff and prompted for approval. That gate is unchanged
+  apart from its name — pass `--approve-diff` to get it. The two are independent
+  and compose: the review pass runs first, so a human answering the diff prompt
+  sees the repaired tree rather than the one the implementer left behind. Runs
+  that pass `--review` print a line saying where the old behavior went.
+  
+  **The reviewer resumes the work session.** On the Claude CLI the pass re-enters
+  the session that just did the work (`--resume <session-id>`, captured from the
+  `session_id` that `--output-format stream-json` stamps on every line) and runs
+  it on a stronger model. That inherits what the diff cannot show: which
+  approaches were tried and abandoned, which files were read and found
+  irrelevant, what the implementer believed it was doing. Vendors whose CLI has no
+  resume equivalent — and any run where the session id never arrived — fall back
+  to a fresh reviewer seeded with the task, its acceptance criteria, and the
+  change's scope.
+  
+  Resuming invites anchoring, so the reviewer's system prompt is built against it:
+  prior reasoning in the conversation is named as evidence under test rather than
+  a position to defend, and every finding must carry inputs-to-wrong-result
+  concrete enough to be refuted. Findings that cannot be triggered are dropped
+  rather than softened.
+  
+  **Review gets its own model tier, `REVIEW_MODELS`.** Review is read-heavy and
+  judgment-dense but short — one diff, one pass — so its token volume is a
+  fraction of the run it audits and a stronger model costs little in absolute
+  terms. Claude defaults to `claude-opus-5` ($5/$25 per MTok): Opus-tier reasoning
+  at the same input price as Opus 4.8, where `claude-fable-5` would cost twice as
+  much for a single pass. Codex and Google resolve to their existing top tier;
+  local uses whatever is loaded.
+  
+  Resolution is `--review-model` → `llm.<vendor>.reviewModel` → `llm.reviewModel`
+  → the vendor default. `llm.model` and `llm.<vendor>.model` are deliberately
+  excluded: inheriting the execution model would mean a project that pins a cheap
+  executor silently gets a cheap reviewer, which defeats the reason the tier
+  exists. `--review-model` without `--review` is an error rather than a no-op.
+  
+  **Findings are triaged, not just listed.** Autonomous runs apply the verdict
+  policy directly — `must-fix` is repaired in-session with the test that would
+  have caught it, `should-fix` and `out-of-scope` are captured as rex items after
+  checking `.rex/prd_tree/` for an existing item describing the same defect, and
+  `not-worth-fixing` is reported with its reason. Interactive runs still stop and
+  ask before writing anything to the PRD. The reviewer is barred from committing,
+  from changing task status, and from any command that rewrites analysis or PRD
+  state concurrently with the run.
+  
+  **A broken review never fails a valid task.** By the time the pass runs, the
+  task's own completion validation has already passed, so a reviewer that dies,
+  writes nothing, or writes something unparseable tells us nothing about the work
+  — the failure is reported and the run continues. The distinction is preserved
+  on the run record (`run.review`) rather than left in terminal scrollback,
+  because a review that silently did not happen must not read as one that found
+  nothing. Report transport is a JSON file under `.hench/reviews/<run-id>.json`,
+  keyed by run so a re-review keeps both, and cleared before each pass so a stale
+  report can never be read as the current one. Unknown enum values in a report
+  are coerced toward alarm — an unrecognized severity becomes `critical`, an
+  unrecognized action becomes `failed` — so a garbled field demands attention
+  instead of reading as clean.
+  
+  The pass requires the CLI provider and errors out on `provider=api` rather than
+  accepting the flag and doing nothing. Its token usage is charged to the run it
+  reviewed, so `ndx usage` reflects what `--review` actually costs.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop resolving a tool subcommand as the project directory.
+  
+  Before dispatch, `main()` infers a directory to read `.n-dx.json` from and to
+  check whether the project is initialized. It used the same last-positional rule
+  the command handlers use — but a tool-delegation call still carries its
+  subcommand in those args, so `ndx hench record --task=X --status=completed`
+  resolved the project directory to `./record`, and `ndx rex status --format=json`
+  to `./status`.
+  
+  Two things followed, neither of them loud. `checkProjectStaleness` looked for
+  `.rex`, `.hench` and `.sourcevision` under a path that does not exist and printed
+  "Project setup incomplete — run ndx init to initialize" in a fully initialized
+  project. And `loadProjectConfig` read `.n-dx.json` from that same path and fell
+  back to `{}`, so `commandTimeouts` and BETA experimental flags silently stopped
+  applying to any `ndx rex|hench|sourcevision|sv <subcommand>` call without a
+  trailing directory. The delegated tool itself was unaffected — it resolves its
+  own directory — which is why the symptom was a false warning and dropped config
+  rather than a failed command.
+  
+  That call site now uses `resolveExistingDir`, which accepts a positional only
+  when it names a real directory. This is safe there specifically because the
+  result is never an operation target: a path that does not exist has no config to
+  read, so falling back to the cwd loses nothing. The 25 handler call sites keep
+  the existing rule, so a directory the user intends to create — `ndx init newdir`
+  — still resolves as before. The stricter rule also fixes the same misfire for a
+  non-path positional, such as `ndx rex add "some description"`.
+
+- [#343](https://github.com/en-dash-consulting/n-dx/pull/343) [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558) Thanks [@endash-shal](https://github.com/endash-shal)! - Skill commit steps no longer prescribe a POSIX-only heredoc.
+  
+  Five skill bodies (`ndx-adversarial-review`, `ndx-capture`, `ndx-config`, `ndx-plan`, `ndx-reshape`) built their commit message with `git commit -m "$(cat <<'EOF' … )"` — a construct that does not exist in PowerShell or cmd.exe, and Git Bash is not part of Windows (it arrives with Git for Windows, whose `usr/bin` is not on PATH outside Git Bash itself). The failure landed at the skill's LAST step, after all real work was written; worse, an assistant improvising around the parse error could drop the `Co-Authored-By` trailer, which fails silently — the commit lands but vanishes from the dashboard's merge graph.
+  
+  The bodies now instruct the assistant to write the message with its file-writing tool to a scratch file and run `git commit -F <file>` — no shell quoting anywhere, so the trailer bytes survive in every shell. Repeated `-m` flags are explicitly named as unsafe (git's blank-line joining splits the trailer block). `tests/e2e/skill-portability.test.js` now rejects `cat <<` and `$(cat` in any skill body, so a sixth copy cannot creep in.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - File PRD items against `add_item`'s real fields in every skill that creates them.
+  
+  `/ndx-plan`, `/ndx-capture`, and `/ndx-reshape` described item content in prose —
+  "create it with appropriate descriptions, acceptance criteria, and parent
+  placement" — without naming the parameters those map to. Two things went wrong
+  as a result. Acceptance criteria landed in `description` prose while the
+  `acceptanceCriteria` array stayed empty, and that array is what `verify_criteria`
+  and the dashboard's requirements view read, so the criteria could never be mapped
+  to tests or checked by a later review: the item looked complete while being
+  quietly unverifiable. And `level`, which is required with no default, was guessed
+  per run, so items of the same kind landed at different levels.
+  
+  Each skill now names the fields it actually needs rather than carrying a copy of
+  the same table. `/ndx-plan` — which files in bulk and had no coverage at all —
+  gained the full mapping including `priority` and `source`. `/ndx-capture` already
+  handled level, parent, and priority through its own steps, so it gained the
+  `acceptanceCriteria` and `source` guidance it lacked. `/ndx-reshape` creates
+  containers rather than work items, so it gained explicit `level` and `parentId`
+  for those, and the criteria rule for the rarer case where a container has a
+  testable outcome of its own.
+  
+  A new test, `tests/e2e/skill-item-fields.test.js`, derives its skill list from the
+  manifest, so a future skill that creates items is covered the moment it is added.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Scope every skill's run record to the skill's own work.
+  
+  `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, and `/ndx-config` all ended with
+  `ndx hench record` but never captured a start time, so none could pass
+  `--startedAt`. Without it the first record in a session has no watermark to work
+  back from: `readUsageDelta` opens its window at the top of the transcript and the
+  record claims every token the session spent before the skill was invoked. A
+  `/ndx-capture` run measured while fixing this claimed 21,343,032 tokens across
+  171 messages — an entire session's unrelated work charged to one captured item.
+  
+  Each of the four now notes the current time in ISO-8601 before it starts and
+  passes it as `--startedAt`. `/ndx-work` already did, but prescribed `date -Is`,
+  which does not exist in PowerShell; it and the four new instructions name both
+  `date -Is` and `Get-Date -Format o` as examples of whatever the shell provides.
+  
+  A new test, `tests/e2e/skill-run-recording.test.js`, derives its skill list from
+  the manifest rather than hardcoding it, so a future skill that records runs is
+  covered the moment it is added: it must pass `--startedAt`, say where the value
+  comes from, and not prescribe a POSIX-only command to get it.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx start stop` no longer warns that a server "did not exit" when it did.
+  
+  `terminateTreeByPid` returns whether a pid stopped answering signal 0, which is not the same question as whether the intended process exited: `kill(pid, 0)` succeeds for a zombie — exited but not yet reaped — and for a PID that has since been recycled. SIGKILL is unblockable, so a still-signallable pid after one is weak evidence of survival and strong evidence of nothing.
+  
+  The two stop paths disagreed about that. `cli.js` discarded the result and explained why; `web.js` branched on it and logged `Server (PID N) did not exit within Nms of SIGKILL.` — directly above the `Stopped ...` line it printed anyway. Stopping a server that exited cleanly could produce both lines, and the warning was the wrong one.
+  
+  `web.js` now discards the result too. The rationale lives in one place — the contract on `terminateTreeByPid` — with both call sites pointing at it instead of carrying their own copy, and the `@returns` tag corrected: it claimed "whether the pid is gone", contradicting the prose four lines above it.
+  
+  Where a stop path genuinely needs to report failure, the signal-0 probe belongs *before* the kill, which is where `cli.js` already separates EPERM ("exists, not ours to signal" — a real failure) from ESRCH ("already gone" — success). That behaviour is unchanged.
+  
+  Guarded by a source assertion rather than a behavioural test: misreporting needs an unreaped zombie in the window between exit and reap, which cannot be staged deterministically, whereas the invariant that produced it — no caller consults the result — checks exactly.
+
+- [#339](https://github.com/en-dash-consulting/n-dx/pull/339) [`a1ab6cc`](https://github.com/en-dash-consulting/n-dx/commit/a1ab6cc90d5ae171fddcc623c670a1e1c0df2a12) Thanks [@endash-shal](https://github.com/endash-shal)! - Update LLM model catalogs to current vendor releases
+  
+  Refreshes the Claude, Codex, and Gemini model catalogs and fixes several
+  incorrect context-window and pricing entries. Two of the previous defaults
+  pointed at models that are no longer usable.
+  
+  **Claude**
+  - `claude-opus-4-8` → `claude-opus-5` in the init catalog, the `opus` shorthand
+    alias, and the `heavy` tier (was `claude-opus-4-7`).
+  - Added a `fable` shorthand alias for `claude-fable-5`.
+  - Corrected context windows: `claude-sonnet-4-6` and `claude-opus-4-7` are 1M
+    models, not 200K.
+  - Corrected pricing: `claude-haiku-4-5` is $1.00/$5.00 (was $0.80/$4.00) and
+    `claude-opus-4-7` is $5.00/$25.00 (was $15.00/$75.00).
+  - Default remains `claude-sonnet-5`.
+  
+  **Codex** — GPT-5.6 replaces the GPT-5.4/5.5 line
+  - Default is now `gpt-5.6-terra` (was `gpt-5.5`), with `gpt-5.6-sol` as a new
+    `heavy` tier (codex previously had no tier above standard) and `gpt-5.6-luna`
+    as `light` (was `gpt-5.4-mini`).
+  - `gpt-5.4` and `gpt-5.4-mini` retire from ChatGPT-authenticated Codex sessions
+    on 2026-08-31; `gpt-5.3-codex` and `gpt-5.2` are already unavailable there.
+    All four are now legacy aliases that normalize to OpenAI's stated
+    replacements, so existing `.n-dx.json` files keep working after upgrade.
+  - `gpt-5.5` is still supported and remains a selectable catalog entry.
+  - `openai-api-provider` default was `gpt-4o`; now `gpt-5.6-terra`.
+  
+  **Google**
+  - `gemini-2.0-flash` has been **shut down** by Google and was the configured
+    `light` tier — replaced with `gemini-3.5-flash-lite`. `standard` moves from
+    `gemini-2.5-flash` to `gemini-3.7-flash`.
+  - `heavy` intentionally stays on `gemini-2.5-pro`, the newest *stable* Pro
+    model. `gemini-3.1-pro-preview` is newer but is a preview release whose ID
+    may be renamed or withdrawn; it remains selectable via `llm.google.model`.
+  - Corrected `gemini-2.5-flash` pricing to $0.30/$2.50 (was $0.15/$0.60).
+  
+  Also refreshes the dashboard's model suggestions, which still listed retired
+  IDs (`claude-haiku-3-5`, `claude-3-7-sonnet-20250219`, `o3`, `o4-mini`), and
+  updates model examples in `ndx config --help`, `ndx init --help`, and the
+  configuration guide.
+
+- [#331](https://github.com/en-dash-consulting/n-dx/pull/331) [`cfdd3b5`](https://github.com/en-dash-consulting/n-dx/commit/cfdd3b5d3f53ad7e6a032fa855ba66a359818be9) Thanks [@jeremylumanbailey](https://github.com/jeremylumanbailey)! - Add `--verbose`/`--debug` live progress across `ndx init` and `sourcevision analyze`, and replace scattered vendor string literals with shared `LLM_VENDOR` constants.
+  
+  **Live progress instrumentation.** `ndx init` gave no visibility into a slow `sourcevision analyze` run — `--debug` reached the child process but its output was fully captured and discarded on success, so a slow run was indistinguishable from a hung one. `ndx init`'s spinner now forwards the child's own progress live (throttled so a high-volume `--debug` firehose can't stall the pipe via backpressure), and the Components phase (component parsing, route detection, server-route detection) gets per-operation timestamped tracing plus automatic gap detection that flags any silence past 250ms by naming the last known checkpoint. A worker-thread-backed live stopwatch prints an incrementing "current operation runtime" for any operation still in flight — verified to keep ticking even during a fully synchronous, non-yielding block, which a same-thread timer cannot do. `hench`'s shell tool gets equivalent live-tail output for long-running commands.
+  
+  **Fixed a real infinite loop this instrumentation surfaced.** `inferPrefix` (server-route prefix inference) could spin forever on any two ordinary routes that share no deeper common path (e.g. `/users/:id` and `/orders`) — confirmed live via a CPU sample showing 100% of time in `String.prototype.lastIndexOf`. Also tightens `isLikelyRouteFile` so a client-side `api/` directory (axios/fetch-style callers, not Express-style route definitions) is no longer scanned for server routes at all, and adds a length guard against any future misextracted route "path" that's actually an unrelated string literal.
+  
+  **Vendor literal consolidation.** Replaces hardcoded `"claude"`/`"codex"`/`"google"`/`"local"` string comparisons throughout `core`, `hench`, `rex`, `sourcevision`, and `web` with the canonical `LLM_VENDOR`/`DEFAULT_LLM_VENDOR`/`LLM_VENDORS`/`isLLMVendor` helpers exported from `provider-interface.ts` and re-exported through each package's llm-client gateway, so the supported-vendor set has one source of truth instead of being duplicated ad hoc at each call site.
+  
+  **Fixed `ndx config <key>` incorrectly reporting an initialized project as stale.** The pre-dispatch directory resolver used for the staleness check and command-timeout config load treated a config key like `llm` as a target directory when no explicit directory argument was given, so `ndx config llm` looked for `.sourcevision`/`.rex`/`.hench` under a nonexistent `llm/` subdirectory and reported a fully-initialized project as uninitialized.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Review follow-ups on session usage recording and the adversarial-review skill.
+  
+  - **The usage watermark can no longer rewind.** When the newest scanned transcript entry carried no `uuid`, the cursor kept the previous `lastUuid` while `consumed` advanced past it — and `lastUuid` wins on the next read, so everything between the two was claimed twice. The uuid watermark is now dropped when the tail has none, so the count governs and nothing is re-claimed. Latent rather than live (real transcripts stamp a uuid on every usage-bearing entry), but `uuid` is typed optional and the input is untrusted JSON parsed line-by-line, and the failure mode was silent inflation of exactly the number this module exists to make trustworthy.
+  - **`CLAUDE_CONFIG_DIR` is honoured when locating the transcript.** `resolveTranscriptPath` accepted a `configDir` option but nothing outside its own test passed one, so a user who relocated their Claude config tree silently recorded zero tokens. The environment variable is now consulted between the explicit option and the `~/.claude` default.
+  - **Transcript discovery probes with `stat` instead of a full read.** The existence probe read the whole file and threw the bytes away; the caller then read it again — twice the I/O on transcripts that reach tens of MB.
+  - **`ndx-adversarial-review` stages only what it wrote.** Its commit step inherited the house `git add -A`, but this skill's diff mode takes the dirty working tree as its review subject, so unscoped staging swept the user's in-progress work into a commit attributed to the review. It now runs `git add .rex/prd_tree/` and scopes its porcelain check the same way; the other committing skills, which never take a dirty tree as input, keep `git add -A`.
+- Updated dependencies [[`1f6f17c`](https://github.com/en-dash-consulting/n-dx/commit/1f6f17c32b0ae387ab0e927688ce71ad6859fb3b), [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce), [`a1ab6cc`](https://github.com/en-dash-consulting/n-dx/commit/a1ab6cc90d5ae171fddcc623c670a1e1c0df2a12), [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce), [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce), [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558), [`2bb6a4c`](https://github.com/en-dash-consulting/n-dx/commit/2bb6a4c240e61aa34bf0d240e7ffc26c7e5a4dab), [`a7b3227`](https://github.com/en-dash-consulting/n-dx/commit/a7b3227e42f778bedb0e19343cf42443f545c167), [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558), [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce), [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558), [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce), [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558), [`1f6f17c`](https://github.com/en-dash-consulting/n-dx/commit/1f6f17c32b0ae387ab0e927688ce71ad6859fb3b), [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558), [`1f6f17c`](https://github.com/en-dash-consulting/n-dx/commit/1f6f17c32b0ae387ab0e927688ce71ad6859fb3b), [`a1ab6cc`](https://github.com/en-dash-consulting/n-dx/commit/a1ab6cc90d5ae171fddcc623c670a1e1c0df2a12), [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558), [`cfdd3b5`](https://github.com/en-dash-consulting/n-dx/commit/cfdd3b5d3f53ad7e6a032fa855ba66a359818be9), [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce)]:
+  - @n-dx/rex@0.5.1
+  - @n-dx/hench@0.5.1
+  - @n-dx/web@0.5.1
+  - @n-dx/sourcevision@0.5.1
+  - @n-dx/llm-client@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes

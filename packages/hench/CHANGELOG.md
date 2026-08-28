@@ -1,5 +1,194 @@
 # @n-dx/hench
 
+## 0.5.1
+
+### Patch Changes
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Assisted skill runs now record what they cost, instead of zero.
+  
+  `hench record` writes the run entry for work driven through a skill rather than a spawned agent. Those entries carried empty token usage, on the stated grounds that "Claude Code does not expose its own token consumption to the running skill". That holds for the tool surface and not for the filesystem: Claude Code writes a JSONL transcript per session in which every assistant message carries the API's `usage` object, and it exports `CLAUDE_CODE_SESSION_ID` to the tools it runs. So the numbers were readable all along, and `ndx usage` plus the dashboard's per-item rollup were under-reporting every skill-driven task by its entire cost.
+  
+  Usage is now read from that transcript by default. Two things make the attribution honest rather than merely non-zero:
+  
+  - **Only the delta.** One session routinely completes several tasks — the session this was built in completed four — so a per-record session total would count the same tokens once per task. A watermark per session lives in `.hench/usage-cursors/`, and each record claims only what accumulated since the last one. It survives transcript compaction by falling back from message uuid to a count, and says when it did.
+  - **Only after the work started.** The watermark cannot help the FIRST record in a session, which would otherwise claim everything spent before the task began. Measured against a live session: 549 messages and 127M cache-read tokens for one task. `--startedAt` now doubles as the earliest spend a record may claim, and `/ndx-work` captures it when it marks the task in progress.
+  
+  Precedence is explicit `--input-tokens`/`--output-tokens`/`--cache-*-tokens` flags, then the transcript, then zeros. A missing or unreadable transcript never fails the record — an unrecorded run is worse than one missing its tokens — and the command reports which happened. `--no-tokens` opts out; `--session` and `--transcript` override discovery.
+  
+  The `assisted` flag keeps its meaning as provenance (skill vs agent) rather than "no usage", and `turns` is now the transcript's message count, which is a real API-call count.
+  
+  Skills that mutate state — `/ndx-work`, `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-config` — record their runs as a documented step. Planning-style skills record against `skill:<name>`, which `get_token_usage` reports in its existing `orphans` bucket: work that produced many items should not be charged to one of them.
+  
+  Also fixes a test-isolation hazard this created. `CLAUDE_CODE_SESSION_ID` is exported to `pnpm test` as well, so the suite began reading the ambient live transcript and asserting against numbers that change between runs — green in CI, unreproducible locally. `tests/setup-session-env.js` clears it in every worker, the same shape as the existing `setup-color-env.js` and for the same reason.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the tests' `sh`-on-PATH dependency explicit instead of failing opaquely.
+  
+  `sh` is absent from a stock Windows PATH — it ships with Git for Windows, which Git Bash exposes and PowerShell/cmd.exe do not. Tests that spawn `sh -c` therefore passed from Git Bash and failed from PowerShell on the same commit, and no failure message mentioned a shell: the orphan test reported `expected false to be true` after burning a 5s wait, because the grandchild that never started also never wrote its pid. Two of these were investigated as suspected regressions during a merge before the shell was identified as the variable.
+  
+  The audit found more than the two files that prompted it: **28 shell-dependent cases across 5 files**, of which 21 were failing and **5 were passing vacuously** — a case asserting "nothing was written after the timeout" is trivially satisfied when nothing ever ran, and hench's `reports exit code on failure without output` is satisfied by a spawn that failed to launch. Those were green on machines where the behaviour was never exercised, which is the worse half of this bug.
+  
+  Each site now skips with `sh` named, via one helper per suite boundary, all delegating to the production `isExecutableOnPath` probe. The `sh` indirection itself is preserved, not removed: libuv puts every non-detached child it spawns on Windows into a global job object, so spawning `node` directly would reap the tree for free and make the tests vacuous — which is how an earlier version of the orphan test managed to prove nothing.
+  
+  For hench the skip says more, because there `sh` is not scaffolding: `run_command` and the post-task test runner spawn `sh -c` on *every* platform, so a machine without `sh` cannot run those tools at all. The skip records which product capability went unverified rather than implying a test artifact.
+  
+  Also: shell spawns in tests no longer discard their own failure. `stdio: "ignore"` is about the child's output, and with the spawn error thrown away an unresolvable shell looked identical to a surviving orphan. Full inventory and the rules for adding a new shell-spawning test are in `tests/shell-spawn-inventory.md`.
+
+- [#341](https://github.com/en-dash-consulting/n-dx/pull/341) [`2bb6a4c`](https://github.com/en-dash-consulting/n-dx/commit/2bb6a4c240e61aa34bf0d240e7ffc26c7e5a4dab) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Route mechanical single-shot LLM calls to the light model tier. In rex, `spawnClaude()` gains an optional task-weight parameter (default `"standard"`), and sibling renames, group renames, body merges, the consolidation guard, the granularity assessment pass, guided clarify rounds, and the post-prune consolidation pass now resolve the vendor's light-tier model (e.g. haiku) when no explicit model is given. In hench, pre-run commit-message generation resolves the light tier instead of the run's standard model. An explicit `--model` flag (or a per-vendor `lightModel` config for the light tier) still overrides tier resolution, and the active tier is surfaced in vendor-header/spinner output ("light tier").
+
+- [#342](https://github.com/en-dash-consulting/n-dx/pull/342) [`a7b3227`](https://github.com/en-dash-consulting/n-dx/commit/a7b3227e42f778bedb0e19343cf42443f545c167) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `ndx work --review`: an adversarial review pass that runs after a task's
+  changes validate and before the commit prompt, so must-fix repairs ship in the
+  same commit as the work they repair.
+  
+  **`--review` changes meaning; the old gate is now `--approve-diff`.** The flag
+  previously showed the diff and prompted for approval. That gate is unchanged
+  apart from its name — pass `--approve-diff` to get it. The two are independent
+  and compose: the review pass runs first, so a human answering the diff prompt
+  sees the repaired tree rather than the one the implementer left behind. Runs
+  that pass `--review` print a line saying where the old behavior went.
+  
+  **The reviewer resumes the work session.** On the Claude CLI the pass re-enters
+  the session that just did the work (`--resume <session-id>`, captured from the
+  `session_id` that `--output-format stream-json` stamps on every line) and runs
+  it on a stronger model. That inherits what the diff cannot show: which
+  approaches were tried and abandoned, which files were read and found
+  irrelevant, what the implementer believed it was doing. Vendors whose CLI has no
+  resume equivalent — and any run where the session id never arrived — fall back
+  to a fresh reviewer seeded with the task, its acceptance criteria, and the
+  change's scope.
+  
+  Resuming invites anchoring, so the reviewer's system prompt is built against it:
+  prior reasoning in the conversation is named as evidence under test rather than
+  a position to defend, and every finding must carry inputs-to-wrong-result
+  concrete enough to be refuted. Findings that cannot be triggered are dropped
+  rather than softened.
+  
+  **Review gets its own model tier, `REVIEW_MODELS`.** Review is read-heavy and
+  judgment-dense but short — one diff, one pass — so its token volume is a
+  fraction of the run it audits and a stronger model costs little in absolute
+  terms. Claude defaults to `claude-opus-5` ($5/$25 per MTok): Opus-tier reasoning
+  at the same input price as Opus 4.8, where `claude-fable-5` would cost twice as
+  much for a single pass. Codex and Google resolve to their existing top tier;
+  local uses whatever is loaded.
+  
+  Resolution is `--review-model` → `llm.<vendor>.reviewModel` → `llm.reviewModel`
+  → the vendor default. `llm.model` and `llm.<vendor>.model` are deliberately
+  excluded: inheriting the execution model would mean a project that pins a cheap
+  executor silently gets a cheap reviewer, which defeats the reason the tier
+  exists. `--review-model` without `--review` is an error rather than a no-op.
+  
+  **Findings are triaged, not just listed.** Autonomous runs apply the verdict
+  policy directly — `must-fix` is repaired in-session with the test that would
+  have caught it, `should-fix` and `out-of-scope` are captured as rex items after
+  checking `.rex/prd_tree/` for an existing item describing the same defect, and
+  `not-worth-fixing` is reported with its reason. Interactive runs still stop and
+  ask before writing anything to the PRD. The reviewer is barred from committing,
+  from changing task status, and from any command that rewrites analysis or PRD
+  state concurrently with the run.
+  
+  **A broken review never fails a valid task.** By the time the pass runs, the
+  task's own completion validation has already passed, so a reviewer that dies,
+  writes nothing, or writes something unparseable tells us nothing about the work
+  — the failure is reported and the run continues. The distinction is preserved
+  on the run record (`run.review`) rather than left in terminal scrollback,
+  because a review that silently did not happen must not read as one that found
+  nothing. Report transport is a JSON file under `.hench/reviews/<run-id>.json`,
+  keyed by run so a re-review keeps both, and cleared before each pass so a stale
+  report can never be read as the current one. Unknown enum values in a report
+  are coerced toward alarm — an unrecognized severity becomes `critical`, an
+  unrecognized action becomes `failed` — so a garbled field demands attention
+  instead of reading as clean.
+  
+  The pass requires the CLI provider and errors out on `provider=api` rather than
+  accepting the flag and doing nothing. Its token usage is charged to the run it
+  reviewed, so `ndx usage` reflects what `--review` actually costs.
+
+- [#343](https://github.com/en-dash-consulting/n-dx/pull/343) [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558) Thanks [@endash-shal](https://github.com/endash-shal)! - `hench record --no-tokens` now burns the suppressed spend instead of deferring it to the next record.
+  
+  The `--no-tokens` branch returned before the transcript was read, so the session watermark never advanced: in one session, `record --task=A --no-tokens` followed by a normal `record --task=B` silently rolled A's entire spend into B's record and B's PRD-item rollup. The flag's plain reading — and the existing precedent of the explicit `--*-tokens` path, which advances the watermark because "that spend is now accounted for" — is that suppressed spend is attributed to nothing.
+  
+  Now the transcript is still read under `--no-tokens` and the watermark advances past the suppressed messages; the record keeps its zeros and its note says how many messages were discarded. A transcript problem never fails a `--no-tokens` record (the caller asked for no usage at all), and `hench record --help` states the discard semantics.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - A run file that cannot be read is no longer treated as a run file that changed.
+  
+  Both change detectors trust mtime only once it is older than the filesystem's timestamp granularity, and inside that window compare a hash of the bytes instead. `hashFile` returns null when the read fails, and both docblocks promised the caller treats that as "no usable hash" rather than as a change. Neither caller did: the comparison guarded the *previous* hash against null but not the new one, so a previously-hashed file whose read now failed compared `"abc" !== null` and was reported modified.
+  
+  In the web aggregator that was the expensive direction to get wrong. "Modified" means subtract-then-re-read, and when the re-read failed too the contribution was dropped outright — so a momentarily unreadable run file silently lost its tokens from the per-task aggregate until something else touched it. Absence of evidence became a deletion. The hench detector only reports the change without mutating an accumulator, so the cost there was a spurious change flag.
+  
+  Both now require *both* hashes to be usable before a difference counts. mtime and size already agree at that point, so nothing suggests a rewrite — only that this scan could not check, which is not the same thing. Each side gained a test that injects the read failure (reproducing it from the filesystem is platform-specific; the branch is not) and asserts the file's tokens survive it, with a precondition check so it cannot pass vacuously when no hash was being carried.
+  
+  Fixed in both copies together, as the twins' shared rule requires. Note for anyone tracing this: there is no parity test between these two detectors and there was never meant to be — `incremental-task-usage.ts` explains why they are deliberately unshared and unpaired, unlike the `quoteWindowsToken` twins.
+
+- [#343](https://github.com/en-dash-consulting/n-dx/pull/343) [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558) Thanks [@endash-shal](https://github.com/endash-shal)! - `hench record` no longer silently claims a whole session when its usage window is missing or malformed.
+  
+  `--startedAt` doubles as the usage window: the earliest spend a record may claim. Two paths quietly widened that window to the entire transcript. An unparseable value — `--startedAt=25/08/2026`, the shape a locale-formatted `Get-Date` produces — was accepted and discarded, taking the same branch as no window at all. And omitting the flag on a session's first record (the CLI help's own first example) claimed every usage-bearing message the session had, with the total reported as plain fact; measured while building the feature, that was 549 messages and 127M cache-read tokens attributed to one PRD item.
+  
+  Now an unparseable `--startedAt`/`--since` is a hard error naming the flag — the precedent `--turns=abc` already set — instead of an accepted no-op. A genuinely windowless first record still writes (recording a whole session is legitimate when the whole session was the task), but warns first, naming the message count it is about to claim and pointing at `--startedAt`. `hench record --help` states both behaviors, and its first example now passes `--startedAt`.
+  
+  The one behavior change to scripts: a sloppy timestamp that used to be ignored now fails the command. That is the point — the silent path put wrong numbers in `get_token_usage` and `ndx usage` with nothing marking them suspicious.
+
+- [#335](https://github.com/en-dash-consulting/n-dx/pull/335) [`1f6f17c`](https://github.com/en-dash-consulting/n-dx/commit/1f6f17c32b0ae387ab0e927688ce71ad6859fb3b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Stamp `actor` (git `user.name`/`user.email` → OS username → `"unknown"`) and `host` (`os.hostname()`) on every `RunRecord` at run start, for both agent-loop runs and assisted `hench record` runs. Both fields are additive on the v1 schema — existing run files without them still parse. `hench show`/`status` and the run-complete summary surface the actor.
+
+- [#339](https://github.com/en-dash-consulting/n-dx/pull/339) [`a1ab6cc`](https://github.com/en-dash-consulting/n-dx/commit/a1ab6cc90d5ae171fddcc623c670a1e1c0df2a12) Thanks [@endash-shal](https://github.com/endash-shal)! - Update LLM model catalogs to current vendor releases
+  
+  Refreshes the Claude, Codex, and Gemini model catalogs and fixes several
+  incorrect context-window and pricing entries. Two of the previous defaults
+  pointed at models that are no longer usable.
+  
+  **Claude**
+  - `claude-opus-4-8` → `claude-opus-5` in the init catalog, the `opus` shorthand
+    alias, and the `heavy` tier (was `claude-opus-4-7`).
+  - Added a `fable` shorthand alias for `claude-fable-5`.
+  - Corrected context windows: `claude-sonnet-4-6` and `claude-opus-4-7` are 1M
+    models, not 200K.
+  - Corrected pricing: `claude-haiku-4-5` is $1.00/$5.00 (was $0.80/$4.00) and
+    `claude-opus-4-7` is $5.00/$25.00 (was $15.00/$75.00).
+  - Default remains `claude-sonnet-5`.
+  
+  **Codex** — GPT-5.6 replaces the GPT-5.4/5.5 line
+  - Default is now `gpt-5.6-terra` (was `gpt-5.5`), with `gpt-5.6-sol` as a new
+    `heavy` tier (codex previously had no tier above standard) and `gpt-5.6-luna`
+    as `light` (was `gpt-5.4-mini`).
+  - `gpt-5.4` and `gpt-5.4-mini` retire from ChatGPT-authenticated Codex sessions
+    on 2026-08-31; `gpt-5.3-codex` and `gpt-5.2` are already unavailable there.
+    All four are now legacy aliases that normalize to OpenAI's stated
+    replacements, so existing `.n-dx.json` files keep working after upgrade.
+  - `gpt-5.5` is still supported and remains a selectable catalog entry.
+  - `openai-api-provider` default was `gpt-4o`; now `gpt-5.6-terra`.
+  
+  **Google**
+  - `gemini-2.0-flash` has been **shut down** by Google and was the configured
+    `light` tier — replaced with `gemini-3.5-flash-lite`. `standard` moves from
+    `gemini-2.5-flash` to `gemini-3.7-flash`.
+  - `heavy` intentionally stays on `gemini-2.5-pro`, the newest *stable* Pro
+    model. `gemini-3.1-pro-preview` is newer but is a preview release whose ID
+    may be renamed or withdrawn; it remains selectable via `llm.google.model`.
+  - Corrected `gemini-2.5-flash` pricing to $0.30/$2.50 (was $0.15/$0.60).
+  
+  Also refreshes the dashboard's model suggestions, which still listed retired
+  IDs (`claude-haiku-3-5`, `claude-3-7-sonnet-20250219`, `o3`, `o4-mini`), and
+  updates model examples in `ndx config --help`, `ndx init --help`, and the
+  configuration guide.
+
+- [#331](https://github.com/en-dash-consulting/n-dx/pull/331) [`cfdd3b5`](https://github.com/en-dash-consulting/n-dx/commit/cfdd3b5d3f53ad7e6a032fa855ba66a359818be9) Thanks [@jeremylumanbailey](https://github.com/jeremylumanbailey)! - Add `--verbose`/`--debug` live progress across `ndx init` and `sourcevision analyze`, and replace scattered vendor string literals with shared `LLM_VENDOR` constants.
+  
+  **Live progress instrumentation.** `ndx init` gave no visibility into a slow `sourcevision analyze` run — `--debug` reached the child process but its output was fully captured and discarded on success, so a slow run was indistinguishable from a hung one. `ndx init`'s spinner now forwards the child's own progress live (throttled so a high-volume `--debug` firehose can't stall the pipe via backpressure), and the Components phase (component parsing, route detection, server-route detection) gets per-operation timestamped tracing plus automatic gap detection that flags any silence past 250ms by naming the last known checkpoint. A worker-thread-backed live stopwatch prints an incrementing "current operation runtime" for any operation still in flight — verified to keep ticking even during a fully synchronous, non-yielding block, which a same-thread timer cannot do. `hench`'s shell tool gets equivalent live-tail output for long-running commands.
+  
+  **Fixed a real infinite loop this instrumentation surfaced.** `inferPrefix` (server-route prefix inference) could spin forever on any two ordinary routes that share no deeper common path (e.g. `/users/:id` and `/orders`) — confirmed live via a CPU sample showing 100% of time in `String.prototype.lastIndexOf`. Also tightens `isLikelyRouteFile` so a client-side `api/` directory (axios/fetch-style callers, not Express-style route definitions) is no longer scanned for server routes at all, and adds a length guard against any future misextracted route "path" that's actually an unrelated string literal.
+  
+  **Vendor literal consolidation.** Replaces hardcoded `"claude"`/`"codex"`/`"google"`/`"local"` string comparisons throughout `core`, `hench`, `rex`, `sourcevision`, and `web` with the canonical `LLM_VENDOR`/`DEFAULT_LLM_VENDOR`/`LLM_VENDORS`/`isLLMVendor` helpers exported from `provider-interface.ts` and re-exported through each package's llm-client gateway, so the supported-vendor set has one source of truth instead of being duplicated ad hoc at each call site.
+  
+  **Fixed `ndx config <key>` incorrectly reporting an initialized project as stale.** The pre-dispatch directory resolver used for the staleness check and command-timeout config load treated a config key like `llm` as a target directory when no explicit directory argument was given, so `ndx config llm` looked for `.sourcevision`/`.rex`/`.hench` under a nonexistent `llm/` subdirectory and reported a fully-initialized project as uninitialized.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Review follow-ups on session usage recording and the adversarial-review skill.
+  
+  - **The usage watermark can no longer rewind.** When the newest scanned transcript entry carried no `uuid`, the cursor kept the previous `lastUuid` while `consumed` advanced past it — and `lastUuid` wins on the next read, so everything between the two was claimed twice. The uuid watermark is now dropped when the tail has none, so the count governs and nothing is re-claimed. Latent rather than live (real transcripts stamp a uuid on every usage-bearing entry), but `uuid` is typed optional and the input is untrusted JSON parsed line-by-line, and the failure mode was silent inflation of exactly the number this module exists to make trustworthy.
+  - **`CLAUDE_CONFIG_DIR` is honoured when locating the transcript.** `resolveTranscriptPath` accepted a `configDir` option but nothing outside its own test passed one, so a user who relocated their Claude config tree silently recorded zero tokens. The environment variable is now consulted between the explicit option and the `~/.claude` default.
+  - **Transcript discovery probes with `stat` instead of a full read.** The existence probe read the whole file and threw the bytes away; the caller then read it again — twice the I/O on transcripts that reach tens of MB.
+  - **`ndx-adversarial-review` stages only what it wrote.** Its commit step inherited the house `git add -A`, but this skill's diff mode takes the dirty working tree as its review subject, so unscoped staging swept the user's in-progress work into a commit attributed to the review. It now runs `git add .rex/prd_tree/` and scopes its porcelain check the same way; the other committing skills, which never take a dirty tree as input, keep `git add -A`.
+- Updated dependencies [[`1f6f17c`](https://github.com/en-dash-consulting/n-dx/commit/1f6f17c32b0ae387ab0e927688ce71ad6859fb3b), [`a1ab6cc`](https://github.com/en-dash-consulting/n-dx/commit/a1ab6cc90d5ae171fddcc623c670a1e1c0df2a12), [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce), [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce), [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558), [`2bb6a4c`](https://github.com/en-dash-consulting/n-dx/commit/2bb6a4c240e61aa34bf0d240e7ffc26c7e5a4dab), [`a7b3227`](https://github.com/en-dash-consulting/n-dx/commit/a7b3227e42f778bedb0e19343cf42443f545c167), [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558), [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558), [`1f6f17c`](https://github.com/en-dash-consulting/n-dx/commit/1f6f17c32b0ae387ab0e927688ce71ad6859fb3b), [`a1ab6cc`](https://github.com/en-dash-consulting/n-dx/commit/a1ab6cc90d5ae171fddcc623c670a1e1c0df2a12), [`e02a5fe`](https://github.com/en-dash-consulting/n-dx/commit/e02a5fee539a091a456a17994fa5e8d0ba491558), [`cfdd3b5`](https://github.com/en-dash-consulting/n-dx/commit/cfdd3b5d3f53ad7e6a032fa855ba66a359818be9)]:
+  - @n-dx/rex@0.5.1
+  - @n-dx/llm-client@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes

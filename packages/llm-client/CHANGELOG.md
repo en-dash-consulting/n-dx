@@ -1,5 +1,141 @@
 # @n-dx/llm-client
 
+## 0.5.1
+
+### Patch Changes
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Ctrl-C now reaches commands run through `exec()`. Tree-kill puts POSIX children in their own process group so a timeout can reach grandchildren, which also took them out of the group the terminal signals — so an interrupt no longer stopped them, and hench's `run_command` and `git` tools had to be killed by hand. While a detached child is alive, a SIGINT arriving at the parent is now forwarded to the child's group. One shared listener regardless of how many commands are in flight, removed as soon as the last child settles, and it stands down and re-raises when nothing else is listening so a CLI never ends up ignoring Ctrl-C. Windows is unchanged — it never detaches for tree-kill.
+
+- [#332](https://github.com/en-dash-consulting/n-dx/pull/332) [`b6be7f7`](https://github.com/en-dash-consulting/n-dx/commit/b6be7f7f80232fe9b1b45479040db6f81bf6bbce) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the tests' `sh`-on-PATH dependency explicit instead of failing opaquely.
+  
+  `sh` is absent from a stock Windows PATH — it ships with Git for Windows, which Git Bash exposes and PowerShell/cmd.exe do not. Tests that spawn `sh -c` therefore passed from Git Bash and failed from PowerShell on the same commit, and no failure message mentioned a shell: the orphan test reported `expected false to be true` after burning a 5s wait, because the grandchild that never started also never wrote its pid. Two of these were investigated as suspected regressions during a merge before the shell was identified as the variable.
+  
+  The audit found more than the two files that prompted it: **28 shell-dependent cases across 5 files**, of which 21 were failing and **5 were passing vacuously** — a case asserting "nothing was written after the timeout" is trivially satisfied when nothing ever ran, and hench's `reports exit code on failure without output` is satisfied by a spawn that failed to launch. Those were green on machines where the behaviour was never exercised, which is the worse half of this bug.
+  
+  Each site now skips with `sh` named, via one helper per suite boundary, all delegating to the production `isExecutableOnPath` probe. The `sh` indirection itself is preserved, not removed: libuv puts every non-detached child it spawns on Windows into a global job object, so spawning `node` directly would reap the tree for free and make the tests vacuous — which is how an earlier version of the orphan test managed to prove nothing.
+  
+  For hench the skip says more, because there `sh` is not scaffolding: `run_command` and the post-task test runner spawn `sh -c` on *every* platform, so a machine without `sh` cannot run those tools at all. The skip records which product capability went unverified rather than implying a test artifact.
+  
+  Also: shell spawns in tests no longer discard their own failure. `stdio: "ignore"` is about the child's output, and with the spawn error thrown away an unresolvable shell looked identical to a surviving orphan. Full inventory and the rules for adding a new shell-spawning test are in `tests/shell-spawn-inventory.md`.
+
+- [#342](https://github.com/en-dash-consulting/n-dx/pull/342) [`a7b3227`](https://github.com/en-dash-consulting/n-dx/commit/a7b3227e42f778bedb0e19343cf42443f545c167) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `ndx work --review`: an adversarial review pass that runs after a task's
+  changes validate and before the commit prompt, so must-fix repairs ship in the
+  same commit as the work they repair.
+  
+  **`--review` changes meaning; the old gate is now `--approve-diff`.** The flag
+  previously showed the diff and prompted for approval. That gate is unchanged
+  apart from its name — pass `--approve-diff` to get it. The two are independent
+  and compose: the review pass runs first, so a human answering the diff prompt
+  sees the repaired tree rather than the one the implementer left behind. Runs
+  that pass `--review` print a line saying where the old behavior went.
+  
+  **The reviewer resumes the work session.** On the Claude CLI the pass re-enters
+  the session that just did the work (`--resume <session-id>`, captured from the
+  `session_id` that `--output-format stream-json` stamps on every line) and runs
+  it on a stronger model. That inherits what the diff cannot show: which
+  approaches were tried and abandoned, which files were read and found
+  irrelevant, what the implementer believed it was doing. Vendors whose CLI has no
+  resume equivalent — and any run where the session id never arrived — fall back
+  to a fresh reviewer seeded with the task, its acceptance criteria, and the
+  change's scope.
+  
+  Resuming invites anchoring, so the reviewer's system prompt is built against it:
+  prior reasoning in the conversation is named as evidence under test rather than
+  a position to defend, and every finding must carry inputs-to-wrong-result
+  concrete enough to be refuted. Findings that cannot be triggered are dropped
+  rather than softened.
+  
+  **Review gets its own model tier, `REVIEW_MODELS`.** Review is read-heavy and
+  judgment-dense but short — one diff, one pass — so its token volume is a
+  fraction of the run it audits and a stronger model costs little in absolute
+  terms. Claude defaults to `claude-opus-5` ($5/$25 per MTok): Opus-tier reasoning
+  at the same input price as Opus 4.8, where `claude-fable-5` would cost twice as
+  much for a single pass. Codex and Google resolve to their existing top tier;
+  local uses whatever is loaded.
+  
+  Resolution is `--review-model` → `llm.<vendor>.reviewModel` → `llm.reviewModel`
+  → the vendor default. `llm.model` and `llm.<vendor>.model` are deliberately
+  excluded: inheriting the execution model would mean a project that pins a cheap
+  executor silently gets a cheap reviewer, which defeats the reason the tier
+  exists. `--review-model` without `--review` is an error rather than a no-op.
+  
+  **Findings are triaged, not just listed.** Autonomous runs apply the verdict
+  policy directly — `must-fix` is repaired in-session with the test that would
+  have caught it, `should-fix` and `out-of-scope` are captured as rex items after
+  checking `.rex/prd_tree/` for an existing item describing the same defect, and
+  `not-worth-fixing` is reported with its reason. Interactive runs still stop and
+  ask before writing anything to the PRD. The reviewer is barred from committing,
+  from changing task status, and from any command that rewrites analysis or PRD
+  state concurrently with the run.
+  
+  **A broken review never fails a valid task.** By the time the pass runs, the
+  task's own completion validation has already passed, so a reviewer that dies,
+  writes nothing, or writes something unparseable tells us nothing about the work
+  — the failure is reported and the run continues. The distinction is preserved
+  on the run record (`run.review`) rather than left in terminal scrollback,
+  because a review that silently did not happen must not read as one that found
+  nothing. Report transport is a JSON file under `.hench/reviews/<run-id>.json`,
+  keyed by run so a re-review keeps both, and cleared before each pass so a stale
+  report can never be read as the current one. Unknown enum values in a report
+  are coerced toward alarm — an unrecognized severity becomes `critical`, an
+  unrecognized action becomes `failed` — so a garbled field demands attention
+  instead of reading as clean.
+  
+  The pass requires the CLI provider and errors out on `provider=api` rather than
+  accepting the flag and doing nothing. Its token usage is charged to the run it
+  reviewed, so `ndx usage` reflects what `--review` actually costs.
+
+- [#339](https://github.com/en-dash-consulting/n-dx/pull/339) [`a1ab6cc`](https://github.com/en-dash-consulting/n-dx/commit/a1ab6cc90d5ae171fddcc623c670a1e1c0df2a12) Thanks [@endash-shal](https://github.com/endash-shal)! - Update LLM model catalogs to current vendor releases
+  
+  Refreshes the Claude, Codex, and Gemini model catalogs and fixes several
+  incorrect context-window and pricing entries. Two of the previous defaults
+  pointed at models that are no longer usable.
+  
+  **Claude**
+  - `claude-opus-4-8` → `claude-opus-5` in the init catalog, the `opus` shorthand
+    alias, and the `heavy` tier (was `claude-opus-4-7`).
+  - Added a `fable` shorthand alias for `claude-fable-5`.
+  - Corrected context windows: `claude-sonnet-4-6` and `claude-opus-4-7` are 1M
+    models, not 200K.
+  - Corrected pricing: `claude-haiku-4-5` is $1.00/$5.00 (was $0.80/$4.00) and
+    `claude-opus-4-7` is $5.00/$25.00 (was $15.00/$75.00).
+  - Default remains `claude-sonnet-5`.
+  
+  **Codex** — GPT-5.6 replaces the GPT-5.4/5.5 line
+  - Default is now `gpt-5.6-terra` (was `gpt-5.5`), with `gpt-5.6-sol` as a new
+    `heavy` tier (codex previously had no tier above standard) and `gpt-5.6-luna`
+    as `light` (was `gpt-5.4-mini`).
+  - `gpt-5.4` and `gpt-5.4-mini` retire from ChatGPT-authenticated Codex sessions
+    on 2026-08-31; `gpt-5.3-codex` and `gpt-5.2` are already unavailable there.
+    All four are now legacy aliases that normalize to OpenAI's stated
+    replacements, so existing `.n-dx.json` files keep working after upgrade.
+  - `gpt-5.5` is still supported and remains a selectable catalog entry.
+  - `openai-api-provider` default was `gpt-4o`; now `gpt-5.6-terra`.
+  
+  **Google**
+  - `gemini-2.0-flash` has been **shut down** by Google and was the configured
+    `light` tier — replaced with `gemini-3.5-flash-lite`. `standard` moves from
+    `gemini-2.5-flash` to `gemini-3.7-flash`.
+  - `heavy` intentionally stays on `gemini-2.5-pro`, the newest *stable* Pro
+    model. `gemini-3.1-pro-preview` is newer but is a preview release whose ID
+    may be renamed or withdrawn; it remains selectable via `llm.google.model`.
+  - Corrected `gemini-2.5-flash` pricing to $0.30/$2.50 (was $0.15/$0.60).
+  
+  Also refreshes the dashboard's model suggestions, which still listed retired
+  IDs (`claude-haiku-3-5`, `claude-3-7-sonnet-20250219`, `o3`, `o4-mini`), and
+  updates model examples in `ndx config --help`, `ndx init --help`, and the
+  configuration guide.
+
+- [#331](https://github.com/en-dash-consulting/n-dx/pull/331) [`cfdd3b5`](https://github.com/en-dash-consulting/n-dx/commit/cfdd3b5d3f53ad7e6a032fa855ba66a359818be9) Thanks [@jeremylumanbailey](https://github.com/jeremylumanbailey)! - Add `--verbose`/`--debug` live progress across `ndx init` and `sourcevision analyze`, and replace scattered vendor string literals with shared `LLM_VENDOR` constants.
+  
+  **Live progress instrumentation.** `ndx init` gave no visibility into a slow `sourcevision analyze` run — `--debug` reached the child process but its output was fully captured and discarded on success, so a slow run was indistinguishable from a hung one. `ndx init`'s spinner now forwards the child's own progress live (throttled so a high-volume `--debug` firehose can't stall the pipe via backpressure), and the Components phase (component parsing, route detection, server-route detection) gets per-operation timestamped tracing plus automatic gap detection that flags any silence past 250ms by naming the last known checkpoint. A worker-thread-backed live stopwatch prints an incrementing "current operation runtime" for any operation still in flight — verified to keep ticking even during a fully synchronous, non-yielding block, which a same-thread timer cannot do. `hench`'s shell tool gets equivalent live-tail output for long-running commands.
+  
+  **Fixed a real infinite loop this instrumentation surfaced.** `inferPrefix` (server-route prefix inference) could spin forever on any two ordinary routes that share no deeper common path (e.g. `/users/:id` and `/orders`) — confirmed live via a CPU sample showing 100% of time in `String.prototype.lastIndexOf`. Also tightens `isLikelyRouteFile` so a client-side `api/` directory (axios/fetch-style callers, not Express-style route definitions) is no longer scanned for server routes at all, and adds a length guard against any future misextracted route "path" that's actually an unrelated string literal.
+  
+  **Vendor literal consolidation.** Replaces hardcoded `"claude"`/`"codex"`/`"google"`/`"local"` string comparisons throughout `core`, `hench`, `rex`, `sourcevision`, and `web` with the canonical `LLM_VENDOR`/`DEFAULT_LLM_VENDOR`/`LLM_VENDORS`/`isLLMVendor` helpers exported from `provider-interface.ts` and re-exported through each package's llm-client gateway, so the supported-vendor set has one source of truth instead of being duplicated ad hoc at each call site.
+  
+  **Fixed `ndx config <key>` incorrectly reporting an initialized project as stale.** The pre-dispatch directory resolver used for the staleness check and command-timeout config load treated a config key like `llm` as a target directory when no explicit directory argument was given, so `ndx config llm` looked for `.sourcevision`/`.rex`/`.hench` under a nonexistent `llm/` subdirectory and reported a fully-initialized project as uninitialized.
+
 ## 0.5.0
 
 ### Minor Changes
