@@ -26,3 +26,11 @@ description: "The light/standard/heavy tier machinery exists in llm-client but i
 lastModified: "2026-08-28T17:37:54.978Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [llm-client: resolveTaskModel + DEFAULT_ROUTES registry and routing config types](./llm-client-resolvetaskmodel-1e3ec2.md) | completed |
+| [ndx config validators, help, and web UI paths for llm routing keys](./ndx-config-validators-help-and-24f506.md) | pending |
+| [Thread taskClass through rex, sourcevision, and hench call sites](./thread-taskclass-through-rex-3c6d08.md) | pending |

@@ -46,6 +46,14 @@ export type { LLMVendor };
  */
 export type TaskWeight = "light" | "standard" | "heavy";
 
+/**
+ * A routing tier: the three vendor-catalog weights plus `free`, the
+ * zero-cost tier served by a locally configured model. `free` has no
+ * catalog entry — a route that names it falls through to `light` unless
+ * `llm.tiers.<vendor>.free` supplies a model.
+ */
+export type TaskTier = TaskWeight | "free";
+
 /** Optional Codex-specific config section in `.n-dx.json`. */
 export interface CodexConfig {
   /** Path to Codex CLI binary. Defaults to `codex`. */
@@ -210,6 +218,33 @@ export interface LLMConfig {
    * Default: false (disabled for backward compatibility).
    */
   autoFailover?: boolean;
+  /**
+   * Tier → model overrides per vendor (`llm.tiers.<vendor>.<tier>`).
+   * Consulted by `resolveTaskModel` after routing picks a tier, ahead of the
+   * legacy per-vendor slots (`lightModel`, `model`) and the `TIER_MODELS`
+   * catalog. The only place the `free` tier can be given a model.
+   */
+  tiers?: Partial<Record<LLMVendor, Partial<Record<TaskTier, string>>>>;
+  /**
+   * Task class → tier routes (`llm.routes.<class>`). Keys are exact class
+   * names (`"prd.rename"`) or glob prefixes (`"prd.*"`, `"*"`); exact wins
+   * over glob, longer prefixes over shorter. Values name a {@link TaskTier};
+   * an unrecognized value degrades to `standard` rather than erroring.
+   */
+  routes?: Record<string, string>;
+  /**
+   * Task class → effort level (`llm.effort.<class>`), matched with the same
+   * exact-then-glob rules as `routes`. Returned verbatim by
+   * `resolveTaskModel` for callers that pass `--effort` / `output_config`.
+   */
+  effort?: Record<string, string>;
+  /**
+   * Escalation policy for light-first task classes: retry a failed
+   * light-tier call once on the standard tier with the validation error
+   * appended. Declared here so config can round-trip it; the ladder itself
+   * is implemented by the callers that validate light-tier output.
+   */
+  escalation?: { enabled?: boolean; maxSteps?: number };
 }
 
 /** Alias that preserves migration ergonomics for downstream packages. */
