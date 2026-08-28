@@ -2,9 +2,8 @@
 id: "ebe4c082-7e93-44ee-a286-cf01c05dd907"
 level: "epic"
 title: "SourceVision"
-status: "completed"
+status: "pending"
 startedAt: "2026-04-13T18:35:49.604Z"
-completedAt: "2026-03-24T04:16:45.798Z"
 description: "Static analysis engine: file inventory, import graph, zone detection (Louvain community detection), React component catalog, PR markdown generation. Produces .sourcevision/CONTEXT.md and llms.txt for AI consumption.\n\n---\n\nBuild an evaluation harness in tests/gauntlet/ that captures sourcevision's current LLM-driven analysis output (zone enrichment, file classification) as golden fixtures and scores future runs against them. Once the harness exists, optimization PRs (Haiku swap, heuristic-first classifier, payload reduction, raised concurrency, skip-trivial-zones short-circuit, --full pass signature dedup, cached LLM replay, semantic zone-name scoring) become measured changes with eval-score deltas rather than vibes-based judgment. Motivation: sourcevision analyze burns substantial tokens and wall-clock time; multiple optimization paths exist but each carries silent quality regression risk."
 ---
 
@@ -47,3 +46,4 @@ description: "Static analysis engine: file inventory, import graph, zone detecti
 | [Web Server Port Management](./web-server-port-management/index.md) | completed |
 | [Web UI Memory Management and Crash Resolution](./web-ui-memory-management-and-0344ce/index.md) | completed |
 | [Zone Detection Validation for Go Projects](./zone-detection-validation-for-fe5bf3/index.md) | completed |
+| [Optional 3D isometric architecture map generator](./optional-3d-isometric-f666d3.md) | pending |
