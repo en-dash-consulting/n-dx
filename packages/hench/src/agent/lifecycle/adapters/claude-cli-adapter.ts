@@ -112,6 +112,16 @@ export interface ClaudeCliInput {
    * different model is exactly what the review pass does.
    */
   resumeSessionId?: string;
+  /**
+   * Fork the resumed session instead of continuing it (`--fork-session`),
+   * so the spawn inherits the parent transcript under a new session id and
+   * leaves the parent unmutated. That is what makes one orientation session
+   * reusable across many task spawns.
+   *
+   * Ignored without {@link resumeSessionId} — forking is a modifier on
+   * resume, and emitting it alone would claim a fork that never happened.
+   */
+  forkSession?: boolean;
 }
 
 /** Separates the system prompt from the task prompt when both travel via stdin. */
@@ -148,6 +158,7 @@ export function buildClaudeCliArgs(
     ...(input.modelOverride ? ["--model", input.modelOverride] : []),
     ...(input.permissionMode ? ["--permission-mode", input.permissionMode] : []),
     ...(input.resumeSessionId ? ["--resume", input.resumeSessionId] : []),
+    ...(input.resumeSessionId && input.forkSession ? ["--fork-session"] : []),
   ];
 
   return { args, stdinContent };
@@ -386,6 +397,7 @@ export const claudeCliAdapter: VendorAdapter = {
       modelOverride: opts.model,
       permissionMode: opts.permissionMode,
       resumeSessionId: opts.resumeSessionId,
+      forkSession: opts.forkSession,
     });
 
     return {

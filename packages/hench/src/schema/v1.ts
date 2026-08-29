@@ -180,6 +180,34 @@ export interface HenchConfig {
    */
   autoCommit?: boolean;
   /**
+   * How task spawns relate to vendor sessions.
+   *
+   * - `"fork"` (default where supported) — run orientation once, then fork
+   *   that session per task (`--resume <id> --fork-session`), so no task
+   *   re-pays cold-start context or re-explores the repo.
+   * - `"batch"` — execute up to {@link tasksPerSession} tasks in one session,
+   *   feeding each next brief as a follow-up turn. Vendor-neutral.
+   * - `"cold"` — a fresh spawn per task (the original behavior).
+   *
+   * Forking requires a CLI that can resume by session id (Claude today), so
+   * other vendors and the API provider resolve to `"cold"` regardless. See
+   * `resolveSessionStrategy` in `agent/lifecycle/session-cache.ts`.
+   */
+  sessionStrategy?: "fork" | "batch" | "cold";
+  /**
+   * Tasks executed per session under the `"batch"` strategy (default: 4).
+   * Bounded deliberately — a longer shared session saves more cold starts
+   * but accumulates cross-task context that can bleed between them.
+   */
+  tasksPerSession?: number;
+  /**
+   * How long a cached orientation session may be forked before it is
+   * rebuilt, in hours (default: 24). The analysis fingerprint invalidates a
+   * parent when the repo is re-analyzed; this bounds how stale an
+   * orientation can get without one.
+   */
+  parentMaxAgeHours?: number;
+  /**
    * When true, skip the mandatory full test suite gate before commit.
    * Default: false (gate is mandatory). The --skip-test-gate CLI flag sets this.
    * Test gate failure blocks commit unless this flag is set or user selects skip.

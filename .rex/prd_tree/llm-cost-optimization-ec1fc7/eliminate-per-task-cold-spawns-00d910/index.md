@@ -22,3 +22,11 @@ description: "Every hench task today is a fresh claude -p spawn — re-paying th
 lastModified: "2026-08-28T17:38:58.341Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Orientation pass and warm-parent fork wiring](./orientation-pass-and-warm-649bcd.md) | pending |
+| [Sequential session batching strategy (tasksPerSession)](./sequential-session-batching-d80a00.md) | pending |
+| [Session cache, adapter --fork-session flag, and session-strategy config keys](./session-cache-adapter-fork-052cfa.md) | completed |
