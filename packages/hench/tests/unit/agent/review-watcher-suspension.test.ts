@@ -24,7 +24,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 
 import { processSuccessfulResult } from "../../../src/agent/lifecycle/cli-loop.js";
@@ -114,6 +114,19 @@ describe("commit watcher is suspended for the review pass", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
+  /**
+   * Make `git commit` slow enough to still be running when the suspension
+   * arrives — the window the in-flight defect lives in. Without this the
+   * commit finishes inside the test's own wait and the race never occurs.
+   */
+  async function installSlowPreCommitHook(): Promise<void> {
+    await writeFile(
+      join(projectDir, ".git", "hooks", "pre-commit"),
+      `#!/bin/sh\n"${process.execPath.replace(/\\/g, "/")}" -e "setTimeout(()=>{}, 1200)"\n`,
+      { encoding: "utf-8", mode: 0o755 },
+    );
+  }
+
   it("cancels the watcher before the reviewer spawns, so a review longer than the timeout cannot auto-commit", async () => {
     const calls: string[] = [];
     const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: WATCHER_TIMEOUT_MS });
@@ -121,6 +134,10 @@ describe("commit watcher is suspended for the review pass", () => {
       cancel: () => {
         calls.push("cancel");
         watcher.cancel();
+      },
+      settle: () => {
+        calls.push("settle");
+        return watcher.settle();
       },
       didAutoCommit: () => watcher.didAutoCommit(),
     };
@@ -177,6 +194,146 @@ describe("commit watcher is suspended for the review pass", () => {
     expect(await commitCount(projectDir)).toBe(1);
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(true);
   }, 20_000);
+
+  /**
+   * cancel() disarms the timer, but it cannot un-fire one that already went
+   * off: `tryAutoCommit` was launched fire-and-forget, so a `git commit`
+   * already running kept running while the reviewer spawned alongside it.
+   *
+   * Two ways that hurts. The commit lands mid-review, splitting the repairs
+   * from the work they repair — and the HEAD-moved guard, reading HEAD before
+   * the commit finished, stayed quiet about it. Or the reviewer's own git
+   * invocation collides with it on `.git/index.lock`, the commit fails, and
+   * the message file is unlinked anyway, losing the executor's message with
+   * nothing committed.
+   *
+   * The suspension therefore has to wait for an in-flight commit to settle,
+   * not merely disarm the timer.
+   */
+  it("waits for an in-flight auto-commit to finish before the reviewer spawns", async () => {
+    await installSlowPreCommitHook();
+
+    // What the reviewer sees the moment it is asked to spawn.
+    let commitsAtSpawn: number | undefined;
+    const calls: string[] = [];
+    const adapter = {
+      vendor: "claude",
+      parseMode: "stream-json",
+      buildSpawnConfig: (): SpawnConfig => {
+        calls.push("buildSpawnConfig");
+        commitsAtSpawn = Number(
+          execFileSync("git", ["rev-list", "--count", "HEAD"], { cwd: projectDir, encoding: "utf-8" }).trim(),
+        );
+        return { binary: process.execPath, args: [sleepScript], env: {}, stdinContent: null };
+      },
+      parseEvent: () => null,
+      classifyError: () => "unknown",
+    } as unknown as VendorAdapter;
+
+    await writeFile(sleepScript, "setTimeout(() => {}, 10);\n", "utf-8");
+
+    const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 50 });
+    // Let the timer fire and the (slow) commit get under way.
+    await sleep(400);
+
+    const run = runRecord();
+    await processSuccessfulResult({
+      run,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      result: {
+        turns: 3,
+        toolCalls: [{ name: "Bash", input: "echo", timestamp: new Date().toISOString() }],
+        tokenUsage: { input: 10, output: 10 },
+        turnTokenUsage: [],
+        summary: "did the work",
+      } as any,
+      accumulated: { turns: 3, toolCalls: [], turnTokenUsage: [], tokenUsage: { input: 10, output: 10 } },
+      attempt: 0,
+      store: {} as PRDStore,
+      taskId: "task-1",
+      projectDir,
+      startingHead: await git(projectDir, "rev-parse", "HEAD"),
+      reviewPass: {
+        adapter,
+        vendor: "claude",
+        cliBinary: process.execPath,
+        policy: DEFAULT_EXECUTION_POLICY,
+        henchDir,
+        reviewModel: "",
+        permissionMode: "acceptEdits",
+        autonomous: true,
+        taskTitle: "Test task",
+      },
+      commitWatcher: watcher,
+    });
+
+    expect(calls).toContain("buildSpawnConfig");
+    // The commit had landed before the reviewer was asked for its spawn
+    // config. Without the settle it would still have been in flight, and this
+    // would read 1.
+    expect(commitsAtSpawn).toBe(2);
+    expect(watcher.didAutoCommit()).toBe(true);
+  }, 30_000);
+
+  it("warns that HEAD moved when a pre-review auto-commit lands, instead of staying silent", async () => {
+    await writeFile(sleepScript, "setTimeout(() => {}, 10);\n", "utf-8");
+    // Same slow commit as above: without the settle the guard reads HEAD
+    // before the commit finishes and reports nothing, which is the silence
+    // this case exists to catch.
+    await installSlowPreCommitHook();
+
+    const startingHead = await git(projectDir, "rev-parse", "HEAD");
+    const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 50 });
+    await sleep(400); // timer fires; the commit is still running
+
+    const lines: string[] = [];
+    const write = process.stdout.write.bind(process.stdout);
+    const log = console.log.bind(console);
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      lines.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+
+    try {
+      await processSuccessfulResult({
+        run: runRecord(),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        result: {
+          turns: 3,
+          toolCalls: [{ name: "Bash", input: "echo", timestamp: new Date().toISOString() }],
+          tokenUsage: { input: 10, output: 10 },
+          turnTokenUsage: [],
+          summary: "did the work",
+        } as any,
+        accumulated: { turns: 3, toolCalls: [], turnTokenUsage: [], tokenUsage: { input: 10, output: 10 } },
+        attempt: 0,
+        store: {} as PRDStore,
+        taskId: "task-1",
+        projectDir,
+        startingHead,
+        reviewPass: {
+          adapter: stubAdapter(sleepScript, []),
+          vendor: "claude",
+          cliBinary: process.execPath,
+          policy: DEFAULT_EXECUTION_POLICY,
+          henchDir,
+          reviewModel: "",
+          permissionMode: "acceptEdits",
+          autonomous: true,
+          taskTitle: "Test task",
+        },
+        commitWatcher: watcher,
+      });
+    } finally {
+      process.stdout.write = write;
+      console.log = log;
+    }
+
+    expect(watcher.didAutoCommit()).toBe(true);
+    // The guard used to read HEAD before the commit settled and say nothing.
+    expect(lines.join("")).toContain("HEAD moved before the review pass");
+  }, 30_000);
 
   it("still runs the review pass when no watcher is provided (API/loop callers)", async () => {
     const calls: string[] = [];

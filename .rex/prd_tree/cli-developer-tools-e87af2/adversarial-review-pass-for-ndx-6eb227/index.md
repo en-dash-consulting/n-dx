@@ -19,7 +19,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Break token figures into fresh/cache/output in the run summary and hench record](./break-token-figures-into-fresh-0ba847.md) | completed |
 | [captureFailedFindings mislabels a must-fix whose own repair attempt failed as a capture failure](./capturefailedfindings-mislabels-0c5870.md) | completed |
 | [Commit-message watcher auto-commits mid-review, splitting or dropping the reviewer's repairs](./commit-message-watcher-auto-8b7df3.md) | completed |
-| [commitWatcher.cancel() cannot stop an auto-commit already in flight, so the review-pass suspension has a silent hole](./commitwatcher-cancel-cannot-63cbcc.md) | pending |
+| [commitWatcher.cancel() cannot stop an auto-commit already in flight, so the review-pass suspension has a silent hole](./commitwatcher-cancel-cannot-63cbcc.md) | completed |
 | [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-859237.md) | completed |
 | [Don't skip the full test suite gate when the agent has already committed its work](./don-t-skip-the-full-test-suite-c97114.md) | pending |
 | [Give review its own model tier with a review-model override](./give-review-its-own-model-tier-b889a2.md) | completed |

@@ -1368,6 +1368,13 @@ export async function processSuccessfulResult(ctx: SuccessContext): Promise<Succ
       // review: a reviewer crash leaves staged work plus the message file,
       // which the pre-run commit gate already recovers on the next run.
       ctx.commitWatcher?.cancel();
+      // cancel() disarms a timer that has not fired; it cannot un-fire one
+      // that has. A commit already in flight would otherwise keep running
+      // while the reviewer spawns into the same tree — landing mid-review and
+      // moving HEAD unannounced, or colliding with the reviewer's own git on
+      // .git/index.lock. Waiting also makes didAutoCommit() and the HEAD-moved
+      // guard below read settled state rather than a commit about to land.
+      await ctx.commitWatcher?.settle();
       const reviewOutcome = await runAdversarialReviewPass(ctx.reviewPass, {
         run,
         taskId,

@@ -13,6 +13,11 @@
  * run lifecycle always cancels before calling `performCommitPromptIfNeeded` so
  * the two mechanisms cannot double-commit.
  *
+ * `cancel()` only disarms; it cannot un-fire a timer that already went off.
+ * A caller that must know nothing is running — the review pass, which cancels
+ * and then spawns a second agent into the same working tree — awaits
+ * `settle()` afterwards.
+ *
  * @module
  */
 
@@ -37,8 +42,29 @@ export interface CommitMsgWatcher {
   /** Cancel the watcher and any pending timer. No-op if already cancelled. */
   cancel(): void;
   /**
+   * Wait for an auto-commit that has already started to finish.
+   *
+   * `cancel()` disarms a timer that has not fired; it cannot un-fire one that
+   * has. When the timer fires it launches `tryAutoCommit()`, which spends up
+   * to 30 seconds inside `git commit`. Cancelling during that window leaves
+   * the commit running, so a caller that proceeds immediately — the review
+   * pass, which cancels and then spawns — runs concurrently with it: either
+   * the commit lands mid-review and moves HEAD unannounced, or the two git
+   * invocations collide on `.git/index.lock` and the commit fails after the
+   * message file has already been consumed.
+   *
+   * Resolves immediately when no commit is in flight. Never rejects — a
+   * failed auto-commit is reported by `didAutoCommit()` returning false, not
+   * by throwing at whoever happened to wait.
+   */
+  settle(): Promise<void>;
+  /**
    * Check if the timer fired and successfully auto-committed changes.
    * Returns true only if tryAutoCommit() ran and completed a git commit.
+   *
+   * Only meaningful after {@link settle} resolves: before that, a commit may
+   * still be in flight and this reads false for a commit that is about to
+   * land.
    */
   didAutoCommit(): boolean;
 }
@@ -75,6 +101,12 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
   let pollTimer: ReturnType<typeof setInterval> | undefined;
   let watcherClosed = false;
   let autoCommitted = false;
+  /**
+   * The in-flight tryAutoCommit(), retained so cancel() has something to wait
+   * on. Fire-and-forget was the hole: a commit already running outlived the
+   * cancel that was meant to stop it.
+   */
+  let inFlight: Promise<void> | undefined;
 
   function stopPolling(): void {
     if (pollTimer !== undefined) {
@@ -151,7 +183,10 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
     timer = setTimeout(() => {
       timer = undefined;
       if (!cancelled) {
-        tryAutoCommit().catch(() => { /* swallow — never block the process */ });
+        // Retained (and pre-caught, so awaiting it can never reject) for
+        // settle(); still not awaited here, so the timer callback returns
+        // immediately and never blocks the process.
+        inFlight = tryAutoCommit().catch(() => { /* swallow — never block the process */ });
       }
     }, timeoutMs);
   }
@@ -195,6 +230,7 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
 
   return {
     cancel,
+    settle: () => inFlight ?? Promise.resolve(),
     didAutoCommit: () => autoCommitted,
   };
 }
