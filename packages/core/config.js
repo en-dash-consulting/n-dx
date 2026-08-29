@@ -1336,6 +1336,18 @@ Hench settings (.hench/config.json):
                                      Set to true for unattended 'ndx work --loop' runs — the agent
                                      runs 'git commit' directly so no approval prompt interrupts
                                      the loop.
+  hench.sessionStrategy    string    How task spawns relate to vendor sessions (default: "fork"
+                                     where supported, else "cold"):
+                                       fork  — orient once, then fork that session per task, so no
+                                               task re-pays cold-start context or re-explores the repo
+                                       batch — run up to hench.tasksPerSession tasks in one session
+                                       cold  — a fresh spawn per task
+                                     Forking needs a CLI that resumes by session id (Claude today);
+                                     other vendors and hench.provider=api fall back to "cold".
+  hench.tasksPerSession    number    Tasks per session under the "batch" strategy (default: 4)
+  hench.parentMaxAgeHours  number    How long a cached orientation session may be forked before it
+                                     is rebuilt (default: 24). Re-analyzing the repo invalidates it
+                                     sooner; 'ndx work --fresh' forces a new one.
 
 Hench git-safety settings (pre-run commit gate):
   hench.git.checkpointThreshold  number    Lines-changed threshold at/above which the pre-run

@@ -108,6 +108,18 @@ export interface VendorSpawnOptions {
    * falls back to a fresh session for those vendors.
    */
   readonly resumeSessionId?: string;
+  /**
+   * Fork the resumed session rather than continuing it, leaving the parent
+   * transcript unmutated so it can be reused by later spawns.
+   *
+   * Set by the warm-parent session strategy, where one orientation session
+   * is forked per task: every fork inherits the same byte-identical prefix,
+   * which is both the cache-read win and the reason no task re-explores the
+   * repo. Only honored by the Claude CLI adapter (`--fork-session`), and
+   * only alongside {@link resumeSessionId}; other adapters ignore it and the
+   * strategy falls back to cold spawns for them.
+   */
+  readonly forkSession?: boolean;
 }
 
 // ── VendorAdapter ────────────────────────────────────────────────────────
