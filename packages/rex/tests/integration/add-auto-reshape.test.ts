@@ -27,6 +27,8 @@ import {
   encodeReshapeLock,
 } from "../../src/cli/commands/add-reshape.js";
 import { loadArchive, ARCHIVE_FILE } from "../../src/core/archive.js";
+import { stampModified } from "../../src/core/sync.js";
+import { insertChild } from "../../src/core/tree.js";
 import type { PRDItem } from "../../src/schema/index.js";
 
 // No BUDGET_MULTIPLIER here. The perf assertion below guards complexity, and it
@@ -470,13 +472,14 @@ describe("cmdAdd scoped consolidation pass", () => {
    * growth. Ambient load scales both readings, so the ratio holds on a busy
    * machine while a real complexity regression still trips it.
    */
-  // 60s, not the 30s default: comparing two sizes means building 125 items via
-  // addItem, and each add re-serializes the tree, so SETUP dominates — measured
-  // ~14s locally while the two timed passes together are ~190ms of it. The old
-  // single-size version fit in 30s, so raising this is a direct cost of the
-  // two-point measurement. Note this is a timeout, not the assertion: it guards
-  // against a hang, and the pass/fail decision is the ratio below.
-  it("scoped pass cost grows sub-quadratically with sibling count", { timeout: 60_000 }, async () => {
+  // Back on the default timeout. This carried an explicit 60s because building
+  // 125 items through store.addItem — one full load-and-rewrite of the tree per
+  // item — made setup ~14s, and under full-suite load that setup blew past even
+  // 60s (observed at 60034ms while passing in 21s isolated). Batching the whole
+  // cohort into a single withTransaction removed the cause rather than the
+  // symptom: the case now runs in ~1.5s, so the default leaves ~20x headroom and
+  // the two-point measurement no longer costs a special-cased limit.
+  it("scoped pass cost grows sub-quadratically with sibling count", async () => {
     /**
      * Build an epic with `siblings` features in ITS OWN store, then time the
      * consolidation pass triggered by one more. Returns the fastest of `runs`.
@@ -498,8 +501,8 @@ describe("cmdAdd scoped consolidation pass", () => {
      * the minimum discards it without needing a separate throwaway.
      *
      * The tree is built ONCE and only the pass is repeated. Rebuilding per run
-     * would triple the expensive half: setup is ~14s of addItem calls against
-     * ~190ms of timed work, which is also why this test carries a raised timeout.
+     * would repeat the setup for no gain — it is still the larger half even
+     * batched, and repeating it would measure the same tree either way.
      */
     async function timeScopedPass(siblings: number, runs = 7): Promise<number> {
       const own = await setupDir();
@@ -507,20 +510,51 @@ describe("cmdAdd scoped consolidation pass", () => {
       const store = await resolveStore(own.rexDir);
 
       const epicId = randomUUID();
-      await store.addItem({ id: epicId, title: "Scaling Epic", level: "epic", status: "pending" });
-      for (let i = 0; i < siblings; i++) {
-        await store.addItem(
-          { id: randomUUID(), title: `Scaling Feature ${i}`, level: "feature", status: "pending" },
-          epicId,
-        );
-      }
-
       // Added directly, bypassing cmdAdd overhead, so only the pass is timed.
       const newId = randomUUID();
-      await store.addItem(
-        { id: newId, title: "Scaling Feature unique", level: "feature", status: "pending" },
-        epicId,
-      );
+
+      // ONE transaction for the whole cohort, not one per item. store.addItem
+      // wraps every insert in its own withTransaction — take the lock, load the
+      // entire tree, write the entire tree — so building 126 items cost 126 full
+      // loads and 126 full writes, quadratic in the work rather than the tree.
+      // That setup, not the timed pass, is what pushed this test past its limit
+      // under full-suite load (observed timing out at 60s while passing in 21s
+      // isolated).
+      //
+      // Uses the same stampModified + insertChild that addItem uses, so the tree
+      // this produces is identical — it is only serialized once. insertChild's
+      // return is asserted because it answers false on a hierarchy violation
+      // rather than throwing, and a silently-empty epic would make the timings
+      // below measure nothing.
+      await store.withTransaction(async (doc) => {
+        doc.items.push(
+          await stampModified({ id: epicId, title: "Scaling Epic", level: "epic", status: "pending" }),
+        );
+        for (let i = 0; i < siblings; i++) {
+          const ok = insertChild(
+            doc.items,
+            epicId,
+            await stampModified({
+              id: randomUUID(),
+              title: `Scaling Feature ${i}`,
+              level: "feature",
+              status: "pending",
+            }),
+          );
+          expect(ok, `failed to insert sibling ${i}`).toBe(true);
+        }
+        const ok = insertChild(
+          doc.items,
+          epicId,
+          await stampModified({
+            id: newId,
+            title: "Scaling Feature unique",
+            level: "feature",
+            status: "pending",
+          }),
+        );
+        expect(ok, "failed to insert the triggering sibling").toBe(true);
+      });
 
       let best = Infinity;
       for (let i = 0; i < runs; i++) {
@@ -558,6 +592,12 @@ describe("cmdAdd scoped consolidation pass", () => {
     //     1        61.4ms        192.0ms    3.13x
     //     2        64.4ms        199.7ms    3.10x
     //     3        80.5ms        227.9ms    2.83x
+    //
+    // RE-MEASURED 2026-08-31, after setup moved to a single withTransaction:
+    // 34.3ms / 129.7ms, ratio 3.78x. The timed pass is unchanged, so the lower
+    // absolute readings are the quieter machine (no 126 tree rewrites racing the
+    // filesystem immediately beforehand); the ratio moved within its existing
+    // spread and stays far below the 8x bound.
     //
     // Sub-linear for a 4x sibling step, because the pass's cost is dominated by
     // loading the tree (26 vs 101 items) rather than by scanning the cohort.
