@@ -103,9 +103,9 @@ export interface VendorSpawnOptions {
    * what was rejected, which files were read — rather than rediscovering it
    * from the diff alone.
    *
-   * Currently only honored by the Claude CLI adapter, which forwards it as
-   * `--resume <session-id>`. Other adapters ignore it, and the review pass
-   * falls back to a fresh session for those vendors.
+   * Honored by the Claude CLI adapter (`--resume <session-id>`) and the Codex
+   * CLI adapter (`exec resume <session-id>`). Other adapters ignore it and
+   * fall back to a fresh session.
    */
   readonly resumeSessionId?: string;
   /**
@@ -189,6 +189,25 @@ export interface VendorAdapter {
     turn: number,
     metadata: Record<string, unknown>,
   ): RuntimeEvent | null;
+
+  /**
+   * Pull the vendor's session id out of one parsed JSONL line, or return
+   * `undefined` when the line does not carry one.
+   *
+   * Vendors disagree on both the event and the key: the Claude CLI puts
+   * `session_id` on many lines, while `codex exec --json` emits exactly one
+   * `{"type":"thread.started","thread_id":"…"}`. Keeping that knowledge here
+   * rather than in the run loop is what lets the loop stay vendor-neutral —
+   * it records whatever the adapter reports and feeds it back as
+   * {@link VendorSpawnOptions.resumeSessionId}.
+   *
+   * Optional: an adapter that omits it falls back to the loop's `session_id`
+   * lookup, which is the Claude shape.
+   *
+   * @param rawJson - One already-parsed JSONL line from the vendor's stdout
+   * @returns The session id, or `undefined` if this line has none
+   */
+  extractSessionId?(rawJson: unknown): string | undefined;
 
   /**
    * Classify an error into the shared failure taxonomy.

@@ -929,10 +929,20 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
      *
      * Only the first value is kept: a single spawn is a single session, and
      * ignoring later lines means a malformed or adversarial payload late in
-     * the stream cannot redirect a subsequent `--resume` at another session.
+     * the stream cannot redirect a subsequent resume at another session.
+     *
+     * Which event and key carry the id is the adapter's business — Claude
+     * stamps `session_id` on many lines, codex emits one `thread.started`
+     * with `thread_id`. An adapter that declares nothing falls back to the
+     * Claude shape, which is what this function used to hardcode.
      */
     function captureSessionId(rawJson: unknown): void {
       if (result.sessionId) return;
+      if (adapter.extractSessionId) {
+        const id = adapter.extractSessionId(rawJson);
+        if (id) result.sessionId = id;
+        return;
+      }
       if (!rawJson || typeof rawJson !== "object") return;
       const id = (rawJson as Record<string, unknown>).session_id;
       if (typeof id === "string" && id) result.sessionId = id;
