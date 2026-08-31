@@ -51,6 +51,13 @@ import {
   isBatchChainUsable,
 } from "./session-cache.js";
 import { buildTaskBoundaryDivider } from "./batch-divider.js";
+import {
+  createSpawnLedger,
+  recordSpawn,
+  spawnBudgetExhausted,
+  describeSpawnBudget,
+  type SpawnReason,
+} from "./spawn-budget.js";
 import { DEFAULT_TASKS_PER_SESSION } from "./session-cache.js";
 import { mkdir, rm } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -254,6 +261,34 @@ export function buildRetryNotice(
     `Files written to disk by the prior attempt still exist. ` +
     `Check the current state of files before re-doing any work.\n---`
   );
+}
+
+/**
+ * Whether a retry should carry the cold-restart notice.
+ *
+ * The notice tells a *fresh* session that files from a prior attempt already
+ * exist on disk. A resumed session **was** that attempt, so sending it would
+ * restate what the model just did and grow the prompt on every retry — the
+ * exact cost retry-via-resume exists to remove.
+ */
+export function shouldSendRetryNotice(
+  attempt: number,
+  retryResumeSessionId: string | undefined,
+): boolean {
+  return attempt > 0 && !retryResumeSessionId;
+}
+
+/**
+ * Session a retry should resume, or undefined for a cold retry.
+ *
+ * Resume is Claude-CLI-only today; other vendors have no equivalent on this
+ * path and fall back to a cold spawn, which is why the notice still exists.
+ */
+export function resolveRetryResume(
+  vendor: string,
+  lastSessionId: string | undefined,
+): string | undefined {
+  return vendor === LLM_VENDOR.CLAUDE && lastSessionId ? lastSessionId : undefined;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -1694,8 +1729,36 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   let currentPermissionMode = opts.permissionMode;
   let planModeAppendix: string | undefined;
   const MAX_PLAN_RESPAWNS = 2;
+  /**
+   * Plan re-spawns already made, charged against the retry budget.
+   *
+   * The outer loop's effective attempt allowance is reduced by this, so a
+   * task that spends its budget entering plan mode does not additionally get
+   * a full set of failure retries.
+   */
+  let planRespawnsChargedToRetries = 0;
   let planRespawns = 0;
   let cancelledByUser = false;
+  /**
+   * One budget for every spawn this task makes, whatever the reason.
+   *
+   * The retry counter alone cannot bound this: some re-spawn paths
+   * deliberately avoid charging it (a plan-mode interception, the
+   * stale-parent fork fallback) because nothing was learned about the task.
+   * The ledger counts those too, so the allowances add up instead of
+   * multiplying.
+   */
+  const spawnLedger = createSpawnLedger(config.maxSpawnsPerTask);
+  /** Reason attributed to the next spawn. */
+  let nextSpawnReason: SpawnReason = "initial";
+  /**
+   * Session to resume for a retry, when the failed attempt reported one.
+   *
+   * Resuming carries what the attempt already did, so the retry notice's
+   * "check the current state of files before re-doing any work" is both
+   * redundant and a prompt-growth cost on every retry.
+   */
+  let retryResumeSessionId: string | undefined;
   /**
    * Session the most recent spawn ran in. On a plain resume the vendor reports
    * the session it continued, so this is the transcript the next batched task
@@ -1704,7 +1767,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   let lastSessionId: string | undefined;
 
   try {
-    for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= retryConfig.maxRetries - planRespawnsChargedToRetries; attempt++) {
       let result!: SpawnResult;
       let attemptAccumulator: EventAccumulator | undefined;
 
@@ -1724,11 +1787,16 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             })
           : "";
 
+        // The retry notice exists to tell a *fresh* session that files from a
+        // prior attempt are already on disk. A resumed session was that
+        // attempt, so the notice would restate what it just did and grow the
+        // prompt on every retry.
+        const needsRetryNotice = shouldSendRetryNotice(attempt, retryResumeSessionId);
         const briefContent =
           boundaryDivider +
-          (attempt === 0
-            ? boundedBriefText
-            : boundedBriefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns)) +
+          (needsRetryNotice
+            ? boundedBriefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns)
+            : boundedBriefText) +
           (planModeAppendix ? `\n\n${planModeAppendix}` : "");
 
         // Build the per-attempt PromptEnvelope. On the first attempt with
@@ -1752,8 +1820,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           // Batch resumes WITHOUT forking on purpose: the point is a single
           // accumulating transcript, so this task's turns must land in the
           // session the next task will resume.
-          resumeSessionId: warmParentId ?? batchResumeId,
-          forkSession: warmParentId ? true : undefined,
+          // Retry-resume wins over the warm parent: continuing the attempt
+          // that just failed is more useful than re-forking orientation, and
+          // it is a plain resume (no fork) because we want that transcript.
+          resumeSessionId: retryResumeSessionId ?? warmParentId ?? batchResumeId,
+          forkSession: !retryResumeSessionId && warmParentId ? true : undefined,
         });
 
         // Capture prompt section diagnostics on the first attempt for run-level storage.
@@ -1774,6 +1845,25 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // Event pipeline: create a per-attempt accumulator. Events from this
         // attempt are pushed here, then merged into runAccumulator after spawn.
         attemptAccumulator = useEventPipeline ? new EventAccumulator() : undefined;
+
+        // Hard cap, checked before spending rather than reported after.
+        if (spawnBudgetExhausted(spawnLedger)) {
+          run.status = "failed";
+          run.error =
+            `Spawn budget exhausted for this task: ${describeSpawnBudget(spawnLedger)}. ` +
+            "Raise hench.maxSpawnsPerTask if this task legitimately needs more, " +
+            "or investigate why it keeps re-spawning.";
+          run.spawnCount = spawnLedger.total;
+          run.spawnBreakdown = { ...spawnLedger.byReason };
+          info(`\n${run.error}`);
+          await toolRexAppendLog(store, taskId, {
+            event: "task_failed",
+            detail: run.error,
+          });
+          cancelledByUser = true;
+          break;
+        }
+        recordSpawn(spawnLedger, nextSpawnReason);
 
         // Generic adapter-based spawn — replaces dispatchVendorSpawn
         result = await withHeartbeat(
@@ -1803,6 +1893,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // nothing was learned about the task itself.
         if (result.error && warmParentId && !forkFallbackUsed) {
           forkFallbackUsed = true;
+          nextSpawnReason = "fork-fallback";
           warmParentId = undefined;
           run.parentSessionId = undefined;
           await clearSessionCache(henchDir);
@@ -1836,6 +1927,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         currentPermissionMode = "acceptEdits";
         planModeAppendix = formatPlanModeAppendix(result.planModeIntercept.planText, decision);
         planRespawns++;
+        nextSpawnReason = "plan-respawn";
+        // Charge the retry budget too. Previously plan re-spawns were a
+        // separate per-attempt allowance, so four retries times three plan
+        // re-spawns could reach twelve spawns for one task; consuming an
+        // attempt makes the allowances additive.
+        planRespawnsChargedToRetries++;
         if (planRespawns > MAX_PLAN_RESPAWNS) {
           run.status = "failed";
           run.error =
@@ -1876,7 +1973,14 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           store, taskId, retryConfig, vendor,
         });
         if (action === "break") break;
-        // action === "retry" → continue loop
+        // action === "retry" → continue loop.
+        //
+        // Resume the failed session on vendors that can, so the retry keeps
+        // what the attempt already did instead of rediscovering it. Only the
+        // Claude CLI honors resume today; elsewhere this stays undefined and
+        // the retry is a cold spawn carrying the retry notice.
+        nextSpawnReason = "retry";
+        retryResumeSessionId = resolveRetryResume(vendor, lastSessionId);
       }
     }
   } catch (err) {
@@ -1939,6 +2043,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     baselineUntracked,
     startingHead,
   });
+
+  // Retry overhead, recorded whatever the outcome: a task that took four
+  // spawns to succeed is a different story from one that took one.
+  run.spawnCount = spawnLedger.total;
+  run.spawnBreakdown = { ...spawnLedger.byReason };
 
   // Batch bookkeeping, after the run's outcome is known.
   //

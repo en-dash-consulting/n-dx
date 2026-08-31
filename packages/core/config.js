@@ -1473,6 +1473,11 @@ Hench settings (.hench/config.json):
   hench.parentMaxAgeHours  number    How long a cached orientation session may be forked before it
                                      is rebuilt (default: 24). Re-analyzing the repo invalidates it
                                      sooner; 'ndx work --fresh' forces a new one.
+  hench.maxSpawnsPerTask   number    Ceiling on vendor spawns for one task (default: 8). Counts
+                                     every spawn — the first, failure retries, plan-mode re-spawns,
+                                     and fallbacks — so the allowances add up rather than
+                                     multiplying. Hitting it fails the task with the breakdown
+                                     instead of continuing to spend.
 
 Hench git-safety settings (pre-run commit gate):
   hench.git.checkpointThreshold  number    Lines-changed threshold at/above which the pre-run

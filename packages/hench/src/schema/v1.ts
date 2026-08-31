@@ -208,6 +208,16 @@ export interface HenchConfig {
    */
   parentMaxAgeHours?: number;
   /**
+   * Ceiling on vendor spawns for a single task (default: 8).
+   *
+   * Every spawn counts — the initial one, failure retries, plan-mode
+   * re-spawns, and fallbacks — because the defect this bounds was
+   * multiplication between independent allowances, not any single one being
+   * too generous. Hitting the ceiling fails the task loudly with the
+   * breakdown rather than continuing to spend.
+   */
+  maxSpawnsPerTask?: number;
+  /**
    * When true, skip the mandatory full test suite gate before commit.
    * Default: false (gate is mandatory). The --skip-test-gate CLI flag sets this.
    * Test gate failure blocks commit unless this flag is set or user selects skip.
@@ -843,6 +853,19 @@ export interface RunRecord {
    * cold. v1 additive field.
    */
   parentSessionId?: string;
+  /**
+   * Total vendor spawns this task made, including retries, plan-mode
+   * re-spawns, and fallbacks. Recorded so `ndx usage` can report retry
+   * overhead: a task that cost four spawns to complete is a different story
+   * from one that cost one. v1 additive field.
+   */
+  spawnCount?: number;
+  /**
+   * Spawns by reason, so the same total can be told apart — six plan-mode
+   * re-spawns and six failure retries call for entirely different fixes.
+   * v1 additive field.
+   */
+  spawnBreakdown?: Record<string, number>;
   retryAttempts?: number;
   /** Structured metadata derived from tool calls at run finalization. */
   structuredSummary?: RunSummaryData;
