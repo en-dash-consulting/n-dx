@@ -27,6 +27,7 @@ import { FileStore } from "../../src/store/file-adapter.js";
 import { FolderTreeStore } from "../../src/store/folder-tree-store.js";
 import { acquireLock } from "../../src/store/file-lock.js";
 import { handleMoveItem, handleUpdateTaskStatus } from "../../src/cli/mcp-tools.js";
+import { syncFolderTree } from "../../src/cli/commands/folder-tree-sync.js";
 import type { PRDStore } from "../../src/store/contracts.js";
 import type { PRDDocument, PRDItem } from "../../src/schema/index.js";
 
@@ -70,6 +71,15 @@ function withPauseAfterRead(inner: PRDStore, pause: () => Promise<void>): PRDSto
 
 function task(id: string, title: string, status: PRDItem["status"] = "pending"): PRDItem {
   return { id, title, level: "task", status };
+}
+
+/**
+ * The handler's own error text, for the assertion message. `isError` alone
+ * reports as "expected true to be undefined", which says nothing about which
+ * of the handler's many failure paths fired.
+ */
+function why(result: { content: Array<{ text: string }>; isError?: boolean }): string {
+  return result.content.map((c) => c.text).join("\n");
 }
 
 describe("concurrent PRD writers do not lose updates", () => {
@@ -121,7 +131,7 @@ describe("concurrent PRD writers do not lose updates", () => {
       id: "task-2",
       parentId: "epic-2",
     });
-    expect(moveResult.isError).toBeUndefined();
+    expect(moveResult.isError, why(moveResult)).toBeUndefined();
     await addPromise;
 
     const finalDoc = await new FileStore(rexDir).loadDocument();
@@ -146,7 +156,7 @@ describe("concurrent PRD writers do not lose updates", () => {
       status: "deleted",
       force: true,
     });
-    expect(deleteResult.isError).toBeUndefined();
+    expect(deleteResult.isError, why(deleteResult)).toBeUndefined();
     await addPromise;
 
     const finalDoc = await new FileStore(rexDir).loadDocument();
@@ -154,6 +164,130 @@ describe("concurrent PRD writers do not lose updates", () => {
     const epicTwo = finalDoc.items.find((i) => i.id === "epic-2");
     expect(epicOne?.children?.some((c) => c.id === "task-1")).toBeFalsy();
     expect(epicTwo?.children?.some((c) => c.id === "task-late")).toBe(true);
+  });
+});
+
+describe("syncFolderTree locking", () => {
+  let projectDir: string;
+  let rexDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "rex-sync-lock-"));
+    rexDir = join(projectDir, ".rex");
+    await mkdir(rexDir, { recursive: true });
+    await new FileStore(rexDir).saveDocument({
+      schema: "rex/v1",
+      title: "Test PRD",
+      items: [
+        { id: "epic-1", title: "Epic One", level: "epic", status: "pending", children: [task("task-1", "Task One")] },
+        { id: "epic-2", title: "Epic Two", level: "epic", status: "pending" },
+      ],
+    });
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  // syncFolderTree is a full read-modify-write of the tree: it deletes every
+  // on-disk entry absent from the snapshot it loaded. Unlocked, it both read
+  // half-written item directories (parseFolderTree throws ENOENT, surfacing as
+  // an MCP isError) and deleted the concurrent writer's items.
+  it("waits for an open transaction instead of reading a half-written tree", async () => {
+    const store = new FileStore(rexDir);
+    const order: string[] = [];
+
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => { openGate = resolve; });
+    let inCallback!: () => void;
+    const callbackEntered = new Promise<void>((resolve) => { inCallback = resolve; });
+
+    const txn = store.withTransaction(async (doc) => {
+      inCallback();
+      await gate;
+      // Turns epic-2 from a bare `epic-2.md` into an `epic-2/` directory —
+      // the transient state an unlocked reader used to trip over.
+      const epicTwo = doc.items.find((i) => i.id === "epic-2");
+      epicTwo!.children = [task("task-late", "Inserted Mid-Write")];
+      order.push("transaction-committed");
+    });
+
+    await callbackEntered;
+    const sync = syncFolderTree(rexDir, store).then(() => order.push("sync-completed"));
+
+    // Give the sync a chance to (wrongly) slip past the open transaction.
+    await sleep(150);
+    openGate();
+    await txn;
+    await sync;
+
+    expect(order).toEqual(["transaction-committed", "sync-completed"]);
+
+    // The sync serialized the post-transaction tree, so the item it never
+    // loaded at call time is still on disk.
+    const finalDoc = await new FileStore(rexDir).loadDocument();
+    const epicTwo = finalDoc.items.find((i) => i.id === "epic-2");
+    expect(epicTwo?.children?.some((c) => c.id === "task-late")).toBe(true);
+  });
+});
+
+describe("folder-tree lock identity", () => {
+  let projectDir: string;
+  let rexDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "rex-lock-identity-"));
+    rexDir = join(projectDir, ".rex");
+    await mkdir(rexDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  // One resource, one lock name. FileStore used to guard the tree with
+  // `tree.lock` while FolderTreeStore used `prd.lock`, so a writer on each
+  // store rewrote `.rex/prd_tree/` simultaneously with neither seeing the
+  // other. Both must now contend on prdLockPath().
+  it("FileStore and FolderTreeStore serialize against each other", async () => {
+    const fileStore = new FileStore(rexDir);
+    const treeStore = new FolderTreeStore(rexDir);
+    await fileStore.saveDocument({
+      schema: "rex/v1",
+      title: "Test PRD",
+      items: [task("t1", "Task One")],
+    });
+
+    const order: string[] = [];
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => { openGate = resolve; });
+    let inCallback!: () => void;
+    const callbackEntered = new Promise<void>((resolve) => { inCallback = resolve; });
+
+    const txn = fileStore.withTransaction(async (doc) => {
+      inCallback();
+      await gate;
+      doc.items.push(task("t-file", "From FileStore"));
+      order.push("file-store-committed");
+    });
+
+    await callbackEntered;
+    const treeWrite = treeStore
+      .addItem(task("t-tree", "From FolderTreeStore"))
+      .then(() => order.push("tree-store-committed"));
+
+    await sleep(150);
+    openGate();
+    await txn;
+    await treeWrite;
+
+    expect(order).toEqual(["file-store-committed", "tree-store-committed"]);
+
+    // Serialized writes compose: neither clobbered the other.
+    const finalDoc = await new FileStore(rexDir).loadDocument();
+    const ids = finalDoc.items.map((i) => i.id);
+    expect(ids).toContain("t-file");
+    expect(ids).toContain("t-tree");
   });
 });
 

@@ -15,7 +15,7 @@ package-lock.json
 .rex/.backups/
 .rex/.cache/
 .rex/n-dx_workflow.md
-.rex/prd.json.lock
+.rex/*.lock
 .rex/adapters.json
 .rex/pending-proposals.json
 .rex/acknowledged-findings.json

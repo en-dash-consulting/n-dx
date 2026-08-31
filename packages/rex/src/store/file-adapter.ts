@@ -19,7 +19,7 @@ import { parseFolderTree } from "./folder-tree-parser.js";
 import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
-import { PRD_TREE_DIRNAME } from "./paths.js";
+import { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
@@ -56,10 +56,6 @@ export class FileStore implements PRDStore {
 
   private get markdownPath(): string {
     return this.path(PRD_MARKDOWN_FILENAME);
-  }
-
-  private get prdLockPath(): string {
-    return this.path(`${PRD_FILENAME}.lock`);
   }
 
   private get markdownLockPath(): string {
@@ -254,7 +250,7 @@ export class FileStore implements PRDStore {
     _filename: string,
     fn: (doc: PRDDocument) => Promise<T>,
   ): Promise<T> {
-    const folderTreeLockPath = this.path("tree.lock");
+    const folderTreeLockPath = prdLockPath(this.rexDir);
     return withLock(folderTreeLockPath, async () => {
       const doc = await this.loadDocument();
       const result = await fn(doc);
@@ -506,12 +502,12 @@ export class FileStore implements PRDStore {
     }
 
     // Use folder-tree lock path (not markdown lock)
-    const folderTreeLockPath = this.path("tree.lock");
+    const folderTreeLockPath = prdLockPath(this.rexDir);
     await withLock(folderTreeLockPath, () => this.writeFolderTree(doc));
   }
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
-    const folderTreeLockPath = this.path("tree.lock");
+    const folderTreeLockPath = prdLockPath(this.rexDir);
     return withLock(folderTreeLockPath, async () => {
       const doc = await this.loadDocument();
       const result = await fn(doc);
