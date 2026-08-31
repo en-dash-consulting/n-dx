@@ -887,6 +887,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--model=<model>", description: "Override the Claude model" },
       { flag: "--yes", description: "Auto-confirm the proposed commit and skip rollback prompts" },
       { flag: "--allow-dirty", description: "Let autonomous runs (--auto/--loop/--epic-by-epic) start with an uncommitted working tree (they abort by default)" },
+      { flag: "--fresh", description: "Discard the cached orientation session so this run re-orients before forking task spawns (see hench.sessionStrategy)" },
     ],
     examples: [
       { command: "ndx work", description: "Run next task interactively" },

@@ -27,6 +27,6 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Orientation pass and warm-parent fork wiring](./orientation-pass-and-warm-649bcd.md) | pending |
+| [Orientation pass and warm-parent fork wiring](./orientation-pass-and-warm-649bcd.md) | completed |
 | [Sequential session batching strategy (tasksPerSession)](./sequential-session-batching-d80a00.md) | pending |
 | [Session cache, adapter --fork-session flag, and session-strategy config keys](./session-cache-adapter-fork-052cfa.md) | completed |

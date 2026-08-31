@@ -18,7 +18,8 @@ import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
-import { section } from "../../types/output.js";
+import { section, detail } from "../../types/output.js";
+import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 import { LLM_VENDOR, printVendorModelHeader, resolveModel, resolveTaskModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
@@ -1058,6 +1059,9 @@ export async function cmdRun(
   // --allow-dirty lets autonomous runs start against an uncommitted working
   // tree instead of aborting at the pre-run commit gate.
   const allowDirty = flags["allow-dirty"] === "true";
+  // --fresh discards the cached orientation session so this run re-orients
+  // before forking task spawns from it.
+  const fresh = flags["fresh"] === "true";
   const model = resolvedModel;
   // Always pass the resolved model to the spawned vendor CLI so the user's
   // configured choice (top-level or vendor-pinned) survives the spawn. The
@@ -1388,6 +1392,15 @@ export async function cmdRun(
     if (gate === "stop") {
       info("Stopped before running. Commit or discard your changes, then re-run.");
       return;
+    }
+
+    // --fresh: drop the cached orientation session exactly once, here, before
+    // any task runs. Clearing per task instead would make every task in a
+    // loop re-orient, which is the opposite of what the flag is for — the
+    // first task then re-orients on the cache miss and the rest reuse it.
+    if (fresh) {
+      await clearSessionCache(henchDir);
+      detail("Discarded the cached orientation session (--fresh)");
     }
 
     if (epicByEpic) {
