@@ -19,6 +19,15 @@ function initGitRepo(dir: string): void {
   execSync("git init", { cwd: dir, stdio: "ignore" });
   execSync("git config user.email test@test.com", { cwd: dir, stdio: "ignore" });
   execSync("git config user.name Test", { cwd: dir, stdio: "ignore" });
+  // core.autocrlf=true is the Git-for-Windows installer default (lands in
+  // SYSTEM config, so it applies even without an explicit user setting):
+  // a test writes LF, a later `git checkout`/`restore` hands it back as
+  // CRLF, and byte-exact content assertions fail on content git restored
+  // exactly as configured. Pin both off per-repo so those assertions are
+  // deterministic across platforms. See packages/hench/tests/helpers/index.ts
+  // GIT_FIXTURE_CONFIG for the same fix applied there.
+  execSync("git config core.autocrlf false", { cwd: dir, stdio: "ignore" });
+  execSync("git config core.eol lf", { cwd: dir, stdio: "ignore" });
   // Some environments default to "main"/"master" inconsistently — pin it so
   // --abbrev-ref HEAD assertions are stable across machines.
   execSync("git checkout -b main", { cwd: dir, stdio: "ignore" });
