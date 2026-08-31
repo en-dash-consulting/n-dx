@@ -667,6 +667,43 @@ export const codexCliAdapter: VendorAdapter = {
     // opts.permissionMode is intentionally ignored — it is a Claude-CLI
     // concept with no Codex equivalent; the run.ts caller drops it with a
     // warning before reaching this adapter.
+
+    // Resume branch — the batch session strategy's route out of per-task cold
+    // starts. Codex cannot fork (it has no `--fork-session` equivalent), so
+    // resuming the previous task's thread is the only way to reuse context;
+    // `codex exec resume` appends to the transcript rather than branching it.
+    //
+    // Two deliberate differences from the fresh-exec args, both dictated by
+    // the subcommand's own surface (`codex exec resume --help`, codex-cli
+    // 0.147.0):
+    //
+    //   1. No policy flags. Resume accepts neither `-s/--sandbox` nor
+    //      `--approve-for-me`; passing either aborts the spawn on argument
+    //      parsing. Sandbox and approval policy belong to the thread being
+    //      resumed, which is why the CLI dropped the flags here.
+    //   2. The session id is always explicit, never `--last`. `--last` picks
+    //      the newest recorded session *globally*, so any other codex run on
+    //      the machine — another loop, an interactive session — would silently
+    //      capture the chain and this task would append to a stranger's
+    //      transcript. A captured id cannot be hijacked that way.
+    if (opts.resumeSessionId) {
+      return {
+        binary: "codex",
+        args: [
+          "exec",
+          "resume",
+          opts.resumeSessionId,
+          "--json",
+          "--skip-git-repo-check",
+          ...(opts.model ? ["-m", opts.model] : []),
+          "-", // stdin sentinel — resume reads the follow-up prompt from stdin
+        ],
+        env: {},
+        stdinContent: prompt,
+        cwd: ".",
+      };
+    }
+
     const args = [
       "exec",
       ...policyFlags,
@@ -700,6 +737,28 @@ export const codexCliAdapter: VendorAdapter = {
     }
 
     return null;
+  },
+
+  /**
+   * Codex announces its thread once, on the first line of `--json` output:
+   *
+   *   {"type":"thread.started","thread_id":"01a05958-2931-73f1-9aba-38fa915bb8df"}
+   *
+   * `thread_id`, not `session_id` — the latter appears only in the on-disk
+   * rollout file (`session_meta.payload.session_id`), which is a different
+   * format from the stdout stream. Verified against codex-cli 0.147.0.
+   *
+   * Scoped to `thread.started` on purpose: reading the key off any line would
+   * let a later payload in the stream redirect the next `exec resume` at a
+   * different thread. Resuming re-emits the same id, so a resumed spawn
+   * reports the id it continued and the chain stays on one thread.
+   */
+  extractSessionId(rawJson: unknown): string | undefined {
+    if (!rawJson || typeof rawJson !== "object") return undefined;
+    const event = rawJson as Record<string, unknown>;
+    if (event.type !== "thread.started") return undefined;
+    const id = event.thread_id;
+    return typeof id === "string" && id ? id : undefined;
   },
 
   classifyError(err: unknown): FailureCategory {

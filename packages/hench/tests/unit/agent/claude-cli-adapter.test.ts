@@ -1051,3 +1051,24 @@ describe("session fork (--fork-session)", () => {
     expect(config.args[config.args.indexOf("--resume") + 1]).toBe("parent-2");
   });
 });
+
+describe("claudeCliAdapter.extractSessionId", () => {
+  it("reads session_id from a stream line", () => {
+    expect(claudeCliAdapter.extractSessionId?.({ type: "system", session_id: "abc-123" })).toBe(
+      "abc-123",
+    );
+  });
+
+  it("returns undefined when the line carries no id", () => {
+    expect(claudeCliAdapter.extractSessionId?.({ type: "assistant" })).toBeUndefined();
+    expect(claudeCliAdapter.extractSessionId?.({ session_id: "" })).toBeUndefined();
+    expect(claudeCliAdapter.extractSessionId?.(null)).toBeUndefined();
+    expect(claudeCliAdapter.extractSessionId?.("not an object")).toBeUndefined();
+  });
+
+  it("does not accept codex's thread_id key", () => {
+    expect(
+      claudeCliAdapter.extractSessionId?.({ type: "thread.started", thread_id: "codex-shape" }),
+    ).toBeUndefined();
+  });
+});

@@ -417,6 +417,16 @@ export const claudeCliAdapter: VendorAdapter = {
     return parseStreamLine(line, turn, metadata);
   },
 
+  /**
+   * The Claude CLI stamps `session_id` on many stream-json lines, so the
+   * first one wins — see the run loop, which keeps only the first value.
+   */
+  extractSessionId(rawJson: unknown): string | undefined {
+    if (!rawJson || typeof rawJson !== "object") return undefined;
+    const id = (rawJson as Record<string, unknown>).session_id;
+    return typeof id === "string" && id ? id : undefined;
+  },
+
   classifyError(err: unknown): FailureCategory {
     return classifyVendorError(err);
   },

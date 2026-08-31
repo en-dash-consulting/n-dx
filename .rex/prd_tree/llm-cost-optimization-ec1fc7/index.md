@@ -22,7 +22,8 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Eliminate per-task cold spawns (warm-parent fork + session batching)](./eliminate-per-task-cold-spawns-00d910/index.md) | completed |
 | [Wire tiered model resolution (task class → tier → model)](./wire-tiered-model-resolution-462b95/index.md) | completed |
 | [Cap total spawns per task and retry via --resume](./cap-total-spawns-per-task-and-7dcba8.md) | completed |
-| [Extend the batch session strategy to the codex CLI](./extend-the-batch-session-662bb4.md) | pending |
+| [codex exec rejects the --full-auto flag, breaking autonomous codex spawns](./codex-exec-rejects-the-full-c86273.md) | pending |
+| [Extend the batch session strategy to the codex CLI](./extend-the-batch-session-662bb4.md) | completed |
 | [JSON prompt discipline — compact JSON in and out](./json-prompt-discipline-compact-0284c3.md) | pending |
 | [List the known task classes in ndx config and flag an unrecognized route as probably-new, with the closest match](./list-the-known-task-classes-in-949f60.md) | completed |
 | [Route commit messages and rex mechanical calls to the light tier](./route-commit-messages-and-rex-2db5af.md) | completed |

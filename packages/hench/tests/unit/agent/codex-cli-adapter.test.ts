@@ -882,3 +882,173 @@ describe("CodexCliAdapter: end-to-end pipeline", () => {
     expect(codexCliAdapter.classifyError(unknownErr)).toBe("unknown");
   });
 });
+
+// ── 7. Session resume (batch session strategy) ───────────────────────────
+
+/**
+ * Verified against codex-cli 0.147.0 on 2026-08-31, not assumed:
+ *
+ *   $ codex exec --json --skip-git-repo-check -s read-only -m <bogus> "hi"
+ *   {"type":"thread.started","thread_id":"01a05958-2931-73f1-9aba-38fa915bb8df"}
+ *
+ *   $ codex exec resume 01a05958-… --json --skip-git-repo-check -m <bogus> -
+ *   {"type":"thread.started","thread_id":"01a05958-2931-73f1-9aba-38fa915bb8df"}
+ *
+ * Two facts the batch chain depends on: the id arrives as `thread_id` on a
+ * `thread.started` event (NOT `session_id` — that key appears only in the
+ * on-disk rollout file's `session_meta`), and resuming re-emits the *same*
+ * id, so capturing it from a resumed spawn keeps the chain on one session.
+ *
+ * `codex exec resume --help` also confirms the flag surface: it accepts
+ * `--json`, `--skip-git-repo-check`, `-m`, `-c`, `--last`, but NOT `-s/
+ * --sandbox` or `--approve-for-me`.
+ */
+describe("codexCliAdapter session resume", () => {
+  const envelope = createStandardEnvelope();
+
+  it("emits `exec resume <id>` instead of a fresh `exec`", () => {
+    const config = codexCliAdapter.buildSpawnConfig(envelope, STANDARD_POLICY, {
+      resumeSessionId: "01a05958-2931-73f1-9aba-38fa915bb8df",
+    });
+
+    expect(config.args.slice(0, 3)).toEqual([
+      "exec",
+      "resume",
+      "01a05958-2931-73f1-9aba-38fa915bb8df",
+    ]);
+    expect(config.args).toContain("--json");
+    expect(config.args[config.args.length - 1]).toBe("-");
+  });
+
+  it("omits sandbox and approval flags on resume — the subcommand rejects them", () => {
+    const config = codexCliAdapter.buildSpawnConfig(envelope, STANDARD_POLICY, {
+      resumeSessionId: "01a05958-2931-73f1-9aba-38fa915bb8df",
+    });
+
+    // `codex exec resume` has no -s/--sandbox or --approve-for-me; passing
+    // either aborts the spawn on argument parsing.
+    expect(config.args).not.toContain("--sandbox");
+    expect(config.args).not.toContain("-s");
+    expect(config.args).not.toContain("--approve-for-me");
+    expect(config.args).not.toContain("--full-auto");
+  });
+
+  it("never uses --last, which would hijack a concurrent codex run", () => {
+    const resumed = codexCliAdapter.buildSpawnConfig(envelope, STANDARD_POLICY, {
+      resumeSessionId: "01a05958-2931-73f1-9aba-38fa915bb8df",
+    });
+    const fresh = codexCliAdapter.buildSpawnConfig(envelope, STANDARD_POLICY, {});
+
+    // --last resolves to the newest recorded session *globally*, so another
+    // codex run anywhere on the machine would capture the chain.
+    expect(resumed.args).not.toContain("--last");
+    expect(fresh.args).not.toContain("--last");
+  });
+
+  it("still spawns a fresh `exec` with policy flags when no id is given", () => {
+    const config = codexCliAdapter.buildSpawnConfig(envelope, STANDARD_POLICY, {});
+
+    expect(config.args[0]).toBe("exec");
+    expect(config.args[1]).not.toBe("resume");
+    expect(config.args).toEqual(expect.arrayContaining(compileCodexPolicyFlags(STANDARD_POLICY)));
+  });
+
+  it("passes the model through on resume", () => {
+    const config = codexCliAdapter.buildSpawnConfig(envelope, STANDARD_POLICY, {
+      resumeSessionId: "abc-123",
+      model: "gpt-5-codex",
+    });
+
+    expect(config.args).toEqual(expect.arrayContaining(["-m", "gpt-5-codex"]));
+  });
+
+  it("delivers the prompt on stdin, not argv, on resume too", () => {
+    const config = codexCliAdapter.buildSpawnConfig(envelope, STANDARD_POLICY, {
+      resumeSessionId: "abc-123",
+    });
+
+    expect(config.stdinContent).toContain("SYSTEM:");
+    expect(config.args[config.args.length - 1]).toBe("-");
+  });
+});
+
+describe("codexCliAdapter.extractSessionId", () => {
+  it("reads thread_id from a thread.started event", () => {
+    expect(
+      codexCliAdapter.extractSessionId?.({
+        type: "thread.started",
+        thread_id: "01a05958-2931-73f1-9aba-38fa915bb8df",
+      }),
+    ).toBe("01a05958-2931-73f1-9aba-38fa915bb8df");
+  });
+
+  it("ignores thread_id on any other event type", () => {
+    // Only `thread.started` announces the session. Accepting the key from
+    // any line would let a late payload redirect a later resume.
+    expect(
+      codexCliAdapter.extractSessionId?.({ type: "turn.started", thread_id: "other" }),
+    ).toBeUndefined();
+  });
+
+  it("returns undefined for ordinary stream events", () => {
+    expect(codexCliAdapter.extractSessionId?.({ type: "turn.started" })).toBeUndefined();
+    expect(
+      codexCliAdapter.extractSessionId?.({ type: "item.completed", item: { type: "agent_message" } }),
+    ).toBeUndefined();
+    expect(codexCliAdapter.extractSessionId?.(null)).toBeUndefined();
+    expect(codexCliAdapter.extractSessionId?.("not an object")).toBeUndefined();
+  });
+
+  it("does not accept Claude's session_id key", () => {
+    // Codex never emits it; accepting it would mask a schema change.
+    expect(
+      codexCliAdapter.extractSessionId?.({ type: "thread.started", session_id: "claude-shape" }),
+    ).toBeUndefined();
+  });
+});
+
+/**
+ * The chain's load-bearing seam: the id codex *reports* must be the id the
+ * next spawn *resumes*. Both halves are tested above in isolation; this
+ * composes them, because a mismatch between the two (say, capturing
+ * `thread_id` but emitting it where codex expects a thread name) would leave
+ * every unit test green and still break batching.
+ */
+describe("codex batch chain seam", () => {
+  it("resumes the thread id it captured from the previous spawn", () => {
+    const firstSpawnFirstLine = {
+      type: "thread.started",
+      thread_id: "01a05958-2931-73f1-9aba-38fa915bb8df",
+    };
+
+    const captured = codexCliAdapter.extractSessionId?.(firstSpawnFirstLine);
+    expect(captured).toBe("01a05958-2931-73f1-9aba-38fa915bb8df");
+
+    const nextTask = codexCliAdapter.buildSpawnConfig(
+      createStandardEnvelope(),
+      STANDARD_POLICY,
+      { resumeSessionId: captured },
+    );
+
+    expect(nextTask.args.slice(0, 3)).toEqual([
+      "exec",
+      "resume",
+      "01a05958-2931-73f1-9aba-38fa915bb8df",
+    ]);
+  });
+
+  it("reports the same id again when resuming, so the chain stays on one thread", () => {
+    // Verified live: `codex exec resume <id>` re-emits `thread.started` with
+    // the id it continued, not a new one. That is what lets the loop capture
+    // unconditionally and still have advanceBatchChain keep counting the
+    // same session rather than restarting the count every task.
+    const resumedSpawnFirstLine = {
+      type: "thread.started",
+      thread_id: "01a05958-2931-73f1-9aba-38fa915bb8df",
+    };
+
+    expect(codexCliAdapter.extractSessionId?.(resumedSpawnFirstLine)).toBe(
+      "01a05958-2931-73f1-9aba-38fa915bb8df",
+    );
+  });
+});
