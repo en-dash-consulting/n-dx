@@ -10,7 +10,7 @@
  */
 
 import { join } from "node:path";
-import { serializeFolderTree, parseFolderTree, PRD_TREE_DIRNAME } from "../../store/index.js";
+import { serializeFolderTree, parseFolderTree, PRD_TREE_DIRNAME, prdLockPath, withLock } from "../../store/index.js";
 import { walkTree } from "../../core/tree.js";
 import type { PRDStore } from "../../store/index.js";
 import type { PRDItem } from "../../schema/index.js";
@@ -28,11 +28,24 @@ export const FOLDER_TREE_SUBDIR = PRD_TREE_DIRNAME;
  *
  * Loads the current document state from the store and writes it to the
  * folder structure. Errors propagate to the caller.
+ *
+ * Runs under the folder-tree lock. This is a full read-modify-write of the
+ * tree — it deletes every on-disk entry absent from the snapshot it just
+ * loaded — so an unlocked sync racing a store write both crashed (the read
+ * observes a half-created item directory and `parseFolderTree` throws ENOENT)
+ * and silently dropped the other writer's items. Holding the lock across the
+ * load and the serialize also makes the snapshot un-staleable, which is why
+ * no `loadedAt` proof is needed here.
+ *
+ * Callers must not already hold the lock: it is not reentrant. Every call
+ * site runs after its store mutation has committed and released.
  */
 export async function syncFolderTree(rexDir: string, store: PRDStore): Promise<void> {
-  const doc = await store.loadDocument();
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
-  await serializeFolderTree(doc.items, treeRoot);
+  await withLock(prdLockPath(rexDir), async () => {
+    const doc = await store.loadDocument();
+    await serializeFolderTree(doc.items, treeRoot);
+  });
 }
 
 /**
