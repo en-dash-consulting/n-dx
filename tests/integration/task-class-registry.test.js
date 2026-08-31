@@ -96,7 +96,12 @@ describe("task-class registry contract", () => {
 
   it("sourcevision declares its routed classes", () => {
     const classes = byPackage.get("sourcevision");
-    for (const cls of ["zone.enrich-scan", "zone.enrich-deep", "zone.meta-eval"]) {
+    for (const cls of [
+      "zone.enrich-scan",
+      "zone.enrich-deep",
+      "zone.meta-eval",
+      "code.classify",
+    ]) {
       expect(classes.has(cls), `sourcevision no longer declares ${cls}`).toBe(true);
     }
   });

@@ -370,6 +370,71 @@ export interface BodyMergeResult {
 }
 
 /**
+ * Upper bound for a merged description. Generous — descriptions here run to a
+ * few hundred characters — so exceeding it means the model ignored "concise"
+ * and returned an essay, not that a legitimate description was long.
+ */
+export const MERGED_DESCRIPTION_MAX_LENGTH = 4000;
+
+/** Lines where the model is announcing the answer instead of giving it. */
+const DESCRIPTION_PREAMBLE_RE =
+  /^(sure|certainly|of course|here('s| is| are)|okay|ok)\b.*$|^.*\b(description|summary)\s*:\s*$/i;
+
+/**
+ * Validate the light-tier body-merge response before it becomes a PRD item's
+ * description.
+ *
+ * This is the validation half of routing the call to the cheap tier: the
+ * result is persisted as the surviving item's body, so unusable output must be
+ * *detected* rather than written. Shape noise the cheap tier tends to add —
+ * code fences, an announcing first line — is stripped; anything still not a
+ * plain-text description throws.
+ *
+ * Throwing is deliberate. `reshape` treats body merge as best-effort and keeps
+ * the item's existing description when this fails, which is a better outcome
+ * than persisting a preamble, a JSON blob, or a sentence cut in half by a
+ * length cap.
+ *
+ * @throws when the response is not a usable plain-text description.
+ */
+export function validateMergedDescription(text: string): string {
+  const withoutFences = (text ?? "")
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("```"))
+    .join("\n");
+
+  // Drop leading announcement lines, then keep the remainder verbatim so a
+  // legitimate multi-paragraph description survives intact.
+  const lines = withoutFences.split("\n");
+  let start = 0;
+  while (start < lines.length) {
+    const line = lines[start].trim();
+    if (!line || DESCRIPTION_PREAMBLE_RE.test(line)) {
+      start++;
+      continue;
+    }
+    break;
+  }
+  const description = lines.slice(start).join("\n").trim();
+
+  if (!description) {
+    throw new Error("LLM body-merge response was empty after stripping formatting.");
+  }
+  if (description.startsWith("{") || description.startsWith("[")) {
+    throw new Error(
+      "LLM body-merge response looks like JSON; the prompt asks for plain text.",
+    );
+  }
+  if (description.length > MERGED_DESCRIPTION_MAX_LENGTH) {
+    throw new Error(
+      `LLM body-merge response is too long (${description.length} chars, ` +
+        `max ${MERGED_DESCRIPTION_MAX_LENGTH}).`,
+    );
+  }
+  return description;
+}
+
+/**
  * Use LLM to generate a merged description for a group of hash-suffix duplicate items.
  * Returns a generic description that covers the combined scope of all items.
  *
@@ -404,7 +469,7 @@ export async function reasonForBodyMerge(
   accumulateTokenUsage(tokenUsage, llmResult.tokenUsage);
 
   return {
-    description: llmResult.text.trim(),
+    description: validateMergedDescription(llmResult.text),
     tokenUsage,
   };
 }

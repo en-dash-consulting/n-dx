@@ -422,7 +422,12 @@ async function classifyBatchWithLLM(
 
     let callText: string;
     try {
-      const callResult = await callClaude(prompt);
+      // Light tier via the routing registry. This is the textbook cheap-tier
+      // call: a fixed-size batch in, an enum-constrained list out, with the
+      // contract enforced below — unknown paths and unknown archetype ids are
+      // dropped per item, and the attempt ladder degrades the prompt on a
+      // parse failure. A wrong answer costs one dropped classification.
+      const callResult = await callClaude(prompt, undefined, { taskClass: "code.classify" });
       accumulateTokenUsage(tokenUsage, callResult.tokenUsage);
       callText = callResult.text;
     } catch (err) {

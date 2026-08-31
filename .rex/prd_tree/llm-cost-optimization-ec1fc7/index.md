@@ -24,5 +24,5 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Cap total spawns per task and retry via --resume](./cap-total-spawns-per-task-and-7dcba8.md) | pending |
 | [JSON prompt discipline — compact JSON in and out](./json-prompt-discipline-compact-0284c3.md) | pending |
 | [List the known task classes in ndx config and flag an unrecognized route as probably-new, with the closest match](./list-the-known-task-classes-in-949f60.md) | pending |
-| [Route commit messages and rex mechanical calls to the light tier](./route-commit-messages-and-rex-2db5af.md) | pending |
+| [Route commit messages and rex mechanical calls to the light tier](./route-commit-messages-and-rex-2db5af.md) | completed |
 | [Targeted retry escalation ladder — no more identical-prompt retries](./targeted-retry-escalation-7fa8f0.md) | pending |

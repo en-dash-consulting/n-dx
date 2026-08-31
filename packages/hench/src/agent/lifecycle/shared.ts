@@ -35,6 +35,7 @@ import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/g
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
 import { discoverChangedFiles } from "../analysis/changed-files.js";
+import { extractCommitSubject } from "./commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
@@ -1203,8 +1204,11 @@ export async function proposePreRunCommitMessage(
       "style, no body, no surrounding quotes or backticks) summarizing these " +
       `uncommitted changes:\n\n${diff.stat}\n\n${diff.diff.slice(0, PRE_RUN_COMMIT_DIFF_CHAR_LIMIT)}`;
     const { text } = await provider.complete({ prompt, model: resolvedModel });
-    const firstLine = (text ?? "").split("\n").map((line) => line.trim()).find(Boolean);
-    return firstLine ? firstLine.slice(0, 100) : PRE_RUN_COMMIT_FALLBACK_MESSAGE;
+    // Output contract for the light-tier route: the answer goes straight to
+    // `git commit -m`, so a preamble, fence, or paragraph would land in the
+    // repository's history. Anything that is not a usable single-line subject
+    // yields the generic fallback instead.
+    return extractCommitSubject(text) ?? PRE_RUN_COMMIT_FALLBACK_MESSAGE;
   } catch {
     return PRE_RUN_COMMIT_FALLBACK_MESSAGE;
   }
