@@ -21,7 +21,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Commit-message watcher auto-commits mid-review, splitting or dropping the reviewer's repairs](./commit-message-watcher-auto-8b7df3.md) | completed |
 | [commitWatcher.cancel() cannot stop an auto-commit already in flight, so the review-pass suspension has a silent hole](./commitwatcher-cancel-cannot-63cbcc.md) | completed |
 | [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-859237.md) | completed |
-| [Don't skip the full test suite gate when the agent has already committed its work](./don-t-skip-the-full-test-suite-c97114.md) | pending |
+| [Don't skip the full test suite gate when the agent has already committed its work](./don-t-skip-the-full-test-suite-c97114.md) | completed |
 | [Give review its own model tier with a review-model override](./give-review-its-own-model-tier-b889a2.md) | completed |
 | [Grant the reviewer PRD-write permission so findings can be captured in non-interactive runs](./grant-the-reviewer-prd-write-120b14.md) | completed |
 | [Resume the work session for the reviewer on --resume](./resume-the-work-session-for-the-2eb560.md) | completed |

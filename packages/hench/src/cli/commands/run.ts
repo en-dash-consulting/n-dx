@@ -5,7 +5,7 @@ import { resolveStore, findNextTask, findActionableTasks as findActionable, find
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
-import { classifyChangedFiles } from "../../store/file-classifier.js";
+import { classifyFile } from "../../store/file-classifier.js";
 import type { FileCategory } from "../../store/file-classifier.js";
 import { loadConfig } from "../../store/config.js";
 import { listRuns } from "../../store/runs.js";
@@ -671,18 +671,31 @@ function hasPrdStatusUpdate(toolCalls: ToolCallRecord[]): boolean {
 /**
  * Format a change classification summary for the run output.
  *
+ * Uses structuredSummary.filesChanged (populated from git diffs in finalizeRun)
+ * rather than re-deriving from tool calls, so committed changes and Claude CLI
+ * edits (whose tool names differ from what classifyChangedFiles recognises) are
+ * counted correctly.
+ *
  * Examples:
  *   "Changes: 3 files (2 code, 1 test) + PRD status update"
  *   "Changes: PRD status update only (no code changes)"
  *   "Changes: 1 file (1 docs)"
  */
-function formatChangeClassification(toolCalls: ToolCallRecord[]): string {
-  const classified = classifyChangedFiles(toolCalls);
-  const prdUpdate = hasPrdStatusUpdate(toolCalls);
+function formatChangeClassification(run: RunRecord): string {
+  const filesChanged = run.structuredSummary?.filesChanged ?? [];
+  const prdUpdate = hasPrdStatusUpdate(run.toolCalls);
 
-  // Remove metadata from the classified map for display purposes
-  // (metadata = prd.json, shown separately as "PRD status update")
-  classified.delete("metadata");
+  // Build classification map from the git-authoritative file list.
+  // Metadata paths (.rex/) are excluded from the count and shown separately
+  // as "PRD status update" via hasPrdStatusUpdate.
+  const classified = new Map<FileCategory, string[]>();
+  for (const file of filesChanged) {
+    const category = classifyFile(file);
+    if (category === "metadata") continue;
+    const existing = classified.get(category) ?? [];
+    existing.push(file);
+    classified.set(category, existing);
+  }
 
   const totalFiles = [...classified.values()].reduce((sum, files) => sum + files.length, 0);
 
@@ -845,7 +858,7 @@ async function runOne(
   }
 
   // Change classification
-  info(formatChangeClassification(run.toolCalls));
+  info(formatChangeClassification(run));
 
   if (run.summary) {
     info(`\nSummary: ${run.summary}`);

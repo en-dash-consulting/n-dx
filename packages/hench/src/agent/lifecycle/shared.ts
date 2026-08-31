@@ -832,6 +832,14 @@ export interface FinalizeRunOptions {
    * pre-existing untracked work (issue #303).
    */
   baselineUntracked?: string[];
+  /**
+   * Git commit SHA recorded before the agent started (via
+   * {@link captureStartingHead}). Used to discover committed changes when the
+   * agent self-commits before the test gate runs, and to detect staged/unstaged
+   * changes that buildRunSummary missed (e.g. Claude CLI tool names differ from
+   * Codex tool names). When omitted, the fallback uses only HEAD-relative diffs.
+   */
+  startingHead?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1969,7 +1977,7 @@ export function deriveTokenDiagnosticStatus(turns: TurnTokenUsage[]): "complete"
  * and persist. Called at the end of both loops.
  */
 export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
-  const { run, henchDir, projectDir, config, testCommand, heartbeat, memoryCtx, selfHeal, yes, autonomous, skipFullTestGate } = opts;
+  const { run, henchDir, projectDir, config, testCommand, heartbeat, memoryCtx, selfHeal, yes, autonomous, skipFullTestGate, startingHead } = opts;
 
   run.structuredSummary = buildRunSummary(run.toolCalls);
 
@@ -2025,29 +2033,61 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     }
   }
 
-  // Discover changed files for the test gate.
-  // When the agent loop produced no tool call records (e.g. Codex CLI, which
-  // emits verbose text rather than structured tool events), fall back to
-  // `git diff --name-only HEAD` to discover which files were actually changed.
-  // This ensures the test gate runs even for vendors that do not emit
-  // structured tool events. The check is vendor-agnostic and runs for all modes.
-  if (run.structuredSummary && run.toolCalls.length === 0) {
+  // Discover changed files for the test gate via git.
+  //
+  // Runs unconditionally, regardless of whether buildRunSummary found files via
+  // tool-call analysis. Two cases this fixes:
+  //
+  //  1. The agent self-committed before the gate ran. The working tree is clean,
+  //     so HEAD-relative diffs find nothing — but `startingHead..HEAD` shows
+  //     every committed path in this run.
+  //
+  //  2. Claude CLI tool names (Edit, Write, Bash) differ from the names that
+  //     buildRunSummary and classifyChangedFiles recognise (write_file,
+  //     str_replace_editor). So structuredSummary.filesChanged is empty even
+  //     on a run that plainly modified files. Staged and unstaged diffs
+  //     against HEAD catch them.
+  //
+  // The git-derived set is MERGED with whatever buildRunSummary found, so
+  // neither source silently drops files.
+  if (run.structuredSummary) {
     try {
-      const { stdout } = await execShellCmd("git diff --name-only HEAD", {
+      const gitFiles = new Set<string>(run.structuredSummary.filesChanged);
+
+      // Committed changes since the run started
+      if (startingHead) {
+        const { stdout } = await execShellCmd(
+          `git diff --name-only ${startingHead} HEAD`,
+          { cwd: projectDir, timeout: 10_000 },
+        );
+        stdout.trim().split("\n").filter(Boolean).forEach((f) => gitFiles.add(f));
+      }
+
+      // Staged changes (not yet committed)
+      const { stdout: stagedOut } = await execShellCmd("git diff --name-only --cached", {
         cwd: projectDir,
         timeout: 10_000,
       });
-      const gitChangedFiles = stdout.trim().split("\n").filter(Boolean);
-      if (gitChangedFiles.length > 0) {
-        run.structuredSummary.filesChanged = gitChangedFiles;
+      stagedOut.trim().split("\n").filter(Boolean).forEach((f) => gitFiles.add(f));
+
+      // Unstaged working-tree changes
+      const { stdout: unstagedOut } = await execShellCmd("git diff --name-only", {
+        cwd: projectDir,
+        timeout: 10_000,
+      });
+      unstagedOut.trim().split("\n").filter(Boolean).forEach((f) => gitFiles.add(f));
+
+      const allFiles = [...gitFiles].sort();
+      if (allFiles.length > 0) {
+        run.structuredSummary.filesChanged = allFiles;
         run.structuredSummary.counts = {
           ...run.structuredSummary.counts,
-          filesChanged: gitChangedFiles.length,
+          filesChanged: allFiles.length,
         };
       }
     } catch {
-      // Best-effort: if git is unavailable, the test gate falls back to
-      // the existing filesChanged (empty), which causes it to skip.
+      // Best-effort: if git is unavailable, leave structuredSummary.filesChanged
+      // as-is (from tool call analysis). The gate may skip if it remains empty.
     }
   }
 

@@ -714,6 +714,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
     baselineUntracked,
+    startingHead,
   });
 
   return { run };
@@ -1170,6 +1171,7 @@ async function runLocalToolLoop(params: {
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
     baselineUntracked,
+    startingHead,
   });
 
   return { run };
@@ -1532,6 +1534,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
     baselineUntracked,
+    startingHead,
   });
 
   return { run };
