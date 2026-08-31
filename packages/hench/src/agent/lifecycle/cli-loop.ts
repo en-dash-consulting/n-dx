@@ -28,7 +28,7 @@ import { toolRexAppendLog } from "../../tools/rex.js";
 import {checkTokenBudget} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
-import { section, subsection, stream, info, withHeartbeat } from "../../types/output.js";
+import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
 import { isSpinningRun } from "../analysis/spin.js";
 import {
   buildReviewSystemPrompt,
@@ -42,7 +42,16 @@ import type { ReviewPassOutcome } from "../analysis/adversarial-review.js";
 import { snapshotDirtyState, diffDirtyState } from "../analysis/review-repairs.js";
 import type { DirtySnapshot } from "../analysis/review-repairs.js";
 import { ensureWarmParent } from "./orientation.js";
-import { resolveSessionStrategy, clearSessionCache } from "./session-cache.js";
+import {
+  resolveSessionStrategy,
+  clearSessionCache,
+  readBatchChain,
+  advanceBatchChain,
+  clearBatchChain,
+  isBatchChainUsable,
+} from "./session-cache.js";
+import { buildTaskBoundaryDivider } from "./batch-divider.js";
+import { DEFAULT_TASKS_PER_SESSION } from "./session-cache.js";
 import { mkdir, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
@@ -1613,6 +1622,39 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     configured: config.sessionStrategy,
   });
   let warmParentId: string | undefined;
+
+  // Batch strategy: resume the *previous task's* session so the transcript
+  // accumulates, rather than forking a fixed orientation. `cliLoop` runs once
+  // per task, so the chain lives in the cache file and is bounded by
+  // tasksPerSession — an unbounded shared transcript costs more on every later
+  // turn and lets one task's framing bleed into the next.
+  let batchResumeId: string | undefined;
+  let batchTaskNumber = 1;
+  let batchPreviousTaskTitle: string | undefined;
+  const tasksPerSession = config.tasksPerSession ?? DEFAULT_TASKS_PER_SESSION;
+  if (sessionStrategy === "batch") {
+    const chain = await readBatchChain(henchDir);
+    const verdict = isBatchChainUsable(chain, {
+      vendor,
+      model: opts.spawnModel ?? "",
+      tasksPerSession,
+    });
+    if (verdict.usable && chain) {
+      batchResumeId = chain.sessionId;
+      batchTaskNumber = chain.tasksUsed + 1;
+      batchPreviousTaskTitle = chain.lastTaskTitle;
+      detail(
+        `Batch session: continuing ${chain.sessionId.slice(0, 8)} ` +
+          `(task ${batchTaskNumber} of up to ${tasksPerSession})`,
+      );
+    } else {
+      // Any rejection means this task opens a new session. Drop the old chain
+      // so a later failure cannot resume a session we have stopped counting.
+      if (chain) await clearBatchChain(henchDir);
+      detail(`Batch session: starting fresh (${verdict.usable ? "new chain" : verdict.reason})`);
+    }
+  }
+
   if (sessionStrategy === "fork") {
     warmParentId = await ensureWarmParent({
       adapter,
@@ -1654,6 +1696,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const MAX_PLAN_RESPAWNS = 2;
   let planRespawns = 0;
   let cancelledByUser = false;
+  /**
+   * Session the most recent spawn ran in. On a plain resume the vendor reports
+   * the session it continued, so this is the transcript the next batched task
+   * should join.
+   */
+  let lastSessionId: string | undefined;
 
   try {
     for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
@@ -1665,7 +1713,19 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       // triggering ExitPlanMode (or when the plan-respawn cap is hit / the
       // user rejects the plan).
       while (true) {
+        // Batch turns after the first arrive in a conversation that already
+        // finished a task, so the brief needs an explicit boundary or it
+        // reads as a continuation of the previous one.
+        const boundaryDivider = batchResumeId
+          ? buildTaskBoundaryDivider({
+              taskNumber: batchTaskNumber,
+              tasksPerSession,
+              previousTaskTitle: batchPreviousTaskTitle,
+            })
+          : "";
+
         const briefContent =
+          boundaryDivider +
           (attempt === 0
             ? boundedBriefText
             : boundedBriefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns)) +
@@ -1688,7 +1748,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           // Fork the orientation session rather than continuing it, so the
           // parent stays reusable by the next task and this spawn gets its
           // own session id. Retries and plan re-spawns fork the same parent.
-          resumeSessionId: warmParentId,
+          //
+          // Batch resumes WITHOUT forking on purpose: the point is a single
+          // accumulating transcript, so this task's turns must land in the
+          // session the next task will resume.
+          resumeSessionId: warmParentId ?? batchResumeId,
           forkSession: warmParentId ? true : undefined,
         });
 
@@ -1748,6 +1812,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           );
           continue;
         }
+
+        if (result.sessionId) lastSessionId = result.sessionId;
 
         accumulateResult(accumulated, result);
 
@@ -1873,6 +1939,25 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     baselineUntracked,
     startingHead,
   });
+
+  // Batch bookkeeping, after the run's outcome is known.
+  //
+  // A successful task hands its session to the next one. A failed task does
+  // not: whatever went wrong is now in that transcript, and resuming it would
+  // start the next task inside the failure. The same applies when the vendor
+  // reported no session id — there is nothing to hand on.
+  if (sessionStrategy === "batch") {
+    if (run.status === "completed" && lastSessionId) {
+      await advanceBatchChain(henchDir, {
+        sessionId: lastSessionId,
+        vendor,
+        model: opts.spawnModel ?? "",
+        lastTaskTitle: brief.task.title,
+      }).catch(() => { /* best effort — the next task just starts fresh */ });
+    } else {
+      await clearBatchChain(henchDir);
+    }
+  }
 
   return { run };
 }
