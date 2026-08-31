@@ -107,6 +107,13 @@ const SKIP_DIRS = new Set([
   // <name>/` prefix the ALLOWED list doesn't recognize, and reports it as
   // a violation of a rule the real, committed file already satisfies.
   ".claude",
+  // Same class as `.claude`: gitignored scratch space, here for throwaway
+  // projects a verification run initialises and drives (see the harness under
+  // `.local_testing/`). Those projects are deliberately written the way an
+  // outside consumer would write them — raw `child_process`, no `@n-dx/*`
+  // imports — which is the point of the fixture and not a policy violation of
+  // this repo's source tree.
+  ".local_testing",
 ]);
 
 function walk(dir, files = []) {
