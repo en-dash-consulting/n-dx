@@ -833,12 +833,12 @@ describe("vendor adapter contract: Claude CLI arg snapshots", () => {
 describe("vendor adapter contract: Codex policy flag snapshots", () => {
   it("standard policy compiles to deterministic Codex flags", () => {
     const flags = compileCodexPolicyFlags(STANDARD_POLICY);
-    expect(flags).toEqual(["--full-auto"]);
+    expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never"]);
   });
 
   it("read-only policy compiles to deterministic Codex flags", () => {
     const flags = compileCodexPolicyFlags(READONLY_POLICY);
-    expect(flags).toEqual(["--sandbox", "read-only"]);
+    expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request"]);
   });
 
   it("full-access policy compiles to deterministic Codex flags", () => {

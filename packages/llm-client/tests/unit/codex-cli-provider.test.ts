@@ -36,12 +36,26 @@ describe("Codex policy flag compilation", () => {
   });
 
   describe("mapApprovalToCodexFlag", () => {
-    it("maps on-request to default", () => {
-      expect(mapApprovalToCodexFlag("on-request")).toBe("default");
+    // These used to expect "default" and "full-auto" — the names of `codex
+    // exec` flags, not `approval_policy` config values. Both are gone from
+    // the exec surface; `--full-auto` in particular was killing every
+    // unattended spawn on argument parsing.
+    it("maps on-request to the on-request approval policy", () => {
+      expect(mapApprovalToCodexFlag("on-request")).toBe("on-request");
     });
 
-    it("maps never to full-auto", () => {
-      expect(mapApprovalToCodexFlag("never")).toBe("full-auto");
+    it("maps never to the never approval policy", () => {
+      expect(mapApprovalToCodexFlag("never")).toBe("never");
+    });
+
+    it("only returns values codex accepts for approval_policy", () => {
+      // Read off codex-cli 0.147.0's own rejection of a bogus value:
+      //   unknown variant `x`, expected one of `untrusted`, `on-failure`,
+      //   `on-request`, `granular`, `never`
+      const accepted = ["untrusted", "on-failure", "on-request", "granular", "never"];
+      for (const policy of ["on-request", "never"] as ApprovalPolicy[]) {
+        expect(accepted).toContain(mapApprovalToCodexFlag(policy));
+      }
     });
 
     it("covers all ApprovalPolicy values", () => {
@@ -53,9 +67,22 @@ describe("Codex policy flag compilation", () => {
   });
 
   describe("compileCodexPolicyFlags", () => {
-    it("uses --full-auto for the default unattended policy", () => {
+    it("states sandbox and approvals explicitly for the default unattended policy", () => {
       const flags = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY);
-      expect(flags).toEqual(["--full-auto"]);
+      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never"]);
+    });
+
+    it("never emits --full-auto, which codex exec no longer accepts", () => {
+      const policies: ExecutionPolicy[] = [
+        DEFAULT_EXECUTION_POLICY,
+        { ...DEFAULT_EXECUTION_POLICY, approvals: "on-request" },
+        { ...DEFAULT_EXECUTION_POLICY, sandbox: "read-only", approvals: "on-request" },
+        { ...DEFAULT_EXECUTION_POLICY, sandbox: "danger-full-access", approvals: "never" },
+        { ...DEFAULT_EXECUTION_POLICY, sandbox: "danger-full-access", approvals: "on-request" },
+      ];
+      for (const policy of policies) {
+        expect(compileCodexPolicyFlags(policy)).not.toContain("--full-auto");
+      }
     });
 
     it("compiles read-only + on-request policy to a plain sandbox flag", () => {
@@ -65,7 +92,7 @@ describe("Codex policy flag compilation", () => {
         approvals: "on-request",
       };
       const flags = compileCodexPolicyFlags(policy);
-      expect(flags).toEqual(["--sandbox", "read-only"]);
+      expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request"]);
     });
 
     it("compiles workspace-write + on-request policy to a plain sandbox flag", () => {
@@ -74,7 +101,7 @@ describe("Codex policy flag compilation", () => {
         approvals: "on-request",
       };
       const flags = compileCodexPolicyFlags(policy);
-      expect(flags).toEqual(["--sandbox", "workspace-write"]);
+      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=on-request"]);
     });
 
     it("compiles danger-full-access + never policy", () => {
@@ -94,17 +121,33 @@ describe("Codex policy flag compilation", () => {
         approvals: "on-request",
       };
       const flags = compileCodexPolicyFlags(policy);
-      expect(flags).toEqual(["--sandbox", "danger-full-access"]);
+      expect(flags).toEqual([
+        "--sandbox",
+        "danger-full-access",
+        "-c",
+        "approval_policy=on-request",
+      ]);
     });
 
-    it("returns a compact supported flag set", () => {
-      expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)).toHaveLength(1);
+    it("keeps the one preset that is still on the exec surface", () => {
+      // danger-full-access + never is the only combination that stays a
+      // single flag: it is the only way to express "no sandbox at all".
+      expect(
+        compileCodexPolicyFlags({
+          ...DEFAULT_EXECUTION_POLICY,
+          sandbox: "danger-full-access",
+          approvals: "never",
+        }),
+      ).toEqual(["--dangerously-bypass-approvals-and-sandbox"]);
+
+      // Everything else is the explicit sandbox + approval_policy pair.
+      expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)).toHaveLength(4);
       expect(
         compileCodexPolicyFlags({
           ...DEFAULT_EXECUTION_POLICY,
           approvals: "on-request",
         }),
-      ).toHaveLength(2);
+      ).toHaveLength(4);
     });
   });
 });

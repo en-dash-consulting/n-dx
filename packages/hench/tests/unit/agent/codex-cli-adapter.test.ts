@@ -88,10 +88,15 @@ describe("CodexCliAdapter: buildSpawnConfig", () => {
     expect(config.args).toContain("--skip-git-repo-check");
   });
 
-  it("compiles default policy to the supported --full-auto preset", () => {
+  it("compiles default policy to an explicit sandbox + approval_policy pair", () => {
     const config = codexCliAdapter.buildSpawnConfig(createMinimalEnvelope(), DEFAULT_EXECUTION_POLICY, {});
 
-    expect(config.args).toContain("--full-auto");
+    expect(config.args).toEqual(
+      expect.arrayContaining(["--sandbox", "workspace-write", "-c", "approval_policy=never"]),
+    );
+    // `--full-auto` was removed from `codex exec` in codex-cli 0.147.0 and
+    // `--approval-policy` never existed on the exec surface.
+    expect(config.args).not.toContain("--full-auto");
     expect(config.args).not.toContain("--approval-policy");
   });
 
@@ -177,7 +182,10 @@ describe("CodexCliAdapter: snapshot parity", () => {
     // The prompt is delivered via stdin; args end with the "-" stdin marker.
     expect(config.args).toEqual([
       "exec",
-      "--full-auto",
+      "--sandbox",
+      "workspace-write",
+      "-c",
+      "approval_policy=never",
       "--json",
       "--skip-git-repo-check",
       "-",
@@ -189,7 +197,10 @@ describe("CodexCliAdapter: snapshot parity", () => {
 
     expect(config.args).toEqual([
       "exec",
-      "--full-auto",
+      "--sandbox",
+      "workspace-write",
+      "-c",
+      "approval_policy=never",
       "--json",
       "--skip-git-repo-check",
       "-m", "gpt-5-codex",
