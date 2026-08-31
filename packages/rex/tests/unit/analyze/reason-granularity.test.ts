@@ -40,7 +40,7 @@ describe("buildBreakdownPrompt", () => {
     const proposals = [makeProposal("User Auth")];
     const prompt = buildBreakdownPrompt(proposals);
 
-    expect(prompt).toContain('"title": "User Auth"');
+    expect(prompt).toContain('"title":"User Auth"');
     expect(prompt).toContain("Feature 1 of User Auth");
     expect(prompt).toContain("Task 1 for User Auth F1");
   });
@@ -89,15 +89,15 @@ describe("buildBreakdownPrompt", () => {
     const proposals = [makeProposal("Auth")];
     const prompt = buildBreakdownPrompt(proposals);
 
-    expect(prompt).toContain("ONLY a valid JSON array");
+    expect(prompt).toContain("ONLY a valid, minified JSON array");
   });
 
   it("handles multiple proposals", () => {
     const proposals = [makeProposal("Auth"), makeProposal("Dashboard")];
     const prompt = buildBreakdownPrompt(proposals);
 
-    expect(prompt).toContain('"title": "Auth"');
-    expect(prompt).toContain('"title": "Dashboard"');
+    expect(prompt).toContain('"title":"Auth"');
+    expect(prompt).toContain('"title":"Dashboard"');
   });
 });
 
@@ -108,7 +108,7 @@ describe("buildConsolidatePrompt", () => {
     const proposals = [makeProposal("User Auth", 2, 3)];
     const prompt = buildConsolidatePrompt(proposals);
 
-    expect(prompt).toContain('"title": "User Auth"');
+    expect(prompt).toContain('"title":"User Auth"');
     expect(prompt).toContain("Feature 1 of User Auth");
     expect(prompt).toContain("Task 1 for User Auth F1");
   });
@@ -156,6 +156,6 @@ describe("buildConsolidatePrompt", () => {
     const proposals = [makeProposal("Auth")];
     const prompt = buildConsolidatePrompt(proposals);
 
-    expect(prompt).toContain("ONLY a valid JSON array");
+    expect(prompt).toContain("ONLY a valid, minified JSON array");
   });
 });

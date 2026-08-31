@@ -125,54 +125,10 @@ Guidelines:
 - For splits: ensure child items are at the appropriate hierarchy level.
 - For updates: only propose when there's a meaningful improvement (not cosmetic rewording).
 
-Respond with ONLY a valid JSON array of action objects. No explanation, no markdown fences, no commentary — just the JSON.`;
+Respond with ONLY a valid, minified JSON array of action objects — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON.`;
 
 export const RESHAPE_FEW_SHOT = `Example output (for reference — do NOT include this in your response):
-[
-  {
-    "action": "merge",
-    "survivorId": "abc-123",
-    "mergedIds": ["def-456"],
-    "title": "Implement user authentication with OAuth2",
-    "reason": "Both items describe OAuth2 authentication setup with overlapping acceptance criteria"
-  },
-  {
-    "action": "update",
-    "itemId": "ghi-789",
-    "updates": {
-      "description": "Handle rate limiting for external API calls with exponential backoff",
-      "acceptanceCriteria": ["Returns 429 with retry-after header", "Implements exponential backoff up to 60s"]
-    },
-    "reason": "Original description was too vague — added specific retry strategy and verifiable criteria"
-  },
-  {
-    "action": "split",
-    "sourceId": "mno-345",
-    "children": [
-      {
-        "title": "Validate form inputs on submit",
-        "level": "task",
-        "acceptanceCriteria": ["Required fields rejected with clear error", "Email format validated against RFC 5322"]
-      },
-      {
-        "title": "Show inline error messages on validation failure",
-        "level": "task"
-      }
-    ],
-    "reason": "Original task bundled validation logic and error UX — splitting clarifies scope and ownership"
-  },
-  {
-    "action": "reparent",
-    "itemId": "pqr-678",
-    "newParentId": "stu-901",
-    "reason": "Belongs under the auth epic, not the dashboard epic"
-  },
-  {
-    "action": "obsolete",
-    "itemId": "jkl-012",
-    "reason": "This migration task was for the old database schema which has been replaced by the v2 schema"
-  }
-]`;
+[{"action":"merge","survivorId":"abc-123","mergedIds":["def-456"],"title":"Implement user authentication with OAuth2","reason":"Both items describe OAuth2 authentication setup with overlapping acceptance criteria"},{"action":"update","itemId":"ghi-789","updates":{"description":"Handle rate limiting for external API calls with exponential backoff","acceptanceCriteria":["Returns 429 with retry-after header","Implements exponential backoff up to 60s"]},"reason":"Original description was too vague — added specific retry strategy and verifiable criteria"},{"action":"split","sourceId":"mno-345","children":[{"title":"Validate form inputs on submit","level":"task","acceptanceCriteria":["Required fields rejected with clear error","Email format validated against RFC 5322"]},{"title":"Show inline error messages on validation failure","level":"task"}],"reason":"Original task bundled validation logic and error UX — splitting clarifies scope and ownership"},{"action":"reparent","itemId":"pqr-678","newParentId":"stu-901","reason":"Belongs under the auth epic, not the dashboard epic"},{"action":"obsolete","itemId":"jkl-012","reason":"This migration task was for the old database schema which has been replaced by the v2 schema"}]`;
 
 const SMART_PRUNE_PROMPT = `You are reviewing this PRD to identify items that should be pruned — either because they are obsolete, redundant, or no longer relevant to the project's current direction.
 
@@ -207,7 +163,7 @@ Guidelines:
 - For splits: ensure child items are at the appropriate hierarchy level below the source.
 - Provide a clear "reason" for every action explaining how it improves post-prune organization.
 
-Respond with ONLY a valid JSON array of action objects. No explanation, no markdown fences, no commentary — just the JSON. Return an empty array [] if no consolidation is needed.`;
+Respond with ONLY a valid, minified JSON array of action objects — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON. Return an empty array [] if no consolidation is needed.`;
 
 export interface ReshapeReasonOptions {
   dir?: string;

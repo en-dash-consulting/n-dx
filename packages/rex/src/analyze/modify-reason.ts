@@ -74,7 +74,7 @@ export function buildModifyPrompt(
     projectContext?: string;
   },
 ): string {
-  const proposalJson = JSON.stringify(proposals, null, 2);
+  const proposalJson = JSON.stringify(proposals);
 
   const existingBlock = options?.existingSummary
     ? `\nExisting PRD (for deduplication — do NOT include these items):\n${options.existingSummary}\n`
