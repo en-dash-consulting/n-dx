@@ -20,6 +20,10 @@ import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
 import { section, detail } from "../../types/output.js";
 import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
+import {
+  trimDocument,
+  MAX_CONTEXT_FILE_CHARS,
+} from "../../agent/planning/context-caps.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
 import { LLM_VENDOR, printVendorModelHeader, resolveModel, resolveTaskModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
@@ -1250,7 +1254,18 @@ export async function cmdRun(
   if (contextFilePath) {
     if (existsSync(contextFilePath)) {
       try {
-        extraContext = readFileSync(contextFilePath, "utf-8");
+        // Size-guarded: `ndx work` pipes the entire CONTEXT.md plus the PRD
+        // tree through this flag, and the result is re-sent on every task and
+        // every retry. Trim with a stated marker rather than inlining
+        // whatever happens to be on disk.
+        const raw = readFileSync(contextFilePath, "utf-8");
+        extraContext = trimDocument(raw, MAX_CONTEXT_FILE_CHARS, "context file");
+        if (raw.length > MAX_CONTEXT_FILE_CHARS) {
+          info(
+            `⚠ Context file trimmed: ${raw.length} chars → ${MAX_CONTEXT_FILE_CHARS} ` +
+              `(${contextFilePath})`,
+          );
+        }
       } catch (err) {
         info(`⚠ Could not read context file "${contextFilePath}": ${(err as Error).message}`);
       }
