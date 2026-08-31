@@ -36,9 +36,37 @@ and never mutates `.sourcevision/`.
 missing the map still renders and says so in its own footer — see *Self-declared
 gaps* below.
 
+## The second input path: direct scan
+
+`--source=scan` skips `.sourcevision/` entirely and derives everything in one
+pass over the file tree (`src/export/iso-scan.ts`). This is what lets the map
+work on a repository that has never been analyzed, and it is the path the
+portable `/iso-map` skill takes by default there.
+
+| Visual property | Derived from |
+|---|---|
+| Zones | Directory structure: workspace containers (`packages/`, `apps/`, …), then source roots (`src/`, `lib/`, `internal/`, …) |
+| Edges | Imports extracted by regex for JS/TS, Python and Go |
+| Cohesion / coupling | Ratio of intra-zone to cross-zone edges |
+| Block colour | Path conventions (`routes/` → entry, `models/` → data, …) |
+| Dependency column | Non-relative specifiers, minus the standard library |
+
+Three resolution details are worth knowing, because without them whole packages
+look like third-party dependencies:
+
+- **tsconfig `paths`** are read (including JSONC with comments and trailing
+  commas), so `@app/core` resolves inside the repo.
+- **Workspace packages** are mapped from each package's `name` in its
+  `package.json` to its directory, so a monorepo's internal packages resolve.
+- **Go** has no relative imports: `go.mod`'s `module` line is read so
+  intra-module imports resolve to sibling packages rather than looking external.
+
+Scan mode never produces findings, insights or risk levels — those only exist in
+a real analysis — and it says so in the page footer.
+
 ## The gaps
 
-### 1. Edges are imports, not data flow
+### 1. Edges are imports, not data flow — partly closed
 
 A connector means *this zone's files import that zone's files*. It does not mean
 a request, a message, or a record travels along it. The two diverge constantly:
@@ -49,12 +77,17 @@ a request, a message, or a record travels along it. The two diverge constantly:
 - Import direction is fixed at build time; control flow reverses through
   callbacks.
 
-**To close it:** `callgraph.json` already exists and holds `edges[]` with
-`callerFile` / `calleeFile`. Aggregating those to zone pairs would give a
-call-weighted overlay that is much closer to runtime behaviour than imports are.
-This was left out of the first version deliberately — the call graph is large
-(189k edges on this repo) and needs its own noise filtering before it can drive
-a visual. It is the single highest-value addition.
+**Partly closed.** When `callgraph.json` is present, `aggregateCallEdges()` in
+`src/export/iso-sources.ts` collapses its function-level edges to zone pairs and
+attaches a call count to every connector. The page then offers a
+**Weight: imports / calls** toggle that re-strokes the map by runtime calls
+instead of imports, and an edge that exists *only* in the call graph — no import
+resolves it — is drawn and labelled as such, which is the signature of an
+injected or event-driven seam.
+
+**Still open:** calls are resolved statically, so a dispatch through a variable,
+a string key, or a registry is not counted; and the call graph says nothing
+about volume at runtime, only about how many call sites exist in the source.
 
 ### 2. Injection seams point the wrong way, or not at all
 

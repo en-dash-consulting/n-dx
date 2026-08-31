@@ -1,34 +1,29 @@
 /**
  * Isometric map model builder.
  *
- * Turns sourcevision analysis output into a layered, grid-placed scene graph
- * that the isometric renderer can extrude into 3D boxes. All geometry is
- * computed here — in project grid units, not pixels — so the layout is
- * deterministic and testable without touching HTML or the DOM.
+ * Turns a normalized view of a codebase into a layered, grid-placed scene graph
+ * that the renderer can extrude into 3D boxes. All geometry is computed here —
+ * in project grid units, not pixels — so the layout is deterministic and
+ * testable without touching HTML or the DOM.
+ *
+ * The input is deliberately source-agnostic: `iso-sources.ts` adapts either a
+ * `.sourcevision/` analysis or a direct filesystem scan into the same shape, so
+ * there is exactly one implementation of layering, sizing, colouring and
+ * routing regardless of where the facts came from.
  *
  * Grid units: `u` runs along the dependency axis (left→right in the projected
  * scene), `v` across it, `h` is extrusion height. The renderer projects
  * (u, v, h) to screen space; nothing in this module knows about pixels.
+ *
+ * Imports nothing but types — this module is bundled into a standalone script.
  */
-
-import type {
-  Classifications,
-  Components,
-  Finding,
-  Imports,
-  Inventory,
-  Manifest,
-  RiskLevel,
-  Zone,
-  Zones,
-} from "../schema/v1.js";
 
 // ── Public model types ──────────────────────────────────────────────────────
 
 /**
- * Visual category for a node. Derived from the dominant archetype of a zone's
- * files, which is what gives the map its "these blocks do the same kind of
- * work" reading rather than colouring by package.
+ * Visual category for a node, derived from what a zone's files mostly do.
+ * This is what gives the map its "these blocks do the same kind of work"
+ * reading rather than colouring by package.
  */
 export type IsoKind =
   | "entry"
@@ -44,9 +39,10 @@ export interface IsoKindMeta {
   id: IsoKind;
   label: string;
   color: string;
+  /** Shown beside the colour so kind is never encoded by colour alone. */
+  glyph: string;
 }
 
-/** A cross-zone relationship shown in a node's detail panel. */
 export interface IsoNodeLink {
   id: string;
   name: string;
@@ -58,9 +54,15 @@ export interface IsoNodeMetrics {
   lines: number;
   cohesion: number;
   coupling: number;
-  riskLevel: RiskLevel | "unscored";
+  riskLevel: string;
   /** Server routes owned by this zone — a concrete inbound entry point count. */
   routes: number;
+}
+
+/** A file shown in a node's panel, optionally linked to its source. */
+export interface IsoKeyFile {
+  path: string;
+  url?: string;
 }
 
 export interface IsoNode {
@@ -71,28 +73,21 @@ export interface IsoNode {
   col: number;
   /** Slot within the layer. */
   row: number;
-  /** Grid origin and footprint. */
   u: number;
   v: number;
   w: number;
   d: number;
   /** Extrusion height, scaled from line count. */
   h: number;
-  /** Layer caption shown above the node name in the panel. */
   stage: string;
-  /** One-line metric summary. */
   sub: string;
-  /** Zone description. */
   body: string;
   metrics: IsoNodeMetrics;
-  /** Archetype mix, most common first: [archetypeId, fileCount]. */
-  archetypes: Array<[string, number]>;
-  /** Representative files — entry points first, then largest by line count. */
-  keyFiles: string[];
-  /** Zone insights from analysis (structural + AI-enriched). */
+  /** Composition of the zone, most common first: [label, count]. */
+  mix: Array<[string, number]>;
+  keyFiles: IsoKeyFile[];
   insights: string[];
-  /** Findings scoped to this zone. */
-  findings: Array<{ text: string; severity: string; type: string }>;
+  findings: Array<{ text: string; severity: string }>;
   inbound: IsoNodeLink[];
   outbound: IsoNodeLink[];
 }
@@ -100,8 +95,10 @@ export interface IsoNode {
 export interface IsoEdge {
   from: string;
   to: string;
-  /** Number of underlying cross-zone import edges. */
+  /** Cross-zone import references. */
   weight: number;
+  /** Runtime call references, when a call graph was available. */
+  calls: number;
   /** True when the edge runs backwards through the layering (a cycle). */
   back: boolean;
   /** Orthogonal route in grid units, precomputed so the renderer stays dumb. */
@@ -113,13 +110,15 @@ export interface IsoModelMeta {
   analyzedAt: string;
   gitBranch?: string;
   gitSha?: string;
+  /** Where the facts came from. */
+  origin: "sourcevision" | "scan";
   totalZones: number;
   shownZones: number;
   totalFiles: number;
   totalLines: number;
-  /** Zones dropped by the maxNodes cap, largest-first ordering retained. */
   omittedZones: string[];
-  /** Signals the map could not derive from analysis output. */
+  /** True when edges carry call counts as well as import counts. */
+  hasCalls: boolean;
   gaps: string[];
 }
 
@@ -129,18 +128,54 @@ export interface IsoModel {
   kinds: IsoKindMeta[];
   layers: string[];
   meta: IsoModelMeta;
-  /** Scene bounds in grid units. */
   bounds: { uMin: number; uMax: number; vMin: number; vMax: number };
 }
 
+// ── Normalized input ────────────────────────────────────────────────────────
+
+export interface IsoZoneInput {
+  id: string;
+  name: string;
+  description: string;
+  files: string[];
+  entryPoints: string[];
+  cohesion: number;
+  coupling: number;
+  riskLevel?: string;
+  insights?: string[];
+}
+
+export interface IsoFileInput {
+  lineCount: number;
+  /** Visual kind hint for this file. */
+  kind: IsoKind;
+  /** Finer label used for the composition breakdown (archetype, or the kind). */
+  label?: string;
+  /** Server routes defined in this file. */
+  routes?: number;
+}
+
 export interface IsoModelInput {
-  manifest: Manifest;
-  zones: Zones;
-  inventory: Inventory;
-  imports: Imports;
-  classifications?: Classifications;
-  components?: Components;
-  projectName: string;
+  zones: IsoZoneInput[];
+  crossings: Array<{ fromZone: string; toZone: string }>;
+  files: Map<string, IsoFileInput>;
+  external: Array<{ package: string; importedBy: string[] }>;
+  findings: Array<{ scope: string; text: string; severity?: string }>;
+  /** Aggregated call-graph edges between zones, when available. */
+  callEdges?: Array<{ fromZone: string; toZone: string; weight: number }>;
+  meta: {
+    project: string;
+    analyzedAt: string;
+    gitBranch?: string;
+    gitSha?: string;
+    origin: "sourcevision" | "scan";
+    totalFiles: number;
+    totalLines: number;
+    /** Source-specific caveats prepended to the standing gap list. */
+    extraGaps?: string[];
+  };
+  /** Base URL for source links, e.g. https://github.com/o/r/blob/main. */
+  linkBase?: string;
 }
 
 export interface IsoModelOptions {
@@ -150,57 +185,33 @@ export interface IsoModelOptions {
   includeExternals?: boolean;
   /** Cap on external nodes. Default 5. */
   maxExternals?: number;
-  /**
-   * Minimum number of consuming zones before an external package earns a node.
-   * Keeps the column to genuinely shared infrastructure. Default 2.
-   */
+  /** Minimum consuming zones before an external earns a node. Default 2. */
   minExternalConsumers?: number;
 }
 
-// ── Palette and archetype mapping ───────────────────────────────────────────
+// ── Palette ─────────────────────────────────────────────────────────────────
 
 export const ISO_KINDS: IsoKindMeta[] = [
-  { id: "entry", label: "Entry points", color: "#4F9BE8" },
-  { id: "logic", label: "Business logic", color: "#7FAE33" },
-  { id: "data", label: "Data & schema", color: "#C06BD4" },
-  { id: "ui", label: "User interface", color: "#E0A33E" },
-  { id: "gateway", label: "Gateways", color: "#3FB6A8" },
-  { id: "support", label: "Support & config", color: "#6F7BA6" },
-  { id: "tests", label: "Tests", color: "#4E5B78" },
-  { id: "external", label: "Outside the codebase", color: "#7C879B" },
+  { id: "entry", label: "Entry points", color: "#4F9BE8", glyph: "▶" },
+  { id: "logic", label: "Business logic", color: "#7FAE33", glyph: "◆" },
+  { id: "data", label: "Data & schema", color: "#C06BD4", glyph: "▤" },
+  { id: "ui", label: "User interface", color: "#E0A33E", glyph: "▣" },
+  { id: "gateway", label: "Gateways", color: "#3FB6A8", glyph: "⇄" },
+  { id: "support", label: "Support & config", color: "#6F7BA6", glyph: "○" },
+  { id: "tests", label: "Tests", color: "#4E5B78", glyph: "✓" },
+  { id: "external", label: "Outside the codebase", color: "#7C879B", glyph: "◇" },
 ];
 
-/**
- * Archetype → visual kind. Anything unmapped falls through to "support",
- * which is the honest default for utility-shaped code.
- */
-const ARCHETYPE_KIND: Record<string, IsoKind> = {
-  entrypoint: "entry",
-  "route-handler": "entry",
-  page: "entry",
-  "cli-command": "logic",
-  service: "logic",
-  middleware: "logic",
-  store: "data",
-  schema: "data",
-  types: "data",
-  model: "data",
-  component: "ui",
-  hook: "ui",
-  view: "ui",
-  gateway: "gateway",
-  adapter: "gateway",
-  client: "gateway",
-  utility: "support",
-  config: "support",
-  "test-helper": "support",
-};
+const KIND_IDS = new Set<string>(ISO_KINDS.map((k) => k.id));
+
+/** Narrow an arbitrary string to a known kind, defaulting to support. */
+export function asKind(value: string | undefined): IsoKind {
+  return value && KIND_IDS.has(value) ? (value as IsoKind) : "support";
+}
 
 // ── Geometry constants ──────────────────────────────────────────────────────
 
-/** Gap between dependency layers, in grid units — leaves room for routing. */
 const GAP_U = 5;
-/** Gap between slots within a layer. */
 const GAP_V = 2;
 const MIN_W = 3;
 const MAX_W = 9;
@@ -215,101 +226,84 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-/** Round to 2dp so emitted JSON stays stable across platforms. */
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
-}
-
-function dominant<T extends string>(counts: Map<T, number>): T | undefined {
-  let best: T | undefined;
-  let bestCount = -1;
-  // Sort keys so ties resolve deterministically rather than by insertion order.
-  for (const key of [...counts.keys()].sort()) {
-    const count = counts.get(key)!;
-    if (count > bestCount) {
-      best = key;
-      bestCount = count;
-    }
-  }
-  return best;
 }
 
 function formatCount(n: number): string {
   return n.toLocaleString("en-US");
 }
 
+/**
+ * Zone kind from its files' kind hints.
+ *
+ * Kinds are resolved per file and then counted, rather than picking a dominant
+ * archetype and mapping that afterwards. The difference matters: a zone of 20
+ * utilities, 12 services and 10 middleware is mostly business logic (22) even
+ * though "utility" is the single most common label (20). Counting after the
+ * mapping answers "what does this zone do"; counting before answers "what is
+ * its most common file type", which is not the question the colour is asking.
+ */
+export function resolveZoneKind(kindCounts: Map<IsoKind, number>, totalFiles: number): IsoKind {
+  // Test files usually carry a generic label, so a majority-test zone wins
+  // outright — otherwise a test-heavy repo reads as infrastructure.
+  const tests = kindCounts.get("tests") ?? 0;
+  if (tests * 2 > totalFiles) return "tests";
+
+  let best: IsoKind = "support";
+  let bestCount = -1;
+  // Iterate the palette in order so ties resolve deterministically.
+  for (const meta of ISO_KINDS) {
+    const count = kindCounts.get(meta.id) ?? 0;
+    if (count > bestCount) {
+      best = meta.id;
+      bestCount = count;
+    }
+  }
+  return bestCount <= 0 ? "support" : best;
+}
+
 // ── Model construction ──────────────────────────────────────────────────────
 
-export function buildIsoModel(
-  input: IsoModelInput,
-  options: IsoModelOptions = {},
-): IsoModel {
+export function buildIsoModel(input: IsoModelInput, options: IsoModelOptions = {}): IsoModel {
   const maxNodes = options.maxNodes ?? 40;
   const includeExternals = options.includeExternals ?? true;
   const maxExternals = options.maxExternals ?? 5;
   const minExternalConsumers = options.minExternalConsumers ?? 2;
 
-  const { zones, inventory, imports, classifications, components, manifest } = input;
-
-  // ── Per-file lookups ──────────────────────────────────────────────────────
-
-  const linesByFile = new Map<string, number>();
-  const roleByFile = new Map<string, string>();
-  for (const file of inventory.files) {
-    linesByFile.set(file.path, file.lineCount);
-    roleByFile.set(file.path, file.role);
-  }
-
-  const archetypeByFile = new Map<string, string>();
-  for (const entry of classifications?.files ?? []) {
-    if (entry.archetype) archetypeByFile.set(entry.path, entry.archetype);
-  }
-
-  const routesByFile = new Map<string, number>();
-  for (const group of components?.serverRoutes ?? []) {
-    for (const route of group.routes ?? []) {
-      routesByFile.set(route.file, (routesByFile.get(route.file) ?? 0) + 1);
-    }
-  }
+  const { files, meta } = input;
 
   // ── Select zones ──────────────────────────────────────────────────────────
 
-  // Detection artifacts carry meaningless cohesion/coupling — showing them as
-  // architecture would be a lie, so they are excluded from the scene entirely.
-  const candidates = zones.zones.filter(
-    (z) => z.files.length > 0 && z.detectionQuality !== "artifact",
-  );
-
+  const candidates = input.zones.filter((z) => z.files.length > 0);
   const ranked = [...candidates].sort(
     (a, b) => b.files.length - a.files.length || a.id.localeCompare(b.id),
   );
   const selected = ranked.slice(0, maxNodes);
   const omitted = ranked.slice(maxNodes).map((z) => z.name);
   const selectedIds = new Set(selected.map((z) => z.id));
-
   const zoneById = new Map(selected.map((z) => [z.id, z]));
 
-  // ── Zone-level aggregates ─────────────────────────────────────────────────
+  // ── Zone aggregates ───────────────────────────────────────────────────────
 
   interface Agg {
     lines: number;
     routes: number;
-    /** Files whose inventory role is "test" — drives the tests kind. */
-    testFiles: number;
-    archetypes: Map<string, number>;
+    kinds: Map<IsoKind, number>;
+    labels: Map<string, number>;
   }
   const aggById = new Map<string, Agg>();
 
   for (const zone of selected) {
-    const agg: Agg = { lines: 0, routes: 0, testFiles: 0, archetypes: new Map() };
-    for (const file of zone.files) {
-      agg.lines += linesByFile.get(file) ?? 0;
-      agg.routes += routesByFile.get(file) ?? 0;
-      if (roleByFile.get(file) === "test") agg.testFiles += 1;
-      const archetype = archetypeByFile.get(file);
-      if (archetype) {
-        agg.archetypes.set(archetype, (agg.archetypes.get(archetype) ?? 0) + 1);
-      }
+    const agg: Agg = { lines: 0, routes: 0, kinds: new Map(), labels: new Map() };
+    for (const path of zone.files) {
+      const file = files.get(path);
+      if (!file) continue;
+      agg.lines += file.lineCount;
+      agg.routes += file.routes ?? 0;
+      agg.kinds.set(file.kind, (agg.kinds.get(file.kind) ?? 0) + 1);
+      const label = file.label ?? file.kind;
+      agg.labels.set(label, (agg.labels.get(label) ?? 0) + 1);
     }
     aggById.set(zone.id, agg);
   }
@@ -319,7 +313,7 @@ export function buildIsoModel(
   // Keyed on a tab, which cannot appear in a zone id, so the pair is recovered
   // from the stored value rather than by splitting the key back apart.
   const edgeWeights = new Map<string, { from: string; to: string; weight: number }>();
-  for (const crossing of zones.crossings) {
+  for (const crossing of input.crossings) {
     const { fromZone, toZone } = crossing;
     if (fromZone === toZone) continue;
     if (!selectedIds.has(fromZone) || !selectedIds.has(toZone)) continue;
@@ -329,22 +323,28 @@ export function buildIsoModel(
     else edgeWeights.set(key, { from: fromZone, to: toZone, weight: 1 });
   }
 
-  const rawEdges = [...edgeWeights.values()]
-    .sort(
-      (a, b) =>
-        b.weight - a.weight ||
-        a.from.localeCompare(b.from) ||
-        a.to.localeCompare(b.to),
-    );
+  const callWeights = new Map<string, number>();
+  for (const call of input.callEdges ?? []) {
+    if (call.fromZone === call.toZone) continue;
+    if (!selectedIds.has(call.fromZone) || !selectedIds.has(call.toZone)) continue;
+    const key = `${call.fromZone}\t${call.toZone}`;
+    callWeights.set(key, (callWeights.get(key) ?? 0) + call.weight);
+    // A runtime call across a boundary is a real relationship even when no
+    // import resolves it — dependency injection is exactly this shape.
+    if (!edgeWeights.has(key)) {
+      edgeWeights.set(key, { from: call.fromZone, to: call.toZone, weight: 0 });
+    }
+  }
+
+  const rawEdges = [...edgeWeights.values()].sort(
+    (a, b) => b.weight - a.weight || a.from.localeCompare(b.from) || a.to.localeCompare(b.to),
+  );
 
   // ── Layer assignment ──────────────────────────────────────────────────────
 
-  const layerById = assignLayers(
-    selected.map((z) => z.id),
-    rawEdges,
-  );
+  const layerById = assignLayers(selected.map((z) => z.id), rawEdges);
 
-  // ── External nodes occupy a leading column ────────────────────────────────
+  // ── Externals occupy a leading column ─────────────────────────────────────
 
   const zoneOfFile = new Map<string, string>();
   for (const zone of selected) {
@@ -359,7 +359,7 @@ export function buildIsoModel(
   const externalPicks: ExternalPick[] = [];
 
   if (includeExternals) {
-    const scored = imports.external
+    const scored = input.external
       .map((ext) => {
         const consumers = new Set<string>();
         for (const importer of ext.importedBy) {
@@ -369,35 +369,27 @@ export function buildIsoModel(
         return { pkg: ext.package, consumers: [...consumers].sort() };
       })
       .filter((e) => e.consumers.length >= minExternalConsumers)
-      .sort(
-        (a, b) =>
-          b.consumers.length - a.consumers.length || a.pkg.localeCompare(b.pkg),
-      )
+      .sort((a, b) => b.consumers.length - a.consumers.length || a.pkg.localeCompare(b.pkg))
       .slice(0, maxExternals);
 
     for (const entry of scored) {
-      externalPicks.push({
-        id: `ext:${entry.pkg}`,
-        name: entry.pkg,
-        consumers: entry.consumers,
-      });
+      externalPicks.push({ id: `ext:${entry.pkg}`, name: entry.pkg, consumers: entry.consumers });
     }
   }
 
-  // Externals sit one layer left of everything; shift zones right to make room.
   const layerShift = externalPicks.length > 0 ? 1 : 0;
 
-  // ── Build nodes (pre-geometry) ────────────────────────────────────────────
+  // ── Node assembly ─────────────────────────────────────────────────────────
 
   const lineValues = selected.map((z) => aggById.get(z.id)!.lines);
   const minLines = lineValues.length ? Math.min(...lineValues) : 0;
   const maxLines = lineValues.length ? Math.max(...lineValues) : 0;
 
-  const findingsByZone = new Map<string, Finding[]>();
-  for (const finding of zones.findings ?? []) {
+  const findingsByZone = new Map<string, Array<{ text: string; severity: string }>>();
+  for (const finding of input.findings) {
     if (!selectedIds.has(finding.scope)) continue;
     const list = findingsByZone.get(finding.scope) ?? [];
-    list.push(finding);
+    list.push({ text: finding.text, severity: finding.severity ?? "info" });
     findingsByZone.set(finding.scope, list);
   }
 
@@ -419,58 +411,36 @@ export function buildIsoModel(
 
   for (const zone of selected) {
     const agg = aggById.get(zone.id)!;
-    const archetypes = [...agg.archetypes.entries()].sort(
-      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
-    );
-    // Test files usually classify as utility or test-helper, which would sink
-    // them into "support" and make a test-heavy repo look like infrastructure.
-    // Role is the more honest signal, so a majority-test zone wins outright and
-    // becomes filterable from the legend.
-    const topArchetype = dominant(agg.archetypes);
-    const kind: IsoKind =
-      agg.testFiles * 2 > zone.files.length
-        ? "tests"
-        : topArchetype
-          ? (ARCHETYPE_KIND[topArchetype] ?? "support")
-          : "support";
-
-    const files = zone.files.length;
-    const w = clamp(Math.round(Math.sqrt(files) * 1.4), MIN_W, MAX_W);
-    const d = clamp(Math.round(Math.sqrt(files) * 1.0), MIN_D, MAX_D);
-    const h = scaleHeight(agg.lines, minLines, maxLines);
+    const fileCount = zone.files.length;
 
     nodes.push({
       id: zone.id,
       name: zone.name,
-      kind,
-      col: layerById.get(zone.id)! + layerShift,
-      row: 0, // assigned during ordering
+      kind: resolveZoneKind(agg.kinds, fileCount),
+      col: (layerById.get(zone.id) ?? 0) + layerShift,
+      row: 0,
       u: 0,
       v: 0,
-      w,
-      d,
-      h,
+      w: clamp(Math.round(Math.sqrt(fileCount) * 1.4), MIN_W, MAX_W),
+      d: clamp(Math.round(Math.sqrt(fileCount) * 1.0), MIN_D, MAX_D),
+      h: scaleHeight(agg.lines, minLines, maxLines),
       stage: "",
-      sub: `${formatCount(files)} files · ${formatCount(agg.lines)} lines`,
+      sub: `${formatCount(fileCount)} files · ${formatCount(agg.lines)} lines`,
       body: zone.description,
       metrics: {
-        files,
+        files: fileCount,
         lines: agg.lines,
         cohesion: zone.cohesion,
         coupling: zone.coupling,
-        riskLevel: zone.riskMetrics?.riskLevel ?? "unscored",
+        riskLevel: zone.riskLevel ?? "unscored",
         routes: agg.routes,
       },
-      archetypes: archetypes.slice(0, 6),
-      keyFiles: pickKeyFiles(zone, linesByFile),
+      mix: [...agg.labels.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 6),
+      keyFiles: pickKeyFiles(zone, files, input.linkBase),
       insights: zone.insights ?? [],
-      findings: (findingsByZone.get(zone.id) ?? [])
-        .slice(0, 8)
-        .map((f) => ({
-          text: f.text,
-          severity: f.severity ?? "info",
-          type: f.type,
-        })),
+      findings: (findingsByZone.get(zone.id) ?? []).slice(0, 8),
       inbound: (inboundById.get(zone.id) ?? []).slice(0, 8),
       outbound: (outboundById.get(zone.id) ?? []).slice(0, 8),
     });
@@ -494,31 +464,20 @@ export function buildIsoModel(
       stage: "",
       sub: `used by ${consumerNames.length} zones`,
       body: `Third-party package imported across ${consumerNames.length} zones. Nothing in this repository controls its behaviour — it is shown to make the shared dependency surface visible.`,
-      metrics: {
-        files: 0,
-        lines: 0,
-        cohesion: 0,
-        coupling: 0,
-        riskLevel: "unscored",
-        routes: 0,
-      },
-      archetypes: [],
+      metrics: { files: 0, lines: 0, cohesion: 0, coupling: 0, riskLevel: "unscored", routes: 0 },
+      mix: [],
       keyFiles: [],
       insights: [],
       findings: [],
       inbound: [],
-      outbound: consumerNames.map((name, i) => ({
-        id: ext.consumers[i],
-        name,
-        weight: 1,
-      })),
+      outbound: consumerNames.map((name, i) => ({ id: ext.consumers[i], name, weight: 1 })),
     });
   }
 
-  // ── Row ordering and grid placement ───────────────────────────────────────
+  // ── Placement ─────────────────────────────────────────────────────────────
 
   orderRows(nodes, rawEdges);
-  placeOnGrid(nodes);
+  const lanes = placeOnGrid(nodes);
 
   const layerCount = nodes.reduce((max, n) => Math.max(max, n.col), 0) + 1;
   const layers: string[] = [];
@@ -530,42 +489,41 @@ export function buildIsoModel(
 
   const bounds = computeBounds(nodes);
 
-  // ── Edges, including external fan-out ─────────────────────────────────────
+  // ── Edges ─────────────────────────────────────────────────────────────────
 
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const edges: IsoEdge[] = [];
 
-  for (const edge of rawEdges) {
+  rawEdges.forEach((edge, index) => {
     const a = nodeById.get(edge.from);
     const b = nodeById.get(edge.to);
-    if (!a || !b) continue;
-    const back = b.col <= a.col;
+    if (!a || !b) return;
     edges.push({
       from: edge.from,
       to: edge.to,
       weight: edge.weight,
-      back,
-      points: routeEdge(a, b, bounds),
+      calls: callWeights.get(`${edge.from}\t${edge.to}`) ?? 0,
+      back: b.col <= a.col,
+      points: routeEdge(a, b, bounds, lanes, index),
     });
-  }
+  });
 
-  for (const ext of externalPicks) {
+  externalPicks.forEach((ext, extIndex) => {
     const a = nodeById.get(ext.id);
-    if (!a) continue;
-    for (const consumerId of ext.consumers) {
+    if (!a) return;
+    ext.consumers.forEach((consumerId, i) => {
       const b = nodeById.get(consumerId);
-      if (!b) continue;
+      if (!b) return;
       edges.push({
         from: ext.id,
         to: consumerId,
         weight: 1,
+        calls: 0,
         back: b.col <= a.col,
-        points: routeEdge(a, b, bounds),
+        points: routeEdge(a, b, bounds, lanes, rawEdges.length + extIndex * 8 + i),
       });
-    }
-  }
-
-  const totalLines = inventory.summary?.totalLines ?? 0;
+    });
+  });
 
   return {
     nodes,
@@ -574,15 +532,17 @@ export function buildIsoModel(
     layers,
     bounds,
     meta: {
-      project: input.projectName,
-      analyzedAt: manifest.analyzedAt,
-      gitBranch: manifest.gitBranch,
-      gitSha: manifest.gitSha,
+      project: meta.project,
+      analyzedAt: meta.analyzedAt,
+      gitBranch: meta.gitBranch,
+      gitSha: meta.gitSha,
+      origin: meta.origin,
       totalZones: candidates.length,
       shownZones: selected.length,
-      totalFiles: inventory.summary?.totalFiles ?? inventory.files.length,
-      totalLines,
+      totalFiles: meta.totalFiles,
+      totalLines: meta.totalLines,
       omittedZones: omitted,
+      hasCalls: (input.callEdges?.length ?? 0) > 0,
       gaps: describeGaps(input),
     },
   };
@@ -595,9 +555,9 @@ export function buildIsoModel(
  *
  * Import graphs are rarely acyclic, so back edges are removed first via a
  * deterministic DFS (any edge pointing at a node already on the recursion
- * stack). Those edges still render — they are drawn through a return lane
- * below the scene — but they must not participate in depth, or a single cycle
- * would stretch the map to the node count.
+ * stack). Those edges still render — through a return lane below the scene —
+ * but they must not participate in depth, or a single cycle would stretch the
+ * map to the node count.
  */
 export function assignLayers(
   nodeIds: string[],
@@ -633,7 +593,7 @@ export function assignLayers(
       const next = neighbours[frame.index++];
       const nextState = state.get(next);
       if (nextState === 1) {
-        backEdges.add(`${frame.id} ${next}`);
+        backEdges.add(`${frame.id}\t${next}`);
       } else if (nextState === 0) {
         state.set(next, 1);
         stack.push({ id: next, index: 0 });
@@ -641,12 +601,12 @@ export function assignLayers(
     }
   }
 
-  // Pass 2 — longest path on the remaining DAG, memoized.
+  // Pass 2 — longest path on the remaining DAG, memoized over reverse edges.
   const incoming = new Map<string, string[]>();
   for (const id of ids) incoming.set(id, []);
   for (const [from, targets] of adjacency) {
     for (const to of targets) {
-      if (backEdges.has(`${from} ${to}`)) continue;
+      if (backEdges.has(`${from}\t${to}`)) continue;
       incoming.get(to)!.push(from);
     }
   }
@@ -675,9 +635,9 @@ export function assignLayers(
 // ── Row ordering ────────────────────────────────────────────────────────────
 
 /**
- * Orders nodes within each layer using a barycenter heuristic: a node sits
- * near the average row of the things that depend on it. One forward pass is
- * enough to remove most edge crossings without the cost of full Sugiyama.
+ * Orders nodes within each layer using a barycenter heuristic: a node sits near
+ * the average row of the things that depend on it. One forward pass removes
+ * most edge crossings without the cost of full Sugiyama.
  */
 function orderRows(nodes: IsoNode[], edges: Array<{ from: string; to: string }>): void {
   const byCol = new Map<number, IsoNode[]>();
@@ -695,9 +655,7 @@ function orderRows(nodes: IsoNode[], edges: Array<{ from: string; to: string }>)
   }
 
   const rowOf = new Map<string, number>();
-  const cols = [...byCol.keys()].sort((a, b) => a - b);
-
-  for (const col of cols) {
+  for (const col of [...byCol.keys()].sort((a, b) => a - b)) {
     const layer = byCol.get(col)!;
     layer.sort((a, b) => {
       const ba = barycenter(a, predecessors, rowOf);
@@ -718,9 +676,7 @@ function barycenter(
   rowOf: Map<string, number>,
 ): number {
   const preds = predecessors.get(node.id) ?? [];
-  const rows = preds
-    .map((id) => rowOf.get(id))
-    .filter((r): r is number => r !== undefined);
+  const rows = preds.map((id) => rowOf.get(id)).filter((r): r is number => r !== undefined);
   if (rows.length === 0) return Number.MAX_SAFE_INTEGER; // unanchored → sort last
   return rows.reduce((sum, r) => sum + r, 0) / rows.length;
 }
@@ -728,11 +684,15 @@ function barycenter(
 // ── Grid placement ──────────────────────────────────────────────────────────
 
 /**
- * Converts (col, row) slots into grid coordinates. Column widths and row
- * depths are sized to the largest box occupying them, so boxes never overlap
- * regardless of how lopsided the zone sizes are.
+ * Converts (col, row) slots into grid coordinates and returns the free
+ * horizontal corridors between rows.
+ *
+ * Column widths and row depths are sized to the largest box occupying them, so
+ * boxes never overlap however lopsided the zone sizes are. The corridors are
+ * the empty strips between rows — edge routing uses them to cross the scene
+ * without cutting through blocks.
  */
-function placeOnGrid(nodes: IsoNode[]): void {
+function placeOnGrid(nodes: IsoNode[]): number[] {
   const colWidth = new Map<number, number>();
   const rowDepth = new Map<number, number>();
 
@@ -749,16 +709,21 @@ function placeOnGrid(nodes: IsoNode[]): void {
   }
 
   const rowOffset = new Map<number, number>();
+  const lanes: number[] = [round2(-GAP_V / 2)]; // corridor above the first row
   let v = 0;
   for (const row of [...rowDepth.keys()].sort((a, b) => a - b)) {
     rowOffset.set(row, v);
-    v += rowDepth.get(row)! + GAP_V;
+    v += rowDepth.get(row)!;
+    lanes.push(round2(v + GAP_V / 2)); // corridor after this row
+    v += GAP_V;
   }
 
   for (const node of nodes) {
     node.u = colOffset.get(node.col)!;
     node.v = rowOffset.get(node.row)!;
   }
+
+  return lanes;
 }
 
 function computeBounds(nodes: IsoNode[]): IsoModel["bounds"] {
@@ -774,18 +739,34 @@ function computeBounds(nodes: IsoNode[]): IsoModel["bounds"] {
 
 // ── Edge routing ────────────────────────────────────────────────────────────
 
+/** The free corridor nearest a target v coordinate. */
+function nearestLane(lanes: number[], target: number): number {
+  if (lanes.length === 0) return target;
+  let best = lanes[0];
+  for (const lane of lanes) {
+    if (Math.abs(lane - target) < Math.abs(best - target)) best = lane;
+  }
+  return best;
+}
+
 /**
  * Orthogonal route between two boxes, in grid units.
  *
- * Forward edges leave the right face, step into the inter-layer gap, cross,
- * and enter the left face. Back edges (cycles, and same-layer links) drop below
- * the scene into a shared return lane so they read as exceptions rather than
- * cutting through the middle of the map.
+ * Adjacent layers are joined directly through the inter-column gap, which is
+ * empty by construction. An edge spanning more than one layer would otherwise
+ * cut straight through whatever sits in between, so it detours into a free
+ * corridor between rows, runs the distance there, and comes back — the whole
+ * long leg stays in empty space. Back edges (cycles, and same-layer links) drop
+ * below the scene into a shared return lane so they read as exceptions.
+ *
+ * `index` only nudges parallel routes apart so overlapping edges stay legible.
  */
 export function routeEdge(
   a: IsoNode,
   b: IsoNode,
   bounds: IsoModel["bounds"],
+  lanes: number[] = [],
+  index = 0,
 ): Array<[number, number]> {
   const av = round2(a.v + a.d / 2);
   const bv = round2(b.v + b.d / 2);
@@ -793,18 +774,32 @@ export function routeEdge(
   if (b.col > a.col) {
     const exit = a.u + a.w;
     const entry = b.u;
-    const mid = round2(exit + (entry - exit) / 2);
-    if (av === bv) return [[exit, av], [entry, bv]];
+
+    // Adjacent columns: the gap between them is empty, cross it directly.
+    if (b.col === a.col + 1) {
+      if (av === bv) return [[exit, av], [entry, bv]];
+      const mid = round2(exit + (entry - exit) / 2);
+      return [[exit, av], [mid, av], [mid, bv], [entry, bv]];
+    }
+
+    // Spanning layers: travel in a corridor between rows rather than through
+    // whatever occupies the columns in between.
+    const jog = round2(exit + GAP_U / 2);
+    const back = round2(entry - GAP_U / 2);
+    const lane = round2(nearestLane(lanes, (av + bv) / 2) + (index % 3) * 0.3);
+    if (lane === av && lane === bv) return [[exit, av], [entry, bv]];
     return [
       [exit, av],
-      [mid, av],
-      [mid, bv],
+      [jog, av],
+      [jog, lane],
+      [back, lane],
+      [back, bv],
       [entry, bv],
     ];
   }
 
-  // Return lane below the scene, keyed off the deeper of the two boxes so
-  // routes for adjacent rows do not stack on the same line.
+  // Return lane below the scene, keyed off the row so routes for adjacent rows
+  // do not stack on the same line.
   const lane = round2(bounds.vMax + 2 + (a.row % 3) * 0.8);
   const ax = round2(a.u + a.w / 2);
   const bx = round2(b.u + b.w / 2);
@@ -835,7 +830,11 @@ export function scaleHeight(lines: number, minLines: number, maxLines: number): 
 
 // ── Detail helpers ──────────────────────────────────────────────────────────
 
-function pickKeyFiles(zone: Zone, linesByFile: Map<string, number>): string[] {
+function pickKeyFiles(
+  zone: IsoZoneInput,
+  files: Map<string, IsoFileInput>,
+  linkBase?: string,
+): IsoKeyFile[] {
   const seen = new Set<string>();
   const picked: string[] = [];
 
@@ -848,9 +847,7 @@ function pickKeyFiles(zone: Zone, linesByFile: Map<string, number>): string[] {
   const bySize = [...zone.files]
     .filter((f) => !seen.has(f))
     .sort(
-      (a, b) =>
-        (linesByFile.get(b) ?? 0) - (linesByFile.get(a) ?? 0) ||
-        a.localeCompare(b),
+      (a, b) => (files.get(b)?.lineCount ?? 0) - (files.get(a)?.lineCount ?? 0) || a.localeCompare(b),
     );
 
   for (const file of bySize) {
@@ -858,36 +855,32 @@ function pickKeyFiles(zone: Zone, linesByFile: Map<string, number>): string[] {
     picked.push(file);
   }
 
-  return picked;
+  const base = linkBase?.replace(/\/$/, "");
+  return picked.map((path) => (base ? { path, url: `${base}/${path}` } : { path }));
 }
 
 /**
- * What the map cannot show from static analysis alone.
+ * What the map cannot show.
  *
- * This is deliberately data-driven rather than a fixed string: the list shrinks
- * as the underlying analysis gains the corresponding signal, so the rendered
- * map always states its own honest limits. See
- * docs/architecture/iso-map-data-flow.md for the full analysis.
+ * Data-driven rather than a fixed string: the list shrinks as the underlying
+ * analysis gains the corresponding signal, so the rendered map always states
+ * its own honest limits. See docs/architecture/iso-map-data-flow.md.
  */
 function describeGaps(input: IsoModelInput): string[] {
-  const gaps: string[] = [];
+  const gaps: string[] = [...(input.meta.extraGaps ?? [])];
 
-  if (!input.classifications) {
+  if ((input.callEdges?.length ?? 0) > 0) {
     gaps.push(
-      "No classifications.json — block colours fall back to a single support kind. Run a full analyze to classify archetypes.",
+      "Connectors carry both import counts and runtime call counts. Calls are closer to real behaviour, but they are still resolved statically — a dispatch through a variable or a string key is not counted.",
     );
-  }
-  if (!input.components || (input.components.serverRoutes ?? []).length === 0) {
+  } else {
     gaps.push(
-      "No server routes detected — inbound entry points are inferred from zone entry files rather than real HTTP surfaces.",
+      'Edges are static import relationships, not runtime data flow. A drawn edge means "this zone imports that one", not "a request travels this way".',
     );
   }
 
   gaps.push(
-    "Edges are static import relationships, not runtime data flow. A drawn edge means \"this zone imports that one\", not \"a request travels this way\".",
-  );
-  gaps.push(
-    "Runtime infrastructure — queues, caches, buckets, databases, cron — has no static import signature and is absent unless a zone wraps it in code.",
+    "Runtime infrastructure — queues, caches, buckets, databases, cron — has no static signature and is absent unless a zone wraps it in code.",
   );
   gaps.push(
     "Edge direction follows imports. A callback or event seam inverts control at runtime and will appear pointing the wrong way.",

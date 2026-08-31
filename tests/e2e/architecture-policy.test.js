@@ -67,6 +67,14 @@ const ALLOWED = new Set([
   "packages/sourcevision/src/analyzers/branch-work-filter.ts",
   "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
   "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
+  // Iso map — reads the HEAD commit time and origin remote so the rendered page
+  // is reproducible (timestamp) and can link to source. Bundled verbatim into
+  // the generated skill script below.
+  "packages/sourcevision/src/export/iso-sources.ts",
+  // Generated artifact: the standalone iso-map skill, bundled from
+  // packages/sourcevision/src/export/ by scripts/build-iso-skill.mjs. It
+  // inherits the git usage above; edit the TypeScript, not this file.
+  ".claude/skills/iso-map/scripts/iso-map.mjs",
   // Windows-safe CLI helper — wraps execFileSync with cmd.exe routing for .cmd shims
   "packages/sourcevision/src/util/exec-cli.ts",
   // Web server routes — spawn CLI subprocesses for domain tool execution

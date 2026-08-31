@@ -122,6 +122,9 @@ ndx dev [dir]             # start web dev server with live reload
 ndx ci [dir]              # run analysis pipeline and validate PRD health (--format=json)
 ndx config [key] [value]  # view/edit settings (--json, --help)
 ndx export [dir]          # export static deployable dashboard (--out-dir, --deploy=github)
+ndx iso [dir]             # render a standalone isometric architecture map
+                          #   --source=auto|sourcevision|scan  --max-nodes=N
+                          #   --no-externals  --link-base=<url>
 ```
 
 ## Direct Tool Access
@@ -148,8 +151,17 @@ sv <command> [args]               # alias for sourcevision
 
 `init`, `analyze`, `serve`, `validate`, `reset`, `iso`, `mcp`
 
-`sv iso` renders `.sourcevision/iso-map.html`: a standalone isometric map of the
-codebase's architectural zones. Opt-in only — `analyze` never generates it.
+`sv iso` (also `ndx iso`) renders `.sourcevision/iso-map.html`: a standalone
+isometric map of the codebase's architectural zones. Opt-in only — `analyze`
+never generates it. `--source=scan` derives zones from the file tree instead of
+the analysis, so it works on a project that has never been analyzed. The web
+dashboard serves the same map at `/api/iso-map`.
+
+The `/iso-map` skill wraps the same generator as a portable, dependency-free
+script. That script is **generated** from `packages/sourcevision/src/export/`
+by `scripts/build-iso-skill.mjs` — edit the TypeScript and re-run it; do not
+hand-edit `.claude/skills/iso-map/scripts/iso-map.mjs`.
+
 See [`docs/architecture/iso-map-data-flow.md`](docs/architecture/iso-map-data-flow.md)
 for what the map can and cannot show.
 

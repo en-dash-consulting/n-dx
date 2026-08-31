@@ -52,12 +52,14 @@ export { setArchetypeOverride } from "./util/archetype-overrides.js";
 
 // ---- Isometric architecture map -----------------------------------------------
 //
-// Opt-in renderer behind `sourcevision iso`. Exported so a host (the web
-// dashboard, or a downstream tool) can build the same map from analysis data it
-// already holds in memory, without shelling out to the CLI.
+// Opt-in renderer behind `sourcevision iso`, and the API the web dashboard's
+// /api/iso-map route builds on. Lets a host produce the same map from analysis
+// data it already holds, without shelling out to the CLI.
 
 export { buildIsoModel, ISO_KINDS } from "./export/iso-model.js";
 export { renderIsoMap } from "./export/iso-map.js";
+export { loadIsoInput, loadFromSourcevision, loadFromScan, hasSourcevision } from "./export/iso-sources.js";
+export type { IsoSourceMode, LoadOptions as IsoLoadOptions } from "./export/iso-sources.js";
 export type {
   IsoModel,
   IsoModelInput,

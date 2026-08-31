@@ -26,6 +26,8 @@ the script has no dependencies and installs nothing.
 | `--no-externals` | Drop the shared third-party dependency column |
 | `--source=<mode>` | `auto` (default), `sourcevision`, or `scan` |
 | `--title=<text>` | Override the page title |
+| `--link-base=<url>` | Base URL for source links (default: the git remote, pinned to HEAD) |
+| `--analyzed-at=<t>` | Timestamp to stamp (default: the HEAD commit time) |
 | `--json` | Also print the model to stdout, for inspection |
 
 After it runs, tell the user the output path and offer to open it. On macOS
@@ -42,7 +44,9 @@ The script picks its input automatically:
 2. **Otherwise** — scans the project itself: walks source files (skipping
    `node_modules`, build output, and plain directory names from `.gitignore`),
    groups them into zones by directory structure, and extracts imports by
-   regex for JavaScript/TypeScript, Python and Go.
+   regex for JavaScript/TypeScript, Python and Go. It resolves tsconfig `paths`
+   aliases, workspace package names, and Go intra-module imports through
+   `go.mod`, so a monorepo's own packages do not show up as third-party.
 
 Force either with `--source=sourcevision` or `--source=scan`. The rendered page
 states which mode produced it, so a reader always knows how much to trust it.
@@ -62,6 +66,14 @@ states which mode produced it, so a reader always knows how much to trust it.
 - Clicking a block opens its files, metrics and cross-zone edges; clicking a
   connector explains that one dependency. The legend filters by kind. Drag to
   pan, scroll to zoom, `Esc` clears the selection.
+- **Colour is doubled by a glyph** (▶ entry, ◆ logic, ▤ data, ▣ UI, ⇄ gateway,
+  ○ support, ✓ tests, ◇ third-party) so the map reads without colour vision.
+  The page follows the reader's light/dark preference and honours
+  `prefers-reduced-motion`.
+- When the analysis includes a call graph, a **Weight: imports / calls** toggle
+  appears. Switching to calls re-strokes the connectors by runtime call count,
+  which is closer to real behaviour than imports. An edge with calls but no
+  imports is an injected or event-driven seam, and the panel says so.
 
 ## What to tell the user
 
@@ -97,7 +109,23 @@ rendered page also states them in its own footer.
   reads far better, and the page names the zones it left out.
 - If zones look wrong in scan mode, the grouping heuristic keys off workspace
   containers (`packages/`, `apps/`, `services/`) and source roots (`src/`,
-  `lib/`, `app/`, `internal/`, `pkg/`). Adjusting those sets near the top of the
-  script is the intended customization point.
-- The palette, block proportions and grid spacing are constants near the top of
-  the geometry section.
+  `lib/`, `app/`, `internal/`, `pkg/`).
+- Pass `--link-base` to make the key-file lists clickable when there is no git
+  remote, or when the map should point at somewhere other than `origin`.
+
+## Editing this skill
+
+`scripts/iso-map.mjs` is a **generated file** — it is bundled from
+`packages/sourcevision/src/export/` by `scripts/build-iso-skill.mjs` in the n-dx
+repository, so the map has exactly one implementation rather than a copy that
+silently drifts. Do not hand-edit it. Change the TypeScript and re-run:
+
+```sh
+node scripts/build-iso-skill.mjs
+```
+
+`tests/e2e/iso-skill-drift.test.js` fails if the committed bundle is stale.
+
+If you are reading this in a repository where the skill was installed on its
+own, there are no TypeScript sources alongside it — the script is standalone and
+self-contained by design, and editing it directly is fine there.

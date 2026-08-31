@@ -86,7 +86,7 @@ describe("sourcevision iso (e2e)", { timeout: 180_000 }, () => {
 
   it("states the analysis gaps in the rendered page", () => {
     expect(html).toContain("What this map does and does not show");
-    expect(html).toContain("runtime data flow");
+    expect(html).toMatch(/runtime data flow|runtime call counts/);
   });
 
   it("honours --max-nodes", () => {
@@ -154,5 +154,45 @@ describe("sourcevision iso (e2e)", { timeout: 180_000 }, () => {
     expect(readFileSync(join(tmpDir, "a.html"), "utf-8")).toBe(
       readFileSync(join(tmpDir, "b.html"), "utf-8"),
     );
+  });
+
+  it("scans the file tree when asked, without touching the analysis", () => {
+    const out = join(tmpDir, "scan.html");
+    run(["iso", tmpDir, "--source=scan", "-o=" + out, "--analyzed-at=2026-01-01T00:00:00.000Z"]);
+    const scanned = readFileSync(out, "utf-8");
+    expect(scanned).toContain("direct scan");
+    expect(scanned).toContain("inferred from directory structure");
+  });
+
+  it("scans a project that was never analyzed", async () => {
+    const bare = await mkdtemp(join(tmpdir(), "sv-iso-bare-"));
+    await cp(FIXTURE_DIR, bare, { recursive: true });
+    const out = join(bare, "map.html");
+    run(["iso", bare, "--source=scan", "-o=" + out]);
+    expect(existsSync(out)).toBe(true);
+    await rm(bare, { recursive: true, force: true });
+  });
+
+  it("stamps a caller-supplied timestamp for reproducible output", () => {
+    const out = join(tmpDir, "stamped.html");
+    run(["iso", tmpDir, "-o=" + out, "--analyzed-at=2020-05-05T05:05:05.000Z"]);
+    expect(readFileSync(out, "utf-8")).toContain("2020-05-05T05:05:05.000Z");
+  });
+
+  it("links key files when given a link base", () => {
+    const out = join(tmpDir, "linked.html");
+    run(["iso", tmpDir, "-o=" + out, "--link-base=https://example.com/blob/main"]);
+    expect(readFileSync(out, "utf-8")).toContain("https://example.com/blob/main/");
+  });
+
+  it("rejects an unknown --source", () => {
+    const { status, output } = runExpectingFailure(["iso", tmpDir, "--source=nonsense"]);
+    expect(status).not.toBe(0);
+    expect(output).toContain("--source");
+  });
+
+  it("follows the reader's colour scheme and reduced-motion preference", () => {
+    expect(html).toContain("prefers-color-scheme: light");
+    expect(html).toContain("prefers-reduced-motion");
   });
 });

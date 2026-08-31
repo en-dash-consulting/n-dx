@@ -2297,6 +2297,22 @@ async function handleReset(rest) {
   exitWithCleanup(0);
 }
 
+/**
+ * Render the isometric architecture map.
+ *
+ * Unlike the other delegated sourcevision commands this does not require
+ * `.sourcevision/` — `--source=scan` derives zones straight from the file tree,
+ * which is the whole point of the map working on an un-analyzed project.
+ */
+async function handleIso(rest) {
+  const dir = resolveDir(rest);
+  const flags = rest.filter((a) => a.startsWith("-"));
+  const scanning = flags.some((a) => a === "--source=scan");
+  if (!scanning) requireInit(dir, [".sourcevision"]);
+  await runOrDie(tools.sourcevision, ["iso", dir, ...flags]);
+  exitWithCleanup(0);
+}
+
 // ── Delegated hench commands ─────────────────────────────────────────────────
 
 async function handleShow(rest) {
@@ -2599,6 +2615,7 @@ const COMMAND_DISPATCH = new Map([
   ["tree",              handleTree],
   // ── Delegated sourcevision commands ──
   ["reset",             handleReset],
+  ["iso",               handleIso],
   // ── Delegated hench commands ──
   ["show",              handleShow],
   // ── Renamed: single-command / sc → pair-programming / bicker ──

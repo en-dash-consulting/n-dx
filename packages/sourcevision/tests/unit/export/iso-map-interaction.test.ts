@@ -13,17 +13,10 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { JSDOM } from "jsdom";
 import { buildIsoModel } from "../../../src/export/iso-model.js";
 import { renderIsoMap } from "../../../src/export/iso-map.js";
-import type { Imports, Inventory, Manifest, Zones } from "../../../src/schema/index.js";
+import type { IsoFileInput, IsoModelInput } from "../../../src/export/iso-model.js";
 
-function makeInput() {
-  const manifest: Manifest = {
-    schemaVersion: "1.0.0",
-    toolVersion: "0.0.0-test",
-    analyzedAt: "2026-01-01T00:00:00.000Z",
-    targetPath: "/tmp/p",
-    modules: {},
-  };
-  const zones: Zones = {
+function makeInput(over: Partial<IsoModelInput> = {}): IsoModelInput {
+  return {
     zones: [
       {
         id: "api", name: "Api", description: "HTTP surface",
@@ -42,32 +35,25 @@ function makeInput() {
       },
     ],
     crossings: [
-      { from: "src/api/a.ts", to: "src/core/c.ts", fromZone: "api", toZone: "core" },
-      { from: "src/core/c.ts", to: "src/db/f.ts", fromZone: "core", toZone: "db" },
+      { fromZone: "api", toZone: "core" },
+      { fromZone: "core", toZone: "db" },
     ],
-    unzoned: [],
-  };
-  const inventory: Inventory = {
-    files: [
-      ["src/api/a.ts", 100], ["src/api/b.ts", 50], ["src/core/c.ts", 400],
-      ["src/core/d.ts", 300], ["src/core/e.ts", 200], ["src/db/f.ts", 20],
-    ].map(([path, lineCount]) => ({
-      path: path as string, size: 100, language: "TypeScript",
-      lineCount: lineCount as number, hash: "h", role: "source" as const, category: "core",
-    })),
-    summary: {
-      totalFiles: 6, totalLines: 1070, byLanguage: { TypeScript: 6 },
-      byRole: { source: 6 }, byCategory: { core: 6 },
+    files: new Map<string, IsoFileInput>([
+      ["src/api/a.ts", { lineCount: 100, kind: "entry" }],
+      ["src/api/b.ts", { lineCount: 50, kind: "entry" }],
+      ["src/core/c.ts", { lineCount: 400, kind: "logic" }],
+      ["src/core/d.ts", { lineCount: 300, kind: "logic" }],
+      ["src/core/e.ts", { lineCount: 200, kind: "support" }],
+      ["src/db/f.ts", { lineCount: 20, kind: "data" }],
+    ]),
+    external: [],
+    findings: [],
+    meta: {
+      project: "interaction-fixture", analyzedAt: "2026-01-01T00:00:00.000Z",
+      origin: "sourcevision", totalFiles: 6, totalLines: 1070,
     },
+    ...over,
   };
-  const imports: Imports = {
-    edges: [], external: [],
-    summary: {
-      totalEdges: 0, totalExternal: 0, circularCount: 0, circulars: [],
-      mostImported: [], avgImportsPerFile: 0,
-    },
-  };
-  return { manifest, zones, inventory, imports, projectName: "interaction-fixture" };
 }
 
 /** The pair of events a browser fires for one physical click. */
@@ -76,72 +62,68 @@ function realClick(win: JSDOM["window"], element: Element): void {
   element.dispatchEvent(new win.MouseEvent("click", { bubbles: true }));
 }
 
+function mount(input: IsoModelInput): JSDOM {
+  return new JSDOM(renderIsoMap(buildIsoModel(input)), { runScripts: "dangerously" });
+}
+
 describe("iso map interaction", () => {
   let dom: JSDOM;
   let doc: Document;
   let win: JSDOM["window"];
 
-  const panelHeading = () => doc.querySelector("#dossier h3")?.textContent ?? "";
+  const heading = () => doc.querySelector("#dossier h3")?.textContent ?? "";
+  const panel = () => doc.querySelector("#dossier")!.innerHTML;
   const blocks = () => [...doc.querySelectorAll("#iso .node[role=button]")];
   const edges = () => [...doc.querySelectorAll("#iso .edge")];
+  const block = (name: string) =>
+    blocks().find((b) => (b.getAttribute("aria-label") ?? "").startsWith(name))!;
 
   beforeAll(() => {
-    const html = renderIsoMap(buildIsoModel(makeInput()));
-    dom = new JSDOM(html, { runScripts: "dangerously" });
+    dom = mount(makeInput());
     doc = dom.window.document;
     win = dom.window;
   });
 
   afterAll(() => dom.window.close());
 
-  it("builds a block per zone and a clickable connector per edge", () => {
+  it("builds a block per zone and a connector per edge", () => {
     expect(blocks()).toHaveLength(3);
     expect(edges()).toHaveLength(2);
   });
 
   it("shows the overview before anything is selected", () => {
-    expect(panelHeading()).toBe("interaction-fixture");
+    expect(heading()).toBe("interaction-fixture");
   });
 
   it("selects a zone on a real click — the pointerup+click pair", () => {
-    const target = blocks().find((b) =>
-      (b.getAttribute("aria-label") ?? "").startsWith("Core"),
-    )!;
-    realClick(win, target);
-    expect(panelHeading()).toBe("Core");
+    realClick(win, block("Core"));
+    expect(heading()).toBe("Core");
   });
 
   it("keeps the zone selected when the same block is clicked again", () => {
-    const target = blocks().find((b) =>
-      (b.getAttribute("aria-label") ?? "").startsWith("Core"),
-    )!;
-    realClick(win, target);
-    realClick(win, target);
-    expect(panelHeading()).toBe("Core");
+    realClick(win, block("Core"));
+    realClick(win, block("Core"));
+    expect(heading()).toBe("Core");
   });
 
   it("moves the selection between blocks", () => {
-    const core = blocks().find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Core"))!;
-    const api = blocks().find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Api"))!;
-    realClick(win, core);
-    realClick(win, api);
-    expect(panelHeading()).toBe("Api");
+    realClick(win, block("Core"));
+    realClick(win, block("Api"));
+    expect(heading()).toBe("Api");
   });
 
-  it("shows the zone's files and dependencies in the panel", () => {
-    const core = blocks().find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Core"))!;
-    realClick(win, core);
-    const panel = doc.querySelector("#dossier")!.innerHTML;
-    expect(panel).toContain("src/core/c.ts");
-    expect(panel).toContain("Imported by");
-    expect(panel).toContain("Imports");
-    expect(panel).toContain("cohesion");
+  it("shows the zone's files, metrics and dependencies", () => {
+    realClick(win, block("Core"));
+    expect(panel()).toContain("src/core/c.ts");
+    expect(panel()).toContain("Imported by");
+    expect(panel()).toContain("Imports");
+    expect(panel()).toContain("cohesion");
   });
 
   it("selects a dependency when its connector is clicked", () => {
     realClick(win, edges()[0]);
-    expect(panelHeading()).toMatch(/→/);
-    expect(doc.querySelector("#dossier")!.innerHTML).toContain("cross-zone import");
+    expect(heading()).toMatch(/→/);
+    expect(panel()).toContain("cross-zone import");
   });
 
   it("gives every connector a widened transparent hit target", () => {
@@ -153,26 +135,33 @@ describe("iso map interaction", () => {
   });
 
   it("navigates to a zone from a link in the panel", () => {
-    realClick(win, blocks().find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Api"))!);
+    realClick(win, block("Api"));
     const link = doc.querySelector("#dossier [data-goto]") as HTMLElement;
     link.dispatchEvent(new win.MouseEvent("click", { bubbles: true }));
-    expect(panelHeading()).not.toBe("Api");
+    expect(heading()).not.toBe("Api");
+  });
+
+  it("opens a dependency from the reference count in a zone panel", () => {
+    realClick(win, block("Core"));
+    const wire = doc.querySelector("#dossier [data-edge]") as HTMLElement;
+    expect(wire).not.toBeNull();
+    wire.dispatchEvent(new win.MouseEvent("click", { bubbles: true }));
+    expect(heading()).toMatch(/→/);
   });
 
   it("clears the selection on Escape", () => {
     realClick(win, blocks()[0]);
-    expect(panelHeading()).not.toBe("interaction-fixture");
+    expect(heading()).not.toBe("interaction-fixture");
     doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(panelHeading()).toBe("interaction-fixture");
+    expect(heading()).toBe("interaction-fixture");
   });
 
   it("toggles a legend filter without disturbing the selection", () => {
-    const core = blocks().find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Core"))!;
-    realClick(win, core);
+    realClick(win, block("Core"));
     const legend = doc.querySelector('.lg[data-kind="support"]') as HTMLElement;
     legend.dispatchEvent(new win.MouseEvent("click", { bubbles: true }));
     expect(legend.getAttribute("aria-pressed")).toBe("true");
-    expect(panelHeading()).toBe("Core");
+    expect(heading()).toBe("Core");
   });
 
   it("raises no script errors while loading and interacting", () => {
@@ -181,5 +170,119 @@ describe("iso map interaction", () => {
     realClick(win, blocks()[0]);
     realClick(win, edges()[0]);
     expect(errors).toEqual([]);
+  });
+});
+
+// ── Accessibility ───────────────────────────────────────────────────────────
+
+describe("iso map accessibility", () => {
+  let dom: JSDOM;
+  let doc: Document;
+
+  beforeAll(() => {
+    dom = mount(makeInput());
+    doc = dom.window.document;
+  });
+  afterAll(() => dom.window.close());
+
+  it("keeps connectors out of the tab order", () => {
+    // A real map has hundreds of edges; tabbing through them all would bury the
+    // blocks. Every edge stays reachable from either zone's panel instead.
+    for (const edge of doc.querySelectorAll("#iso .edge")) {
+      expect(edge.getAttribute("tabindex")).toBe("-1");
+    }
+    const tabbable = doc.querySelectorAll('#iso [tabindex="0"]');
+    expect(tabbable.length).toBe(3); // one per zone, nothing else
+  });
+
+  it("gives every block an accessible name and pressed state", () => {
+    for (const b of doc.querySelectorAll("#iso .node[role=button]")) {
+      expect((b.getAttribute("aria-label") ?? "").length).toBeGreaterThan(0);
+      expect(b.getAttribute("aria-pressed")).toBe("false");
+    }
+  });
+
+  it("offers a skip link to the details panel", () => {
+    const skip = doc.querySelector("a.skip") as HTMLAnchorElement;
+    expect(skip).not.toBeNull();
+    expect(skip.getAttribute("href")).toBe("#dossier");
+  });
+
+  it("encodes kind with a glyph as well as a colour", () => {
+    // Colour alone excludes anyone who cannot separate the hues.
+    const glyphs = [...doc.querySelectorAll(".lg .gl")].map((g) => g.textContent);
+    expect(glyphs.length).toBeGreaterThan(0);
+    expect(glyphs.every((g) => (g ?? "").length > 0)).toBe(true);
+  });
+
+  it("honours reduced-motion and colour-scheme preferences in CSS", () => {
+    const css = doc.querySelector("style")!.textContent ?? "";
+    expect(css).toContain("prefers-reduced-motion");
+    expect(css).toContain("prefers-color-scheme: light");
+  });
+
+  it("themes the scene through CSS variables rather than baked-in fills", () => {
+    // Presentation attributes would beat the media query and strand the map in
+    // dark mode for a light-theme reader.
+    expect(doc.querySelector(".ground")!.getAttribute("fill")).toBeNull();
+    expect(doc.querySelector(".wire")!.getAttribute("stroke")).toBeNull();
+  });
+});
+
+// ── Call-graph overlay ──────────────────────────────────────────────────────
+
+describe("iso map call overlay", () => {
+  it("offers a weight toggle only when call data exists", () => {
+    const without = mount(makeInput());
+    expect(without.window.document.getElementById("weight")).toBeNull();
+    without.window.close();
+
+    const withCalls = mount(makeInput({
+      callEdges: [{ fromZone: "api", toZone: "core", weight: 25 }],
+    }));
+    const btn = withCalls.window.document.getElementById("weight");
+    expect(btn).not.toBeNull();
+    expect(btn!.textContent).toContain("imports");
+    btn!.dispatchEvent(new withCalls.window.MouseEvent("click", { bubbles: true }));
+    expect(btn!.getAttribute("aria-pressed")).toBe("true");
+    expect(btn!.textContent).toContain("calls");
+    withCalls.window.close();
+  });
+
+  it("names a call-only edge as an injected seam", () => {
+    const dom = mount(makeInput({
+      callEdges: [{ fromZone: "db", toZone: "api", weight: 9 }],
+    }));
+    const doc = dom.window.document;
+    const edges = [...doc.querySelectorAll("#iso .edge")];
+    const injected = edges.find((e) =>
+      (e.getAttribute("aria-label") ?? "").startsWith("Dependency: Db"),
+    )!;
+    injected.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+    expect(doc.querySelector("#dossier")!.innerHTML).toContain("only in the call graph");
+    dom.window.close();
+  });
+});
+
+// ── Escaping ────────────────────────────────────────────────────────────────
+
+describe("iso map escaping", () => {
+  it("neutralises markup arriving from analysis data", () => {
+    const input = makeInput();
+    input.zones[0].name = `<img src=x onerror="boom">`;
+    input.zones[0].description = `</script><script>boom()</script>`;
+    const html = renderIsoMap(buildIsoModel(input));
+    // The model is embedded as JSON, so no raw closing tag may survive.
+    expect(html).not.toContain("</script><script>boom");
+    const dom = new JSDOM(html, { runScripts: "dangerously" });
+    const doc = dom.window.document;
+    const target = [...doc.querySelectorAll("#iso .node[role=button]")].find((b) =>
+      (b.getAttribute("aria-label") ?? "").includes("img src"),
+    )!;
+    target.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+    // Rendered as text, never as an element.
+    expect(doc.querySelector("#dossier img")).toBeNull();
+    expect(doc.querySelector("#dossier h3")!.textContent).toContain("<img");
+    dom.window.close();
   });
 });

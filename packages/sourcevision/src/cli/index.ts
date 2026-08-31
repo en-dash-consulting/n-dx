@@ -75,7 +75,9 @@ async function cmdMcp(dir: string): Promise<void> {
 }
 
 // Commands that require .sourcevision/ to exist
-const NEEDS_SV_DIR = new Set(["serve", "validate", "reset", "pr-markdown", "mcp", "iso"]);
+// `iso` is absent deliberately: --source=scan derives zones from the file tree
+// and must work on a project that has never been analyzed. cmdIso gates itself.
+const NEEDS_SV_DIR = new Set(["serve", "validate", "reset", "pr-markdown", "mcp"]);
 
 try {
   // Show help: per-command help when --help/-h is given with a command,
