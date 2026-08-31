@@ -56,6 +56,7 @@ import type {
 } from "./rex-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
 import { resolveNdxBin } from "./routes-commands.js";
+import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { ProcessMemoryTracker } from "./process-memory-tracker.js";
 import { ConcurrentExecutionMetrics } from "./concurrent-execution-metrics.js";
 
@@ -1276,16 +1277,43 @@ async function handleExecute(
     .then((result) => {
       const entry = activeExecutions.get(taskId);
       if (entry) {
+        // exitCode alone used to be treated as the sole success signal, but
+        // `hench run --auto` (what `ndx work` spawns) exits 0 even when the
+        // task run itself failed — its iteration loop only throws for truly
+        // unexpected errors; a task ending in failed/timeout/budget_exceeded
+        // status is a graceful stop, logged and then a normal return. That
+        // made a failed run show up here as "completed" with a green check,
+        // and its last stdout line (e.g. "Stopping after 1 iteration(s) due
+        // to failed status.") displayed as if it were a routine completion
+        // detail. Fixed at the source too (see run.ts's `process.exitCode`
+        // assignment on that path) so exitCode is correct now, but keep
+        // this non-zero check as the actual success signal rather than
+        // re-deriving it from stdout text.
         const isSuccess = result.exitCode === 0;
         entry.state.status = isSuccess ? "completed" : "failed";
         entry.state.finishedAt = new Date().toISOString();
         entry.state.exitCode = result.exitCode;
-        if (!isSuccess && result.stderr) {
-          entry.state.error = result.stderr.slice(-200);
+        const lastOutLine = result.stdout
+          ? result.stdout.split("\n").filter((l) => l.trim()).at(-1)
+          : undefined;
+        if (!isSuccess) {
+          // stderr is empty for this failure mode (hench logs the reason via
+          // its normal stdout info() logging, not console.error), so fall
+          // back to the last meaningful stdout line rather than leaving the
+          // dashboard with no explanation at all.
+          entry.state.error = (result.stderr ? result.stderr.slice(-200) : undefined)
+            || lastOutLine
+            || "Task run failed";
+          appendLog(ctx, {
+            timestamp: entry.state.finishedAt,
+            event: "task_execution_failed",
+            itemId: taskId,
+            detail: `"${taskTitle}" failed (exit ${result.exitCode}): ${
+              (result.stderr || result.stdout || "").trim().slice(-2000) || "no output captured"
+            }`,
+          });
         }
-        if (result.stdout) {
-          entry.state.lastOutput = result.stdout.split("\n").filter((l) => l.trim()).at(-1) ?? "";
-        }
+        if (lastOutLine) entry.state.lastOutput = lastOutLine;
         broadcastExecState(broadcast, { ...entry.state });
       }
       processMemoryTracker.markCompleted(taskId);
@@ -1299,6 +1327,12 @@ async function handleExecute(
         entry.state.finishedAt = new Date().toISOString();
         entry.state.error = err instanceof Error ? err.message : String(err);
         broadcastExecState(broadcast, { ...entry.state });
+        appendLog(ctx, {
+          timestamp: entry.state.finishedAt,
+          event: "task_execution_failed",
+          itemId: taskId,
+          detail: `"${taskTitle}" failed to run: ${entry.state.error}`,
+        });
       }
       processMemoryTracker.markCompleted(taskId);
       executionMetrics.taskCompleted(taskId);

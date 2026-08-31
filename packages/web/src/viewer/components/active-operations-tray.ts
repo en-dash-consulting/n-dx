@@ -12,9 +12,11 @@ import { useState } from "preact/hooks";
 import type { ActiveOperation } from "../hooks/index.js";
 import { useTick } from "../hooks/index.js";
 import { fmtDuration } from "../utils/format.js";
+import type { NavigateTo } from "../types.js";
 
 export interface ActiveOperationsTrayProps {
   operations: ActiveOperation[];
+  navigateTo?: NavigateTo;
 }
 
 const STATUS_ICON: Record<ActiveOperation["status"], string> = {
@@ -27,8 +29,13 @@ function elapsedFormatter(startedAt: string): string {
   return fmtDuration(startedAt, new Date().toISOString());
 }
 
-function OperationRow({ op }: { op: ActiveOperation }) {
+function OperationRow({ op, navigateTo }: { op: ActiveOperation; navigateTo?: NavigateTo }) {
   const elapsed = useTick(op.startedAt, elapsedFormatter);
+  // The full failure detail (untruncated) is only actually logged to the
+  // Activity log for hench task executions (routes-hench.ts's
+  // task_execution_failed entries) — don't offer the link for operation
+  // kinds where it'd lead to an empty search.
+  const canViewDetails = op.status === "failed" && op.kind === "hench" && !!navigateTo;
 
   return h("li", { class: `active-op-row active-op-row-${op.status}` },
     h("span", { class: "active-op-icon", "aria-hidden": "true" }, STATUS_ICON[op.status]),
@@ -38,14 +45,24 @@ function OperationRow({ op }: { op: ActiveOperation }) {
         op.status === "running"
           ? `running… ${elapsed}`
           : op.status === "failed"
-            ? (op.error || op.detail || "Failed")
+            ? "Task failed"
             : (op.detail || "Complete"),
       ),
+      op.status === "failed" && (op.error || op.detail)
+        ? h("span", { class: "active-op-reason", title: op.error || op.detail }, op.error || op.detail)
+        : null,
+      canViewDetails
+        ? h("button", {
+            class: "active-op-details-link",
+            type: "button",
+            onClick: () => navigateTo!("activity"),
+          }, "View details")
+        : null,
     ),
   );
 }
 
-export function ActiveOperationsTray({ operations }: ActiveOperationsTrayProps) {
+export function ActiveOperationsTray({ operations, navigateTo }: ActiveOperationsTrayProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (operations.length === 0) return null;
@@ -74,7 +91,7 @@ export function ActiveOperationsTray({ operations }: ActiveOperationsTrayProps) 
     ),
     expanded
       ? h("ul", { class: "active-operations-list", "aria-label": "Active and recent operations" },
-          operations.map((op) => h(OperationRow, { key: op.id, op })),
+          operations.map((op) => h(OperationRow, { key: op.id, op, navigateTo })),
         )
       : null,
   );

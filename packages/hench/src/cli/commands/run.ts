@@ -1499,6 +1499,13 @@ async function runIterations(
 
     if (status === "failed" || status === "timeout" || status === "budget_exceeded") {
       info(`\n${red(`Stopping after ${i + 1} iteration(s) due to ${status} status.`)}`);
+      // Without this, the process exits 0 despite the task run failing —
+      // this loop only ever throws for unexpected errors, so a graceful
+      // stop here looked identical to success to any caller checking the
+      // exit code (e.g. the dashboard's "Start Working" trigger, which
+      // used exitCode === 0 as its sole success signal and reported
+      // "completed" for a run that actually failed).
+      process.exitCode = 1;
       break;
     }
 

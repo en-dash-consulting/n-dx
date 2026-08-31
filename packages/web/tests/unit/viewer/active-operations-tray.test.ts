@@ -117,7 +117,7 @@ describe("ActiveOperationsTray", () => {
     expect(row.querySelector(".active-op-detail")!.textContent).toBe("4/4 modules analyzed");
   });
 
-  it("renders a failed row with its error text", () => {
+  it("renders a failed row with 'Task failed' plus the reason as a secondary line", () => {
     const op = makeOp({ status: "failed", finishedAt: "2026-08-26T10:05:00.000Z", error: "build failed", detail: undefined });
     render(h(ActiveOperationsTray, { operations: [op] }), root);
     (root.querySelector(".active-operations-toggle") as HTMLButtonElement).click();
@@ -125,7 +125,44 @@ describe("ActiveOperationsTray", () => {
 
     const row = root.querySelector(".active-op-row-failed")!;
     expect(row).not.toBeNull();
-    expect(row.querySelector(".active-op-detail")!.textContent).toBe("build failed");
+    expect(row.querySelector(".active-op-detail")!.textContent).toBe("Task failed");
+    expect(row.querySelector(".active-op-reason")!.textContent).toBe("build failed");
+  });
+
+  it("shows a 'View details' link for a failed hench task execution, and it navigates to Activity", () => {
+    const navigated: string[] = [];
+    const op = makeOp({
+      id: "hench:task-1", kind: "hench", label: "Add dark mode toggle",
+      status: "failed", finishedAt: "2026-08-26T10:05:00.000Z",
+      error: "Stopping after 1 iteration(s) due to failed status.",
+    });
+    render(h(ActiveOperationsTray, { operations: [op], navigateTo: (view) => navigated.push(view) }), root);
+    (root.querySelector(".active-operations-toggle") as HTMLButtonElement).click();
+    render(h(ActiveOperationsTray, { operations: [op], navigateTo: (view) => navigated.push(view) }), root);
+
+    const link = root.querySelector(".active-op-details-link") as HTMLButtonElement;
+    expect(link).not.toBeNull();
+    expect(link.textContent).toBe("View details");
+    link.click();
+    expect(navigated).toEqual(["activity"]);
+  });
+
+  it("does not show a 'View details' link for a failed non-hench operation", () => {
+    const op = makeOp({ status: "failed", error: "boom" });
+    render(h(ActiveOperationsTray, { operations: [op], navigateTo: () => {} }), root);
+    (root.querySelector(".active-operations-toggle") as HTMLButtonElement).click();
+    render(h(ActiveOperationsTray, { operations: [op], navigateTo: () => {} }), root);
+
+    expect(root.querySelector(".active-op-details-link")).toBeNull();
+  });
+
+  it("does not show a 'View details' link when navigateTo is not provided", () => {
+    const op = makeOp({ id: "hench:task-1", kind: "hench", status: "failed", error: "boom" });
+    render(h(ActiveOperationsTray, { operations: [op] }), root);
+    (root.querySelector(".active-operations-toggle") as HTMLButtonElement).click();
+    render(h(ActiveOperationsTray, { operations: [op] }), root);
+
+    expect(root.querySelector(".active-op-details-link")).toBeNull();
   });
 
   it("renders multiple concurrent operations as separate rows", () => {

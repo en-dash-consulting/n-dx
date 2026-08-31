@@ -212,7 +212,7 @@ function App({ scope }: { scope: string | null }) {
       : null,
     h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
-    h(ActiveOperationsTray, { operations: activeOperations }),
+    h(ActiveOperationsTray, { operations: activeOperations, navigateTo }),
     (showDrop && !hasData)
       ? h("div", { class: "drop-overlay", role: "dialog", "aria-label": "File drop zone" },
           h("div", { class: "drop-box" },

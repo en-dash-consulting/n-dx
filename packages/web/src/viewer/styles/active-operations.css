@@ -150,6 +150,33 @@
 
 .active-op-row-failed .active-op-detail {
   color: var(--red);
+  font-weight: 600;
+}
+
+.active-op-reason {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.active-op-details-link {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.active-op-details-link:hover,
+.active-op-details-link:focus-visible {
+  color: var(--red);
 }
 
 @keyframes active-operations-fade-in {
