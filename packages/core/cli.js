@@ -339,6 +339,14 @@ let exitPromise = null;
  */
 let pendingUpdateCheck = null;
 
+/**
+ * Cancels {@link pendingUpdateCheck}. Held so `flushAndExit` can stop the check
+ * rather than merely stop waiting for it — see the abort in that function for
+ * why abandoning it crashes the process on Windows.
+ * @type {AbortController | null}
+ */
+let updateCheckAbort = null;
+
 /** True when the user passed --quiet / -q — update notice is suppressed. */
 let updateCheckQuiet = false;
 
@@ -391,16 +399,39 @@ async function flushAndExit(code = 0) {
       // Race against 500 ms so a slow or firewalled network never delays exit.
       // Written to stderr so JSON stdout output stays machine-parseable.
       if (code === 0 && !updateCheckQuiet && pendingUpdateCheck) {
+        let raceTimer;
         try {
           const updateInfo = await Promise.race([
             pendingUpdateCheck,
-            new Promise((r) => setTimeout(() => r(null), 500)),
+            new Promise((r) => { raceTimer = setTimeout(() => r(null), 500); }),
           ]);
           if (updateInfo) {
             process.stderr.write(formatUpdateNotice(updateInfo) + "\n");
           }
         } catch {
           // Never block exit for update-check errors.
+        } finally {
+          // The race decides whether we WAIT for the notice. It does not stop
+          // the check, and stopping it is the part that matters: process.exit()
+          // below does not drain the event loop, so an abandoned fetch leaves a
+          // socket — and behind it a DNS lookup on libuv's threadpool — running
+          // into a loop that is already closing. The completing worker calls
+          // uv_async_send on a closing handle and the process aborts with
+          //
+          //   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING),
+          //   file src\win\async.c, line 94
+          //
+          // rather than exiting. Measured on Windows at 390 aborts in 448
+          // concurrent `ndx config` spawns under CPU load; 0 with the check
+          // disabled, and 0 with this cancellation in place.
+          //
+          // Awaiting the cancelled promise is what makes exit safe: abort only
+          // REQUESTS teardown, so returning immediately would race the very
+          // unwind we asked for. The wait is bounded by the abort itself, not
+          // by the network.
+          clearTimeout(raceTimer);
+          updateCheckAbort?.abort();
+          await pendingUpdateCheck.catch(() => {});
         }
       }
 
@@ -421,7 +452,31 @@ async function flushAndExit(code = 0) {
         if (process.stdout.writableFinished) done(); else process.stdout.end(done);
         if (process.stderr.writableFinished) done(); else process.stderr.end(done);
       });
-      process.exit(code);
+      // Exit by letting the event loop drain, not by calling process.exit().
+      //
+      // process.exit() does not unwind the loop — it tears it down where it
+      // stands. Anything still outstanding on libuv's threadpool then completes
+      // into a closing loop and calls uv_async_send on a closing handle, which
+      // aborts the process:
+      //
+      //   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING),
+      //   file src\win\async.c, line 94
+      //
+      // A DNS lookup is the reachable case here: the update check's fetch puts
+      // one on the threadpool, and uv_getaddrinfo cannot be cancelled once
+      // queued, so aborting the request above is necessary but NOT sufficient —
+      // measured at 385 aborts in 448 concurrent `ndx config` spawns with the
+      // abort in place and process.exit() still here, versus 0 once the exit
+      // became natural. The abort still earns its keep by making this drain
+      // fast rather than waiting out the fetch.
+      //
+      // The fallback is unref'd, so it never keeps the process alive on its own
+      // — it only fires if some OTHER handle is still holding the loop, which
+      // is the hang this guards against. It calls process.exit() and so
+      // reintroduces the hazard, deliberately: by then the loop has had two
+      // seconds to drain, and exiting late beats never exiting.
+      process.exitCode = code;
+      setTimeout(() => process.exit(code), 2000).unref();
     })();
   }
 
@@ -2764,7 +2819,11 @@ async function main() {
       const { version: currentVersion } = JSON.parse(
         readFileSync(join(__dir, "package.json"), "utf-8"),
       );
-      pendingUpdateCheck = startUpdateCheck({ currentVersion });
+      updateCheckAbort = new AbortController();
+      pendingUpdateCheck = startUpdateCheck({
+        currentVersion,
+        signal: updateCheckAbort.signal,
+      });
     } catch {
       // Non-fatal — update check skipped if we can't read our own version.
     }

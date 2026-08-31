@@ -59,6 +59,76 @@ describe("update-check", () => {
       expect(result).toBeNull();
     });
 
+    /**
+     * Cancellation exists so the CLI can STOP this check, not merely stop
+     * waiting for it. flushAndExit races the check against 500 ms; a check that
+     * loses and is abandoned leaves its request — and the DNS lookup behind it
+     * — outstanding while the process exits, which aborts the process on
+     * Windows with the libuv UV_HANDLE_CLOSING assertion. Reproduced at 390
+     * aborts in 448 concurrent `ndx config` spawns under load.
+     */
+    describe("cancellation", () => {
+      it("passes the caller's signal through to fetch", async () => {
+        const controller = new AbortController();
+        await startUpdateCheck({ currentVersion: "1.0.0", signal: controller.signal });
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const { signal } = fetchMock.mock.calls[0][1];
+        expect(signal).toBeInstanceOf(AbortSignal);
+        // Combined with the internal timeout rather than replacing it, so an
+        // uncancelled caller still gets the 3s cap.
+        expect(signal.aborted).toBe(false);
+        controller.abort();
+        expect(signal.aborted).toBe(true);
+      });
+
+      it("resolves null when the caller aborts mid-flight", async () => {
+        const controller = new AbortController();
+        const abortError = () => Object.assign(new Error("aborted"), { name: "AbortError" });
+        fetchMock.mockImplementation((_url, { signal }) =>
+          new Promise((_resolve, reject) => {
+            // The already-aborted case is the one that actually happens here:
+            // startUpdateCheck awaits loadCache() before fetching, so a caller
+            // aborting "mid-flight" has usually done so before fetch is reached.
+            // An abort listener attached after the fact never fires.
+            if (signal.aborted) {
+              reject(abortError());
+              return;
+            }
+            signal.addEventListener("abort", () => reject(abortError()));
+          }),
+        );
+
+        const pending = startUpdateCheck({ currentVersion: "1.0.0", signal: controller.signal });
+        controller.abort();
+
+        // Never rejects — the caller awaits this during teardown and an
+        // unhandled rejection there would be worse than a missing notice.
+        await expect(pending).resolves.toBeNull();
+      });
+
+      it("does not write the cache when the check was cancelled", async () => {
+        const controller = new AbortController();
+        // Resolve the fetch, but abort before the result is used: the caller is
+        // already exiting, and a cache write is one more piece of threadpool
+        // work inside the teardown window.
+        fetchMock.mockImplementation(async () => {
+          controller.abort();
+          return { ok: true, json: async () => ({ version: "99.0.0" }) };
+        });
+
+        await startUpdateCheck({ currentVersion: "1.0.0", signal: controller.signal });
+
+        expect(writeFile).not.toHaveBeenCalled();
+      });
+
+      it("still writes the cache on a normal, uncancelled check", async () => {
+        const controller = new AbortController();
+        await startUpdateCheck({ currentVersion: "1.0.0", signal: controller.signal });
+        expect(writeFile).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it("returns null when current version is already up to date", async () => {
       fetchMock.mockResolvedValue({
         ok: true,

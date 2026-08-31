@@ -59,22 +59,24 @@ async function saveCache(latestVersion) {
 
 /**
  * Fetch the latest published version from the npm registry.
- * Returns null on any error (network failure, timeout, bad response, etc.).
+ * Returns null on any error (network failure, timeout, abort, bad response).
+ *
+ * @param {AbortSignal} [signal] Caller's cancellation signal, combined with the
+ *   internal timeout. The caller uses this to tear the request down when it has
+ *   stopped waiting for the answer — see `startUpdateCheck`.
  */
-async function fetchLatestVersion() {
+async function fetchLatestVersion(signal) {
   try {
-    const controller = new AbortController();
-    // 3-second timeout — fast networks finish in < 200 ms; this avoids
-    // blocking exit on sluggish or firewalled environments.
-    const timer = setTimeout(() => controller.abort(), 3000);
-    try {
-      const res = await fetch(REGISTRY_URL, { signal: controller.signal });
-      if (!res.ok) return null;
-      const data = await res.json();
-      return typeof data.version === "string" ? data.version : null;
-    } finally {
-      clearTimeout(timer);
-    }
+    // 3-second cap — fast networks finish in < 200 ms; this avoids hanging on
+    // sluggish or firewalled environments. AbortSignal.timeout's timer is
+    // unref'd, so unlike a manual setTimeout it cannot itself hold the loop
+    // open, and there is nothing to clear on the success path.
+    const timeout = AbortSignal.timeout(3000);
+    const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const res = await fetch(REGISTRY_URL, { signal: combined });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data.version === "string" ? data.version : null;
   } catch {
     return null;
   }
@@ -154,15 +156,26 @@ export function formatUpgradeCommand(manager = detectInstallManager()) {
 /**
  * Start an update check against the npm registry.
  *
- * @param {{ currentVersion?: string|null }} options
+ * @param {{ currentVersion?: string|null, signal?: AbortSignal }} options
  * @returns {Promise<{ current: string, latest: string } | null>}
  *   Resolves with update info when a newer version is available, or null
- *   when the current version is up to date, the check fails, or
+ *   when the current version is up to date, the check fails, is cancelled, or
  *   `currentVersion` is falsy.
+ *
+ * ## Cancellation
+ *
+ * `signal` exists because the caller exits on a deadline this check may miss.
+ * Ignoring a late answer is not enough: an abandoned `fetch` leaves a socket —
+ * and, before it, a DNS lookup on libuv's threadpool — outstanding while
+ * `process.exit()` tears the event loop down. The completing worker then calls
+ * `uv_async_send` on an already-closing handle, and the process aborts with
+ * `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` instead of exiting.
+ * Cancelling lets the request unwind so the caller can await this promise and
+ * exit with nothing in flight.
  *
  * This function never rejects.
  */
-export async function startUpdateCheck({ currentVersion } = {}) {
+export async function startUpdateCheck({ currentVersion, signal } = {}) {
   try {
     if (!currentVersion) return null;
 
@@ -170,8 +183,10 @@ export async function startUpdateCheck({ currentVersion } = {}) {
     let latestVersion = await loadCache();
 
     if (!latestVersion) {
-      latestVersion = await fetchLatestVersion();
-      if (latestVersion) {
+      latestVersion = await fetchLatestVersion(signal);
+      // A cancelled check must not write the cache: the caller is exiting, and
+      // the write is one more piece of threadpool work in the teardown window.
+      if (latestVersion && !signal?.aborted) {
         await saveCache(latestVersion);
       }
     }
