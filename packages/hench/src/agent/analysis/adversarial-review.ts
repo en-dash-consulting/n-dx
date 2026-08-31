@@ -519,12 +519,74 @@ export function formatReviewSummary(report: ReviewReport): string[] {
 }
 
 /**
+ * Unresolved findings split by *why* they are unresolved.
+ *
+ * The two reasons carry different urgency and must not share a label: a
+ * must-fix the pass could not repair is a defect still in the tree, while a
+ * should-fix whose PRD capture failed is a bookkeeping miss. Reporting the
+ * combined count as must-fix overstated the severity (run 4b4526c5 warned of
+ * an unrepaired must-fix when the only finding was a low/should-fix failed
+ * capture) and would have eroded trust in the warning.
+ */
+export interface UnresolvedBreakdown {
+  /** Must-fix findings that were not repaired — a defect a human must look at. */
+  unrepairedMustFix: ReviewFinding[];
+  /**
+   * Findings below must-fix whose action failed (e.g. the PRD capture threw).
+   * The code is fine; the record of it is not. A failed *must-fix* belongs to
+   * `unrepairedMustFix`, never here, so the two buckets never double-count.
+   */
+  failedActions: ReviewFinding[];
+  /** Both buckets, in report order — what {@link unresolvedFindings} returns. */
+  all: ReviewFinding[];
+}
+
+/** Partition the unresolved findings. See {@link UnresolvedBreakdown}. */
+export function classifyUnresolved(report: ReviewReport): UnresolvedBreakdown {
+  const isUnrepairedMustFix = (f: ReviewFinding): boolean =>
+    f.verdict === "must-fix" && f.action !== "fixed";
+
+  return {
+    unrepairedMustFix: report.findings.filter(isUnrepairedMustFix),
+    failedActions: report.findings.filter(
+      (f) => f.action === "failed" && !isUnrepairedMustFix(f),
+    ),
+    all: report.findings.filter((f) => isUnrepairedMustFix(f) || f.action === "failed"),
+  };
+}
+
+/**
  * Findings the pass tried to fix but could not, plus any it recorded as
  * `failed`. These are the ones a human must look at before trusting the
  * commit — everything else is either repaired, tracked, or reasoned away.
+ *
+ * The union of both {@link UnresolvedBreakdown} buckets. Use
+ * {@link classifyUnresolved} when the two need distinct labels or counts.
  */
 export function unresolvedFindings(report: ReviewReport): ReviewFinding[] {
-  return report.findings.filter(
-    (f) => f.action === "failed" || (f.verdict === "must-fix" && f.action !== "fixed"),
-  );
+  return classifyUnresolved(report).all;
+}
+
+/**
+ * Operator warning for the unresolved findings, one line per reason, or `[]`
+ * when everything resolved. Returned as lines (like
+ * {@link formatReviewSummary}) so the caller owns the output channel and the
+ * wording stays testable.
+ */
+export function formatUnresolvedWarning(report: ReviewReport): string[] {
+  const { unrepairedMustFix, failedActions } = classifyUnresolved(report);
+  if (unrepairedMustFix.length === 0 && failedActions.length === 0) return [];
+
+  const lines = [""];
+  if (unrepairedMustFix.length > 0) {
+    lines.push(`⚠ ${unrepairedMustFix.length} must-fix finding(s) were not repaired.`);
+  }
+  if (failedActions.length > 0) {
+    lines.push(
+      `⚠ ${failedActions.length} finding(s) below must-fix could not be processed ` +
+        "(e.g. a PRD capture that failed).",
+    );
+  }
+  lines.push("Inspect them before trusting this commit.");
+  return lines;
 }

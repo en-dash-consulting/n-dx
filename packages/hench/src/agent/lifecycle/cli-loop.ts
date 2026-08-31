@@ -36,7 +36,8 @@ import {
   readReviewReport,
   reviewReportPath,
   formatReviewSummary,
-  unresolvedFindings,
+  classifyUnresolved,
+  formatUnresolvedWarning,
 } from "../analysis/adversarial-review.js";
 import type { ReviewPassOutcome } from "../analysis/adversarial-review.js";
 import { snapshotDirtyState, diffDirtyState } from "../analysis/review-repairs.js";
@@ -1237,14 +1238,8 @@ async function runAdversarialReviewPass(
 
   for (const line of formatReviewSummary(outcome.report)) info(line);
 
-  const unresolved = unresolvedFindings(outcome.report);
-  if (unresolved.length > 0) {
-    info("");
-    info(
-      `⚠ ${unresolved.length} must-fix finding(s) were not repaired. ` +
-        "Inspect them before trusting this commit.",
-    );
-  }
+  const unresolved = classifyUnresolved(outcome.report);
+  for (const line of formatUnresolvedWarning(outcome.report)) info(line);
 
   // What the reviewer actually changed, from the snapshot pair. `.rex/` is
   // the completion-metadata commit's territory and `.hench/` holds the report
@@ -1266,7 +1261,9 @@ async function runAdversarialReviewPass(
     model: ctx.reviewModel,
     resumedSession: !!resumeSessionId,
     findingCount: outcome.report.findings.length,
-    unresolvedCount: unresolved.length,
+    unresolvedCount: unresolved.all.length,
+    unrepairedMustFixCount: unresolved.unrepairedMustFix.length,
+    failedActionCount: unresolved.failedActions.length,
     fixesApplied: outcome.report.fixesApplied,
     reportPath,
     repairedFiles,
