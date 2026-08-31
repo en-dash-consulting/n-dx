@@ -3,7 +3,7 @@
   "provider": "cli",
   "model": "sonnet",
   "permissionMode": "acceptEdits",
-  "maxTurns": 50,
+  "maxTurns": 100,
   "maxTokens": 8192,
   "rexDir": ".rex",
   "apiKeyEnv": "ANTHROPIC_API_KEY",
@@ -29,5 +29,6 @@
     }
   },
   "claudePath": "claude",
-  "autoCommit": true
+  "autoCommit": true,
+  "tokenBudget": 42236
 }

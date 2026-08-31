@@ -1,0 +1,24 @@
+{
+  "records": [
+    {
+      "suggestionId": "turn-optimization-2",
+      "title": "Turn limit reached frequently",
+      "category": "turn-optimization",
+      "decision": "accepted",
+      "decidedAt": "2026-08-28T19:31:02.146Z",
+      "appliedChanges": {
+        "maxTurns": 100
+      }
+    },
+    {
+      "suggestionId": "token-efficiency-1",
+      "title": "Set a token budget based on historical usage",
+      "category": "token-efficiency",
+      "decision": "accepted",
+      "decidedAt": "2026-08-28T19:31:06.582Z",
+      "appliedChanges": {
+        "tokenBudget": 42236
+      }
+    }
+  ]
+}
