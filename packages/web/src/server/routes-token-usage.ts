@@ -129,6 +129,8 @@ interface CostEstimate {
   totalRaw: number;
   inputCost: number;
   outputCost: number;
+  cacheWriteCost: number;
+  cacheReadCost: number;
 }
 
 type TimePeriod = "day" | "week" | "month";
@@ -268,17 +270,39 @@ function normalizeWeeklyBudgetConfig(
   return { config, validationErrors };
 }
 
-/** Default Sonnet pricing. */
+/**
+ * Default Sonnet pricing.
+ *
+ * Must stay in step with `DEFAULT_PRICING` in
+ * `packages/rex/src/core/token-usage.ts` — the dashboard and `ndx usage` are
+ * expected to quote the same figure for the same runs. Cache rates are
+ * multiples of the input rate: a write costs a premium, a read a fraction.
+ */
 const DEFAULT_PRICING = {
   inputPerMillion: 3,
   outputPerMillion: 15,
+  cacheWritePerMillion: 3.75, // 1.25x input
+  cacheReadPerMillion: 0.3, // 0.1x input
 };
 
 function estimateCost(usage: AggregateTokenUsage): CostEstimate {
   const inputCost = (usage.totalInputTokens / 1_000_000) * DEFAULT_PRICING.inputPerMillion;
   const outputCost = (usage.totalOutputTokens / 1_000_000) * DEFAULT_PRICING.outputPerMillion;
-  const totalRaw = inputCost + outputCost;
-  return { total: `$${totalRaw.toFixed(2)}`, totalRaw, inputCost, outputCost };
+  // Counted in the totals already; they were simply never priced, so the
+  // dashboard quoted a figure that ignored most of the bill.
+  const cacheWriteCost =
+    (usage.totalCacheCreationTokens / 1_000_000) * DEFAULT_PRICING.cacheWritePerMillion;
+  const cacheReadCost =
+    (usage.totalCacheReadTokens / 1_000_000) * DEFAULT_PRICING.cacheReadPerMillion;
+  const totalRaw = inputCost + outputCost + cacheWriteCost + cacheReadCost;
+  return {
+    total: `$${totalRaw.toFixed(2)}`,
+    totalRaw,
+    inputCost,
+    outputCost,
+    cacheWriteCost,
+    cacheReadCost,
+  };
 }
 
 // ---------------------------------------------------------------------------
