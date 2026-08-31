@@ -21,6 +21,8 @@ import {
   reviewReportPath,
   formatReviewSummary,
   unresolvedFindings,
+  classifyUnresolved,
+  formatUnresolvedWarning,
   REVIEW_REPORT_SUBDIR,
 } from "../../../src/agent/analysis/adversarial-review.js";
 import type {
@@ -265,6 +267,108 @@ describe("readReviewReport", () => {
 
     expect(outcome.ok).toBe(true);
     expect(outcome.ok === true && outcome.report.summary).toBe("clean");
+  });
+});
+
+describe("classifyUnresolved", () => {
+  it("separates unrepaired must-fix from other failed actions", () => {
+    const { unrepairedMustFix, failedActions, all } = classifyUnresolved(
+      report({
+        findings: [
+          finding({ verdict: "must-fix", action: "captured" }),
+          finding({ verdict: "should-fix", action: "failed" }),
+        ],
+      }),
+    );
+
+    expect(unrepairedMustFix).toHaveLength(1);
+    expect(unrepairedMustFix[0].verdict).toBe("must-fix");
+    expect(failedActions).toHaveLength(1);
+    expect(failedActions[0].verdict).toBe("should-fix");
+    expect(all).toHaveLength(2);
+  });
+
+  it("counts a failed must-fix once, as unrepaired must-fix", () => {
+    // Both predicates match it. Reporting it in each bucket would double the
+    // headline count and overstate how much is wrong.
+    const { unrepairedMustFix, failedActions, all } = classifyUnresolved(
+      report({ findings: [finding({ verdict: "must-fix", action: "failed" })] }),
+    );
+
+    expect(unrepairedMustFix).toHaveLength(1);
+    expect(failedActions).toEqual([]);
+    expect(all).toHaveLength(1);
+  });
+
+  it("puts the union in `all`, in report order, each finding once", () => {
+    const r = report({
+      findings: [
+        finding({ verdict: "must-fix", action: "failed" }),
+        finding({ verdict: "must-fix", action: "captured" }),
+        finding({ verdict: "should-fix", action: "failed" }),
+        finding({ verdict: "must-fix", action: "fixed" }),
+        finding({ verdict: "not-worth-fixing", action: "dropped" }),
+      ],
+    });
+
+    // Asserted against literal membership rather than against
+    // `unresolvedFindings`, which delegates here and so could never disagree.
+    expect(classifyUnresolved(r).all.map((f) => `${f.verdict}/${f.action}`)).toEqual([
+      "must-fix/failed",
+      "must-fix/captured",
+      "should-fix/failed",
+    ]);
+    expect(unresolvedFindings(r)).toEqual(classifyUnresolved(r).all);
+  });
+});
+
+describe("formatUnresolvedWarning", () => {
+  it("says nothing when every finding resolved", () => {
+    expect(
+      formatUnresolvedWarning(
+        report({ findings: [finding({ verdict: "must-fix", action: "fixed" })] }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("does not call a failed non-must-fix capture an unrepaired must-fix", () => {
+    // The bug this pins: run 4b4526c5's single unresolved finding was a
+    // low/should-fix whose PRD capture failed, and the console still claimed
+    // "1 must-fix finding(s) were not repaired".
+    const lines = formatUnresolvedWarning(
+      report({
+        findings: [finding({ severity: "low", verdict: "should-fix", action: "failed" })],
+      }),
+    );
+
+    expect(lines.join("\n")).not.toContain("must-fix finding(s) were not repaired");
+    expect(lines.join("\n")).toContain("could not be processed");
+  });
+
+  it("labels an unrepaired must-fix as one", () => {
+    const lines = formatUnresolvedWarning(
+      report({ findings: [finding({ verdict: "must-fix", action: "captured" })] }),
+    );
+
+    expect(lines.join("\n")).toContain("1 must-fix finding(s) were not repaired");
+    expect(lines.join("\n")).not.toContain("could not be processed");
+  });
+
+  it("reports both groups separately when both are present", () => {
+    const lines = formatUnresolvedWarning(
+      report({
+        findings: [
+          finding({ verdict: "must-fix", action: "captured" }),
+          finding({ verdict: "must-fix", action: "dropped" }),
+          finding({ verdict: "should-fix", action: "failed" }),
+        ],
+      }),
+    );
+    const text = lines.join("\n");
+
+    expect(text).toContain("2 must-fix finding(s) were not repaired");
+    expect(text).toContain("1 finding(s) below must-fix could not be processed");
+    expect(text).toContain("Inspect them before trusting this commit.");
   });
 });
 

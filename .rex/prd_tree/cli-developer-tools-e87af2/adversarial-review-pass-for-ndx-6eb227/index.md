@@ -2,12 +2,15 @@
 id: "6eb227af-ffb2-4f39-8f62-d4afbad09a57"
 level: "feature"
 title: "Adversarial review pass for ndx work (--review)"
-status: "pending"
+status: "completed"
 priority: "high"
+startedAt: "2026-08-31T19:37:13.157Z"
+completedAt: "2026-08-31T19:37:13.157Z"
+endedAt: "2026-08-31T19:37:13.157Z"
 acceptanceCriteria: []
 description: "After a task's changes pass completion validation and before the commit prompt, a second agent attacks the change, triages each finding for severity and necessity, repairs must-fix findings in-session, and captures the rest to the PRD. On the Claude CLI the reviewer resumes the work session on a stronger model so it inherits the implementation context; other vendors get a fresh reviewer. Taking the --review flag moves the existing interactive diff-approval gate to --approve-diff."
-lastModified: "2026-08-26T04:37:26.277Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-08-31T19:37:13.164Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -22,5 +25,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Post-review full-suite gate skips because filesChanged misses executor and reviewer modifications](./post-review-full-suite-gate-3ff761.md) | completed |
 | [Resume the work session for the reviewer on --resume](./resume-the-work-session-for-the-2eb560.md) | completed |
 | [Review report transport, parsing, and run-record recording](./review-report-transport-parsing-2f0be1.md) | completed |
-| [Unresolved-findings warning mislabels non-must-fix failures as unrepaired must-fix](./unresolved-findings-warning-377d09.md) | pending |
+| [Unresolved-findings warning mislabels non-must-fix failures as unrepaired must-fix](./unresolved-findings-warning-377d09.md) | completed |
 | [Verify the review pass end-to-end against a real ndx work run](./verify-the-review-pass-end-to-0deece.md) | completed |

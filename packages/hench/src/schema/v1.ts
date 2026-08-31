@@ -781,8 +781,23 @@ export type RunReviewRecord =
       resumedSession: boolean;
       /** Findings surviving both passes, including the ones deliberately dropped. */
       findingCount: number;
-      /** Must-fix findings the pass could not repair. Non-zero needs a human. */
+      /**
+       * Findings left unresolved for either reason — the sum of the two counts
+       * below. Not a must-fix count: it also carries findings below must-fix
+       * whose action failed. Kept as the single "needs a look" headline.
+       */
       unresolvedCount: number;
+      /**
+       * Must-fix findings the pass could not repair. Non-zero means a defect
+       * is still in the tree and needs a human.
+       */
+      unrepairedMustFixCount: number;
+      /**
+       * Findings below must-fix whose action failed (e.g. the PRD capture
+       * threw). The code is fine; the record of it is not. A failed must-fix
+       * counts under `unrepairedMustFixCount`, never here.
+       */
+      failedActionCount: number;
       /** True when the reviewer edited a file. */
       fixesApplied: boolean;
       /** Absolute path of the JSON report the reviewer wrote. */
