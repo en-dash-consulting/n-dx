@@ -39,3 +39,4 @@ description: "PRD management: hierarchical epics/features/tasks/subtasks, smart 
 | [Audit MCP tool schemas against PRDItem fields](./audit-mcp-tool-schemas-against-8fc484.md) | completed |
 | [Fix --mode=fast being ignored when --accept is passed to reorganize](./fix-mode-fast-being-ignored-0f8711.md) | completed |
 | [Investigate flaky store-roundtrip concurrency test (0 items after serialized mutations)](./investigate-flaky-store-5d0a66.md) | completed |
+| [rex add hangs indefinitely when stdin is an open pipe](./rex-add-hangs-indefinitely-when-769fe7.md) | pending |
