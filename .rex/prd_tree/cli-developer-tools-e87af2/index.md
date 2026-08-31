@@ -26,7 +26,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record](./hench-record-no-tokens-leaves-90e6af.md) | completed |
 | [`hench record` with no usage window silently claims the entire session transcript](./hench-record-with-no-usage-f1ada0.md) | completed |
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-f93230.md) | completed |
-| [rex add-auto-reshape complexity gate times out under full-suite load](./rex-add-auto-reshape-complexity-b3dd78.md) | pending |
+| [rex add-auto-reshape complexity gate times out under full-suite load](./rex-add-auto-reshape-complexity-b3dd78.md) | completed |
 | [Skill commit steps prescribe a POSIX-only heredoc, which fails in PowerShell and can drop the attribution trailer](./skill-commit-steps-prescribe-a-bdd329.md) | completed |
 | [Skills that call add_item describe item content in prose instead of naming its parameters](./skills-that-call-add-item-08c198.md) | completed |
 | [Skills that record runs omit --startedAt, so each one's first record claims the whole session](./skills-that-record-runs-omit-f050ba.md) | completed |
