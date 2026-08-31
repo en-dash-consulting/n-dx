@@ -18,9 +18,9 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Artifact diet — cap sourcevision artifacts and startup context](./artifact-diet-cap-sourcevision-eda610/index.md) | completed |
 | [Eliminate per-task cold spawns (warm-parent fork + session batching)](./eliminate-per-task-cold-spawns-00d910/index.md) | completed |
 | [Wire tiered model resolution (task class → tier → model)](./wire-tiered-model-resolution-462b95/index.md) | completed |
-| [Artifact diet — cap sourcevision artifacts and startup context](./artifact-diet-cap-sourcevision-eda610.md) | pending |
 | [Cap total spawns per task and retry via --resume](./cap-total-spawns-per-task-and-7dcba8.md) | pending |
 | [Extend the batch session strategy to the codex CLI](./extend-the-batch-session-662bb4.md) | pending |
 | [JSON prompt discipline — compact JSON in and out](./json-prompt-discipline-compact-0284c3.md) | pending |
