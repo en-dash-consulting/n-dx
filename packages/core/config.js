@@ -1015,6 +1015,120 @@ const TASK_TIERS = new Set(["light", "standard", "heavy", "free"]);
 const EFFORT_LEVELS = new Set(["low", "medium", "high", "xhigh", "max"]);
 
 /**
+ * Known task classes and the tier each routes to by default.
+ *
+ * Duplicated from `DEFAULT_ROUTES` in `@n-dx/llm-client` rather than imported:
+ * orchestration-tier scripts must not import from packages, which is why
+ * `LLM_VENDOR` and the tier/effort sets above are declared locally too. The
+ * copy is not trusted to stay correct on its own — `tests/integration/
+ * task-class-sync.test.js` fails when it drifts from the registry.
+ *
+ * Used for two things only, both advisory: listing the classes in `--help`,
+ * and telling a user who mistypes one that their route will never match.
+ * Routing itself never consults this — an unknown class is written as given,
+ * because glob keys and classes newer than this copy must keep working.
+ */
+export const TASK_CLASSES = {
+  // hench
+  "agent.execute": "standard",
+  "git.commit-message": "light",
+  "context.summarize": "light",
+  "context.distill": "standard",
+  // rex
+  "prd.propose": "standard",
+  "prd.consolidate-check": "light",
+  "prd.decompose": "light",
+  "prd.rename": "light",
+  "prd.merge": "light",
+  "prd.assess": "light",
+  "prd.modify": "standard",
+  "prd.clarify": "light",
+  "prd.spec": "standard",
+  "prd.smart-add": "standard",
+  "prd.restructure": "standard",
+  // sourcevision
+  "code.classify": "light",
+  "zone.enrich-scan": "light",
+  "zone.enrich-deep": "standard",
+  "zone.meta-eval": "standard",
+};
+
+/**
+ * Levenshtein distance, iterative with a single row.
+ *
+ * Local and tiny on purpose: the only consumer is the did-you-mean hint
+ * below, and pulling a dependency into the orchestration tier for twenty
+ * lines of arithmetic would cost more than it saves.
+ */
+function editDistance(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const substitution = previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1);
+      current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, substitution);
+    }
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+/**
+ * Maximum edit distance at which a suggestion is offered.
+ *
+ * Three catches the realistic typos — a transposition, a dropped or doubled
+ * character, a wrong suffix — without pointing `zone.enrich-scan` at
+ * `code.classify` and sending someone down the wrong path. Beyond it the note
+ * still appears; only the suggestion is withheld.
+ */
+const TASK_CLASS_SUGGESTION_MAX_DISTANCE = 3;
+
+/**
+ * Nearest known task class to `candidate`, or null when nothing is close.
+ */
+export function nearestTaskClass(candidate) {
+  let best = null;
+  for (const known of Object.keys(TASK_CLASSES)) {
+    const distance = editDistance(candidate, known);
+    if (distance <= TASK_CLASS_SUGGESTION_MAX_DISTANCE && (!best || distance < best.distance)) {
+      best = { known, distance };
+    }
+  }
+  return best ? best.known : null;
+}
+
+/**
+ * Advisory note for a `llm.routes.<class>` / `llm.effort.<class>` write whose
+ * class this build does not recognize. Returns null when the class is known,
+ * or is a glob pattern (which is a routing feature, not a typo).
+ *
+ * Deliberately advisory: rejecting would break glob keys and any class added
+ * to the registry after this copy was written. The value is written either
+ * way; the user simply learns that a route which will never match looks like
+ * a mistake.
+ */
+export function describeUnknownTaskClass(settingPath) {
+  const prefix = ["routes.", "effort."].find((p) => settingPath.startsWith(p));
+  if (!prefix) return null;
+
+  const taskClass = settingPath.slice(prefix.length);
+  if (!taskClass || taskClass.includes("*")) return null;
+  if (Object.hasOwn(TASK_CLASSES, taskClass)) return null;
+
+  const suggestion = nearestTaskClass(taskClass);
+  const lead = `Note: "${taskClass}" is not a task class this build knows about.`;
+  return suggestion
+    ? `${lead} Did you mean "${suggestion}"? Setting it anyway — ` +
+        "run 'ndx config --help' for the full list."
+    : `${lead} Setting it anyway, but it will not match any call site unless a ` +
+        "newer n-dx defines it. Run 'ndx config --help' for the known classes.";
+}
+
+/**
  * Validators for the parameterized `llm.*` routing keys.
  *
  * These paths carry a variable segment (`llm.tiers.<vendor>.<tier>`,
@@ -1633,6 +1747,20 @@ Task routing (which model serves which kind of call):
                                     globs the longest prefix wins.
                                       n-dx config llm.routes.agent.execute heavy
                                       n-dx config "llm.routes.prd.*" standard
+  Known task classes (<class> above), with the tier each routes to by default:
+    hench        agent.execute (standard)      git.commit-message (light)
+                 context.summarize (light)     context.distill (standard)
+    rex          prd.propose (standard)        prd.consolidate-check (light)
+                 prd.decompose (light)         prd.rename (light)
+                 prd.merge (light)             prd.assess (light)
+                 prd.modify (standard)         prd.clarify (light)
+                 prd.spec (standard)           prd.smart-add (standard)
+                 prd.restructure (standard)
+    sourcevision code.classify (light)         zone.enrich-scan (light)
+                 zone.enrich-deep (standard)   zone.meta-eval (standard)
+  Setting a route for a class not listed here still works — it may be a glob, or a
+  class a newer n-dx defines — but ndx says so, and suggests the closest match.
+
   llm.effort.<class>       string    Thinking effort for a class: low, medium, high, xhigh, or
                                     max. Matched with the same exact-then-glob rules as routes.
                                     Light-tier models have no effort parameter, so an entry for
@@ -2129,6 +2257,14 @@ async function handleSetProjectSection(
   // vendor is still persisted.
   if (pkg === "llm" && settingPath === "vendor") {
     await runLLMVendorPreflight(coerced, configs, flags["soft-preflight"] === "true");
+  }
+
+  // Advisory did-you-mean for routing keys. A mistyped class is accepted by
+  // the validator on purpose (globs and newer classes must work), so without
+  // this the write succeeds, matches nothing, and the user sees no signal.
+  if (pkg === "llm") {
+    const classNote = describeUnknownTaskClass(settingPath);
+    if (classNote) console.error(classNote);
   }
 
   setByPath(configs[pkg], settingPath, coerced, pkg);

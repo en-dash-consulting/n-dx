@@ -1614,6 +1614,15 @@ describe("n-dx config", () => {
   // ── LLM task-routing config (llm.tiers / routes / effort / escalation) ─────
 
   describe("llm routing config keys", () => {
+    /** Local capture helper — `runCapture` above is scoped to the vendor block. */
+    function captureConfig(args) {
+      const res = spawnSync("node", [CLI_PATH, "config", ...args], {
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+      });
+      return { stdout: res.stdout ?? "", stderr: res.stderr ?? "", status: res.status };
+    }
+
     it("sets a per-vendor tier model", async () => {
       run(["llm.tiers.claude.light", "claude-haiku-4-5", tmpDir]);
 
@@ -1691,6 +1700,44 @@ describe("n-dx config", () => {
     it("rejects a negative or non-integer maxSteps", async () => {
       expect(runFail(["llm.escalation.maxSteps", "-1", tmpDir])).toMatch(/maxSteps/i);
       expect(runFail(["llm.escalation.maxSteps", "1.5", tmpDir])).toMatch(/maxSteps/i);
+    });
+
+    it("hints the closest class when a route class looks mistyped", async () => {
+      // The validator accepts any class on purpose (globs, newer classes), so
+      // without the hint this write succeeds and silently matches nothing.
+      const { stderr } = captureConfig(["llm.routes.agent.exceute", "heavy", tmpDir]);
+
+      expect(stderr).toContain("agent.execute");
+      expect(stderr).toMatch(/not a task class/i);
+
+      // Advisory only — the value is still written.
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.routes["agent.exceute"]).toBe("heavy");
+    });
+
+    it("says nothing for a known class", async () => {
+      const { stderr } = captureConfig(["llm.routes.agent.execute", "heavy", tmpDir]);
+      expect(stderr).not.toMatch(/not a task class/i);
+    });
+
+    it("says nothing for a glob route key", async () => {
+      const { stderr } = captureConfig(["llm.routes.prd.*", "standard", tmpDir]);
+      expect(stderr).not.toMatch(/not a task class/i);
+    });
+
+    it("notes an unrecognized class without a suggestion when nothing is close", async () => {
+      const { stderr } = captureConfig(["llm.routes.wildly.unrelated", "light", tmpDir]);
+      expect(stderr).toMatch(/not a task class/i);
+      expect(stderr).toMatch(/will not match/i);
+    });
+
+    it("lists the known task classes and their default tiers in help", async () => {
+      const help = run(["--help", tmpDir]);
+
+      expect(help).toContain("Known task classes");
+      expect(help).toContain("agent.execute (standard)");
+      expect(help).toContain("prd.rename (light)");
+      expect(help).toContain("code.classify (light)");
     });
 
     it("documents the routing keys and the llm.model shorthand in help", async () => {

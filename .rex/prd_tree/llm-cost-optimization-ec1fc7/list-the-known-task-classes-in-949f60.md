@@ -2,7 +2,7 @@
 id: "949f600b-219c-4bba-8a88-1517df83f00b"
 level: "task"
 title: "List the known task classes in ndx config and flag an unrecognized route as probably-new, with the closest match"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "core"
@@ -10,6 +10,9 @@ tags:
   - "model-routing"
   - "dx"
 source: "ndx-capture"
+startedAt: "2026-08-31T15:47:01.567Z"
+completedAt: "2026-08-31T15:52:07.188Z"
+endedAt: "2026-08-31T15:52:07.188Z"
 acceptanceCriteria:
   - "The known task classes and their default tiers are discoverable from the ndx config CLI without reading source"
   - "Setting llm.routes.<class> or llm.effort.<class> for an unrecognized non-glob class succeeds and prints a note that the class looks new"
@@ -19,6 +22,6 @@ acceptanceCriteria:
   - "The class list used by core stays in sync with DEFAULT_ROUTES, enforced by a test rather than by convention"
   - "Exit status is unchanged for the probably-new case — it is a warning, not a failure"
 description: "llm.routes.<class> and llm.effort.<class> deliberately accept any class name: glob keys (prd.*, *) are legal, and the class registry (DEFAULT_ROUTES) lives in @n-dx/llm-client, which orchestration-tier config.js must not import. The cost of that openness is a silent footgun — `ndx config llm.routes.agent.exceute heavy` is accepted, written, and never matches anything, so the user sees success and gets the old model with no signal. Close the gap with information rather than rejection: (a) surface the known task classes and their default tiers somewhere discoverable (ndx config --help, or a listing such as `ndx config llm.routes`), and (b) when a set targets a class that is neither a known class nor a glob, still write it but print a note that it looks like a new class, naming the closest known class when one is within a small edit distance. A warning rather than an error is required — genuinely new classes and glob patterns must keep working. Implementation note: core cannot import DEFAULT_ROUTES across the tier boundary, so the class list has to reach it another way (spawn a query, generate the list at build time, or duplicate it behind a sync test); the same problem and the same three options apply to the web UI if it grows a class picker."
-lastModified: "2026-08-31T13:49:44.915Z"
+lastModified: "2026-08-31T15:52:07.193Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
