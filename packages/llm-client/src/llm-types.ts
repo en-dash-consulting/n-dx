@@ -93,6 +93,14 @@ export interface LocalVerifierConfig {
    * Once exhausted the run finalizes with whatever state the primary is in.
    */
   maxCycles?: number;
+  /**
+   * Request timeout in milliseconds for a verifier call (default: 60000 = 1 min).
+   *
+   * Deliberately independent of {@link LocalConfig.timeoutMs}: verification is
+   * best-effort — a hung verifier is skipped rather than allowed to stall the
+   * run for as long as the primary model is permitted to think.
+   */
+  timeoutMs?: number;
 }
 
 /** Optional local model config section in `.n-dx.json` (e.g. LM Studio). */
@@ -128,6 +136,18 @@ export interface LocalConfig {
    * surfaced with actionable guidance via parseLmStudioError.
    */
   maxContextTokens?: number;
+  /**
+   * Request timeout in milliseconds for a single local completion
+   * (default: 900000 = 15 min).
+   *
+   * Local inference on a large model — or one that spills out of VRAM — can
+   * take many minutes per turn, so this is generous by default. Raise it
+   * further for very large models; lower it if you would rather fail fast.
+   *
+   * Applies to blocking completions and to the connection phase of a streaming
+   * request. Once a stream has begun emitting chunks it is not affected.
+   */
+  timeoutMs?: number;
   /**
    * Second-model verifier. When set, hench sends the primary model's completed
    * solution to this endpoint for review before finalizing the run.

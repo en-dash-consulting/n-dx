@@ -61,6 +61,18 @@ const BASE_DELAY_MS = 1000;
 const MAX_CONTEXT_PAIRS = 20;
 const MAX_SUMMARY_LENGTH = 500;
 const MAX_TOOL_OUTPUT_STORED = 2000;
+/**
+ * Default per-turn request timeout for the local (LM Studio) tool loop.
+ * Overridable via `llm.local.timeoutMs` in `.n-dx.json`.
+ */
+const LOCAL_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
+/**
+ * Default timeout for a local verifier call. Kept well below
+ * {@link LOCAL_REQUEST_TIMEOUT_MS}: verification is best-effort and a hung
+ * verifier is skipped, so it should not stall a run for as long as the primary
+ * model is allowed to think. Overridable via `llm.local.verifier.timeoutMs`.
+ */
+const LOCAL_VERIFIER_TIMEOUT_MS = 2 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Extracted helpers — each handles one focused concern within the turn loop
@@ -812,7 +824,7 @@ async function executeLocalToolCalls(
  * a verifier failure should never block task completion.
  */
 async function callVerifier(
-  cfg: { host?: string; port?: number; model?: string },
+  cfg: { host?: string; port?: number; model?: string; timeoutMs?: number },
   briefText: string,
   primaryFinalMessage: string,
 ): Promise<{ verdict: "PASS" | "FAIL"; reasoning: string }> {
@@ -820,6 +832,10 @@ async function callVerifier(
   const port = typeof cfg.port === "number" && cfg.port > 0 ? cfg.port : 1235;
   const model = typeof cfg.model === "string" ? cfg.model : "";
   const baseUrl = `http://${host}:${port}/v1`;
+  const timeoutMs =
+    typeof cfg.timeoutMs === "number" && Number.isFinite(cfg.timeoutMs) && cfg.timeoutMs > 0
+      ? cfg.timeoutMs
+      : LOCAL_VERIFIER_TIMEOUT_MS;
 
   const systemContent =
     "You are an independent code reviewer. Your only job is to verify whether a proposed " +
@@ -848,7 +864,7 @@ async function callVerifier(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(reqBody),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!resp.ok) {
@@ -922,6 +938,14 @@ async function runLocalToolLoop(params: {
   const maxContextTokens = typeof localCfg?.["maxContextTokens"] === "number"
     ? (localCfg["maxContextTokens"] as number)
     : undefined;
+  // Per-turn request timeout (set via ndx config llm.local.timeoutMs=N). Local
+  // inference on a large model can take many minutes per turn, so the default is
+  // generous; a non-positive or non-finite value falls back to it.
+  const rawTimeout = localCfg?.["timeoutMs"];
+  const requestTimeoutMs =
+    typeof rawTimeout === "number" && Number.isFinite(rawTimeout) && rawTimeout > 0
+      ? rawTimeout
+      : LOCAL_REQUEST_TIMEOUT_MS;
 
   // Verifier config — second model that reviews the primary's completed solution.
   const verifierRaw = localCfg?.["verifier"];
@@ -1029,12 +1053,14 @@ async function runLocalToolLoop(params: {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(reqBody),
-          signal: AbortSignal.timeout(5 * 60 * 1000), // 5 min
+          signal: AbortSignal.timeout(requestTimeoutMs),
         });
       } catch (err) {
         throw new Error(
           `Cannot reach local server at ${baseUrl}: ${(err as Error).message}. ` +
-          "Is LM Studio running?",
+          "Is LM Studio running? " +
+          `(timeout: ${Math.round(requestTimeoutMs / 1000)}s — raise it with ` +
+          "'ndx config llm.local.timeoutMs <ms>')",
         );
       }
 
@@ -1093,7 +1119,7 @@ async function runLocalToolLoop(params: {
           section(`Verifier Review (cycle ${verifierCycleCount + 1}/${maxVerifierCycles})`);
           detail(`[Verifier] Querying ${vHost}:${vPort} …`);
           const { verdict, reasoning } = await callVerifier(
-            verifierCfg as { host?: string; port?: number; model?: string },
+            verifierCfg as { host?: string; port?: number; model?: string; timeoutMs?: number },
             briefText,
             assistantContent ?? "(no summary provided)",
           );

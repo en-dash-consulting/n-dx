@@ -50,6 +50,16 @@ describe("repairProjectConfig", () => {
     expect((await readConfig()).cli.timeoutMs).toBe(60000);
   });
 
+  it("coerces llm.local.timeoutMs stored as a string", async () => {
+    await writeConfig({ llm: { local: { timeoutMs: "1800000" } } });
+    const { repairs } = await repairProjectConfig(dir);
+
+    expect(repairs).toEqual([
+      { path: "llm.local.timeoutMs", from: "1800000", to: 1800000 },
+    ]);
+    expect((await readConfig()).llm.local.timeoutMs).toBe(1800000);
+  });
+
   it("repairs multiple entries under cli.timeouts", async () => {
     await writeConfig({
       cli: { timeouts: { work: "14400000", analyze: "60000", plan: 30000 } },

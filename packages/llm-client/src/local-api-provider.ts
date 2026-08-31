@@ -47,7 +47,7 @@ const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = 1234;
 // Local inference can be slow; use a long timeout. Streaming is unaffected
 // because the connection stays open as chunks arrive.
-const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 // ── Options ───────────────────────────────────────────────────────────────
 
@@ -62,14 +62,32 @@ export interface LocalApiProviderOptions {
   /** Maximum response tokens (default: 8192). */
   maxTokens?: number;
   /**
-   * Request timeout in milliseconds for non-streaming completions (default: 300000 = 5 min).
+   * Request timeout in milliseconds for non-streaming completions (default: 900000 = 15 min).
    * Local inference can be slow; set higher for very large models.
-   * Streaming completions are not affected — the connection stays open as chunks arrive.
+   * Overrides `localConfig.timeoutMs` when both are present.
+   * Streaming completions are not affected once chunks arrive — the timeout
+   * only covers the connection phase.
    */
   timeoutMs?: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+
+/**
+ * Resolve the per-request timeout.
+ *
+ * Precedence: explicit option → `llm.local.timeoutMs` in `.n-dx.json` → default.
+ * A non-positive or non-finite value falls through to the next source rather
+ * than disabling the timeout, so a typo in config cannot hang a run forever.
+ */
+function resolveTimeoutMs(explicit?: number, localConfig?: LocalConfig): number {
+  for (const candidate of [explicit, localConfig?.timeoutMs]) {
+    if (typeof candidate === "number" && Number.isFinite(candidate) && candidate > 0) {
+      return candidate;
+    }
+  }
+  return DEFAULT_TIMEOUT_MS;
+}
 
 /** Build the base URL from host and port config. */
 function resolveBaseUrl(localConfig?: LocalConfig): string {
@@ -165,7 +183,7 @@ export function createLocalApiProvider(
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = resolveTimeoutMs(options.timeoutMs, localConfig);
   // Empty string is intentional: LM Studio uses whichever model is loaded.
   const defaultModel = localConfig?.model ?? "";
 

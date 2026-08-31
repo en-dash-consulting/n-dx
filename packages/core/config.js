@@ -208,6 +208,8 @@ const NUMERIC_CONFIG_PATHS = [
   "cli.timeoutMs",
   "cli.timeouts.*",
   "web.port",
+  "llm.local.timeoutMs",
+  "llm.local.verifier.timeoutMs",
 ];
 
 /**
@@ -920,6 +922,14 @@ const LLM_VALIDATORS = {
   },
   "local.model": validateModel,
   "local.lightModel": validateModel,
+  "local.timeoutMs": (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new Error(
+        `Invalid local.timeoutMs "${v}". Expected a positive number of milliseconds.`,
+      );
+    }
+  },
   autoFailover: validateAutoFailover,
 };
 
@@ -1404,6 +1414,11 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     Leave unset to use whichever model is currently loaded
                                     in LM Studio.
   llm.local.lightModel     string    Local model for light-weight tasks (optional)
+  llm.local.timeoutMs      number    Per-request timeout for local completions in ms
+                                    (default: 900000 = 15 min). Raise it when a large
+                                    model needs longer per turn; a request that exceeds
+                                    it aborts the run.
+                                    Example: n-dx config llm.local.timeoutMs 1800000
   llm.autoFailover         boolean   Enable automatic model/vendor failover on errors (default: false)
                                     When true, hench retries failed runs on fallback models
                                     before surfacing the original error. Disabled by default
