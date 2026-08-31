@@ -1610,4 +1610,97 @@ describe("n-dx config", () => {
       expect(stderr).toContain("\x1b[2m");
     });
   });
+
+  // ── LLM task-routing config (llm.tiers / routes / effort / escalation) ─────
+
+  describe("llm routing config keys", () => {
+    it("sets a per-vendor tier model", async () => {
+      run(["llm.tiers.claude.light", "claude-haiku-4-5", tmpDir]);
+
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.tiers.claude.light).toBe("claude-haiku-4-5");
+    });
+
+    it("sets the free tier, which only exists in the tier map", async () => {
+      run(["llm.tiers.local.free", "qwen2.5-coder-14b", tmpDir]);
+
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.tiers.local.free).toBe("qwen2.5-coder-14b");
+    });
+
+    it("rejects an unknown vendor in a tier path", async () => {
+      const stderr = runFail(["llm.tiers.notavendor.light", "some-model", tmpDir]);
+      expect(stderr).toMatch(/vendor/i);
+    });
+
+    it("rejects an unknown tier name in a tier path", async () => {
+      const stderr = runFail(["llm.tiers.claude.turbo", "some-model", tmpDir]);
+      expect(stderr).toMatch(/tier/i);
+    });
+
+    it("rejects an empty tier model", async () => {
+      const stderr = runFail(["llm.tiers.claude.light", "", tmpDir]);
+      expect(stderr).toMatch(/model/i);
+    });
+
+    it("routes a task class to a tier", async () => {
+      run(["llm.routes.agent.execute", "heavy", tmpDir]);
+
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.routes["agent.execute"]).toBe("heavy");
+    });
+
+    it("accepts a glob route key — prefix routing is the documented design", async () => {
+      run(["llm.routes.prd.*", "standard", tmpDir]);
+
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.routes["prd.*"]).toBe("standard");
+    });
+
+    it("rejects a route value that is not a tier", async () => {
+      const stderr = runFail(["llm.routes.prd.rename", "haiku", tmpDir]);
+      expect(stderr).toMatch(/light.*standard.*heavy|tier/i);
+    });
+
+    it("sets an effort level per class", async () => {
+      run(["llm.effort.agent.execute", "high", tmpDir]);
+
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.effort["agent.execute"]).toBe("high");
+    });
+
+    it("rejects an unknown effort level", async () => {
+      const stderr = runFail(["llm.effort.agent.execute", "turbo", tmpDir]);
+      expect(stderr).toMatch(/effort/i);
+    });
+
+    it("sets escalation.enabled as a boolean, not a string", async () => {
+      run(["llm.escalation.enabled", "true", tmpDir]);
+
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.escalation.enabled).toBe(true);
+    });
+
+    it("sets escalation.maxSteps as a number", async () => {
+      run(["llm.escalation.maxSteps", "1", tmpDir]);
+
+      const config = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(config.llm.escalation.maxSteps).toBe(1);
+    });
+
+    it("rejects a negative or non-integer maxSteps", async () => {
+      expect(runFail(["llm.escalation.maxSteps", "-1", tmpDir])).toMatch(/maxSteps/i);
+      expect(runFail(["llm.escalation.maxSteps", "1.5", tmpDir])).toMatch(/maxSteps/i);
+    });
+
+    it("documents the routing keys and the llm.model shorthand in help", async () => {
+      const help = run(["--help", tmpDir]);
+
+      expect(help).toContain("llm.tiers");
+      expect(help).toContain("llm.routes");
+      expect(help).toContain("llm.effort");
+      expect(help).toContain("llm.escalation");
+      expect(help).toMatch(/llm\.model/);
+    });
+  });
 });

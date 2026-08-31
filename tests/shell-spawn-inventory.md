@@ -41,6 +41,7 @@ PowerShell (no `sh`) and from Git Bash (`sh` at `/usr/bin/sh`), same commit.
 | `packages/hench/tests/unit/tools/shell.test.ts` | under test | 14 of 34 | 13 false failures + **1 false pass** | `describeNeedsPosixShell` ×4, `itNeedsPosixShell` ×2 |
 | `packages/hench/tests/unit/tools/test-runner.test.ts` | under test | 4 of 58 | 2 false failures + **2 false passes** | `itNeedsPosixShell` ×4 |
 | `packages/hench/tests/unit/tools/git.test.ts` | under test | 7 of 25 | 7 false failures (`expected 'Exit code: 1' to contain 'branch'` etc.) | `itNeedsPosixShell` ×7 |
+| `packages/hench/tests/integration/gate-changed-files.test.ts` | under test | 2 of 3 | 2 false failures — both assert the gate `ran`, which a failed `sh` launch makes false | `itNeedsPosixShell` ×2 |
 
 Totals: 35 guarded cases across 6 files — 28 were failing, 5 were passing
 vacuously, and 2 are the POSIX-only interrupt cases that skip on Windows for a
@@ -64,6 +65,7 @@ exercised.
 | `packages/hench/tests/unit/tools/go-test-runner.test.ts` | Passes from PowerShell — verified, no shell-dependent assertion |
 | `runTestGate` cases in `test-runner.test.ts` | Assert shape only (`typeof passed === "boolean"`, `duration >= 0`), so they neither fail nor pass *because of* the shell. Weak, but not shell-dependent |
 | `packages/hench/tests/integration/test-gate.test.ts` | Same shape-only rationale as the `runTestGate` cases above — asserts result structure, never shell output |
+| `still skips when the run genuinely changed nothing` in `gate-changed-files.test.ts` | An empty changed set makes `runTestGate` return before spawning, so the case never reaches `sh` |
 | 4 cases in `packages/hench/tests/unit/tools/git.test.ts` (`runs git branch`, `properly handles quoted args…`, `handles args with special characters…`, `records git operations in policy audit log`) | Assert shape (`typeof result === "string"`) or guard bookkeeping that happens before the spawn — verified passing from PowerShell without `sh` |
 | Files writing `#!/bin/sh` shims (`cli-auth`, `cli-config`, `cli-stale-check`, `codex-integration`, `assistant-parity-smoke`, `llm-client/tests/helpers/fake-cli.ts`) | Write a script; execution is either POSIX-only (where `/bin/sh` exists by definition) or routed through cmd.exe on Windows |
 | Unit tests asserting `cmd === "sh"` (`llm-client/tests/unit/exec.test.ts:270`, `hench/tests/unit/process/exec.test.ts:124`, `hench/tests/unit/agent/completion.test.ts:320`) | Inspect a fake spawn's arguments; no process is created |
