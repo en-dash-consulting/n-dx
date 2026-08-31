@@ -20,6 +20,14 @@ import type {
 } from "../../schema/index.js";
 import { CLIError } from "../../prd/llm-gateway.js";
 import type { PromptSection } from "../../prd/llm-gateway.js";
+import {
+  capList,
+  dedupeRequirements,
+  trimDocument,
+  MAX_BRIEF_SIBLINGS,
+  MAX_BRIEF_REQUIREMENTS,
+  MAX_WORKFLOW_CHARS,
+} from "./context-caps.js";
 
 export interface AssembleBriefOptions {
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
@@ -258,7 +266,10 @@ export async function assembleTaskBrief(
     task: itemToTaskBrief(entry.item),
     parentChain: entry.parents.map(itemToParent),
     siblings: getSiblings(entry, doc),
-    requirements,
+    // collectRequirements walks the whole parent chain, so a constraint
+    // restated at several levels arrives once per level. Collapse those
+    // before they are rendered (and re-sent on every retry).
+    requirements: dedupeRequirements(requirements),
     project,
     workflow,
     recentLog: recentLog.map((e) => ({
@@ -361,20 +372,35 @@ export function formatTaskBrief(brief: TaskBrief): string {
   // Requirements
   if (brief.requirements.length > 0) {
     sections.push("\n## Requirements");
-    for (const req of brief.requirements) {
+    const cappedReqs = capList(brief.requirements, MAX_BRIEF_REQUIREMENTS);
+    for (const req of cappedReqs.items) {
       sections.push(`- **${req.title}** [${req.category}/${req.validationType}] (from: ${req.source})`);
       for (const ac of req.acceptanceCriteria) {
         sections.push(`  - ${ac}`);
       }
     }
+    if (cappedReqs.omitted > 0) {
+      sections.push(
+        `- … ${cappedReqs.omitted} more inherited requirement(s) not listed ` +
+          `(of ${brief.requirements.length} total)`,
+      );
+    }
   }
 
-  // Siblings
+  // Siblings — capped: this list grows with the parent's fan-out, not with
+  // the task, and is re-sent on every retry.
   if (brief.siblings.length > 0) {
     sections.push("\n## Sibling Tasks");
-    for (const s of brief.siblings) {
+    const cappedSiblings = capList(brief.siblings, MAX_BRIEF_SIBLINGS);
+    for (const s of cappedSiblings.items) {
       const marker = s.status === "completed" ? "[x]" : "[ ]";
       sections.push(`- ${marker} ${s.title} (${s.status})`);
+    }
+    if (cappedSiblings.omitted > 0) {
+      sections.push(
+        `- … ${cappedSiblings.omitted} more sibling task(s) not listed ` +
+          `(of ${brief.siblings.length} total)`,
+      );
     }
   }
 
@@ -395,10 +421,11 @@ export function formatTaskBrief(brief: TaskBrief): string {
     sections.push(`Test: \`${brief.project.testCommand}\``);
   }
 
-  // Workflow
+  // Workflow — trimmed at a line boundary. This file states rules, so a
+  // mid-line cut would leave a truncated rule reading as a complete one.
   if (brief.workflow) {
     sections.push("\n## Workflow");
-    sections.push(brief.workflow);
+    sections.push(trimDocument(brief.workflow, MAX_WORKFLOW_CHARS, "workflow.md"));
   }
 
   // Recent log
