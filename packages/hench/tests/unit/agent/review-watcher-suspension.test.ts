@@ -504,6 +504,9 @@ describe("performCommitPromptIfNeeded after a pre-review auto-commit", () => {
       console.log = log;
     }
 
+    const output = lines.join("");
+    expect(output).toContain("proceeding to next task");
+    expect(output).not.toContain("uncommitted");
     expect(await git(projectDir, "rev-list", "--count", "HEAD")).toBe("1");
   });
 });
