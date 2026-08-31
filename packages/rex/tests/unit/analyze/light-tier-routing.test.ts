@@ -89,13 +89,20 @@ describe("proposeSiblingRenames light-tier routing", () => {
     text: JSON.stringify({ titleA: "New A", titleB: "New B", reasoning: "distinct" }),
   };
 
-  it("resolves the light-tier model when no explicit model is given", async () => {
+  it("declares the prd.rename task class, which routes light", async () => {
+    // Model resolution moved out of this call site: renames now go through
+    // the escalation ladder, which routes attempt 1 by class and lets
+    // spawnClaude resolve it. What this site controls — and therefore what
+    // this test pins — is the class it declares. The resolution itself is
+    // covered by llm-bridge-route.test.ts (prd.rename -> light, config
+    // overrides, explicit-model precedence) and by llm-client's
+    // task-model.test.ts (tier map, legacy lightModel slot).
     mockSpawnClaude.mockResolvedValue(renameResponse);
 
     await proposeSiblingRenames(makeItem("a", "Same"), makeItem("b", "Same"));
 
     expect(mockSpawnClaude).toHaveBeenCalledTimes(1);
-    expect(mockSpawnClaude.mock.calls[0][1]).toBe(CLAUDE_LIGHT);
+    expect(mockSpawnClaude.mock.calls[0][3]).toEqual({ taskClass: "prd.rename" });
   });
 
   it("honors an explicit model override", async () => {
@@ -106,23 +113,33 @@ describe("proposeSiblingRenames light-tier routing", () => {
     expect(mockSpawnClaude.mock.calls[0][1]).toBe("claude-opus-4-7");
   });
 
-  it("honors a configured lightModel override for the light tier", async () => {
-    setLLMConfig({ vendor: "claude", claude: { lightModel: "claude-custom-light" } });
-    mockSpawnClaude.mockResolvedValue(renameResponse);
+  it("escalates a schema failure to the standard tier", async () => {
+    mockSpawnClaude
+      .mockResolvedValueOnce({ text: "not json at all" })
+      .mockResolvedValueOnce(renameResponse);
 
-    await proposeSiblingRenames(makeItem("a", "Same"), makeItem("b", "Same"));
+    const result = await proposeSiblingRenames(makeItem("a", "Same"), makeItem("b", "Same"));
 
-    expect(mockSpawnClaude.mock.calls[0][1]).toBe("claude-custom-light");
+    expect(result.titleA).toBe("New A");
+    expect(mockSpawnClaude.mock.calls[1][3]).toBe("standard");
   });
 
-  it("does not let the standard-tier model config affect the light tier", async () => {
-    setLLMConfig({ vendor: "claude", claude: { model: "claude-opus-4-7" } });
-    mockSpawnClaude.mockResolvedValue(renameResponse);
+  it("escalates when both proposed titles collide, rather than failing outright", async () => {
+    // Two identical titles satisfy the schema but do not resolve the
+    // collision the call exists to resolve. This check used to run after all
+    // retries, so a light model returning duplicates failed the rename;
+    // inside the contract, the standard tier gets a chance at it.
+    mockSpawnClaude
+      .mockResolvedValueOnce({
+        text: JSON.stringify({ titleA: "Same Title", titleB: "same title", reasoning: "x" }),
+      })
+      .mockResolvedValueOnce(renameResponse);
 
-    await proposeSiblingRenames(makeItem("a", "Same"), makeItem("b", "Same"));
+    const result = await proposeSiblingRenames(makeItem("a", "Same"), makeItem("b", "Same"));
 
-    // Standard-tier `model` config applies to the standard tier only.
-    expect(mockSpawnClaude.mock.calls[0][1]).toBe(CLAUDE_LIGHT);
+    expect(result.titleA).toBe("New A");
+    expect(result.titleB).toBe("New B");
+    expect(mockSpawnClaude).toHaveBeenCalledTimes(2);
   });
 });
 

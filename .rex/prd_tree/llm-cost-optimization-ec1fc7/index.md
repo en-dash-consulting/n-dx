@@ -26,4 +26,4 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [JSON prompt discipline — compact JSON in and out](./json-prompt-discipline-compact-0284c3.md) | pending |
 | [List the known task classes in ndx config and flag an unrecognized route as probably-new, with the closest match](./list-the-known-task-classes-in-949f60.md) | completed |
 | [Route commit messages and rex mechanical calls to the light tier](./route-commit-messages-and-rex-2db5af.md) | completed |
-| [Targeted retry escalation ladder — no more identical-prompt retries](./targeted-retry-escalation-7fa8f0.md) | pending |
+| [Targeted retry escalation ladder — no more identical-prompt retries](./targeted-retry-escalation-7fa8f0.md) | completed |
