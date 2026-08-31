@@ -77,8 +77,86 @@ export type ParentRejection =
 
 export type ParentVerdict = { usable: true } | { usable: false; reason: ParentRejection };
 
+/**
+ * The batch strategy's running session.
+ *
+ * Where forking gives every task the same orientation prefix in isolation,
+ * batching resumes the *previous task's* session so the transcript
+ * accumulates. That is the right shape for a CLI whose resume appends rather
+ * than branches (`codex exec resume` has no fork equivalent), and it is why
+ * the chain needs a bound: an unbounded shared transcript costs more on every
+ * later turn and lets one task's framing bleed into the next.
+ */
+export interface BatchChainEntry {
+  /** Session the next task should resume. */
+  sessionId: string;
+  /** Tasks this session has already served, against `tasksPerSession`. */
+  tasksUsed: number;
+  /** Vendor the chain was started under. */
+  vendor: string;
+  /** Model the chain was started under. */
+  model: string;
+  /**
+   * Title of the last task this session served. Carried here rather than
+   * threaded through the loop drivers: the chain is already the state that
+   * survives between per-task `cliLoop` calls, so the divider's "previous
+   * task" name belongs with it.
+   */
+  lastTaskTitle?: string;
+}
+
+/** Why a batch chain cannot be continued. */
+export type BatchChainRejection =
+  | "no-chain"
+  | "cap-reached"
+  | "vendor-changed"
+  | "model-changed"
+  | "disabled";
+
+export type BatchChainVerdict =
+  | { usable: true }
+  | { usable: false; reason: BatchChainRejection };
+
+/**
+ * On-disk shape: the orientation parent stays flat at the top level — that is
+ * the format already written by released code, and moving it would strand
+ * caches in the field — while the batch chain gets its own nested key.
+ */
+interface SessionCacheFile extends Partial<SessionCacheEntry> {
+  batch?: BatchChainEntry;
+}
+
 function cachePath(henchDir: string): string {
   return join(henchDir, SESSION_CACHE_FILE);
+}
+
+/** Read and parse the cache file, or undefined when there is nothing usable. */
+async function readCacheFile(henchDir: string): Promise<SessionCacheFile | undefined> {
+  try {
+    const raw = await readFile(cachePath(henchDir), "utf-8");
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return undefined;
+    return parsed as SessionCacheFile;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Merge one slot into the cache file, preserving the other.
+ *
+ * Both strategies persist here, so a write must never clobber the slot it does
+ * not own — switching strategies would otherwise silently discard the state
+ * the previous one had built up.
+ */
+async function updateCacheFile(
+  henchDir: string,
+  mutate: (file: SessionCacheFile) => void,
+): Promise<void> {
+  await mkdir(henchDir, { recursive: true });
+  const file = (await readCacheFile(henchDir)) ?? {};
+  mutate(file);
+  await writeFile(cachePath(henchDir), `${JSON.stringify(file, null, 2)}\n`, "utf-8");
 }
 
 /**
@@ -112,20 +190,114 @@ export async function writeSessionCache(
   henchDir: string,
   entry: Omit<SessionCacheEntry, "createdAt"> & { createdAt?: string },
 ): Promise<void> {
-  await mkdir(henchDir, { recursive: true });
-  const record: SessionCacheEntry = {
-    parentId: entry.parentId,
-    createdAt: entry.createdAt ?? new Date().toISOString(),
-    svFingerprint: entry.svFingerprint,
-    vendor: entry.vendor,
-    model: entry.model,
-  };
-  await writeFile(cachePath(henchDir), `${JSON.stringify(record, null, 2)}\n`, "utf-8");
+  await updateCacheFile(henchDir, (file) => {
+    file.parentId = entry.parentId;
+    file.createdAt = entry.createdAt ?? new Date().toISOString();
+    file.svFingerprint = entry.svFingerprint;
+    file.vendor = entry.vendor;
+    file.model = entry.model;
+  });
 }
 
-/** Drop the cached parent. Silent when there is nothing to drop. */
+/**
+ * Drop the cached parent, leaving any batch chain intact.
+ *
+ * `--fresh` and the stale-parent fallback both mean "re-orient", not "forget
+ * everything": a batch chain is unrelated state and removing it here would
+ * make the two strategies quietly interfere.
+ */
 export async function clearSessionCache(henchDir: string): Promise<void> {
-  await rm(cachePath(henchDir), { force: true }).catch(() => { /* best effort */ });
+  const file = await readCacheFile(henchDir);
+  if (!file) {
+    await rm(cachePath(henchDir), { force: true }).catch(() => { /* best effort */ });
+    return;
+  }
+  if (!file.batch) {
+    await rm(cachePath(henchDir), { force: true }).catch(() => { /* best effort */ });
+    return;
+  }
+  await updateCacheFile(henchDir, (next) => {
+    delete next.parentId;
+    delete next.createdAt;
+    delete next.svFingerprint;
+    delete next.vendor;
+    delete next.model;
+  }).catch(() => { /* best effort */ });
+}
+
+// ── Batch chain ──────────────────────────────────────────────────────────
+
+/** Read the running batch chain, or undefined when there is none. */
+export async function readBatchChain(henchDir: string): Promise<BatchChainEntry | undefined> {
+  const file = await readCacheFile(henchDir);
+  const batch = file?.batch;
+  if (!batch || typeof batch !== "object") return undefined;
+  if (typeof batch.sessionId !== "string" || !batch.sessionId) return undefined;
+  return {
+    sessionId: batch.sessionId,
+    tasksUsed: typeof batch.tasksUsed === "number" && batch.tasksUsed > 0 ? batch.tasksUsed : 1,
+    vendor: typeof batch.vendor === "string" ? batch.vendor : "",
+    model: typeof batch.model === "string" ? batch.model : "",
+    lastTaskTitle: typeof batch.lastTaskTitle === "string" ? batch.lastTaskTitle : undefined,
+  };
+}
+
+/**
+ * Record that a task used `sessionId`, incrementing the count when it is the
+ * session already on the chain and restarting it when a new session takes
+ * over.
+ */
+export async function advanceBatchChain(
+  henchDir: string,
+  entry: Omit<BatchChainEntry, "tasksUsed">,
+): Promise<void> {
+  await updateCacheFile(henchDir, (file) => {
+    const continuing = file.batch?.sessionId === entry.sessionId;
+    file.batch = {
+      sessionId: entry.sessionId,
+      tasksUsed: continuing ? (file.batch?.tasksUsed ?? 0) + 1 : 1,
+      vendor: entry.vendor,
+      model: entry.model,
+      lastTaskTitle: entry.lastTaskTitle,
+    };
+  });
+}
+
+/** Drop the batch chain, leaving the orientation parent intact. */
+export async function clearBatchChain(henchDir: string): Promise<void> {
+  const file = await readCacheFile(henchDir);
+  if (!file?.batch) return;
+  await updateCacheFile(henchDir, (next) => {
+    delete next.batch;
+  }).catch(() => { /* best effort */ });
+}
+
+export interface BatchChainUsabilityInput {
+  vendor: string;
+  model: string;
+  /** `hench.tasksPerSession`; defaults to {@link DEFAULT_TASKS_PER_SESSION}. */
+  tasksPerSession?: number;
+}
+
+/**
+ * Decide whether the next task may join the existing chain.
+ *
+ * The cap is the whole point: batching trades isolation for cold-start
+ * savings, and the trade stops paying once the shared transcript is long
+ * enough that every later turn re-reads it. A vendor or model change starts
+ * fresh because the session belongs to the process that created it.
+ */
+export function isBatchChainUsable(
+  chain: BatchChainEntry | undefined,
+  input: BatchChainUsabilityInput,
+): BatchChainVerdict {
+  const cap = input.tasksPerSession ?? DEFAULT_TASKS_PER_SESSION;
+  if (cap <= 1) return { usable: false, reason: "disabled" };
+  if (!chain) return { usable: false, reason: "no-chain" };
+  if (chain.vendor !== input.vendor) return { usable: false, reason: "vendor-changed" };
+  if (chain.model !== input.model) return { usable: false, reason: "model-changed" };
+  if (chain.tasksUsed >= cap) return { usable: false, reason: "cap-reached" };
+  return { usable: true };
 }
 
 export interface ParentUsabilityInput {
