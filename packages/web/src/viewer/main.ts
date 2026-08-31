@@ -14,6 +14,7 @@ import {
   RefreshQueueStatus,
   PollingSuspensionIndicator,
   ActiveOperationsTray,
+  GitStatusBanner,
   SearchOverlay,
   useSearchOverlay,
   NeolithicOverlay,
@@ -30,6 +31,7 @@ import {
   useGracefulDegradation,
   useRefreshThrottle,
   useActiveOperations,
+  useGitStatus,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
 import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
@@ -96,6 +98,7 @@ function App({ scope }: { scope: string | null }) {
   const { state: refreshQueueState } = useRefreshThrottle();
   const { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount } = usePollingSuspension();
   const activeOperations = useActiveOperations();
+  const { status: gitStatus, refetch: refetchGitStatus } = useGitStatus();
   const [searchOpen, , closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const handleTripleClick = useMemo(
@@ -213,6 +216,7 @@ function App({ scope }: { scope: string | null }) {
     h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
     h(ActiveOperationsTray, { operations: activeOperations, navigateTo }),
+    h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
     (showDrop && !hasData)
       ? h("div", { class: "drop-overlay", role: "dialog", "aria-label": "File drop zone" },
           h("div", { class: "drop-box" },

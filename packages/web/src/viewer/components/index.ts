@@ -50,6 +50,8 @@ export { PollingSuspensionIndicator } from "./polling-suspension-indicator.js";
 export { RefreshQueueStatus } from "./refresh-queue-status.js";
 export { ActiveOperationsTray } from "./active-operations-tray.js";
 export type { ActiveOperationsTrayProps } from "./active-operations-tray.js";
+export { GitStatusBanner } from "./git-status-banner.js";
+export type { GitStatusBannerProps } from "./git-status-banner.js";
 
 // ── Status indicators ───────────────────────────────────────────────
 

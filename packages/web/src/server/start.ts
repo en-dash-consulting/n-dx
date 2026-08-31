@@ -25,6 +25,7 @@ import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
 import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
+import { handleGitRoute } from "./routes-git.js";
 import { handleStatusRoute, clearStatusCache } from "./routes-status.js";
 import { handleConfigRoute } from "./routes-config.js";
 import { handleSearchRoute } from "./routes-search.js";
@@ -618,6 +619,7 @@ async function handleApiRoutes(
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;
   if (await handleProjectRoute(req, res, ctx)) return true;
+  if (await handleScopedRoute(true, handleGitRoute(req, res, ctx))) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleNotionRoute(req, res, ctx))) return true;
