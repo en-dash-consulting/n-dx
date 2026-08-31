@@ -19,7 +19,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [autoCommit leaves reviewer must-fix repairs uncommitted when the executor self-commits](./autocommit-leaves-reviewer-must-0e5993.md) | completed |
 | [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-859237.md) | completed |
 | [Give review its own model tier with a review-model override](./give-review-its-own-model-tier-b889a2.md) | completed |
-| [Post-review full-suite gate skips because filesChanged misses executor and reviewer modifications](./post-review-full-suite-gate-3ff761.md) | pending |
+| [Post-review full-suite gate skips because filesChanged misses executor and reviewer modifications](./post-review-full-suite-gate-3ff761.md) | completed |
 | [Resume the work session for the reviewer on --resume](./resume-the-work-session-for-the-2eb560.md) | completed |
 | [Review report transport, parsing, and run-record recording](./review-report-transport-parsing-2f0be1.md) | completed |
 | [Unresolved-findings warning mislabels non-must-fix failures as unrepaired must-fix](./unresolved-findings-warning-377d09.md) | pending |
