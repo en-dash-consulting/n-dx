@@ -42,8 +42,8 @@ describe("buildAssessmentPrompt", () => {
     const proposals = [makeProposal("User Auth")];
     const prompt = buildAssessmentPrompt(proposals);
 
-    expect(prompt).toContain('"proposalIndex": 0');
-    expect(prompt).toContain('"title": "User Auth"');
+    expect(prompt).toContain('"proposalIndex":0');
+    expect(prompt).toContain('"title":"User Auth"');
     expect(prompt).toContain("Feature 1 of User Auth");
     expect(prompt).toContain("Task 1 for User Auth F1");
   });
@@ -95,10 +95,10 @@ describe("buildAssessmentPrompt", () => {
     const proposals = [makeProposal("Auth"), makeProposal("Dashboard")];
     const prompt = buildAssessmentPrompt(proposals);
 
-    expect(prompt).toContain('"proposalIndex": 0');
-    expect(prompt).toContain('"proposalIndex": 1');
-    expect(prompt).toContain('"title": "Auth"');
-    expect(prompt).toContain('"title": "Dashboard"');
+    expect(prompt).toContain('"proposalIndex":0');
+    expect(prompt).toContain('"proposalIndex":1');
+    expect(prompt).toContain('"title":"Auth"');
+    expect(prompt).toContain('"title":"Dashboard"');
   });
 });
 

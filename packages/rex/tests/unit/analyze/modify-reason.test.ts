@@ -65,7 +65,7 @@ describe("buildModifyPrompt", () => {
     const proposals = [makeProposal("User Auth")];
     const prompt = buildModifyPrompt(proposals, "Add rate limiting");
 
-    expect(prompt).toContain('"title": "User Auth"');
+    expect(prompt).toContain('"title":"User Auth"');
     expect(prompt).toContain("Feature 1 of User Auth");
     expect(prompt).toContain("Task 1 for User Auth F1");
   });
@@ -89,7 +89,7 @@ describe("buildModifyPrompt", () => {
     const proposals = [makeProposal("Auth")];
     const prompt = buildModifyPrompt(proposals, "Change priorities");
 
-    expect(prompt).toContain("ONLY a valid JSON array");
+    expect(prompt).toContain("ONLY a valid, minified JSON array");
   });
 
   it("includes PRD schema definition", () => {
@@ -143,8 +143,8 @@ describe("buildModifyPrompt", () => {
     const proposals = [makeProposal("Auth"), makeProposal("Dashboard")];
     const prompt = buildModifyPrompt(proposals, "Merge these");
 
-    expect(prompt).toContain('"title": "Auth"');
-    expect(prompt).toContain('"title": "Dashboard"');
+    expect(prompt).toContain('"title":"Auth"');
+    expect(prompt).toContain('"title":"Dashboard"');
   });
 
   it("includes existing PRD summary when provided", () => {
