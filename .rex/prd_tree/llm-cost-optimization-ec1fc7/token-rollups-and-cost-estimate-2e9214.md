@@ -1,0 +1,17 @@
+---
+id: "2e921485-212e-49b8-a00a-f6666144dee4"
+level: "task"
+title: "Token rollups and cost estimate exclude cache tokens, undercounting spend ~50x"
+status: "pending"
+priority: "high"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "Token rollups account for cacheCreationInput and cacheReadInput, not just input and output"
+  - "The cost estimate prices cache reads and cache writes at their own rates rather than ignoring them"
+  - "`ndx usage`, `ndx status`, and the dashboard report the same total for the same run set"
+  - "Output distinguishes fresh input, cache writes, and cache reads rather than collapsing them into one number"
+  - "A test pins a run record with all four fields against the expected rollup total"
+description: "Run records store four token fields (input, output, cacheCreationInput, cacheReadInput) but every rollup sums only input + output. packages/rex/src/cli/commands/usage.ts:43 is `const total = pkg.inputTokens + pkg.outputTokens`, and the same omission reaches `ndx status` and the dashboard. Measured: `ndx usage` reports 1,212,931 tokens and an $18.00 estimate across 1,024 runs, while a single assisted run record written today holds 22,785,751 cacheReadInput tokens — 99.5% of that run's usage. `hench record` prints the cache-inclusive total, so the two surfaces disagree by roughly 50x on the same data with no indication why. Cache reads and cache writes are billed (at a discount and a premium respectively), so the cost estimate is wrong, not merely partial. This matters most for the LLM Cost Optimization work: cache-read volume is the dominant term the optimizations move, and the measurement surface cannot currently see it."
+lastModified: "2026-08-31T23:00:58.942Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---

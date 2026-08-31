@@ -31,3 +31,4 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [List the known task classes in ndx config and flag an unrecognized route as probably-new, with the closest match](./list-the-known-task-classes-in-949f60.md) | completed |
 | [Route commit messages and rex mechanical calls to the light tier](./route-commit-messages-and-rex-2db5af.md) | completed |
 | [Targeted retry escalation ladder — no more identical-prompt retries](./targeted-retry-escalation-7fa8f0.md) | completed |
+| [Token rollups and cost estimate exclude cache tokens, undercounting spend ~50x](./token-rollups-and-cost-estimate-2e9214.md) | pending |
