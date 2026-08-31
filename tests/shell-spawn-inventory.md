@@ -13,8 +13,23 @@ The `sh` indirection is deliberate everywhere it appears and must not be replace
 by spawning `node` directly. libuv assigns every non-detached child it spawns on
 Windows to a global job object, so a node-spawns-node tree reaps itself when the
 parent dies and the test passes without proving anything — an earlier version of
-the orphan test was vacuous for exactly that reason. `sh -c` is also the real
-production path (`execShell`).
+the orphan test was vacuous for exactly that reason.
+
+> **Changed 2026-08-31.** `execShellCmd` is no longer `sh -c` on every platform.
+> It prefers `sh` wherever it resolves and falls back to `cmd.exe /d /s /c` on
+> win32 when it does not — see `resolveShellInvocation`. The old behaviour was
+> not a degraded shell but *no* shell: `spawn("sh", …)` failed ENOENT, `exec`
+> resolved rather than rejected, and callers reading only `stdout` could not
+> tell a shell that never launched from a command that printed nothing. The
+> mandatory pre-commit test gate skipped itself three times on that ambiguity
+> (tasks c971145e, 5f791a91).
+>
+> Consequence for this inventory: the **under test** rationale below is now
+> half-true. A missing `sh` no longer means the product is broken on that
+> machine — it means the product takes its cmd.exe path, which those suites do
+> not exercise at all. They skip, so Windows-without-`sh` product behaviour is
+> unverified rather than known-broken. Making those guards run the cmd.exe path
+> instead of skipping is tracked separately.
 
 ## Two kinds of dependency
 
@@ -22,11 +37,15 @@ production path (`execShell`).
 tree is worth testing. A missing shell is a test-environment problem, and the
 test skips.
 
-**Under test.** hench's tools run `exec("sh", ["-c", cmd])` on *every* platform,
-so a POSIX shell is a genuine runtime requirement of the product on Windows too.
-A missing shell means `run_command` and the post-task test runner would not work
-on that machine either. Those tests also skip, but the skip message says which
-product capability went unverified — the limitation is real, not an artifact.
+**Under test.** hench's tools run their commands through `execShellCmd`, so the
+shell is the product's own runtime dependency rather than test scaffolding.
+These tests also skip when `sh` is missing, and the skip message says which
+product capability went unverified.
+
+Since the 2026-08-31 change above, what that skip *means* has shifted: it no
+longer says "`run_command` and the post-task test runner are broken on this
+machine", it says "they take the cmd.exe path here, and this suite did not
+check it". The gap moved from the product to the coverage.
 
 ## Inventory
 

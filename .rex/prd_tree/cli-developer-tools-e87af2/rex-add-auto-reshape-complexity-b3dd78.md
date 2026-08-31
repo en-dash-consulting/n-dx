@@ -1,0 +1,20 @@
+---
+id: "b3dd78db-db78-430c-96f3-839ae1af2e71"
+level: "task"
+title: "rex add-auto-reshape complexity gate times out under full-suite load"
+status: "pending"
+priority: "medium"
+tags:
+  - "flake"
+  - "test-infra"
+  - "rex"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "The test passes as part of a full `pnpm test` run on a loaded machine, across repeated runs"
+  - "Setup cost is reduced at its source (single tree serialization) rather than by raising the timeout again"
+  - "The growth-ratio assertion is unchanged — the gate still trips on a genuine complexity regression"
+  - "TESTING.md 'Flake Resistance' is updated if the fix establishes a reusable pattern for setup-dominated perf tests"
+description: "`packages/rex/tests/integration/add-auto-reshape.test.ts` › \"scoped pass cost grows sub-quadratically with sibling count\" hit its 60s timeout (60034ms) during a full `pnpm test` run on 2026-08-31, failing the whole @n-dx/rex suite. It passes in isolation in 21s. Reproduced twice in one session, both times only under full-suite load.\n\nNot a regression from the change under test at the time (llm-client's execShellCmd shell selection) — rex has no execShellCmd call sites at all, verified by grep.\n\nThe test has already been hardened against this twice, and its own comments record the history: an absolute `expect(elapsed).toBeLessThan(500)` became a two-point growth ratio, the timeout went 30s → 60s, and the timed pass became fastest-of-7. The assertion itself is sound and load-tolerant — the ratio scales with ambient load — but the SETUP is not: the comments measure it at ~14s of `addItem` calls building 125 items against ~190ms of actually-timed work, because each add re-serializes the tree. Under a loaded machine that ~14s is what blows past 60s.\n\nSo raising the timeout again treats the symptom and the author already flagged the previous raise as \"a direct cost of the two-point measurement\". The real fix is to make setup cheap: build the 125 items inside a single `store.withTransaction` so the tree serializes once instead of 125 times. That does not weaken the gate, because setup is explicitly excluded from what is timed.\n\nNoted while verifying 5f791a91; deliberately not fixed there to avoid retuning a carefully-reasoned perf gate mid-task in an unrelated package."
+lastModified: "2026-08-31T20:45:26.823Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---

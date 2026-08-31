@@ -315,11 +315,13 @@ describe("validateCompletion", () => {
     expect(gitArgs).toContain("def456");
     expect(gitArgs).not.toContain("HEAD");
 
-    // Test command should have run via sh -c
-    const testArgs = mockSpawn.mock.calls[1];
-    expect(testArgs[0]).toBe("sh");
-    expect(testArgs[1]).toContain("-c");
-    expect(testArgs[1]).toContain("pnpm test");
+    // Test command should have run through a shell. WHICH shell is the host's
+    // business — `sh` wherever it resolves, cmd.exe on a Windows PATH without
+    // it (resolveShellInvocation) — and validateCompletion takes no platform
+    // override, so pinning one here would only assert the developer's machine.
+    const [shellCmd, shellArgs] = mockSpawn.mock.calls[1] as [string, string[]];
+    expect(["sh", "cmd.exe"]).toContain(shellCmd);
+    expect(shellArgs).toContain("pnpm test");
 
     expect(result.valid).toBe(true);
     expect(result.hasChanges).toBe(true);

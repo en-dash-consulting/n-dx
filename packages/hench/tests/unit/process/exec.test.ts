@@ -115,11 +115,18 @@ describe("execStdout", () => {
 });
 
 describe("execShellCmd", () => {
+  // Platform is pinned rather than inherited: execShellCmd picks the shell per
+  // platform now (sh where it resolves, cmd.exe on win32 without it), so an
+  // unpinned assertion here would pass or fail by machine.
   it("wraps command in sh -c", async () => {
     const spawned = fakeSpawn("ok");
     mockSpawn.mockImplementation(spawned.impl);
 
-    await execShellCmd("echo hello | head", { cwd: "/tmp", timeout: 5000 });
+    await execShellCmd("echo hello | head", {
+      cwd: "/tmp",
+      timeout: 5000,
+      _platform: "linux",
+    });
 
     expect(spawned.calls[0]!.cmd).toBe("sh");
     expect(spawned.calls[0]!.args).toEqual(["-c", "echo hello | head"]);

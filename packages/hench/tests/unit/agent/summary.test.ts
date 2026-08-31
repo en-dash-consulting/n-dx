@@ -20,6 +20,57 @@ describe("buildRunSummary", () => {
     expect(summary.testsRun).toEqual([]);
   });
 
+  /**
+   * The Claude CLI reports its own tool names — Write, Edit, Read, Bash — not
+   * hench's (write_file, read_file, run_command) or Codex's. That is the shape
+   * every `ndx work` CLI-provider run records, and it went unrecognised: run
+   * a4197298 persisted 19 tool calls including Bash, Read, Write and Edit and
+   * still reported filesRead 0, commandsExecuted 0, testsRun 0.
+   *
+   * The path argument is `file_path`, not `path`.
+   */
+  describe("Claude CLI tool names", () => {
+    it("tracks files written via Write and Edit", () => {
+      const summary = buildRunSummary([
+        call("Write", { file_path: "src/utils.js", content: "x" }),
+        call("Edit", { file_path: "src/other.js", old_string: "a", new_string: "b" }),
+      ]);
+      expect(summary.filesChanged).toEqual(["src/other.js", "src/utils.js"]);
+      expect(summary.counts.filesChanged).toBe(2);
+    });
+
+    it("tracks files read via Read", () => {
+      const summary = buildRunSummary([call("Read", { file_path: "package.json" })]);
+      expect(summary.filesRead).toEqual(["package.json"]);
+      expect(summary.counts.filesRead).toBe(1);
+    });
+
+    it("tracks commands run via Bash, and recognises test commands among them", () => {
+      const summary = buildRunSummary([
+        call("Bash", { command: "ls -la" }),
+        call("Bash", { command: "npm test" }),
+      ]);
+      expect(summary.counts.commandsExecuted).toBe(2);
+      expect(summary.counts.testsRun).toBe(1);
+      expect(summary.testsRun[0].command).toBe("npm test");
+    });
+
+    it("counts a multi-file edit once per file", () => {
+      const summary = buildRunSummary([
+        call("MultiEdit", { file_path: "src/a.ts", edits: [{}, {}] }),
+      ]);
+      expect(summary.filesChanged).toEqual(["src/a.ts"]);
+    });
+
+    it("does not double-count a file touched by both Write and git add", () => {
+      const summary = buildRunSummary([
+        call("Write", { file_path: "src/utils.js", content: "x" }),
+        call("git", { subcommand: "add", args: "src/utils.js" }),
+      ]);
+      expect(summary.filesChanged).toEqual(["src/utils.js"]);
+    });
+  });
+
   it("tracks files written via write_file", () => {
     const calls = [
       call("write_file", { path: "src/foo.ts", content: "hello" }),

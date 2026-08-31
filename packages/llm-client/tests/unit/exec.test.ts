@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, resolveShellInvocation, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
 import { resolve } from "node:path";
 import { fakeSpawn } from "../helpers/fake-spawn.js";
 
@@ -261,11 +261,17 @@ describe("execStdout", () => {
 });
 
 describe("execShellCmd", () => {
+  // Platform is pinned rather than inherited: the shell is chosen per platform
+  // now, so a host-dependent assertion here would pass or fail by machine.
   it("wraps command in sh -c", async () => {
     const spawned = fakeSpawn({ stdout: "ok" });
     mockSpawn.mockImplementation(spawned.impl);
 
-    await execShellCmd("echo hello | head", { cwd: "/tmp", timeout: 5000 });
+    await execShellCmd("echo hello | head", {
+      cwd: "/tmp",
+      timeout: 5000,
+      _platform: "linux",
+    });
 
     expect(spawned.calls[0]!.cmd).toBe("sh");
     expect(spawned.calls[0]!.args).toEqual(["-c", "echo hello | head"]);
@@ -283,6 +289,87 @@ describe("execShellCmd", () => {
 
     expect(result.stdout).toBe("hello\n");
     expect(result.exitCode).toBe(0);
+  });
+
+  /**
+   * `sh` ships with Git for Windows and is absent from a stock Windows PATH, so
+   * a hard-coded `sh -c` spawns ENOENT there. `exec` resolves rather than
+   * rejects, so every caller that reads only `stdout` sees "" and cannot tell a
+   * failed shell from a command that legitimately printed nothing — which is
+   * how the mandatory test-suite gate came to skip itself three times.
+   */
+  it("falls back to cmd.exe on win32 when sh is not on PATH", async () => {
+    const spawned = fakeSpawn({ stdout: "ok" });
+    mockSpawn.mockImplementation(spawned.impl);
+
+    await execShellCmd("git diff --name-only --cached", {
+      cwd: "/tmp",
+      timeout: 5000,
+      _platform: "win32",
+      _posixShellOnPath: false,
+    });
+
+    expect(spawned.calls[0]!.cmd).toBe("cmd.exe");
+    expect(spawned.calls[0]!.args).toEqual([
+      "/d",
+      "/s",
+      "/c",
+      "git diff --name-only --cached",
+    ]);
+  });
+
+  it("keeps sh on win32 when it IS on PATH (Git Bash)", async () => {
+    const spawned = fakeSpawn({ stdout: "ok" });
+    mockSpawn.mockImplementation(spawned.impl);
+
+    await execShellCmd("echo hi | head", {
+      cwd: "/tmp",
+      timeout: 5000,
+      _platform: "win32",
+      _posixShellOnPath: true,
+    });
+
+    expect(spawned.calls[0]!.cmd).toBe("sh");
+    expect(spawned.calls[0]!.args).toEqual(["-c", "echo hi | head"]);
+  });
+
+  it("never uses cmd.exe off win32, even without sh on PATH", async () => {
+    const spawned = fakeSpawn({ stdout: "ok" });
+    mockSpawn.mockImplementation(spawned.impl);
+
+    await execShellCmd("echo hi", {
+      cwd: "/tmp",
+      timeout: 5000,
+      _platform: "linux",
+      _posixShellOnPath: false,
+    });
+
+    expect(spawned.calls[0]!.cmd).toBe("sh");
+  });
+});
+
+describe("resolveShellInvocation", () => {
+  it("uses sh -c on POSIX", () => {
+    expect(resolveShellInvocation("ls -la", "linux", true)).toEqual({
+      cmd: "sh",
+      args: ["-c", "ls -la"],
+    });
+  });
+
+  it("uses sh -c on win32 when the POSIX shell is available", () => {
+    expect(resolveShellInvocation("ls -la", "win32", true)).toEqual({
+      cmd: "sh",
+      args: ["-c", "ls -la"],
+    });
+  });
+
+  // `/s` makes cmd strip exactly the outermost quote pair Node adds around the
+  // command, leaving the command itself intact — the same contract spawnCli relies on.
+  it("uses cmd.exe /d /s /c on win32 without a POSIX shell", () => {
+    expect(resolveShellInvocation("npm run test", "win32", false)).toEqual({
+      cmd: "cmd.exe",
+      args: ["/d", "/s", "/c", "npm run test"],
+    });
   });
 });
 

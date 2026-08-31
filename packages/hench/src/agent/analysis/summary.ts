@@ -132,6 +132,45 @@ export function buildRunSummary(toolCalls: ToolCallRecord[]): RunSummaryData {
         break;
       }
 
+      // ── Claude CLI tool names ─────────────────────────────────────────────
+      // The CLI provider records the names Claude Code itself uses, which match
+      // neither hench's own tool names above nor Codex's. This is the default
+      // `ndx work` path, so leaving them out zeroed every count on an ordinary
+      // run — and an empty filesChanged is what the mandatory test gate reads
+      // as "nothing modified". The path argument is `file_path`, not `path`.
+
+      case "Write":
+      case "Edit":
+      case "MultiEdit":
+      case "NotebookEdit": {
+        const path = call.input.file_path as string | undefined;
+        if (path) changedSet.add(path);
+        break;
+      }
+
+      case "Read": {
+        const path = call.input.file_path as string | undefined;
+        if (path) readSet.add(path);
+        break;
+      }
+
+      case "Bash": {
+        const cmd = call.input.command as string | undefined;
+        if (!cmd) break;
+
+        const exitStatus = inferExitStatus(call.output);
+        commands.push({ command: cmd, exitStatus, durationMs: call.durationMs });
+
+        if (isTestCommand(cmd)) {
+          tests.push({
+            command: cmd,
+            passed: exitStatus === "ok",
+            durationMs: call.durationMs,
+          });
+        }
+        break;
+      }
+
       // list_directory, search_files, rex_*, computer — no file/command tracking needed
       default:
         break;

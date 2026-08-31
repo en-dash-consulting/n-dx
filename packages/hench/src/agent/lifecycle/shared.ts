@@ -21,7 +21,7 @@ import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage,
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
-import { getCurrentHead, execShellCmd, execStdout } from "../../process/exec.js";
+import { getCurrentHead, execStdout } from "../../process/exec.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
@@ -31,7 +31,7 @@ import type { PromptEnvelope } from "../../prd/llm-gateway.js";
 import { saveRun } from "../../store/runs.js";
 import { persistRunLog } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
-import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
+import { captureCommitChanges, discoverChangedFiles, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel } from "../../prd/llm-gateway.js";
@@ -2043,51 +2043,37 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   //     every committed path in this run.
   //
   //  2. Claude CLI tool names (Edit, Write, Bash) differ from the names that
-  //     buildRunSummary and classifyChangedFiles recognise (write_file,
-  //     str_replace_editor). So structuredSummary.filesChanged is empty even
-  //     on a run that plainly modified files. Staged and unstaged diffs
-  //     against HEAD catch them.
+  //     classifyChangedFiles recognises, so a set derived from tool calls alone
+  //     can be short. Staged and unstaged diffs against HEAD catch the rest.
   //
   // The git-derived set is MERGED with whatever buildRunSummary found, so
   // neither source silently drops files.
+  //
+  // Discovery failure is recorded, not swallowed: an empty set from a git that
+  // never ran must not read as "nothing changed". See discoverChangedFiles.
+  let filesChangedKnown = true;
   if (run.structuredSummary) {
-    try {
-      const gitFiles = new Set<string>(run.structuredSummary.filesChanged);
+    const discovery = await discoverChangedFiles({
+      projectDir,
+      startingHead,
+      seed: run.structuredSummary.filesChanged,
+    });
 
-      // Committed changes since the run started
-      if (startingHead) {
-        const { stdout } = await execShellCmd(
-          `git diff --name-only ${startingHead} HEAD`,
-          { cwd: projectDir, timeout: 10_000 },
-        );
-        stdout.trim().split("\n").filter(Boolean).forEach((f) => gitFiles.add(f));
-      }
+    if (discovery.files.length > 0) {
+      run.structuredSummary.filesChanged = discovery.files;
+      run.structuredSummary.counts = {
+        ...run.structuredSummary.counts,
+        filesChanged: discovery.files.length,
+      };
+    }
 
-      // Staged changes (not yet committed)
-      const { stdout: stagedOut } = await execShellCmd("git diff --name-only --cached", {
-        cwd: projectDir,
-        timeout: 10_000,
-      });
-      stagedOut.trim().split("\n").filter(Boolean).forEach((f) => gitFiles.add(f));
-
-      // Unstaged working-tree changes
-      const { stdout: unstagedOut } = await execShellCmd("git diff --name-only", {
-        cwd: projectDir,
-        timeout: 10_000,
-      });
-      unstagedOut.trim().split("\n").filter(Boolean).forEach((f) => gitFiles.add(f));
-
-      const allFiles = [...gitFiles].sort();
-      if (allFiles.length > 0) {
-        run.structuredSummary.filesChanged = allFiles;
-        run.structuredSummary.counts = {
-          ...run.structuredSummary.counts,
-          filesChanged: allFiles.length,
-        };
-      }
-    } catch {
-      // Best-effort: if git is unavailable, leave structuredSummary.filesChanged
-      // as-is (from tool call analysis). The gate may skip if it remains empty.
+    if (discovery.failed) {
+      filesChangedKnown = false;
+      info(
+        `⚠ Could not determine which files this run changed — the test gate will ` +
+          `run the full suite rather than assume nothing changed.`,
+      );
+      for (const failure of discovery.failures) detail(failure);
     }
   }
 
@@ -2134,6 +2120,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       const testGate = await runTestGate({
         projectDir,
         filesChanged: run.structuredSummary.filesChanged,
+        filesChangedKnown,
         testCommand: resolvedTestCommand,
       });
 

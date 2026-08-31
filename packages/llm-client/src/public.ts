@@ -265,6 +265,7 @@ export {
   exec,
   execStdout,
   execShellCmd,
+  resolveShellInvocation,
   getCurrentHead,
   getCurrentBranch,
   sanitizeBranchName,

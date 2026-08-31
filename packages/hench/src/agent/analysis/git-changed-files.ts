@@ -8,7 +8,7 @@
  * @module hench/agent/analysis/git-changed-files
  */
 
-import { execStdout } from "../../process/exec.js";
+import { exec, execStdout } from "../../process/exec.js";
 
 /**
  * Git status code for a changed file.
@@ -159,6 +159,110 @@ export function extractPaths(changes: FileChangeWithStatus[]): string[] {
  */
 export function formatChanges(changes: FileChangeWithStatus[]): string[] {
   return changes.map((c) => `${c.status}\t${c.path}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Pre-commit discovery (test gate input)
+// ─────────────────────────────────────────────────────────────────────────
+
+/** What {@link discoverChangedFiles} found, and whether it could look. */
+export interface ChangedFileDiscovery {
+  /** Discovered paths, merged with the seed and sorted. */
+  files: string[];
+  /**
+   * True when at least one git query could not be run.
+   *
+   * Load-bearing: an empty {@link files} means "nothing changed" only when this
+   * is false. Callers must not read the two as the same thing.
+   */
+  failed: boolean;
+  /** One human-readable reason per failed query. Empty when `failed` is false. */
+  failures: string[];
+}
+
+/** Options for {@link discoverChangedFiles}. */
+export interface DiscoverChangedFilesOptions {
+  /** Project directory — the git working directory. */
+  projectDir: string;
+  /** Run's starting commit. When set, commits made during the run are included. */
+  startingHead?: string;
+  /** Paths already known from tool-call analysis. Merged, never replaced. */
+  seed?: string[];
+}
+
+/**
+ * Discover every path this run touched, for the mandatory test gate.
+ *
+ * Asks git three questions and merges the answers with the seed:
+ *
+ *  1. `startingHead..HEAD` — committed during the run (the agent self-committed)
+ *  2. `--cached` — staged but not yet committed (the normal end-of-run state)
+ *  3. working tree — modified but not staged
+ *
+ * ## Why argv rather than a shell
+ *
+ * These ran through `execShellCmd` (`sh -c`) until run a4197298 showed what
+ * that costs: `sh` is absent from a stock Windows PATH, `spawn` fails ENOENT,
+ * `exec` resolves rather than rejects, and reading only `stdout` turns a shell
+ * that never launched into "no files changed". The gate then skipped itself on
+ * a run that shipped source and tests — the third such skip, and the first
+ * after the previous fix. None of these queries needs a shell: no pipes, no
+ * globs, no redirection. Passing argv removes the dependency instead of
+ * repairing it.
+ *
+ * ## Why failure is returned rather than thrown
+ *
+ * The caller finalizes a run either way; a git that will not answer should not
+ * abort the run. But it must not be silent either, which is what a bare
+ * `catch` around the old code produced. {@link ChangedFileDiscovery.failed}
+ * makes "could not look" a distinct state from "looked, found nothing", so the
+ * gate can refuse to skip on the strength of an answer nobody got.
+ */
+export async function discoverChangedFiles(
+  options: DiscoverChangedFilesOptions,
+): Promise<ChangedFileDiscovery> {
+  const { projectDir, startingHead, seed } = options;
+
+  const queries: { label: string; args: string[] }[] = [];
+  if (startingHead) {
+    queries.push({
+      label: `committed since ${startingHead}`,
+      args: ["diff", "--name-only", startingHead, "HEAD"],
+    });
+  }
+  queries.push({ label: "staged", args: ["diff", "--name-only", "--cached"] });
+  queries.push({ label: "unstaged", args: ["diff", "--name-only"] });
+
+  const found = new Set<string>(seed ?? []);
+  const failures: string[] = [];
+
+  for (const query of queries) {
+    const result = await exec("git", query.args, { cwd: projectDir, timeout: 10_000 });
+
+    // exec never rejects — a spawn failure arrives as `error`, and git's own
+    // refusal as a non-zero code. Both mean the answer is unknown, so both are
+    // recorded rather than read as an empty result.
+    if (result.error || result.exitCode !== 0) {
+      const reason = result.error?.message || result.stderr.trim();
+      failures.push(
+        `git ${query.args.join(" ")} (${query.label}) failed` +
+          `${result.exitCode !== null ? ` with exit ${result.exitCode}` : ""}` +
+          `${reason ? `: ${reason}` : ""}`,
+      );
+      continue;
+    }
+
+    for (const line of result.stdout.trim().split("\n")) {
+      const path = line.trim();
+      if (path) found.add(path);
+    }
+  }
+
+  return {
+    files: [...found].sort(),
+    failed: failures.length > 0,
+    failures,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────

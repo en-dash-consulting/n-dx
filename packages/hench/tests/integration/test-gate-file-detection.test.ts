@@ -136,6 +136,91 @@ describe("test gate file detection", () => {
     expect(result.skipReason).toBeUndefined();
   });
 
+  /**
+   * Run a4197298 reproduced the skip a THIRD time, after both cases above were
+   * fixed. The cases above cannot catch it: they run git themselves via
+   * execFileSync, build the file list by hand, and feed it to runTestGate. That
+   * asserts git's behaviour and the gate's behaviour but never the production
+   * code that connects them — which ran its git queries through `sh -c`, and so
+   * returned nothing on a Windows PATH without `sh` while reporting no error.
+   *
+   * These exercise the real discovery function.
+   */
+  it("discovers staged files through the production discovery path", async () => {
+    const startingHead = captureHead(projectDir);
+
+    await mkdir(join(projectDir, "src"), { recursive: true });
+    await writeFile(join(projectDir, "src/handler.ts"), "export function handle() {}");
+    await writeFile(join(projectDir, "src/handler.test.ts"), "import './handler';");
+    execFileSync("git", ["add", "src/handler.ts", "src/handler.test.ts"], { cwd: projectDir, stdio: "ignore" });
+
+    const { discoverChangedFiles } = await import("../../src/agent/analysis/git-changed-files.js");
+    const discovery = await discoverChangedFiles({ projectDir, startingHead });
+
+    expect(discovery.failed).toBe(false);
+    expect(discovery.files).toContain("src/handler.ts");
+    expect(discovery.files).toContain("src/handler.test.ts");
+
+    const { runTestGate } = await import("../../src/tools/test-runner.js");
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: discovery.files,
+      filesChangedKnown: !discovery.failed,
+      timeout: 1000,
+    });
+
+    expect(result.ran).toBe(true);
+    expect(result.skipReason).toBeUndefined();
+  });
+
+  it("merges the seed from buildRunSummary rather than replacing it", async () => {
+    const startingHead = captureHead(projectDir);
+    await writeFile(join(projectDir, "tracked.ts"), "export const a = 1;");
+    execFileSync("git", ["add", "tracked.ts"], { cwd: projectDir, stdio: "ignore" });
+
+    const { discoverChangedFiles } = await import("../../src/agent/analysis/git-changed-files.js");
+    const discovery = await discoverChangedFiles({
+      projectDir,
+      startingHead,
+      seed: ["from-tool-calls.ts"],
+    });
+
+    expect(discovery.files).toContain("from-tool-calls.ts");
+    expect(discovery.files).toContain("tracked.ts");
+  });
+
+  /**
+   * The failure this whole class of bug turns on: a discovery that cannot run
+   * must not be indistinguishable from a discovery that found nothing.
+   */
+  it("reports failure instead of silently returning an empty set", async () => {
+    const notARepo = await mkdtemp(join(tmpdir(), "hench-gate-norepo-"));
+    try {
+      const { discoverChangedFiles } = await import("../../src/agent/analysis/git-changed-files.js");
+      const discovery = await discoverChangedFiles({ projectDir: notARepo });
+
+      expect(discovery.failed).toBe(true);
+      expect(discovery.files).toHaveLength(0);
+      expect(discovery.failures.join(" ")).toMatch(/git/i);
+    } finally {
+      await rm(notARepo, { recursive: true, force: true });
+    }
+  });
+
+  it("runs the suite rather than skipping when the changed set is unknown", async () => {
+    const { runTestGate } = await import("../../src/tools/test-runner.js");
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: [],
+      filesChangedKnown: false,
+      timeout: 1000,
+    });
+
+    // An empty set that we could not verify is not evidence of "nothing changed".
+    expect(result.ran).toBe(true);
+    expect(result.skipReason).toBeUndefined();
+  });
+
   it("gate still skips when there are genuinely no changes since startingHead", async () => {
     // Nothing happens after the initial commit
     const startingHead = captureHead(projectDir);

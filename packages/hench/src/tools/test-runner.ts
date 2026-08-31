@@ -430,6 +430,14 @@ export interface TestGateOptions {
   projectDir: string;
   /** Files changed during the task. */
   filesChanged: string[];
+  /**
+   * Whether {@link filesChanged} is a trustworthy answer. Default: true.
+   *
+   * False when discovery could not run (see `discoverChangedFiles`). An empty
+   * set is then not evidence that nothing changed, so the gate runs instead of
+   * skipping — the mandatory gate must fail closed, not open.
+   */
+  filesChangedKnown?: boolean;
   /** Test command to execute. If not provided, defaults to "pnpm test --reporter=json". */
   testCommand?: string;
   /** Timeout for the test command in ms. Default: 300_000. */
@@ -567,10 +575,17 @@ function parseVitestOutput(stdout: string, stderr: string): TestPackageResult[] 
 export async function runTestGate(
   options: TestGateOptions,
 ): Promise<TestGateResult> {
-  const { projectDir, filesChanged, testCommand, timeout = TEST_GATE_TIMEOUT } = options;
+  const {
+    projectDir,
+    filesChanged,
+    filesChangedKnown = true,
+    testCommand,
+    timeout = TEST_GATE_TIMEOUT,
+  } = options;
 
-  // Skip if no files were modified
-  if (filesChanged.length === 0) {
+  // Skip only when we know nothing was modified. An empty set we could not
+  // verify means the answer is unknown, and the gate runs rather than skips.
+  if (filesChanged.length === 0 && filesChangedKnown) {
     return {
       ran: false,
       passed: true,

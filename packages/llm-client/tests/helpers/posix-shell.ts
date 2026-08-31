@@ -4,8 +4,11 @@
  * `sh -c` is load-bearing in the process-tree tests — libuv puts every
  * non-detached child it spawns on Windows into a global job object, so a node
  * intermediate is reaped for free and proves nothing, while `sh` is not
- * libuv-managed and its children genuinely escape. It is also the real
- * production path (`execShell`).
+ * libuv-managed and its children genuinely escape.
+ *
+ * It is no longer the only production path: since 2026-08-31 `execShellCmd`
+ * falls back to `cmd.exe` on win32 without `sh` (see `resolveShellInvocation`).
+ * These tests still need `sh` specifically, for the job-object reason above.
  *
  * But `sh` is absent from a stock Windows PATH: it ships with Git for Windows,
  * which Git Bash exposes and PowerShell/cmd.exe do not. Without this guard the

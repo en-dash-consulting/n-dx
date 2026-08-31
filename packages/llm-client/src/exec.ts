@@ -92,6 +92,12 @@ export interface ExecOptions {
    * Production callers must never pass this.
    */
   _platform?: NodeJS.Platform;
+  /**
+   * @internal Override the `sh`-on-PATH probe used by {@link execShellCmd} —
+   * for unit tests only. Production callers must never pass this; the real
+   * probe runs once per process and is memoized.
+   */
+  _posixShellOnPath?: boolean;
 }
 
 /**
@@ -384,16 +390,79 @@ export function execStdout(
   });
 }
 
+/** A shell and the argv that runs a command string through it. */
+export interface ShellInvocation {
+  cmd: string;
+  args: string[];
+}
+
+/** The POSIX shell {@link execShellCmd} prefers on every platform. */
+const POSIX_SHELL = "sh";
+
 /**
- * Execute a shell command string (via `sh -c`).
+ * Choose the shell that runs a command string.
  *
- * Wraps the command in a shell for glob expansion, pipes, etc.
+ * `sh` everywhere it exists — including win32, where Git for Windows provides
+ * it — so a command string keeps POSIX semantics (pipes, `&&`, redirection)
+ * wherever it possibly can. `cmd.exe` is the fallback for the one case that
+ * otherwise cannot work at all: win32 with no `sh` on PATH.
+ *
+ * That case was not a degraded shell, it was no shell: `spawn("sh", …)` fails
+ * ENOENT, {@link exec} resolves rather than rejects, and callers reading only
+ * `stdout` cannot distinguish a shell that never launched from a command that
+ * printed nothing. The mandatory pre-commit test gate skipped itself three
+ * times on exactly that ambiguity.
+ *
+ * `cmd.exe /d /s /c` mirrors {@link spawnCli}: `/s` strips exactly the
+ * outermost quote pair — the one Node adds around the single command argument
+ * — and leaves the command intact. Command strings written for `sh` that use
+ * POSIX-only syntax will not survive the translation; the callers in this repo
+ * pass plain `<binary> <args>` strings, which do.
+ *
+ * Pure function — safe to call on any platform; its tests run on every CI.
+ */
+export function resolveShellInvocation(
+  command: string,
+  platform: NodeJS.Platform,
+  posixShellOnPath: boolean,
+): ShellInvocation {
+  if (platform !== "win32" || posixShellOnPath) {
+    return { cmd: POSIX_SHELL, args: ["-c", command] };
+  }
+  return { cmd: "cmd.exe", args: ["/d", "/s", "/c", command] };
+}
+
+/** Memoized result of the `sh`-on-PATH probe. PATH does not change mid-process. */
+let posixShellOnPath: boolean | undefined;
+
+/**
+ * Whether `sh` can be resolved on PATH. Probed once per process.
+ *
+ * Only consulted on win32 — elsewhere `sh` is assumed and the probe's cost is
+ * never paid.
+ */
+function hasPosixShell(): boolean {
+  if (posixShellOnPath === undefined) {
+    posixShellOnPath = isExecutableOnPath(POSIX_SHELL);
+  }
+  return posixShellOnPath;
+}
+
+/**
+ * Execute a shell command string.
+ *
+ * Wraps the command in a shell for glob expansion, pipes, etc. See
+ * {@link resolveShellInvocation} for which shell, and why it is not
+ * unconditionally `sh`.
  */
 export function execShellCmd(
   command: string,
   opts: ExecOptions,
 ): Promise<ExecResult> {
-  return exec("sh", ["-c", command], opts);
+  const platform = opts._platform ?? (process.platform as NodeJS.Platform);
+  const onPath = opts._posixShellOnPath ?? (platform === "win32" ? hasPosixShell() : true);
+  const { cmd, args } = resolveShellInvocation(command, platform, onPath);
+  return exec(cmd, args, opts);
 }
 
 /**
