@@ -1,0 +1,25 @@
+---
+id: "3ca4e4da-6a00-4139-a413-872c9d482702"
+level: "task"
+title: "Distilled context primer (context.distill) replacing the untrimmed CONTEXT.md pipe"
+status: "completed"
+priority: "medium"
+tags:
+  - "hench"
+  - "sourcevision"
+  - "context"
+  - "model-routing"
+source: "ndx-work"
+startedAt: "2026-08-31T14:35:13.156Z"
+completedAt: "2026-08-31T15:11:00.626Z"
+endedAt: "2026-08-31T15:11:00.626Z"
+acceptanceCriteria:
+  - "A context.distill call produces a primer within a stated size bound from sourcevision output"
+  - "The primer is cached and reused until the sourcevision fingerprint changes"
+  - "ndx work injects the primer instead of the full CONTEXT.md plus PRD tree"
+  - "A distill failure degrades to the previous behaviour rather than failing the run"
+  - "The primer covers layout, build and test commands, and conventions"
+description: "Replace ndx work's untrimmed CONTEXT.md + full-PRD-tree pipe with a distilled 5-10 KB repo primer produced by a context.distill call and cached by sourcevision content hash. This is the vendor-neutral startup-context floor from the design: it works for every provider and every session strategy, unlike forking which needs a resume-capable CLI. The task class already exists in DEFAULT_ROUTES (standard tier). Cache invalidation should reuse the sourcevisionFingerprint helper already built for the session cache."
+lastModified: "2026-08-31T15:11:00.633Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---
