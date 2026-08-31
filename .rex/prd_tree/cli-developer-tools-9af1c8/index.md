@@ -2,10 +2,12 @@
 id: "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6"
 level: "epic"
 title: "CLI & Developer Tools"
-status: "pending"
+status: "completed"
 startedAt: "2026-04-02T17:55:36.327Z"
+completedAt: "2026-08-31T23:38:10.231Z"
+endedAt: "2026-08-31T23:38:10.231Z"
 description: "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline."
-lastModified: "2026-08-27T17:45:10.192Z"
+lastModified: "2026-08-31T23:38:10.255Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -16,7 +18,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [ANSI Color Output Across Rex, SourceVision, and Hench](./ansi-color-output-across-rex-c513f2/index.md) | completed |
 | [ANSI Color Output Across Rex, SourceVision, and Hench](./ansi-color-output-across-rex-e73702/index.md) | completed |
 | [ANSI Color Reset Consistency in Tool Output](./ansi-color-reset-consistency-in-eb21a9/index.md) | completed |
-| [Child Process Cleanup and Exit Hygiene](./child-process-cleanup-and-exit-b67648/index.md) | pending |
+| [Child Process Cleanup and Exit Hygiene](./child-process-cleanup-and-exit-b67648/index.md) | completed |
 | [CLI Hint Correctness, Test Coverage, and Documentation Sync](./cli-hint-correctness-test-6ba404/index.md) | completed |
 | [CLI Hint Correctness, Test Coverage, and Documentation Sync](./cli-hint-correctness-test-77b9a8/index.md) | completed |
 | [CLI Robustness](./cli-robustness-f69ce6/index.md) | completed |
