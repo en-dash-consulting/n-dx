@@ -619,7 +619,7 @@ describe("gateway export auto-detection", () => {
         "parseApiTokenUsage", "parseApiTokenUsageWithDiagnostic", "parseStreamTokenUsage",
         "parseStreamTokenUsageWithDiagnostic", "mapCodexUsageToTokenUsage",
         "accumulateTokenUsage", "emptyAggregateTokenUsage",
-        "resolveModel", "resolveVendorModel", "resolveReviewModel",
+        "resolveModel", "resolveVendorModel", "resolveReviewModel", "resolveTaskModel",
         "isModelCompatibleWithVendor", "resetStaleModel", "formatVendorChangeWarning",
         "formatUsage", "createPromptEnvelope", "assemblePrompt",
         "mapErrorReasonToFailureCategory", "mapRunFailureToCategory", "classifyVendorError",

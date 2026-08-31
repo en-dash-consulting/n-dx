@@ -304,8 +304,40 @@ function isMachineLocalKey(keyArg) {
  * Get a nested value from an object by dot-separated path.
  * Returns undefined if any segment is missing.
  */
-function getByPath(obj, path) {
-  const parts = path.split(".");
+/**
+ * Sections under `llm` that hold a flat map keyed by task class.
+ *
+ * Task classes contain dots (`agent.execute`, `prd.rename`), and so does the
+ * config path syntax — so `llm.routes.agent.execute` must set the single key
+ * `"agent.execute"` in a flat `routes` object, not nest `{agent: {execute}}`.
+ * Nesting would write config that {@link loadLLMConfig}'s flat-map extractor
+ * silently ignores, so the setting would appear to work and do nothing.
+ */
+const LLM_FLAT_MAP_SECTIONS = ["routes.", "effort."];
+
+/**
+ * Split a section-relative setting path into object keys.
+ *
+ * Identical to `path.split(".")` except inside the flat-map sections above,
+ * where everything after the section name is one literal key.
+ *
+ * @param {string} settingPath Path within the section (no package prefix).
+ * @param {string} [pkg] Owning section, when known.
+ * @returns {string[]}
+ */
+function splitSettingPath(settingPath, pkg) {
+  if (pkg === "llm") {
+    for (const prefix of LLM_FLAT_MAP_SECTIONS) {
+      if (settingPath.startsWith(prefix) && settingPath.length > prefix.length) {
+        return [prefix.slice(0, -1), settingPath.slice(prefix.length)];
+      }
+    }
+  }
+  return settingPath.split(".");
+}
+
+function getByPath(obj, path, pkg) {
+  const parts = splitSettingPath(path, pkg);
   let current = obj;
   for (const part of parts) {
     if (current == null || typeof current !== "object") return undefined;
@@ -318,8 +350,8 @@ function getByPath(obj, path) {
  * Set a nested value in an object by dot-separated path.
  * Creates intermediate objects as needed.
  */
-function setByPath(obj, path, value) {
-  const parts = path.split(".");
+function setByPath(obj, path, value, pkg) {
+  const parts = splitSettingPath(path, pkg);
   let current = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     const part = parts[i];
@@ -847,7 +879,9 @@ export function validateTimeoutMs(value) {
  */
 function getValidator(pkg, settingPath) {
   if (pkg === "claude") return CLAUDE_VALIDATORS[settingPath] ?? null;
-  if (pkg === "llm") return LLM_VALIDATORS[settingPath] ?? null;
+  if (pkg === "llm") {
+    return LLM_VALIDATORS[settingPath] ?? getLLMRoutingValidator(settingPath);
+  }
   if (pkg === "cli") {
     if (settingPath === "timeoutMs") return validateTimeoutMs;
     if (settingPath.startsWith("timeouts.")) return validateTimeoutMs;
@@ -921,7 +955,122 @@ const LLM_VALIDATORS = {
   "local.model": validateModel,
   "local.lightModel": validateModel,
   autoFailover: validateAutoFailover,
+  "escalation.enabled": (v) => {
+    if (v !== true && v !== false && v !== "true" && v !== "false") {
+      throw new Error(
+        `Invalid llm.escalation.enabled "${v}". Expected true or false.`,
+      );
+    }
+  },
+  "escalation.maxSteps": (v) => {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0) {
+      throw new Error(
+        `Invalid llm.escalation.maxSteps "${v}". Expected a non-negative integer ` +
+          "(0 disables escalation; 1 is the recommended single step).",
+      );
+    }
+  },
 };
+
+/**
+ * Routing tiers a `llm.routes.<class>` value may name.
+ *
+ * Duplicated from `@n-dx/llm-client` rather than imported: orchestration-tier
+ * scripts must not import from packages, which is why `LLM_VENDOR` above is
+ * declared locally too. Keep in sync with `TaskTier` in `llm-client`.
+ */
+const TASK_TIERS = new Set(["light", "standard", "heavy", "free"]);
+
+/**
+ * Effort levels a `llm.effort.<class>` value may name — the vendor's
+ * documented range for adaptive-thinking models. Light-tier models have no
+ * effort parameter, so an effort entry for a light-routed class is inert
+ * rather than invalid.
+ */
+const EFFORT_LEVELS = new Set(["low", "medium", "high", "xhigh", "max"]);
+
+/**
+ * Validators for the parameterized `llm.*` routing keys.
+ *
+ * These paths carry a variable segment (`llm.tiers.<vendor>.<tier>`,
+ * `llm.routes.<class>`, `llm.effort.<class>`), so they cannot be looked up in
+ * the exact-match {@link LLM_VALIDATORS} table.
+ *
+ * The strictness is deliberately asymmetric. Values are checked strictly, and
+ * so is the *shape* of a tier path — an unrecognized vendor or tier there is
+ * a typo, never a feature. Route and effort *class names* are left open:
+ * glob keys (`prd.*`, `*`) are the documented routing design, and this tier
+ * cannot see the task-class registry to tell a new class from a misspelled
+ * one without importing from a package.
+ *
+ * @param {string} settingPath Path within the `llm` section (no `llm.` prefix).
+ * @returns {((value: unknown) => void) | null}
+ */
+function getLLMRoutingValidator(settingPath) {
+  if (settingPath.startsWith("tiers.")) {
+    const rest = settingPath.slice("tiers.".length);
+    const [vendor, tier, ...extra] = rest.split(".");
+    return (value) => {
+      if (!vendor || !Object.values(LLM_VENDOR).includes(vendor)) {
+        throw new Error(
+          `Invalid vendor "${vendor}" in llm.tiers.${rest}. ` +
+            `Expected one of: ${Object.values(LLM_VENDOR).join(", ")}.`,
+        );
+      }
+      if (!tier || !TASK_TIERS.has(tier)) {
+        throw new Error(
+          `Invalid tier "${tier ?? ""}" in llm.tiers.${rest}. ` +
+            `Expected one of: ${[...TASK_TIERS].join(", ")}.`,
+        );
+      }
+      if (extra.length > 0) {
+        throw new Error(
+          `Unexpected extra path segments in llm.tiers.${rest}. ` +
+            "Expected llm.tiers.<vendor>.<tier>.",
+        );
+      }
+      if (typeof value !== "string" || !value.trim()) {
+        throw new Error(
+          `Invalid model for llm.tiers.${rest}: expected a non-empty model ID.\n` +
+            `  Example: n-dx config llm.tiers.${vendor}.${tier} <model-id>`,
+        );
+      }
+    };
+  }
+
+  if (settingPath.startsWith("routes.")) {
+    const taskClass = settingPath.slice("routes.".length);
+    return (value) => {
+      if (!taskClass) {
+        throw new Error("Missing task class in llm.routes.<class>.");
+      }
+      if (typeof value !== "string" || !TASK_TIERS.has(value)) {
+        throw new Error(
+          `Invalid tier "${value}" for llm.routes.${taskClass}. ` +
+            `Expected one of: ${[...TASK_TIERS].join(", ")}.`,
+        );
+      }
+    };
+  }
+
+  if (settingPath.startsWith("effort.")) {
+    const taskClass = settingPath.slice("effort.".length);
+    return (value) => {
+      if (!taskClass) {
+        throw new Error("Missing task class in llm.effort.<class>.");
+      }
+      if (typeof value !== "string" || !EFFORT_LEVELS.has(value)) {
+        throw new Error(
+          `Invalid effort "${value}" for llm.effort.${taskClass}. ` +
+            `Expected one of: ${[...EFFORT_LEVELS].join(", ")}.`,
+        );
+      }
+    };
+  }
+
+  return null;
+}
 
 /**
  * Build provider-specific auth preflight command.
@@ -1421,6 +1570,37 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     before surfacing the original error. Disabled by default
                                     to preserve existing behavior.
 
+Task routing (which model serves which kind of call):
+  Call sites declare a task class — what kind of work a call is, never a model. Routes map
+  a class to a tier, and the tier map resolves a tier to a model for the active vendor.
+
+  llm.model                string    Standard-tier shorthand for the active vendor: sets the
+                                    model used by every class routed "standard", and wins over
+                                    llm.<vendor>.model. Light and heavy tiers are unaffected —
+                                    use llm.tiers.* to change those.
+  llm.tiers.<vendor>.<tier>
+                           string    Model serving one tier for one vendor. <vendor> is claude,
+                                    codex, google, or local; <tier> is light, standard, heavy,
+                                    or free. Outranks llm.<vendor>.lightModel and llm.model.
+                                    "free" has no built-in model — a class routed free falls
+                                    through to light until you set one here.
+                                      n-dx config llm.tiers.claude.light claude-haiku-4-5
+  llm.routes.<class>       string    Tier a task class resolves to: light, standard, heavy, or
+                                    free. Overrides the built-in default for that class.
+                                    <class> may be exact ("prd.rename") or a glob prefix
+                                    ("prd.*", "*"); an exact match wins over a glob, and among
+                                    globs the longest prefix wins.
+                                      n-dx config llm.routes.agent.execute heavy
+                                      n-dx config "llm.routes.prd.*" standard
+  llm.effort.<class>       string    Thinking effort for a class: low, medium, high, xhigh, or
+                                    max. Matched with the same exact-then-glob rules as routes.
+                                    Light-tier models have no effort parameter, so an entry for
+                                    a light-routed class is inert rather than an error.
+  llm.escalation.enabled   boolean   Retry a failed light-tier call once on the standard tier,
+                                    with the validation error appended (default: true).
+  llm.escalation.maxSteps  number    How many escalation steps a call may take (default: 1).
+                                    0 disables escalation without clearing the config.
+
 Local server preflight error codes:
   NDX_LOCAL_PREFLIGHT_HTTP_ERROR     Server is reachable but returned a non-200 response
   NDX_LOCAL_PREFLIGHT_CONNECT_ERROR  Cannot connect to the local server
@@ -1791,7 +1971,7 @@ async function coerceAndValidateProjectValue(
   configs,
   flags,
 ) {
-  const existing = getByPath(configs[pkg], settingPath);
+  const existing = getByPath(configs[pkg], settingPath, pkg);
   if (
     typeof existing === "object" &&
     existing !== null &&
@@ -1910,7 +2090,7 @@ async function handleSetProjectSection(
     await runLLMVendorPreflight(coerced, configs, flags["soft-preflight"] === "true");
   }
 
-  setByPath(configs[pkg], settingPath, coerced);
+  setByPath(configs[pkg], settingPath, coerced, pkg);
 
   const targetFile = isLocalProjectSetting(pkg, settingPath)
     ? LOCAL_CONFIG_FILE
@@ -1931,7 +2111,7 @@ async function handleSetProjectSection(
     oldCodexModel = current[pkg].codex?.model;
   }
 
-  setByPath(current[pkg], settingPath, coerced);
+  setByPath(current[pkg], settingPath, coerced, pkg);
 
   // Now perform vendor-change model reset if needed
   if (pkg === "llm" && settingPath === "vendor") {
@@ -2044,7 +2224,7 @@ async function handleSetPackageConfig(
     process.exit(1);
   }
 
-  const existing = getByPath(configs[pkg], settingPath);
+  const existing = getByPath(configs[pkg], settingPath, pkg);
   if (
     typeof existing === "object" &&
     existing !== null &&
@@ -2065,7 +2245,7 @@ async function handleSetPackageConfig(
   }
 
   // Write to raw (un-merged) config so project overrides don't leak
-  setByPath(rawConfigs[pkg], settingPath, coerced);
+  setByPath(rawConfigs[pkg], settingPath, coerced, pkg);
 
   const meta = PACKAGES[pkg];
   const configPath = join(dir, meta.dir, meta.file);
@@ -2130,7 +2310,7 @@ function handleGet(keyArg, configs, flags) {
     process.exit(1);
   }
 
-  const value = getByPath(configs[pkg], settingPath);
+  const value = getByPath(configs[pkg], settingPath, pkg);
   if (value === undefined) {
     const defaultValue = getProjectKeyDefault(pkg, settingPath);
     if (defaultValue !== null) {

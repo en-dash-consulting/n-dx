@@ -14,6 +14,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { initGitFixtureRepoSync } from "../helpers/index.js";
+// These cases assert the gate actually RAN, which needs the `sh -c` that
+// runTestGate spawns on every platform — so they are shell-dependent for real,
+// not shape-only. See tests/shell-spawn-inventory.md.
+import { itNeedsPosixShell } from "../helpers/posix-shell.js";
 import { discoverChangedFiles } from "../../src/agent/analysis/changed-files.js";
 import { runTestGate } from "../../src/tools/test-runner.js";
 
@@ -42,7 +46,7 @@ describe("full-suite gate no longer skips changed runs", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  it("runs the gate when only the reviewer changed files after a self-committing executor", async () => {
+  itNeedsPosixShell("runs the gate when only the reviewer changed files after a self-committing executor", async () => {
     // The exact live sequence: executor commits its own work, then the
     // reviewer repairs in the working tree. Previously filesChanged was
     // empty here (model summary said nothing, `git diff HEAD` saw nothing
@@ -61,7 +65,7 @@ describe("full-suite gate no longer skips changed runs", () => {
     expect(result.skipReason).toBeUndefined();
   });
 
-  it("runs the gate when the executor committed and nothing else touched the tree", async () => {
+  itNeedsPosixShell("runs the gate when the executor committed and nothing else touched the tree", async () => {
     await writeFile(join(projectDir, "src.ts"), "export const a = 2;\n");
     git(projectDir, "add", "-A");
     git(projectDir, "commit", "-m", "feat: executor work");
@@ -73,6 +77,8 @@ describe("full-suite gate no longer skips changed runs", () => {
     expect(result.ran).toBe(true);
   });
 
+  // No guard: an empty changed set returns before any spawn, so this case
+  // never reaches `sh`.
   it("still skips when the run genuinely changed nothing", async () => {
     const filesChanged = await discoverChangedFiles({ projectDir, startingHead });
     expect(filesChanged).toEqual([]);
