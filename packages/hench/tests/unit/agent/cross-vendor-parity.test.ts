@@ -141,12 +141,12 @@ describe("cross-vendor execution policy parity", () => {
 
   it("standard policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(STANDARD_POLICY);
-    expect(flags).toEqual(["--sandbox", "workspace-write"]);
+    expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never"]);
   });
 
   it("read-only policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(READONLY_POLICY);
-    expect(flags).toEqual(["--sandbox", "read-only"]);
+    expect(flags).toEqual(["--sandbox", "read-only", "-c", "approval_policy=on-request"]);
   });
 
   it("full-access policy compiles to correct Codex flags", () => {
@@ -162,9 +162,10 @@ describe("cross-vendor execution policy parity", () => {
     });
   });
 
-  it("every ApprovalPolicy maps to a Codex flag", () => {
-    expect(mapApprovalToCodexFlag("on-request")).toBe("default");
-    expect(mapApprovalToCodexFlag("never")).toBe("full-auto");
+  it("every ApprovalPolicy maps to a Codex approval_policy value", () => {
+    // Config values, not flag names — `codex exec` has no approval flag.
+    expect(mapApprovalToCodexFlag("on-request")).toBe("on-request");
+    expect(mapApprovalToCodexFlag("never")).toBe("never");
   });
 
   it("policy fields are identical between vendors (only delivery differs)", () => {
