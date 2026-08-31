@@ -15,12 +15,24 @@ import { PROJECT_DIRS } from "@n-dx/llm-client";
 // Types
 // ---------------------------------------------------------------------------
 
-/** Aggregated token usage for a single package. */
+/**
+ * Aggregated token usage for a single package.
+ *
+ * All four token kinds are tracked because all four are billed. Cache writes
+ * cost more than fresh input (~1.25x) and cache reads much less (~0.1x), but
+ * neither is free — and on a warm agent loop cache reads are the largest term
+ * by an order of magnitude, so a rollup that omits them is not an
+ * approximation, it is the wrong number.
+ */
 export interface PackageTokenUsage {
-  /** Total input tokens. */
+  /** Fresh (uncached) input tokens. */
   inputTokens: number;
   /** Total output tokens. */
   outputTokens: number;
+  /** Input tokens written to the prompt cache. Billed above the input rate. */
+  cacheCreationTokens: number;
+  /** Input tokens served from the prompt cache. Billed below the input rate. */
+  cacheReadTokens: number;
   /** Number of LLM calls. */
   calls: number;
 }
@@ -36,6 +48,8 @@ export interface AggregateTokenUsage {
   /** Total tokens across all packages. */
   totalInputTokens: number;
   totalOutputTokens: number;
+  totalCacheCreationTokens: number;
+  totalCacheReadTokens: number;
   totalCalls: number;
 }
 
@@ -82,7 +96,50 @@ export interface TokenUsageLogEntry {
 // ---------------------------------------------------------------------------
 
 function emptyPackageUsage(): PackageTokenUsage {
-  return { inputTokens: 0, outputTokens: 0, calls: 0 };
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    calls: 0,
+  };
+}
+
+/**
+ * Every billed token in one usage record. Used wherever a single "how big is
+ * this" number is needed — display totals, sort keys, budget checks — so that
+ * no call site can quietly go back to counting only input + output.
+ */
+export function totalTokens(usage: {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+}): number {
+  return (
+    usage.inputTokens +
+    usage.outputTokens +
+    usage.cacheCreationTokens +
+    usage.cacheReadTokens
+  );
+}
+
+/** Roll three per-package records into the aggregate, totals included. */
+function combinePackages(
+  rex: PackageTokenUsage,
+  hench: PackageTokenUsage,
+  sv: PackageTokenUsage,
+): AggregateTokenUsage {
+  return {
+    packages: { rex, hench, sv },
+    totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
+    totalOutputTokens: rex.outputTokens + hench.outputTokens + sv.outputTokens,
+    totalCacheCreationTokens:
+      rex.cacheCreationTokens + hench.cacheCreationTokens + sv.cacheCreationTokens,
+    totalCacheReadTokens:
+      rex.cacheReadTokens + hench.cacheReadTokens + sv.cacheReadTokens,
+    totalCalls: rex.calls + hench.calls + sv.calls,
+  };
 }
 
 function isInRange(timestamp: string, filter: TokenUsageFilter): boolean {
@@ -123,10 +180,18 @@ export function extractRexTokenUsage(
         calls?: number;
         inputTokens?: number;
         outputTokens?: number;
+        cacheCreationInputTokens?: number;
+        cacheReadInputTokens?: number;
       };
       if (typeof data.calls === "number") usage.calls += data.calls;
       if (typeof data.inputTokens === "number") usage.inputTokens += data.inputTokens;
       if (typeof data.outputTokens === "number") usage.outputTokens += data.outputTokens;
+      if (typeof data.cacheCreationInputTokens === "number") {
+        usage.cacheCreationTokens += data.cacheCreationInputTokens;
+      }
+      if (typeof data.cacheReadInputTokens === "number") {
+        usage.cacheReadTokens += data.cacheReadInputTokens;
+      }
     } catch {
       // Malformed detail — skip
     }
@@ -146,6 +211,8 @@ export interface TokenEvent {
   package: "rex" | "hench" | "sv";
   inputTokens: number;
   outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
   calls: number;
   vendor?: string;
   model?: string;
@@ -155,10 +222,17 @@ export interface TokenEvent {
 interface HenchRunSummary {
   startedAt: string;
   model?: string;
-  tokenUsage: { input: number; output: number };
+  tokenUsage: {
+    input: number;
+    output: number;
+    cacheCreationInput?: number;
+    cacheReadInput?: number;
+  };
   turnTokenUsage?: Array<{
     input: number;
     output: number;
+    cacheCreationInput?: number;
+    cacheReadInput?: number;
     vendor?: string;
     model?: string;
   }>;
@@ -197,6 +271,8 @@ export async function extractHenchTokenUsage(
       usage.calls += 1; // Each run counts as one aggregate call
       usage.inputTokens += run.tokenUsage.input ?? 0;
       usage.outputTokens += run.tokenUsage.output ?? 0;
+      usage.cacheCreationTokens += run.tokenUsage.cacheCreationInput ?? 0;
+      usage.cacheReadTokens += run.tokenUsage.cacheReadInput ?? 0;
     } catch {
       // Invalid run file — skip
     }
@@ -280,6 +356,8 @@ export function extractRexTokenEvents(
         calls?: number;
         inputTokens?: number;
         outputTokens?: number;
+        cacheCreationInputTokens?: number;
+        cacheReadInputTokens?: number;
         vendor?: string;
         model?: string;
       };
@@ -289,6 +367,8 @@ export function extractRexTokenEvents(
         package: "rex",
         inputTokens: data.inputTokens ?? 0,
         outputTokens: data.outputTokens ?? 0,
+        cacheCreationTokens: data.cacheCreationInputTokens ?? 0,
+        cacheReadTokens: data.cacheReadInputTokens ?? 0,
         calls: data.calls ?? 0,
         vendor: normalizeEventMetadata(data.vendor) ?? "unknown",
         model: normalizeEventMetadata(data.model) ?? "unknown",
@@ -337,6 +417,8 @@ export async function extractHenchTokenEvents(
             package: "hench",
             inputTokens: turn.input ?? 0,
             outputTokens: turn.output ?? 0,
+            cacheCreationTokens: turn.cacheCreationInput ?? 0,
+            cacheReadTokens: turn.cacheReadInput ?? 0,
             calls: 1,
             vendor: turn.vendor,
             model: turn.model ?? run.model,
@@ -351,6 +433,8 @@ export async function extractHenchTokenEvents(
         package: "hench",
         inputTokens: run.tokenUsage.input ?? 0,
         outputTokens: run.tokenUsage.output ?? 0,
+        cacheCreationTokens: run.tokenUsage.cacheCreationInput ?? 0,
+        cacheReadTokens: run.tokenUsage.cacheReadInput ?? 0,
         calls: 1,
         model: run.model,
       });
@@ -386,6 +470,9 @@ export async function extractSvTokenEvents(
       package: "sv",
       inputTokens: manifest.tokenUsage.inputTokens ?? 0,
       outputTokens: manifest.tokenUsage.outputTokens ?? 0,
+      // The sourcevision manifest records no cache split.
+      cacheCreationTokens: 0,
+      cacheReadTokens: 0,
       calls: manifest.tokenUsage.calls ?? 0,
     });
   } catch {
@@ -433,20 +520,22 @@ export function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
         package: ev.package,
         inputTokens: 0,
         outputTokens: 0,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
         calls: 0,
       };
       map.set(key, entry);
     }
     entry.inputTokens += ev.inputTokens;
     entry.outputTokens += ev.outputTokens;
+    entry.cacheCreationTokens += ev.cacheCreationTokens;
+    entry.cacheReadTokens += ev.cacheReadTokens;
     entry.calls += ev.calls;
   }
 
-  // Sort by total tokens descending
-  return Array.from(map.values()).sort(
-    (a, b) =>
-      b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens),
-  );
+  // Sort by total tokens descending — cache included, since a command whose
+  // spend is mostly cache reads would otherwise sort as though it were free.
+  return Array.from(map.values()).sort((a, b) => totalTokens(b) - totalTokens(a));
 }
 
 // ---------------------------------------------------------------------------
@@ -530,15 +619,12 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
     const pkg = ev.package === "rex" ? rex : ev.package === "hench" ? hench : sv;
     pkg.inputTokens += ev.inputTokens;
     pkg.outputTokens += ev.outputTokens;
+    pkg.cacheCreationTokens += ev.cacheCreationTokens;
+    pkg.cacheReadTokens += ev.cacheReadTokens;
     pkg.calls += ev.calls;
   }
 
-  return {
-    packages: { rex, hench, sv },
-    totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
-    totalOutputTokens: rex.outputTokens + hench.outputTokens + sv.outputTokens,
-    totalCalls: rex.calls + hench.calls + sv.calls,
-  };
+  return combinePackages(rex, hench, sv);
 }
 
 // ---------------------------------------------------------------------------
@@ -563,12 +649,7 @@ export async function aggregateTokenUsage(
     extractSvTokenUsage(projectDir, filter),
   ]);
 
-  return {
-    packages: { rex, hench, sv },
-    totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
-    totalOutputTokens: rex.outputTokens + hench.outputTokens + sv.outputTokens,
-    totalCalls: rex.calls + hench.calls + sv.calls,
-  };
+  return combinePackages(rex, hench, sv);
 }
 
 // ---------------------------------------------------------------------------
@@ -579,6 +660,10 @@ export async function aggregateTokenUsage(
 export interface ModelPricing {
   inputPerMillion: number;
   outputPerMillion: number;
+  /** Writing a token to the prompt cache. Above the input rate. */
+  cacheWritePerMillion: number;
+  /** Reading a token back from the prompt cache. Well below the input rate. */
+  cacheReadPerMillion: number;
 }
 
 /**
@@ -589,6 +674,8 @@ export interface ModelPricing {
 const DEFAULT_PRICING: ModelPricing = {
   inputPerMillion: 3, // $3 per 1M input tokens
   outputPerMillion: 15, // $15 per 1M output tokens
+  cacheWritePerMillion: 3.75, // 1.25x input — a cache write costs a premium
+  cacheReadPerMillion: 0.3, // 0.1x input — the discount caching exists for
 };
 
 /** Estimated cost breakdown. */
@@ -597,17 +684,26 @@ export interface CostEstimate {
   total: string;
   /** Raw numeric total in USD. */
   totalRaw: number;
-  /** Cost from input tokens. */
+  /** Cost from fresh input tokens. */
   inputCost: number;
   /** Cost from output tokens. */
   outputCost: number;
+  /** Cost from tokens written to the prompt cache. */
+  cacheWriteCost: number;
+  /** Cost from tokens served out of the prompt cache. */
+  cacheReadCost: number;
 }
 
 /**
  * Estimate cost from aggregate token usage.
  *
  * Uses default Sonnet pricing as a baseline. Cost is approximate since
- * individual calls may use different models or benefit from prompt caching.
+ * individual calls may use different models.
+ *
+ * All four token kinds are priced. Cache tokens used to be omitted entirely,
+ * which did not merely make the estimate approximate — on a cache-heavy agent
+ * workload it made it wrong by more than an order of magnitude, and it hid the
+ * one term the cost work is trying to move.
  */
 export function estimateCost(
   usage: AggregateTokenUsage,
@@ -615,13 +711,19 @@ export function estimateCost(
 ): CostEstimate {
   const inputCost = (usage.totalInputTokens / 1_000_000) * pricing.inputPerMillion;
   const outputCost = (usage.totalOutputTokens / 1_000_000) * pricing.outputPerMillion;
-  const totalRaw = inputCost + outputCost;
+  const cacheWriteCost =
+    (usage.totalCacheCreationTokens / 1_000_000) * pricing.cacheWritePerMillion;
+  const cacheReadCost =
+    (usage.totalCacheReadTokens / 1_000_000) * pricing.cacheReadPerMillion;
+  const totalRaw = inputCost + outputCost + cacheWriteCost + cacheReadCost;
 
   return {
     total: `$${totalRaw.toFixed(2)}`,
     totalRaw,
     inputCost,
     outputCost,
+    cacheWriteCost,
+    cacheReadCost,
   };
 }
 

@@ -132,8 +132,8 @@ describe("token usage regression fixtures", () => {
     const usage: AggregateTokenUsage = {
       packages: {
         rex: { inputTokens: fixtures.budget.usage.input, outputTokens: fixtures.budget.usage.output, calls: 1 },
-        hench: { inputTokens: 0, outputTokens: 0, calls: 0 },
-        sv: { inputTokens: 0, outputTokens: 0, calls: 0 },
+        hench: { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 },
+        sv: { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 },
       },
       totalInputTokens: fixtures.budget.usage.input,
       totalOutputTokens: fixtures.budget.usage.output,
