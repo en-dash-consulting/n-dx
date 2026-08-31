@@ -22,6 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [commitWatcher.cancel() cannot stop an auto-commit already in flight, so the review-pass suspension has a silent hole](./commitwatcher-cancel-cannot-63cbcc.md) | completed |
 | [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-859237.md) | completed |
 | [Don't skip the full test suite gate when the agent has already committed its work](./don-t-skip-the-full-test-suite-c97114.md) | completed |
+| [Full test suite gate still skips with "No files modified in prior phases" after the c971145e fix](./full-test-suite-gate-still-5f791a.md) | pending |
 | [Give review its own model tier with a review-model override](./give-review-its-own-model-tier-b889a2.md) | completed |
 | [Grant the reviewer PRD-write permission so findings can be captured in non-interactive runs](./grant-the-reviewer-prd-write-120b14.md) | completed |
 | [Resume the work session for the reviewer on --resume](./resume-the-work-session-for-the-2eb560.md) | completed |
@@ -33,5 +34,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Stop labeling every unresolved finding as must-fix in the review warning](./stop-labeling-every-unresolved-8c5cc2.md) | completed |
 | [The "keeps the quiet acknowledgment" test asserts nothing about the acknowledgment it names](./the-keeps-the-quiet-234090.md) | completed |
 | [Verified: the executor needs no rex MCP grants — its PRD writes are in-process](./verified-the-executor-needs-no-bd3459.md) | completed |
-| [Verify a reviewer must-fix repair reaches the run's commit on a live run](./verify-a-reviewer-must-fix-f29a55.md) | pending |
+| [Verify a reviewer must-fix repair reaches the run's commit on a live run](./verify-a-reviewer-must-fix-f29a55.md) | completed |
 | [Verify the review pass end-to-end against a real ndx work run](./verify-the-review-pass-end-to-0deece.md) | completed |
