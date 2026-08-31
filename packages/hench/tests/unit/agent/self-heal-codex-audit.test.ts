@@ -139,7 +139,7 @@ describe("IC-1 (resolved): buildRunSummary with Codex tool names", () => {
 
 describe("IC-4 (limitation): normalizeCodexResponse on typical Codex verbose stdout", () => {
   it("returns no tool events for Codex session header output", () => {
-    // When `codex exec --full-auto` runs, its stdout looks like:
+    // When `codex exec --sandbox workspace-write` runs, its stdout looks like:
     //   "Reading additional input from stdin...\nOpenAI Codex v0.120.0 (research preview)\n---\n..."
     // parseMaybeJson() at cli-loop.ts:173-192 sees non-JSON text and returns it as a string.
     // normalizeCodexResponse at cli-loop.ts:246-252 then treats it as plain text,

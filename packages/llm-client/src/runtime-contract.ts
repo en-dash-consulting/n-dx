@@ -109,8 +109,9 @@ export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access"
  *
  * These map to vendor-specific CLI flags:
  * - Claude: `--allowed-tools` allowlist (tools not listed require approval)
- * - Codex: `--full-auto` / `--dangerously-bypass-approvals-and-sandbox`
- *   presets where supported, otherwise plain `--sandbox`
+ * - Codex: `--dangerously-bypass-approvals-and-sandbox` where supported,
+ *   otherwise plain `--sandbox` (`codex exec` has no separate approval-prompt
+ *   surface, so `never` reduces to an explicit sandbox mode)
  */
 export type ApprovalPolicy = "on-request" | "never";
 
@@ -118,7 +119,8 @@ export type ApprovalPolicy = "on-request" | "never";
  * Normalized execution policy for both vendors.
  *
  * One n-dx policy object compiles to vendor-specific CLI flags/config.
- * This replaces ad hoc `--full-auto` and `--allowed-tools` patterns.
+ * This replaces ad hoc `--allowed-tools` patterns and Codex's now-removed
+ * `--full-auto` shortcut.
  *
  * @see docs/analysis/claude-codex-runtime-identity-discovery.md §7.1
  */
@@ -279,7 +281,7 @@ export interface RuntimeDiagnostics {
  *
  * Maps to:
  * - Claude: `--allowed-tools` with the listed file tools + `Bash(cmd:*)` patterns
- * - Codex: `--full-auto`
+ * - Codex: `--sandbox workspace-write`
  */
 export const DEFAULT_EXECUTION_POLICY: ExecutionPolicy = {
   sandbox: "workspace-write",
