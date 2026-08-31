@@ -41,6 +41,8 @@ import {
 import type { ReviewPassOutcome } from "../analysis/adversarial-review.js";
 import { snapshotDirtyState, diffDirtyState } from "../analysis/review-repairs.js";
 import type { DirtySnapshot } from "../analysis/review-repairs.js";
+import { ensureWarmParent } from "./orientation.js";
+import { resolveSessionStrategy, clearSessionCache } from "./session-cache.js";
 import { mkdir, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
@@ -1600,6 +1602,48 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       : `Agent Run${opts.spawnModel ? ` (${opts.spawnModel})` : ""}`,
   );
 
+  // Warm-parent session: when the fork strategy is available, establish (or
+  // reuse) one read-only orientation session and fork every task spawn from
+  // it, so no task re-pays cold-start context or re-explores the repo.
+  // `cliLoop` runs once per task, so the cache — not loop plumbing — is what
+  // makes orientation happen once per loop and persist across invocations.
+  const sessionStrategy = resolveSessionStrategy({
+    vendor,
+    provider: config.provider,
+    configured: config.sessionStrategy,
+  });
+  let warmParentId: string | undefined;
+  if (sessionStrategy === "fork") {
+    warmParentId = await ensureWarmParent({
+      adapter,
+      vendor,
+      cliBinary,
+      cliEnv,
+      policy,
+      henchDir,
+      projectDir,
+      model: opts.spawnModel ?? "",
+      maxAgeHours: config.parentMaxAgeHours,
+      spawn: (spawnConfig) =>
+        spawnWithAdapter({
+          adapter,
+          spawnConfig,
+          cliBinary,
+          cliEnv,
+          cwd: projectDir,
+          tokenMetadata,
+        }),
+    });
+    if (warmParentId) run.parentSessionId = warmParentId;
+  }
+
+  // A cached parent is validated against its own metadata, not against the
+  // vendor's session store — so a parent the CLI has since forgotten would
+  // otherwise fail every task in the loop. The first forked spawn that fails
+  // drops the cache, disables forking for the rest of the run, and re-spawns
+  // cold without consuming retry budget (the same shape as a plan re-spawn).
+  let forkFallbackUsed = false;
+
   // Plan-mode bookkeeping: when the spawned Claude session emits an
   // ExitPlanMode tool_use we kill the spawn, prompt the user (or auto-accept
   // when no TTY is attached), and re-spawn with permissionMode=acceptEdits
@@ -1641,6 +1685,11 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         const spawnConfig = adapter.buildSpawnConfig(envelope, policy, {
           model: opts.spawnModel,
           permissionMode: currentPermissionMode,
+          // Fork the orientation session rather than continuing it, so the
+          // parent stays reusable by the next task and this spawn gets its
+          // own session id. Retries and plan re-spawns fork the same parent.
+          resumeSessionId: warmParentId,
+          forkSession: warmParentId ? true : undefined,
         });
 
         // Capture prompt section diagnostics on the first attempt for run-level storage.
@@ -1682,6 +1731,22 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // usage and assistant text aren't lost.
         if (useEventPipeline && attemptAccumulator && runAccumulator) {
           runAccumulator.push(...attemptAccumulator.events);
+        }
+
+        // Stale-parent fallback: the fork failed, and the likeliest cause is
+        // a parent the vendor CLI no longer has. Drop it, stop forking, and
+        // re-spawn cold — without charging this to the retry budget, since
+        // nothing was learned about the task itself.
+        if (result.error && warmParentId && !forkFallbackUsed) {
+          forkFallbackUsed = true;
+          warmParentId = undefined;
+          run.parentSessionId = undefined;
+          await clearSessionCache(henchDir);
+          info(
+            `⚠ Forking the warm session failed (${result.error}). ` +
+              "Re-orienting on the next run; continuing this task with a cold spawn.",
+          );
+          continue;
         }
 
         accumulateResult(accumulated, result);

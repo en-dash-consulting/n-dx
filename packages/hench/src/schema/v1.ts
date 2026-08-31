@@ -836,6 +836,13 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   weight?: string;
+  /**
+   * Orientation session this run's task spawn was forked from, when the
+   * warm-parent strategy was active. Its presence is what makes the saving
+   * auditable: a run with a parent paid no cold start, one without spawned
+   * cold. v1 additive field.
+   */
+  parentSessionId?: string;
   retryAttempts?: number;
   /** Structured metadata derived from tool calls at run finalization. */
   structuredSummary?: RunSummaryData;
