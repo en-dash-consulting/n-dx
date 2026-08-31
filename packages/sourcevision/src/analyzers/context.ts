@@ -15,6 +15,17 @@ import { buildClassificationMap } from "./classify.js";
 import { deriveNextSteps } from "./next-steps.js";
 import { computeZoneAggregates, RISK_THRESHOLDS } from "./risk-scoring.js";
 
+/**
+ * Caps on the routes section, matching the 15-item caps already applied to
+ * findings and next steps further down this file.
+ *
+ * CONTEXT.md is piped into every `ndx work` run, so its size is a per-run
+ * token cost. The routes section was the one place that grew without bound —
+ * measured at 54% of the file on a route-heavy project.
+ */
+export const CONTEXT_MAX_ROUTE_GROUPS = 15;
+export const CONTEXT_MAX_ROUTES_PER_GROUP = 15;
+
 export function generateContext(
   manifest: Manifest,
   inventory: Inventory,
@@ -164,12 +175,31 @@ export function generateContext(
       if (hasClientRoutes) lines.push("");
       lines.push(`Server routes: ${components.summary.totalServerRoutes} endpoints in ${components.serverRoutes.length} handler(s)`);
       lines.push("");
-      for (const group of components.serverRoutes) {
+      // Capped like the findings and next-steps sections below. This file is
+      // piped into agent runs, and an exhaustive endpoint listing is reference
+      // material rather than orientation — the counts above already convey the
+      // shape of the surface.
+      const shownGroups = components.serverRoutes.slice(0, CONTEXT_MAX_ROUTE_GROUPS);
+      for (const group of shownGroups) {
         const handler = group.handler ? ` (${group.handler})` : "";
         lines.push(`${group.prefix}${handler} — ${group.file}`);
-        for (const r of group.routes) {
+        const shownRoutes = group.routes.slice(0, CONTEXT_MAX_ROUTES_PER_GROUP);
+        for (const r of shownRoutes) {
           lines.push(`  ${r.method.padEnd(7)} ${r.path}`);
         }
+        const omittedRoutes = group.routes.length - shownRoutes.length;
+        if (omittedRoutes > 0) {
+          lines.push(`  … ${omittedRoutes} more route(s) in this handler not listed`);
+        }
+      }
+      const omittedGroups = components.serverRoutes.length - shownGroups.length;
+      if (omittedGroups > 0) {
+        lines.push("");
+        lines.push(
+          `… ${omittedGroups} more handler(s) not listed ` +
+            `(capped at ${CONTEXT_MAX_ROUTE_GROUPS}). Use the sourcevision ` +
+            "`get_route_tree` tool for the full route surface.",
+        );
       }
     }
 

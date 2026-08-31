@@ -193,6 +193,58 @@ function registerOverviewTools(server: McpServer, context: McpContext): void {
   );
 }
 
+/**
+ * Shape the `sourcevision://zones` resource for a tool result.
+ *
+ * The resource used to return the whole of zones.json pretty-printed —
+ * measured at roughly 80K tokens on a large project, in a single result. Two
+ * things drove that: the indentation, which is billed like any other
+ * character, and every zone's complete file list, which is per-zone detail
+ * rather than the cross-zone picture this resource exists to give.
+ *
+ * So the resource now carries the map — zone identity, metrics, size, entry
+ * points, crossings — and names `get_zone` for the detail it drops. A consumer
+ * that wants one zone's files can ask for that zone instead of paying for
+ * every zone's files to find it.
+ */
+export function summarizeZonesResource(zones: Zones | null | undefined): {
+  zones: Array<{
+    id: string;
+    name: string;
+    description: string;
+    fileCount: number;
+    cohesion: number;
+    coupling: number;
+    entryPoints: string[];
+  }>;
+  crossings: Zones["crossings"];
+  unzonedCount: number;
+  insights?: string[];
+  note: string;
+} {
+  const source = zones ?? { zones: [], crossings: [], unzoned: [] };
+  return {
+    zones: (source.zones ?? []).map((zone) => ({
+      id: zone.id,
+      name: zone.name,
+      description: zone.description,
+      fileCount: zone.files?.length ?? 0,
+      cohesion: zone.cohesion,
+      coupling: zone.coupling,
+      // Entry points are kept: they are how a reader gets into a zone, and
+      // there are a handful per zone rather than hundreds.
+      entryPoints: zone.entryPoints ?? [],
+    })),
+    crossings: source.crossings ?? [],
+    unzonedCount: source.unzoned?.length ?? 0,
+    insights: source.insights,
+    note:
+      "Zone file lists and per-zone findings are omitted here to keep this " +
+      "result small. Call the get_zone tool with a zone id for a zone's files, " +
+      "insights, and findings.",
+  };
+}
+
 function registerZoneTools(server: McpServer, context: McpContext): void {
   server.tool(
     "get_zone",
@@ -505,7 +557,7 @@ function registerMcpResources(server: McpServer, context: McpContext): void {
         contents: [{
           uri: "sourcevision://zones",
           mimeType: "application/json",
-          text: JSON.stringify(data.zones ?? { zones: [], crossings: [], unzoned: [] }, null, 2),
+          text: JSON.stringify(summarizeZonesResource(data.zones)),
         }],
       };
     }
