@@ -5,6 +5,7 @@ package-lock.json
 .hench/runs/
 .hench/locks/
 .hench/usage-cursors/
+.hench/reviews/
 .hench-commit-msg.txt
 .run-logs/
 .n-dx.json
@@ -65,4 +66,3 @@ claude_commands.log.1
 # regression twice: the files were deleted once as "unreferenced fixtures" and
 # simply came back. Deliberately NOT re-added: if an .args file ever appears here
 # again it should show up in `git status`.
-.hench/reviews/*.json
