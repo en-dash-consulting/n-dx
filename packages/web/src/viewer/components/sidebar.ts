@@ -16,6 +16,7 @@ import { ConfigFooter } from "./config-footer.js";
 import { useProjectMetadata, useFeatureToggle, useCliName } from "../api.js";
 import { resolveCliLabel } from "../hooks/index.js";
 import { SOURCEVISION_TABS } from "../api.js";
+import { isDeployedMode } from "../deployed-mode.js";
 
 const STORAGE_KEY = "sidebar-expanded-section";
 
@@ -30,7 +31,16 @@ interface SidebarProps {
   scope?: string | null;
 }
 
-type NavItem = { type: "item"; id: ViewId; icon: string; label: string; minPass: number; featureGate?: string };
+type NavItem = {
+  type: "item";
+  id: ViewId;
+  icon: string;
+  label: string;
+  minPass: number;
+  featureGate?: string;
+  /** Views built on demand by the server — absent from a static export. */
+  requiresServer?: boolean;
+};
 type NavSection = { type: "section"; label: string; product?: "sourcevision" | "rex" | "hench" };
 type NavEntry = NavItem | NavSection;
 
@@ -144,6 +154,8 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
       ...s,
       items: s.items
         .filter((item) => {
+          // Server-rendered views have nothing to show in a static export.
+          if (item.requiresServer && isDeployedMode()) return false;
           if (!item.featureGate) return true;
           return enabledGates.get(item.featureGate) ?? false;
         })

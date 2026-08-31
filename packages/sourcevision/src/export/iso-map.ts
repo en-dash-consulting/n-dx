@@ -140,7 +140,7 @@ const STYLES = `
   --muted:#9B9BC4; --accent:#7FAE33; --warn:#E0A33E; --crit:#E36262;
   --chip:#232253; --chip-hover:#2C2B66;
   --ground:#171639; --gridline:#222150;
-  --wire:#4A4990; --wire-hot:#7FAE33;
+  --wire:#4A4990; --wire-hot:#7FAE33; --seam:#C9789E; --infra:#B0668A;
   --tag-bg:#1B1A45; --tag-ink:#EFEFF7; --tag-ink-on:#12122B;
   --body-ink:#D3D3E8;
 }
@@ -150,7 +150,7 @@ const STYLES = `
     --muted:#5C5F7A; --accent:#4E7A16; --warn:#9A6512; --crit:#B3352F;
     --chip:#EFF0F7; --chip-hover:#E3E5F2;
     --ground:#E7E9F5; --gridline:#D2D5E8;
-    --wire:#8E93BC; --wire-hot:#4E7A16;
+    --wire:#8E93BC; --wire-hot:#4E7A16; --seam:#A2416C; --infra:#8E4467;
     --tag-bg:#FFFFFF; --tag-ink:#1B1B33; --tag-ink-on:#FFFFFF;
     --body-ink:#33344F;
   }
@@ -200,6 +200,10 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
 .grid{stroke:var(--gridline);stroke-width:1}
 .wire{stroke:var(--wire);fill:none;stroke-linejoin:round;stroke-linecap:round}
 .wire.hot{stroke:var(--wire-hot)}
+/* Declared, not inferred: a different hue so nobody reads a human assertion
+   as something the analysis proved. */
+.wire.seam{stroke:var(--seam)}
+.wire.infra{stroke:var(--infra)}
 .tagbox{fill:var(--tag-bg)}
 .tagtext{fill:var(--tag-ink)}
 
@@ -352,18 +356,22 @@ var edgeEls = [];
 EDGES.forEach(function(e, index){
   var projected = e.points.map(function(q){ return P(q[0], q[1], 0); });
   var from = BY[e.from], to = BY[e.to];
+  var kindWord = e.seam ? "Runtime seam: " : (e.infra ? "Uses infrastructure: " : "Dependency: ");
+  var relation = e.seam ? " calls back into " : (e.infra ? " talks to " : " imports ");
   var g = el("g", {
     "class": "edge", tabindex: "-1", role: "button",
-    "aria-label": "Dependency: " + (from ? from.name : e.from) + " imports " +
-      (to ? to.name : e.to) + ", " + e.weight + " references"
+    "aria-label": kindWord + (from ? from.name : e.from) + relation +
+      (to ? to.name : e.to) + (e.seam || e.infra ? "" : ", " + e.weight + " references")
   });
   var hit = el("polyline", {
     points: pts(projected), fill: "none", stroke: "transparent",
     "stroke-width": "14", "stroke-linejoin": "round", "stroke-linecap": "round"
   });
   var line = el("polyline", { points: pts(projected), "marker-end": "url(#wire)" });
-  line.setAttribute("class", "wire");
-  if (e.back) line.setAttribute("stroke-dasharray", "7 6");
+  line.setAttribute("class", "wire" + (e.seam ? " seam" : "") + (e.infra ? " infra" : ""));
+  if (e.seam) line.setAttribute("stroke-dasharray", "2 5");
+  else if (e.infra) line.setAttribute("stroke-dasharray", "10 4");
+  else if (e.back) line.setAttribute("stroke-dasharray", "7 6");
   g.appendChild(hit); g.appendChild(line);
   gEdge.appendChild(g);
   edgeEls.push({ e: e, g: g, node: line });
@@ -480,6 +488,10 @@ var INTRO =
   '<h4>Try this</h4><ul>' +
   '<li>Click a block to see its files and cross-zone edges.</li>' +
   '<li>Click a connector, or a reference count in a panel, to inspect one dependency.</li>' +
+  (MODEL.meta.seamCount || MODEL.meta.infraCount
+    ? '<li>Pink connectors are <b>declared</b>, not inferred: runtime seams and infrastructure ' +
+      'that no import can show. They are assertions from <code>.n-dx.json</code> or IaC.</li>'
+    : '') +
   '<li>Use the legend to isolate one kind of zone.</li>' +
   '<li>Drag to pan, scroll to zoom, <b>Reset view</b> to recentre. <b>Esc</b> clears.</li>' +
   '</ul>';
@@ -554,19 +566,46 @@ function renderNode(n){
 function renderEdge(e){
   var from = BY[e.from], to = BY[e.to];
   var fromName = from ? from.name : e.from, toName = to ? to.name : e.to;
-  var h = '<div class="kind">Dependency</div>';
+  var h, sub, body;
+
+  if (e.seam) {
+    // A declared seam is an assertion by a person, and the panel says so —
+    // it is not something the analysis proved.
+    h = '<div class="kind">Runtime seam &middot; declared</div>';
+    sub = e.seam.callbacks.length
+      ? e.seam.callbacks.length + ' injected ' + (e.seam.callbacks.length === 1 ? 'callback' : 'callbacks')
+      : 'declared in .n-dx.json';
+    body = esc(fromName) + ' injects into ' + esc(toName) + ', so at runtime control flows ' +
+      'this way even though the import points the other way. Static analysis cannot see this &mdash; ' +
+      'it is declared under <code>sourcevision.isoMap.injectionSeams</code> and is only as accurate ' +
+      'as that declaration.';
+  } else if (e.infra) {
+    h = '<div class="kind">Infrastructure &middot; declared</div>';
+    sub = to ? esc(to.sub) : 'runtime resource';
+    body = esc(fromName) + ' uses ' + esc(toName) + '. This relationship has no import signature; ' +
+      'it comes from a declaration or from infrastructure-as-code.';
+  } else {
+    h = '<div class="kind">Dependency</div>';
+    sub = num(e.weight) + ' cross-zone import ' + (e.weight === 1 ? 'reference' : 'references') +
+      (MODEL.meta.hasCalls ? ' &middot; ' + num(e.calls) + ' runtime calls' : '');
+    body = esc(fromName) + ' imports from ' + esc(toName) + '. ' +
+      (e.back
+        ? 'This edge runs backwards through the layering, so these two zones sit in a dependency cycle &mdash; the arrow is drawn through the return lane below the scene.'
+        : 'The arrow points from the importer to what it imports.') +
+      (e.weight === 0 && e.calls > 0
+        ? ' No import resolves this edge &mdash; it exists only in the call graph, which is the signature of an injected or event-driven seam.'
+        : '');
+  }
+
   h += '<h3>' + esc(fromName) + ' &rarr; ' + esc(toName) + '</h3>';
-  h += '<div class="sub">' + num(e.weight) + ' cross-zone import ' +
-    (e.weight === 1 ? 'reference' : 'references') +
-    (MODEL.meta.hasCalls ? ' &middot; ' + num(e.calls) + ' runtime calls' : '') + '</div>';
-  h += '<div class="body">' + esc(fromName) + ' imports from ' + esc(toName) + '. ' +
-    (e.back
-      ? 'This edge runs backwards through the layering, so these two zones sit in a dependency cycle &mdash; the arrow is drawn through the return lane below the scene.'
-      : 'The arrow points from the importer to what it imports.') +
-    (e.weight === 0 && e.calls > 0
-      ? ' No import resolves this edge &mdash; it exists only in the call graph, which is the signature of an injected or event-driven seam.'
-      : '') +
-    '</div>';
+  h += '<div class="sub">' + sub + '</div>';
+  h += '<div class="body">' + body + '</div>';
+  if (e.seam && e.seam.callbacks.length) {
+    h += '<h4>Injected</h4><ul>' + e.seam.callbacks.map(function(c){
+      return '<li><code>' + esc(c) + '</code></li>';
+    }).join("") + '</ul>';
+  }
+  if (e.seam && e.seam.note) h += '<h4>Why</h4><div class="body">' + esc(e.seam.note) + '</div>';
   h += '<h4>Both ends</h4><ul>' +
     '<li><button type="button" class="link" data-goto="' + esc(e.from) + '">' + esc(fromName) + '</button>' +
     (from ? ' <span class="sub">' + esc(from.sub) + '</span>' : '') + '</li>' +
@@ -641,7 +680,8 @@ function refresh(scrollPanel){
     var hot = (i === curEdge) || (curNode !== null && (x.e.from === curNode || x.e.to === curNode));
     var ends = kindVisible((BY[x.e.from] || {}).kind) && kindVisible((BY[x.e.to] || {}).kind);
     var weight = edgeWeight(x.e);
-    x.node.setAttribute("class", hot ? "wire hot" : "wire");
+    var declared = (x.e.seam ? " seam" : "") + (x.e.infra ? " infra" : "");
+    x.node.setAttribute("class", "wire" + declared + (hot ? " hot" : ""));
     x.node.setAttribute("marker-end", hot ? "url(#wirehot)" : "url(#wire)");
     x.node.setAttribute("stroke-width", String(Math.min(4.5, 1.6 + Math.log(weight + 1))));
     x.node.setAttribute("opacity", !ends ? "0.05" : (focused ? (hot ? "1" : "0.18") : (weight === 0 ? "0.35" : "0.85")));

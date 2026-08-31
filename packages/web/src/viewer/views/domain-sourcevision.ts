@@ -12,6 +12,7 @@
 
 export { Overview } from "./overview.js";
 export { Graph } from "./graph.js";
+export { IsoMapView } from "./iso-map.js";
 export { ZonesView } from "./zones.js";
 export { FilesView } from "./files.js";
 export { ArchitectureView } from "./architecture.js";

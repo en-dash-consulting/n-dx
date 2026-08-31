@@ -15,6 +15,13 @@ import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleIsoMapRoute, parseIsoParams, MAX_MAX_NODES } from "../../../src/server/routes-iso-map.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
+import {
+  ISO_MAP_DEFAULTS,
+  ISO_MAP_MAX_NODES,
+  ISO_MAP_SOURCES,
+  buildIsoMapUrl,
+  type IsoMapControls,
+} from "../../../src/viewer/views/iso-map-url.js";
 
 /** Three zones so a `maxNodes=1` request has something visible to drop. */
 const zonesData = {
@@ -248,5 +255,48 @@ describe("GET /api/iso-map without analysis", () => {
     expect(res.status).toBe(404);
     const data = await res.json() as { error: string };
     expect(data.error).toContain("Nothing to map");
+  });
+});
+
+/**
+ * Viewer ↔ route contract.
+ *
+ * The Isometric Map view builds its request with `buildIsoMapUrl`, which
+ * duplicates this route's bounds (the viewer must not import from src/server/).
+ * These assertions keep the duplicate honest: every URL the controls can
+ * produce must parse back to exactly the state that produced it.
+ */
+describe("buildIsoMapUrl round-trips through parseIsoParams", () => {
+  function paramsOf(url: string): URLSearchParams {
+    const qIdx = url.indexOf("?");
+    return new URLSearchParams(qIdx === -1 ? "" : url.slice(qIdx + 1));
+  }
+
+  const cases: IsoMapControls[] = [
+    ISO_MAP_DEFAULTS,
+    { source: "sourcevision", maxNodes: 1, includeExternals: false },
+    { source: "scan", maxNodes: MAX_MAX_NODES, includeExternals: true },
+    { source: "auto", maxNodes: 137, includeExternals: false },
+  ];
+
+  for (const controls of cases) {
+    it(`preserves ${JSON.stringify(controls)}`, () => {
+      const parsed = parseIsoParams(paramsOf(buildIsoMapUrl(controls)));
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) return;
+      expect(parsed.params.source).toBe(controls.source);
+      expect(parsed.params.maxNodes).toBe(controls.maxNodes);
+      expect(parsed.params.includeExternals).toBe(controls.includeExternals);
+    });
+  }
+
+  it("accepts every source mode the view offers", () => {
+    for (const source of ISO_MAP_SOURCES) {
+      expect(parseIsoParams(paramsOf(buildIsoMapUrl({ ...ISO_MAP_DEFAULTS, source }))).ok).toBe(true);
+    }
+  });
+
+  it("agrees with the route on the maxNodes ceiling", () => {
+    expect(ISO_MAP_MAX_NODES).toBe(MAX_MAX_NODES);
   });
 });

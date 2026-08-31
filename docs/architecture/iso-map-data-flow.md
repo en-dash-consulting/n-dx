@@ -98,9 +98,35 @@ imports the scheduler; at runtime, the scheduler calls back into the server. The
 map draws one arrow, in the build-time direction, and no arrow for the
 runtime one.
 
-**To close it:** these seams are already documented in prose. A machine-readable
-seam list in `.n-dx.json` — injection site, target, direction — could be read by
-the model builder and drawn as a distinct connector style.
+**Closed, by declaration.** Seams are declared under
+`sourcevision.isoMap.injectionSeams` in `.n-dx.json`:
+
+```json
+{
+  "sourcevision": {
+    "isoMap": {
+      "injectionSeams": [
+        {
+          "from": "packages/web/src/server/start.ts",
+          "to": "packages/web/src/server/register-scheduler.ts",
+          "callbacks": ["broadcast", "loadPRD"],
+          "note": "why this seam exists"
+        }
+      ]
+    }
+  }
+}
+```
+
+`from` and `to` accept a zone id, a file path, or a directory prefix. A declared
+seam is drawn in the direction control flows at *runtime* — the opposite of the
+import — in a distinct colour and dot pattern, and its panel says plainly that
+it was declared rather than inferred.
+
+**Still open:** only seams somebody wrote down are drawn. An undeclared one
+still points the wrong way, and nothing verifies that a declaration is true. A
+declaration that cannot be drawn — both ends in one zone, or a file no zone owns
+— is reported in the page footer rather than silently dropped.
 
 ### 3. Runtime infrastructure is invisible
 
@@ -110,11 +136,29 @@ identical unless a file in the zone happens to be named for the store. The
 reference map that inspired this feature had first-class nodes for an S3 bucket,
 two SQS queues and a dead-letter queue; none of those could be derived here.
 
-**To close it:** infrastructure has to be declared, not detected. The realistic
-source is IaC — a Terraform or CloudFormation parser emitting a
-`infrastructure.json` of resources and the code that references them. Absent
-that, a hand-maintained list in `.n-dx.json` would let a team pin the handful of
-stores that matter.
+**Closed, by declaration and by IaC.** Infrastructure now comes from two places
+and is drawn as its own trailing column:
+
+1. **Terraform.** `.tf` files are scanned for `resource "type" "name"` blocks.
+   Types are classified by substring into buckets, queues, topics, databases,
+   caches, streams, schedulers, secrets and compute; anything with no
+   architectural meaning (an IAM role, a security group) is skipped. A resource
+   is attributed to the zones whose source names it — a string match on the
+   resource's own name literals, with names shorter than five characters or too
+   generic (`main`, `default`, `data`) refused outright.
+2. **`.n-dx.json`**, under `sourcevision.isoMap.infrastructure`, for anything
+   IaC does not cover — a managed service, another team's queue, a database that
+   predates the repo:
+
+```json
+{ "id": "infra:jobs", "name": "jobs-queue", "kind": "queue",
+  "usedBy": ["packages/hench/src/process"], "note": "async work" }
+```
+
+**Still open:** a string match is weaker evidence than an import, and the panel
+says so. Infrastructure nothing on the map references is not drawn at all, since
+a floating block asserts a relationship the map cannot support. Only Terraform
+is parsed; CloudFormation and Pulumi are not.
 
 ### 4. Entry points are approximate
 

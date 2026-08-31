@@ -61,18 +61,18 @@ export function ArchitectureView({ data, onSelect, navigateTo }: ArchitecturePro
       `${findings.length} findings from ${zones?.zones.length ?? 0} zones`
     ),
 
-    // Isometric map — a server-rendered standalone page, so a plain link
-    // rather than an in-app view. Hidden in deployed (static export) mode,
-    // where no server is around to render it.
-    isDeployedMode()
+    // Isometric map — now a first-class view with its own generation
+    // controls, so this is a pointer to it rather than a second entry point.
+    // Hidden in deployed (static export) mode, where no server is around to
+    // build the map.
+    isDeployedMode() || !navigateTo
       ? null
       : h("p", { class: "cmd-panel-actions" },
-          h("a", {
+          h("button", {
+            type: "button",
             class: "cmd-btn cmd-btn-secondary",
-            href: "/api/iso-map",
-            target: "_blank",
-            rel: "noopener noreferrer",
-            title: "Open a standalone isometric map of this codebase's zones in a new tab",
+            onClick: () => navigateTo("iso-map"),
+            title: "Open the isometric map of this codebase's zones",
           },
             h("span", { "aria-hidden": "true" }, "◧"),
             " Isometric map",

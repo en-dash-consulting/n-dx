@@ -14,3 +14,16 @@
 export { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 export type { SourceVisionTab, SourceVisionTabId } from "./sourcevision-tabs.js";
 export { SOURCEVISION_TABS, SOURCEVISION_TAB_IDS } from "./sourcevision-tabs.js";
+export type { IsoMapControls, IsoMapSource } from "./iso-map-url.js";
+export {
+  ISO_MAP_DEFAULTS,
+  ISO_MAP_ENDPOINT,
+  ISO_MAP_MAX_NODES,
+  ISO_MAP_MIN_NODES,
+  ISO_MAP_SOURCES,
+  ISO_MAP_SOURCE_LABELS,
+  buildIsoMapUrl,
+  clampMaxNodes,
+  isIsoMapSource,
+  isoMapDownloadName,
+} from "./iso-map-url.js";

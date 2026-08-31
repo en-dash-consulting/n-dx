@@ -75,6 +75,24 @@ states which mode produced it, so a reader always knows how much to trust it.
   which is closer to real behaviour than imports. An edge with calls but no
   imports is an injected or event-driven seam, and the panel says so.
 
+## Declaring what analysis cannot see
+
+Two things no import graph can show. Both are read from `.n-dx.json` under
+`sourcevision.isoMap`, and both render in a distinct colour with a panel saying
+they were declared rather than inferred:
+
+- **`injectionSeams`** — a callback or event seam whose runtime direction is the
+  reverse of the import. `{ "from": "...", "to": "...", "callbacks": ["onX"],
+  "note": "why" }`; `from`/`to` accept a zone id, a file path or a directory.
+- **`infrastructure`** — a queue, bucket, cache or database.
+  `{ "id": "...", "name": "...", "kind": "queue", "usedBy": ["src/core"] }`.
+
+Terraform is also scanned automatically: `resource "aws_sqs_queue" "ingest"`
+becomes a node, attributed to the zones whose source names it.
+
+A declaration that cannot be drawn is reported in the page footer, never
+silently dropped.
+
 ## What to tell the user
 
 Lead with what the map shows about *their* codebase, not with the fact that a
@@ -95,10 +113,12 @@ rendered page also states them in its own footer.
 
 - **Edges are imports, not data flow.** A connector means "this zone imports
   that one", not "a request travels this way".
-- **Runtime infrastructure is invisible.** Queues, caches, buckets, databases
-  and cron jobs have no import signature and will not appear.
+- **Runtime infrastructure is declared, not detected.** Queues, caches, buckets
+  and databases appear only from `.n-dx.json` or Terraform, and a zone is
+  attributed to one by naming it in source — weaker than an import.
 - **Injection inverts direction.** A callback or event seam runs the opposite
-  way at runtime from how the import is drawn.
+  way at runtime from how the import is drawn. Declared seams are drawn the
+  right way round; undeclared ones are not.
 - **In scan mode, zones come from directory structure**, which reflects how code
   is filed rather than how it is organised, and imports come from regexes, so
   path aliases and build-tool mapping can be missed.

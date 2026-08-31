@@ -10,8 +10,8 @@
 // tests/e2e/iso-skill-drift.test.js fails if this file is out of date.
 // ─────────────────────────────────────────────────────────────────────────────
 // packages/sourcevision/src/export/iso-standalone.ts
-import { writeFileSync, existsSync as existsSync3 } from "node:fs";
-import { resolve as resolve3, join as join3, dirname as dirname2 } from "node:path";
+import { writeFileSync, existsSync as existsSync4 } from "node:fs";
+import { resolve as resolve3, join as join4, dirname as dirname2 } from "node:path";
 
 // packages/sourcevision/src/export/iso-model.ts
 var ISO_KINDS = [
@@ -22,7 +22,8 @@ var ISO_KINDS = [
   { id: "gateway", label: "Gateways", color: "#3FB6A8", glyph: "⇄" },
   { id: "support", label: "Support & config", color: "#6F7BA6", glyph: "○" },
   { id: "tests", label: "Tests", color: "#4E5B78", glyph: "✓" },
-  { id: "external", label: "Outside the codebase", color: "#7C879B", glyph: "◇" }
+  { id: "external", label: "Outside the codebase", color: "#7C879B", glyph: "◇" },
+  { id: "infra", label: "Runtime infrastructure", color: "#B0668A", glyph: "▥" }
 ];
 var KIND_IDS = new Set(ISO_KINDS.map((k) => k.id));
 function asKind(value) {
@@ -212,12 +213,44 @@ function buildIsoModel(input, options = {}) {
       outbound: consumerNames.map((name, i) => ({ id: ext.consumers[i], name, weight: 1 }))
     });
   }
-  orderRows(nodes, rawEdges);
+  const maxZoneCol = nodes.reduce((max, n) => Math.max(max, n.col), 0);
+  const infraNodes = [];
+  const infraEdges = [];
+  for (const infra of input.infrastructure ?? []) {
+    const consumers = infra.consumers.filter((id) => selectedIds.has(id));
+    if (consumers.length === 0) continue;
+    infraNodes.push({
+      id: infra.id,
+      name: infra.name,
+      kind: "infra",
+      col: maxZoneCol + 1,
+      row: 0,
+      u: 0,
+      v: 0,
+      w: MIN_W,
+      d: MIN_D,
+      h: MIN_H + 0.6,
+      stage: "",
+      sub: `${infra.kind} · used by ${consumers.length} ${consumers.length === 1 ? "zone" : "zones"}`,
+      body: (infra.note ? `${infra.note}. ` : "") + (infra.origin === "config" ? "Declared in .n-dx.json — this relationship was asserted by a person, not inferred from the code." : `Discovered in ${infra.origin}. Zones are attributed by finding its name in their source, which is weaker evidence than an import.`),
+      metrics: { files: 0, lines: 0, cohesion: 0, coupling: 0, riskLevel: "unscored", routes: 0 },
+      mix: [],
+      keyFiles: [],
+      insights: [],
+      findings: [],
+      inbound: consumers.map((id) => ({ id, name: zoneById.get(id).name, weight: 1 })),
+      outbound: []
+    });
+    for (const id of consumers) infraEdges.push({ from: id, to: infra.id });
+  }
+  nodes.push(...infraNodes);
+  orderRows(nodes, [...rawEdges, ...infraEdges]);
   const lanes = placeOnGrid(nodes);
   const layerCount = nodes.reduce((max, n) => Math.max(max, n.col), 0) + 1;
   const layers = [];
   for (let i = 0; i < layerCount; i++) {
     if (layerShift === 1 && i === 0) layers.push("Dependencies");
+    else if (infraNodes.length > 0 && i === layerCount - 1) layers.push("Infrastructure");
     else layers.push(`Layer ${i - layerShift + 1}`);
   }
   for (const node of nodes) node.stage = layers[node.col];
@@ -235,6 +268,37 @@ function buildIsoModel(input, options = {}) {
       calls: callWeights.get(`${edge.from}	${edge.to}`) ?? 0,
       back: b.col <= a.col,
       points: routeEdge(a, b, bounds, lanes, index)
+    });
+  });
+  const seamList = (input.seams ?? []).filter(
+    (s) => selectedIds.has(s.fromZone) && selectedIds.has(s.toZone) && s.fromZone !== s.toZone
+  );
+  seamList.forEach((seam, i) => {
+    const a = nodeById.get(seam.fromZone);
+    const b = nodeById.get(seam.toZone);
+    if (!a || !b) return;
+    edges.push({
+      from: seam.fromZone,
+      to: seam.toZone,
+      weight: 0,
+      calls: 0,
+      back: b.col <= a.col,
+      seam: { callbacks: seam.callbacks ?? [], note: seam.note },
+      points: routeEdge(a, b, bounds, lanes, rawEdges.length + i)
+    });
+  });
+  infraEdges.forEach((edge, i) => {
+    const a = nodeById.get(edge.from);
+    const b = nodeById.get(edge.to);
+    if (!a || !b) return;
+    edges.push({
+      from: edge.from,
+      to: edge.to,
+      weight: 0,
+      calls: 0,
+      back: b.col <= a.col,
+      infra: true,
+      points: routeEdge(a, b, bounds, lanes, rawEdges.length + seamList.length + i)
     });
   });
   externalPicks.forEach((ext, extIndex) => {
@@ -271,6 +335,8 @@ function buildIsoModel(input, options = {}) {
       totalLines: meta.totalLines,
       omittedZones: omitted,
       hasCalls: (input.callEdges?.length ?? 0) > 0,
+      seamCount: seamList.length,
+      infraCount: infraNodes.length,
       gaps: describeGaps(input)
     }
   };
@@ -487,12 +553,26 @@ function describeGaps(input) {
       'Edges are static import relationships, not runtime data flow. A drawn edge means "this zone imports that one", not "a request travels this way".'
     );
   }
-  gaps.push(
-    "Runtime infrastructure — queues, caches, buckets, databases, cron — has no static signature and is absent unless a zone wraps it in code."
-  );
-  gaps.push(
-    "Edge direction follows imports. A callback or event seam inverts control at runtime and will appear pointing the wrong way."
-  );
+  const infraCount = (input.infrastructure ?? []).length;
+  if (infraCount > 0) {
+    gaps.push(
+      "Runtime infrastructure is shown from declarations, not detection: entries in .n-dx.json and resources found in Terraform. A queue nobody declared is still invisible, and a zone is attributed to a resource by naming it in source, which is weaker evidence than an import."
+    );
+  } else {
+    gaps.push(
+      "Runtime infrastructure — queues, caches, buckets, databases, cron — has no static signature and is absent. Declare it under sourcevision.isoMap.infrastructure in .n-dx.json, or add Terraform, and it will be drawn."
+    );
+  }
+  const seamCount = (input.seams ?? []).length;
+  if (seamCount > 0) {
+    gaps.push(
+      "Import edges follow build-time direction. Declared injection seams are drawn separately in the direction control flows at runtime — but only the seams somebody wrote down; an undeclared one still points the wrong way."
+    );
+  } else {
+    gaps.push(
+      "Edge direction follows imports. A callback or event seam inverts control at runtime and will appear pointing the wrong way. Declare it under sourcevision.isoMap.injectionSeams in .n-dx.json to draw the runtime direction."
+    );
+  }
   return gaps;
 }
 
@@ -577,7 +657,7 @@ var STYLES = `
   --muted:#9B9BC4; --accent:#7FAE33; --warn:#E0A33E; --crit:#E36262;
   --chip:#232253; --chip-hover:#2C2B66;
   --ground:#171639; --gridline:#222150;
-  --wire:#4A4990; --wire-hot:#7FAE33;
+  --wire:#4A4990; --wire-hot:#7FAE33; --seam:#C9789E; --infra:#B0668A;
   --tag-bg:#1B1A45; --tag-ink:#EFEFF7; --tag-ink-on:#12122B;
   --body-ink:#D3D3E8;
 }
@@ -587,7 +667,7 @@ var STYLES = `
     --muted:#5C5F7A; --accent:#4E7A16; --warn:#9A6512; --crit:#B3352F;
     --chip:#EFF0F7; --chip-hover:#E3E5F2;
     --ground:#E7E9F5; --gridline:#D2D5E8;
-    --wire:#8E93BC; --wire-hot:#4E7A16;
+    --wire:#8E93BC; --wire-hot:#4E7A16; --seam:#A2416C; --infra:#8E4467;
     --tag-bg:#FFFFFF; --tag-ink:#1B1B33; --tag-ink-on:#FFFFFF;
     --body-ink:#33344F;
   }
@@ -637,6 +717,10 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
 .grid{stroke:var(--gridline);stroke-width:1}
 .wire{stroke:var(--wire);fill:none;stroke-linejoin:round;stroke-linecap:round}
 .wire.hot{stroke:var(--wire-hot)}
+/* Declared, not inferred: a different hue so nobody reads a human assertion
+   as something the analysis proved. */
+.wire.seam{stroke:var(--seam)}
+.wire.infra{stroke:var(--infra)}
 .tagbox{fill:var(--tag-bg)}
 .tagtext{fill:var(--tag-ink)}
 
@@ -781,18 +865,22 @@ var edgeEls = [];
 EDGES.forEach(function(e, index){
   var projected = e.points.map(function(q){ return P(q[0], q[1], 0); });
   var from = BY[e.from], to = BY[e.to];
+  var kindWord = e.seam ? "Runtime seam: " : (e.infra ? "Uses infrastructure: " : "Dependency: ");
+  var relation = e.seam ? " calls back into " : (e.infra ? " talks to " : " imports ");
   var g = el("g", {
     "class": "edge", tabindex: "-1", role: "button",
-    "aria-label": "Dependency: " + (from ? from.name : e.from) + " imports " +
-      (to ? to.name : e.to) + ", " + e.weight + " references"
+    "aria-label": kindWord + (from ? from.name : e.from) + relation +
+      (to ? to.name : e.to) + (e.seam || e.infra ? "" : ", " + e.weight + " references")
   });
   var hit = el("polyline", {
     points: pts(projected), fill: "none", stroke: "transparent",
     "stroke-width": "14", "stroke-linejoin": "round", "stroke-linecap": "round"
   });
   var line = el("polyline", { points: pts(projected), "marker-end": "url(#wire)" });
-  line.setAttribute("class", "wire");
-  if (e.back) line.setAttribute("stroke-dasharray", "7 6");
+  line.setAttribute("class", "wire" + (e.seam ? " seam" : "") + (e.infra ? " infra" : ""));
+  if (e.seam) line.setAttribute("stroke-dasharray", "2 5");
+  else if (e.infra) line.setAttribute("stroke-dasharray", "10 4");
+  else if (e.back) line.setAttribute("stroke-dasharray", "7 6");
   g.appendChild(hit); g.appendChild(line);
   gEdge.appendChild(g);
   edgeEls.push({ e: e, g: g, node: line });
@@ -909,6 +997,10 @@ var INTRO =
   '<h4>Try this</h4><ul>' +
   '<li>Click a block to see its files and cross-zone edges.</li>' +
   '<li>Click a connector, or a reference count in a panel, to inspect one dependency.</li>' +
+  (MODEL.meta.seamCount || MODEL.meta.infraCount
+    ? '<li>Pink connectors are <b>declared</b>, not inferred: runtime seams and infrastructure ' +
+      'that no import can show. They are assertions from <code>.n-dx.json</code> or IaC.</li>'
+    : '') +
   '<li>Use the legend to isolate one kind of zone.</li>' +
   '<li>Drag to pan, scroll to zoom, <b>Reset view</b> to recentre. <b>Esc</b> clears.</li>' +
   '</ul>';
@@ -983,19 +1075,46 @@ function renderNode(n){
 function renderEdge(e){
   var from = BY[e.from], to = BY[e.to];
   var fromName = from ? from.name : e.from, toName = to ? to.name : e.to;
-  var h = '<div class="kind">Dependency</div>';
+  var h, sub, body;
+
+  if (e.seam) {
+    // A declared seam is an assertion by a person, and the panel says so —
+    // it is not something the analysis proved.
+    h = '<div class="kind">Runtime seam &middot; declared</div>';
+    sub = e.seam.callbacks.length
+      ? e.seam.callbacks.length + ' injected ' + (e.seam.callbacks.length === 1 ? 'callback' : 'callbacks')
+      : 'declared in .n-dx.json';
+    body = esc(fromName) + ' injects into ' + esc(toName) + ', so at runtime control flows ' +
+      'this way even though the import points the other way. Static analysis cannot see this &mdash; ' +
+      'it is declared under <code>sourcevision.isoMap.injectionSeams</code> and is only as accurate ' +
+      'as that declaration.';
+  } else if (e.infra) {
+    h = '<div class="kind">Infrastructure &middot; declared</div>';
+    sub = to ? esc(to.sub) : 'runtime resource';
+    body = esc(fromName) + ' uses ' + esc(toName) + '. This relationship has no import signature; ' +
+      'it comes from a declaration or from infrastructure-as-code.';
+  } else {
+    h = '<div class="kind">Dependency</div>';
+    sub = num(e.weight) + ' cross-zone import ' + (e.weight === 1 ? 'reference' : 'references') +
+      (MODEL.meta.hasCalls ? ' &middot; ' + num(e.calls) + ' runtime calls' : '');
+    body = esc(fromName) + ' imports from ' + esc(toName) + '. ' +
+      (e.back
+        ? 'This edge runs backwards through the layering, so these two zones sit in a dependency cycle &mdash; the arrow is drawn through the return lane below the scene.'
+        : 'The arrow points from the importer to what it imports.') +
+      (e.weight === 0 && e.calls > 0
+        ? ' No import resolves this edge &mdash; it exists only in the call graph, which is the signature of an injected or event-driven seam.'
+        : '');
+  }
+
   h += '<h3>' + esc(fromName) + ' &rarr; ' + esc(toName) + '</h3>';
-  h += '<div class="sub">' + num(e.weight) + ' cross-zone import ' +
-    (e.weight === 1 ? 'reference' : 'references') +
-    (MODEL.meta.hasCalls ? ' &middot; ' + num(e.calls) + ' runtime calls' : '') + '</div>';
-  h += '<div class="body">' + esc(fromName) + ' imports from ' + esc(toName) + '. ' +
-    (e.back
-      ? 'This edge runs backwards through the layering, so these two zones sit in a dependency cycle &mdash; the arrow is drawn through the return lane below the scene.'
-      : 'The arrow points from the importer to what it imports.') +
-    (e.weight === 0 && e.calls > 0
-      ? ' No import resolves this edge &mdash; it exists only in the call graph, which is the signature of an injected or event-driven seam.'
-      : '') +
-    '</div>';
+  h += '<div class="sub">' + sub + '</div>';
+  h += '<div class="body">' + body + '</div>';
+  if (e.seam && e.seam.callbacks.length) {
+    h += '<h4>Injected</h4><ul>' + e.seam.callbacks.map(function(c){
+      return '<li><code>' + esc(c) + '</code></li>';
+    }).join("") + '</ul>';
+  }
+  if (e.seam && e.seam.note) h += '<h4>Why</h4><div class="body">' + esc(e.seam.note) + '</div>';
   h += '<h4>Both ends</h4><ul>' +
     '<li><button type="button" class="link" data-goto="' + esc(e.from) + '">' + esc(fromName) + '</button>' +
     (from ? ' <span class="sub">' + esc(from.sub) + '</span>' : '') + '</li>' +
@@ -1070,7 +1189,8 @@ function refresh(scrollPanel){
     var hot = (i === curEdge) || (curNode !== null && (x.e.from === curNode || x.e.to === curNode));
     var ends = kindVisible((BY[x.e.from] || {}).kind) && kindVisible((BY[x.e.to] || {}).kind);
     var weight = edgeWeight(x.e);
-    x.node.setAttribute("class", hot ? "wire hot" : "wire");
+    var declared = (x.e.seam ? " seam" : "") + (x.e.infra ? " infra" : "");
+    x.node.setAttribute("class", "wire" + declared + (hot ? " hot" : ""));
     x.node.setAttribute("marker-end", hot ? "url(#wirehot)" : "url(#wire)");
     x.node.setAttribute("stroke-width", String(Math.min(4.5, 1.6 + Math.log(weight + 1))));
     x.node.setAttribute("opacity", !ends ? "0.05" : (focused ? (hot ? "1" : "0.18") : (weight === 0 ? "0.35" : "0.85")));
@@ -1195,8 +1315,8 @@ refresh(false);
 `;
 
 // packages/sourcevision/src/export/iso-sources.ts
-import { readFileSync as readFileSync2, existsSync as existsSync2 } from "node:fs";
-import { join as join2, basename as basename2, resolve as resolve2 } from "node:path";
+import { readFileSync as readFileSync3, existsSync as existsSync3 } from "node:fs";
+import { join as join3, basename as basename2, resolve as resolve2 } from "node:path";
 import { execFileSync } from "node:child_process";
 
 // packages/sourcevision/src/export/iso-scan.ts
@@ -1798,6 +1918,193 @@ function scanProject(root) {
   };
 }
 
+// packages/sourcevision/src/export/iso-declared.ts
+import { readFileSync as readFileSync2, existsSync as existsSync2, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
+import { join as join2, relative as relative2, extname as extname2, sep as sep2 } from "node:path";
+function readJson(path) {
+  try {
+    return JSON.parse(readFileSync2(path, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+function readDeclaredConfig(root) {
+  const config = readJson(join2(root, ".n-dx.json"));
+  const isoMap = config?.sourcevision?.isoMap;
+  if (!isoMap) return { seams: [], infrastructure: [] };
+  const seams = (isoMap.injectionSeams ?? []).filter(
+    (s) => Boolean(s && typeof s.from === "string" && typeof s.to === "string")
+  );
+  const infrastructure = (isoMap.infrastructure ?? []).filter((i) => i && typeof i.id === "string" && typeof i.name === "string").map((i) => ({ ...i, kind: i.kind || "service", origin: "config" }));
+  return { seams, infrastructure };
+}
+var IAC_KINDS = [
+  [/bucket|blob_container|storage_account/, "bucket"],
+  [/sqs|_queue|servicebus_queue|pubsub_subscription/, "queue"],
+  [/sns|pubsub_topic|eventgrid|event_bus|eventbridge/, "topic"],
+  [/dynamodb|rds|_sql|spanner|firestore|bigtable|cosmosdb|documentdb|database/, "database"],
+  [/elasticache|redis|memcache/, "cache"],
+  [/kinesis|kafka|msk|firehose/, "stream"],
+  [/cloudwatch_event_rule|scheduler|cron|eventbridge_rule/, "scheduler"],
+  [/secret|kms|vault|parameter/, "secrets"],
+  [/lambda_function|cloud_run|cloudfunctions|container_app/, "compute"]
+];
+function classifyResource(type) {
+  const lower = type.toLowerCase();
+  for (const [pattern, kind] of IAC_KINDS) {
+    if (pattern.test(lower)) return kind;
+  }
+  return null;
+}
+var IAC_SKIP = /* @__PURE__ */ new Set([
+  "node_modules",
+  ".git",
+  ".terraform",
+  "dist",
+  "build",
+  "vendor",
+  "coverage"
+]);
+function findTerraform(root, limit = 400) {
+  const found = [];
+  function walk(dir, depth) {
+    if (depth > 8 || found.length >= limit) return;
+    let entries;
+    try {
+      entries = readdirSync2(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      if (found.length >= limit) return;
+      const full = join2(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (IAC_SKIP.has(entry.name) || entry.name.startsWith(".")) continue;
+        walk(full, depth + 1);
+      } else if (extname2(entry.name) === ".tf") {
+        found.push(relative2(root, full).split(sep2).join("/"));
+      }
+    }
+  }
+  walk(root, 0);
+  return found;
+}
+var TF_RESOURCE = /resource\s+"([^"]+)"\s+"([^"]+)"\s*\{/g;
+var TF_NAME_ATTR = /^\s*(?:name|bucket|queue_name|topic_name|function_name|identifier|table_name)\s*=\s*"([^"]+)"/gm;
+function discoverFromIaC(root) {
+  const files = findTerraform(root);
+  if (files.length === 0) return { infrastructure: [], sawIaC: false };
+  const infrastructure = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const file of files) {
+    let content;
+    try {
+      content = readFileSync2(join2(root, file), "utf-8");
+    } catch {
+      continue;
+    }
+    TF_RESOURCE.lastIndex = 0;
+    let match;
+    while ((match = TF_RESOURCE.exec(content)) !== null) {
+      const [, type, localName] = match;
+      const kind = classifyResource(type);
+      if (!kind) continue;
+      const id = `infra:${type}.${localName}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const block = content.slice(match.index, match.index + 800);
+      TF_NAME_ATTR.lastIndex = 0;
+      const literals = /* @__PURE__ */ new Set([localName]);
+      let attr;
+      while ((attr = TF_NAME_ATTR.exec(block)) !== null) literals.add(attr[1]);
+      infrastructure.push({
+        id,
+        name: localName,
+        kind,
+        usedBy: [],
+        note: `${type} declared in ${file}`,
+        origin: file,
+        literals: [...literals].sort()
+      });
+    }
+  }
+  infrastructure.sort((a, b) => a.id.localeCompare(b.id));
+  return { infrastructure, sawIaC: true };
+}
+var TOO_GENERIC = /* @__PURE__ */ new Set([
+  "main",
+  "default",
+  "this",
+  "test",
+  "app",
+  "api",
+  "web",
+  "data",
+  "config",
+  "name",
+  "id",
+  "key",
+  "value",
+  "type",
+  "input",
+  "output",
+  "queue",
+  "bucket"
+]);
+function usableLiterals(infra) {
+  return (infra.literals ?? [infra.name]).filter(
+    (l) => l.length >= 5 && !TOO_GENERIC.has(l.toLowerCase())
+  );
+}
+function linkInfrastructure(infrastructure, filePaths, readFile) {
+  const candidates = infrastructure.filter(
+    (i) => i.origin !== "config" && (i.usedBy ?? []).length === 0
+  );
+  if (candidates.length === 0) return infrastructure;
+  const literalsById = /* @__PURE__ */ new Map();
+  for (const infra of candidates) {
+    const literals = usableLiterals(infra);
+    if (literals.length > 0) literalsById.set(infra.id, literals);
+  }
+  if (literalsById.size === 0) return infrastructure;
+  const hits = /* @__PURE__ */ new Map();
+  for (const path of filePaths) {
+    const content = readFile(path);
+    if (!content) continue;
+    for (const [id, literals] of literalsById) {
+      if (literals.some((l) => content.includes(l))) {
+        if (!hits.has(id)) hits.set(id, /* @__PURE__ */ new Set());
+        hits.get(id).add(path);
+      }
+    }
+  }
+  return infrastructure.map((infra) => {
+    const found = hits.get(infra.id);
+    if (!found) return infra;
+    return { ...infra, usedBy: [...found].sort() };
+  });
+}
+function loadDeclaredArchitecture(root, filePaths, readFile) {
+  const config = readDeclaredConfig(root);
+  const iac = discoverFromIaC(root);
+  const read = readFile ?? ((path) => {
+    try {
+      const full = join2(root, path);
+      if (!existsSync2(full) || statSync2(full).size > 1e6) return null;
+      return readFileSync2(full, "utf-8");
+    } catch {
+      return null;
+    }
+  });
+  const infrastructure = linkInfrastructure(
+    [...config.infrastructure, ...iac.infrastructure],
+    filePaths,
+    read
+  );
+  return { seams: config.seams, infrastructure, sawIaC: iac.sawIaC };
+}
+
 // packages/sourcevision/src/export/iso-sources.ts
 var ARCHETYPE_KIND = {
   entrypoint: "entry",
@@ -1874,29 +2181,90 @@ function aggregateCallEdges(callGraph, zoneOfFile) {
     (a, b) => b.weight - a.weight || a.fromZone.localeCompare(b.fromZone) || a.toZone.localeCompare(b.toZone)
   );
 }
+function toZoneId(ref, zoneIds, zoneOfFile) {
+  if (zoneIds.has(ref)) return ref;
+  const exact = zoneOfFile.get(ref);
+  if (exact) return exact;
+  const prefix = ref.replace(/\/+$/, "") + "/";
+  for (const [file, zone] of zoneOfFile) {
+    if (file.startsWith(prefix)) return zone;
+  }
+  return null;
+}
+function resolveSeams(seams, zoneIds, zoneOfFile) {
+  const resolved = [];
+  const internal = [];
+  const unresolved = [];
+  for (const seam of seams) {
+    const label = `${seam.from} → ${seam.to}`;
+    const fromZone = toZoneId(seam.from, zoneIds, zoneOfFile);
+    const toZone = toZoneId(seam.to, zoneIds, zoneOfFile);
+    if (!fromZone || !toZone) {
+      unresolved.push(label);
+      continue;
+    }
+    if (fromZone === toZone) {
+      internal.push(label);
+      continue;
+    }
+    resolved.push({ fromZone, toZone, callbacks: seam.callbacks, note: seam.note });
+  }
+  return { seams: resolved, internal, unresolved };
+}
+function seamGaps(resolution) {
+  const gaps = [];
+  if (resolution.internal.length > 0) {
+    gaps.push(
+      `${resolution.internal.length} declared seam${resolution.internal.length === 1 ? " has" : "s have"} both ends inside one zone, so there is nothing to draw between blocks: ${resolution.internal.join(", ")}.`
+    );
+  }
+  if (resolution.unresolved.length > 0) {
+    gaps.push(
+      `${resolution.unresolved.length} declared seam${resolution.unresolved.length === 1 ? "" : "s"} could not be placed — the named file or zone is not in the map: ${resolution.unresolved.join(", ")}.`
+    );
+  }
+  return gaps;
+}
+function resolveInfrastructure(infrastructure, zoneIds, zoneOfFile) {
+  return infrastructure.map((infra) => {
+    const consumers = /* @__PURE__ */ new Set();
+    for (const ref of infra.usedBy ?? []) {
+      const zone = toZoneId(ref, zoneIds, zoneOfFile);
+      if (zone) consumers.add(zone);
+    }
+    return {
+      id: infra.id,
+      name: infra.name,
+      kind: infra.kind,
+      note: infra.note,
+      origin: infra.origin,
+      consumers: [...consumers].sort()
+    };
+  });
+}
 var REQUIRED_FILES = ["zones.json", "inventory.json", "imports.json"];
 function hasSourcevision(root) {
-  const svDir = join2(root, ".sourcevision");
-  return existsSync2(svDir) && REQUIRED_FILES.every((f) => existsSync2(join2(svDir, f)));
+  const svDir = join3(root, ".sourcevision");
+  return existsSync3(svDir) && REQUIRED_FILES.every((f) => existsSync3(join3(svDir, f)));
 }
-function readJson(path) {
+function readJson2(path) {
   try {
-    return JSON.parse(readFileSync2(path, "utf-8"));
+    return JSON.parse(readFileSync3(path, "utf-8"));
   } catch {
     return null;
   }
 }
 function loadFromSourcevision(root, options = {}) {
-  const svDir = join2(root, ".sourcevision");
+  const svDir = join3(root, ".sourcevision");
   if (!hasSourcevision(root)) return null;
-  const zonesData = readJson(join2(svDir, "zones.json"));
-  const inventory = readJson(join2(svDir, "inventory.json"));
-  const imports = readJson(join2(svDir, "imports.json"));
+  const zonesData = readJson2(join3(svDir, "zones.json"));
+  const inventory = readJson2(join3(svDir, "inventory.json"));
+  const imports = readJson2(join3(svDir, "imports.json"));
   if (!zonesData || !inventory || !imports) return null;
-  const classifications = readJson(join2(svDir, "classifications.json"));
-  const components = readJson(join2(svDir, "components.json"));
-  const manifest = readJson(join2(svDir, "manifest.json"));
-  const callGraph = readJson(join2(svDir, "callgraph.json"));
+  const classifications = readJson2(join3(svDir, "classifications.json"));
+  const components = readJson2(join3(svDir, "components.json"));
+  const manifest = readJson2(join3(svDir, "manifest.json"));
+  const callGraph = readJson2(join3(svDir, "callgraph.json"));
   const archetypeOf = /* @__PURE__ */ new Map();
   for (const entry of classifications?.files ?? []) {
     if (entry.archetype) archetypeOf.set(entry.path, entry.archetype);
@@ -1944,9 +2312,15 @@ function loadFromSourcevision(root, options = {}) {
       "No server routes detected — inbound entry points are inferred from zone entry files rather than real HTTP surfaces."
     );
   }
+  const zoneIds = new Set(zones.map((z) => z.id));
+  const declared = loadDeclaredArchitecture(root, [...files.keys()]);
+  const seamResolution = resolveSeams(declared.seams, zoneIds, zoneOfFile);
+  extraGaps.push(...seamGaps(seamResolution));
   return {
     zones,
     crossings: (zonesData.crossings ?? []).map((c) => ({ fromZone: c.fromZone, toZone: c.toZone })),
+    seams: seamResolution.seams,
+    infrastructure: resolveInfrastructure(declared.infrastructure, zoneIds, zoneOfFile),
     files,
     external: (imports.external ?? []).map((e) => ({
       package: e.package,
@@ -1982,7 +2356,15 @@ function loadFromScan(root, options = {}) {
     "Zones were inferred from directory structure, not from community detection. They reflect how the code is filed, which is not always how it is organised.",
     "Imports were extracted with regular expressions. Dynamic requires and build-tool path mapping beyond tsconfig paths and workspace names may be missed."
   ];
+  const zoneOfFile = /* @__PURE__ */ new Map();
+  for (const zone of scan.zones) for (const f of zone.files) zoneOfFile.set(f, zone.id);
+  const zoneIds = new Set(scan.zones.map((z) => z.id));
+  const declared = loadDeclaredArchitecture(root, [...files.keys()]);
+  const seamResolution = resolveSeams(declared.seams, zoneIds, zoneOfFile);
+  extraGaps.push(...seamGaps(seamResolution));
   return {
+    seams: seamResolution.seams,
+    infrastructure: resolveInfrastructure(declared.infrastructure, zoneIds, zoneOfFile),
     zones: scan.zones.map((z) => ({
       id: z.id,
       name: z.name,
@@ -2095,7 +2477,7 @@ function runStandalone(argv, io) {
     return 0;
   }
   const root = resolve3(opts.dir);
-  if (!existsSync3(root)) {
+  if (!existsSync4(root)) {
     io.err(`iso-map: Directory not found: ${root}
 `);
     return 1;
@@ -2119,8 +2501,8 @@ function runStandalone(argv, io) {
     );
     return 1;
   }
-  const out = resolve3(opts.out ?? join3(root, "iso-map.html"));
-  if (!existsSync3(dirname2(out))) {
+  const out = resolve3(opts.out ?? join4(root, "iso-map.html"));
+  if (!existsSync4(dirname2(out))) {
     io.err(`iso-map: Output directory does not exist: ${dirname2(out)}
 `);
     return 1;

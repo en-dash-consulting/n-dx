@@ -319,6 +319,13 @@ script. That script is **generated** from `packages/sourcevision/src/export/`
 by `scripts/build-iso-skill.mjs` — edit the TypeScript and re-run it; do not
 hand-edit `.claude/skills/iso-map/scripts/iso-map.mjs`.
 
+Two things no import graph can show are declared under `sourcevision.isoMap` in
+`.n-dx.json` and drawn as explicitly-declared relationships: `injectionSeams`
+(callback/event seams, drawn in the runtime control-flow direction rather than
+the import direction) and `infrastructure` (queues, buckets, caches, databases).
+Terraform `resource` blocks are discovered automatically. A declaration that
+cannot be drawn is reported in the page footer rather than dropped.
+
 See [`docs/architecture/iso-map-data-flow.md`](docs/architecture/iso-map-data-flow.md)
 for what the map can and cannot show.
 

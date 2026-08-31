@@ -19,6 +19,8 @@ import { execFileSync } from "node:child_process";
 import type { IsoFileInput, IsoKind, IsoModelInput, IsoZoneInput } from "./iso-model.js";
 import { asKind } from "./iso-model.js";
 import { scanProject } from "./iso-scan.js";
+import { loadDeclaredArchitecture } from "./iso-declared.js";
+import type { DeclaredInfra, DeclaredSeam } from "./iso-declared.js";
 import type {
   CallGraph,
   Classifications,
@@ -164,6 +166,106 @@ export function aggregateCallEdges(
   );
 }
 
+// ── Resolving declarations onto zones ───────────────────────────────────────
+
+/**
+ * Resolve a declaration's endpoint to a zone id.
+ *
+ * Declarations name either a zone id directly or a file path, because both are
+ * natural to write by hand: "web-server" and "web/src/server/start.ts" should
+ * both work. A path prefix resolves to the zone owning the first file under it.
+ */
+function toZoneId(ref: string, zoneIds: Set<string>, zoneOfFile: Map<string, string>): string | null {
+  if (zoneIds.has(ref)) return ref;
+  const exact = zoneOfFile.get(ref);
+  if (exact) return exact;
+  const prefix = ref.replace(/\/+$/, "") + "/";
+  for (const [file, zone] of zoneOfFile) {
+    if (file.startsWith(prefix)) return zone;
+  }
+  return null;
+}
+
+interface SeamResolution {
+  seams: NonNullable<IsoModelInput["seams"]>;
+  /** Declarations that resolved to a single zone — nothing to draw between. */
+  internal: string[];
+  /** Declarations naming something no zone owns. */
+  unresolved: string[];
+}
+
+/**
+ * Resolve declared seams onto zone pairs.
+ *
+ * A declaration that cannot be drawn is reported rather than dropped: somebody
+ * wrote it expecting to see it, and "both ends are in the same zone" or "that
+ * file is in no zone" is useful feedback, where silence is not.
+ */
+function resolveSeams(
+  seams: DeclaredSeam[],
+  zoneIds: Set<string>,
+  zoneOfFile: Map<string, string>,
+): SeamResolution {
+  const resolved: NonNullable<IsoModelInput["seams"]> = [];
+  const internal: string[] = [];
+  const unresolved: string[] = [];
+
+  for (const seam of seams) {
+    const label = `${seam.from} → ${seam.to}`;
+    const fromZone = toZoneId(seam.from, zoneIds, zoneOfFile);
+    const toZone = toZoneId(seam.to, zoneIds, zoneOfFile);
+    if (!fromZone || !toZone) {
+      unresolved.push(label);
+      continue;
+    }
+    if (fromZone === toZone) {
+      internal.push(label);
+      continue;
+    }
+    resolved.push({ fromZone, toZone, callbacks: seam.callbacks, note: seam.note });
+  }
+
+  return { seams: resolved, internal, unresolved };
+}
+
+/** Turn undrawable declarations into caveats the rendered page states. */
+function seamGaps(resolution: SeamResolution): string[] {
+  const gaps: string[] = [];
+  if (resolution.internal.length > 0) {
+    gaps.push(
+      `${resolution.internal.length} declared seam${resolution.internal.length === 1 ? " has" : "s have"} both ends inside one zone, so there is nothing to draw between blocks: ${resolution.internal.join(", ")}.`,
+    );
+  }
+  if (resolution.unresolved.length > 0) {
+    gaps.push(
+      `${resolution.unresolved.length} declared seam${resolution.unresolved.length === 1 ? "" : "s"} could not be placed — the named file or zone is not in the map: ${resolution.unresolved.join(", ")}.`,
+    );
+  }
+  return gaps;
+}
+
+function resolveInfrastructure(
+  infrastructure: DeclaredInfra[],
+  zoneIds: Set<string>,
+  zoneOfFile: Map<string, string>,
+): IsoModelInput["infrastructure"] {
+  return infrastructure.map((infra) => {
+    const consumers = new Set<string>();
+    for (const ref of infra.usedBy ?? []) {
+      const zone = toZoneId(ref, zoneIds, zoneOfFile);
+      if (zone) consumers.add(zone);
+    }
+    return {
+      id: infra.id,
+      name: infra.name,
+      kind: infra.kind,
+      note: infra.note,
+      origin: infra.origin,
+      consumers: [...consumers].sort(),
+    };
+  });
+}
+
 // ── Sourcevision ────────────────────────────────────────────────────────────
 
 const REQUIRED_FILES = ["zones.json", "inventory.json", "imports.json"];
@@ -253,9 +355,16 @@ export function loadFromSourcevision(root: string, options: LoadOptions = {}): I
     );
   }
 
+  const zoneIds = new Set(zones.map((z) => z.id));
+  const declared = loadDeclaredArchitecture(root, [...files.keys()]);
+  const seamResolution = resolveSeams(declared.seams, zoneIds, zoneOfFile);
+  extraGaps.push(...seamGaps(seamResolution));
+
   return {
     zones,
     crossings: (zonesData.crossings ?? []).map((c) => ({ fromZone: c.fromZone, toZone: c.toZone })),
+    seams: seamResolution.seams,
+    infrastructure: resolveInfrastructure(declared.infrastructure, zoneIds, zoneOfFile),
     files,
     external: (imports.external ?? []).map((e) => ({
       package: e.package,
@@ -297,7 +406,16 @@ export function loadFromScan(root: string, options: LoadOptions = {}): IsoModelI
     "Imports were extracted with regular expressions. Dynamic requires and build-tool path mapping beyond tsconfig paths and workspace names may be missed.",
   ];
 
+  const zoneOfFile = new Map<string, string>();
+  for (const zone of scan.zones) for (const f of zone.files) zoneOfFile.set(f, zone.id);
+  const zoneIds = new Set(scan.zones.map((z) => z.id));
+  const declared = loadDeclaredArchitecture(root, [...files.keys()]);
+  const seamResolution = resolveSeams(declared.seams, zoneIds, zoneOfFile);
+  extraGaps.push(...seamGaps(seamResolution));
+
   return {
+    seams: seamResolution.seams,
+    infrastructure: resolveInfrastructure(declared.infrastructure, zoneIds, zoneOfFile),
     zones: scan.zones.map((z) => ({
       id: z.id,
       name: z.name,
