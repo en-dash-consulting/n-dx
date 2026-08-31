@@ -21,7 +21,7 @@ import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage,
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
-import { getCurrentHead, execShellCmd, execStdout } from "../../process/exec.js";
+import { getCurrentHead, execStdout } from "../../process/exec.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
@@ -34,6 +34,7 @@ import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
+import { discoverChangedFiles } from "../analysis/changed-files.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
@@ -831,8 +832,20 @@ export interface FinalizeRunOptions {
    * {@link captureBaselineUntracked}). Threaded into rollback so only
    * agent-created untracked files are removed on failure — never the user's
    * pre-existing untracked work (issue #303).
+   *
+   * Also used as the exclusion set when discovering this run's changed files:
+   * an untracked file that was already there is the user's, not the run's.
    */
   baselineUntracked?: string[];
+  /**
+   * Commit the run started from (via {@link captureStartingHead}).
+   *
+   * The baseline for changed-file discovery. It has to be the pre-run commit
+   * rather than HEAD: on the autoCommit path the executor commits its own
+   * work before the gate runs, so a HEAD-relative diff reports nothing and
+   * the gate would skip the very run it should be testing.
+   */
+  startingHead?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1928,28 +1941,32 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   }
 
   // Discover changed files for the test gate.
-  // When the agent loop produced no tool call records (e.g. Codex CLI, which
-  // emits verbose text rather than structured tool events), fall back to
-  // `git diff --name-only HEAD` to discover which files were actually changed.
-  // This ensures the test gate runs even for vendors that do not emit
-  // structured tool events. The check is vendor-agnostic and runs for all modes.
-  if (run.structuredSummary && run.toolCalls.length === 0) {
-    try {
-      const { stdout } = await execShellCmd("git diff --name-only HEAD", {
-        cwd: projectDir,
-        timeout: 10_000,
-      });
-      const gitChangedFiles = stdout.trim().split("\n").filter(Boolean);
-      if (gitChangedFiles.length > 0) {
-        run.structuredSummary.filesChanged = gitChangedFiles;
-        run.structuredSummary.counts = {
-          ...run.structuredSummary.counts,
-          filesChanged: gitChangedFiles.length,
-        };
-      }
-    } catch {
-      // Best-effort: if git is unavailable, the test gate falls back to
-      // the existing filesChanged (empty), which causes it to skip.
+  //
+  // Git is the authority here, not the model's own summary of what it did.
+  // The summary can report nothing while tool calls wrote files, and the
+  // previous fallback only consulted git when the loop recorded no tool
+  // calls at all — which never happens on the Claude CLI, so the gate read
+  // an empty list and skipped on the default path. Repairs made by the
+  // adversarial review pass are invisible to the summary besides: they
+  // happen in a separate spawn, after it was parsed.
+  //
+  // The baseline is the commit the run started from, so the set includes
+  // work the executor committed itself (invisible to `git diff HEAD`) as
+  // well as everything still uncommitted at gate time. `undefined` means
+  // git could not answer — distinct from "nothing changed" — and leaves the
+  // model-reported list in place rather than overriding it with a guess.
+  if (run.structuredSummary) {
+    const gitChangedFiles = await discoverChangedFiles({
+      projectDir,
+      startingHead: opts.startingHead,
+      baselineUntracked: opts.baselineUntracked,
+    });
+    if (gitChangedFiles) {
+      run.structuredSummary.filesChanged = gitChangedFiles;
+      run.structuredSummary.counts = {
+        ...run.structuredSummary.counts,
+        filesChanged: gitChangedFiles.length,
+      };
     }
   }
 
