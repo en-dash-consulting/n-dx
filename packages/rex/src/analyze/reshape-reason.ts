@@ -24,6 +24,7 @@ import {
   emptyAnalyzeTokenUsage,
   accumulateTokenUsage,
 } from "./reason.js";
+import { withEscalation } from "./escalate.js";
 
 // ── Zod schemas for LLM response validation ──
 
@@ -465,12 +466,18 @@ export async function reasonForBodyMerge(
     itemSummary,
   ].join("\n");
 
-  const llmResult = await spawnClaude(prompt, model, undefined, { taskClass: "prd.merge" });
-  accumulateTokenUsage(tokenUsage, llmResult.tokenUsage);
-
+  // Light-tier with escalation: an unusable description retries on the
+  // standard tier carrying the reason, instead of throwing away the merge.
+  const escalation = await withEscalation({
+    prompt,
+    taskClass: "prd.merge",
+    model,
+    validate: (text: string) => validateMergedDescription(text),
+  });
   return {
-    description: validateMergedDescription(llmResult.text),
-    tokenUsage,
+    description: escalation.value,
+    // Carried through whole — see modify-reason: every attempt was billed.
+    tokenUsage: escalation.tokenUsage,
   };
 }
 
