@@ -10,6 +10,18 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 - **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores all PRD state in a slug-based folder tree at `.rex/prd_tree/`: one directory per item with an `index.md` file. No JSON files are written by PRD mutations.
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
 
+## Monorepo Structure
+
+```
+packages/
+  core/            # CLI orchestrator (published as @n-dx/core)
+  sourcevision/    # analysis engine
+  rex/             # PRD + task tracker
+  hench/           # autonomous agent
+  llm-client/      # vendor-neutral LLM foundation (claude adapter + future vendors)
+  web/             # dashboard + MCP HTTP server
+```
+
 ### Architecture
 
 Four-tier dependency hierarchy (each layer imports only from the layer below):
@@ -29,7 +41,7 @@ Zero circular dependencies. The web package sits alongside orchestration — it 
 
 #### Web package internal zone layering
 
-The web package forms a hub topology with `web-viewer` at the centre:
+Within the web package, four internal zones form a hub topology with `web-viewer` at the center:
 
 ```
   web-server          (composition root — Express routes, gateways, MCP handlers)
@@ -38,20 +50,28 @@ The web package forms a hub topology with `web-viewer` at the centre:
        ↑ ↓                  ↓
   viewer-message-pipeline  (messaging middleware — coalescer, throttle, rate-limiter, request-dedup)
        ↓                    ↓
-  src/shared/         (framework-agnostic utilities — data-files, features, view-id, view-routing)
+  web-shared          (framework-agnostic utilities — data-files, node-culler, view-id)
 ```
 
-`web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `src/shared/`, while also receiving imports from sub-directories such as `crash/`. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `src/shared/` is the foundation layer with zero upward dependencies, enforced by `boundary-check.test.ts`.
-
-Measured zone metrics are not reproduced here — they change with every analysis. Run `ndx analyze --deep .` and read `.sourcevision/zones.json`; per-package policies live in `packages/*/CLAUDE.md`.
+`web-viewer` is the hub: it imports from `viewer-message-pipeline` (via `external.ts`) and `web-shared`, while also receiving imports from sub-zones like `crash/` and `hench-agent-monitor`. The actual import graph has 11+ distinct cross-zone edges radiating from `web-viewer`, making it a hub rather than a linear stack. `web-server` is a parallel composition root — it wires gateways and routes but does not import from `web-viewer` at runtime (the viewer is built separately and served as static assets). `web-shared` is the foundation layer with zero upward dependencies (enforced by `boundary-check.test.ts`).
 
 
 ### Package conventions
 
 | Convention | Pattern | Notes |
 |-----------|---------|-------|
-| Naming | All packages are `@n-dx/` scoped (`@n-dx/core`, `@n-dx/rex`, `@n-dx/sourcevision`, `@n-dx/hench`, `@n-dx/llm-client`, `@n-dx/web`) | The unscoped `rex` / `hench` / `sourcevision` / `sv` names are **bin aliases**, not package names — they exist so the CLIs can be invoked directly after install, not for `npx <name>`. Changesets must use the scoped name — an unscoped name fails `changeset status` with "not in the workspace" |
+| Public API | `src/public.ts` → `exports["."]` in `package.json` | All 5 packages follow this |
+| Test structure | `tests/{unit,integration,e2e}/**/*.test.ts` | Standardized across all packages |
+| Naming | Mixed: `rex`, `sourcevision`, `hench` (unscoped) / `@n-dx/web`, `@n-dx/llm-client` (scoped) | Intentional: CLI tools use short unscoped names for `npx`/`pnpm exec`; internal-only packages use the `@n-dx/` scope |
 | Subpath exports | `"./dist/*": "./dist/*"` | Intentional escape hatch — not public API, no stability guarantee. See `PACKAGE_GUIDELINES.md` for acceptable/prohibited uses |
+
+Build and test:
+
+```sh
+pnpm build          # build all packages
+pnpm test           # test all packages
+pnpm typecheck      # typecheck all packages
+```
 
 ## Assistant Instruction Files
 
@@ -67,28 +87,91 @@ Measured zone metrics are not reproduced here — they change with every analysi
 
 Re-run `ndx init` to regenerate all instruction files after changes to `packages/core/assistant-assets/`.
 
+## Command Aliases
+
+Both `n-dx` and `ndx` work identically (`ndx` is shorter to type).
+`sv` is an alias for `sourcevision`.
+
 ## n-dx Orchestration Commands
 
-Run `ndx <command> --help` for full usage, or see `README.md` for the command reference and direct-tool-access aliases (`ndx rex`, `ndx hench`, `ndx sv`, or the standalone binaries).
+```sh
+ndx init [dir]            # sourcevision init → rex init → hench init + LLM model selection
+                          #   --provider=claude|codex  --model=<id>
+                          #   --claude-model=<id>  --codex-model=<id>
+ndx analyze [dir]         # sourcevision analyze (--deep, --full, --lite)
+ndx recommend [dir]       # rex recommend (--accept, --actionable-only, --acknowledge)
+ndx add "description"     # smart-add PRD items from freeform descriptions
+ndx add --file=spec.md    # import ideas from a text file
+ndx plan [dir]            # sourcevision analyze → rex analyze (show proposals)
+ndx plan --accept [dir]   # ...then accept proposals into PRD
+ndx work [dir]            # hench run (pass --task=ID, --auto, --iterations=N, --yes,
+                          #   --permission-mode=<default|acceptEdits|bypassPermissions|plan>, etc.)
+                          # Autonomous runs (--auto/--loop/--epic-by-epic) default to
+                          # acceptEdits so the spawned Claude session won't stall in plan
+                          # mode. Override with --permission-mode or hench.permissionMode.
+                          # The no-plan-mode rule is embedded in the hench system prompt
+                          # for all CLI-provider runs (see /no-plan-mode skill).
+ndx self-heal [N] [dir]   # iterative improvement loop (analyze → recommend → execute; --yes for unattended)
+ndx start [dir]           # start server: dashboard + MCP endpoints (--port=N, --background, stop, status)
+ndx status [dir]          # rex status (pass --format=json)
+ndx usage [dir]           # token usage analytics (--format=json, --group=day|week|month)
+ndx sync [dir]            # sync local PRD with remote adapter (--push, --pull)
+ndx refresh [dir]         # refresh dashboard artifacts (--ui-only, --data-only, --no-build)
+ndx dev [dir]             # start web dev server with live reload
+ndx ci [dir]              # run analysis pipeline and validate PRD health (--format=json)
+ndx config [key] [value]  # view/edit settings (--json, --help)
+ndx export [dir]          # export static deployable dashboard (--out-dir, --deploy=github)
+```
 
-**Gotcha:** `ndx work` autonomous runs (`--auto`/`--loop`/`--epic-by-epic`) default `--permission-mode` to `acceptEdits` so the spawned Claude session won't stall in plan mode — override with `--permission-mode` or `hench.permissionMode`. This default is enforced repo-wide via the hench system prompt for all CLI-provider runs (see the `/no-plan-mode` skill).
+## Direct Tool Access
+
+```sh
+# Via orchestrator
+ndx rex <command> [args]
+ndx hench <command> [args]
+ndx sourcevision <command> [args]
+ndx sv <command> [args]           # alias for sourcevision
+
+# Standalone binaries (also available after npm link)
+rex <command> [args]
+hench <command> [args]
+sourcevision <command> [args]
+sv <command> [args]               # alias for sourcevision
+```
+
+### Rex commands
+
+`init`, `status`, `next`, `add`, `remove`, `update`, `validate`, `analyze`, `recommend`, `mcp`
+
+### Sourcevision commands
+
+`init`, `analyze`, `serve`, `validate`, `reset`, `mcp`
+
+### Hench commands
+
+`init`, `run`, `status`, `show`
 
 ## Changeset Versioning
 
 - **Always default changeset bumps to `patch`** across all affected packages unless explicitly instructed otherwise by a user.
-- **Use the scoped package name** (`@n-dx/rex`, `@n-dx/hench`, …) in changeset frontmatter. An unscoped name is not in the workspace and fails `changeset status`, breaking the release pipeline.
 
 ## Key Files
 
 | Path | Purpose |
 |------|---------|
+| `.sourcevision/CONTEXT.md` | AI-readable codebase summary |
+| `.sourcevision/manifest.json` | Analysis metadata and version |
 | `.rex/prd_tree/` | PRD storage root — slug-based folder tree; one directory per item (epic/feature/task) containing `index.md` |
 | `.rex/prd.md` | (Legacy) flat Markdown PRD; migration source for `rex migrate-to-folder-tree`. Absent after migration. |
 | `.rex/prd.json` | (Legacy) JSON PRD; migration source when neither `prd.md` nor the tree exists. |
 | `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
+| `.rex/workflow.md` | Human-readable workflow state |
+| `.rex/config.json` | Rex project configuration |
 | `.rex/archive.json` | Pruned/reshaped item archive (written by `rex prune` and `rex reshape`; max 100 batches, auto-trimmed; safe to delete — only used for item recovery/audit) |
-| `.hench/usage-cursors/` | Per-session watermarks recording how far through a Claude Code transcript `hench record` has already attributed tokens (machine-local; safe to delete) |
+| `.hench/config.json` | Hench agent configuration (model, max turns) |
+| `.hench/runs/` | Run history and transcripts |
 | `.n-dx.json` | Project-level config overrides (web.port, llm.vendor, llm.claude.model, llm.codex.model) |
+| `.n-dx-web.pid` | Background web server PID file (auto-managed) |
 | `tests/e2e/architecture-policy.test.js` | Spawn-only enforcement, intra-package layering, zone-cycle detection |
 | `tests/e2e/domain-isolation.test.js` | Gateway enforcement, domain layer isolation, foundation tier boundary |
 | `tests/e2e/mcp-transport.test.js` | MCP HTTP transport end-to-end validation (session management, tool calls) |
@@ -97,7 +180,9 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 | `tests/integration/scheduler-startup.test.js` | **Required test** — see [TESTING.md](TESTING.md#required-tests) |
 | `OPEN_SOURCE_SCOPE.md` | Licensing boundaries, included/excluded components, and contribution expectations |
 
-> **PRD file layout.** Subtasks are encoded as sections within the parent task's `index.md` (not separate directories). `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running — do not read it from code outside the web server. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
+> **PRD file layout.** `.rex/prd_tree/` is the sole writable PRD surface. Each item (epic/feature/task) maps to a slug-named directory containing `index.md`; subtasks are encoded as sections within the parent task's `index.md`. No JSON files are written by the rex CLI, MCP tools, or `rex update`. `.rex/prd.md` and branch-scoped `.rex/prd_{branch}_{date}.md` files are legacy migration sources — absent after running `rex migrate-to-folder-tree`. `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running; do not read it from code outside the web server.
+
+> **PRD folder tree schema.** The primary PRD storage format maps each PRD level (epic → feature → task) to a directory containing an `index.md`. Subtasks are encoded as sections within the parent task's `index.md`. See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
 
 ## Workflow
 
@@ -126,7 +211,6 @@ The following skills are installed in `.agents/skills/`. Each skill directory co
 - **ndx-config** `[key] [value]` — View or change n-dx configuration with guided assistance
 - **ndx-reshape** — Restructure the PRD hierarchy — regroup epics, change levels, merge overlaps, create new containers
 - **ndx-feedback** `[description]` — Submit feedback, bug reports, or feature requests for n-dx
-- **ndx-adversarial-review** `[task-id | name | topic]` — Attack a change or a completion claim, triage what breaks, and capture only what the user approves
 
 ## MCP Servers
 
@@ -185,7 +269,7 @@ Two MCP servers provide structured access to project data. They are configured i
 - Log what you did (`append_log`)
 - Check overall project progress (`get_prd_status`)
 
-**Sourcevision** — Codebase analysis. Use sourcevision tools when you need to:
+**SourceVision** — Codebase analysis. Use sourcevision tools when you need to:
 
 - Understand a file's role and dependencies (`get_file_info`, `get_imports`)
 - Find files related to a feature or module (`search_files`)
