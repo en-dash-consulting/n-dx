@@ -2,12 +2,15 @@
 id: "6eb227af-ffb2-4f39-8f62-d4afbad09a57"
 level: "feature"
 title: "Adversarial review pass for ndx work (--review)"
-status: "pending"
+status: "completed"
 priority: "high"
+startedAt: "2026-09-01T19:27:22.489Z"
+completedAt: "2026-09-01T19:27:22.489Z"
+endedAt: "2026-09-01T19:27:22.489Z"
 acceptanceCriteria: []
 description: "After a task's changes pass completion validation and before the commit prompt, a second agent attacks the change, triages each finding for severity and necessity, repairs must-fix findings in-session, and captures the rest to the PRD. On the Claude CLI the reviewer resumes the work session on a stronger model so it inherits the implementation context; other vendors get a fresh reviewer. Taking the --review flag moves the existing interactive diff-approval gate to --approve-diff."
-lastModified: "2026-08-26T04:37:26.277Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-09-01T19:27:22.519Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -32,7 +35,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [run --help promises reviewer MCP capture grants unconditionally, but extraAllowedTools is Claude-only](./run-help-promises-reviewer-mcp-f6a94c.md) | completed |
 | [Run the review pass before the executor's own commit, not after it](./run-the-review-pass-before-the-976d34.md) | completed |
 | [Stop labeling every unresolved finding as must-fix in the review warning](./stop-labeling-every-unresolved-8c5cc2.md) | completed |
-| [Test gate reports "All 0 package(s) passed" for non-vitest suites](./test-gate-reports-all-0-package-6655bf.md) | pending |
+| [Test gate reports "All 0 package(s) passed" for non-vitest suites](./test-gate-reports-all-0-package-6655bf.md) | completed |
 | [The "keeps the quiet acknowledgment" test asserts nothing about the acknowledgment it names](./the-keeps-the-quiet-234090.md) | completed |
 | [Verified: the executor needs no rex MCP grants — its PRD writes are in-process](./verified-the-executor-needs-no-bd3459.md) | completed |
 | [Verify a reviewer must-fix repair reaches the run's commit on a live run](./verify-a-reviewer-must-fix-f29a55.md) | completed |

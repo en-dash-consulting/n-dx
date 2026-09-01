@@ -2,11 +2,12 @@
 id: "e87af290-c9b5-43e2-b1ab-52703f45d806"
 level: "epic"
 title: "CLI & Developer Tools"
-status: "pending"
+status: "completed"
 source: "smart-add"
 startedAt: "2026-05-13T20:29:02.773Z"
-endedAt: "2026-08-26T14:54:16.760Z"
-lastModified: "2026-08-31T20:45:29.562Z"
+completedAt: "2026-09-01T19:27:24.297Z"
+endedAt: "2026-09-01T19:27:24.297Z"
+lastModified: "2026-09-01T19:27:24.320Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -14,7 +15,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Adversarial review pass for ndx work (--review)](./adversarial-review-pass-for-ndx-6eb227/index.md) | pending |
+| [Adversarial review pass for ndx work (--review)](./adversarial-review-pass-for-ndx-6eb227/index.md) | completed |
 | [Auto-Commit on Completion for File-Modifying Claude Code Skills](./auto-commit-on-completion-for-efac37/index.md) | completed |
 | [Git Repository Detection and Init Prompt in ndx init](./git-repository-detection-and-ba9504/index.md) | completed |
 | [/ndx-adversarial-review skill hardening](./ndx-adversarial-review-skill-75bd9d/index.md) | completed |

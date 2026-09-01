@@ -587,4 +587,21 @@ describe("runTestGate", () => {
 
     expect(result.totalDurationMs).toBeGreaterThanOrEqual(0);
   });
+
+  itNeedsPosixShell(
+    "non-vitest output that exits 0 yields passed=true with no package detail",
+    async () => {
+      const { runTestGate } = await import("../../../src/tools/test-runner.js");
+      const result = await runTestGate({
+        projectDir,
+        filesChanged: ["src/foo.ts"],
+        testCommand: "echo 'ok: all tests passed'",
+        timeout: 5000,
+      });
+
+      expect(result.ran).toBe(true);
+      expect(result.passed).toBe(true);
+      expect(result.packages).toEqual([]);
+    },
+  );
 });

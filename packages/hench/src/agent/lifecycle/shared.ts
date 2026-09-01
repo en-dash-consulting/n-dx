@@ -2147,7 +2147,11 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         const passCount = testGate.packages.filter((p) => p.passed).length;
 
         if (testGate.passed) {
-          stream("Test Gate", `✓ All ${packageCount} package(s) passed`);
+          const passMsg =
+            packageCount === 0
+              ? "✓ Test command passed (output not in vitest JSON format; per-package detail unavailable)"
+              : `✓ All ${packageCount} package(s) passed`;
+          stream("Test Gate", passMsg);
           if (testGate.totalDurationMs != null) {
             detail(`Elapsed: ${formatDurationMs(testGate.totalDurationMs)}`);
           }

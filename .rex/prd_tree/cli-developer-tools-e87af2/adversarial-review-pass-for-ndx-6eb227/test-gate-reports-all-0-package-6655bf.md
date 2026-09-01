@@ -2,7 +2,7 @@
 id: "6655bf9e-7750-49be-9611-f36d1d21692e"
 level: "task"
 title: "Test gate reports \"All 0 package(s) passed\" for non-vitest suites"
-status: "pending"
+status: "completed"
 priority: "low"
 tags:
   - "test-gate"
@@ -10,12 +10,17 @@ tags:
   - "severity:low"
   - "display"
 source: "ndx-capture"
+startedAt: "2026-09-01T19:24:03.088Z"
+completedAt: "2026-09-01T19:27:19.932Z"
+endedAt: "2026-09-01T19:27:19.932Z"
+resolutionType: "code-change"
+resolutionDetail: "Fixed message in shared.ts to distinguish unparsed-but-passed from N-packages-passed; added unit test."
 acceptanceCriteria:
   - "A passing non-vitest test command produces a message that does not read as a zero-work success"
   - "The message distinguishes 'ran and passed, detail unparsed' from 'ran and passed, N packages'"
   - "Pass/fail still derives from the exit code, unchanged"
   - "A unit test covers the unparseable-output-but-exit-0 case"
 description: "Cosmetic but trust-eroding. `runTestGate` decides pass/fail from the exit code (`const overallPassed = exitCode === 0`, test-runner.ts:623), which is correct. But the message it prints comes from `parseVitestOutput`, which only understands vitest's JSON reporter. Any other runner yields `packages: []` and the gate announces:\n\n    [Test Gate] ✓ All 0 package(s) passed\n\nObserved on live run c847a623 against a project whose test command is `npm run test` → `node --test`. The gate genuinely ran (`{ran: true, passed: true, command: \"npm run test\", totalDurationMs: 476}`, corroborated by the command taking 532ms standalone) and would have blocked the commit on a non-zero exit. Nothing is wrong with the gating — only the report.\n\nThe problem is that \"All 0 package(s) passed\" is exactly what a gate that did nothing would print, and this feature's whole defect history (c971145e, 5f791a91) is about gates that silently did nothing being mistaken for gates that passed. A reader auditing a run record cannot tell this line apart from the failure mode it superficially resembles.\n\nSuggested: when the parser recognises no packages but the command exited 0, say so directly — e.g. \"✓ Test command passed (output not in vitest JSON format; per-package detail unavailable)\" — rather than reporting a package count of zero as a success tally."
-lastModified: "2026-08-31T20:45:47.260Z"
+lastModified: "2026-09-01T19:27:19.964Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
