@@ -214,7 +214,7 @@ describe("FolderTreeStore.saveDocument locking", () => {
       stdio: "ignore",
     });
     try {
-      const lockPath = join(rexDir, "prd.lock");
+      const lockPath = join(rexDir, "tree.lock");
       await writeFile(
         lockPath,
         JSON.stringify({ pid: child.pid, token: "other-writer", timestamp: new Date().toISOString() }),
@@ -227,5 +227,64 @@ describe("FolderTreeStore.saveDocument locking", () => {
     } finally {
       child.kill();
     }
+  });
+});
+
+describe("FileStore and FolderTreeStore serialize against each other on the same rexDir", () => {
+  let projectDir: string;
+  let rexDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "rex-cross-store-lock-"));
+    rexDir = join(projectDir, ".rex");
+    await mkdir(rexDir, { recursive: true });
+    // Seed with one item via FileStore (the live store).
+    const seed = new FileStore(rexDir);
+    await seed.saveDocument({ schema: "rex/v1", title: "Cross-Store PRD", items: [task("t1", "Task One")] });
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it("a FileStore transaction blocks a concurrent FolderTreeStore write until it completes", async () => {
+    const fileStore = new FileStore(rexDir);
+    const treeStore = new FolderTreeStore(rexDir);
+
+    const order: string[] = [];
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => { openGate = resolve; });
+    let inCallback!: () => void;
+    const callbackEntered = new Promise<void>((resolve) => { inCallback = resolve; });
+
+    // FileStore opens a transaction and pauses inside it, holding tree.lock.
+    const txn = fileStore.withTransaction(async (doc) => {
+      inCallback();
+      await gate;
+      doc.items.push(task("t-file", "From FileStore"));
+      order.push("file-transaction-committed");
+    });
+
+    await callbackEntered;
+
+    // FolderTreeStore tries to add an item concurrently — must wait for tree.lock.
+    const treeWrite = treeStore
+      .addItem(task("t-tree", "From FolderTreeStore"))
+      .then(() => order.push("tree-write-completed"));
+
+    // Give the tree write a chance to (wrongly) slip past the open transaction.
+    await sleep(150);
+    openGate();
+    await txn;
+    await treeWrite;
+
+    expect(order[0]).toBe("file-transaction-committed");
+    expect(order[1]).toBe("tree-write-completed");
+
+    // Both items must be present in the final tree.
+    const finalDoc = await new FolderTreeStore(rexDir).loadDocument();
+    const ids = finalDoc.items.map((i) => i.id);
+    expect(ids).toContain("t-file");
+    expect(ids).toContain("t-tree");
   });
 });
