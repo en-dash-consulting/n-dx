@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [--review leaves the PRD completion metadata uncommitted when the agent commits its own work anyway](./review-leaves-the-prd-544d93.md) | completed |
 | [Review report transport, parsing, and run-record recording](./review-report-transport-parsing-2f0be1.md) | completed |
 | [Reviewer repairs join the run's commit only if the reviewer voluntarily stages them](./reviewer-repairs-join-the-run-s-e168b8.md) | completed |
-| [run --help promises reviewer MCP capture grants unconditionally, but extraAllowedTools is Claude-only](./run-help-promises-reviewer-mcp-f6a94c.md) | pending |
+| [run --help promises reviewer MCP capture grants unconditionally, but extraAllowedTools is Claude-only](./run-help-promises-reviewer-mcp-f6a94c.md) | completed |
 | [Run the review pass before the executor's own commit, not after it](./run-the-review-pass-before-the-976d34.md) | completed |
 | [Stop labeling every unresolved finding as must-fix in the review warning](./stop-labeling-every-unresolved-8c5cc2.md) | completed |
 | [Test gate reports "All 0 package(s) passed" for non-vitest suites](./test-gate-reports-all-0-package-6655bf.md) | pending |
