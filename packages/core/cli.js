@@ -1455,6 +1455,10 @@ async function handleInit(rest) {
   const rexExists = existsSync(join(dir, ".rex"));
   const henchExists = existsSync(join(dir, ".hench"));
   ensureGitignoreEntry(dir, ".n-dx.local.json");
+  // Project setup, not run output — so it belongs here rather than in the run
+  // that first writes a log. hench still ensures it at run start for projects
+  // initialised before this line existed.
+  ensureGitignoreEntry(dir, ".run-logs/");
   ensureGitattributesRules(dir);
   ensureMergeDriverRegistered(dir);
 

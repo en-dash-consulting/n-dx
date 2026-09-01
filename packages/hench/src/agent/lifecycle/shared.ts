@@ -29,7 +29,7 @@ import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
 import type { PromptEnvelope } from "../../prd/llm-gateway.js";
 import { saveRun } from "../../store/runs.js";
-import { persistRunLog } from "../../store/run-log.js";
+import { persistRunLog, ensureRunLogGitignored } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, discoverChangedFiles, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
@@ -424,6 +424,22 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
 
   run.lastActivityAt = new Date().toISOString();
   await saveRun(opts.henchDir, run);
+
+  // Claim the `.run-logs/` ignore entry now, at run START.
+  //
+  // The run writes its log there during finalize, AFTER the commit step, and
+  // the .gitignore append used to happen at the same moment — leaving a
+  // modified tracked file behind with nothing left to commit it. Doing it here
+  // puts the edit in front of the executor's `git add -A`, so the run that
+  // needs the entry is the run that commits it.
+  //
+  // `ndx init` writes this for new projects; this is the fallback for projects
+  // initialised before that, and a no-op once the entry exists. Best-effort by
+  // the same reasoning as the log itself: a .gitignore that will not write is
+  // not worth failing a run over.
+  if (opts.projectDir) {
+    await ensureRunLogGitignored(opts.projectDir);
+  }
 
   // Capture system memory at run start
   const monitor = new SystemMemoryMonitor();

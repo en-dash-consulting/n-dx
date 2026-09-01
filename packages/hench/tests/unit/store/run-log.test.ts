@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { basename, isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
-import { persistRunLog } from "../../../src/store/run-log.js";
+import { persistRunLog, ensureRunLogGitignored } from "../../../src/store/run-log.js";
 
 describe("persistRunLog", () => {
   let projectDir: string;
@@ -87,50 +87,97 @@ describe("persistRunLog", () => {
     expect(content).toBe("");
   });
 
-  describe("gitignore management", () => {
-    it("adds .run-logs/ to .gitignore when file does not exist", async () => {
-      await persistRunLog(projectDir, "run-id-6", "2026-04-08T00:00:00Z", []);
+  /**
+   * The ignore entry is written by `ensureRunLogGitignored` at run START, not
+   * by `persistRunLog` during finalize. persistRunLog runs after the commit
+   * step, so a .gitignore write there left a modified tracked file with
+   * nothing left to commit it — the residue this separation removes.
+   */
+  it("does not touch .gitignore", async () => {
+    await persistRunLog(projectDir, "run-id-6", "2026-04-08T00:00:00Z", ["x"]);
 
-      const gitignore = await readFile(join(projectDir, ".gitignore"), "utf-8");
-      expect(gitignore).toContain(".run-logs/");
-    });
+    await expect(access(join(projectDir, ".gitignore"))).rejects.toThrow();
+  });
 
-    it("appends .run-logs/ to an existing .gitignore", async () => {
-      const gitignorePath = join(projectDir, ".gitignore");
-      await writeFile(gitignorePath, "node_modules/\ndist/\n", "utf-8");
+  it("leaves an existing .gitignore byte-for-byte unchanged", async () => {
+    const gitignorePath = join(projectDir, ".gitignore");
+    const before = "node_modules/\ndist/\n";
+    await writeFile(gitignorePath, before, "utf-8");
 
-      await persistRunLog(projectDir, "run-id-7", "2026-04-08T00:00:00Z", []);
+    await persistRunLog(projectDir, "run-id-7", "2026-04-08T00:00:00Z", ["x"]);
 
-      const content = await readFile(gitignorePath, "utf-8");
-      expect(content).toContain("node_modules/");
-      expect(content).toContain("dist/");
-      expect(content).toContain(".run-logs/");
-    });
+    expect(await readFile(gitignorePath, "utf-8")).toBe(before);
+  });
+});
 
-    it("does not duplicate .run-logs/ when already present with trailing slash", async () => {
-      const gitignorePath = join(projectDir, ".gitignore");
-      await writeFile(gitignorePath, "node_modules/\n.run-logs/\n", "utf-8");
+describe("ensureRunLogGitignored", () => {
+  let projectDir: string;
 
-      await persistRunLog(projectDir, "run-id-8", "2026-04-08T00:00:00Z", []);
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-runlog-ignore-"));
+  });
 
-      const content = await readFile(gitignorePath, "utf-8");
-      const matches = content.split("\n").filter((l) => l.trim() === ".run-logs/");
-      expect(matches).toHaveLength(1);
-    });
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
 
-    it("does not duplicate .run-logs/ when already present without trailing slash", async () => {
-      const gitignorePath = join(projectDir, ".gitignore");
-      await writeFile(gitignorePath, ".run-logs\n", "utf-8");
+  it("creates .gitignore with the entry when the file does not exist", async () => {
+    await ensureRunLogGitignored(projectDir);
 
-      await persistRunLog(projectDir, "run-id-9", "2026-04-08T00:00:00Z", []);
+    const gitignore = await readFile(join(projectDir, ".gitignore"), "utf-8");
+    expect(gitignore).toContain(".run-logs/");
+  });
 
-      const content = await readFile(gitignorePath, "utf-8");
-      // Must not contain ".run-logs/" (with slash) since ".run-logs" (without) was already there
-      const lines = content.split("\n").filter(Boolean);
-      const runLogEntries = lines.filter(
-        (l) => l.trim() === ".run-logs" || l.trim() === ".run-logs/",
-      );
-      expect(runLogEntries).toHaveLength(1);
-    });
+  it("appends to an existing .gitignore without disturbing it", async () => {
+    const gitignorePath = join(projectDir, ".gitignore");
+    await writeFile(gitignorePath, "node_modules/\ndist/\n", "utf-8");
+
+    await ensureRunLogGitignored(projectDir);
+
+    const content = await readFile(gitignorePath, "utf-8");
+    expect(content).toContain("node_modules/");
+    expect(content).toContain("dist/");
+    expect(content).toContain(".run-logs/");
+  });
+
+  it("does not duplicate the entry when already present with trailing slash", async () => {
+    const gitignorePath = join(projectDir, ".gitignore");
+    await writeFile(gitignorePath, "node_modules/\n.run-logs/\n", "utf-8");
+
+    await ensureRunLogGitignored(projectDir);
+
+    const content = await readFile(gitignorePath, "utf-8");
+    const matches = content.split("\n").filter((l) => l.trim() === ".run-logs/");
+    expect(matches).toHaveLength(1);
+  });
+
+  it("does not duplicate the entry when already present without trailing slash", async () => {
+    const gitignorePath = join(projectDir, ".gitignore");
+    await writeFile(gitignorePath, ".run-logs\n", "utf-8");
+
+    await ensureRunLogGitignored(projectDir);
+
+    const content = await readFile(gitignorePath, "utf-8");
+    // Must not add ".run-logs/" (with slash) when ".run-logs" (without) is there
+    const lines = content.split("\n").filter(Boolean);
+    const runLogEntries = lines.filter(
+      (l) => l.trim() === ".run-logs" || l.trim() === ".run-logs/",
+    );
+    expect(runLogEntries).toHaveLength(1);
+  });
+
+  /**
+   * Idempotence is what makes a run-start call safe in --loop and
+   * --iterations, where it runs once per task rather than once per project.
+   */
+  it("is idempotent across repeated calls", async () => {
+    const gitignorePath = join(projectDir, ".gitignore");
+    await ensureRunLogGitignored(projectDir);
+    const afterFirst = await readFile(gitignorePath, "utf-8");
+
+    await ensureRunLogGitignored(projectDir);
+    await ensureRunLogGitignored(projectDir);
+
+    expect(await readFile(gitignorePath, "utf-8")).toBe(afterFirst);
   });
 });
