@@ -2,7 +2,7 @@
 id: "9c7789b0-1982-4260-82f0-2b5254f94d01"
 level: "task"
 title: "Verify the corrected MODEL_COSTS prices against Anthropic's published pricing"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "e2e-finding"
@@ -10,12 +10,17 @@ tags:
   - "verification-gap"
   - "severity:medium"
 source: "ndx-capture"
+startedAt: "2026-09-01T15:55:21.578Z"
+completedAt: "2026-09-01T16:03:13.302Z"
+endedAt: "2026-09-01T16:03:13.302Z"
+resolutionType: "code-change"
+resolutionDetail: "Verified all 16 MODEL_COSTS entries against vendor pricing pages. Fixed claude-sonnet-5 (3.00/15.00 → 2.00/10.00: the table had pre-encoded a 2026-09-01 increase that Anthropic cancelled, making the introductory $2/$10 standard) and modelled gemini-2.5-pro's threshold tiering (1.25/10.00 ≤200k, 2.50/15.00 above) via a new optional aboveThreshold field, with budgetPreflight selecting by token estimate and reporting costTier. Added exported PRICES_LAST_VERIFIED=\"2026-09-01\" plus per-vendor status: Claude and Gemini fully verified, codex sol/terra/luna verified, gpt-5.4-mini and gpt-5.5 explicitly unverified, local out of scope by construction. Documented the claude-api skill's version+hash-specific install path as a known reviewer limitation. 10 new tests (TDD, red first); 6/6 suites green."
 acceptanceCriteria:
   - "Every claude entry in MODEL_COSTS is checked against Anthropic's current published per-MTok pricing and corrected if wrong"
   - "The codex, google, and local entries are checked or explicitly declared out of scope"
   - "MODEL_COSTS records when its prices were last verified against the vendor"
   - "The claude-api skill's failure to load inside a hench run is either fixed or noted as a known reviewer limitation"
 description: "Task 85923733 committed haiku-4-5 at 1.00/5.00 and opus-4-7 at 5.00/25.00 per MTok (commit 138d9585). The adversarial reviewer flagged that it could not confirm those figures: the claude-api skill — the sanctioned in-repo pricing reference, which explicitly says never to answer LLM pricing from memory — failed to load, and its reference files sit outside the run's allowed directories.\n\nSo the committed numbers are exactly the ones the task description supplied, and their correctness rests on that description rather than on any source that was checked. The reviewer was explicit that a human should confirm them against Anthropic's pricing page. Since MODEL_COSTS drives budget preflight, a wrong figure here silently mis-sizes every cost estimate.\n\nNote the reviewer's related observation: a test pinning exact prices would be tautological against the source and could not detect a real-world vendor price change. Only an external check or a dated periodic review can. Worth deciding whether a \"prices last verified on <date>\" comment belongs in MODEL_COSTS."
-lastModified: "2026-08-27T16:49:37.934Z"
+lastModified: "2026-09-01T16:03:13.327Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

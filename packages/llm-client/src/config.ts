@@ -179,12 +179,103 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
 };
 
 /**
+ * The date `MODEL_COSTS` was last checked against the vendors' own published
+ * pricing pages, as `YYYY-MM-DD`.
+ *
+ * This exists because a test cannot detect a vendor price change: any test that
+ * pins prices is tautological against `MODEL_COSTS` itself and passes happily
+ * while the real-world rate moves underneath it. Only an external check — a
+ * human or an agent reading the vendor pages — can catch that, so what is
+ * recorded here is *when* that check last happened.
+ *
+ * Treat prices as suspect once this is more than a quarter old. Re-verify
+ * against the sources listed on `MODEL_COSTS` and update this date, even when
+ * nothing changed — "checked and unchanged" is the useful signal.
+ */
+export const PRICES_LAST_VERIFIED = "2026-09-01";
+
+/** Rates that replace the base ones once a prompt crosses `thresholdTokens`. */
+export interface ModelCostTier {
+  /** Token count above which these rates apply. At exactly this count, base rates still apply. */
+  thresholdTokens: number;
+  inputPerMToken: number;
+  outputPerMToken: number;
+}
+
+/** Per-model pricing: base rates plus an optional above-threshold tier. */
+export interface ModelCost {
+  inputPerMToken: number;
+  outputPerMToken: number;
+  /**
+   * Present only for vendors that charge a long-context premium. Absent means
+   * one rate applies across the whole context window.
+   */
+  aboveThreshold?: ModelCostTier;
+}
+
+/**
  * Per-model cost constants (USD per million tokens).
  *
- * Values are approximate public list pricing as of 2026-08 and should be
- * updated when vendors change rates. Gemini Pro and Claude Sonnet 5 have
- * tiered/introductory rates; the values here are the standard (higher) tier so
- * estimates never under-report on the input side.
+ * ## Verification
+ *
+ * Last verified {@link PRICES_LAST_VERIFIED} against:
+ * - Claude — https://platform.claude.com/docs/en/about-claude/pricing
+ * - Gemini — https://ai.google.dev/gemini-api/docs/pricing
+ * - OpenAI/Codex — the GPT-5.6 tier pricing announcement (openai.com/api/pricing
+ *   itself rejects automated fetches, so these came from the announcement and
+ *   secondary trackers rather than the vendor's own price table).
+ *
+ * Per-vendor status at that check:
+ * - **Claude** — all seven entries verified. `claude-sonnet-5` was corrected
+ *   from 3.00/15.00 to 2.00/10.00: its $2/$10 launch rate was introductory
+ *   through 2026-08-31, and this table had pre-encoded the scheduled 2026-09-01
+ *   increase to $3/$15. Anthropic cancelled that increase and made $2/$10 the
+ *   standard price, so the pre-encoded figure became a 50% overestimate on the
+ *   default Sonnet tier.
+ * - **Gemini** — all four verified. `gemini-3.7-flash` is scheduled to double to
+ *   1.50/7.50 on 2027-01-01; revisit before then. `gemini-2.5-flash` also has a
+ *   higher audio-input rate (1.00) that is not modelled — the text rate is used.
+ * - **Codex/OpenAI** — `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`
+ *   verified. Sol's 4.00/20.00 is promotional at least through 2026-11-21.
+ *   `gpt-5.4-mini` and `gpt-5.5` are **unverified** — no current published rate
+ *   was located for either; treat those two figures as unconfirmed.
+ * - **Local** — no entries, and none are possible: the local vendor resolves to
+ *   `""` (LM Studio serves whatever model is loaded) and is self-hosted, so
+ *   there is no per-token vendor price to record.
+ *
+ * Note for automated reviewers: the in-repo `claude-api` skill is the sanctioned
+ * pricing reference, but its files live under a Claude Code install path that is
+ * both version- and hash-specific (`.../bundled-skills/<version>/<hash>/`), so a
+ * spawned agent whose filesystem access is scoped to the repo generally cannot
+ * read them. A reviewer that cannot load it should report pricing as unverified
+ * rather than guess — that is a known limitation, not a defect to work around.
+ *
+ * ## Which field feeds a computation
+ *
+ * `inputPerMToken` is the only field multiplied anywhere in this codebase. Its
+ * single consumer is `budgetPreflight` (budget-preflight.ts), whose
+ * `estimatedCostUsd` is `inputTokenEstimate × inputPerMToken` — an input-only
+ * figure that deliberately under-reports total request cost.
+ *
+ * `outputPerMToken` is **informational only**: it is multiplied nowhere. The
+ * same is true of `aboveThreshold.outputPerMToken`. Their only references are
+ * shape assertions in the tests (every entry has the field; output rate >= input
+ * rate). This is structural rather than an oversight — budget preflight runs
+ * *before* generation, so the output token count does not exist yet at the point
+ * the estimate is made.
+ *
+ * The consequence, recorded here so it is not rediscovered: **correcting an
+ * output rate changes no computed value anywhere in the system.** Treat such an
+ * edit as a data fix, not a behaviour change, and do not claim a cost-accuracy
+ * improvement from it. Correcting an *input* rate does change behaviour.
+ *
+ * Note that hench's recorded `costUsd` does not come from this table either — it
+ * is the provider's own reported `cost_usd`, passed through unmodified.
+ *
+ * To make the output side live, the caller must be somewhere that knows the
+ * actual output token count — post-hoc usage attribution (`ndx usage`, rex's
+ * `get_token_usage` rollup) rather than preflight. That is a feature, not a fix;
+ * it was deliberately not built as part of that decision.
  *
  * ## Which field feeds a computation
  *
@@ -212,26 +303,39 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
  * `get_token_usage` rollup) rather than preflight. That is a feature, not a fix;
  * it was deliberately not built as part of this decision.
  */
-export const MODEL_COSTS: Readonly<
-  Record<string, { inputPerMToken: number; outputPerMToken: number }>
-> = {
+export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
   // Google Gemini
   "gemini-3.7-flash": { inputPerMToken: 0.75, outputPerMToken: 3.75 },
   "gemini-3.5-flash-lite": { inputPerMToken: 0.30, outputPerMToken: 2.50 },
   "gemini-2.5-flash": { inputPerMToken: 0.30, outputPerMToken: 2.50 },
-  "gemini-2.5-pro": { inputPerMToken: 1.25, outputPerMToken: 10.00 },
-  // Claude
+  // The only entry with a long-context premium: Google doubles the input rate
+  // and raises output by half above 200k tokens, and the context window is 1M,
+  // so prompts in the premium band are routine rather than exotic.
+  "gemini-2.5-pro": {
+    inputPerMToken: 1.25,
+    outputPerMToken: 10.00,
+    aboveThreshold: {
+      thresholdTokens: 200_000,
+      inputPerMToken: 2.50,
+      outputPerMToken: 15.00,
+    },
+  },
+  // Claude — 4.6 and later bill the full 1M window at standard rates, so no
+  // entry here carries an aboveThreshold tier.
   "claude-haiku-4-5": { inputPerMToken: 1.00, outputPerMToken: 5.00 },
   "claude-fable-5": { inputPerMToken: 10.00, outputPerMToken: 50.00 },
   "claude-opus-5": { inputPerMToken: 5.00, outputPerMToken: 25.00 },
   "claude-opus-4-8": { inputPerMToken: 5.00, outputPerMToken: 25.00 },
-  "claude-sonnet-5": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
+  // 2.00/10.00 is the standard rate, not an introductory one — see the
+  // verification notes above before "correcting" this back to 3.00/15.00.
+  "claude-sonnet-5": { inputPerMToken: 2.00, outputPerMToken: 10.00 },
   "claude-sonnet-4-6": { inputPerMToken: 3.00, outputPerMToken: 15.00 },
   "claude-opus-4-7": { inputPerMToken: 5.00, outputPerMToken: 25.00 },
   // Codex / OpenAI
   "gpt-5.6-sol": { inputPerMToken: 4.00, outputPerMToken: 20.00 },
   "gpt-5.6-terra": { inputPerMToken: 2.00, outputPerMToken: 12.00 },
   "gpt-5.6-luna": { inputPerMToken: 0.20, outputPerMToken: 1.20 },
+  // Unverified — no current published rate located on 2026-09-01.
   "gpt-5.4-mini": { inputPerMToken: 0.40, outputPerMToken: 1.60 },
   "gpt-5.5": { inputPerMToken: 7.00, outputPerMToken: 21.00 },
 };

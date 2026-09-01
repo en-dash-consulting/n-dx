@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { budgetPreflight } from "../../src/budget-preflight.js";
-import { MODEL_CONTEXT_WINDOWS, MODEL_COSTS, GOOGLE_MODELS } from "../../src/config.js";
+import {
+  MODEL_CONTEXT_WINDOWS,
+  MODEL_COSTS,
+  GOOGLE_MODELS,
+  PRICES_LAST_VERIFIED,
+} from "../../src/config.js";
 
 describe("budgetPreflight", () => {
   // ── gemini-3.5-flash-lite ───────────────────────────────────────────────────────
@@ -67,10 +72,13 @@ describe("budgetPreflight", () => {
       // Guard the fixture: this assertion is only meaningful while the two rates differ.
       expect(cost.outputPerMToken).not.toBe(cost.inputPerMToken);
 
-      const result = budgetPreflight("gemini-2.5-pro", 4_000_000); // exactly 1M tokens
-      expect(result.estimatedCostUsd).toBeCloseTo(cost.inputPerMToken, 10);
+      // 100k tokens — deliberately inside the base tier, so this asserts the
+      // input/output split rather than accidentally testing tier selection.
+      const result = budgetPreflight("gemini-2.5-pro", 400_000);
+      expect(result.costTier).toBe("base");
+      expect(result.estimatedCostUsd).toBeCloseTo(0.1 * cost.inputPerMToken, 10);
       expect(result.estimatedCostUsd).not.toBeCloseTo(
-        cost.inputPerMToken + cost.outputPerMToken,
+        0.1 * (cost.inputPerMToken + cost.outputPerMToken),
         10,
       );
     });
@@ -178,6 +186,115 @@ describe("MODEL_CONTEXT_WINDOWS", () => {
   });
 });
 
+// ── Threshold-tiered pricing ────────────────────────────────────────────────
+//
+// Some vendors charge a higher rate once a prompt crosses a token threshold
+// (gemini-2.5-pro: 1.25/10.00 at or below 200k tokens, 2.50/15.00 above it).
+// MODEL_COSTS carries those as an optional `aboveThreshold` block and
+// budgetPreflight selects by tokenEstimate, so a large prompt is not priced at
+// the small-prompt rate.
+
+describe("threshold-tiered pricing", () => {
+  const PRO_THRESHOLD = 200_000;
+
+  it("gemini-2.5-pro declares an aboveThreshold tier", () => {
+    const tier = MODEL_COSTS["gemini-2.5-pro"].aboveThreshold;
+    expect(tier).toBeDefined();
+    expect(tier!.thresholdTokens).toBe(PRO_THRESHOLD);
+    expect(tier!.inputPerMToken).toBeGreaterThan(
+      MODEL_COSTS["gemini-2.5-pro"].inputPerMToken,
+    );
+  });
+
+  it("prices a prompt at the threshold using the base rate", () => {
+    const cost = MODEL_COSTS["gemini-2.5-pro"];
+    // Exactly 200_000 tokens — the threshold itself is still the base tier.
+    const result = budgetPreflight("gemini-2.5-pro", PRO_THRESHOLD * 4);
+    expect(result.tokenEstimate).toBe(PRO_THRESHOLD);
+    expect(result.costTier).toBe("base");
+    expect(result.estimatedCostUsd).toBeCloseTo(0.2 * cost.inputPerMToken, 10);
+  });
+
+  it("prices a prompt above the threshold using the aboveThreshold rate", () => {
+    const cost = MODEL_COSTS["gemini-2.5-pro"];
+    const tier = cost.aboveThreshold!;
+    // 1M tokens — well past the threshold, and within the 1M context window.
+    const result = budgetPreflight("gemini-2.5-pro", 4_000_000);
+    expect(result.tokenEstimate).toBe(1_000_000);
+    expect(result.costTier).toBe("aboveThreshold");
+    expect(result.estimatedCostUsd).toBeCloseTo(tier.inputPerMToken, 10);
+    // The bug this tier exists to fix: it must NOT be the base rate.
+    expect(result.estimatedCostUsd).not.toBeCloseTo(cost.inputPerMToken, 10);
+  });
+
+  it("crosses tiers by one token at the threshold boundary", () => {
+    const atThreshold = budgetPreflight("gemini-2.5-pro", PRO_THRESHOLD * 4);
+    const oneOver = budgetPreflight("gemini-2.5-pro", PRO_THRESHOLD * 4 + 4);
+    expect(atThreshold.costTier).toBe("base");
+    expect(oneOver.costTier).toBe("aboveThreshold");
+    expect(oneOver.estimatedCostUsd).toBeGreaterThan(atThreshold.estimatedCostUsd!);
+  });
+
+  it("reports the base tier for models with no aboveThreshold block", () => {
+    // Claude 4.6+ bills the full 1M window at standard rates — no premium tier.
+    const result = budgetPreflight("claude-sonnet-5", 4_000_000);
+    expect(MODEL_COSTS["claude-sonnet-5"].aboveThreshold).toBeUndefined();
+    expect(result.costTier).toBe("base");
+    expect(result.estimatedCostUsd).toBeCloseTo(
+      MODEL_COSTS["claude-sonnet-5"].inputPerMToken,
+      10,
+    );
+  });
+
+  it("reports no cost tier for a model absent from MODEL_COSTS", () => {
+    const result = budgetPreflight("unknown-model-xyz", 1000);
+    expect(result.estimatedCostUsd).toBeUndefined();
+    expect(result.costTier).toBeUndefined();
+  });
+});
+
+// ── Published-price conformance ─────────────────────────────────────────────
+//
+// Pinned to the figures verified against vendor pricing pages on the date in
+// PRICES_LAST_VERIFIED (config.ts). This is deliberately tautological against
+// the source — it cannot detect a real-world vendor price change, only an
+// accidental edit. Detecting vendor changes needs the dated re-review that
+// PRICES_LAST_VERIFIED exists to schedule.
+
+describe("published-price conformance (verified 2026-09-01)", () => {
+  it("claude-sonnet-5 is priced at the post-introductory standard rate", () => {
+    // The $2/$10 launch introductory rate became the standard price; the
+    // increase to $3/$15 scheduled for 2026-09-01 was cancelled by Anthropic.
+    expect(MODEL_COSTS["claude-sonnet-5"]).toMatchObject({
+      inputPerMToken: 2.0,
+      outputPerMToken: 10.0,
+    });
+  });
+
+  it("matches the verified per-MTok figures for every claude entry", () => {
+    const verified: Record<string, [number, number]> = {
+      "claude-haiku-4-5": [1.0, 5.0],
+      "claude-fable-5": [10.0, 50.0],
+      "claude-opus-5": [5.0, 25.0],
+      "claude-opus-4-8": [5.0, 25.0],
+      "claude-sonnet-5": [2.0, 10.0],
+      "claude-sonnet-4-6": [3.0, 15.0],
+      "claude-opus-4-7": [5.0, 25.0],
+    };
+    for (const [model, [input, output]] of Object.entries(verified)) {
+      expect(MODEL_COSTS[model], model).toMatchObject({
+        inputPerMToken: input,
+        outputPerMToken: output,
+      });
+    }
+  });
+
+  it("records when prices were last verified against the vendors", () => {
+    expect(PRICES_LAST_VERIFIED).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(Number.isNaN(Date.parse(PRICES_LAST_VERIFIED))).toBe(false);
+  });
+});
+
 // ── MODEL_COSTS coverage ────────────────────────────────────────────────────
 //
 // These are shape guards on the table, not coverage of a cost calculation. Only
@@ -196,6 +313,23 @@ describe("MODEL_COSTS", () => {
     for (const [model, cost] of Object.entries(MODEL_COSTS)) {
       expect(cost.inputPerMToken, `${model}.inputPerMToken`).toBeGreaterThan(0);
       expect(cost.outputPerMToken, `${model}.outputPerMToken`).toBeGreaterThan(0);
+    }
+  });
+
+  it("any aboveThreshold tier is well-formed and costlier than its base", () => {
+    for (const [model, cost] of Object.entries(MODEL_COSTS)) {
+      const tier = cost.aboveThreshold;
+      if (tier === undefined) continue;
+      expect(tier.thresholdTokens, `${model}.thresholdTokens`).toBeGreaterThan(0);
+      // A premium tier that is not more expensive is either a data error or a
+      // tier that should have been deleted.
+      expect(tier.inputPerMToken, `${model} tier input`).toBeGreaterThan(cost.inputPerMToken);
+      expect(tier.outputPerMToken, `${model} tier output`).toBeGreaterThanOrEqual(
+        cost.outputPerMToken,
+      );
+      expect(tier.outputPerMToken, `${model} tier output >= tier input`).toBeGreaterThanOrEqual(
+        tier.inputPerMToken,
+      );
     }
   });
 

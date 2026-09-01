@@ -167,7 +167,9 @@ export {
   VENDOR_CONTEXT_CHAR_LIMITS,
   MODEL_CONTEXT_WINDOWS,
   MODEL_COSTS,
+  PRICES_LAST_VERIFIED,
 } from "./config.js";
+export type { ModelCost, ModelCostTier } from "./config.js";
 
 // Budget preflight
 export { budgetPreflight } from "./budget-preflight.js";

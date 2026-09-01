@@ -43,15 +43,25 @@ export interface BudgetPreflightResult {
   /** Estimated utilization as a percentage (0–100+). Values above 90 fail the fits check. */
   utilizationPercent: number;
   /**
-   * Estimated **input** cost in USD: `tokenEstimate × MODEL_COSTS.inputPerMToken`.
-   * Undefined when the model has no entry in MODEL_COSTS.
+   * Estimated **input** cost in USD: `tokenEstimate × the input rate of the
+   * applicable pricing tier`. Undefined when the model has no entry in
+   * MODEL_COSTS.
    *
-   * This is not a total-cost estimate. `MODEL_COSTS.outputPerMToken` is not
+   * This is not a total-cost estimate. The tier's `outputPerMToken` is not
    * applied — preflight runs before generation, so the output token count is
    * unknown here. On generation-heavy requests output dominates cost, so treat
    * this as a floor. See the MODEL_COSTS doc comment in config.ts.
    */
   estimatedCostUsd: number | undefined;
+  /**
+   * Which pricing tier `estimatedCostUsd` was computed at — `"base"`, or
+   * `"aboveThreshold"` when the prompt crossed the model's long-context
+   * threshold. Undefined when the model has no entry in MODEL_COSTS.
+   *
+   * Exposed so a cost estimate is auditable: without it, a caller comparing the
+   * figure against a rate in MODEL_COSTS cannot tell which rate was used.
+   */
+  costTier: "base" | "aboveThreshold" | undefined;
 }
 
 /**
@@ -60,7 +70,9 @@ export interface BudgetPreflightResult {
  * Estimates token count using the 4-chars-per-token approximation and checks
  * whether the estimate fits within 90% of the model's context window. Also
  * computes the estimated input cost when pricing data is available — input only,
- * never a total; `outputPerMToken` is not applied here.
+ * never a total; `outputPerMToken` is not applied here. For models with a
+ * long-context premium the rate is selected from the tier the estimate falls in,
+ * and `costTier` reports which one was used.
  *
  * @param modelId        The canonical model identifier (e.g. "gemini-2.5-pro").
  * @param promptCharCount  Number of characters in the prompt text.
@@ -76,8 +88,15 @@ export function budgetPreflight(
   const fits = tokenEstimate <= contextWindow * MAX_UTILIZATION;
 
   const costs = MODEL_COSTS[modelId];
+  // Select the pricing tier before multiplying: a vendor with a long-context
+  // premium charges the higher rate for the whole prompt once it crosses the
+  // threshold, so pricing a large prompt at the base rate under-reports.
+  const tier = costs?.aboveThreshold;
+  const useAboveThreshold = tier !== undefined && tokenEstimate > tier.thresholdTokens;
+  const costTier = costs === undefined ? undefined : useAboveThreshold ? "aboveThreshold" : "base";
+  const inputRate = useAboveThreshold ? tier.inputPerMToken : costs?.inputPerMToken;
   const estimatedCostUsd =
-    costs !== undefined ? (tokenEstimate / 1_000_000) * costs.inputPerMToken : undefined;
+    inputRate !== undefined ? (tokenEstimate / 1_000_000) * inputRate : undefined;
 
   return {
     modelId,
@@ -86,5 +105,6 @@ export function budgetPreflight(
     contextWindow,
     utilizationPercent,
     estimatedCostUsd,
+    costTier,
   };
 }
