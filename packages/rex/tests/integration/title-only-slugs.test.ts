@@ -216,3 +216,21 @@ describe("resolveSiblingSlugs with title-only slugs", () => {
     expect(entries).toEqual(["alpha.md", "beta.md"]);
   });
 });
+
+describe("duplicate ids at write time", () => {
+  it("still gives each instance its own file rather than losing one", async () => {
+    // Two siblings sharing an id is a data invariant violation `validate`
+    // reports — but the writing path must not compound it by dropping one.
+    // Regression guard: an earlier revision routed this through an id-keyed
+    // Map, which collapsed the pair and lost an item.
+    const items: PRDItem[] = [
+      { id: "same-id", title: "Epic A", level: "epic", status: "pending" },
+      { id: "same-id", title: "Epic B", level: "epic", status: "pending" },
+    ];
+
+    await serializeFolderTree(items, treeRoot, { allowBulkDelete: true });
+
+    const files = (await readdir(treeRoot)).filter((e) => e !== "tree-meta.json").sort();
+    expect(files, "an item was lost to its duplicate id").toEqual(["epic-a.md", "epic-b.md"]);
+  });
+});

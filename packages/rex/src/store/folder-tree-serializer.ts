@@ -322,9 +322,13 @@ export async function findNonConformingSlugs(
     }
     const present = new Set(entries);
 
+    const expectedBySlug = resolveSiblingSlugs(siblings);
+
     for (const item of siblings) {
       const children = item.children ?? [];
-      const expected = slugify(item.title, item.id);
+      // Sibling-aware: a legitimately disambiguated collision is conforming,
+      // and comparing against bare `slugify` reported those as foreign.
+      const expected = expectedBySlug.get(item.id) ?? slugify(item.title, item.id);
       // Items with children are directories; leaves are bare `<slug>.md`.
       const expectedEntry = children.length > 0 ? expected : `${expected}.md`;
 
@@ -402,20 +406,23 @@ export function slugifyTitle(title: string): string {
  * already applied by the existing slug system.
  */
 function resolvePositionalSiblingSlugs(items: PRDItem[]): string[] {
-  const initial = items.map((item) => slugify(item.title, item.id));
+  // Keyed by POSITION, not id. `resolveSiblingSlugs` returns a Map keyed by id,
+  // so two siblings sharing an id — a data invariant violation `validate`
+  // reports separately — collapse to one entry there. This is the writing path,
+  // where that collapse means one item overwrites the other and is lost, so it
+  // keeps its own array-shaped pass. The disambiguation rule is the same one.
+  const wanted = items.map((item) => slugify(item.title, item.id));
+  const counts = new Map<string, number>();
+  for (const slug of wanted) counts.set(slug, (counts.get(slug) ?? 0) + 1);
 
-  // Final dedup pass — for genuinely identical (title, id) pairs append a
-  // position suffix so each item still gets its own directory.
-  const finalCounts = new Map<string, number>();
-  for (const slug of initial) {
-    finalCounts.set(slug, (finalCounts.get(slug) ?? 0) + 1);
-  }
-  const seen = new Map<string, number>();
-  return initial.map((slug) => {
-    if ((finalCounts.get(slug) ?? 0) <= 1) return slug;
-    const idx = seen.get(slug) ?? 0;
-    seen.set(slug, idx + 1);
-    return `${slug}-${idx + 1}`;
+  const used = new Set<string>();
+  return items.map((item, i) => {
+    const base = wanted[i];
+    let slug = (counts.get(base) ?? 0) > 1 ? `${base}-${shortId(item.id)}` : base;
+    let n = 2;
+    while (used.has(slug)) slug = `${base}-${shortId(item.id)}-${n++}`;
+    used.add(slug);
+    return slug;
   });
 }
 
