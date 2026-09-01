@@ -15,7 +15,7 @@ import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { appendLog } from "./rex-route-helpers.js";
-import { getAvailableBackups, restoreFromBackup } from "../rex-gateway.js";
+import { getAvailableBackups, restoreFromBackup, isValidSnapshotId } from "../rex-gateway.js";
 
 /** Render a snapshot id back into a readable ISO timestamp for display. */
 function formatSnapshotId(id: string): string {
@@ -105,6 +105,11 @@ async function handleRestore(
 
     if (!input.id) {
       errorResponse(res, 400, "Missing required field: id");
+      return true;
+    }
+
+    if (!isValidSnapshotId(input.id)) {
+      errorResponse(res, 400, `Invalid snapshot id: ${input.id}`);
       return true;
     }
 

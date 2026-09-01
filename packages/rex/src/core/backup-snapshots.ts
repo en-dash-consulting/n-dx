@@ -50,6 +50,31 @@ export function encodeSnapshotId(isoTimestamp: string): string {
 }
 
 /**
+ * Validate a snapshot id before it is used to build a filesystem path.
+ *
+ * `id` reaches `restoreFromBackup` from external callers — the CLI arg, or
+ * the web dashboard's JSON request body — and is joined into `stagingPath`
+ * and `backupPath` there. It must never be trusted as path-safe: a crafted
+ * id containing `..` segments or a path separator can make the join resolve
+ * outside `.rex/.backups/`, and `restoreFromBackup` unconditionally runs
+ * `fs.rm(..., { recursive: true, force: true })` on the result.
+ *
+ * Rejects: empty ids, forward slashes, backslashes, two consecutive dots
+ * (`..`), and NUL bytes. `encodeSnapshotId`'s own output (colons replaced
+ * with dashes) and legacy raw ISO-8601 timestamps (single dots only, before
+ * the trailing `Z`) both still pass — neither contains any rejected
+ * character.
+ */
+export function isValidSnapshotId(id: string): boolean {
+  if (!id) return false;
+  if (id.includes("/")) return false;
+  if (id.includes("\\")) return false;
+  if (id.includes("..")) return false;
+  if (id.includes("\0")) return false;
+  return true;
+}
+
+/**
  * Create a timestamped snapshot of the PRD tree.
  *
  * The snapshot is stored at `.rex/.backups/prd_tree_<ISO-timestamp>/`.
@@ -119,6 +144,10 @@ export async function snapshotPRDTree(rexDir: string): Promise<BackupSnapshot | 
  * @throws If the backup doesn't exist or restore fails
  */
 export async function restoreFromBackup(rexDir: string, id: string): Promise<void> {
+  if (!isValidSnapshotId(id)) {
+    throw new Error(`Invalid snapshot id: ${JSON.stringify(id)}`);
+  }
+
   const treeRoot = join(rexDir, "prd_tree");
   const backupsDir = join(rexDir, ".backups");
 

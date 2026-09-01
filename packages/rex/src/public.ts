@@ -499,6 +499,7 @@ export {
   getAvailableBackups,
   restoreFromBackup,
   encodeSnapshotId,
+  isValidSnapshotId,
 } from "./core/backup-snapshots.js";
 export type { BackupSnapshot } from "./core/backup-snapshots.js";
 

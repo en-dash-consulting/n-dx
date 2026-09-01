@@ -989,4 +989,76 @@ describe("Rex API routes", () => {
       expect(data.error).toContain("empty content");
     });
   });
+
+  // ── Restore endpoint: path-traversal rejection (security regression) ────
+  //
+  // `id` used to flow unvalidated into a filesystem path that
+  // restoreFromBackup recursively force-deletes. These confirm the route
+  // rejects a malicious id with 400 before any stat/restore call runs —
+  // no backup fixtures are created on disk for these cases.
+
+  describe("POST /api/rex/restore", () => {
+    it("rejects an id containing a parent-directory traversal sequence", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "../../../etc/passwd" }),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Invalid snapshot id");
+
+      // The live PRD tree is untouched — the route rejected before any
+      // stat/countFiles/restoreFromBackup call could run.
+      const prd = await readPRDFromStore(rexDir);
+      expect(prd.items).toHaveLength(1);
+      expect(prd.items[0]!.id).toBe("epic-1");
+    });
+
+    it("rejects an id containing a forward slash", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "abc/def" }),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Invalid snapshot id");
+    });
+
+    it("rejects an id containing two consecutive dots", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "abc..def" }),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Invalid snapshot id");
+    });
+
+    it("rejects a missing id before validating format", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Missing required field: id");
+    });
+
+    it("still returns 404 for a well-formed but nonexistent snapshot id", async () => {
+      // Proves the fix doesn't over-reject legitimate, encoded snapshot ids —
+      // this one passes validation and falls through to the existence check.
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "2026-01-01T00-00-00-000Z" }),
+      });
+      expect(res.status).toBe(404);
+      const data = await res.json();
+      expect(data.error).toContain("Snapshot not found");
+    });
+  });
 });

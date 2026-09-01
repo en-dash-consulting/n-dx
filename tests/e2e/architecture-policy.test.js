@@ -984,8 +984,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/web/src/server/rex-gateway.ts",
-    maxExports: 65,
-    description: "web→rex gateway (domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser, folder-tree parser/slug resolver, legacy PRD migration, PRD tree backup snapshots for the dashboard's Restore panel)",
+    maxExports: 66,
+    description: "web→rex gateway (domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser, folder-tree parser/slug resolver, legacy PRD migration, PRD tree backup snapshots for the dashboard's Restore panel — isValidSnapshotId added to reject a path-traversal id in POST /api/rex/restore before it reaches restoreFromBackup's fs.rm)",
   },
   {
     file: "packages/web/src/server/domain-gateway.ts",
