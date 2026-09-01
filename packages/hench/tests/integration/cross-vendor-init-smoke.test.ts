@@ -217,14 +217,16 @@ describe("cross-vendor init-to-run smoke", () => {
       const flags = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY);
 
       expect(flags).not.toContain("--approval-policy");
-      expect(flags).toContain("--full-auto");
-      expect(flags).toHaveLength(1);
+      expect(flags).not.toContain("--full-auto");
+      expect(flags).toContain("--sandbox");
+      expect(flags).toHaveLength(2);
     });
 
-    it("compiled flags use the current standalone --full-auto preset", () => {
+    it("compiled flags use the current explicit --sandbox workspace-write flag", () => {
       const flags = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY);
-      const standaloneFlagIndex = flags.indexOf("--full-auto");
-      expect(standaloneFlagIndex).toBe(0);
+      const sandboxFlagIndex = flags.indexOf("--sandbox");
+      expect(sandboxFlagIndex).toBe(0);
+      expect(flags[sandboxFlagIndex + 1]).toBe("workspace-write");
     });
   });
 

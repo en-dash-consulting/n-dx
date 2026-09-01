@@ -16,6 +16,8 @@ export { MemoryPanel } from "./memory-panel.js";
 export { WsHealthPanel } from "./ws-health-panel.js";
 export { ThrottleControlsPanel } from "./throttle-controls.js";
 export { DetailPanel } from "./detail-panel.js";
+export { StartTaskButton } from "./start-task-button.js";
+export type { StartTaskButtonProps } from "./start-task-button.js";
 
 // ── Banners ──────────────────────────────────────────────────────────
 
@@ -46,6 +48,10 @@ export { NdxLogoPng, ProductLogoPng, BrandedHeader } from "./logos.js";
 export { EnrichmentGate } from "./enrichment-gate.js";
 export { PollingSuspensionIndicator } from "./polling-suspension-indicator.js";
 export { RefreshQueueStatus } from "./refresh-queue-status.js";
+export { ActiveOperationsTray } from "./active-operations-tray.js";
+export type { ActiveOperationsTrayProps } from "./active-operations-tray.js";
+export { GitStatusBanner } from "./git-status-banner.js";
+export type { GitStatusBannerProps } from "./git-status-banner.js";
 
 // ── Status indicators ───────────────────────────────────────────────
 

@@ -53,9 +53,9 @@ describe("Codex policy flag compilation", () => {
   });
 
   describe("compileCodexPolicyFlags", () => {
-    it("uses --full-auto for the default unattended policy", () => {
+    it("uses --sandbox workspace-write for the default unattended policy", () => {
       const flags = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY);
-      expect(flags).toEqual(["--full-auto"]);
+      expect(flags).toEqual(["--sandbox", "workspace-write"]);
     });
 
     it("compiles read-only + on-request policy to a plain sandbox flag", () => {
@@ -98,7 +98,13 @@ describe("Codex policy flag compilation", () => {
     });
 
     it("returns a compact supported flag set", () => {
-      expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)).toHaveLength(1);
+      expect(
+        compileCodexPolicyFlags({
+          ...DEFAULT_EXECUTION_POLICY,
+          sandbox: "danger-full-access",
+        }),
+      ).toHaveLength(1);
+      expect(compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)).toHaveLength(2);
       expect(
         compileCodexPolicyFlags({
           ...DEFAULT_EXECUTION_POLICY,

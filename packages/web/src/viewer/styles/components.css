@@ -191,3 +191,53 @@
   fill: none;
   stroke-linecap: round;
 }
+
+/* ── Start Task button (shared — Rex Dashboard "Up Next" card, Hench Runs empty state) ── */
+
+.start-task-btn {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  padding: var(--space-1-5) var(--space-3-5);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  white-space: nowrap;
+}
+
+.start-task-btn:hover {
+  background: var(--accent-dim);
+  transform: translateY(-1px);
+}
+
+.start-task-btn:active {
+  transform: translateY(0);
+}
+
+.start-task-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.start-task-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.start-task-error {
+  font-size: var(--font-xs);
+  color: var(--red, #ef4444);
+  max-width: 220px;
+  text-align: center;
+  animation: start-task-error-in 0.2s ease;
+}
+
+@keyframes start-task-error-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

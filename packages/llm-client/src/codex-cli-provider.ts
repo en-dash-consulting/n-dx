@@ -7,9 +7,14 @@
  * ## Execution policy compilation
  *
  * The provider compiles an {@link ExecutionPolicy} into Codex-specific CLI
- * flags using the currently supported surface (`--sandbox`, `--full-auto`,
+ * flags using the currently supported surface (`--sandbox`,
  * `--dangerously-bypass-approvals-and-sandbox`). This keeps the n-dx policy
  * object as the single source of truth for permission intent.
+ *
+ * `--full-auto` was removed from the Codex CLI (gone as of codex-cli
+ * 0.147.0's `exec` subcommand) — `workspace-write + never` now compiles to
+ * the equivalent explicit `--sandbox workspace-write`, since `codex exec`
+ * is already non-interactive and has no approval-prompt surface to disable.
  *
  * @see packages/llm-client/src/runtime-contract.ts — policy types
  * @see docs/analysis/claude-codex-runtime-identity-discovery.md §7.1
@@ -112,27 +117,24 @@ export function mapApprovalToCodexFlag(policy: ApprovalPolicy): string {
 /**
  * Compile an n-dx {@link ExecutionPolicy} into Codex CLI flags.
  *
- * Codex no longer exposes a dedicated `--approval-policy` exec flag, so this
- * compiler maps the normalized policy object onto the supported CLI surface:
+ * Codex no longer exposes a dedicated `--approval-policy` exec flag (nor a
+ * `--full-auto` shortcut), so this compiler maps the normalized policy
+ * object onto the supported CLI surface:
  *
- * - `workspace-write + never` → `--full-auto`
  * - `danger-full-access + never` → `--dangerously-bypass-approvals-and-sandbox`
- * - all other combinations → explicit `--sandbox <mode>`
+ * - all other combinations, including `workspace-write + never` → explicit
+ *   `--sandbox <mode>` (`codex exec` is non-interactive already, so there is
+ *   no separate approval prompt to suppress)
  *
  * @example
  * ```ts
  * compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)
- * // → ["--full-auto"]
+ * // → ["--sandbox", "workspace-write"]
  * ```
  */
 export function compileCodexPolicyFlags(policy: ExecutionPolicy): string[] {
-  if (policy.approvals === "never") {
-    if (policy.sandbox === "workspace-write") {
-      return ["--full-auto"];
-    }
-    if (policy.sandbox === "danger-full-access") {
-      return ["--dangerously-bypass-approvals-and-sandbox"];
-    }
+  if (policy.approvals === "never" && policy.sandbox === "danger-full-access") {
+    return ["--dangerously-bypass-approvals-and-sandbox"];
   }
 
   return ["--sandbox", mapSandboxToCodexFlag(policy.sandbox)];

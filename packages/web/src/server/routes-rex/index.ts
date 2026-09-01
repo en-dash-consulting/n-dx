@@ -10,6 +10,7 @@
  *   items.ts        — Item CRUD (add, get, patch, bulk, merge, delete)
  *   requirements.ts — Requirements CRUD, coverage, traceability
  *   prune.ts        — Prune preview and execution
+ *   restore.ts      — List and restore PRD tree snapshots (undo for reorganize/prune/reshape/fix)
  *   ../routes-rex-analysis.ts — Analysis, proposals, smart-add, batch-import
  *   execution.ts    — Epic-by-epic execution, pause/resume, shutdown
  *   health.ts       — Health score and reorganization proposals
@@ -24,6 +25,7 @@ import { routePrdReads } from "./reads.js";
 import { routeItems } from "./items.js";
 import { routeItemRequirements, routeRequirementsAnalytics } from "./requirements.js";
 import { routePrune } from "./prune.js";
+import { routeRestore } from "./restore.js";
 import { routeProposals } from "../routes-rex-analysis.js";
 import { routeExecution } from "./execution.js";
 import { routeHealthReorganize } from "./health.js";
@@ -38,6 +40,7 @@ const REX_PREFIX = "/api/rex/";
  * - Item CRUD (add, get, patch, bulk, merge)
  * - Requirements (item requirements CRUD, coverage, traceability)
  * - Prune (preview, execute)
+ * - Restore (list snapshots, restore from one)
  * - Proposals (analyze, proposals, smart-add, batch-import)
  * - Execution (epic-by-epic, status, pause, resume)
  * - Health & reorganize (health score, proposals, apply)
@@ -69,6 +72,9 @@ export function handleRexRoute(
 
   const pruneResult = routePrune(path, method, req, res, ctx, broadcast);
   if (pruneResult !== false) return pruneResult;
+
+  const restoreResult = routeRestore(path, method, req, res, ctx, broadcast);
+  if (restoreResult !== false) return restoreResult;
 
   const proposalResult = routeProposals(path, method, req, res, ctx, broadcast);
   if (proposalResult !== false) return proposalResult;

@@ -12,7 +12,8 @@ import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { findItemById, appendLog, parentIdOf } from "./rex-route-helpers.js";
-import { loadPRDSync, savePRDSync } from "../prd-io.js";
+import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
+import { resolveStore } from "../rex-gateway.js";
 
 import {
   type PRDItem,
@@ -395,8 +396,7 @@ async function handlePruneExecute(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
+  if (!loadPRDSync(ctx.rexDir)) {
     errorResponse(res, 404, "No PRD data found");
     return true;
   }
@@ -419,54 +419,79 @@ async function handlePruneExecute(
     };
     const now = new Date();
 
-    // Preview first to validate
-    const prunable = findPrunableWithCriteria(doc.items, criteria, now);
-    if (prunable.length === 0) {
-      jsonResponse(res, 200, { ok: true, prunedCount: 0, message: "Nothing to prune" });
-      return true;
-    }
+    // Use the PRDStore's transaction so writes go to the correct backend
+    // (prd_tree/ or prd.md) rather than always writing to prd.md via
+    // savePRDSync — this is a bulk load->mutate->save operation, exactly
+    // what withTransaction is documented for.
+    const store = await resolveStore(ctx.rexDir);
 
-    const expectedCount = prunable.reduce((sum, item) => sum + countSubtree(item), 0);
-
-    // Confirm count must match to prevent operating on stale data
-    if (input.confirmCount !== undefined && input.confirmCount !== expectedCount) {
-      errorResponse(res, 409, `Stale prune request: expected ${input.confirmCount} items but found ${expectedCount}. Refresh the preview.`);
-      return true;
-    }
-
-    // Create backup if requested
+    let noopMessage: string | undefined;
+    let staleError: string | undefined;
     let backupPath: string | undefined;
-    if (input.backup) {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      backupPath = join(ctx.rexDir, `prd-backup-${timestamp}.json`);
-      writeFileSync(backupPath, JSON.stringify(doc, null, 2) + "\n");
+    let prunedCount = 0;
+    let prunedItems: PRDItem[] = [];
+
+    const updatedDoc = await store.withTransaction(async (doc) => {
+      // Preview first to validate
+      const prunable = findPrunableWithCriteria(doc.items, criteria, now);
+      if (prunable.length === 0) {
+        noopMessage = "Nothing to prune";
+        return doc;
+      }
+
+      const expectedCount = prunable.reduce((sum, item) => sum + countSubtree(item), 0);
+
+      // Confirm count must match to prevent operating on stale data
+      if (input.confirmCount !== undefined && input.confirmCount !== expectedCount) {
+        staleError = `Stale prune request: expected ${input.confirmCount} items but found ${expectedCount}. Refresh the preview.`;
+        return doc;
+      }
+
+      // Create backup if requested
+      if (input.backup) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        backupPath = join(ctx.rexDir, `prd-backup-${timestamp}.json`);
+        writeFileSync(backupPath, JSON.stringify(doc, null, 2) + "\n");
+      }
+
+      // Execute prune — remove items matching criteria
+      const prunableIds = new Set(prunable.map((p) => p.id));
+      const result = pruneItemsByIds(doc.items, prunableIds);
+      prunedCount = result.prunedCount;
+      prunedItems = result.pruned;
+
+      // Archive pruned items
+      const archivePath = join(ctx.rexDir, "archive.json");
+      const archive = loadArchiveSync(archivePath);
+      archive.batches.push({
+        timestamp: new Date().toISOString(),
+        source: "prune",
+        items: result.pruned,
+        count: result.prunedCount,
+        ...(criteria.minAgeDays > 0 ? { reason: `age >= ${criteria.minAgeDays}d` } : {}),
+      });
+      writeFileSync(archivePath, JSON.stringify(archive, null, 2) + "\n");
+
+      return doc;
+    });
+
+    if (noopMessage) {
+      jsonResponse(res, 200, { ok: true, prunedCount: 0, message: noopMessage });
+      return true;
+    }
+    if (staleError) {
+      errorResponse(res, 409, staleError);
+      return true;
     }
 
-    // Execute prune — remove items matching criteria
-    const prunableIds = new Set(prunable.map((p) => p.id));
-    const result = pruneItemsByIds(doc.items, prunableIds);
-
-    // Archive pruned items
-    const archivePath = join(ctx.rexDir, "archive.json");
-    const archive = loadArchiveSync(archivePath);
-    archive.batches.push({
-      timestamp: new Date().toISOString(),
-      source: "prune",
-      items: result.pruned,
-      count: result.prunedCount,
-      ...(criteria.minAgeDays > 0 ? { reason: `age >= ${criteria.minAgeDays}d` } : {}),
-    });
-    writeFileSync(archivePath, JSON.stringify(archive, null, 2) + "\n");
-
-    // Save pruned document
-    savePRDSync(ctx.rexDir, doc);
+    refreshPRDCache(ctx.rexDir, updatedDoc);
 
     // Log the prune action
-    const titles = result.pruned.map((i) => i.title).join(", ");
+    const titles = prunedItems.map((i) => i.title).join(", ");
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
       event: "items_pruned",
-      detail: `Pruned ${result.prunedCount} items: ${titles} (via web, criteria: statuses=${criteria.statuses.join(",")}, minAge=${criteria.minAgeDays}d)`,
+      detail: `Pruned ${prunedCount} items: ${titles} (via web, criteria: statuses=${criteria.statuses.join(",")}, minAge=${criteria.minAgeDays}d)`,
     });
 
     if (broadcast) {
@@ -478,8 +503,8 @@ async function handlePruneExecute(
 
     jsonResponse(res, 200, {
       ok: true,
-      prunedCount: result.prunedCount,
-      prunedItems: result.pruned.map(summarizeItem),
+      prunedCount,
+      prunedItems: prunedItems.map(summarizeItem),
       archivedTo: "archive.json",
       ...(backupPath ? { backupPath } : {}),
     });

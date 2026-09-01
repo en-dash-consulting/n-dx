@@ -911,7 +911,9 @@ function RequirementsList({
         ? h(
             "div",
             { class: "task-req-add-form" },
-            h("div", { class: "task-section-label" }, "New Requirement"),
+						// TODO: Fix issue in UI where typing into any of the box fields jumps the focus back to the "requirement title"
+						// Also could clean up the look of these buttons, they look bad
+            h("div", { class: "task-section-label" }, "New Requirement"), 
             h("input", {
               class: "task-req-input",
               type: "text",

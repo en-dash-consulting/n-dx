@@ -56,7 +56,10 @@ for (const a of args.slice(1)) {
     debugMode = true;
   } else if (a === "--help" || a === "-h") {
     help = true;
-  } else if (a.startsWith("--phase=") || a.startsWith("--only=") || a === "--fast" || a === "--full" || a === "--deep") {
+  } else if (
+    a.startsWith("--phase=") || a.startsWith("--only=") || a.startsWith("--target-pass=")
+    || a === "--fast" || a === "--full" || a === "--deep" || a === "--lite"
+  ) {
     passthrough.push(a);
   }
 }

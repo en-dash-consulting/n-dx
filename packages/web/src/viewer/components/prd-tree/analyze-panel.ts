@@ -6,7 +6,7 @@
  */
 
 import { h, Fragment } from "preact";
-import { useState, useCallback, useEffect } from "preact/hooks";
+import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 import type {Proposal} from "@n-dx/rex";// ── Types ────────────────────────────────────────────────────────────
@@ -17,6 +17,41 @@ export interface AnalyzePanelProps {
 }
 
 type AnalyzeState = "idle" | "running" | "done" | "error";
+
+interface AnalyzeJobStatus {
+  running: boolean;
+  finishedAt: string | null;
+  report: { proposals?: Proposal[] } | null;
+  output: string;
+  error: string | null;
+}
+
+/**
+ * Poll the background analyze job until it finishes.
+ *
+ * `rex analyze` is a genuine multi-minute LLM operation on a real project —
+ * POST /api/rex/analyze starts it as a background job (see routes-rex-analysis.ts)
+ * instead of the caller awaiting one long-lived fetch, which used to lose
+ * the entire result (and its LLM cost) on any page reload or navigation
+ * during the wait. Mirrors ValidationActions' pollJob (validation.ts) —
+ * not shared, since the two call sites' wire shapes differ slightly.
+ */
+function pollAnalyzeStatus(onDone: (status: AnalyzeJobStatus) => void): () => void {
+  const interval = setInterval(async () => {
+    try {
+      const res = await fetch("/api/rex/analyze/status");
+      if (!res.ok) return;
+      const status = await res.json() as AnalyzeJobStatus;
+      if (!status.running && status.finishedAt) {
+        clearInterval(interval);
+        onDone(status);
+      }
+    } catch {
+      // Ignore transient poll failures — next tick retries.
+    }
+  }, 2000);
+  return () => clearInterval(interval);
+}
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -29,6 +64,26 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
   const [acceptedIndices, setAcceptedIndices] = useState<Set<number>>(new Set());
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [editing, setEditing] = useState(false);
+  const cancelPollRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => cancelPollRef.current?.(), []);
+
+  const applyAnalyzeResult = useCallback((status: AnalyzeJobStatus) => {
+    const resultProposals = status.report?.proposals;
+    if (resultProposals && resultProposals.length > 0) {
+      setProposals(resultProposals);
+      setSelectedIndices(new Set(resultProposals.map((_, i) => i)));
+      setState("done");
+      return;
+    }
+    if (status.error) {
+      setError(status.error);
+      setState("error");
+      return;
+    }
+    setProposals([]);
+    setState("done");
+  }, []);
 
   // Load any pending proposals on first render
   const loadPending = useCallback(async () => {
@@ -48,14 +103,33 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
     }
   }, []);
 
-  // Load pending on first render
-  useEffect(() => { loadPending(); }, []);
+  // Load pending proposals on first render, and resume watching an
+  // analysis that was already running before this page loaded (e.g. the
+  // operator started it, then reloaded or came back to the tab).
+  useEffect(() => {
+    loadPending();
+    (async () => {
+      try {
+        const res = await fetch("/api/rex/analyze/status");
+        if (!res.ok) return;
+        const status = await res.json() as AnalyzeJobStatus;
+        if (status.running) {
+          setState("running");
+          setError(null);
+          cancelPollRef.current = pollAnalyzeStatus(applyAnalyzeResult);
+        }
+      } catch {
+        // Ignore — the Run Analysis button still works if this check fails.
+      }
+    })();
+  }, []);
 
   const handleAnalyze = useCallback(async () => {
     setState("running");
     setError(null);
     setProposals([]);
     setAcceptedIndices(new Set());
+    cancelPollRef.current?.();
 
     try {
       const res = await fetch("/api/rex/analyze", {
@@ -64,37 +138,17 @@ export function AnalyzePanel({ onPrdChanged }: AnalyzePanelProps) {
         body: JSON.stringify({ noLlm }),
       });
 
-      if (!res.ok) {
+      if (!res.ok && res.status !== 409) {
         const errBody = await res.json().catch(() => ({ error: "Analysis failed" }));
         throw new Error(errBody.error || `HTTP ${res.status}`);
       }
 
-      const data = await res.json();
-
-      if (data.proposals && data.proposals.length > 0) {
-        setProposals(data.proposals);
-        setSelectedIndices(new Set(data.proposals.map((_: Proposal, i: number) => i)));
-        setState("done");
-      } else {
-        // Check for pending proposals after analysis
-        const pendingRes = await fetch("/api/rex/proposals");
-        if (pendingRes.ok) {
-          const pendingData = await pendingRes.json();
-          if (pendingData.proposals && pendingData.proposals.length > 0) {
-            setProposals(pendingData.proposals);
-            setSelectedIndices(new Set(pendingData.proposals.map((_: Proposal, i: number) => i)));
-            setState("done");
-            return;
-          }
-        }
-        setProposals([]);
-        setState("done");
-      }
+      cancelPollRef.current = pollAnalyzeStatus(applyAnalyzeResult);
     } catch (err) {
       setError(String(err));
       setState("error");
     }
-  }, [noLlm]);
+  }, [noLlm, applyAnalyzeResult]);
 
   const handleAccept = useCallback(async () => {
     if (selectedIndices.size === 0) return;

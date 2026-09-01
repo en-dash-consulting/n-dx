@@ -1,4 +1,4 @@
-const ALLOWED_REFRESH_FLAGS = new Set(["--ui-only", "--data-only", "--pr-markdown", "--no-build", "--quiet", "-q", "--fast", "--live-server"]);
+const ALLOWED_REFRESH_FLAGS = new Set(["--ui-only", "--data-only", "--pr-markdown", "--no-build", "--quiet", "-q", "--fast", "--live-server", "--verbose", "--debug"]);
 
 export class RefreshPlanError extends Error {
   constructor(message, suggestion) {
@@ -30,10 +30,14 @@ export function buildRefreshPlan(flags) {
   // must not stop the server, and the plan must not rebuild the UI assets
   // the server is actively serving.
   const liveServer = flags.includes("--live-server");
+  // --verbose/--debug: forwarded to sourcevision analyze so a caller asking
+  // for verbose refresh output (e.g. the dashboard's Refresh panel) actually
+  // gets it, rather than the flag being silently accepted but inert.
+  const verboseFlags = flags.filter((f) => f === "--verbose" || f === "--debug");
   // Flags forwarded to `sourcevision analyze`: quiet flags plus optional --fast
   // (structural-only, skips LLM archetype/zone enrichment). Not forwarded to the
   // pr-markdown step, which has no such mode.
-  const analyzeFlags = [...quietFlags, ...(fast ? ["--fast"] : [])];
+  const analyzeFlags = [...quietFlags, ...(fast ? ["--fast"] : []), ...verboseFlags];
 
   if (uiOnly && dataOnly) {
     throw new RefreshPlanError(

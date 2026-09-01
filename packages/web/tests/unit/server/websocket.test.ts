@@ -145,6 +145,49 @@ describe("WebSocket manager", () => {
     socket.destroy();
   });
 
+  it("computes Sec-WebSocket-Accept per RFC 6455 (spec example vector)", async () => {
+    // RFC 6455 section 1.3's own worked example: for this exact key, every
+    // spec-compliant client (and the `ws` npm package, cross-checked while
+    // diagnosing this) expects exactly this Accept value. Getting the
+    // magic GUID constant wrong (as it previously was — a transcription
+    // error in the last segment) computes a different-but-plausible-looking
+    // base64 string that satisfies every "did we get a 101 back" check
+    // (including this file's other tests, which never look at the Accept
+    // value) while failing the handshake in every real client: browsers,
+    // Node's native WebSocket, and any RFC-compliant implementation. Only
+    // an exact-value assertion against a known vector catches this class
+    // of bug — "got a response" is not "got the right response".
+    const key = "dGhlIHNhbXBsZSBub25jZQ==";
+    const expectedAccept = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=";
+
+    const response = await new Promise<string>((resolve, reject) => {
+      const socket = connect({ host: TEST_HOST, port }, () => {
+        socket.write(
+          `GET / HTTP/1.1\r\n` +
+          `Host: ${TEST_HOST}:${port}\r\n` +
+          `Upgrade: websocket\r\n` +
+          `Connection: Upgrade\r\n` +
+          `Sec-WebSocket-Key: ${key}\r\n` +
+          `Sec-WebSocket-Version: 13\r\n` +
+          `\r\n`,
+        );
+      });
+      let buf = Buffer.alloc(0);
+      socket.on("data", (chunk: Buffer) => {
+        buf = Buffer.concat([buf, chunk]);
+        if (buf.toString("utf-8").includes("\r\n\r\n")) {
+          socket.destroy();
+          resolve(buf.toString("utf-8"));
+        }
+      });
+      socket.on("error", reject);
+      setTimeout(() => reject(new Error("Upgrade timeout")), 3000);
+    });
+
+    const acceptLine = response.split("\r\n").find((l) => l.toLowerCase().startsWith("sec-websocket-accept:"));
+    expect(acceptLine?.split(":")[1]?.trim()).toBe(expectedAccept);
+  });
+
   it("tracks multiple connected clients", async () => {
     expect(ws.clientCount()).toBe(0);
 

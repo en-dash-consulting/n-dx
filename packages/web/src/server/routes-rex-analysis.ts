@@ -17,6 +17,8 @@ import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
+import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
+import { startAsyncJob, newJobStatus } from "./routes-commands.js";
 
 import {
   type PRDItem,
@@ -169,9 +171,14 @@ export function routeProposals(
   req: IncomingMessage, res: ServerResponse, ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): boolean | Promise<boolean> {
-  // POST /api/rex/analyze — trigger analysis
+  // POST /api/rex/analyze — start analysis as a background job
   if (path === "analyze" && method === "POST") {
     return handleAnalyze(req, res, ctx, broadcast);
+  }
+
+  // GET /api/rex/analyze/status — poll the running/last analysis job
+  if (path === "analyze/status" && method === "GET") {
+    return handleAnalyzeStatus(res);
   }
 
   // GET /api/rex/proposals — get pending proposals
@@ -332,63 +339,70 @@ async function handleCaptureNextSteps(
 // Route handlers
 // ---------------------------------------------------------------------------
 
-/** Handle POST /api/rex/analyze — trigger analysis via CLI subprocess */
+/**
+ * Status of the last/current `rex analyze` run, polled by the dashboard.
+ *
+ * `handleAnalyze` used to be fully synchronous: the client `await`ed one
+ * fetch for the whole LLM-refined analysis. On a real (non-trivial) project
+ * that call is a genuine multi-minute LLM operation — every other slow LLM
+ * command in this file/package (sv-analyze full pass, self-heal, reshape,
+ * ci) already runs as a background job with a status-poll endpoint for
+ * exactly this reason. A synchronous 30-minute-capped fetch has two real
+ * failure modes a poll-based job doesn't: (1) a page reload, navigation, or
+ * dropped connection during the wait discards the result — the analysis
+ * keeps running server-side but nothing is left to receive it, so the user
+ * sees a stuck "Analyzing…" forever and the (costly) LLM work is wasted;
+ * (2) zero progress feedback for up to 30 minutes.
+ */
+const analyzeStatus = newJobStatus();
+
+/** Handle POST /api/rex/analyze — start analysis as a background job */
 async function handleAnalyze(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
+  let input: { accept?: boolean; noLlm?: boolean; lite?: boolean };
   try {
     const body = await readBody(req);
-    const input = JSON.parse(body) as {
-      accept?: boolean;
-      noLlm?: boolean;
-      lite?: boolean;
-    };
-
-    const args = ["analyze", "--format=json"];
-    if (input.accept) args.push("--accept");
-    if (input.noLlm) args.push("--no-llm");
-    if (input.lite) args.push("--lite");
-    args.push(ctx.projectDir);
-
-    // Resolve the rex CLI from this server's own install (see resolveRexCli)
-    const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
-    const binArgs = [...prefixArgs, ...args];
-
-    const result = await foundationExec(binPath, binArgs, {
-      cwd: ctx.projectDir,
-      timeout: 120_000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-
-    if (result.error) {
-      // Try to parse JSON from stdout even on error (CLI may exit non-zero but still output)
-      try {
-        const parsed = JSON.parse(result.stdout);
-        jsonResponse(res, 200, { ok: true, ...parsed });
-      } catch {
-        errorResponse(res, 500, `Analysis failed: ${result.stderr || result.error.message}`);
-      }
-    } else {
-      try {
-        const parsed = JSON.parse(result.stdout);
-        if (broadcast) {
-          broadcast({
-            type: "rex:prd-changed",
-            timestamp: new Date().toISOString(),
-          });
-        }
-        jsonResponse(res, 200, { ok: true, ...parsed });
-      } catch {
-        // Non-JSON output — return as plain result
-        jsonResponse(res, 200, { ok: true, output: result.stdout.trim() });
-      }
-    }
+    input = JSON.parse(body) as typeof input;
   } catch (err) {
     errorResponse(res, 400, String(err));
+    return true;
   }
+
+  const args = ["analyze", "--format=json"];
+  if (input.accept) args.push("--accept");
+  if (input.noLlm) args.push("--no-llm");
+  if (input.lite) args.push("--lite");
+  args.push(ctx.projectDir);
+
+  // Resolve the rex CLI from this server's own install (see resolveRexCli)
+  const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
+  const binArgs = [...prefixArgs, ...args];
+
+  // Honor the user's configured "CLI Timeouts" settings (.n-dx.json's
+  // cli.timeoutMs / cli.timeouts.plan) instead of a hardcoded value.
+  // Command key is "plan", not "analyze": this spawns `rex analyze`
+  // directly, which is the CLI Timeouts settings page's "plan" entry
+  // ("Analyze codebase and propose PRD items") — `ndx plan` runs this
+  // exact step after sourcevision. The settings page's separate "analyze"
+  // entry ("Run sourcevision static analysis") maps to a different
+  // command (handleSvAnalyze in routes-commands.ts) — reusing that key
+  // here would let a timeout meant to bound the sourcevision scan also
+  // silently truncate this unrelated rex/LLM step.
+  const timeoutMs = resolveEffectiveCliTimeoutMs(ctx.projectDir, "plan");
+
+  return startAsyncJob(
+    res, analyzeStatus, "Analyze", binPath, binArgs, ctx,
+    timeoutMs, broadcast, input.accept ? "rex:prd-changed" : undefined,
+  );
+}
+
+/** Handle GET /api/rex/analyze/status */
+function handleAnalyzeStatus(res: ServerResponse): boolean {
+  jsonResponse(res, 200, { ...analyzeStatus });
   return true;
 }
 
@@ -889,9 +903,13 @@ async function handleBatchImport(
       const { binPath, prefixArgs } = resolveRexCli(ctx.projectDir);
       const binArgs = [...prefixArgs, ...args];
 
+      // Batch import runs an LLM round-trip per item (same underlying `rex
+      // add` smart-parsing as handleSmartAddPreview), so a fixed short
+      // timeout under-serves larger batches — honor the user's configured
+      // "CLI Timeouts" settings the same way handleAnalyze now does.
       const cliResult = await foundationExec(binPath, binArgs, {
         cwd: ctx.projectDir,
-        timeout: 120_000, // 2 minutes — batch may take longer
+        timeout: resolveEffectiveCliTimeoutMs(ctx.projectDir, "add"),
         maxBuffer: 10 * 1024 * 1024,
       });
 
