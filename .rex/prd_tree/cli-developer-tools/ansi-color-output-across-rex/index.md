@@ -15,8 +15,8 @@ description: "Add semantic ANSI color formatting to all CLI log output across re
 | Title | Status |
 |-------|--------|
 | [Add integration tests validating TTY-aware color emission and NO_COLOR suppression across all CLI tools](./add-integration-tests-validating-tty.md) | completed |
-| [Apply color formatting to sourcevision CLI output](./apply-color-formatting-to-sourcevision.md) | completed |
 | [Apply color formatting to hench and ndx orchestrator output](./apply-color-formatting-to-hench-and.md) | completed |
 | [Apply color formatting to rex CLI output](./apply-color-formatting-to-rex-cli-output.md) | completed |
+| [Apply color formatting to sourcevision CLI output](./apply-color-formatting-to-sourcevision.md) | completed |
 | [Build shared ANSI color formatting utility with TTY and NO_COLOR support](./build-shared-ansi-color-formatting.md) | completed |
 | [Standardize semantic color conventions for status and log-level output across all CLI tools](./standardize-semantic-color-conventions.md) | completed |

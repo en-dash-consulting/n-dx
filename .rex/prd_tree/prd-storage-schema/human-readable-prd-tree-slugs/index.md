@@ -23,4 +23,4 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Give the title-only slug rule a disambiguator for legitimately same-titled siblings](./give-the-title-only-slug-rule-a.md) | pending |
 | [Make the MCP and CLI write paths agree on the slug convention](./make-the-mcp-and-cli-write-paths-agree.md) | completed |
 | [Point migrate-slugs at the readable convention](./point-migrate-slugs-at-the-readable.md) | pending |
-| [Replace the id-qualified slug with a title-only slug, guarding merge safety in validate](./replace-the-id-qualified-slug-with-a.md) | in_progress |
+| [Replace the id-qualified slug with a title-only slug, guarding merge safety in validate](./replace-the-id-qualified-slug-with-a.md) | completed |

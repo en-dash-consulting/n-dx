@@ -16,5 +16,5 @@ description: "Wire the Google vendor adapter into the hench agent run loop, rex 
 | Title | Status |
 |-------|--------|
 | [Add Google to failover chain, quota status logging, and token usage attribution](./add-google-to-failover-chain-quota.md) | completed |
-| [Wire Google vendor into sourcevision analyze LLM path](./wire-google-vendor-into-sourcevision.md) | completed |
 | [Wire Google vendor into hench run loop, rex commands, and llm-gateway](./wire-google-vendor-into-hench-run-loop.md) | completed |
+| [Wire Google vendor into sourcevision analyze LLM path](./wire-google-vendor-into-sourcevision.md) | completed |

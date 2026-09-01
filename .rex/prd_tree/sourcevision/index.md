@@ -36,10 +36,10 @@ description: "Static analysis engine: file inventory, import graph, zone detecti
 | [Resolve critical SourceVision architectural findings](./resolve-critical-sourcevision/index.md) | completed |
 | [SourceVision Findings Remediation](./sourcevision-findings-remediation/index.md) | completed |
 | [SourceVision Import Graph Visualization Enhancement](./sourcevision-import-graph/index.md) | completed |
-| [SourceVision PR Markdown Quality & Manual Refresh](./sourcevision-pr-markdown-quality/index.md) | completed |
 | [SourceVision PR Markdown Artifact-Based Fallback Mode](./sourcevision-pr-markdown-artifact/index.md) | completed |
-| [SourceVision PR Markdown Refresh Degraded-Mode Hardening](./sourcevision-pr-markdown-refresh/index.md) | completed |
 | [SourceVision PR Markdown Git Preflight and Credential Diagnostics](./sourcevision-pr-markdown-git-preflight/index.md) | completed |
+| [SourceVision PR Markdown Quality & Manual Refresh](./sourcevision-pr-markdown-quality/index.md) | completed |
+| [SourceVision PR Markdown Refresh Degraded-Mode Hardening](./sourcevision-pr-markdown-refresh/index.md) | completed |
 | [SourceVision PR Markdown Tab Parity Hardening](./sourcevision-pr-markdown-tab-parity/index.md) | completed |
 | [SourceVision Semantic Diff Failure UX Hardening](./sourcevision-semantic-diff-failure-ux/index.md) | completed |
 | [SourceVision Token Efficiency and Prompt Compaction](./sourcevision-token-efficiency-and/index.md) | completed |
