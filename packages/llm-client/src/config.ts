@@ -343,8 +343,12 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
 /**
  * Map of shorthand model aliases to full Anthropic API model IDs.
  * The Claude CLI resolves these internally, but the API requires full IDs.
+ *
+ * Exported package-internally (not from `public.ts`) so the tier-pointer
+ * coverage test can assert every alias target is priced and sized. Callers
+ * should go through {@link resolveModel} rather than reading this directly.
  */
-const MODEL_ALIASES: Record<string, string> = {
+export const MODEL_ALIASES: Record<string, string> = {
   sonnet: NEWEST_MODELS.claude,
   opus: "claude-opus-5",
   haiku: "claude-haiku-4-5",

@@ -3,7 +3,11 @@ import { budgetPreflight } from "../../src/budget-preflight.js";
 import {
   MODEL_CONTEXT_WINDOWS,
   MODEL_COSTS,
+  MODEL_ALIASES,
   GOOGLE_MODELS,
+  NEWEST_MODELS,
+  REVIEW_MODELS,
+  TIER_MODELS,
   PRICES_LAST_VERIFIED,
 } from "../../src/config.js";
 
@@ -340,5 +344,64 @@ describe("MODEL_COSTS", () => {
         `${model} output cost should be >= input cost`,
       ).toBeGreaterThanOrEqual(cost.inputPerMToken);
     }
+  });
+});
+
+// ── Tier-pointer table coverage ─────────────────────────────────────────────
+//
+// Every model a tier constant points at must appear in both MODEL_COSTS and
+// MODEL_CONTEXT_WINDOWS. Repointing a tier at a newly released ID without
+// adding table entries fails silently: budgetPreflight falls back to
+// DEFAULT_CONTEXT_WINDOW (128_000) for what may be a 1M-context model, so
+// `fits` returns false for prompts that do fit, and estimatedCostUsd becomes
+// undefined — while every other test in this file stays green. These tables
+// have already gone stale twice on model bumps, so the check is table-driven
+// over the maps rather than pinned to a hand-listed set of IDs.
+
+/** One tier pointer: the map it lives in, the key path within it, and its model ID. */
+type TierPointer = [map: string, key: string, model: string];
+
+const TIER_POINTERS: TierPointer[] = [
+  ...Object.entries(NEWEST_MODELS).map(
+    ([vendor, model]): TierPointer => ["NEWEST_MODELS", vendor, model],
+  ),
+  ...Object.entries(TIER_MODELS).flatMap(([vendor, tiers]) =>
+    Object.entries(tiers).map(
+      ([tier, model]): TierPointer => ["TIER_MODELS", `${vendor}.${tier}`, model],
+    ),
+  ),
+  ...Object.entries(REVIEW_MODELS).map(
+    ([vendor, model]): TierPointer => ["REVIEW_MODELS", vendor, model],
+  ),
+  ...Object.entries(MODEL_ALIASES).map(
+    ([alias, model]): TierPointer => ["MODEL_ALIASES", alias, model],
+  ),
+  // The local vendor has no catalog — LM Studio serves whichever model is
+  // loaded, so its entries are empty strings with nothing to price or size.
+].filter(([, , model]) => model !== "");
+
+describe("tier pointers are covered by the pricing and context-window tables", () => {
+  // Guards the generator itself: if a map is renamed or stops being iterated,
+  // it.each silently drops to zero cases and the invariant stops being checked.
+  it("collects pointers from all four maps", () => {
+    expect(new Set(TIER_POINTERS.map(([map]) => map))).toEqual(
+      new Set(["NEWEST_MODELS", "TIER_MODELS", "REVIEW_MODELS", "MODEL_ALIASES"]),
+    );
+  });
+
+  it.each(TIER_POINTERS)("%s[%s] → %s has a MODEL_COSTS entry", (map, key, model) => {
+    expect(
+      MODEL_COSTS[model],
+      `${map}[${key}] points at "${model}", which has no MODEL_COSTS entry — ` +
+        `budgetPreflight would report estimatedCostUsd undefined for it`,
+    ).toBeDefined();
+  });
+
+  it.each(TIER_POINTERS)("%s[%s] → %s has a MODEL_CONTEXT_WINDOWS entry", (map, key, model) => {
+    expect(
+      MODEL_CONTEXT_WINDOWS[model],
+      `${map}[${key}] points at "${model}", which has no MODEL_CONTEXT_WINDOWS entry — ` +
+        `budgetPreflight would fall back to the 128_000-token default for it`,
+    ).toBeDefined();
   });
 });
