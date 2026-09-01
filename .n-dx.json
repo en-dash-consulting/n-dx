@@ -1,11 +1,11 @@
 {
   "llm": {
-    "vendor": "codex",
-    "model": "gpt-5.5",
-    "claude": {},
-    "codex": {
-      "model": "gpt-5.5"
-    }
+    "vendor": "claude",
+    "model": "claude-opus-5",
+    "claude": {
+      "model": "claude-opus-5"
+    },
+    "codex": {}
   },
   "sourcevision": {
     "zones": {
@@ -258,12 +258,12 @@
       }
     }
   },
-  "_initVersion": "0.5.1",
+  "_initVersion": "0.4.6",
   "cli": {
     "timeoutMs": 18000000,
     "name": "n-dx"
   },
   "claude": {
-    "model": "claude-sonnet-4-6"
+    "model": "claude-opus-5"
   }
 }
