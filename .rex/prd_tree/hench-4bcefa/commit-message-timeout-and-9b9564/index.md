@@ -16,6 +16,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A failed timer auto-commit deletes the commit message file anyway, then the fallback path returns silently](./a-failed-timer-auto-commit-c084d8.md) | pending |
+| [A failed timer auto-commit deletes the commit message file anyway, then the fallback path returns silently](./a-failed-timer-auto-commit-c084d8.md) | completed |
 | [Delete empty commit message file on timeout instead of committing](./delete-empty-commit-message-283175.md) | completed |
 | [The run log's .gitignore write lands after the commit step and leaves the tree dirty](./the-run-log-s-gitignore-write-3e4678.md) | pending |
