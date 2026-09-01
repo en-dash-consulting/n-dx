@@ -40,6 +40,7 @@ import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { createWebSocketManager, WsHealthTracker } from "./websocket.js";
 import { ALL_DATA_FILES } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
+import { handleRequestSecurity } from "./request-security.js";
 
 /**
  * File written by the server process to communicate the actual port it bound to.
@@ -516,20 +517,6 @@ function closeWatchers(handles: WatcherHandles): void {
   }
 }
 
-function setCorsHeaders(res: ServerResponse): void {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id");
-  res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
-}
-
-function handlePreflight(req: IncomingMessage, res: ServerResponse): boolean {
-  if ((req.method || "GET") !== "OPTIONS") return false;
-  res.writeHead(204);
-  res.end();
-  return true;
-}
-
 function handleConfigEndpoint(
   req: IncomingMessage,
   res: ServerResponse,
@@ -657,8 +644,7 @@ function createHttpServer(
   watcherHandles: WatcherHandles,
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    setCorsHeaders(res);
-    if (handlePreflight(req, res)) return;
+    if (handleRequestSecurity(req, res)) return;
     if (handleConfigEndpoint(req, res, ctx)) return;
     if (handleReloadSignalEndpoint(req, res, ws)) return;
     if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles)) return;
