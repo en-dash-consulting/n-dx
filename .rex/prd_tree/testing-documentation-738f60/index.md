@@ -31,7 +31,6 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Fix observation in web-server (1 finding)](./fix-observation-in-web-server-1-e8465f/index.md) | completed |
 | [Fix observation in web-unit (1 finding)](./fix-observation-in-web-unit-1-79b805/index.md) | completed |
 | [Fix suggestion in global (1 finding)](./fix-suggestion-in-global-1-52ecd1/index.md) | completed |
-| [Fix suggestion in global (1 finding)](./fix-suggestion-in-global-1-a6bc77/index.md) | completed |
 | [Fix suggestion in web-server (1 finding)](./fix-suggestion-in-web-server-1-17c575/index.md) | completed |
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-5a24a9/index.md) | completed |
 | [macOS Local Docker Test Suite](./macos-local-docker-test-suite-9dbecc/index.md) | completed |
@@ -45,3 +44,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Auto-Update Detection from npm Registry](./auto-update-detection-from-npm-dcf601.md) | completed |
 | [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-daf564.md) | completed |
 | [Zone cohesion gate silently passes in CI instead of reporting it did not run](./zone-cohesion-gate-silently-8d80f0.md) | completed |
+| [Open Source Scope Documentation Audit and Cross-Reference](./open-source-scope-documentation-491547/index.md) | completed |
+| [Skills Reference and .gitignore Guidance in ndx Documentation](./skills-reference-and-gitignore-ab5438/index.md) | completed |
+| [Skills Reference Documentation Page](./skills-reference-documentation-a7eef3/index.md) | completed |
+| [Contributor Page Section Expansion](./contributor-page-section-61b073/index.md) | completed |

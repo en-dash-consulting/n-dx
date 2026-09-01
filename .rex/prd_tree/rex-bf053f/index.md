@@ -42,3 +42,8 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Fix --mode=fast being ignored when --accept is passed to reorganize](./fix-mode-fast-being-ignored-0f8711.md) | completed |
 | [Investigate flaky store-roundtrip concurrency test (0 items after serialized mutations)](./investigate-flaky-store-5d0a66.md) | completed |
 | [rex add hangs indefinitely when stdin is an open pipe](./rex-add-hangs-indefinitely-when-769fe7.md) | completed |
+| [Reshape Consolidation of Hash-Suffixed Same-Title Items Under Generated Parent](./reshape-consolidation-of-hash-d08290/index.md) | completed |
+| [Hash-Suffixed Duplicate Title Consolidation in Reshape](./hash-suffixed-duplicate-title-11be72/index.md) | completed |
+| [Reshape Same-Parent Duplicate Merge with Backup Audit Trail](./reshape-same-parent-duplicate-6518b3/index.md) | completed |
+| [PRD Tree CLI Visualization Command](./prd-tree-cli-visualization-13d17a/index.md) | completed |
+| [Replace Hash-Suffix Title Disambiguation with Rename-or-Merge Resolution](./replace-hash-suffix-title-1e0029/index.md) | completed |

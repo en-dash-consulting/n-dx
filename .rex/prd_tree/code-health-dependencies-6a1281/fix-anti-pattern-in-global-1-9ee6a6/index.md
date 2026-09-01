@@ -8,7 +8,7 @@ source: "sourcevision"
 startedAt: "2026-04-17T15:22:09.583Z"
 completedAt: "2026-04-17T15:22:09.583Z"
 acceptanceCriteria: []
-description: "- God function: handleInit in packages/core/cli.js calls 40 unique functions — consider decomposing into smaller, focused functions"
+description: "- God function: handleInit in packages/core/cli.js calls 40 unique functions — consider decomposing into smaller, focused functions\n\n---\n\n- God function: runCommand in packages/core/cli.js calls 38 unique functions — consider decomposing into smaller, focused functions"
 recommendationMeta: "[object Object]"
 ---
 
@@ -17,3 +17,4 @@ recommendationMeta: "[object Object]"
 | Title | Status |
 |-------|--------|
 | [Fix anti-pattern in global: God function: handleInit in packages/core/cli.js calls 40 unique functions — con](./fix-anti-pattern-in-global-god-f65315.md) | completed |
+| [Fix anti-pattern in global: God function: runCommand in packages/core/cli.js calls 38 unique functions — con](./fix-anti-pattern-in-global-god-a2d6ca.md) | completed |

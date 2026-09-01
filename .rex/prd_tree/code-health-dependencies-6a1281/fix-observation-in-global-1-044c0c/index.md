@@ -8,7 +8,7 @@ source: "sourcevision"
 startedAt: "2026-04-17T15:47:26.842Z"
 completedAt: "2026-04-17T15:47:26.842Z"
 acceptanceCriteria: []
-description: "- Bidirectional coupling: \"viewer-ui-hub\" ↔ \"web-viewer\" (5+5 crossings) — consider extracting shared interface"
+description: "- Bidirectional coupling: \"viewer-ui-hub\" ↔ \"web-viewer\" (5+5 crossings) — consider extracting shared interface\n\n---\n\n- Bidirectional coupling: \"web-server\" ↔ \"web-viewer\" (31+72 crossings) — consider extracting shared interface"
 recommendationMeta: "[object Object]"
 ---
 
@@ -17,3 +17,4 @@ recommendationMeta: "[object Object]"
 | Title | Status |
 |-------|--------|
 | [Fix observation in global: Bidirectional coupling: "viewer-ui-hub" ↔ "web-viewer" (5+5 crossings) — conside](./fix-observation-in-global-c45f46.md) | completed |
+| [Fix observation in global: Bidirectional coupling: "web-server" ↔ "web-viewer" (31+72 crossings) — consider](./fix-observation-in-global-038323.md) | completed |

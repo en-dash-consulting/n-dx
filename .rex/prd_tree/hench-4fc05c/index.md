@@ -40,3 +40,6 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Fix hench parent auto-completion cascade silently skipped + add reconciliation sweep (#293)](./fix-hench-parent-auto-e8f441.md) | completed |
 | [Fix hench task-completion commit gap + fullTestCommand schema drop (#302)](./fix-hench-task-completion-5c8cb3.md) | completed |
 | [Pre-run commit gate: verify uncommitted changes before starting a work loop](./pre-run-commit-gate-verify-9af68a.md) | completed |
+| [Commit Message Timeout and Empty-File Safeguard for Autonomous Runs](./commit-message-timeout-and-9b9564/index.md) | completed |
+| [Task Repetition Detection and Completion Enforcement in Hench Run Loop](./task-repetition-detection-and-032662/index.md) | completed |
+| [Strict Self-Heal Tag Scoping Enforcement](./strict-self-heal-tag-scoping-3d6ce7/index.md) | completed |

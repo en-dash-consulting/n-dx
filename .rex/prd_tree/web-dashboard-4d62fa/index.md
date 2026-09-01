@@ -39,3 +39,7 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-377aa1.md) | completed |
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-9c9ae5.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-a58edb.md) | completed |
+| [UI Density Toggle (Small / Medium / Large)](./ui-density-toggle-small-medium-6f1c50/index.md) | completed |
+| [Folder-Tree-Style Context Graph Visualization](./folder-tree-style-context-graph-8133b2/index.md) | completed |
+| [Rex Context Graph Flowchart Restructure with Shape-Encoded Node Types and Clickable Detail](./rex-context-graph-flowchart-f4e984/index.md) | completed |
+| [Geometric Decorative Design System for ndx UI](./geometric-decorative-design-3f7f48/index.md) | completed |

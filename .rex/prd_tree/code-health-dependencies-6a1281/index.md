@@ -18,7 +18,6 @@ recommendationMeta: "[object Object]"
 |-------|--------|
 | [Deprecated npm Dependency Audit and Remediation](./deprecated-npm-dependency-audit-f6c36d/index.md) | completed |
 | [Fix anti-pattern in global (1 finding)](./fix-anti-pattern-in-global-1-9ee6a6/index.md) | completed |
-| [Fix anti-pattern in global (1 finding)](./fix-anti-pattern-in-global-1-f98f84/index.md) | completed |
 | [Fix anti-pattern in global (2 findings)](./fix-anti-pattern-in-global-2-c4e93f/index.md) | completed |
 | [Fix code in global (4 findings)](./fix-code-in-global-4-findings-6f4160/index.md) | completed |
 | [Fix code in packages-web:integration (2 findings)](./fix-code-in-packages-web-76ab3e/index.md) | completed |
@@ -42,14 +41,9 @@ recommendationMeta: "[object Object]"
 | [Fix documentation in web-server (2 findings)](./fix-documentation-in-web-server-e985fe/index.md) | completed |
 | [Fix move-file in core (1 finding)](./fix-move-file-in-core-1-finding-655213/index.md) | completed |
 | [Fix move-file in web-server (1 finding)](./fix-move-file-in-web-server-1-19e84f/index.md) | completed |
-| [Fix move-file in web-server (1 finding)](./fix-move-file-in-web-server-1-9d4e78/index.md) | completed |
 | [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-573db5/index.md) | completed |
-| [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-9590ed/index.md) | completed |
-| [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-bc5b3b/index.md) | completed |
-| [Fix move-file in web-viewer (1 finding)](./fix-move-file-in-web-viewer-1-f190d1/index.md) | completed |
 | [Fix observation in domain-gateway-routes-mcp (1 finding)](./fix-observation-in-domain-31008a/index.md) | completed |
 | [Fix observation in global (1 finding)](./fix-observation-in-global-1-044c0c/index.md) | completed |
-| [Fix observation in global (1 finding)](./fix-observation-in-global-1-1e94a9/index.md) | completed |
 | [Fix observation in global (2 findings)](./fix-observation-in-global-2-b0a511/index.md) | completed |
 | [Fix observation in health (1 finding)](./fix-observation-in-health-1-ce8e81/index.md) | completed |
 | [Fix observation in hench (1 finding)](./fix-observation-in-hench-1-914b2f/index.md) | completed |
@@ -95,3 +89,5 @@ recommendationMeta: "[object Object]"
 | [Token Usage Aggregation Performance Optimization](./token-usage-aggregation-07874b/index.md) | completed |
 | [Immersive Init Experience with Dinosaur Theme & Branding](./immersive-init-experience-with-ccbcaf.md) | completed |
 | [Stale node_modules makes `pnpm typecheck` report type errors that CI does not have](./stale-node-modules-makes-pnpm-856e89.md) | completed |
+| [Cross-Package Duplicate Logic Consolidation](./cross-package-duplicate-logic-58d4e3/index.md) | completed |
+| [Dead Import and Unused Export Elimination Across All Packages](./dead-import-and-unused-export-56f47d/index.md) | completed |

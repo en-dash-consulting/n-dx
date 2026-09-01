@@ -8,7 +8,7 @@ source: "sourcevision"
 startedAt: "2026-04-14T02:07:29.050Z"
 completedAt: "2026-04-14T02:07:29.050Z"
 acceptanceCriteria: []
-description: "- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server Composition Root\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone"
+description: "- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server Composition Root\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone\n\n---\n\n- File \"packages/web/src/server/routes-rex/analysis.ts\" is pinned to zone \"Web Server\" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone"
 recommendationMeta: "[object Object]"
 ---
 

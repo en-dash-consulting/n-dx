@@ -8,6 +8,7 @@ startedAt: "2026-04-30T21:00:17.624Z"
 completedAt: "2026-04-30T21:00:17.624Z"
 endedAt: "2026-04-30T21:00:17.624Z"
 acceptanceCriteria: []
+description: "Surface which PRD file (canonical or branch-scoped) receives newly added items so users have clear feedback about where their work landed."
 ---
 
 ## Children
@@ -16,3 +17,4 @@ acceptanceCriteria: []
 |-------|--------|
 | [Add regression tests asserting the 'Added to:' path resolves on disk for all PRD item levels](./add-regression-tests-asserting-0e2b33.md) | completed |
 | [Fix ndx add 'Added to:' line to print copy-pasteable folder-tree path of the created item](./fix-ndx-add-added-to-line-to-76bc42.md) | completed |
+| [Display target PRD path in ndx add command output](./display-target-prd-path-in-ndx-efc7df.md) | completed |
