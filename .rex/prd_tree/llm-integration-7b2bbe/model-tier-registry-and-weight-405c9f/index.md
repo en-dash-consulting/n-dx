@@ -15,7 +15,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Add an invariant test requiring every tier pointer to have cost and context-window entries](./add-an-invariant-test-requiring-8bb23d.md) | pending |
+| [Add an invariant test requiring every tier pointer to have cost and context-window entries](./add-an-invariant-test-requiring-8bb23d.md) | completed |
 | [Add per-tier model override fields to LLMConfig schema and config loader](./add-per-tier-model-override-2e1d7e.md) | completed |
 | [Define TaskWeight type and per-vendor tier model constants in llm-client](./define-taskweight-type-and-per-084b25.md) | completed |
 | [Make MODEL_ALIASES.opus track the heavy tier instead of diverging from it](./make-model-aliases-opus-track-34021b.md) | pending |

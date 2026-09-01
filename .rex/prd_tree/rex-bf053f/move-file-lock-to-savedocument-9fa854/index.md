@@ -26,5 +26,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Every PRD write path does an unlocked load→mutate→save, so a concurrent writer's item is silently dropped](./every-prd-write-path-does-an-88f1ce.md) | completed |
-| [FolderTreeStore and FileStore guard the same folder tree with different lock files](./foldertreestore-and-filestore-19c789.md) | pending |
+| [FolderTreeStore and FileStore guard the same folder tree with different lock files](./foldertreestore-and-filestore-19c789.md) | deferred |
 | [The lost-update guard test intermittently fails under load — either a locking hole or a bad test bound](./the-lost-update-guard-test-ff501e.md) | completed |
