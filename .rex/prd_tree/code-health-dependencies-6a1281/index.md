@@ -16,6 +16,8 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
+| [Cross-Package Duplicate Logic Consolidation](./cross-package-duplicate-logic-58d4e3/index.md) | completed |
+| [Dead Import and Unused Export Elimination Across All Packages](./dead-import-and-unused-export-56f47d/index.md) | completed |
 | [Deprecated npm Dependency Audit and Remediation](./deprecated-npm-dependency-audit-f6c36d/index.md) | completed |
 | [Fix anti-pattern in global (1 finding)](./fix-anti-pattern-in-global-1-9ee6a6/index.md) | completed |
 | [Fix anti-pattern in global (1 finding)](./fix-anti-pattern-in-global-1-f98f84/index.md) | completed |

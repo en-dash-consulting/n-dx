@@ -22,6 +22,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Fix observation in rex-recommend (1 finding)](./fix-observation-in-rex-ba206d/index.md) | completed |
 | [Fix observation in rex-core (1 finding)](./fix-observation-in-rex-core-1-38612b/index.md) | completed |
 | [Fix suggestion in rex (1 finding)](./fix-suggestion-in-rex-1-finding-6d9a90/index.md) | completed |
+| [Hash-Suffixed Duplicate Title Consolidation in Reshape](./hash-suffixed-duplicate-title-11be72/index.md) | completed |
 | [Interactive Workflow Shaping and Requirements Integration](./interactive-workflow-shaping-a19a8b/index.md) | completed |
 | [LoE-Calibrated Proposal Generation in rex add](./loe-calibrated-proposal-8feca9/index.md) | completed |
 | [Move file lock to saveDocument for complete write safety](./move-file-lock-to-savedocument-9fa854/index.md) | completed |
@@ -29,7 +30,11 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [ndx add CLI Delegation Fix](./ndx-add-cli-delegation-fix-31fa50/index.md) | completed |
 | [PRD Management Enhancement](./prd-management-enhancement-a53b25/index.md) | completed |
 | [PRD structure and lifecycle](./prd-structure-and-lifecycle-d6d0cb/index.md) | completed |
+| [PRD Tree CLI Visualization Command](./prd-tree-cli-visualization-13d17a/index.md) | completed |
 | [Proactive PRD structure health checks](./proactive-prd-structure-health-f02948/index.md) | completed |
+| [Replace Hash-Suffix Title Disambiguation with Rename-or-Merge Resolution](./replace-hash-suffix-title-1e0029/index.md) | completed |
+| [Reshape Consolidation of Hash-Suffixed Same-Title Items Under Generated Parent](./reshape-consolidation-of-hash-d08290/index.md) | completed |
+| [Reshape Same-Parent Duplicate Merge with Backup Audit Trail](./reshape-same-parent-duplicate-6518b3/index.md) | completed |
 | [Rex Smart Operations UI Integration](./rex-smart-operations-ui-aab3e4/index.md) | completed |
 | [Rex Task and Epic Deletion Functionality](./rex-task-and-epic-deletion-2ad53c/index.md) | completed |
 | [Rex Token Usage & LLM Utilization UX Overhaul](./rex-token-usage-llm-utilization-fdc6c3/index.md) | completed |

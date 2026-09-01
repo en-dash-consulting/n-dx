@@ -19,6 +19,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 |-------|--------|
 | [Audit Recent Merges and Catalog Documentation Gaps](./audit-recent-merges-and-catalog-4c28fb/index.md) | completed |
 | [Claude and Codex Config Validation in Gauntlet](./claude-and-codex-config-45e105/index.md) | completed |
+| [Contributor Page Section Expansion](./contributor-page-section-61b073/index.md) | completed |
 | [Developer Environment Prerequisites Documentation](./developer-environment-af74f8/index.md) | completed |
 | [Documentation improvements](./documentation-improvements-24a05d/index.md) | completed |
 | [End-User Platform Requirements](./end-user-platform-requirements-087ff5/index.md) | completed |
@@ -36,7 +37,10 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-5a24a9/index.md) | completed |
 | [macOS Local Docker Test Suite](./macos-local-docker-test-suite-9dbecc/index.md) | completed |
 | [Make test results independent of ambient environment and machine load](./make-test-results-independent-3c5811/index.md) | completed |
+| [Open Source Scope Documentation Audit and Cross-Reference](./open-source-scope-documentation-491547/index.md) | completed |
 | [Project-aware Navigation and Context](./project-aware-navigation-and-22ba50/index.md) | completed |
+| [Skills Reference and .gitignore Guidance in ndx Documentation](./skills-reference-and-gitignore-ab5438/index.md) | completed |
+| [Skills Reference Documentation Page](./skills-reference-documentation-a7eef3/index.md) | completed |
 | [Timeout Guardrails for Hanging Tests](./timeout-guardrails-for-hanging-0fb7be/index.md) | completed |
 | [TreeNodes DOM Performance Optimization](./treenodes-dom-performance-e93f31/index.md) | completed |
 | [Update Documentation for New PRD Structure](./update-documentation-for-new-ef9224/index.md) | completed |

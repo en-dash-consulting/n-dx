@@ -17,6 +17,7 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Auto-Commit Timer-Expiry Stall Recovery in --loop/--yes Mode](./auto-commit-timer-expiry-stall-97d722/index.md) | completed |
 | [Branch Work System of Record](./branch-work-system-of-record-e6e7f5/index.md) | completed |
 | [Commit Approval Bypass for Autonomous Runs](./commit-approval-bypass-for-3ca4d0/index.md) | completed |
+| [Commit Message Timeout and Empty-File Safeguard for Autonomous Runs](./commit-message-timeout-and-9b9564/index.md) | completed |
 | [Ctrl-C Interrupt Rollback Prompt Coordination](./ctrl-c-interrupt-rollback-469c79/index.md) | completed |
 | [Enforce Plan-to-Execution Continuity in Hench Runs](./enforce-plan-to-execution-e08fe0/index.md) | completed |
 | [Feature 1: Go-Aware Archetype System](./feature-1-go-aware-archetype-c9447a/index.md) | completed |
@@ -36,6 +37,8 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Run Failure Recovery and Rollback](./run-failure-recovery-and-rollback-3415b5/index.md) | completed |
 | [Run Loop Cancellation and Iteration Visibility Refinements](./run-loop-cancellation-and-3e4e10/index.md) | completed |
 | [Sequential Epic Execution](./sequential-epic-execution-be2670/index.md) | completed |
+| [Strict Self-Heal Tag Scoping Enforcement](./strict-self-heal-tag-scoping-3d6ce7/index.md) | completed |
+| [Task Repetition Detection and Completion Enforcement in Hench Run Loop](./task-repetition-detection-and-032662/index.md) | completed |
 | [Web UI: Reorganize around SourceVision / Rex / Hench sections](./web-ui-reorganize-around-d5ad6f/index.md) | completed |
 | [Fix hench parent auto-completion cascade silently skipped + add reconciliation sweep (#293)](./fix-hench-parent-auto-e8f441.md) | completed |
 | [Fix hench task-completion commit gap + fullTestCommand schema drop (#302)](./fix-hench-task-completion-5c8cb3.md) | completed |
