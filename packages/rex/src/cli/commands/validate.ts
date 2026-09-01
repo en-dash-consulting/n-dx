@@ -10,6 +10,7 @@ import {
   applyEpiclessResolutions,
 } from "./validate-interactive.js";
 import { resolveStore, ensureLegacyPrdMigrated, LegacyPrdMigrationError } from "../../store/index.js";
+import { findNonConformingSlugs, PRD_TREE_DIRNAME } from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { REX_DIR } from "./constants.js";
 import { info, result } from "../output.js";
@@ -231,6 +232,29 @@ export async function cmdValidate(
         pass: false,
         severity: "warn",
         errors: parentChildWarnings,
+      });
+    }
+
+    // Slug conformance: catch a tree rewritten by a foreign rex build. Every
+    // other check reads item fields, so a whole-tree re-slug — lossless
+    // renames, untouched content — passes them all and shows up only as an
+    // 800-file diff in whatever branch is open.
+    const slugMismatches = await findNonConformingSlugs(
+      doc.items,
+      join(dir, REX_DIR, PRD_TREE_DIRNAME),
+    );
+    if (slugMismatches.length > 0) {
+      checks.push({
+        name: "tree slug convention",
+        pass: false,
+        severity: "warn",
+        errors: slugMismatches.slice(0, 10).map(
+          (m) =>
+            `Path does not match the current slug rule: "${m.found}" should be ` +
+            `"${m.expected}" in ${m.parentDir} (${m.title}). ` +
+            `A rex build older than the id-qualified slug rule may have rewritten the tree; ` +
+            `run 'rex migrate-slugs' to restore it.`,
+        ),
       });
     }
   }

@@ -252,6 +252,111 @@ export function slugify(title: string, id: string): string {
   return appendShortIdSuffix(normalizeTitleSlug(title), id);
 }
 
+/** One tree path that disagrees with the slug the current rule would produce. */
+export interface SlugMismatch {
+  /** Item id, from the in-memory document. */
+  id: string;
+  /** Item title, for a readable message. */
+  title: string;
+  /** Directory containing the entry, relative to the tree root. */
+  parentDir: string;
+  /** Slug the current rule produces. */
+  expected: string;
+  /** Slug actually on disk. */
+  found: string;
+}
+
+/**
+ * Find tree paths whose slug is not what {@link slugify} would produce.
+ *
+ * The point is to notice a *foreign writer*. The id-qualified rule landed
+ * 2026-08-26; an older rex build — a stale `dist/`, a globally installed
+ * earlier version, an MCP server spawned from either — re-serializes the whole
+ * tree to the suffix-less form on its first write. That rewrite is invisible to
+ * every other check: the renames are lossless, the item fields are untouched,
+ * and `validate` never looks at the paths items live in. So an 800-file rewrite
+ * reads as a clean tree and lands in whatever branch is open.
+ *
+ * An item whose expected file is simply missing is *not* reported here. That is
+ * a different fault with its own reporting, and folding it in would make this
+ * finding noisy enough to ignore.
+ */
+export async function findNonConformingSlugs(
+  items: PRDItem[],
+  treeRoot: string,
+): Promise<SlugMismatch[]> {
+  const mismatches: SlugMismatch[] = [];
+
+  async function walk(siblings: PRDItem[], dir: string, relDir: string): Promise<void> {
+    let entries: string[];
+    try {
+      entries = await readdir(dir);
+    } catch {
+      return; // Directory absent — nothing to compare against.
+    }
+    const present = new Set(entries);
+
+    for (const item of siblings) {
+      const children = item.children ?? [];
+      const expected = slugify(item.title, item.id);
+      // Items with children are directories; leaves are bare `<slug>.md`.
+      const expectedEntry = children.length > 0 ? expected : `${expected}.md`;
+
+      if (!present.has(expectedEntry)) {
+        // Look for the same item under a different slug before concluding
+        // anything: only a *rival* entry proves a foreign convention, whereas
+        // nothing at all just means the file is missing.
+        const found = await locateById(dir, entries, item.id, children.length > 0);
+        if (found) {
+          mismatches.push({
+            id: item.id,
+            title: item.title,
+            parentDir: relDir || ".",
+            expected: expectedEntry,
+            found,
+          });
+        }
+      }
+
+      if (children.length > 0) {
+        const actualDir = present.has(expected)
+          ? expected
+          : (await locateById(dir, entries, item.id, true)) ?? expected;
+        await walk(children, join(dir, actualDir), join(relDir, actualDir));
+      }
+    }
+  }
+
+  await walk(items, treeRoot, "");
+  return mismatches;
+}
+
+/** Entry in `dir` whose front-matter id is `id`, or undefined. */
+async function locateById(
+  dir: string,
+  entries: readonly string[],
+  id: string,
+  wantDirectory: boolean,
+): Promise<string | undefined> {
+  for (const entry of entries) {
+    if (entry === "tree-meta.json") continue;
+    const candidate = wantDirectory ? join(dir, entry, "index.md") : join(dir, entry);
+    if (!wantDirectory && !entry.endsWith(".md")) continue;
+    if (!wantDirectory && entry === "index.md") continue;
+    try {
+      const raw = await readFile(candidate, "utf8");
+      if (new RegExp(`^id:\\s*"?${escapeForRegExp(id)}"?\\s*$`, "m").test(raw)) return entry;
+    } catch {
+      // Not readable or not the shape we are looking for.
+    }
+  }
+  return undefined;
+}
+
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Convert a title into the slug it would use before ID-based uniqueness rules.
  * This is deterministic for a title alone and never returns an empty string.
