@@ -43,5 +43,5 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Web Viewer Architecture: Package Extraction and Independent Viewers](./web-viewer-architecture-package-ed4461/index.md) | completed |
 | [Auto Re-Init Detection for Stale Projects](./auto-re-init-detection-for-013bc1.md) | completed |
 | [Auto-Update Detection from npm Registry](./auto-update-detection-from-npm-dcf601.md) | completed |
-| [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-daf564.md) | pending |
+| [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-daf564.md) | completed |
 | [Zone cohesion gate silently passes in CI instead of reporting it did not run](./zone-cohesion-gate-silently-8d80f0.md) | pending |

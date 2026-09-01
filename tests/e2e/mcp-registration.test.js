@@ -363,7 +363,12 @@ describe("registerMcpServers uses the discovered claude path, not a bare literal
     // The original defect: `"${claudeCmd}" mcp add ${name} -- node "${bin}" … "${absDir}"`.
     // A project path ending in a backslash escaped its own closing quote, so
     // argument parsing corrupted from that point on — and could still exit 0.
-    expect(fnBody).toMatch(/\["mcp",\s*"add",\s*name,\s*"--",\s*"node",\s*bin,/);
+    // The scope flag between "add" and name is optional here on purpose: this
+    // case is about argv vs. string interpolation, not about which scope init
+    // registers into (tests/e2e/mcp-registration-scope.test.js covers that).
+    expect(fnBody).toMatch(
+      /\["mcp",\s*"add",\s*(?:"--scope",\s*"\w+",\s*)?name,\s*"--",\s*"node",\s*bin,/,
+    );
     expect(fnBody).not.toMatch(/`[^`]*\$\{absDir\}[^`]*`/);
     expect(fnBody).not.toMatch(/`[^`]*\$\{bin\}[^`]*`/);
   });

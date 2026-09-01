@@ -197,7 +197,15 @@ function registerMcpServers(dir) {
   const absDir = resolve(dir);
   const servers = getMcpServers();
 
-  // Register each MCP server defined in the manifest via stdio transport
+  // Register each MCP server defined in the manifest via stdio transport.
+  //
+  // Every claude invocation runs with `cwd: absDir`. Local scope — the default
+  // for `claude mcp add` — is stored per-directory, so without this the child
+  // inherits the caller's working directory and `ndx init <other-project>`
+  // registers the servers against wherever the shell happened to be, pointing
+  // them at a project that is not the one being initialised. The remove loop
+  // needs it just as much: run from the wrong directory it strips that
+  // directory's rex/sourcevision registrations instead of the target's.
   for (const [name, descriptor] of Object.entries(servers)) {
     const bin = resolveSubPackageCli(descriptor.package, descriptor.npmName);
     // Remove existing registration(s) first to make init idempotent —
@@ -207,6 +215,7 @@ function registerMcpServers(dir) {
         execFileSyncCli(claudeCmd, ["mcp", "remove", "--scope", scope, name], {
           stdio: "ignore",
           timeout: 5_000,
+          cwd: absDir,
         });
       } catch {
         // Server may not exist in this scope — continue cleanup.
@@ -215,8 +224,8 @@ function registerMcpServers(dir) {
     try {
       execFileSyncCli(
         claudeCmd,
-        ["mcp", "add", name, "--", "node", bin, descriptor.mcpCommand, absDir],
-        { stdio: "pipe", timeout: 10_000 },
+        ["mcp", "add", "--scope", "local", name, "--", "node", bin, descriptor.mcpCommand, absDir],
+        { stdio: "pipe", timeout: 10_000, cwd: absDir },
       );
       results.push({ name, transport: "stdio", ok: true });
     } catch (e) {
