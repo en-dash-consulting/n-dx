@@ -16,7 +16,7 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix move-file in web-viewer: File "packages/web/src/viewer/hooks/use-polling.ts" is pinned to zone "Web Viewe](./fix-move-file-in-web-viewer-file.md) | completed |
-| [Fix move-file in web-viewer: File "packages/web/src/viewer/components/prd-tree/status-filter.ts" is pinned to](./fix-move-file-in-web-viewer-file.md) | completed |
-| [Fix move-file in web-viewer: File "packages/web/src/viewer/components/progressive-loader.ts" is pinned to zon](./fix-move-file-in-web-viewer-file.md) | completed |
-| [Fix move-file in web-viewer: File "packages/web/src/viewer/external.ts" is pinned to zone "Web Viewer" but li](./fix-move-file-in-web-viewer-file.md) | completed |
+| [Fix move-file in web-viewer: File "packages/web/src/viewer/hooks/use-polling.ts" is pinned to zone "Web Viewe](./fix-move-file-in-web-viewer-file-26cb28.md) | completed |
+| [Fix move-file in web-viewer: File "packages/web/src/viewer/components/prd-tree/status-filter.ts" is pinned to](./fix-move-file-in-web-viewer-file-755f11.md) | completed |
+| [Fix move-file in web-viewer: File "packages/web/src/viewer/components/progressive-loader.ts" is pinned to zon](./fix-move-file-in-web-viewer-file-81b1d6.md) | completed |
+| [Fix move-file in web-viewer: File "packages/web/src/viewer/external.ts" is pinned to zone "Web Viewer" but li](./fix-move-file-in-web-viewer-file-f85abf.md) | completed |

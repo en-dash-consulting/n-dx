@@ -2,10 +2,12 @@
 id: "a4992835-70eb-4d9d-a79f-d0577b8927bc"
 level: "epic"
 title: "PRD Storage & Schema"
-status: "in_progress"
+status: "completed"
 startedAt: "2026-05-06T13:26:50.051Z"
+completedAt: "2026-09-01T17:52:39.006Z"
+endedAt: "2026-09-01T17:52:39.006Z"
 description: "PRD persistence model: folder-tree storage, markdown serialization, schema evolution, visibility/reporting, branch attribution, and the migration history that produced the current single-source-of-truth tree at .rex/prd_tree/."
-lastModified: "2026-09-01T14:30:38.958Z"
+lastModified: "2026-09-01T17:52:39.011Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
 
@@ -27,7 +29,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Folder-Level index.md Summary Aggregation](./folder-level-index-md-summary/index.md) | completed |
 | [Folder-Per-Task Hierarchy Enforcement](./folder-per-task-hierarchy-enforcement/index.md) | completed |
 | [Folder Tree Migration, Initialization, and Auto-Trigger](./folder-tree-migration-initialization/index.md) | completed |
-| [Human-readable PRD tree slugs](./human-readable-prd-tree-slugs/index.md) | pending |
+| [Human-readable PRD tree slugs](./human-readable-prd-tree-slugs/index.md) | completed |
 | [JSON Write Path Removal and Markdown-Only Enforcement](./json-write-path-removal-and-markdown/index.md) | completed |
 | [Legacy Migration and Multi-File Integration Validation](./legacy-migration-and-multi-file/index.md) | completed |
 | [Markdown Schema Design and Bidirectional Serialization](./markdown-schema-design-and/index.md) | completed |
