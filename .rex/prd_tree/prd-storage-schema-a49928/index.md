@@ -2,11 +2,12 @@
 id: "a4992835-70eb-4d9d-a79f-d0577b8927bc"
 level: "epic"
 title: "PRD Storage & Schema"
-status: "pending"
+status: "completed"
 startedAt: "2026-05-06T13:26:50.051Z"
-endedAt: "2026-09-01T02:02:11.749Z"
+completedAt: "2026-09-01T02:56:36.366Z"
+endedAt: "2026-09-01T02:56:36.366Z"
 description: "PRD persistence model: folder-tree storage, markdown serialization, schema evolution, visibility/reporting, branch attribution, and the migration history that produced the current single-source-of-truth tree at .rex/prd_tree/."
-lastModified: "2026-09-01T02:31:13.329Z"
+lastModified: "2026-09-01T02:56:36.389Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -41,4 +42,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-e430a1/index.md) | completed |
 | [Test Suite Updates for Folder-Tree PRD Storage](./test-suite-updates-for-folder-db58ca/index.md) | completed |
 | [Title-Based PRD Item File Naming Convention](./title-based-prd-item-file-1797eb/index.md) | completed |
-| [Stale-save guard false-positives on a same-millisecond write, failing FileStore tests intermittently](./stale-save-guard-false-ceaaf1.md) | pending |
+| [Stale-save guard false-positives on a same-millisecond write, failing FileStore tests intermittently](./stale-save-guard-false-ceaaf1.md) | completed |

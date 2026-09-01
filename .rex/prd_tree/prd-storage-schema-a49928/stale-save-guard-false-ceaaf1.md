@@ -2,7 +2,7 @@
 id: "ceaaf15d-6d66-4f6c-aa25-3ac532ca13f0"
 level: "task"
 title: "Stale-save guard false-positives on a same-millisecond write, failing FileStore tests intermittently"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "flake"
@@ -10,12 +10,17 @@ tags:
   - "stale-save-guard"
   - "rex"
 source: "ndx-capture"
+startedAt: "2026-09-01T02:46:28.523Z"
+completedAt: "2026-09-01T02:56:34.212Z"
+endedAt: "2026-09-01T02:56:34.212Z"
+resolutionType: "code-change"
+resolutionDetail: "Commit 9819cb8f. (1) 20 consecutive isolated runs of store-roundtrip with 0 failures, plus full pnpm test 6/6 (rex 216) — against a measured 25-in-40 failure rate for the same sequence before. (2) The guard still refuses a genuinely stale save: \"errors instead of deleting an item written after the snapshot was loaded\" and \"guards the store write path end to end\" both retained, and neither depends on timing any more — the sleep() calls they needed are gone, which is what proves the dependence was removed rather than hidden. (3) The mechanism was addressed, not the tolerance: the timestamp comparison is gone entirely, replaced by knownItemIds identity. Justified by measurement — the delta between a pre-load file's mtime and the load timestamp scattered -8ms to +6ms, so the 2ms tolerance was never the issue and no value would have worked; the two figures come from different clocks (high-precision system time vs the ~15.6ms filesystem timer tick). (4) No call site passes allowBulkDelete as a workaround; it remains only where it already was, as explicit bulk intent. Added coverage for the specific false positive (a leaf promoted to a folder by the writer that loaded it) and for repeated load-mutate-save cycles through the store. Docs updated at both CLAUDE.md and its generator source, so ndx init cannot restore the old description."
 acceptanceCriteria:
   - "store-roundtrip passes across at least 20 consecutive isolated runs and inside a full pnpm test"
   - "The guard still refuses a genuinely stale save that would delete another writer's item — covered by a test that does not depend on timing"
   - "The false-positive mechanism is addressed rather than the tolerance widened, or the widening is justified with a measured false-positive rate"
   - "No call site is changed to pass allowBulkDelete as a workaround"
 description: "The stale-save guard rejects legitimate writes at a meaningful rate, failing different `FileStore` tests from run to run:\n\n    Error: Stale-save guard: this save would delete 1 item written after the document being saved was loaded\n      - Auth System [epic-1] (.../\\.rex/prd_tree/auth-system-epic1.md)\n      at guardStaleEntries folder-tree-serializer.ts:162\n      at FileStore.addItem file-adapter.ts:560\n\nObserved failing tests, both in `packages/rex/tests/integration/`:\n- `store-roundtrip.test.ts` › \"full lifecycle persists state to folder tree\"\n- `markdown-only-writes.test.ts` › \"FileStore.saveDocument does not create branch-scoped prd_*_*.md files\"\n\nNot one flaky test — one flaky guard, surfacing wherever a test loads and saves inside the same few milliseconds.\n\nRate and independence:\n- Reproduced 1-in-3 and 1-in-5 running `store-roundtrip.test.ts` ALONE on an idle machine, so it is not merely full-suite load.\n- Reproduced inside full `pnpm test` runs on separate occasions, hitting a different test each time.\n- NOT a regression from 7fb079f6 (layout-churn reporting). Verified by checking out the pre-7fb079f6 `folder-tree-serializer.ts` and `folder-tree-store.ts` and re-running: still 1 failure in 5. The defect pre-dates that commit.\n- The failing runs had a freshly built `dist/`, so this is not the separate stale-build guard.\n\nMechanism — the tolerance in `guardStaleEntries`:\n\n    const MTIME_TOLERANCE_MS = 2;\n    if ((await newestMtime(entry.path)) > options.loadedAt + MTIME_TOLERANCE_MS) → violation\n\n`loadedAt` is `Date.now()` (integer ms); `mtimeMs` carries fractional milliseconds. The comment already concedes the granularity mismatch and picks 2ms as \"close enough\". A caller that creates an item and immediately adds a child does load-then-save inside that window, so a file the load definitely saw can read as newer than the load.\n\nWorth treating as a product defect, not a test flake. The guard exists to refuse destroying a concurrent writer's work. A guard that also refuses legitimate writes will eventually be worked around with `allowBulkDelete` — which disables the protection entirely. Its false-positive rate is what decides whether it stays trusted.\n\nDirections worth weighing:\n- Compare like with like: record the maximum mtime observed during the load and compare candidates against that, instead of wall-clock `Date.now()` against filesystem time.\n- Identify entries by item id rather than timestamp: an entry whose id is absent from the loaded document was not written by a concurrent writer, whatever its mtime. This removes the race rather than widening it.\n- Widening the tolerance is the cheap option, but it only moves the race, and each widening weakens the guard.\n\nFound while working task 3e46780d; deliberately not fixed there to avoid retuning a safety guard as a side effect of an unrelated change."
-lastModified: "2026-09-01T02:39:33.121Z"
+lastModified: "2026-09-01T02:56:34.237Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
