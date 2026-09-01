@@ -25,6 +25,7 @@ import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
+import { requireFreshBuiltCli } from "../helpers/built-cli.js";
 
 import { HenchConfigSchema } from "../../src/schema/validate.js";
 import { DEFAULT_HENCH_CONFIG } from "../../src/schema/v1.js";
@@ -47,7 +48,7 @@ import {
   mapCodexUsageToTokenUsage,
 } from "../../src/prd/llm-gateway.js";
 
-const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
+const CLI_PATH = requireFreshBuiltCli();
 
 // ── Fresh project setup ───────────────────────────────────────────────────
 

@@ -11,8 +11,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
+import { requireFreshBuiltCli } from "../helpers/built-cli.js";
 
-const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
+const CLI_PATH = requireFreshBuiltCli();
 const UNKNOWN_COMMAND_CODE = "NDX_CLI_UNKNOWN_COMMAND";
 const TIMEOUT = 10_000;
 

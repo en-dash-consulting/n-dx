@@ -4,8 +4,9 @@ import { mkdtemp, cp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer as createNetServer } from "node:net";
+import { requireFreshBuiltCli } from "../helpers/built-cli.js";
 
-const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
+const CLI_PATH = requireFreshBuiltCli();
 const FIXTURE_DIR = join(import.meta.dirname, "../fixtures/small-ts-project");
 const LOOPBACK_PROBE = [
   "-e",

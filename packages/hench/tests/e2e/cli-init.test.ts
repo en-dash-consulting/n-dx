@@ -5,8 +5,9 @@ import { tmpdir } from "node:os";
 import { execSync } from "node:child_process";
 import { HenchConfigSchema } from "../../src/schema/validate.js";
 import { DEFAULT_HENCH_CONFIG, HENCH_SCHEMA_VERSION } from "../../src/schema/v1.js";
+import { requireFreshBuiltCli } from "../helpers/built-cli.js";
 
-const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
+const CLI_PATH = requireFreshBuiltCli();
 
 describe("hench init", () => {
   let testDir: string;
