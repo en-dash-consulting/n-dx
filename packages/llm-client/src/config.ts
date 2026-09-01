@@ -344,14 +344,31 @@ export const MODEL_COSTS: Readonly<Record<string, ModelCost>> = {
  * Map of shorthand model aliases to full Anthropic API model IDs.
  * The Claude CLI resolves these internally, but the API requires full IDs.
  *
+ * ## Aliases track `TIER_MODELS.claude`
+ *
+ * `haiku` / `sonnet` / `opus` are derived from the tier table rather than
+ * written as literals, so repointing a tier carries its alias along. This is a
+ * decision, not a style preference: the heavy tier once moved to
+ * `claude-opus-5` while a hardcoded `opus: "claude-opus-4-8"` stayed behind, so
+ * a project configuring `llm.claude.model: "opus"` quietly ran the previous
+ * Opus. Both IDs were valid and priced identically — nothing failed, only
+ * capability was lost, which is why it survived a release. Deriving makes that
+ * drift unrepresentable.
+ *
+ * `fable` is the deliberate exception: Fable is its own model line rather than
+ * a rung on the haiku/sonnet/opus ladder, so no tier points at it and it has
+ * nothing to follow. A new alias needs the same call — derive it from a tier,
+ * or pin it and record the reason in the `MODEL_ALIASES tracks the Claude tier
+ * table` tests in `config.test.ts`, which fail on an undeclared literal.
+ *
  * Exported package-internally (not from `public.ts`) so the tier-pointer
  * coverage test can assert every alias target is priced and sized. Callers
  * should go through {@link resolveModel} rather than reading this directly.
  */
 export const MODEL_ALIASES: Record<string, string> = {
-  sonnet: NEWEST_MODELS.claude,
-  opus: "claude-opus-5",
-  haiku: "claude-haiku-4-5",
+  sonnet: TIER_MODELS.claude.standard,
+  opus: TIER_MODELS.claude.heavy,
+  haiku: TIER_MODELS.claude.light,
   fable: "claude-fable-5",
 };
 

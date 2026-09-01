@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadClaudeConfig, resolveApiKey, resolveCliPath, resolveVendorModel, normalizeCodexModel, NEWEST_MODELS, TIER_MODELS, GOOGLE_MODELS } from "../../src/config.js";
+import { loadClaudeConfig, resolveApiKey, resolveCliPath, resolveModel, resolveVendorModel, normalizeCodexModel, MODEL_ALIASES, NEWEST_MODELS, TIER_MODELS, GOOGLE_MODELS } from "../../src/config.js";
+import type { TaskWeight } from "../../src/llm-types.js";
 import { isModelCompatibleWithVendor } from "../../src/vendor-model-reset.js";
 
 describe("loadClaudeConfig", () => {
@@ -308,6 +309,53 @@ describe("TIER_MODELS", () => {
     for (const tier of ["light", "standard", "heavy"] as const) {
       expect(isModelCompatibleWithVendor("codex", TIER_MODELS.codex[tier])).toBe(true);
     }
+  });
+});
+
+// ── Alias ↔ tier tracking ───────────────────────────────────────────────────
+//
+// The alias table and TIER_MODELS.claude must not give two different answers
+// for "the current Opus". They did once: the heavy tier moved to
+// claude-opus-5 while the `opus` alias stayed on claude-opus-4-8, so a project
+// configuring llm.claude.model: "opus" ran the older Opus. Both IDs were valid
+// and priced identically, so no test and no user-visible error caught it —
+// only capability was lost. These tests fail on the repoint instead.
+
+describe("MODEL_ALIASES tracks the Claude tier table", () => {
+  const TIERED_ALIASES: Array<[alias: string, tier: TaskWeight]> = [
+    ["haiku", "light"],
+    ["sonnet", "standard"],
+    ["opus", "heavy"],
+  ];
+
+  it.each(TIERED_ALIASES)('"%s" resolves to TIER_MODELS.claude.%s', (alias, tier) => {
+    expect(
+      resolveModel(alias),
+      `alias "${alias}" and TIER_MODELS.claude.${tier} disagree on the current model`,
+    ).toBe(TIER_MODELS.claude[tier]);
+  });
+
+  it.each(TIERED_ALIASES)(
+    'llm.claude.model: "%s" resolves to the same model as weight "%s"',
+    (alias, tier) => {
+      // The user-facing trigger: asking for a model by name must land on the
+      // same ID the codebase's own tier for that model declares current.
+      expect(resolveVendorModel("claude", { claude: { model: alias } })).toBe(
+        resolveVendorModel("claude", {}, tier),
+      );
+    },
+  );
+
+  it("pins only the aliases that no tier points at", () => {
+    const tierIds = new Set(Object.values(TIER_MODELS.claude));
+    const untiered = Object.keys(MODEL_ALIASES).filter(
+      (alias) => !tierIds.has(MODEL_ALIASES[alias]),
+    );
+    // Fable is its own model line, not a rung on the haiku/sonnet/opus ladder,
+    // so it has no tier to follow and is pinned as a literal. Another name here
+    // means a hardcoded alias was added — derive it from a tier, or extend this
+    // list and say why in the MODEL_ALIASES doc comment.
+    expect(untiered).toEqual(["fable"]);
   });
 });
 
