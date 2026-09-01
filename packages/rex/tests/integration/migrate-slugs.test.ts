@@ -97,18 +97,19 @@ describe("rex migrate-slugs", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  it("renames every entry to an id-qualified slug and the parser reads the result identically", async () => {
+  it("renames every entry to the title-only slug and the parser reads the result identically", async () => {
     const before = await new FolderTreeStore(rexDir).loadDocument();
 
     await cmdMigrateSlugs(projectDir, {});
 
     const entries = await listTree(treeRoot);
-    expect(entries).toContain("auth-feature-aaaaaa");
-    expect(entries).toContain("auth-feature-aaaaaa/login-task-bbbbbb.md");
-    expect(entries).toContain("solo-epic-cccccc.md");
-    // No title-only leftovers.
-    expect(entries).not.toContain("auth-feature");
-    expect(entries).not.toContain("solo-epic.md");
+    // Titles unique among their siblings carry no id component.
+    expect(entries).toContain("auth-feature");
+    expect(entries).toContain("auth-feature/login-task.md");
+    expect(entries).toContain("solo-epic.md");
+    // No id-qualified leftovers.
+    expect(entries).not.toContain("auth-feature-aaaaaa");
+    expect(entries).not.toContain("solo-epic-cccccc.md");
 
     // The parsed document is unchanged by the rename: same items, same shape.
     const after = new FolderTreeStore(rexDir);

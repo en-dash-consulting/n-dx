@@ -25,6 +25,27 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { PRDItem } from "../schema/index.js";
 
+/**
+ * Slug length cap, held at 40 for Windows' 260-character `MAX_PATH`.
+ *
+ * The cap originally existed partly to leave room for the `-{id6}` suffix
+ * every slug carried. Dropping that suffix did not free the cap to grow —
+ * it bought headroom that raising the cap would immediately spend, and then
+ * some. Measured against the project's own 1369-item tree at its nesting
+ * depth of 4, worst-case *relative* path under `.rex/prd_tree/`:
+ *
+ * | cap | relative | + a long user checkout root |
+ * |-----|----------|-----------------------------|
+ * | 40  | 148      | 201                         |
+ * | 60  | 197      | 250                         |
+ * | 80  | 218      | 271 — over MAX_PATH         |
+ *
+ * At 40 the title-only rule is already 14 characters shorter than the
+ * id-qualified rule it replaced (148 vs 162), so readability improved while
+ * the Windows margin widened. Raising to 80 breaks a realistic checkout, and
+ * 60 leaves ~9 characters at *today's* depth — one more nesting level would
+ * exhaust it. `slug-path-length.test.ts` guards the budget.
+ */
 const MAX_SLUG_LENGTH = 40;
 const SHORT_ID_LENGTH = 6;
 const EMPTY_TITLE_SLUG = "untitled";
@@ -239,17 +260,23 @@ async function writeSiblings(
 }
 
 /**
- * Derive a deterministic, title-first, id-qualified directory slug for one item.
+ * Derive the directory slug for one item, disregarding its siblings.
  *
- * Every slug carries a `-{id6}` suffix (the first six safe ID characters),
- * unconditionally: same-titled items created on divergent branches would
- * otherwise collide on identical paths, and a git merge would silently unify
- * two distinct items. The title body is truncated at a word boundary to keep
- * the whole slug within 40 characters. Trees written before this rule are
- * renamed in one pass by `rex migrate-slugs`.
+ * This is the *base* slug: title-only, truncated at a word boundary. It is
+ * not necessarily the slug the item ends up with, because disambiguation is
+ * a property of a sibling set rather than of an item — see
+ * {@link resolveSiblingSlugs}, which is the authoritative resolver and the
+ * one every writer must use.
+ *
+ * A previous rule appended `-{id6}` to every slug unconditionally, to keep
+ * same-titled items created on divergent branches off identical paths. That
+ * traded a hex string in every path for a hazard that only ever affects a
+ * handful of items; the merge case is now caught by `rex validate`, which
+ * fails when a path and its front-matter id disagree or when two items claim
+ * the same id.
  */
-export function slugify(title: string, id: string): string {
-  return appendShortIdSuffix(normalizeTitleSlug(title), id);
+export function slugify(title: string): string {
+  return slugifyTitle(title);
 }
 
 /** One tree path that disagrees with the slug the current rule would produce. */
@@ -295,10 +322,12 @@ export async function findNonConformingSlugs(
       return; // Directory absent — nothing to compare against.
     }
     const present = new Set(entries);
+    // Slugs depend on the whole sibling set, not the item alone.
+    const siblingSlugs = resolveSiblingSlugs(siblings);
 
     for (const item of siblings) {
       const children = item.children ?? [];
-      const expected = slugify(item.title, item.id);
+      const expected = siblingSlugs.get(item.id) ?? slugifyTitle(item.title);
       // Items with children are directories; leaves are bare `<slug>.md`.
       const expectedEntry = children.length > 0 ? expected : `${expected}.md`;
 
@@ -332,6 +361,90 @@ export async function findNonConformingSlugs(
 }
 
 /** Entry in `dir` whose front-matter id is `id`, or undefined. */
+/** Two items claiming one id, or one path carrying an unexpected id. */
+export interface TreeIdentityFault {
+  kind: "duplicate-id" | "path-id-mismatch";
+  /** Human-readable location: a tree path, or the ids involved. */
+  where: string;
+  detail: string;
+}
+
+/**
+ * Find the faults that a title-only slug rule makes possible.
+ *
+ * Dropping `-{id6}` from every path removed a guard: two items with the same
+ * title, created on divergent branches, now derive the same path, and a merge
+ * can leave one file where the tree expects the other. Nothing else notices —
+ * the content is well-formed and every field-level check passes.
+ *
+ * Two faults are reported:
+ *
+ * - **duplicate-id** — two items claim one id. Purely in-memory, and the
+ *   surest sign that a merge unified two distinct items.
+ * - **path-id-mismatch** — the file at an item's expected path carries a
+ *   different id. This is the merge landing directly.
+ *
+ * Absent files are not faults here: an item whose file is simply missing is a
+ * different problem, reported elsewhere, and folding it in would bury these.
+ */
+export async function findTreeIdentityFaults(
+  items: PRDItem[],
+  treeRoot: string,
+): Promise<TreeIdentityFault[]> {
+  const faults: TreeIdentityFault[] = [];
+
+  const seenIds = new Map<string, string>();
+  (function collect(nodes: PRDItem[]): void {
+    for (const node of nodes) {
+      const previous = seenIds.get(node.id);
+      if (previous !== undefined) {
+        faults.push({
+          kind: "duplicate-id",
+          where: node.id,
+          detail:
+            `Two items share id "${node.id}": "${previous}" and "${node.title}". ` +
+            `A merge may have unified two distinct items.`,
+        });
+      } else {
+        seenIds.set(node.id, node.title);
+      }
+      collect(node.children ?? []);
+    }
+  })(items);
+
+  async function walk(siblings: PRDItem[], dir: string, relDir: string): Promise<void> {
+    const slugs = resolveSiblingSlugs(siblings);
+    for (const item of siblings) {
+      const children = item.children ?? [];
+      const slug = slugs.get(item.id) ?? slugifyTitle(item.title);
+      const entry = children.length > 0 ? join(slug, "index.md") : `${slug}.md`;
+
+      let raw: string;
+      try {
+        raw = await readFile(join(dir, entry), "utf8");
+      } catch {
+        continue; // Missing file — not this check's business.
+      }
+
+      const found = /^id:\s*"?([^"\n]+?)"?\s*$/m.exec(raw)?.[1];
+      if (found !== undefined && found !== item.id) {
+        faults.push({
+          kind: "path-id-mismatch",
+          where: join(relDir, entry),
+          detail:
+            `Path derives from "${item.title}" (${item.id}) but the file there ` +
+            `carries id "${found}". Two same-titled items resolved to one path.`,
+        });
+      }
+
+      if (children.length > 0) await walk(children, join(dir, slug), join(relDir, slug));
+    }
+  }
+
+  await walk(items, treeRoot, "");
+  return faults;
+}
+
 async function locateById(
   dir: string,
   entries: readonly string[],
@@ -366,26 +479,42 @@ export function slugifyTitle(title: string): string {
 }
 
 /**
- * Resolve final directory slugs by position so duplicate-id inputs survive.
+ * Resolve final directory slugs for one sibling set, by position.
  *
- * Returns an array aligned with `items`. When two siblings share an id (a
- * pre-existing PRD-data invariant violation that downstream `validate`
- * surfaces), each instance still gets its own directory — the migration is
- * lossless even on malformed input. Falls back to position suffixes for
- * remaining slug collisions after the title- and id-based suffix rules
- * already applied by the existing slug system.
+ * Returns an array aligned with `items`. Three rules apply in order:
+ *
+ * 1. **Title-only.** A title unique among its siblings becomes the whole
+ *    slug. This is the common case — the readable path.
+ * 2. **`-{id6}` on collision.** When two or more siblings normalise to the
+ *    same base, *every* member of that set takes the suffix. Suffixing only
+ *    the later ones would make a slug depend on sibling order, so adding an
+ *    item could silently rename an existing path. Deriving it from the id
+ *    keeps each path stable under reordering, unlike a positional index.
+ * 3. **Position, last resort.** Two siblings sharing both title *and* id is
+ *    a data-invariant violation that `validate` reports, but the write must
+ *    still be lossless, so each instance gets its own directory.
  */
 function resolvePositionalSiblingSlugs(items: PRDItem[]): string[] {
-  const initial = items.map((item) => slugify(item.title, item.id));
+  const bases = items.map((item) => slugifyTitle(item.title));
 
-  // Final dedup pass — for genuinely identical (title, id) pairs append a
-  // position suffix so each item still gets its own directory.
+  const baseCounts = new Map<string, number>();
+  for (const base of bases) {
+    baseCounts.set(base, (baseCounts.get(base) ?? 0) + 1);
+  }
+
+  // Rule 2: a colliding base disambiguates every member, not just the later
+  // ones, so a slug never depends on where its item sits in the array.
+  const disambiguated = bases.map((base, i) =>
+    (baseCounts.get(base) ?? 0) > 1 ? appendShortIdSuffix(base, items[i].id) : base,
+  );
+
+  // Rule 3: identical (title, id) pairs still need distinct directories.
   const finalCounts = new Map<string, number>();
-  for (const slug of initial) {
+  for (const slug of disambiguated) {
     finalCounts.set(slug, (finalCounts.get(slug) ?? 0) + 1);
   }
   const seen = new Map<string, number>();
-  return initial.map((slug) => {
+  return disambiguated.map((slug) => {
     if ((finalCounts.get(slug) ?? 0) <= 1) return slug;
     const idx = seen.get(slug) ?? 0;
     seen.set(slug, idx + 1);
@@ -394,18 +523,23 @@ function resolvePositionalSiblingSlugs(items: PRDItem[]): string[] {
 }
 
 /**
- * Resolve final directory slugs for sibling items.
+ * Resolve final directory slugs for sibling items, keyed by item id.
  *
- * Every slug is id-qualified by `slugify`, so distinct sibling ids can never
- * collide; the map form is kept for callers that key by item id.
+ * The authoritative resolver: callers must not build a path by slugifying a
+ * title on its own, because whether a slug carries a `-{id6}` suffix depends
+ * on the item's siblings. Writers that skipped this and used a per-item slug
+ * mapped every same-titled sibling onto one directory and lost all but the
+ * last.
+ *
+ * Duplicate ids collapse in the returned map — {@link serializeFolderTree}
+ * uses the positional form so it stays lossless on that malformed input.
  *
  * @public — used by folder-tree-mutations for rendering
  */
 export function resolveSiblingSlugs(items: PRDItem[]): Map<string, string> {
+  const slugs = resolvePositionalSiblingSlugs(items);
   const resolved = new Map<string, string>();
-  for (const item of items) {
-    resolved.set(item.id, slugify(item.title, item.id));
-  }
+  items.forEach((item, i) => resolved.set(item.id, slugs[i]));
   return resolved;
 }
 

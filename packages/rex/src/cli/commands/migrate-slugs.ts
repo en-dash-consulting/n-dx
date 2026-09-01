@@ -1,20 +1,20 @@
 /**
- * Migration command: rename the PRD tree to id-qualified slugs in one pass.
+ * Migration command: bring the PRD tree onto the current slug rule in one pass.
  *
- * `slugify()` used to emit title-only slugs — the `-{id6}` suffix appeared
- * only for long titles or same-tree sibling collisions. Same-titled items
- * created on divergent branches therefore collided on identical paths, and a
- * rename relocated an item's files. Every new write is now id-qualified; this
- * command brings an existing tree onto the new scheme deliberately, in one
+ * The rule is title-only, with a `-{id6}` suffix added only where siblings
+ * collide on a normalised title. It replaced a rule that suffixed every slug
+ * unconditionally. This command performs the rename deliberately, in one
  * reviewable commit, instead of letting the next ordinary save produce a
  * surprise mass diff.
  *
  * The mechanics are a canonicalizing round-trip: load the tree through the
  * store, save it back inside a transaction. The serializer writes every item
- * at its id-qualified path and removes the title-only entries — the stale-save
- * guard permits those deletions because they were part of the loaded snapshot.
+ * at its current-rule path and removes the entries written under the old one —
+ * the stale-save guard permits those deletions because they were part of the
+ * loaded snapshot. Because it round-trips rather than encoding a rule of its
+ * own, this command follows the serializer automatically.
  *
- * Idempotent: a second run finds every entry already id-qualified and changes
+ * Idempotent: a second run finds every entry already canonical and changes
  * nothing.
  *
  * @module rex/cli/commands/migrate-slugs
@@ -52,8 +52,8 @@ export async function cmdMigrateSlugs(
   // Snapshot first so `rex restore` can undo a migration gone wrong.
   await ensureSnapshot(rexDir, "migrate-slugs", flags);
 
-  // Load + save under one lock: the serializer emits id-qualified paths and
-  // removes the title-only entries it loaded.
+  // Load + save under one lock: the serializer emits current-rule paths and
+  // removes the entries it loaded from the superseded ones.
   await store.withTransaction(async () => {});
 
   const after = await listTree(treeRoot);
@@ -68,11 +68,11 @@ export async function cmdMigrateSlugs(
   }
 
   if (renamed === 0) {
-    result("PRD tree already uses id-qualified slugs — nothing to rename.");
+    result("PRD tree already uses the current slug rule — nothing to rename.");
     return;
   }
-  result(`Renamed ${renamed} entr${renamed === 1 ? "y" : "ies"} to id-qualified slugs (${unchanged} already canonical).`);
-  info("Commit the renamed tree so divergent branches stop colliding on same-titled items.");
+  result(`Renamed ${renamed} entr${renamed === 1 ? "y" : "ies"} to readable slugs (${unchanged} already canonical).`);
+  info("Commit the renamed tree, then run 'rex validate' to confirm no two items share a path.");
 }
 
 /** All tree-entry paths (relative), sorted — dotfiles and non-md noise excluded. */

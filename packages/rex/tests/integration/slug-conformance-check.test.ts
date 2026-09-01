@@ -1,13 +1,14 @@
 /**
  * `rex validate` must notice a tree written in a foreign slug convention.
  *
- * The id-qualified slug rule (`<title>-<shortId>`) landed 2026-08-26. Any rex
- * build predating it — a globally installed older version, a stale `dist/`,
- * an MCP server spawned from either — serializes the whole tree back to the
- * suffix-less form on its first write. Observed 2026-09-01: 823 of 1398 files
- * renamed by one status update. Nothing failed: every rename was R100, no
- * content was lost, and `rex validate` reported all checks passed, because it
- * inspects item fields and never looks at the paths those items live in.
+ * The rule is now title-only, with `-{id6}` added only where siblings collide.
+ * It superseded a rule that appended `-{id6}` to every slug unconditionally,
+ * so a build on either side of the change rewrites the whole tree on its first
+ * write — the direction differs, the damage does not. Observed 2026-09-01:
+ * 1365 of 1369 files renamed by one status update through a stale MCP server.
+ * Nothing failed: every rename was R100, no content was lost, and `rex
+ * validate` reported all checks passed, because it inspects item fields and
+ * never looks at the paths those items live in.
  *
  * That silence is the problem. A stray writer's 800-file rewrite is
  * indistinguishable from an intentional migration, and it lands in whatever PR
@@ -64,18 +65,19 @@ describe("findNonConformingSlugs", () => {
     expect(await findNonConformingSlugs(DOC.items, treeRoot)).toEqual([]);
   });
 
-  it("reports a directory written in the pre-2026-08-26 suffix-less form", async () => {
-    // Exactly what an older build produces: title slug, no id suffix, and the
-    // title body no longer truncated to leave room for one.
+  it("reports a directory written in the superseded id-qualified form", async () => {
+    // Exactly what a build on the other side of the change produces: the title
+    // body truncated to leave room for a `-{id6}` suffix that the current rule
+    // adds only on a sibling collision.
     const entries = (await readdir(treeRoot)).filter((e) => e !== "tree-meta.json");
     const current = entries[0];
-    await rename(join(treeRoot, current), join(treeRoot, "child-process-cleanup-and-exit-hygiene"));
+    await rename(join(treeRoot, current), join(treeRoot, "child-process-cleanup-and-exit-epicab"));
 
     const findings = await findNonConformingSlugs(DOC.items, treeRoot);
 
     expect(findings).toHaveLength(1);
     expect(findings[0].expected).toBe(current);
-    expect(findings[0].found).toBe("child-process-cleanup-and-exit-hygiene");
+    expect(findings[0].found).toBe("child-process-cleanup-and-exit-epicab");
     expect(findings[0].id).toBe("epic-abc123");
   });
 
@@ -84,13 +86,13 @@ describe("findNonConformingSlugs", () => {
     const inside = (await readdir(join(treeRoot, epicDir))).filter((f) => f !== "index.md");
     await rename(
       join(treeRoot, epicDir, inside[0]),
-      join(treeRoot, epicDir, "harden-the-runner.md"),
+      join(treeRoot, epicDir, "harden-the-runner-taskde.md"),
     );
 
     const findings = await findNonConformingSlugs(DOC.items, treeRoot);
 
     expect(findings.map((f) => f.id)).toEqual(["task-def456"]);
-    expect(findings[0].found).toBe("harden-the-runner.md");
+    expect(findings[0].found).toBe("harden-the-runner-taskde.md");
   });
 
   it("does not flag an item whose file is simply absent", async () => {

@@ -69,8 +69,12 @@ export {
   slugify,
   slugifyTitle,
   resolveSiblingSlugs,
+  findTreeIdentityFaults,
 } from "./store/folder-tree-serializer.js";
-export type { SerializeResult } from "./store/folder-tree-serializer.js";
+export type {
+  SerializeResult,
+  TreeIdentityFault,
+} from "./store/folder-tree-serializer.js";
 
 // ---- Title-to-filename normalization ----------------------------------------
 
