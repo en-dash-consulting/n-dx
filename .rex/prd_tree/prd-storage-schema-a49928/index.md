@@ -25,6 +25,7 @@ description: "PRD persistence model: folder-tree storage, markdown serialization
 | [Folder-Based PRD Schema Design and Serialization](./folder-based-prd-schema-design-7286f1/index.md) | completed |
 | [Folder-Level index.md Summary Aggregation](./folder-level-index-md-summary-722b72/index.md) | completed |
 | [Folder Tree Migration, Initialization, and Auto-Trigger](./folder-tree-migration-568a1a/index.md) | completed |
+| [Human-readable PRD tree slugs](./human-readable-prd-tree-slugs-c83eec/index.md) | pending |
 | [JSON Write Path Removal and Markdown-Only Enforcement](./json-write-path-removal-and-21a866/index.md) | completed |
 | [Legacy Migration and Multi-File Integration Validation](./legacy-migration-and-multi-file-65020d/index.md) | completed |
 | [Markdown Schema Design and Bidirectional Serialization](./markdown-schema-design-and-6687ab/index.md) | completed |
