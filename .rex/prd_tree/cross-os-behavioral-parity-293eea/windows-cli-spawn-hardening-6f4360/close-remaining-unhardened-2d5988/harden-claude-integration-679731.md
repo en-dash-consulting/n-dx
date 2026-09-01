@@ -1,0 +1,28 @@
+---
+id: "67973131-6101-470b-bd9d-1cb6a98698c4"
+level: "subtask"
+title: "Harden claude-integration execSync sites and make the DEP0190 guard self-maintaining"
+status: "completed"
+priority: "high"
+tags:
+  - "windows"
+  - "core"
+  - "init"
+  - "spawn"
+  - "testing"
+  - "architecture"
+source: "exploration-2026-08-17"
+startedAt: "2026-08-17T20:38:53.248Z"
+completedAt: "2026-08-17T20:51:41.224Z"
+endedAt: "2026-08-17T20:51:41.224Z"
+resolutionType: "code-change"
+resolutionDetail: "Part 1: all six claude-integration.js execSync sites (mcp remove/add + four --version probes) now use execFileSyncCli from win-spawn.js; unused execSync/logCliInvocation imports and duplicate manual logging removed. Part 2: deleted the hardcoded 12-file DEP0190_SCOPE and replaced it with a tree-wide scan (packages/ + scripts/ + pr-check.js) banning exec/execSync imports, shell:process.platform, and shell:true+args, with exemptions in a SHELL_STRING_EXEMPT map carrying reasons — export.js pointing at task c990fd76, plus ci.js and pr-check.js pnpm cases that were previously only mentioned in a comment and never enforced. Added a >100-file assertion so a broken scan cannot pass vacuously. TDD per AC5: a new file importing execSync failed the guard with no guard edit needed, then passed once hardened; probe deleted. Corrected the task's premise — paths WERE quoted in the old strings, so the & concern applied only to manifest-derived constants; the real defect is a trailing backslash escaping its own closing quote, which can exit 0 having stored a truncated command. Proved fixed on C:\\Users\\Tom&Jerry\\my proj (v2)\\ (backslash doubled, & stays quoted, 9 argv -> 9 tokens). AC2 not verified end-to-end by design: real `ndx init` would run `claude mcp remove --scope user rex` and delete the developer's live MCP registrations. AC6 needed no work — mcp add failures already surface at claude-integration.js:447 and assistant-integration.js:190. Also dropped claude-integration.js from the child_process allowlists in architecture-policy.test.js and ci.js (no longer imports child_process). Fixed 10 tests asserting the old implementation: re-pointed claude-discovery.test.js mocks from child_process to the win-spawn boundary, and updated mcp-registration.test.js source regexes to the argv shape. Typecheck clean; root suite 90 files / 2066 passed / 0 failed; rex's 3 failures are the known ambient-load flakes from task 676af18f."
+acceptanceCriteria:
+  - "All six claude-integration.js execSync sites route through win-spawn.js execFileSyncCli; no hand-built command strings remain"
+  - "`ndx init` registers MCP servers successfully from a project path containing a space, an & character, and a trailing backslash"
+  - "The guard discovers spawn sites by scanning rather than by a hardcoded file list — adding a new unhardened shell-string spawn anywhere fails the test without editing the guard first"
+  - "Every existing intentional exemption is preserved as an explicit allowlist entry with a documented reason"
+  - "TDD: the inverted guard is demonstrated RED against a deliberately-added unhardened spawn in a new file, then GREEN once hardened"
+  - "Silent-failure note addressed: registration failures on affected paths surface to the user rather than being swallowed by the best-effort catch"
+description: "TWO parts: fix the site, then fix the guard that should have caught it.\n\nPART 1 — packages/core/claude-integration.js. Six `execSync` calls build shell command strings by hand with bare `\"` quoting:\n- :201 `\"${claudeCmd}\" mcp remove --scope ${scope} ${name}`\n- :207-208 `\"${claudeCmd}\" mcp add ${name} -- node \"${bin}\" ${descriptor.mcpCommand} \"${absDir}\"`\n- :315, :328, :338, :348 — `\"${path}\" --version` discovery probes\n\n`absDir`, `claudeCmd`, and `bin` are all filesystem paths interpolated straight into a cmd.exe command line. A project directory containing `&`, `^`, `(`, `)`, or `!` splits the command (`C:\\Users\\Tom&Jerry\\proj` terminates at `&`); a trailing backslash turns the closing `\"` into an escaped quote and merges arguments. This is exactly the class task acf2fb32 fixed in the quoting twin — `ndx init` MCP registration simply never got routed through it. Route these through packages/core/win-spawn.js (execFileSyncCli), which already applies quoteWindowsToken/ArgvQuote rules. Note these are best-effort probes whose failure is caught and ignored — so the current bug manifests as *silent* registration failure on affected paths, not a visible error.\n\nPART 2 — the guard's blind spot. DEP0190_SCOPE (tests/e2e/architecture-policy.test.js:1668) is a hardcoded 11-file list. It has a stale-entry guard that fails when a listed file disappears, but NOTHING fails when a new file introduces an unhardened shell-string spawn. The ratchet only covers files someone remembered to enumerate — which is why claude-integration.js and export.js survived an entire Windows-hardening epic untouched.\n\nInvert it: scan the tree for spawn/exec/execSync/execFileSync call sites and fail on any that (a) pass a single command STRING rather than (binary, argv), or (b) use shell:true with non-empty args, unless the file appears in an explicit EXEMPT list with a stated reason. Discovery becomes automatic; exemption becomes the deliberate act. Preserve the existing documented exemptions (llm-client execShellCmd's intentional `sh -c`, pair-programming runShellTestCommand's empty-args shell:true, ci.js/pr-check.js pnpm spawns) as entries in the new exempt list rather than as gaps in coverage."
+---

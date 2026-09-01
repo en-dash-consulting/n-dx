@@ -29,6 +29,7 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Graceful Cancellation with Rollback Prompt on Ctrl+C](./graceful-cancellation-with-626d40/index.md) | completed |
 | [Hench Process Concurrency Management](./hench-process-concurrency-f7e6ba/index.md) | completed |
 | [Hench Resource Monitoring and User Feedback](./hench-resource-monitoring-and-a5f844/index.md) | completed |
+| [Hench Run-Loop Visual Output Refinements](./hench-run-loop-visual-output-43a6c2/index.md) | completed |
 | [Hench UI Real-time Task Monitoring](./hench-ui-real-time-task-79851c/index.md) | completed |
 | [Loop Consecutive-Failure Auto-Cancellation](./loop-consecutive-failure-auto-29e95b/index.md) | completed |
 | [Mandatory Pre-Commit Full Test Suite Gate](./mandatory-pre-commit-full-test-dde6d1/index.md) | completed |

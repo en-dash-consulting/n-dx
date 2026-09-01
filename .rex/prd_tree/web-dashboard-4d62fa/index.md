@@ -36,6 +36,7 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [Surface per-file cross-zone connections in the expandable Zones graph](./surface-per-file-cross-zone-7da574/index.md) | completed |
 | [Transparent task selection and completion reasoning](./transparent-task-selection-and-cb54ce/index.md) | completed |
 | [UI Density Toggle (Small / Medium / Large)](./ui-density-toggle-small-medium-6f1c50/index.md) | completed |
+| [Web Dashboard Accessibility (a11y)](./web-dashboard-accessibility-a11y-0842c3/index.md) | completed |
 | [Fix undefined design tokens and standardize buttons on General and analyze/plan settings pages](./fix-undefined-design-tokens-and-623a33.md) | completed |
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-5dd63e.md) | completed |
 | [Match settings-page text boxes to the Analyze & Import input style and fix dark-mode native form chrome](./match-settings-page-text-boxes-136a8c.md) | completed |

@@ -1,0 +1,25 @@
+---
+id: "582769c3-90f7-4524-afe5-8fe3c7e4dc67"
+level: "subtask"
+title: "Make SourceVision import graph and context graph visualizations accessible with keyboard navigation and text alternatives"
+status: "completed"
+priority: "high"
+tags:
+  - "a11y"
+  - "sourcevision"
+  - "import-graph"
+  - "context-graph"
+  - "keyboard-nav"
+source: "smart-add"
+startedAt: "2026-08-03T15:10:30.060Z"
+completedAt: "2026-08-03T15:25:58.971Z"
+endedAt: "2026-08-03T15:25:58.971Z"
+acceptanceCriteria:
+  - "Import graph SVG nodes are Tab-reachable and have aria-label describing file path, zone, and import count"
+  - "Arrow keys traverse connected nodes in the import graph from a focused node"
+  - "A 'Switch to table view' button near each graph offers a semantic <table> alternative with the same data"
+  - "Import graph table columns: Source File, Imported File, Import Type; sortable by column header buttons"
+  - "Context graph table columns: Item Title, Type (epic/feature/task), Parent, Status"
+  - "Both graphs announce the count of visible nodes/edges via aria-live when filtered"
+description: "The SourceVision import graph and the Rex context graph are SVG force-directed visualizations with similar a11y challenges to the zones graph. Apply the same approach: keyboard-navigable SVG nodes with ARIA roles and labels, arrow-key traversal along edges, and a toggle to an accessible table/list view. The import graph table should show source file, imported file, and import type. The context graph table should show PRD item, parent, status, and type. This work can reuse patterns established in the zones graph a11y task."
+---
