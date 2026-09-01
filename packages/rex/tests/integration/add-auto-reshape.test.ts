@@ -472,14 +472,21 @@ describe("cmdAdd scoped consolidation pass", () => {
    * growth. Ambient load scales both readings, so the ratio holds on a busy
    * machine while a real complexity regression still trips it.
    */
-  // Back on the default timeout. This carried an explicit 60s because building
-  // 125 items through store.addItem — one full load-and-rewrite of the tree per
-  // item — made setup ~14s, and under full-suite load that setup blew past even
-  // 60s (observed at 60034ms while passing in 21s isolated). Batching the whole
-  // cohort into a single withTransaction removed the cause rather than the
-  // symptom: the case now runs in ~1.5s, so the default leaves ~20x headroom and
-  // the two-point measurement no longer costs a special-cased limit.
-  it("scoped pass cost grows sub-quadratically with sibling count", async () => {
+  // 60s, not the 30s default, and the margin is NOT decoration.
+  //
+  // Batching the setup into one withTransaction (it was 125 separate addItem
+  // calls, each a full load-and-rewrite of the tree) took this case from ~35s
+  // to ~1.5s isolated. On that basis the explicit timeout was removed as no
+  // longer needed — and the very next full-suite run timed out at 30594ms.
+  // Isolated it was still 1.5s, so nothing had regressed: full-suite load
+  // amplifies this case by more than 20x, and 30s does not cover it.
+  //
+  // Two things to take from that. The batching is worth keeping regardless — it
+  // is a real 23x on the dominant cost. And a wall-clock limit here can only
+  // ever be a hang guard; the pass/fail decision is the growth ratio below,
+  // which is load-tolerant by construction. So the limit is set generously and
+  // deliberately, not tuned to the fastest observation.
+  it("scoped pass cost grows sub-quadratically with sibling count", { timeout: 60_000 }, async () => {
     /**
      * Build an epic with `siblings` features in ITS OWN store, then time the
      * consolidation pass triggered by one more. Returns the fastest of `runs`.

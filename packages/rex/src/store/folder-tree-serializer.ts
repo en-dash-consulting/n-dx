@@ -41,6 +41,22 @@ export interface SerializeResult {
   directoriesCreated: number;
   /** Stale directories removed (items no longer in PRD). */
   directoriesRemoved: number;
+  /**
+   * Stale files removed (leaf items no longer at that path).
+   *
+   * Counted separately from {@link directoriesRemoved} because a rename-only
+   * migration moves mostly LEAF files, so a directory count alone reports zero
+   * for the very churn an operator needs explained.
+   */
+  filesRemoved: number;
+  /**
+   * PRD items serialized — every item in the document, at every level.
+   *
+   * The denominator for reading the removal counts: each item was written to
+   * its current path before any removal ran, so a removal cannot discard an
+   * item the document still holds.
+   */
+  itemsWritten: number;
 }
 
 /**
@@ -96,6 +112,8 @@ export async function serializeFolderTree(
     filesSkipped: 0,
     directoriesCreated: 0,
     directoriesRemoved: 0,
+    filesRemoved: 0,
+    itemsWritten: 0,
   };
 
   await ensureDir(treeRoot, result);
@@ -110,6 +128,7 @@ export async function serializeFolderTree(
   for (const entry of staleEntries) {
     await rm(entry.path, { recursive: entry.isDir, force: true });
     if (entry.isDir) result.directoriesRemoved++;
+    else result.filesRemoved++;
   }
 
   return result;
@@ -209,6 +228,7 @@ async function writeSiblings(
     const item = items[i];
     const itemSlug = positionalSlugs[i];
     const children = item.children ?? [];
+    result.itemsWritten++;
 
     // Leaf item (any level): bare `<slug>.md` at parentDir. It carries
     // only its own frontmatter — no children listing, no parent metadata.

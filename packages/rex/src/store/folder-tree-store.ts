@@ -12,7 +12,22 @@
  *     nested-object values are coerced to strings (supportsPassthrough: false).
  *   - All writes use atomic (temp + rename) operations for crash-safety.
  *   - Advisory file-locking prevents concurrent PRD writes (FIFO queue).
- *   - Single-item mutations avoid full-tree re-serialization when possible.
+ *
+ * ## Every save rewrites the whole tree
+ *
+ * There is no partial-write path. `saveDocument` and `withTransaction` both go
+ * through `writeTree`, which hands the ENTIRE document to `serializeFolderTree`
+ * and then removes every on-disk entry the document no longer accounts for.
+ * `addItem`/`updateItem`/`removeItem` are read-modify-write over the whole
+ * document, not surgical edits. Writes are content-addressed — `writeIfChanged`
+ * skips a file whose bytes already match — so a whole-tree save is cheap in
+ * practice and produces an empty diff when nothing changed.
+ *
+ * The consequence worth knowing: a change to the SLUG RULE renames every path
+ * at once, so one status edit can produce a diff of hundreds of files. That is
+ * a re-layout, not data loss, and `reportLayoutChurn` below says so out loud.
+ * It also means a naming migration converges in a single save — if a tree needs
+ * several, something is writing it with more than one version of the rule.
  *
  * @module rex/store/folder-tree-store
  */
@@ -24,11 +39,57 @@ import { SCHEMA_VERSION } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { findItem, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
 import { serializeFolderTree } from "./folder-tree-serializer.js";
+import type { SerializeResult } from "./folder-tree-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
 import { PRD_TREE_DIRNAME } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 import { stampModified, stampActor } from "../core/sync.js";
+
+// ---------------------------------------------------------------------------
+// Layout-churn reporting
+// ---------------------------------------------------------------------------
+
+/**
+ * Removals above this count stop looking like an edit and start looking like an
+ * accident. A normal mutation removes nothing, or the single path an item moved
+ * from; only a layout change — a slug-rule migration, a bulk prune — reaches
+ * double digits.
+ */
+const LAYOUT_CHURN_THRESHOLD = 20;
+
+/**
+ * Explain a mass removal so it cannot be misread as data loss.
+ *
+ * A slug-rule change rewrites every path in the tree, so a single status edit
+ * can land a diff with hundreds of deletions in it. That has already been
+ * mistaken for the PRD being destroyed, and disproving it meant counting items
+ * by hand on both sides of the commit (972 before, 972 after).
+ *
+ * The reassurance is not a guess. `serializeFolderTree` writes every item in
+ * the document to its current path BEFORE it removes anything, so a removed
+ * path is necessarily one that nothing in the document occupies any more.
+ * Printing the item count beside the removal count puts both halves of that
+ * comparison in front of the operator at the moment it would otherwise alarm
+ * them.
+ *
+ * Exported for tests; not part of the store's public contract.
+ */
+export function reportLayoutChurn(
+  result: SerializeResult,
+  warn: (message: string) => void = console.warn,
+): void {
+  const removed = result.filesRemoved + result.directoriesRemoved;
+  if (removed < LAYOUT_CHURN_THRESHOLD) return;
+
+  warn(
+    `PRD tree layout changed: ${removed} stale path(s) removed after writing ` +
+      `all ${result.itemsWritten} item(s) in the document.\n` +
+      `  Every item was written to its current path before any removal, so this ` +
+      `is a re-layout (e.g. a slug-naming migration), not lost items.\n` +
+      `  Expect a large rename diff — check the item count, not the file count.`,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // FolderTreeStore
@@ -83,7 +144,8 @@ export class FolderTreeStore implements PRDStore {
   private async writeTree(doc: PRDDocument): Promise<void> {
     await mkdir(this.treeRoot, { recursive: true });
     await writeFile(this.path("tree-meta.json"), JSON.stringify({ title: doc.title }), "utf-8");
-    await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    const result = await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    reportLayoutChurn(result);
     // A completed save makes this instance's view of the tree current again:
     // its own writes must not read as "another writer's work" on the next save.
     this.loadedAt = Date.now();
