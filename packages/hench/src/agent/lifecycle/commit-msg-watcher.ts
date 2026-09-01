@@ -2,12 +2,27 @@
  * Commit message file watcher with auto-commit timer.
  *
  * When the agent writes `.hench-commit-msg.txt` during a run, this module
- * detects the write and arms a one-shot timer. On timer expiry the file is
- * read: if it has non-empty content the staged changes are committed and the
- * file is removed; if the file is empty or whitespace-only it is deleted
- * without committing and a distinct log line is emitted. This handles the
- * case where the run terminates abnormally (timeout, crash) after the agent
- * staged its work but before n-dx could process the commit prompt.
+ * detects the write and arms a one-shot timer. This handles the case where the
+ * run terminates abnormally (timeout, crash) after the agent staged its work
+ * but before n-dx could process the commit prompt.
+ *
+ * On timer expiry the file is read, and what happens to it depends on the
+ * outcome — the message is the executor's authored work and usually the only
+ * copy, so it is only discarded when it is provably useless:
+ *
+ * | Outcome                     | Commit | Message file | `didAutoCommit()` |
+ * |-----------------------------|--------|--------------|-------------------|
+ * | Non-empty, commit succeeds  | yes    | removed      | true              |
+ * | Empty / whitespace-only     | no     | removed      | false             |
+ * | Fails, "nothing to commit"  | no     | removed      | false             |
+ * | Fails for any other reason  | no     | **kept**     | false             |
+ *
+ * That last row is load-bearing. Deleting the message on a failed commit lost
+ * it permanently AND left `performCommitPromptIfNeeded` with nothing to find,
+ * so it returned silently and the staged files rode the next run's
+ * `git add -A` under an unrelated task. A kept file is the recoverable
+ * direction: the pre-run commit gate already handles a dirty tree with a
+ * message file present.
  *
  * Call `cancel()` to disarm both the watcher and any pending timer — the normal
  * run lifecycle always cancels before calling `performCommitPromptIfNeeded` so
@@ -24,8 +39,21 @@
 import { watch as fsWatch } from "node:fs";
 import { readFileSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { execStdout } from "../../process/exec.js";
-import { detail } from "../../types/output.js";
+import { exec } from "../../process/exec.js";
+import { detail, info } from "../../types/output.js";
+
+/**
+ * git's phrasings for "the index holds nothing to record".
+ *
+ * The only `git commit` failure where the message file is genuinely useless
+ * rather than precious, so the only one that still cleans up after itself.
+ */
+const NOTHING_TO_COMMIT = /nothing to commit|no changes added to commit|nothing added to commit/i;
+
+/** First non-empty line of command output, for a one-line failure summary. */
+function firstLine(text: string): string {
+  return text.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
+}
 
 /** The sentinel file the agent writes its proposed commit message to. */
 const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
@@ -82,10 +110,10 @@ export interface CommitMsgWatcherOptions {
  * Start watching for `.hench-commit-msg.txt` in `projectDir`.
  *
  * - Arms a one-shot timer on first detection of the file (even if empty).
- * - On expiry:
- *   - Non-empty content → runs `git commit -F` and removes the file.
- *   - Empty or whitespace-only → deletes the file without committing and
- *     logs a distinct line so operators know the skip was intentional.
+ * - On expiry, resolves one of the four outcomes tabulated in the module
+ *   docblock above: commit and remove, skip-and-remove for an empty message or
+ *   a "nothing to commit" failure, or keep the file and warn for any other
+ *   commit failure.
  * - Returns `{ cancel }` for callers to disarm when the run ends normally.
  *
  * When `timeoutMs` is 0 the watcher still runs (tracking the file) but the
@@ -162,18 +190,68 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
       return;
     }
 
-    try {
-      await execStdout("git", ["commit", "-F", PENDING_COMMIT_FILE], {
-        cwd: projectDir,
-        timeout: 30_000,
-      });
+    // `exec`, not `execStdout`: execStdout discards its error argument and
+    // always resolves, so the failure branch below was unreachable and a
+    // rejected commit set `autoCommitted = true` — the run then reported an
+    // auto-commit that had not happened.
+    const commit = await exec("git", ["commit", "-F", PENDING_COMMIT_FILE], {
+      cwd: projectDir,
+      timeout: 30_000,
+    });
+
+    if (commit.exitCode === 0) {
       detail("Auto-commit: committed staged changes (timer expiry).");
       autoCommitted = true;
-    } catch (err) {
-      detail(`Auto-commit failed: ${(err as Error).message}`);
-    } finally {
-      try { unlinkSync(msgPath); } catch { /* ignore */ }
+      removeMsgFile();
+      return;
     }
+
+    const output = `${commit.stdout}\n${commit.stderr}`.trim();
+
+    if (NOTHING_TO_COMMIT.test(output)) {
+      // The one failure where discarding the message is correct: it describes
+      // nothing, and keeping it would leave a stale file for the next run.
+      detail("Auto-commit: nothing staged to commit — message file removed.");
+      removeMsgFile();
+      return;
+    }
+
+    // Any other failure — a rejecting hook, a signing error, a held
+    // .git/index.lock. The message file is the executor's authored work and the
+    // only copy; deleting it here loses it permanently AND makes
+    // performCommitPromptIfNeeded bail at its `!existsSync` check, so the
+    // operator sees nothing and the staged files ride the next run's
+    // `git add -A` under an unrelated task. Keep the file and say so loudly:
+    // a stale message file is recoverable (the pre-run commit gate handles a
+    // dirty tree with one present), a destroyed one is not.
+    const staged = await countStagedFiles();
+    info(
+      `⚠ Auto-commit failed — ${staged} staged file(s) were NOT committed.\n` +
+        `  ${PENDING_COMMIT_FILE} has been kept, so the message is not lost and the ` +
+        `commit prompt can still use it.\n` +
+        `  git: ${firstLine(output) || `exit ${commit.exitCode}`}`,
+    );
+  }
+
+  /** Remove the message file, ignoring a file that has already gone. */
+  function removeMsgFile(): void {
+    try { unlinkSync(msgPath); } catch { /* already gone */ }
+  }
+
+  /**
+   * How many files are staged, for the failure warning.
+   *
+   * Best-effort: the warning is more useful with a count than blocked without
+   * one, so a failure to count reports 0 rather than throwing inside the
+   * handler for another failure.
+   */
+  async function countStagedFiles(): Promise<number> {
+    const staged = await exec("git", ["diff", "--cached", "--name-only"], {
+      cwd: projectDir,
+      timeout: 10_000,
+    });
+    if (staged.exitCode !== 0) return 0;
+    return staged.stdout.split("\n").filter((line) => line.trim().length > 0).length;
   }
 
   function armTimerOnce(): void {

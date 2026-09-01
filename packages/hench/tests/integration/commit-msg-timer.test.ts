@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -229,5 +229,125 @@ describe("startCommitMsgWatcher (auto-commit timer)", () => {
 
     expect(await getHeadSubject(projectDir)).toBe("feat: early write");
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
+  });
+
+  /**
+   * A failed auto-commit used to be indistinguishable from a successful one.
+   *
+   * `git commit -F` ran through `execStdout`, which ignores its error argument
+   * and always resolves — so the catch was dead code, `autoCommitted` was set
+   * even when the commit had failed, and the `finally` deleted the message file
+   * regardless. The run then reported an auto-commit that never happened, with
+   * the authored message permanently gone and the staged work left to ride the
+   * next run's `git add -A` under someone else's task.
+   *
+   * The failure is injected via a nonexistent gpg signer: it is one of the
+   * modes named in the report, it fails the commit for a reason unrelated to
+   * the working tree, and unlike a `#!/bin/sh` pre-commit hook it behaves the
+   * same on Windows (where such a hook fails to spawn at all, testing the wrong
+   * thing).
+   */
+  describe("when the commit itself fails", () => {
+    async function breakCommitSigning(dir: string): Promise<void> {
+      await execAsync("git config commit.gpgsign true", { cwd: dir });
+      await execAsync("git config gpg.program ndx-nonexistent-gpg", { cwd: dir });
+    }
+
+    it("keeps the message file, warns, and does not claim an auto-commit", async () => {
+      const { startCommitMsgWatcher } = await import(
+        "../../src/agent/lifecycle/commit-msg-watcher.js"
+      );
+
+      await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+      await execAsync("git add src.ts", { cwd: projectDir });
+      await breakCommitSigning(projectDir);
+
+      const headBefore = await getHeadSubject(projectDir);
+      const msgPath = join(projectDir, ".hench-commit-msg.txt");
+
+      // info() writes through console.log. The warning has to reach the
+      // operator: a detail() line is what this defect already had, and it was
+      // easy to miss in a long run log.
+      const logged: string[] = [];
+      const logSpy = vi.spyOn(console, "log").mockImplementation((...args) => {
+        logged.push(args.join(" "));
+      });
+
+      try {
+        const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 100 });
+        await writeFile(msgPath, "feat: work that must not be lost", "utf-8");
+
+        // Cannot poll on didAutoCommit() here — it must stay false — so wait
+        // for the attempt to settle instead.
+        await waitFor(() => false, 900);
+        await watcher.settle();
+        watcher.cancel();
+
+        // The commit did not happen...
+        expect(await getHeadSubject(projectDir)).toBe(headBefore);
+        // ...and is not reported as having happened.
+        expect(watcher.didAutoCommit()).toBe(false);
+        // The authored message survives, so the commit prompt can still use it.
+        expect(existsSync(msgPath)).toBe(true);
+        expect(readFileSync(msgPath, "utf-8")).toContain("must not be lost");
+
+        const warning = logged.join("\n");
+        expect(warning).toMatch(/Auto-commit failed/i);
+        // Names the staged count and says the message was kept, so the operator
+        // knows both what is uncommitted and that nothing was destroyed.
+        expect(warning).toMatch(/1 staged file/);
+        expect(warning).toContain(".hench-commit-msg.txt");
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
+
+    it("leaves the staged work committable once the cause is fixed", async () => {
+      const { startCommitMsgWatcher } = await import(
+        "../../src/agent/lifecycle/commit-msg-watcher.js"
+      );
+
+      await writeFile(join(projectDir, "src.ts"), "export const x = 3;\n", "utf-8");
+      await execAsync("git add src.ts", { cwd: projectDir });
+      await breakCommitSigning(projectDir);
+
+      const msgPath = join(projectDir, ".hench-commit-msg.txt");
+      const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 100 });
+      await writeFile(msgPath, "feat: recoverable", "utf-8");
+
+      await waitFor(() => false, 900);
+      await watcher.settle();
+      watcher.cancel();
+
+      // Repair the cause and commit using the message the watcher preserved.
+      await execAsync("git config --unset commit.gpgsign", { cwd: projectDir });
+      await execAsync("git commit -F .hench-commit-msg.txt", { cwd: projectDir });
+
+      expect(await getHeadSubject(projectDir)).toBe("feat: recoverable");
+    });
+
+    /**
+     * The one failure where discarding the message is right: there is nothing
+     * to commit, so the message describes nothing. Keeping it would leave a
+     * stale file for the next run to trip over.
+     */
+    it("still cleans up when the failure is 'nothing to commit'", async () => {
+      const { startCommitMsgWatcher } = await import(
+        "../../src/agent/lifecycle/commit-msg-watcher.js"
+      );
+
+      // Nothing staged — the commit fails, but for a reason that makes the
+      // message file useless rather than precious.
+      const msgPath = join(projectDir, ".hench-commit-msg.txt");
+      const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 100 });
+      await writeFile(msgPath, "feat: describes nothing", "utf-8");
+
+      await waitFor(() => !existsSync(msgPath), 900);
+      await watcher.settle();
+      watcher.cancel();
+
+      expect(existsSync(msgPath)).toBe(false);
+      expect(watcher.didAutoCommit()).toBe(false);
+    });
   });
 });
