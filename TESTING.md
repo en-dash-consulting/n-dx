@@ -389,6 +389,38 @@ an agent running the suite inside Claude Code — ever saw the failure.
   inside a 16 ms window, or on a hash being carried, asserts that precondition
   explicitly — otherwise it reports success from a state it never reached.
 
+### Which architecture gates run where
+
+`tests/e2e/architecture-policy.test.js` holds two kinds of gate, and they do
+not have the same reach:
+
+| Gate | Input | Runs in CI? |
+|---|---|---|
+| Spawn-only enforcement, intra-package layering, gateway rules, export-count boundaries, dynamic-import declarations, analyzer/test pairing | committed source under `packages/` | ✅ always |
+| Zone import cycles, non-web family coupling, web zone load order, zone cohesion threshold, `COHESION_EXCEPTIONS` staleness | `.sourcevision/zones.json`, `.sourcevision/zones/` | ⏭️ skipped — developer machines only |
+
+The five zone gates depend on analysis output. `.sourcevision/*` is gitignored
+(only `.gitignore` and `hints.md` are tracked) and no CI step runs
+`ndx analyze`, so their input does not exist in CI. They used to `return` on
+missing input, which vitest counts as a **pass** — so they reported green in CI
+while checking nothing, and a `hench-agent` zone sitting at cohesion 0.25 went
+unnoticed. They now call `ctx.skip()`, so the run reports "skipped" rather than
+claiming a check it never made.
+
+**Why CI does not generate the analysis to enforce them.** Zone IDs and metrics
+are Louvain outputs: they shift between runs as the import graph moves, zones
+merge and split, and the repo's own governance docs tell you to re-read
+`.sourcevision/zones.json` rather than trust a written-down number. Gating CI
+on a threshold over an unstable partition buys flaky failures, not
+architecture. The zone gates are a **local review tool**: run
+`ndx analyze --deep .` and then the suite to exercise them.
+
+The committed-source gates take the opposite treatment. A missing input there
+is not a legitimate absence — it means a declaration has gone stale (a boundary
+named over a moved file, a renamed directory) — so those gates assert the path
+exists and fail loudly. `tests/unit/architecture-gate-reporting.test.js` keeps
+both halves honest: it fails if any gate goes back to returning silently.
+
 ### Family 5 — the suite leaking into the developer's environment
 
 The inverse of Family 4, and harder to notice: the tests pass, so nothing

@@ -253,7 +253,8 @@ describe("architecture policy: orchestration spawn-only rule", () => {
   for (const file of ORCHESTRATION_FILES) {
     it(`${file} does not import from package internals`, () => {
       const fullPath = join(ROOT, file);
-      if (!existsSync(fullPath)) return; // skip if file doesn't exist
+      // Committed source: absence means the declaration above is stale.
+      expect(existsSync(fullPath), `${file} is declared here but does not exist`).toBe(true);
 
       const content = readFileSync(fullPath, "utf-8");
       const violations = [];
@@ -455,12 +456,9 @@ const CYCLE_EXCEPTIONS = new Map([
 ]);
 
 describe("architecture policy: zone import cycle detection", () => {
-  it("no cycles exist among production zones in the zone-level import graph", () => {
+  it("no cycles exist among production zones in the zone-level import graph", (ctx) => {
     const zonesPath = join(ROOT, ".sourcevision/zones.json");
-    if (!existsSync(zonesPath)) {
-      // Skip if sourcevision hasn't been run yet
-      return;
-    }
+    if (!existsSync(zonesPath)) ctx.skip(ANALYSIS_ABSENT);
 
     const data = JSON.parse(readFileSync(zonesPath, "utf-8"));
     const crossings = data.crossings || [];
@@ -618,9 +616,9 @@ describe("architecture policy: zone import cycle detection", () => {
  * zones in a different package family — confirming coupling === 0.
  */
 describe("architecture policy: non-web zone coupling guard", () => {
-  it("non-web package families have zero inter-family zone coupling", () => {
+  it("non-web package families have zero inter-family zone coupling", (ctx) => {
     const zonesPath = join(ROOT, ".sourcevision/zones.json");
-    if (!existsSync(zonesPath)) return;
+    if (!existsSync(zonesPath)) ctx.skip(ANALYSIS_ABSENT);
 
     const configPath = join(ROOT, ".n-dx.json");
 
@@ -851,6 +849,21 @@ describe("architecture policy: process execution", () => {
  *   2. Be merged into a more cohesive parent zone
  *   3. Be added to COHESION_EXCEPTIONS with a justification
  */
+/**
+ * Why a gate is being skipped rather than passed.
+ *
+ * `.sourcevision/*` is gitignored (only `.gitignore` and `hints.md` are
+ * tracked) and no CI step runs `ndx analyze`, so these inputs are absent in CI
+ * and present only on a machine that has analysed locally. These gates used to
+ * `return`, which vitest counts as a pass — so they reported green in CI while
+ * checking nothing, and a zone sitting at cohesion 0.25 went unnoticed for
+ * however long. Skipping says "not run"; passing said "checked, fine".
+ *
+ * See TESTING.md — "Which architecture gates run where".
+ */
+const ANALYSIS_ABSENT =
+  "no .sourcevision analysis in this checkout — run `ndx analyze --deep .` to exercise this gate";
+
 const COHESION_THRESHOLD = 0.5;
 
 /**
@@ -873,9 +886,9 @@ const MIN_FILES_FOR_COHESION_GATE = 5;
 const COHESION_EXCEPTIONS = new Map([]);
 
 describe("architecture policy: zone cohesion gate", () => {
-  it(`all production zones meet minimum cohesion threshold (${COHESION_THRESHOLD})`, () => {
+  it(`all production zones meet minimum cohesion threshold (${COHESION_THRESHOLD})`, (ctx) => {
     const zonesDir = join(ROOT, ".sourcevision/zones");
-    if (!existsSync(zonesDir)) return;
+    if (!existsSync(zonesDir)) ctx.skip(ANALYSIS_ABSENT);
 
     const configPath = join(ROOT, ".n-dx.json");
     const zoneTypes = existsSync(configPath)
@@ -926,9 +939,9 @@ describe("architecture policy: zone cohesion gate", () => {
     }
   });
 
-  it("COHESION_EXCEPTIONS contains no stale entries", () => {
+  it("COHESION_EXCEPTIONS contains no stale entries", (ctx) => {
     const zonesDir = join(ROOT, ".sourcevision/zones");
-    if (!existsSync(zonesDir)) return;
+    if (!existsSync(zonesDir)) ctx.skip(ANALYSIS_ABSENT);
 
     const stale = [];
     for (const [zoneId] of COHESION_EXCEPTIONS) {
@@ -1008,7 +1021,10 @@ describe("architecture policy: boundary file export caps", () => {
   for (const boundary of BOUNDARY_FILES) {
     it(`${boundary.file} does not exceed ${boundary.maxExports} exports`, () => {
       const fullPath = join(ROOT, boundary.file);
-      if (!existsSync(fullPath)) return;
+      expect(
+        existsSync(fullPath),
+        `${boundary.file} has an export-count boundary declared but does not exist`,
+      ).toBe(true);
 
       const content = readFileSync(fullPath, "utf-8");
 
@@ -1076,7 +1092,10 @@ describe("architecture policy: analyzer test coverage pairing", () => {
   ]);
 
   it("each analyzer service has a corresponding test file", () => {
-    if (!existsSync(analyzersDir) || !existsSync(testDir)) return;
+    // Both are committed directories; if either moved, this gate would stop
+    // enforcing the analyzer/test pairing without anyone noticing.
+    expect(existsSync(analyzersDir), `${analyzersDir} is missing`).toBe(true);
+    expect(existsSync(testDir), `${testDir} is missing`).toBe(true);
 
     const analyzers = readdirSync(analyzersDir)
       .filter((f) => f.endsWith(".ts") && !f.endsWith(".d.ts"))
@@ -1126,9 +1145,9 @@ const WEB_ZONE_LOAD_ORDER = [
 ];
 
 describe("architecture policy: web package intra-zone cycle detection", () => {
-  it("web internal zones respect the declared load order", () => {
+  it("web internal zones respect the declared load order", (ctx) => {
     const zonesPath = join(ROOT, ".sourcevision/zones.json");
-    if (!existsSync(zonesPath)) return;
+    if (!existsSync(zonesPath)) ctx.skip(ANALYSIS_ABSENT);
 
     const data = JSON.parse(readFileSync(zonesPath, "utf-8"));
     const crossings = data.crossings || [];
@@ -1274,7 +1293,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
 describe("architecture policy: dynamic import audit", () => {
   it("all dynamic imports in package sources are documented", () => {
     const packagesDir = join(ROOT, "packages");
-    if (!existsSync(packagesDir)) return;
+    expect(existsSync(packagesDir), "packages/ is missing from the repo").toBe(true);
 
     const undocumented = [];
     const dynamicImportRe = /await\s+import\s*\(/g;
@@ -1356,7 +1375,10 @@ describe("architecture policy: dynamic import audit", () => {
    */
   it("rex analyze.ts dynamic import targets are declared and exist", () => {
     const analyzeFile = join(ROOT, "packages/rex/src/cli/commands/analyze.ts");
-    if (!existsSync(analyzeFile)) return;
+    expect(
+      existsSync(analyzeFile),
+      "this gate names analyze.ts explicitly; if it moved, update the path here",
+    ).toBe(true);
 
     const content = readFileSync(analyzeFile, "utf-8");
 
@@ -1448,7 +1470,7 @@ describe("intra-package dependency direction", () => {
     const coreDir = join(rexSrc, "core");
     const violations = [];
 
-    if (!existsSync(coreDir)) return;
+    expect(existsSync(coreDir), "packages/rex/src/core is missing").toBe(true);
 
     const coreFiles = walk(coreDir);
     for (const file of coreFiles) {
@@ -1479,7 +1501,7 @@ describe("intra-package dependency direction", () => {
     const prdDir = join(henchSrc, "prd");
     const violations = [];
 
-    if (!existsSync(prdDir)) return;
+    expect(existsSync(prdDir), "packages/hench/src/prd is missing").toBe(true);
 
     const prdFiles = walk(prdDir);
     for (const file of prdFiles) {
