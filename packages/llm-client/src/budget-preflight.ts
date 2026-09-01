@@ -2,7 +2,8 @@
  * Budget preflight — prompt-size and cost estimation before sending a request.
  *
  * Uses MODEL_CONTEXT_WINDOWS and MODEL_COSTS from config.ts to determine whether
- * a prompt fits within a model's context window and to estimate the request cost.
+ * a prompt fits within a model's context window and to estimate the input cost
+ * of the request. Only the input side is priced — see `estimatedCostUsd` below.
  *
  * ## Usage
  *
@@ -42,8 +43,13 @@ export interface BudgetPreflightResult {
   /** Estimated utilization as a percentage (0–100+). Values above 90 fail the fits check. */
   utilizationPercent: number;
   /**
-   * Estimated input cost in USD based on MODEL_COSTS.inputPerMToken.
+   * Estimated **input** cost in USD: `tokenEstimate × MODEL_COSTS.inputPerMToken`.
    * Undefined when the model has no entry in MODEL_COSTS.
+   *
+   * This is not a total-cost estimate. `MODEL_COSTS.outputPerMToken` is not
+   * applied — preflight runs before generation, so the output token count is
+   * unknown here. On generation-heavy requests output dominates cost, so treat
+   * this as a floor. See the MODEL_COSTS doc comment in config.ts.
    */
   estimatedCostUsd: number | undefined;
 }
@@ -53,7 +59,8 @@ export interface BudgetPreflightResult {
  *
  * Estimates token count using the 4-chars-per-token approximation and checks
  * whether the estimate fits within 90% of the model's context window. Also
- * computes the estimated input cost when pricing data is available.
+ * computes the estimated input cost when pricing data is available — input only,
+ * never a total; `outputPerMToken` is not applied here.
  *
  * @param modelId        The canonical model identifier (e.g. "gemini-2.5-pro").
  * @param promptCharCount  Number of characters in the prompt text.

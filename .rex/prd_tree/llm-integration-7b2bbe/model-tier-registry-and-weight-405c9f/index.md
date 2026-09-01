@@ -19,5 +19,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Add per-tier model override fields to LLMConfig schema and config loader](./add-per-tier-model-override-2e1d7e.md) | completed |
 | [Define TaskWeight type and per-vendor tier model constants in llm-client](./define-taskweight-type-and-per-084b25.md) | completed |
 | [Make MODEL_ALIASES.opus track the heavy tier instead of diverging from it](./make-model-aliases-opus-track-34021b.md) | pending |
-| [outputPerMToken is multiplied nowhere, so all output-side MODEL_COSTS figures are inert](./outputpermtoken-is-multiplied-359b5e.md) | pending |
+| [outputPerMToken is multiplied nowhere, so all output-side MODEL_COSTS figures are inert](./outputpermtoken-is-multiplied-359b5e.md) | completed |
 | [Verify the corrected MODEL_COSTS prices against Anthropic's published pricing](./verify-the-corrected-model-9c7789.md) | pending |

@@ -58,6 +58,22 @@ describe("budgetPreflight", () => {
       const result = budgetPreflight("gemini-3.5-flash-lite", 4_000_000); // 1M tokens
       expect(result.estimatedCostUsd).toBeCloseTo(cost.inputPerMToken, 5);
     });
+
+    // Locks the documented input-only contract (see the MODEL_COSTS doc comment in
+    // config.ts). If a future change starts folding output cost into this figure,
+    // that is a behaviour change and must update the docs — not slip through.
+    it("excludes output cost — estimatedCostUsd prices only the input side", () => {
+      const cost = MODEL_COSTS["gemini-2.5-pro"];
+      // Guard the fixture: this assertion is only meaningful while the two rates differ.
+      expect(cost.outputPerMToken).not.toBe(cost.inputPerMToken);
+
+      const result = budgetPreflight("gemini-2.5-pro", 4_000_000); // exactly 1M tokens
+      expect(result.estimatedCostUsd).toBeCloseTo(cost.inputPerMToken, 10);
+      expect(result.estimatedCostUsd).not.toBeCloseTo(
+        cost.inputPerMToken + cost.outputPerMToken,
+        10,
+      );
+    });
   });
 
   // ── gemini-2.5-pro ─────────────────────────────────────────────────────────
@@ -163,6 +179,11 @@ describe("MODEL_CONTEXT_WINDOWS", () => {
 });
 
 // ── MODEL_COSTS coverage ────────────────────────────────────────────────────
+//
+// These are shape guards on the table, not coverage of a cost calculation. Only
+// `inputPerMToken` feeds one (via budgetPreflight); `outputPerMToken` is
+// informational and asserted on for presence and ordering only. Passing this
+// block does not mean the output rates affect any computed value — they do not.
 
 describe("MODEL_COSTS", () => {
   it("covers all three Google Gemini tiers", () => {

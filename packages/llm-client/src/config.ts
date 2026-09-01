@@ -181,10 +181,36 @@ export const MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
 /**
  * Per-model cost constants (USD per million tokens).
  *
- * Used by budget preflight to estimate request cost. Values are approximate
- * public list pricing as of 2026-08 and should be updated when vendors change
- * rates. Gemini Pro and Claude Sonnet 5 have tiered/introductory rates; the
- * values here are the standard (higher) tier so estimates never under-report.
+ * Values are approximate public list pricing as of 2026-08 and should be
+ * updated when vendors change rates. Gemini Pro and Claude Sonnet 5 have
+ * tiered/introductory rates; the values here are the standard (higher) tier so
+ * estimates never under-report on the input side.
+ *
+ * ## Which field feeds a computation
+ *
+ * `inputPerMToken` is the only field multiplied anywhere in this codebase. Its
+ * single consumer is `budgetPreflight` (budget-preflight.ts), whose
+ * `estimatedCostUsd` is `inputTokenEstimate × inputPerMToken` — an input-only
+ * figure that deliberately under-reports total request cost.
+ *
+ * `outputPerMToken` is **informational only**: it is multiplied nowhere. Its
+ * only references are shape assertions in the tests (every entry has the field;
+ * output rate >= input rate). This is structural rather than an oversight —
+ * budget preflight runs *before* generation, so the output token count does not
+ * exist yet at the point the estimate is made.
+ *
+ * The consequence, recorded here so it is not rediscovered: **correcting an
+ * output rate changes no computed value anywhere in the system.** Treat such an
+ * edit as a data fix, not a behaviour change, and do not claim a cost-accuracy
+ * improvement from it.
+ *
+ * Note that hench's recorded `costUsd` does not come from this table either — it
+ * is the provider's own reported `cost_usd`, passed through unmodified.
+ *
+ * To make the output side live, the caller must be somewhere that knows the
+ * actual output token count — post-hoc usage attribution (`ndx usage`, rex's
+ * `get_token_usage` rollup) rather than preflight. That is a feature, not a fix;
+ * it was deliberately not built as part of this decision.
  */
 export const MODEL_COSTS: Readonly<
   Record<string, { inputPerMToken: number; outputPerMToken: number }>
