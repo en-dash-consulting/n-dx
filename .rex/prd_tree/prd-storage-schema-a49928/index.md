@@ -2,11 +2,11 @@
 id: "a4992835-70eb-4d9d-a79f-d0577b8927bc"
 level: "epic"
 title: "PRD Storage & Schema"
-status: "completed"
+status: "in_progress"
 startedAt: "2026-05-06T13:26:50.051Z"
-completedAt: "2026-05-06T13:26:50.051Z"
-endedAt: "2026-05-06T13:26:50.051Z"
 description: "PRD persistence model: folder-tree storage, markdown serialization, schema evolution, visibility/reporting, branch attribution, and the migration history that produced the current single-source-of-truth tree at .rex/prd_tree/."
+lastModified: "2026-09-01T14:30:38.958Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
 
 ## Children
