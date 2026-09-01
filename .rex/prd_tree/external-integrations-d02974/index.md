@@ -19,6 +19,3 @@ description: "Store adapters, bidirectional sync (Notion, future backends), CI/C
 | [Fix observation in panel (1 finding)](./fix-observation-in-panel-1-d97894/index.md) | completed |
 | [PR Build Pipeline and Code Quality Automation](./pr-build-pipeline-and-code-845626/index.md) | completed |
 | [PR Build Pipeline and Cross-Platform CLI Validation](./pr-build-pipeline-and-cross-084647/index.md) | completed |
-| [PR Build Pipeline and Cross-Platform CLI Validation Hardening](./pr-build-pipeline-and-cross-1dc428/index.md) | completed |
-| [PR Build Pipeline and Cross-Platform CLI Validation](./pr-build-pipeline-and-cross-3257d8/index.md) | completed |
-| [PR Build Pipeline and Cross-Platform CLI Validation Hardening](./pr-build-pipeline-and-cross-544adb/index.md) | completed |

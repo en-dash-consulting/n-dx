@@ -18,7 +18,6 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Auth Failure Detection and Re-Authentication Guidance](./auth-failure-detection-and-re-07e456/index.md) | completed |
 | [Automatic Model and Vendor Failover on Run Errors](./automatic-model-and-vendor-2e136c/index.md) | completed |
 | [Between-Run API Quota Status Logging](./between-run-api-quota-status-642df7/index.md) | completed |
-| [Between-Run API Quota Status Logging](./between-run-api-quota-status-adf5e5/index.md) | completed |
 | [Centralized Model Resolution and Vendor Visibility Across All LLM Commands](./centralized-model-resolution-e34e66/index.md) | completed |
 | [Codex CLI Token Usage Extraction from Run Output](./codex-cli-token-usage-508bf0/index.md) | completed |
 | [Codex Multi-line Token Count Parsing Fix](./codex-multi-line-token-count-ed1f09/index.md) | completed |

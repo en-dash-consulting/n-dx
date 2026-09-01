@@ -39,7 +39,6 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [PRD Store Integration with Dual-Write and First-Run Migration](./prd-store-integration-with-dual-1306e6/index.md) | completed |
 | [Rename .rex/tree to .rex/prd_tree as Canonical PRD Storage Location](./rename-rex-tree-to-rex-prd-tree-c94d8e/index.md) | completed |
 | [Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend](./retire-prd-md-and-promote-7145d6/index.md) | completed |
-| [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-14ccf2/index.md) | completed |
 | [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-e430a1/index.md) | completed |
 | [Single-Child Container Elimination in PRD Folder Tree](./single-child-container-84a54e/index.md) | completed |
 | [Single-Child Index Suppression and Front-Matter Deduplication Fix](./single-child-index-suppression-9656fa/index.md) | completed |

@@ -16,4 +16,10 @@ description: "Extend the existing PR validation pipeline with additive cross-pla
 |-------|--------|
 | [Add MacOS pipeline stage for ndx install-and-run smoke validation](./add-macos-pipeline-stage-for-d10a17.md) | completed |
 | [Add Windows pipeline stage for ndx install-and-run smoke validation](./add-windows-pipeline-stage-for-1a72b5.md) | completed |
+| [Define OS-agnostic CLI error code taxonomy](./define-os-agnostic-cli-error-5392be.md) | completed |
+| [Diagnose smoke parity suite failure and capture reproducible error context](./diagnose-smoke-parity-suite-a30648.md) | completed |
+| [Emit structured smoke artifacts with normalized error codes](./emit-structured-smoke-artifacts-b714bd.md) | completed |
+| [Harden CLI smoke parity JSON collection for macOS and Windows runners](./harden-cli-smoke-parity-json-d050ac.md) | completed |
 | [Implement cross-platform parity assertions for deterministic CLI responses](./implement-cross-platform-parity-e1319d.md) | completed |
+| [Implement targeted fix for smoke parity regression](./implement-targeted-fix-for-774bf7.md) | completed |
+| [Stabilize repeatable parity verification across original macOS and Windows CI steps](./stabilize-repeatable-parity-d01f76.md) | completed |

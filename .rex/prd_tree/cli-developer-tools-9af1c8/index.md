@@ -14,13 +14,11 @@ description: "Command-line interface: error handling, validation, formatting, he
 |-------|--------|
 | [Adversarial review pass for ndx work (--review)](./adversarial-review-pass-for-ndx-6eb227/index.md) | completed |
 | [ANSI Color Output Across Rex, SourceVision, and Hench](./ansi-color-output-across-rex-c513f2/index.md) | completed |
-| [ANSI Color Output Across Rex, SourceVision, and Hench](./ansi-color-output-across-rex-e73702/index.md) | completed |
 | [ANSI Color Reset Consistency in Tool Output](./ansi-color-reset-consistency-in-eb21a9/index.md) | completed |
 | [Auto-Commit on Completion for File-Modifying Claude Code Skills](./auto-commit-on-completion-for-efac37/index.md) | completed |
 | [Auto-Persist Self-Heal Recommendations into PRD Without Execution](./auto-persist-self-heal-a7b158/index.md) | completed |
 | [Child Process Cleanup and Exit Hygiene](./child-process-cleanup-and-exit-b67648/index.md) | completed |
 | [CLI Hint Correctness, Test Coverage, and Documentation Sync](./cli-hint-correctness-test-6ba404/index.md) | completed |
-| [CLI Hint Correctness, Test Coverage, and Documentation Sync](./cli-hint-correctness-test-77b9a8/index.md) | completed |
 | [CLI Robustness](./cli-robustness-f69ce6/index.md) | completed |
 | [CLI User Experience and Developer Tools](./cli-user-experience-and-4ca9aa/index.md) | completed |
 | [CLI Version Command Surface](./cli-version-command-surface-b3e82a/index.md) | completed |
