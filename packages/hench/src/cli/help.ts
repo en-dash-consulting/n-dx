@@ -84,12 +84,15 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "The execution model is never inherited — pinning a cheap executor\n" +
           "must not silently downgrade the reviewer.\n" +
           "\n" +
-          "Tool grants: the reviewer gets the executor's shell and file access\n" +
-          "plus three rex MCP tools — add_item, get_item, get_prd_status — so it\n" +
-          "can file findings without depending on the analyzed project's own\n" +
-          "permission settings. Deliberately not update_task_status: a reviewer\n" +
-          "must not be able to mark the work it is reviewing complete. Findings\n" +
-          "it still cannot file are reported as such, not silently dropped.\n" +
+          "Tool grants (Claude CLI only): the reviewer gets the executor's\n" +
+          "shell and file access plus three rex MCP tools — add_item, get_item,\n" +
+          "get_prd_status. Deliberately not update_task_status: a reviewer must\n" +
+          "not be able to mark the work it is reviewing complete. Other vendors\n" +
+          "rely on the analyzed project's own permission settings instead.\n" +
+          "On every vendor, capture additionally requires the analyzed project\n" +
+          "to have the rex MCP server registered (run ndx init if it hasn't\n" +
+          "been). Findings that cannot be filed are reported as such, not\n" +
+          "silently dropped.\n" +
           "\n" +
           "Requires the CLI provider. A review that cannot complete warns and\n" +
           "leaves the task's own result alone; it never fails a valid task.",
