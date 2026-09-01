@@ -16,7 +16,7 @@ import {
 } from "./prd-md-migration.js";
 import { parseDocument } from "./markdown-parser.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
-import { serializeFolderTree } from "./folder-tree-serializer.js";
+import { serializeFolderTree, collectItemIds } from "./folder-tree-serializer.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
 import { PRD_TREE_DIRNAME, PRD_TREE_LOCK_FILENAME } from "./paths.js";
@@ -28,11 +28,12 @@ export const PRD_FILENAME = "prd.json";
 export class FileStore implements PRDStore {
   private rexDir: string;
   /**
-   * When this instance last loaded the tree (epoch ms). Passed to the
-   * serializer's stale-save guard: a save may only delete entries no newer
-   * than this. Zero means "never loaded" — such a save may delete nothing.
+   * Every item id this instance saw when it last loaded the tree. Passed to
+   * the serializer's stale-save guard: a save may only delete entries it can
+   * account for. Empty means "never loaded" — such a save may delete nothing
+   * it can identify.
    */
-  private loadedAt = 0;
+  private knownItemIds: ReadonlySet<string> = new Set();
   private itemToFile: Map<string, string> = new Map();
   private fileMetadata: Map<string, { schema: string; title: string }> = new Map();
   private ownershipLoaded = false;
@@ -276,9 +277,9 @@ export class FileStore implements PRDStore {
         this.path("tree-meta.json"),
         JSON.stringify({ title: doc.title }),
       );
-      await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+      await serializeFolderTree(doc.items, this.treeRoot, { knownItemIds: this.knownItemIds });
       // A completed save makes this instance's view current again — see writeFolderTree.
-      this.loadedAt = Date.now();
+      this.knownItemIds = collectItemIds(doc.items);
       this.rebuildOwnershipFromItems(doc);
       return result;
     });
@@ -411,9 +412,16 @@ export class FileStore implements PRDStore {
    * Document title is read from `tree-meta.json` if present; defaults to "PRD".
    */
   async loadDocument(): Promise<PRDDocument> {
-    // Taken before the read starts, so an entry written during or after the
-    // parse registers as newer than the load and the guard flags it.
-    this.loadedAt = Date.now();
+    const doc = await this.readDocument();
+    // Recorded from the document this load actually produced, so the guard
+    // asks "did we see this item?" rather than "was this written recently?" —
+    // every return path below is covered by capturing it here.
+    this.knownItemIds = collectItemIds(doc.items);
+    return doc;
+  }
+
+  /** {@link loadDocument} without the snapshot bookkeeping. */
+  private async readDocument(): Promise<PRDDocument> {
     if (!(await this.directoryExists(this.treeRoot))) {
       return this.loadLegacyDocument();
     }
@@ -491,10 +499,10 @@ export class FileStore implements PRDStore {
       this.path("tree-meta.json"),
       JSON.stringify({ title: doc.title }),
     );
-    await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    await serializeFolderTree(doc.items, this.treeRoot, { knownItemIds: this.knownItemIds });
     // A completed save makes this instance's view of the tree current again:
     // its own writes must not read as "another writer's work" on the next save.
-    this.loadedAt = Date.now();
+    this.knownItemIds = collectItemIds(doc.items);
     this.rebuildOwnershipFromItems(doc);
   }
 

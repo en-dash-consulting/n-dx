@@ -10,7 +10,7 @@
  */
 
 import { join } from "node:path";
-import { serializeFolderTree, parseFolderTree, withLock, PRD_TREE_DIRNAME, PRD_TREE_LOCK_FILENAME } from "../../store/index.js";
+import { serializeFolderTree, collectItemIds, parseFolderTree, withLock, PRD_TREE_DIRNAME, PRD_TREE_LOCK_FILENAME } from "../../store/index.js";
 import { walkTree } from "../../core/tree.js";
 import type { PRDStore } from "../../store/index.js";
 import type { PRDItem } from "../../schema/index.js";
@@ -37,8 +37,8 @@ export const FOLDER_TREE_SUBDIR = PRD_TREE_DIRNAME;
  * deletes on-disk items absent from the document it is given. An acknowledged
  * write would vanish with no error.
  *
- * `loadedAt` is passed for the same reason — without it `guardStaleEntries` is
- * disabled and deletions are applied silently. With the lock held the guard
+ * `knownItemIds` is passed for the same reason — without it `guardStaleEntries`
+ * is disabled and deletions are applied silently. With the lock held the guard
  * should never fire; if it does, some writer reached the tree without taking
  * the lock, and failing loudly is the correct outcome.
  *
@@ -48,12 +48,13 @@ export const FOLDER_TREE_SUBDIR = PRD_TREE_DIRNAME;
 export async function syncFolderTree(rexDir: string, store: PRDStore): Promise<void> {
   const treeRoot = join(rexDir, FOLDER_TREE_SUBDIR);
   await withLock(join(rexDir, PRD_TREE_LOCK_FILENAME), async () => {
-    // Stamped before the load, not after: the guard compares on-disk mtimes
-    // against "when this snapshot was taken", and a stamp taken after the read
-    // would vouch for writes the read never saw.
-    const loadedAt = Date.now();
+    // Taken from the document this load produced: the guard vouches only for
+    // items the read actually saw, so anything on disk it did not see belongs
+    // to a writer that bypassed the lock.
     const doc = await store.loadDocument();
-    await serializeFolderTree(doc.items, treeRoot, { loadedAt });
+    await serializeFolderTree(doc.items, treeRoot, {
+      knownItemIds: collectItemIds(doc.items),
+    });
   });
 }
 

@@ -29,6 +29,7 @@ export type { MarkdownMigrationResult } from "./prd-md-migration.js";
 export { serializeDocument } from "./markdown-serializer.js";
 export {
   serializeFolderTree,
+  collectItemIds,
   slugify,
   slugifyTitle,
   resolveSiblingSlugs,

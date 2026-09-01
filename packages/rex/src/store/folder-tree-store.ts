@@ -38,7 +38,7 @@ import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.
 import { SCHEMA_VERSION } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { findItem, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
-import { serializeFolderTree } from "./folder-tree-serializer.js";
+import { serializeFolderTree, collectItemIds } from "./folder-tree-serializer.js";
 import type { SerializeResult } from "./folder-tree-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
@@ -104,11 +104,12 @@ export class FolderTreeStore implements PRDStore {
   private treeRoot: string;
 
   /**
-   * When this instance last loaded the tree (epoch ms). Passed to the
-   * serializer's stale-save guard: a save may only delete entries no newer
-   * than this. Zero means "never loaded" — such a save may delete nothing.
+   * Every item id this instance saw when it last loaded the tree. Passed to
+   * the serializer's stale-save guard: a save may only delete entries it can
+   * account for. Empty means "never loaded" — such a save may delete nothing
+   * it can identify.
    */
-  private loadedAt = 0;
+  private knownItemIds: ReadonlySet<string> = new Set();
 
   constructor(rexDir: string) {
     this.rexDir = rexDir;
@@ -122,9 +123,6 @@ export class FolderTreeStore implements PRDStore {
   // ---- Document CRUD -------------------------------------------------------
 
   async loadDocument(): Promise<PRDDocument> {
-    // Taken before the read starts, so an entry written during or after the
-    // parse registers as newer than the load and the guard flags it.
-    this.loadedAt = Date.now();
     let title = "PRD";
     try {
       const raw = await readFile(this.path("tree-meta.json"), "utf-8");
@@ -137,6 +135,9 @@ export class FolderTreeStore implements PRDStore {
     }
 
     const { items } = await parseFolderTree(this.treeRoot);
+    // Recorded from what the parse actually produced, so the guard asks "did
+    // we see this item?" rather than "was this written recently?".
+    this.knownItemIds = collectItemIds(items);
     return { schema: SCHEMA_VERSION, title, items };
   }
 
@@ -144,11 +145,13 @@ export class FolderTreeStore implements PRDStore {
   private async writeTree(doc: PRDDocument): Promise<void> {
     await mkdir(this.treeRoot, { recursive: true });
     await writeFile(this.path("tree-meta.json"), JSON.stringify({ title: doc.title }), "utf-8");
-    const result = await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    const result = await serializeFolderTree(doc.items, this.treeRoot, {
+      knownItemIds: this.knownItemIds,
+    });
     reportLayoutChurn(result);
     // A completed save makes this instance's view of the tree current again:
     // its own writes must not read as "another writer's work" on the next save.
-    this.loadedAt = Date.now();
+    this.knownItemIds = collectItemIds(doc.items);
   }
 
   /**

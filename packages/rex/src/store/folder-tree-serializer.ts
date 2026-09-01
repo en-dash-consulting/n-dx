@@ -64,25 +64,51 @@ export interface SerializeResult {
  *
  * Serialization deletes every on-disk item absent from the in-memory tree, so
  * a save from a stale snapshot silently destroys items it never loaded. These
- * options let the caller prove its snapshot's age; without them the serializer
- * keeps its legacy delete-freely behavior (for migration internals and tests —
- * production writes go through the stores, which always pass `loadedAt`).
+ * options let the caller say what its snapshot contained; without them the
+ * serializer keeps its legacy delete-freely behaviour (for migration internals
+ * and tests — production writes go through the stores, which always pass
+ * `knownItemIds`).
  */
 export interface SerializeOptions {
   /**
-   * When the document being saved was loaded from this tree (epoch ms).
-   * A deletion candidate whose on-disk state is newer than this was written
-   * by someone else after the snapshot was taken — the save is stale, and it
-   * fails loudly (naming the items) instead of deleting. Pass `0` for "this
-   * writer never loaded the tree": every deletion is then refused unless
-   * `allowBulkDelete` is set.
+   * Every item id present in the document when it was loaded from this tree.
+   *
+   * A deletion candidate carrying an id in this set is one the snapshot knew
+   * about, so removing it is this writer's own decision — a rename, a
+   * leaf→folder promotion, an explicit `removeItem`. A candidate carrying an
+   * id that is NOT in the set appeared after the load, which means another
+   * writer created it: the save is stale, and it fails loudly (naming the
+   * items) instead of deleting.
+   *
+   * Pass an empty set for "this writer never loaded the tree": every
+   * identifiable deletion is then refused unless `allowBulkDelete` is set.
+   * Omit entirely to keep the legacy delete-freely behaviour.
    */
-  loadedAt?: number;
+  knownItemIds?: ReadonlySet<string>;
   /**
    * Explicit intent to delete without staleness proof — a deliberate
    * whole-tree rewrite (migration, restore). Skips the guard entirely.
    */
   allowBulkDelete?: boolean;
+}
+
+/**
+ * Every item id in `items`, at every depth.
+ *
+ * The stale-save guard's input: a caller records this from the document it
+ * loaded, so the serializer can tell "an item we knew about and are moving or
+ * removing" from "an item that appeared after our load".
+ */
+export function collectItemIds(items: PRDItem[]): Set<string> {
+  const ids = new Set<string>();
+  const walk = (list: PRDItem[]): void => {
+    for (const item of list) {
+      ids.add(item.id);
+      if (item.children?.length) walk(item.children);
+    }
+  };
+  walk(items);
+  return ids;
 }
 
 /** One on-disk entry the serializer wants to remove. */
@@ -137,23 +163,40 @@ export async function serializeFolderTree(
 /**
  * Refuse deletions a stale snapshot cannot vouch for.
  *
- * With `loadedAt`, a candidate whose newest on-disk mtime (recursive — a fresh
- * child inside an old folder counts) is later than the load was written after
- * the snapshot was taken; deleting it would destroy another writer's work.
- * With no options at all the legacy delete-freely behavior is kept.
+ * A deletion candidate is safe when the snapshot KNEW about it: its id was in
+ * the document we loaded, so removing it is this writer's own decision. A
+ * candidate whose id was absent from that document appeared afterwards, which
+ * means another writer created it and this save would destroy their work.
+ * Directories are checked recursively — a fresh item inside a folder we are
+ * deleting counts, which is the whole point.
+ *
+ * With no `knownItemIds` at all the legacy delete-freely behaviour is kept.
+ *
+ * ## Why identity and not timestamps
+ *
+ * This compared `stat().mtimeMs` against a `Date.now()` taken at load, with a
+ * 2 ms tolerance for "fractional milliseconds". That does not hold: the two
+ * values come from different clocks. Node reads a high-precision system time,
+ * while the filesystem stamps writes from the system timer tick (~15.6 ms on
+ * Windows). Measured against a file written strictly BEFORE the load, the
+ * delta scattered from −8 ms to +6 ms — so a file the load definitely saw
+ * regularly read as newer than the load, and the guard refused legitimate
+ * saves 25 times in 40.
+ *
+ * No tolerance value fixes that. Widening it past one timer tick would blind
+ * the guard to precisely the concurrent writes it exists to catch, and the
+ * skew is platform- and filesystem-dependent besides. Item identity is exact,
+ * needs no clock, and answers the real question directly: not "was this
+ * written recently?" but "did we know about this?".
  */
 async function guardStaleEntries(staleEntries: StaleEntry[], options: SerializeOptions): Promise<void> {
-  if (staleEntries.length === 0 || options.allowBulkDelete || options.loadedAt === undefined) return;
-
-  // stat().mtimeMs carries fractional milliseconds while Date.now() is an
-  // integer, so a file written in the same millisecond as the load can read
-  // as fractionally "newer" than it. Tolerate that granularity — a write the
-  // load genuinely raced within 2ms is indistinguishable from one it saw.
-  const MTIME_TOLERANCE_MS = 2;
+  const known = options.knownItemIds;
+  if (staleEntries.length === 0 || options.allowBulkDelete || known === undefined) return;
 
   const violations: string[] = [];
   for (const entry of staleEntries) {
-    if ((await newestMtime(entry.path)) > options.loadedAt + MTIME_TOLERANCE_MS) {
+    const unknownIds = await collectUnknownIds(entry.path, entry.isDir, known);
+    if (unknownIds.length > 0) {
       violations.push(await describeEntry(entry));
     }
   }
@@ -169,21 +212,61 @@ async function guardStaleEntries(staleEntries: StaleEntry[], options: SerializeO
   );
 }
 
-/** Newest mtime under `path` (the entry itself and, for directories, everything inside). */
-async function newestMtime(path: string): Promise<number> {
-  let newest = 0;
-  try {
-    const info = await stat(path);
-    newest = info.mtimeMs;
-    if (!info.isDirectory()) return newest;
-    for (const entry of await readdir(path)) {
-      const childNewest = await newestMtime(join(path, entry));
-      if (childNewest > newest) newest = childNewest;
-    }
-  } catch {
-    // Vanished mid-scan — nothing left to protect.
+/**
+ * Ids under `path` that the snapshot did not know about.
+ *
+ * An entry with no readable id is NOT reported: every item the store writes
+ * carries `id:` frontmatter, so something without one was not created through
+ * the store and is not the concurrent work this guard protects. Reporting it
+ * would block saves over stray files the previous behaviour deleted freely.
+ */
+async function collectUnknownIds(
+  path: string,
+  isDir: boolean,
+  known: ReadonlySet<string>,
+): Promise<string[]> {
+  const unknown: string[] = [];
+
+  if (!isDir) {
+    const id = await readItemId(path);
+    if (id !== null && !known.has(id)) unknown.push(id);
+    return unknown;
   }
-  return newest;
+
+  const ownId = await readItemId(join(path, "index.md"));
+  if (ownId !== null && !known.has(ownId)) unknown.push(ownId);
+
+  let entries: string[];
+  try {
+    entries = await readdir(path);
+  } catch {
+    return unknown; // vanished mid-scan — nothing left to protect
+  }
+
+  for (const child of entries) {
+    if (child === "index.md") continue;
+    const childPath = join(path, child);
+    let childIsDir: boolean;
+    try {
+      childIsDir = (await stat(childPath)).isDirectory();
+    } catch {
+      continue;
+    }
+    if (!childIsDir && !child.endsWith(".md")) continue;
+    unknown.push(...(await collectUnknownIds(childPath, childIsDir, known)));
+  }
+
+  return unknown;
+}
+
+/** The `id` from a content file's frontmatter, or null when unreadable. */
+async function readItemId(contentFile: string): Promise<string | null> {
+  try {
+    const raw = await readFile(contentFile, "utf8");
+    return /^id:\s*"?([^"\n]+?)"?\s*$/m.exec(raw)?.[1] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Human-readable identity for a doomed entry: title and id from its frontmatter, else its path. */

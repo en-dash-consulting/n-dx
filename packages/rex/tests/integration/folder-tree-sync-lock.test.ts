@@ -7,7 +7,7 @@
  *
  *   - No lock, so it ran concurrently with any writer queued behind the
  *     transaction that had just released one.
- *   - No `loadedAt`, which disables `guardStaleEntries` entirely — the
+ *   - No `knownItemIds`, which disables `guardStaleEntries` entirely — the
  *     serializer's protection against a stale snapshot deleting another
  *     writer's items. Deletions were therefore applied silently.
  *
