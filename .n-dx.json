@@ -1,7 +1,6 @@
 {
   "llm": {
     "vendor": "claude",
-    "model": "claude-sonnet-4-6",
     "claude": {
       "model": "claude-opus-5"
     },

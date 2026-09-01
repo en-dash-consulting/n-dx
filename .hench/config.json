@@ -1,7 +1,7 @@
 {
   "schema": "hench/v1",
   "provider": "cli",
-  "model": "sonnet",
+  "model": "opus",
   "permissionMode": "acceptEdits",
   "maxTurns": 100,
   "maxTokens": 8192,
