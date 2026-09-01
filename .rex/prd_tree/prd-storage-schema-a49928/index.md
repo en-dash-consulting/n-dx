@@ -13,6 +13,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Auto-Migration to Folder-Per-Task Schema with Backup](./auto-migration-to-folder-per-6c60e8/index.md) | completed |
 | [Automatic prd.json Detection, Backup, and Migration on PRD-Touching Commands](./automatic-prd-json-detection-3f1a60/index.md) | completed |
 | [Branch Attribution Display in PRD Dashboard](./branch-attribution-display-in-9f96a4/index.md) | completed |
 | [Branch Attribution Metadata on PRD Items](./branch-attribution-metadata-on-578686/index.md) | completed |
@@ -24,6 +25,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Epic-Scoped Slug Naming Convention for Folder-Tree Directories](./epic-scoped-slug-naming-f9376f/index.md) | completed |
 | [Folder-Based PRD Schema Design and Serialization](./folder-based-prd-schema-design-7286f1/index.md) | completed |
 | [Folder-Level index.md Summary Aggregation](./folder-level-index-md-summary-722b72/index.md) | completed |
+| [Folder-Per-Task Hierarchy Enforcement](./folder-per-task-hierarchy-f8638a/index.md) | completed |
 | [Folder Tree Migration, Initialization, and Auto-Trigger](./folder-tree-migration-568a1a/index.md) | completed |
 | [Human-readable PRD tree slugs](./human-readable-prd-tree-slugs-c83eec/index.md) | pending |
 | [JSON Write Path Removal and Markdown-Only Enforcement](./json-write-path-removal-and-21a866/index.md) | completed |
@@ -38,9 +40,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Rename .rex/tree to .rex/prd_tree as Canonical PRD Storage Location](./rename-rex-tree-to-rex-prd-tree-c94d8e/index.md) | completed |
 | [Retire prd.md and Promote Folder-Tree to Exclusive PRD Backend](./retire-prd-md-and-promote-7145d6/index.md) | completed |
 | [Show Target PRD in ndx add Output](./show-target-prd-in-ndx-add-output-14ccf2/index.md) | completed |
+| [Single-Child Container Elimination in PRD Folder Tree](./single-child-container-84a54e/index.md) | completed |
+| [Single-Child Index Suppression and Front-Matter Deduplication Fix](./single-child-index-suppression-9656fa/index.md) | completed |
 | [Test Suite Updates for Folder-Tree PRD Storage](./test-suite-updates-for-folder-db58ca/index.md) | completed |
 | [Title-Based PRD Item File Naming Convention](./title-based-prd-item-file-1797eb/index.md) | completed |
-| [Auto-Migration to Folder-Per-Task Schema with Backup](./auto-migration-to-folder-per-6c60e8/index.md) | completed |
-| [Folder-Per-Task Hierarchy Enforcement](./folder-per-task-hierarchy-f8638a/index.md) | completed |
-| [Single-Child Index Suppression and Front-Matter Deduplication Fix](./single-child-index-suppression-9656fa/index.md) | completed |
-| [Single-Child Container Elimination in PRD Folder Tree](./single-child-container-84a54e/index.md) | completed |

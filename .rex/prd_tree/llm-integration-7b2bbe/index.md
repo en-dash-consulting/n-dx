@@ -16,6 +16,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Auth Failure Detection and Re-Authentication Guidance](./auth-failure-detection-and-re-07e456/index.md) | completed |
+| [Automatic Model and Vendor Failover on Run Errors](./automatic-model-and-vendor-2e136c/index.md) | completed |
 | [Between-Run API Quota Status Logging](./between-run-api-quota-status-642df7/index.md) | completed |
 | [Centralized Model Resolution and Vendor Visibility Across All LLM Commands](./centralized-model-resolution-e34e66/index.md) | completed |
 | [Codex CLI Token Usage Extraction from Run Output](./codex-cli-token-usage-508bf0/index.md) | completed |
@@ -49,4 +50,3 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Unified Server Architecture: HTTP MCP and ndx start](./unified-server-architecture-e96db7/index.md) | completed |
 | [Codex workflow parity — close-out (issue #122 remainder)](./codex-workflow-parity-close-out-8f00a8.md) | completed |
 | [`ndx add` ignores configured Google/Gemini vendor and falls back to Claude](./ndx-add-ignores-configured-46d8b9.md) | completed |
-| [Automatic Model and Vendor Failover on Run Errors](./automatic-model-and-vendor-2e136c/index.md) | completed |

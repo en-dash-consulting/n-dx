@@ -16,6 +16,8 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
+| [Cross-Package Duplicate Logic Consolidation](./cross-package-duplicate-logic-58d4e3/index.md) | completed |
+| [Dead Import and Unused Export Elimination Across All Packages](./dead-import-and-unused-export-56f47d/index.md) | completed |
 | [Deprecated npm Dependency Audit and Remediation](./deprecated-npm-dependency-audit-f6c36d/index.md) | completed |
 | [Fix anti-pattern in global (1 finding)](./fix-anti-pattern-in-global-1-9ee6a6/index.md) | completed |
 | [Fix anti-pattern in global (2 findings)](./fix-anti-pattern-in-global-2-c4e93f/index.md) | completed |
@@ -89,5 +91,3 @@ recommendationMeta: "[object Object]"
 | [Token Usage Aggregation Performance Optimization](./token-usage-aggregation-07874b/index.md) | completed |
 | [Immersive Init Experience with Dinosaur Theme & Branding](./immersive-init-experience-with-ccbcaf.md) | completed |
 | [Stale node_modules makes `pnpm typecheck` report type errors that CI does not have](./stale-node-modules-makes-pnpm-856e89.md) | completed |
-| [Cross-Package Duplicate Logic Consolidation](./cross-package-duplicate-logic-58d4e3/index.md) | completed |
-| [Dead Import and Unused Export Elimination Across All Packages](./dead-import-and-unused-export-56f47d/index.md) | completed |
