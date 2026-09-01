@@ -25,7 +25,20 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { PRDItem } from "../schema/index.js";
 
-const MAX_SLUG_LENGTH = 40;
+/**
+ * Maximum characters in one path component.
+ *
+ * Kept at 40 after the id suffix was removed, for path length rather than
+ * aesthetics: Windows APIs cap many paths at 260 characters, and the tree
+ * nests four levels deep (epic / feature / task / leaf file). At 40 a fully
+ * nested worst case stays under that ceiling with room for the repository
+ * prefix; raising it would not.
+ *
+ * The readability win came from dropping the suffix, not from a larger cap —
+ * titles previously shared these 40 characters with `-<shortId>`, so they now
+ * get roughly seven more before truncation.
+ */
+export const MAX_SLUG_LENGTH = 40;
 const SHORT_ID_LENGTH = 6;
 const EMPTY_TITLE_SLUG = "untitled";
 
@@ -239,17 +252,30 @@ async function writeSiblings(
 }
 
 /**
- * Derive a deterministic, title-first, id-qualified directory slug for one item.
+ * Derive a deterministic, readable directory slug for one item.
  *
- * Every slug carries a `-{id6}` suffix (the first six safe ID characters),
- * unconditionally: same-titled items created on divergent branches would
- * otherwise collide on identical paths, and a git merge would silently unify
- * two distinct items. The title body is truncated at a word boundary to keep
- * the whole slug within 40 characters. Trees written before this rule are
- * renamed in one pass by `rex migrate-slugs`.
+ * Title only: the id lives in front matter and no longer appears in the path.
+ * Paths are read by people constantly and diverge across branches rarely, so
+ * the tree reads as prose — `authentication/oauth2-integration/handle-the-
+ * callback.md` — and each level adds its own specificity rather than repeating
+ * an id.
+ *
+ * The `-{id6}` suffix this replaces existed for a real reason: two same-titled
+ * items created on divergent branches land on identical paths, and a git merge
+ * can silently unify two distinct items. That hazard has not gone away; it is
+ * now caught after the fact instead of prevented by the path. `rex validate`
+ * runs the raw-tree duplicate-id scan, which reports one id appearing at two
+ * paths — the signature of exactly that merge. A collision-only suffix was not
+ * an option: each branch sees no local collision, so neither would add one.
+ *
+ * `id` is retained in the signature: callers pass it, and it still
+ * disambiguates the final fallback when a title normalises to nothing.
  */
 export function slugify(title: string, id: string): string {
-  return appendShortIdSuffix(normalizeTitleSlug(title), id);
+  const slug = truncateAtWordBoundary(normalizeTitleSlug(title), MAX_SLUG_LENGTH);
+  // A title of only punctuation normalises away; fall back to the id so the
+  // item still gets a stable, unique-ish path rather than an empty one.
+  return slug || shortId(id);
 }
 
 /** One tree path that disagrees with the slug the current rule would produce. */
@@ -402,10 +428,32 @@ function resolvePositionalSiblingSlugs(items: PRDItem[]): string[] {
  * @public — used by folder-tree-mutations for rendering
  */
 export function resolveSiblingSlugs(items: PRDItem[]): Map<string, string> {
+  const wanted = items.map((item) => slugify(item.title, item.id));
+
+  // Title-only slugs can genuinely collide: two siblings whose titles normalise
+  // to the same string want the same path, and the second write would clobber
+  // the first. Only the colliding entries take a `-<shortId>` suffix, so the
+  // common case stays readable and the exceptional case stays lossless.
+  //
+  // This is a *local* guarantee and is not the cross-branch protection the
+  // unconditional suffix used to provide — two branches each see one item and
+  // no collision. That case is caught after merging by the duplicate-id scan
+  // in `rex validate`.
+  const counts = new Map<string, number>();
+  for (const slug of wanted) counts.set(slug, (counts.get(slug) ?? 0) + 1);
+
   const resolved = new Map<string, string>();
-  for (const item of items) {
-    resolved.set(item.id, slugify(item.title, item.id));
-  }
+  const used = new Set<string>();
+  items.forEach((item, i) => {
+    const base = wanted[i];
+    let slug = (counts.get(base) ?? 0) > 1 ? `${base}-${shortId(item.id)}` : base;
+    // Belt and braces: identical (title, id) pairs — a data invariant violation
+    // `validate` reports separately — still get distinct directories.
+    let n = 2;
+    while (used.has(slug)) slug = `${base}-${shortId(item.id)}-${n++}`;
+    used.add(slug);
+    resolved.set(item.id, slug);
+  });
   return resolved;
 }
 

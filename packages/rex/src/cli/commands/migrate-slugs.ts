@@ -1,5 +1,5 @@
 /**
- * Migration command: rename the PRD tree to id-qualified slugs in one pass.
+ * Migration command: rename the PRD tree to the current slug rule in one pass.
  *
  * `slugify()` used to emit title-only slugs — the `-{id6}` suffix appeared
  * only for long titles or same-tree sibling collisions. Same-titled items
@@ -68,11 +68,11 @@ export async function cmdMigrateSlugs(
   }
 
   if (renamed === 0) {
-    result("PRD tree already uses id-qualified slugs — nothing to rename.");
+    result("PRD tree already matches the current slug rule — nothing to rename.");
     return;
   }
-  result(`Renamed ${renamed} entr${renamed === 1 ? "y" : "ies"} to id-qualified slugs (${unchanged} already canonical).`);
-  info("Commit the renamed tree so divergent branches stop colliding on same-titled items.");
+  result(`Renamed ${renamed} entr${renamed === 1 ? "y" : "ies"} to the current slug rule (${unchanged} already canonical).`);
+  info("Commit the renamed tree as its own change — it is a pure rename and reviews best alone.");
 }
 
 /** All tree-entry paths (relative), sorted — dotfiles and non-md noise excluded. */

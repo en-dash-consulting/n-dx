@@ -64,18 +64,18 @@ describe("findNonConformingSlugs", () => {
     expect(await findNonConformingSlugs(DOC.items, treeRoot)).toEqual([]);
   });
 
-  it("reports a directory written in the pre-2026-08-26 suffix-less form", async () => {
-    // Exactly what an older build produces: title slug, no id suffix, and the
-    // title body no longer truncated to leave room for one.
+  it("reports a directory written in the superseded id-qualified form", async () => {
+    // What a build older than the title-only rule produces: the title slug
+    // with a `-<shortId>` suffix appended.
     const entries = (await readdir(treeRoot)).filter((e) => e !== "tree-meta.json");
     const current = entries[0];
-    await rename(join(treeRoot, current), join(treeRoot, "child-process-cleanup-and-exit-hygiene"));
+    await rename(join(treeRoot, current), join(treeRoot, `${current}-epicab`));
 
     const findings = await findNonConformingSlugs(DOC.items, treeRoot);
 
     expect(findings).toHaveLength(1);
     expect(findings[0].expected).toBe(current);
-    expect(findings[0].found).toBe("child-process-cleanup-and-exit-hygiene");
+    expect(findings[0].found).toBe(`${current}-epicab`);
     expect(findings[0].id).toBe("epic-abc123");
   });
 
@@ -84,13 +84,13 @@ describe("findNonConformingSlugs", () => {
     const inside = (await readdir(join(treeRoot, epicDir))).filter((f) => f !== "index.md");
     await rename(
       join(treeRoot, epicDir, inside[0]),
-      join(treeRoot, epicDir, "harden-the-runner.md"),
+      join(treeRoot, epicDir, "harden-the-runner-taskde.md"),
     );
 
     const findings = await findNonConformingSlugs(DOC.items, treeRoot);
 
     expect(findings.map((f) => f.id)).toEqual(["task-def456"]);
-    expect(findings[0].found).toBe("harden-the-runner.md");
+    expect(findings[0].found).toBe("harden-the-runner-taskde.md");
   });
 
   it("does not flag an item whose file is simply absent", async () => {

@@ -80,44 +80,43 @@ async function collectFiles(dir: string): Promise<string[]> {
 // ── Slug algorithm ────────────────────────────────────────────────────────────
 
 describe("slugify", () => {
-  it("produces lowercase hyphenated ASCII slugs qualified by id6", () => {
-    expect(slugify("Web Dashboard", "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7")).toBe(
-      "web-dashboard-4d62fa",
-    );
+  it("produces lowercase hyphenated ASCII slugs from the title alone", () => {
+    expect(slugify("Web Dashboard", "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7")).toBe("web-dashboard");
     expect(slugify("Path / Separator \\ Safe!", "11111111-0000-0000-0000-000000000000")).toBe(
-      "path-separator-safe-111111",
+      "path-separator-safe",
     );
   });
 
   it("normalizes Unicode accents and strips unsupported Unicode characters", () => {
     // Héros → heros after NFKD + combining strip + non-ASCII strip
     expect(slugify("Héros & Légendes", "a1b2c3d4-0000-0000-0000-000000000000")).toBe(
-      "heros-legendes-a1b2c3",
+      "heros-legendes",
     );
-    expect(slugify("日本語タイトル", "f0e1d2c3-0000-0000-0000-000000000000")).toBe("untitled-f0e1d2");
+    expect(slugify("日本語タイトル", "f0e1d2c3-0000-0000-0000-000000000000")).toBe("untitled");
   });
 
   it("falls back to a safe slug when title contains only special characters", () => {
-    expect(slugify("--- !!!", "11223344-0000-0000-0000-000000000000")).toBe("untitled-112233");
+    expect(slugify("--- !!!", "11223344-0000-0000-0000-000000000000")).toBe("untitled");
   });
 
-  it("qualifies identical titles with their ids so divergent branches cannot collide", () => {
-    // Same-titled items created on different branches used to produce the
-    // SAME path — a merge then silently unified two distinct items. The id6
-    // suffix is unconditional so their paths can never collide.
+  it("gives identical titles identical slugs, by design", () => {
+    // The inverse of the old rule, stated so the trade is explicit. Paths are
+    // readable; uniqueness is enforced by resolveSiblingSlugs for local
+    // collisions and by the duplicate-id scan in `rex validate` for the
+    // cross-branch merge the old suffix used to prevent.
     const s1 = slugify("Auth Feature", "aaaaaaaa-0000-0000-0000-000000000000");
     const s2 = slugify("Auth Feature", "bbbbbbbb-0000-0000-0000-000000000000");
-    expect(s1).toBe("auth-feature-aaaaaa");
-    expect(s2).toBe("auth-feature-bbbbbb");
-    expect(s1).not.toBe(s2);
+    expect(s1).toBe("auth-feature");
+    expect(s2).toBe("auth-feature");
   });
 
-  it("truncates long titles at a word boundary and appends id6", () => {
+  it("truncates long titles at a word boundary", () => {
     const slug = slugify(
       "Hot-reload MCP tool schemas on HTTP transport without server restart",
       "5dd63e4e-0000-0000-0000-000000000000",
     );
-    expect(slug).toBe("hot-reload-mcp-tool-schemas-on-5dd63e");
+    // The seven characters the id suffix used to occupy now go to the title.
+    expect(slug).toBe("hot-reload-mcp-tool-schemas-on-http");
     expect(slug.length).toBeLessThanOrEqual(40);
     expect(slug).not.toContain("server");
   });
@@ -126,13 +125,23 @@ describe("slugify", () => {
     expect(slugifyTitle("Auth Feature")).toBe("auth-feature");
   });
 
-  it("adds id6 suffixes when sibling items collide without the ID", () => {
+  it("suffixes only the siblings that actually collide", () => {
     const first = makeFeature("aaaaaaaa-0000-0000-0000-000000000000", "Auth Feature");
     const second = makeFeature("bbbbbbbb-0000-0000-0000-000000000000", "Auth Feature!");
     const slugs = resolveSiblingSlugs([first, second]);
 
+    // Both normalise to "auth-feature", so both are disambiguated.
     expect(slugs.get(first.id)).toBe("auth-feature-aaaaaa");
     expect(slugs.get(second.id)).toBe("auth-feature-bbbbbb");
+  });
+
+  it("leaves distinct siblings unsuffixed", () => {
+    const first = makeFeature("aaaaaaaa-0000-0000-0000-000000000000", "Auth Feature");
+    const second = makeFeature("bbbbbbbb-0000-0000-0000-000000000000", "Billing Feature");
+    const slugs = resolveSiblingSlugs([first, second]);
+
+    expect(slugs.get(first.id)).toBe("auth-feature");
+    expect(slugs.get(second.id)).toBe("billing-feature");
   });
 });
 

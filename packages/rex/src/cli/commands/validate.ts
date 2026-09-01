@@ -235,14 +235,29 @@ export async function cmdValidate(
       });
     }
 
+    // Merge safety. Slugs are title-only, so two same-titled items created on
+    // divergent branches want the same path and a git merge can unify them.
+    // The path used to prevent that by carrying the id; now the raw-tree scan
+    // catches it afterwards instead. Run by default rather than only under
+    // --post-merge: the hazard does not announce itself, and a guard you have
+    // to remember to invoke is not a guard.
+    const treeRootPath = join(dir, REX_DIR, PRD_TREE_DIRNAME);
+    const { issues: mergeIssues } = await detectPostMergeIssues(treeRootPath);
+    const duplicateIds = mergeIssues.filter((i) => i.class === "duplicate-id");
+    if (duplicateIds.length > 0) {
+      checks.push({
+        name: "unique item ids across the tree",
+        pass: false,
+        severity: "error",
+        errors: duplicateIds.map((i) => i.message),
+      });
+    }
+
     // Slug conformance: catch a tree rewritten by a foreign rex build. Every
     // other check reads item fields, so a whole-tree re-slug — lossless
     // renames, untouched content — passes them all and shows up only as an
     // 800-file diff in whatever branch is open.
-    const slugMismatches = await findNonConformingSlugs(
-      doc.items,
-      join(dir, REX_DIR, PRD_TREE_DIRNAME),
-    );
+    const slugMismatches = await findNonConformingSlugs(doc.items, treeRootPath);
     if (slugMismatches.length > 0) {
       checks.push({
         name: "tree slug convention",
