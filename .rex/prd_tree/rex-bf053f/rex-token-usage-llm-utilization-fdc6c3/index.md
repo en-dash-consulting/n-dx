@@ -16,5 +16,5 @@ acceptanceCriteria: []
 | [Diagnostics, Fallbacks, and Test Coverage](./diagnostics-fallbacks-and-test-49cac3.md) | completed |
 | [Rex Dashboard IA and LLM Utilization View](./rex-dashboard-ia-and-llm-b87128.md) | completed |
 | [Task-Level Usage Visibility and Budget Context](./task-level-usage-visibility-and-6a135d.md) | completed |
-| [Token Usage Data Pipeline Recovery](./token-usage-data-pipeline-recovery.md) | completed |
+| [Token Usage Data Pipeline Recovery](./token-usage-data-pipeline-530ae1.md) | completed |
 | [Vendor/Model Budget Configuration and Percentage Engine](./vendor-model-budget-dc1bc8.md) | completed |

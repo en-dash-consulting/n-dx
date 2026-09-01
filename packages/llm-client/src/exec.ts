@@ -32,6 +32,7 @@ import type { ChildProcess, StdioOptions } from "node:child_process";
 import { existsSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { logCliInvocation } from "./cli-log.js";
+import { forwardsInterrupts, processInterruptForwarder } from "./interrupt-forwarding.js";
 import { terminateProcessTree, treeKillSpawnOptions } from "./process-tree.js";
 
 // ---------------------------------------------------------------------------
@@ -58,12 +59,20 @@ export interface ExecOptions {
   /** Environment variables for the child process. Defaults to inheriting parent env. */
   env?: NodeJS.ProcessEnv;
   /**
+   * Optional live-output callback, invoked with each stdout/stderr chunk as
+   * it arrives — in addition to (not instead of) the final buffered result.
+   * Purely additive: omitting it preserves existing buffered-only behavior.
+   */
+  onData?: (stream: "stdout" | "stderr", chunk: string) => void;
+  /**
    * On timeout, terminate the command's whole process tree rather than only the
    * process that was spawned. Defaults to true.
    *
-   * Opt out only when the child must stay in this process's own process group —
-   * e.g. it needs to receive the terminal's Ctrl-C alongside the parent. Opting
-   * out means a timeout may leave descendants running.
+   * On POSIX this detaches the child into its own process group, which is what
+   * lets a timeout reach grandchildren. The terminal's Ctrl-C does not cross that
+   * boundary by itself, so `exec` forwards it for the child's lifetime — see
+   * {@link processInterruptForwarder}. Opting out means a timeout may leave
+   * descendants running.
    */
   treeKill?: boolean;
   /**
@@ -127,6 +136,14 @@ const DEFAULT_MAX_BUFFER = 1024 * 1024; // 1 MiB
  * opt out with `treeKill: false`.
  *
  * `exitCode: null` remains the timeout signal.
+ *
+ * ## Interrupt semantics
+ *
+ * Detaching the child costs it the terminal's Ctrl-C, which is delivered to a
+ * process group rather than a process. So for as long as a detached child is
+ * alive, a SIGINT arriving here is forwarded to its group — see
+ * {@link forwardsInterrupts}. Nothing is installed for a child that shares this
+ * process's group, because the terminal already reaches it.
  */
 export function exec(
   cmd: string,
@@ -138,6 +155,7 @@ export function exec(
     timeout,
     maxBuffer = DEFAULT_MAX_BUFFER,
     env,
+    onData,
     treeKill = true,
     freeze = isPosixFreezeKillEnabled(env ?? process.env),
     _platform = process.platform as NodeJS.Platform,
@@ -154,15 +172,23 @@ export function exec(
     let timedOut = false;
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let releaseInterrupts: (() => void) | undefined;
 
     const finish = (result: ExecResult): void => {
       if (timer) clearTimeout(timer);
+      // Both are cleanup for a child that is done: every path here either never
+      // spawned one, or reaches this after it has stopped. Leaving the
+      // registration behind would forward a later Ctrl-C to a dead group and,
+      // worse, keep suppressing this process's own default SIGINT action.
+      releaseInterrupts?.();
       if (settled) return;
       settled = true;
       resolve(result);
     };
 
     const text = (chunks: Buffer[]): string => Buffer.concat(chunks).toString("utf-8");
+
+    const spawnOptions = treeKill ? treeKillSpawnOptions(_platform) : {};
 
     let child: ChildProcess;
     try {
@@ -176,12 +202,19 @@ export function exec(
         // process-group leader, kill(-pid) failed with ESRCH, and only the direct
         // child died while its descendants kept running. Here the option actually
         // arrives.
-        ...(treeKill ? treeKillSpawnOptions(_platform) : {}),
+        ...spawnOptions,
       });
     } catch (error) {
       // spawn throws synchronously for invalid arguments (bad cwd type, etc.).
       finish({ stdout: "", stderr: "", exitCode: 1, error: error as Error });
       return;
+    }
+
+    // The child is its own group leader exactly when it was detached, so its pid
+    // IS the group id. Registered off the spawn options rather than a second
+    // platform check, so this cannot disagree with how the child was spawned.
+    if (forwardsInterrupts(spawnOptions) && child.pid !== undefined) {
+      releaseInterrupts = processInterruptForwarder.register(child.pid);
     }
 
     /**
@@ -300,6 +333,11 @@ export function exec(
     // child that reads from stdin (e.g. `rex add` calling readStdin() in a
     // non-TTY) hang forever waiting for an EOF that will never arrive.
     child.stdin?.end();
+
+    if (onData) {
+      child.stdout?.on("data", (chunk: Buffer) => onData("stdout", chunk.toString()));
+      child.stderr?.on("data", (chunk: Buffer) => onData("stderr", chunk.toString()));
+    }
   });
 }
 

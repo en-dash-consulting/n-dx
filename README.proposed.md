@@ -15,11 +15,10 @@ Top-level layout:
 - `.changeset/`
 - `.github/`
 - `.local_testing/`
-- `.npm-global/`
 - `.profile-tests-tmp/`
-- `.run-logs/`
 - `docs/`
 - `documentation/`
+- `ndx-export/`
 - `packages/`
 - `scripts/`
 - `tests/`

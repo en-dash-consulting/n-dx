@@ -35,11 +35,11 @@ function colorFor(percentRemaining: number): string {
  * Format a single QuotaRemaining entry into a human-readable string.
  *
  * Example outputs:
- *   "\x1b[31mclaude / claude-opus-4-5: 3% remaining\x1b[0m"
- *   "\x1b[33mcodex / gpt-4o: 7% remaining\x1b[0m"
- *   "claude / claude-sonnet-4-5: 42% remaining"
- *   "google / gemini-2.5-flash: quota unavailable"
- *   "codex / gpt-5.5: quota unavailable — codex login (session auth) — set OPENAI_API_KEY or llm.codex.api_key for quota"
+ *   "\x1b[31mclaude / claude-opus-5: 3% remaining\x1b[0m"
+ *   "\x1b[33mcodex / gpt-5.6-sol: 7% remaining\x1b[0m"
+ *   "claude / claude-sonnet-5: 42% remaining"
+ *   "google / gemini-3.7-flash: quota unavailable"
+ *   "codex / gpt-5.6-terra: quota unavailable — codex login (session auth) — set OPENAI_API_KEY or llm.codex.api_key for quota"
  */
 function formatEntry(entry: QuotaRemaining): string {
   if (entry.unavailable) {

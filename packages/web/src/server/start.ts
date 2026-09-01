@@ -6,6 +6,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { existsSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type FSWatcher } from "node:fs";
 import { writeFile, unlink } from "node:fs/promises";
 import { resolve, join, dirname } from "node:path";
+import { isVerbose, verbose } from "@n-dx/llm-client";
 import type { ServerContext, ViewerScope } from "./types.js";
 import { ensureLegacyPrdMigrated } from "./rex-gateway.js";
 import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./routes-static.js";
@@ -677,6 +678,25 @@ function startWsHealthBroadcast(
   }, WS_HEALTH_BROADCAST_INTERVAL_MS);
 }
 
+/** Interval (ms) for the --verbose "still serving" console heartbeat. */
+const VERBOSE_HEARTBEAT_INTERVAL_MS = 60_000;
+
+/**
+ * Print a periodic "still serving" line to the terminal under --verbose.
+ * The server is otherwise silent between the startup banner and shutdown,
+ * which makes a live process indistinguishable from a hung one.
+ */
+function startVerboseHeartbeat(
+  startedAtMs: number,
+  clientCount: () => number,
+): ReturnType<typeof setInterval> | null {
+  if (!isVerbose()) return null;
+  return setInterval(() => {
+    const uptimeSec = Math.round((Date.now() - startedAtMs) / 1000);
+    verbose(`  … still serving (uptime ${uptimeSec}s, ${clientCount()} connected client${clientCount() === 1 ? "" : "s"})`);
+  }, VERBOSE_HEARTBEAT_INTERVAL_MS);
+}
+
 export async function startServer(
   targetDir: string,
   port: number = 3117,
@@ -760,6 +780,11 @@ export async function startServer(
   // metrics to all connected dashboard clients.
   const wsHealthInterval = startWsHealthBroadcast(ws.broadcast, wsHealthTracker, ws.clientCount);
   watcherHandles.monitorIntervals.push(wsHealthInterval);
+
+  // Under --verbose, periodically confirm the server is still alive — it's
+  // otherwise silent between the startup banner and shutdown.
+  const verboseHeartbeatInterval = startVerboseHeartbeat(Date.now(), ws.clientCount);
+  if (verboseHeartbeatInterval) watcherHandles.monitorIntervals.push(verboseHeartbeatInterval);
 
   // Wire MCP route factories — must run before the first request is handled.
   initMcpRoutes({

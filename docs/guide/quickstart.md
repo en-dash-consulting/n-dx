@@ -10,7 +10,7 @@ This guide assumes a **new or empty project**. If you're adding ndx to a codebas
 
 ## Prerequisites
 
-- **Node.js ≥ 18** (Node 22 LTS recommended)
+- **Node.js ≥ 22** (22 LTS)
 - **pnpm ≥ 10** — [install pnpm](https://pnpm.io/installation)
 
 ## 1. Install

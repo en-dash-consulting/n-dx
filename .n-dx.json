@@ -258,9 +258,10 @@
       }
     }
   },
-  "_initVersion": "0.4.6",
+  "_initVersion": "0.5.1",
   "cli": {
-    "timeoutMs": 18000000
+    "timeoutMs": 18000000,
+    "name": "n-dx"
   },
   "claude": {
     "model": "claude-sonnet-4-6"

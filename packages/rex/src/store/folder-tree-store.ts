@@ -28,6 +28,7 @@ import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
 import { PRD_TREE_DIRNAME } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
+import { stampModified, stampActor } from "../core/sync.js";
 
 // ---------------------------------------------------------------------------
 // FolderTreeStore
@@ -41,6 +42,13 @@ export class FolderTreeStore implements PRDStore {
   private rexDir: string;
   private treeRoot: string;
 
+  /**
+   * When this instance last loaded the tree (epoch ms). Passed to the
+   * serializer's stale-save guard: a save may only delete entries no newer
+   * than this. Zero means "never loaded" — such a save may delete nothing.
+   */
+  private loadedAt = 0;
+
   constructor(rexDir: string) {
     this.rexDir = rexDir;
     this.treeRoot = join(rexDir, PRD_TREE_DIRNAME);
@@ -53,6 +61,9 @@ export class FolderTreeStore implements PRDStore {
   // ---- Document CRUD -------------------------------------------------------
 
   async loadDocument(): Promise<PRDDocument> {
+    // Taken before the read starts, so an entry written during or after the
+    // parse registers as newer than the load and the guard flags it.
+    this.loadedAt = Date.now();
     let title = "PRD";
     try {
       const raw = await readFile(this.path("tree-meta.json"), "utf-8");
@@ -68,15 +79,33 @@ export class FolderTreeStore implements PRDStore {
     return { schema: SCHEMA_VERSION, title, items };
   }
 
+  /** Serialize the document to disk. Callers must hold the PRD lock. */
+  private async writeTree(doc: PRDDocument): Promise<void> {
+    await mkdir(this.treeRoot, { recursive: true });
+    await writeFile(this.path("tree-meta.json"), JSON.stringify({ title: doc.title }), "utf-8");
+    await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    // A completed save makes this instance's view of the tree current again:
+    // its own writes must not read as "another writer's work" on the next save.
+    this.loadedAt = Date.now();
+  }
+
+  /**
+   * Persist a full PRD document, replacing whatever was stored.
+   *
+   * Acquires the PRD lock so concurrent writers serialize — matching
+   * `FileStore.saveDocument`. Note the lock only serializes the write itself:
+   * a caller that loaded the document earlier still overwrites concurrent
+   * changes with its stale snapshot. Any read-modify-write belongs in
+   * {@link withTransaction}, which holds the lock across the whole span.
+   */
   async saveDocument(doc: PRDDocument): Promise<void> {
     const check = validateDocument(doc);
     if (!check.ok) {
       throw new Error(`Invalid document: ${check.errors.message}`);
     }
-
-    await mkdir(this.treeRoot, { recursive: true });
-    await writeFile(this.path("tree-meta.json"), JSON.stringify({ title: doc.title }), "utf-8");
-    await serializeFolderTree(doc.items, this.treeRoot);
+    // The lock file lives in rexDir, which may not exist on first save.
+    await mkdir(this.rexDir, { recursive: true });
+    await withLock(this.path("prd.lock"), () => this.writeTree(doc));
   }
 
   async getItem(id: string): Promise<PRDItem | null> {
@@ -86,42 +115,55 @@ export class FolderTreeStore implements PRDStore {
   }
 
   async addItem(item: PRDItem, parentId?: string, _options?: WriteOptions): Promise<void> {
-    const lockPath = this.path("prd.lock");
-    await withLock(lockPath, async () => {
-      const doc = await this.loadDocument();
+    await this.withTransaction(async (doc) => {
+      const stamped = await stampModified(item);
       if (parentId) {
-        if (!insertChild(doc.items, parentId, item)) {
+        if (!insertChild(doc.items, parentId, stamped)) {
           throw new Error(`Parent "${parentId}" not found`);
         }
       } else {
-        doc.items.push(item);
+        doc.items.push(stamped);
       }
       // The serializer always writes the canonical shape: a leaf subtask
       // gaining its first child is naturally promoted from `<slug>.md` to
       // `<slug>/index.md`, and `removeStaleEntries` cleans the old leaf.
-      await this.saveDocument(doc);
     });
   }
 
   async updateItem(id: string, updates: Partial<PRDItem>, _options?: WriteOptions): Promise<void> {
-    const lockPath = this.path("prd.lock");
-    await withLock(lockPath, async () => {
-      const doc = await this.loadDocument();
-      if (!updateInTree(doc.items, id, updates)) {
+    await this.withTransaction(async (doc) => {
+      const entry = findItem(doc.items, id);
+      if (!entry) {
         throw new Error(`Item "${id}" not found`);
       }
-      await this.saveDocument(doc);
+      // Merge updates onto the current item before stamping so `lastModified`
+      // always reflects this write, even when `updates` omits it.
+      const merged = await stampModified({ ...entry.item, ...updates } as PRDItem);
+      if (!updateInTree(doc.items, id, merged)) {
+        throw new Error(`Item "${id}" not found`);
+      }
     });
   }
 
   async removeItem(id: string): Promise<void> {
-    const lockPath = this.path("prd.lock");
-    await withLock(lockPath, async () => {
-      const doc = await this.loadDocument();
+    await this.withTransaction(async (doc) => {
+      const entry = findItem(doc.items, id);
+      if (!entry) {
+        throw new Error(`Item "${id}" not found`);
+      }
       if (!removeFromTree(doc.items, id)) {
         throw new Error(`Item "${id}" not found`);
       }
-      await this.saveDocument(doc);
+      // Removing a child mutates its parent's on-disk content (children
+      // list changes), so the parent needs a fresh stamp too — otherwise a
+      // parent whose only observable change was a child's removal would
+      // never be detected as modified by the sync engine. `parent` is a
+      // live reference into `doc.items` (walkTree does not clone), so
+      // mutating it in place is sufficient — no re-lookup needed.
+      const parent = entry.parents[entry.parents.length - 1];
+      if (parent) {
+        Object.assign(parent, await stampModified(parent));
+      }
     });
   }
 
@@ -144,11 +186,12 @@ export class FolderTreeStore implements PRDStore {
   // ---- Execution log -------------------------------------------------------
 
   async appendLog(entry: LogEntry): Promise<void> {
-    const check = validateLogEntry(entry);
+    const stamped = await stampActor(entry);
+    const check = validateLogEntry(stamped);
     if (!check.ok) {
       throw new Error(`Invalid log entry: ${check.errors.message}`);
     }
-    await appendFile(this.path("execution-log.jsonl"), JSON.stringify(entry) + "\n", "utf-8");
+    await appendFile(this.path("execution-log.jsonl"), JSON.stringify(stamped) + "\n", "utf-8");
   }
 
   async readLog(limit?: number): Promise<LogEntry[]> {
@@ -198,6 +241,8 @@ export class FolderTreeStore implements PRDStore {
   // ---- Transactions --------------------------------------------------------
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
+    // The lock file lives in rexDir, which may not exist on first write.
+    await mkdir(this.rexDir, { recursive: true });
     const lockPath = this.path("prd.lock");
     return withLock(lockPath, async () => {
       const doc = await this.loadDocument();
@@ -206,7 +251,11 @@ export class FolderTreeStore implements PRDStore {
       if (!check.ok) {
         throw new Error(`Invalid document after mutation: ${check.errors.message}`);
       }
-      await this.saveDocument(doc);
+      // Write directly — the lock is already held. Calling saveDocument here
+      // would deadlock on the in-process mutex, and an instance flag to skip
+      // its lock would let a concurrent direct saveDocument bypass the lock
+      // while a transaction is open.
+      await this.writeTree(doc);
       return result;
     });
   }

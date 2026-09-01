@@ -145,6 +145,9 @@ export function buildGroupRenamePrompt(group: GroupRenameInput): string {
  * used as a deterministic fallback, guaranteeing uniqueness because hash
  * suffixes were already distinct before consolidation.
  *
+ * Mechanical single-shot call: when no explicit model is given, resolves the
+ * vendor's light-tier model (e.g. haiku) instead of the standard tier.
+ *
  * @throws {Error} When the LLM call fails or the response cannot be parsed.
  *   Callers must catch and degrade gracefully (children keep existing titles).
  */
@@ -164,7 +167,7 @@ export async function proposeGroupRenames(
 
   const subgroup: GroupRenameInput = { ...group, members: membersToRename };
   const prompt = buildGroupRenamePrompt(subgroup);
-  const resolvedModel = resolveConfiguredModel(model);
+  const resolvedModel = resolveConfiguredModel(model, "light");
 
   const llmResult = await spawnClaude(prompt, resolvedModel);
   const jsonText = extractJson(llmResult.text);

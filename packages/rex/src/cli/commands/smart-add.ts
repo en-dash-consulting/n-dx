@@ -41,8 +41,8 @@ import {
   buildDuplicateOverrideMarkerIndex,
 } from "./smart-add-duplicates.js";
 import type { ProposalDuplicateMatch, ItemFileMap } from "./smart-add-duplicates.js";
+import { DEFAULT_LLM_VENDOR, LLM_VENDOR, printVendorModelHeader, resolveVendorModel } from "@n-dx/llm-client";
 import type { LLMVendor, LLMConfig, CLIErrorCode } from "@n-dx/llm-client";
-import { printVendorModelHeader, resolveVendorModel } from "@n-dx/llm-client";
 import { formatTaskLoE, formatTaskLoERationale } from "./format-loe.js";
 import { resolveVendorCompatibleRexModel } from "../model-resolution.js";
 
@@ -1131,16 +1131,16 @@ function parseSmartAddInput(
  * Determine whether smart-add is using an explicit vendor model override.
  */
 function determineSmartAddModelSource(vendor: LLMVendor, llmConfig: LLMConfig): "configured" | "default" {
-  if (vendor === "claude" && llmConfig.claude?.model) {
+  if (vendor === LLM_VENDOR.CLAUDE && llmConfig.claude?.model) {
     return "configured";
   }
-  if (vendor === "codex" && llmConfig.codex?.model) {
+  if (vendor === LLM_VENDOR.CODEX && llmConfig.codex?.model) {
     return "configured";
   }
-  if (vendor === "google" && llmConfig.google?.model) {
+  if (vendor === LLM_VENDOR.GOOGLE && llmConfig.google?.model) {
     return "configured";
   }
-  if (vendor === "local" && llmConfig.local?.model) {
+  if (vendor === LLM_VENDOR.LOCAL && llmConfig.local?.model) {
     return "configured";
   }
   return "default";
@@ -1227,14 +1227,14 @@ function emitPrdPaths(prdPaths: string[]): void {
 
 /**
  * Resolve the vendor's light/fast tier model (haiku for claude,
- * gpt-5.4-mini for codex) for `--fast`/preview smart-add runs where
+ * gpt-5.6-luna for codex) for `--fast`/preview smart-add runs where
  * generation latency matters more than top-tier proposal quality.
  */
 async function resolveLightSmartAddModel(dir: string): Promise<string | undefined> {
   try {
     const rexDir = join(dir, REX_DIR);
     const llmConfig = await loadLLMConfig(rexDir);
-    const vendor = llmConfig.vendor ?? getLLMVendor() ?? "claude";
+    const vendor = llmConfig.vendor ?? getLLMVendor() ?? DEFAULT_LLM_VENDOR;
     return resolveVendorModel(vendor, llmConfig, "light");
   } catch {
     return undefined;
@@ -1253,12 +1253,12 @@ async function resolveSmartAddModel(
   try {
     const rexDir = join(dir, REX_DIR);
     const llmConfig = await loadLLMConfig(rexDir);
-    const vendor = llmConfig.vendor ?? getLLMVendor() ?? "claude";
+    const vendor = llmConfig.vendor ?? getLLMVendor() ?? DEFAULT_LLM_VENDOR;
     const configuredModel = resolveVendorModel(vendor, llmConfig);
     const hasVendorModelOverride =
-      (vendor === "claude" && typeof llmConfig.claude?.model === "string" && llmConfig.claude.model.trim().length > 0) ||
-      (vendor === "codex" && typeof llmConfig.codex?.model === "string" && llmConfig.codex.model.trim().length > 0) ||
-      (vendor === "google" && typeof llmConfig.google?.model === "string" && llmConfig.google.model.trim().length > 0);
+      (vendor === LLM_VENDOR.CLAUDE && typeof llmConfig.claude?.model === "string" && llmConfig.claude.model.trim().length > 0) ||
+      (vendor === LLM_VENDOR.CODEX && typeof llmConfig.codex?.model === "string" && llmConfig.codex.model.trim().length > 0) ||
+      (vendor === LLM_VENDOR.GOOGLE && typeof llmConfig.google?.model === "string" && llmConfig.google.model.trim().length > 0);
 
     if (hasVendorModelOverride) {
       llmDebug(`effective model=${configuredModel}`);
@@ -1440,7 +1440,7 @@ async function generateSmartAddProposals(params: {
       return proposals;
     } catch (err) {
       spinner?.stop();
-      const classified = classifySmartAddError(err as Error, "file", getLLMVendor() ?? "claude");
+      const classified = classifySmartAddError(err as Error, "file", getLLMVendor() ?? DEFAULT_LLM_VENDOR);
       throw new CLIError(classified.message, classified.suggestion, classified.code);
     }
   }
@@ -1465,7 +1465,7 @@ async function generateSmartAddProposals(params: {
     return proposals;
   } catch (err) {
     spinner?.stop();
-    const classified = classifySmartAddError(err as Error, "description", getLLMVendor() ?? "claude");
+    const classified = classifySmartAddError(err as Error, "description", getLLMVendor() ?? DEFAULT_LLM_VENDOR);
     throw new CLIError(classified.message, classified.suggestion, classified.code);
   }
 }

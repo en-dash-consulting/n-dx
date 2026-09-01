@@ -35,7 +35,7 @@ import type {
 import { ClaudeClientError } from "./types.js";
 import { resolveCliPath } from "./config.js";
 import { parseCliTokenUsage, parseStreamTokenUsage } from "./token-usage.js";
-import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
+import { LLM_VENDOR, type LLMProvider, type ProviderInfo } from "./provider-interface.js";
 import { diagnoseCliInvocation, diagnoseCliNotFound, spawnCli } from "./exec.js";
 import { classifyAuthError } from "./llm-error-classifier.js";
 
@@ -224,7 +224,7 @@ function spawnOnce(
 
       const classified = classifyStderr(detail);
       if (classified.reason === "auth") {
-        const authErr = classifyAuthError(new Error(detail), "claude");
+        const authErr = classifyAuthError(new Error(detail), LLM_VENDOR.CLAUDE);
         if (authErr) { reject(authErr); return; }
       }
       reject(new ClaudeClientError(detail, classified.reason, classified.retryable));
@@ -409,7 +409,7 @@ export function createCliClient(options: CliProviderOptions): ClaudeClient & LLM
   const onRetry = options.onRetry ?? defaultRateLimitOnRetry;
 
   const info: ProviderInfo = {
-    vendor: "claude",
+    vendor: LLM_VENDOR.CLAUDE,
     mode: "cli",
     ...(options.claudeConfig.model ? { model: options.claudeConfig.model } : {}),
     capabilities: [],

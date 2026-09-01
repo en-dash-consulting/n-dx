@@ -19,7 +19,19 @@ import type { ClaudeClient, ClaudeConfig } from "./types.js";
 // LLMVendor is defined in provider-interface.ts (its natural home as part of
 // the provider contract). Re-exported here so consumers can import it from
 // the vendor-neutral types module without knowing its origin.
-import type { LLMVendor } from "./provider-interface.js";
+import {
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  LLM_VENDORS,
+  isLLMVendor,
+  type LLMVendor,
+} from "./provider-interface.js";
+export {
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  LLM_VENDORS,
+  isLLMVendor,
+};
 export type { LLMVendor };
 
 /**
@@ -50,6 +62,12 @@ export interface CodexConfig {
    * instead of TIER_MODELS.codex.light.
    */
   lightModel?: string;
+  /**
+   * Model override for the adversarial review pass (`ndx work --review`).
+   * When set, the reviewer runs on this model instead of the recommended
+   * default in `REVIEW_MODELS`. The `--review-model` CLI flag outranks it.
+   */
+  reviewModel?: string;
 }
 
 /**
@@ -91,6 +109,12 @@ export interface LocalConfig {
    */
   lightModel?: string;
   /**
+   * Model override for the adversarial review pass (`ndx work --review`).
+   * When set, the reviewer runs on this model instead of the recommended
+   * default in `REVIEW_MODELS`. The `--review-model` CLI flag outranks it.
+   */
+  reviewModel?: string;
+  /**
    * Maximum context window size in tokens for the local model.
    *
    * When set, hench will check whether the assembled brief fits before
@@ -131,6 +155,12 @@ export interface GoogleConfig {
    */
   lightModel?: string;
   /**
+   * Model override for the adversarial review pass (`ndx work --review`).
+   * When set, the reviewer runs on this model instead of the recommended
+   * default in `REVIEW_MODELS`. The `--review-model` CLI flag outranks it.
+   */
+  reviewModel?: string;
+  /**
    * Environment variable name for the Google API key.
    * Defaults to `"GEMINI_API_KEY"` when not set.
    * Override to use a custom env var name (e.g. `"MY_GOOGLE_KEY"`).
@@ -149,6 +179,16 @@ export interface LLMConfig {
    * `ndx init`.
    */
   model?: string;
+  /**
+   * Vendor-neutral model override for the adversarial review pass
+   * (`ndx work --review`). Outranked by `<vendor>.reviewModel` and by the
+   * `--review-model` CLI flag; outranks the `REVIEW_MODELS` default.
+   *
+   * Deliberately separate from `model`: the execution model must never be
+   * inherited as the review model, or pinning a cheap executor would silently
+   * downgrade every review.
+   */
+  reviewModel?: string;
   /** Claude-specific config (legacy + active). */
   claude?: ClaudeConfig;
   /** Codex-specific config (reserved for adapter integration). */

@@ -4,8 +4,8 @@ level: "epic"
 title: "Web Dashboard"
 status: "completed"
 startedAt: "2026-03-24T05:27:03.754Z"
-completedAt: "2026-08-18T22:54:59.323Z"
-endedAt: "2026-08-18T22:54:59.323Z"
+completedAt: "2026-08-20T14:46:29.188Z"
+endedAt: "2026-08-20T14:46:29.188Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
 ---
 
@@ -14,16 +14,16 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | Title | Status |
 |-------|--------|
 | [Checkbox multi-select and detail panel UX for PRD tree](./checkbox-multi-select-and-797fa0/index.md) | completed |
-| [CLI Command Aliases and Shortcuts](./cli-command-aliases-and-shortcuts/index.md) | completed |
+| [CLI Command Aliases and Shortcuts](./cli-command-aliases-and-shortcuts-339476/index.md) | completed |
 | [CLI Command Coverage Audit and Dashboard Trigger Controls](./cli-command-coverage-audit-and-749cec/index.md) | completed |
-| [Dashboard Route Ownership Decoupling](./dashboard-route-ownership-decoupling/index.md) | completed |
+| [Dashboard Route Ownership Decoupling](./dashboard-route-ownership-f89b6b/index.md) | completed |
 | [Dedicated Commands Reference Section in Web Dashboard](./dedicated-commands-reference-6f8afa/index.md) | completed |
 | [Fix verified code-review findings on dashboard command triggers](./fix-verified-code-review-868493/index.md) | completed |
-| [Item completion timeline view](./item-completion-timeline-view/index.md) | completed |
+| [Item completion timeline view](./item-completion-timeline-view-577c74/index.md) | completed |
 | [N-Rex Easter Egg — Triple-Click Dino Takeover](./n-rex-easter-egg-triple-click-331928/index.md) | completed |
-| [ndx as the single CLI interface](./ndx-as-the-single-cli-interface/index.md) | completed |
-| [ndx Dashboard Refresh Orchestration](./ndx-dashboard-refresh-orchestration/index.md) | completed |
-| [PRD Merge Context Graph View](./prd-merge-context-graph-view/index.md) | completed |
+| [ndx as the single CLI interface](./ndx-as-the-single-cli-interface-69eb6b/index.md) | completed |
+| [ndx Dashboard Refresh Orchestration](./ndx-dashboard-refresh-f82b4f/index.md) | completed |
+| [PRD Merge Context Graph View](./prd-merge-context-graph-view-a32f8a/index.md) | completed |
 | [Process Lifecycle Management and Graceful Shutdown](./process-lifecycle-management-f95ede/index.md) | completed |
 | [Runtime Process and Thread Lifecycle Enforcement](./runtime-process-and-thread-8abe3c/index.md) | completed |
 | [Settings Page Completeness and Command-Based Reorganization](./settings-page-completeness-and-dc5e66/index.md) | completed |
@@ -36,4 +36,6 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-5dd63e.md) | completed |
 | [Match settings-page text boxes to the Analyze & Import input style and fix dark-mode native form chrome](./match-settings-page-text-boxes-136a8c.md) | completed |
 | [Overview Next Steps panel: consistent formatting, copyable items, and capture-to-PRD action](./overview-next-steps-panel-acebe9.md) | completed |
+| [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-377aa1.md) | completed |
+| [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-9c9ae5.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-a58edb.md) | completed |

@@ -29,6 +29,7 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { LLM_VENDOR } from "../prd/llm-gateway.js";
 import type { QuotaRemaining } from "./types.js";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -155,8 +156,8 @@ function computeWeeklySpend(henchDir: string, now: Date): number {
       if (Array.isArray(run.turnTokenUsage) && run.turnTokenUsage.length > 0) {
         // Per-turn breakdown: count only claude turns (or untagged turns).
         for (const turn of run.turnTokenUsage) {
-          const v = (turn.vendor ?? "claude").toLowerCase();
-          if (v === "claude") {
+          const v = (turn.vendor ?? LLM_VENDOR.CLAUDE).toLowerCase();
+          if (v === LLM_VENDOR.CLAUDE) {
             total += (turn.input ?? 0) + (turn.output ?? 0);
           }
         }
@@ -238,7 +239,7 @@ export function fetchClaudeQuota(options: FetchClaudeQuotaOptions): ClaudeQuotaR
   return {
     ok: true,
     quota: {
-      vendor: "claude",
+      vendor: LLM_VENDOR.CLAUDE,
       model: options.model,
       percentRemaining,
     },

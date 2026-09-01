@@ -12,11 +12,11 @@ import {ARCHIVE_FILE, loadArchive} from "../../core/archive.js";import {  hashPR
 } from "../../core/pending-cache.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
-import { info, warn, result } from "../output.js";
+import { info, warn, result, startSpinner } from "../output.js";
 import { formatTokenUsage } from "./analyze.js";
 import { preflightBudgetCheck, formatBudgetWarnings } from "./token-format.js";
 import { classifyLLMError } from "../llm-error-classifier.js";
-import { printVendorModelHeader } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, printVendorModelHeader } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
 import { getLevelEmoji, formatLevelSummary as formatLevels } from "../../schema/index.js";
 import { ensureSnapshot } from "../snapshot-guard.js";
@@ -147,6 +147,7 @@ export async function cmdPrune(
     // Also preview consolidation proposals in dry-run
     let consolidationProposals: ReshapeProposal[] = [];
     let consolidationTokenUsage: import("../../schema/index.js").AnalyzeTokenUsage | undefined;
+    let consolidateSpinner: ReturnType<typeof startSpinner> | null = null;
     if (!skipConsolidate && doc.items.length > 0) {
       try {
         const { setLLMConfig, setClaudeConfig, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
@@ -156,18 +157,21 @@ export async function cmdPrune(
         const claudeConfig = await loadClaudeConfig(rexDir);
         setClaudeConfig(claudeConfig);
 
-        // Resolve model: explicit flag > vendor config > default
-        const resolvedModel = resolveConfiguredModel(flags.model);
-        const dryRunVendor = getLLMVendor() ?? "claude";
+        // Resolve model: explicit flag > light-tier resolution (consolidation
+        // is a mechanical single-shot pass, so it runs on the light tier;
+        // only lightModel config or --model overrides it).
+        const resolvedModel = resolveConfiguredModel(flags.model, "light");
+        const dryRunVendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
         const dryRunModelSource = flags.model
           ? "cli-override" as const
-          : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
+          : llmConfig.claude?.lightModel || llmConfig.codex?.lightModel || llmConfig.google?.lightModel
             ? "configured" as const
             : "default" as const;
         printVendorModelHeader(dryRunVendor, llmConfig, {
           format: flags.format,
           resolvedModel,
           modelSource: dryRunModelSource,
+          tier: "light",
         });
 
         // Pre-flight budget check
@@ -189,15 +193,16 @@ export async function cmdPrune(
 
         const { reasonForReshape, formatReshapeProposal: fmtProposal } = await import("../../analyze/reshape-reason.js");
 
-        if (flags.format !== "json") {
-          info("\nAnalyzing for consolidation opportunities...");
-        }
+        consolidateSpinner = flags.format !== "json"
+          ? startSpinner("Analyzing for consolidation opportunities...")
+          : null;
 
         const consolidateResult = await reasonForReshape(doc.items, {
           dir,
           model: resolvedModel,
           consolidateMode: true,
         });
+        consolidateSpinner?.stop();
         consolidationProposals = consolidateResult.proposals;
         consolidationTokenUsage = consolidateResult.tokenUsage;
 
@@ -216,10 +221,11 @@ export async function cmdPrune(
           }
         }
       } catch (err) {
+        consolidateSpinner?.stop();
         if (err instanceof BudgetExceededError) throw err;
         if (flags.format !== "json") {
           const { getLLMVendor: getDryRunVendor } = await import("../../analyze/reason.js");
-          const errVendor = getDryRunVendor() ?? "claude";
+          const errVendor = getDryRunVendor() ?? DEFAULT_LLM_VENDOR;
           const classified = classifyLLMError(
             err instanceof Error ? err : new Error(String(err)),
             errVendor,
@@ -287,33 +293,37 @@ export async function cmdPrune(
   const isJson = flags.format === "json";
   const progress = (msg: string): void => { if (!isJson) info(msg); };
 
-  // Prune completed subtrees
+  // Prune completed subtrees. The preview above ran on a snapshot; the prune
+  // itself re-runs against a freshly loaded document under the PRD lock, so an
+  // item a concurrent writer added since the preview survives the save. The
+  // archive is written inside the transaction, before the document, so a crash
+  // cannot persist a prune whose items were never archived.
   progress("Pruning completed subtrees...");
-  const pruneResult = pruneItems(doc.items);
+  const archivePath = join(rexDir, ARCHIVE_FILE);
+  const { pruneResult, prunedDoc } = await store.withTransaction(async (freshDoc) => {
+    const outcome = pruneItems(freshDoc.items);
+    if (outcome.prunedCount > 0) {
+      progress("Archiving pruned items...");
+      const archive = await loadArchive(archivePath);
+      archive.batches.push({
+        timestamp: new Date().toISOString(),
+        source: "prune",
+        items: outcome.pruned,
+        count: outcome.prunedCount,
+      });
+      await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
+      progress("Saving pruned document...");
+    }
+    return { pruneResult: outcome, prunedDoc: freshDoc };
+  });
 
   if (pruneResult.prunedCount === 0) {
     result("Nothing to prune.");
-    if (!skipConsolidate && doc.items.length > 0) {
-      await consolidateAfterPrune(dir, rexDir, store, doc, flags);
+    if (!skipConsolidate && prunedDoc.items.length > 0) {
+      await consolidateAfterPrune(dir, rexDir, store, prunedDoc, flags);
     }
     return;
   }
-
-  // Archive pruned items
-  progress("Archiving pruned items...");
-  const archivePath = join(rexDir, ARCHIVE_FILE);
-  const archive = await loadArchive(archivePath);
-  archive.batches.push({
-    timestamp: new Date().toISOString(),
-    source: "prune",
-    items: pruneResult.pruned,
-    count: pruneResult.prunedCount,
-  });
-  await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
-
-  // Persist the pruned document
-  progress("Saving pruned document...");
-  await store.saveDocument(doc);
 
   // Log the prune action
   const titles = pruneResult.pruned.map((i) => i.title).join(", ");
@@ -332,8 +342,8 @@ export async function cmdPrune(
     };
 
     // Run consolidation and include in JSON output
-    if (!skipConsolidate && doc.items.length > 0) {
-      const consolidation = await consolidateAfterPrune(dir, rexDir, store, doc, flags);
+    if (!skipConsolidate && prunedDoc.items.length > 0) {
+      const consolidation = await consolidateAfterPrune(dir, rexDir, store, prunedDoc, flags);
       if (consolidation) {
         jsonResult.consolidation = consolidation;
       }
@@ -348,8 +358,8 @@ export async function cmdPrune(
     info(`Archived to ${ARCHIVE_FILE}`);
 
     // Chain consolidation after prune
-    if (!skipConsolidate && doc.items.length > 0) {
-      await consolidateAfterPrune(dir, rexDir, store, doc, flags);
+    if (!skipConsolidate && prunedDoc.items.length > 0) {
+      await consolidateAfterPrune(dir, rexDir, store, prunedDoc, flags);
     }
   }
 }
@@ -379,18 +389,21 @@ async function consolidateAfterPrune(
     const claudeConfig = await loadClaudeConfig(rexDir);
     setClaudeConfig(claudeConfig);
 
-    // Resolve model: explicit flag > vendor config > default
-    const resolvedModel = resolveConfiguredModel(flags.model);
-    const vendor = getLLMVendor() ?? "claude";
+    // Resolve model: explicit flag > light-tier resolution (post-prune
+    // consolidation is a mechanical single-shot pass, so it runs on the
+    // light tier; only lightModel config or --model overrides it).
+    const resolvedModel = resolveConfiguredModel(flags.model, "light");
+    const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
     const modelSource = flags.model
       ? "cli-override" as const
-      : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
+      : llmConfig.claude?.lightModel || llmConfig.codex?.lightModel || llmConfig.google?.lightModel
         ? "configured" as const
         : "default" as const;
     printVendorModelHeader(vendor, llmConfig, {
       format: flags.format,
       resolvedModel,
       modelSource,
+      tier: "light",
     });
 
     // Pre-flight budget check
@@ -449,33 +462,34 @@ async function consolidateAfterPrune(
       return undefined;
     }
 
-    // Apply via reshape
+    // Apply via reshape. Proposals came from an LLM call on a snapshot; the
+    // apply re-runs against a freshly loaded document under the PRD lock so a
+    // concurrent writer's item survives the save. Archive first, inside the
+    // transaction, so a crash cannot persist an un-archived consolidation.
     info("Applying consolidation...");
-    const reshapeResult = applyReshape(doc.items, accepted);
+    const reshapeResult = await store.withTransaction(async (freshDoc) => {
+      const outcome = applyReshape(freshDoc.items, accepted);
+      if (outcome.archivedItems.length > 0) {
+        info("Archiving consolidated items...");
+        const archivePath = join(rexDir, ARCHIVE_FILE);
+        const archive = await loadArchive(archivePath);
+        archive.batches.push({
+          timestamp: new Date().toISOString(),
+          source: "reshape",
+          items: outcome.archivedItems,
+          count: outcome.archivedItems.length,
+          reason: "Post-prune consolidation: LLM-proposed restructuring",
+          actions: accepted,
+        });
+        await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
+      }
+      info("Saving consolidated document...");
+      return outcome;
+    });
 
     for (const err of reshapeResult.errors) {
       info(`  Warning: ${err.error}`);
     }
-
-    // Archive any items removed during consolidation
-    if (reshapeResult.archivedItems.length > 0) {
-      info("Archiving consolidated items...");
-      const archivePath = join(rexDir, ARCHIVE_FILE);
-      const archive = await loadArchive(archivePath);
-      archive.batches.push({
-        timestamp: new Date().toISOString(),
-        source: "reshape",
-        items: reshapeResult.archivedItems,
-        count: reshapeResult.archivedItems.length,
-        reason: "Post-prune consolidation: LLM-proposed restructuring",
-        actions: accepted,
-      });
-      await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
-    }
-
-    // Save document
-    info("Saving consolidated document...");
-    await store.saveDocument(doc);
 
     // Log the consolidation
     await store.appendLog({
@@ -503,7 +517,7 @@ async function consolidateAfterPrune(
   } catch (err) {
     if (err instanceof BudgetExceededError) throw err;
     const { getLLMVendor: getVendor } = await import("../../analyze/reason.js");
-    const errVendor = getVendor() ?? "claude";
+    const errVendor = getVendor() ?? DEFAULT_LLM_VENDOR;
     const classified = classifyLLMError(
       err instanceof Error ? err : new Error(String(err)),
       errVendor,
@@ -545,7 +559,7 @@ async function smartPrune(
 
   // Resolve model: explicit flag > vendor config > default
   const resolvedModel = resolveConfiguredModel(flags.model);
-  const vendor = getLLMVendor() ?? "claude";
+  const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
   const modelSource = flags.model
     ? "cli-override" as const
     : llmConfig.claude?.model || llmConfig.codex?.model || llmConfig.google?.model
@@ -590,7 +604,7 @@ async function smartPrune(
     proposals = cached.proposals;
     tokenUsage = undefined;
   } else {
-    info("Analyzing PRD for pruning opportunities...");
+    const pruneSpinner = startSpinner("Analyzing PRD for pruning opportunities...");
     let reshapeResult: Awaited<ReturnType<typeof reasonForReshape>>;
     try {
       reshapeResult = await reasonForReshape(doc.items, {
@@ -598,7 +612,9 @@ async function smartPrune(
         model: resolvedModel,
         pruneMode: true,
       });
+      pruneSpinner.stop();
     } catch (err) {
+      pruneSpinner.stop();
       const classified = classifyLLMError(err instanceof Error ? err : new Error(String(err)), vendor, "identify prune candidates");
       throw new CLIError(classified.message, classified.suggestion, classified.code);
     }
@@ -656,32 +672,34 @@ async function smartPrune(
     return;
   }
 
-  // Apply via reshape
+  // Apply via reshape. Proposals came from an LLM call (or cache) computed on
+  // a snapshot; the apply re-runs against a freshly loaded document under the
+  // PRD lock so a concurrent writer's item survives the save. Archive first,
+  // inside the transaction, so a crash cannot persist an un-archived prune.
   info("Applying smart prune...");
-  const reshapeResult = applyReshape(doc.items, accepted);
+  const reshapeResult = await store.withTransaction(async (freshDoc) => {
+    const outcome = applyReshape(freshDoc.items, accepted);
+    if (outcome.archivedItems.length > 0) {
+      info("Archiving pruned items...");
+      const archivePath = join(rexDir, ARCHIVE_FILE);
+      const archive = await loadArchive(archivePath);
+      archive.batches.push({
+        timestamp: new Date().toISOString(),
+        source: "reshape",
+        items: outcome.archivedItems,
+        count: outcome.archivedItems.length,
+        reason: "Smart prune: LLM-identified obsolete/mergeable items",
+        actions: accepted,
+      });
+      await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
+    }
+    info("Saving document...");
+    return outcome;
+  });
 
   for (const err of reshapeResult.errors) {
     info(`  Warning: ${err.error}`);
   }
-
-  // Archive
-  if (reshapeResult.archivedItems.length > 0) {
-    info("Archiving pruned items...");
-    const archivePath = join(rexDir, ARCHIVE_FILE);
-    const archive = await loadArchive(archivePath);
-    archive.batches.push({
-      timestamp: new Date().toISOString(),
-      source: "reshape",
-      items: reshapeResult.archivedItems,
-      count: reshapeResult.archivedItems.length,
-      reason: "Smart prune: LLM-identified obsolete/mergeable items",
-      actions: accepted,
-    });
-    await writeFile(archivePath, toCanonicalJSON(archive), "utf-8");
-  }
-
-  info("Saving document...");
-  await store.saveDocument(doc);
 
   // Clear cache after successful application
   await clearPendingSmartPrune(rexDir);

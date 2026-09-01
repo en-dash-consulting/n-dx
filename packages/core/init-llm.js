@@ -20,7 +20,14 @@
 
 import { getModelsForVendor, getRecommendedModel } from "./llm-model-catalog.js";
 
-const SUPPORTED_PROVIDERS = ["codex", "claude", "google", "local"];
+const LLM_PROVIDER = {
+  CODEX: "codex",
+  CLAUDE: "claude",
+  GOOGLE: "google",
+  LOCAL: "local",
+};
+
+const SUPPORTED_PROVIDERS = Object.values(LLM_PROVIDER);
 
 /**
  * Legacy model IDs treated as "known" during init so `validateInitFlags` does
@@ -32,10 +39,22 @@ const SUPPORTED_PROVIDERS = ["codex", "claude", "google", "local"];
  * layer, so the sets are duplicated by design.
  */
 const LEGACY_CATALOG_MODEL_ALIASES = {
-  codex: ["gpt-5-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"],
-  claude: ["claude-sonnet-4-6"],
-  google: [],
-  local: [],
+  [LLM_PROVIDER.CODEX]: [
+    "gpt-5-codex",
+    "gpt-5.1-codex-max",
+    "gpt-5.1-codex-mini",
+    // Retired / retiring from Codex — see LEGACY_CODEX_MODEL_ALIASES.
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.3-codex",
+    "gpt-5.2",
+  ],
+  [LLM_PROVIDER.CLAUDE]: ["claude-sonnet-4-6", "claude-opus-4-8", "claude-opus-4-7"],
+  // gemini-2.0-flash and gemini-2.0-flash-lite are shut down by Google, but
+  // are still recognised here so upgrading projects get a clean swap rather
+  // than an "unknown model" warning on top of the request failure.
+  [LLM_PROVIDER.GOOGLE]: ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.5-flash"],
+  [LLM_PROVIDER.LOCAL]: [],
 };
 
 /**
@@ -45,10 +64,10 @@ const LEGACY_CATALOG_MODEL_ALIASES = {
  * @type {Record<string, string>}
  */
 const PROVIDER_LABELS = {
-  codex: "Codex (OpenAI)",
-  claude: "Claude (Anthropic)",
-  google: "Gemini (Google)",
-  local: "Local (LM Studio)",
+  [LLM_PROVIDER.CODEX]: "Codex (OpenAI)",
+  [LLM_PROVIDER.CLAUDE]: "Claude (Anthropic)",
+  [LLM_PROVIDER.GOOGLE]: "Gemini (Google)",
+  [LLM_PROVIDER.LOCAL]: "Local (LM Studio)",
 };
 
 /**

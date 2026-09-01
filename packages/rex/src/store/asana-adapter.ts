@@ -19,7 +19,7 @@ import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, walkTree } from "../core/tree.js";
-import { stampModified } from "../core/sync.js";
+import { stampModified, stampActor } from "../core/sync.js";
 import {
   mapAsanaToDocument,
   mapItemToCreate,
@@ -121,7 +121,7 @@ export class AsanaStore implements PRDStore {
     }
 
     const parentGid = parentId ? idMap.get(parentId) : undefined;
-    const stamped = stampModified(item);
+    const stamped = await stampModified(item);
     await this.client.createTask(
       mapItemToCreate(stamped, this.projectId, parentGid),
     );
@@ -140,7 +140,7 @@ export class AsanaStore implements PRDStore {
     }
 
     const merged = { ...entry.item, ...updates } as PRDItem;
-    const stamped = stampModified(merged);
+    const stamped = await stampModified(merged);
     await this.client.updateTask(gid, mapItemToUpdate(stamped));
   }
 
@@ -172,13 +172,14 @@ export class AsanaStore implements PRDStore {
   }
 
   async appendLog(entry: LogEntry): Promise<void> {
-    const result = validateLogEntry(entry);
+    const stamped = await stampActor(entry);
+    const result = validateLogEntry(stamped);
     if (!result.ok) {
       throw new Error(`Invalid log entry: ${result.errors.message}`);
     }
     await appendFile(
       this.path("execution-log.jsonl"),
-      JSON.stringify(entry) + "\n",
+      JSON.stringify(stamped) + "\n",
       "utf-8",
     );
   }

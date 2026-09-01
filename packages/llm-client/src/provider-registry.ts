@@ -38,7 +38,7 @@
  */
 
 import type { LLMProvider, ProviderInfo } from "./provider-interface.js";
-import type { LLMConfig } from "./llm-types.js";
+import { DEFAULT_LLM_VENDOR, LLM_VENDOR, type LLMConfig } from "./llm-types.js";
 import { createClient } from "./create-client.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
 import { createOpenAiApiProvider, resolveOpenAiApiKey } from "./openai-api-provider.js";
@@ -146,7 +146,7 @@ export class ProviderRegistry {
    * @throws {Error} if no factory is registered for the resolved vendor.
    */
   getActiveProvider(config: LLMConfig): LLMProvider {
-    const vendor = config.vendor ?? "claude";
+    const vendor = config.vendor ?? DEFAULT_LLM_VENDOR;
     return this.create(vendor, config);
   }
 }
@@ -173,14 +173,14 @@ export function createDefaultRegistry(): ProviderRegistry {
   const registry = new ProviderRegistry();
 
   // Claude: delegate to the dual-provider factory (API + CLI auto-detection)
-  registry.register("claude", (config) =>
+  registry.register(LLM_VENDOR.CLAUDE, (config) =>
     createClient({ claudeConfig: config.claude ?? {} }),
   );
 
   // Codex: dual provider stack (API + CLI) with automatic detection.
   // When an OpenAI API key is available (config or env), uses the API provider.
   // Otherwise falls back to the CLI provider adapter.
-  registry.register("codex", (config) => {
+  registry.register(LLM_VENDOR.CODEX, (config) => {
     const apiKey = resolveOpenAiApiKey(config.codex);
     if (apiKey) {
       return createOpenAiApiProvider({ codexConfig: config.codex });
@@ -192,7 +192,7 @@ export function createDefaultRegistry(): ProviderRegistry {
     // implement LLMProvider directly (tracked in the sibling refactor task).
     const client = createCodexCliClient({ codexConfig: config.codex });
     const info: ProviderInfo = {
-      vendor: "codex",
+      vendor: LLM_VENDOR.CODEX,
       mode: "cli",
       model: config.codex?.model,
       capabilities: [],
@@ -204,12 +204,12 @@ export function createDefaultRegistry(): ProviderRegistry {
   });
 
   // Google: API provider using the Gemini REST API.
-  registry.register("google", (config) => {
+  registry.register(LLM_VENDOR.GOOGLE, (config) => {
     return createGoogleApiProvider({ googleConfig: config.google });
   });
 
   // Local: OpenAI-compatible provider for LM Studio and similar local servers.
-  registry.register("local", (config) => {
+  registry.register(LLM_VENDOR.LOCAL, (config) => {
     return createLocalApiProvider({ localConfig: config.local });
   });
 

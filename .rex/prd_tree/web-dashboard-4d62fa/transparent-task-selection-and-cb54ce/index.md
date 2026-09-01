@@ -15,5 +15,5 @@ description: "ndx work --auto should make reasoning transparent at both ends of 
 | Title | Status |
 |-------|--------|
 | [Classify changes in run summary (code/docs/config/metadata-only)](./classify-changes-in-run-summary-e081ca.md) | completed |
-| [Show prior attempt history in task card](./show-prior-attempt-history-in-task-card.md) | completed |
+| [Show prior attempt history in task card](./show-prior-attempt-history-in-e762d1.md) | completed |
 | [Surface selection reasoning in auto-select run header](./surface-selection-reasoning-in-d0c0c6.md) | completed |

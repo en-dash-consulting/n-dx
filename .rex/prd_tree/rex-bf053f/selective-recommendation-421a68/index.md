@@ -13,7 +13,7 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Code of Conduct](./code-of-conduct.md) | completed |
+| [Code of Conduct](./code-of-conduct-0a31d1.md) | completed |
 | [Indexed opt-in parsing for `recommend --accept`](./indexed-opt-in-parsing-for-4a0681.md) | completed |
 | [Interactive parent-child inconsistency resolution](./interactive-parent-child-0f1065.md) | completed |
 | [Validation and UX messaging for selector input](./validation-and-ux-messaging-for-f275e6.md) | completed |

@@ -80,32 +80,36 @@ async function collectFiles(dir: string): Promise<string[]> {
 // ── Slug algorithm ────────────────────────────────────────────────────────────
 
 describe("slugify", () => {
-  it("produces lowercase hyphenated ASCII slugs without special characters", () => {
+  it("produces lowercase hyphenated ASCII slugs qualified by id6", () => {
     expect(slugify("Web Dashboard", "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7")).toBe(
-      "web-dashboard",
+      "web-dashboard-4d62fa",
     );
     expect(slugify("Path / Separator \\ Safe!", "11111111-0000-0000-0000-000000000000")).toBe(
-      "path-separator-safe",
+      "path-separator-safe-111111",
     );
   });
 
   it("normalizes Unicode accents and strips unsupported Unicode characters", () => {
     // Héros → heros after NFKD + combining strip + non-ASCII strip
     expect(slugify("Héros & Légendes", "a1b2c3d4-0000-0000-0000-000000000000")).toBe(
-      "heros-legendes",
+      "heros-legendes-a1b2c3",
     );
-    expect(slugify("日本語タイトル", "f0e1d2c3-0000-0000-0000-000000000000")).toBe("untitled");
+    expect(slugify("日本語タイトル", "f0e1d2c3-0000-0000-0000-000000000000")).toBe("untitled-f0e1d2");
   });
 
   it("falls back to a safe slug when title contains only special characters", () => {
-    expect(slugify("--- !!!", "11223344-0000-0000-0000-000000000000")).toBe("untitled");
+    expect(slugify("--- !!!", "11223344-0000-0000-0000-000000000000")).toBe("untitled-112233");
   });
 
-  it("is deterministic for the same normal title regardless of ID", () => {
+  it("qualifies identical titles with their ids so divergent branches cannot collide", () => {
+    // Same-titled items created on different branches used to produce the
+    // SAME path — a merge then silently unified two distinct items. The id6
+    // suffix is unconditional so their paths can never collide.
     const s1 = slugify("Auth Feature", "aaaaaaaa-0000-0000-0000-000000000000");
     const s2 = slugify("Auth Feature", "bbbbbbbb-0000-0000-0000-000000000000");
-    expect(s1).toBe("auth-feature");
-    expect(s2).toBe("auth-feature");
+    expect(s1).toBe("auth-feature-aaaaaa");
+    expect(s2).toBe("auth-feature-bbbbbb");
+    expect(s1).not.toBe(s2);
   });
 
   it("truncates long titles at a word boundary and appends id6", () => {
@@ -752,6 +756,28 @@ describe("serializeFolderTree: round-trip with parseFolderTree", () => {
     );
     expect(content).toContain("myCustomField");
     expect(content).toContain('"custom-value"');
+  });
+
+  it("round-trips the lastModified stamp through serialize -> parse", async () => {
+    // FolderTreeStore stamps `lastModified` on every mutation (see
+    // folder-tree-store.ts); this proves the stamp survives a full
+    // serialize/parse cycle just like any other passthrough frontmatter field.
+    const stamp = "2026-08-20T12:34:56.789Z";
+    const task = makeTask("33333333-0000-0000-0000-000000000000", "Stamped Task", {
+      lastModified: stamp,
+    } as Partial<PRDItem>);
+
+    await serializeFolderTree([task], testDir);
+    const content = await readFile(
+      join(testDir, `${slugify(task.title, task.id)}.md`),
+      "utf8",
+    );
+    expect(content).toContain("lastModified");
+    expect(content).toContain(stamp);
+
+    const { items, warnings } = await parseFolderTree(testDir);
+    expect(warnings).toEqual([]);
+    expect((items[0] as Record<string, unknown>).lastModified).toBe(stamp);
   });
 
   it("round-trips work-item links (linkage model visibility)", async () => {

@@ -84,7 +84,7 @@ This prevents existing code from appearing as a wall of pending tasks.
 
 | File | Purpose |
 |------|---------|
-| `.rex/prd.json` | PRD tree (epics → features → tasks → subtasks) |
+| `.rex/prd_tree/` | PRD folder tree (epics → features → tasks; subtasks are sections in the parent task's `index.md`) |
 | `.rex/config.json` | Project configuration |
 | `.rex/execution-log.jsonl` | Execution history (append-only, auto-rotated at 1 MB) |
 | `.rex/workflow.md` | Human-readable workflow state |
@@ -113,4 +113,5 @@ Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes 
 | `facets` | List configured facets with distribution |
 | `append_log` | Write structured log entry |
 | `sync_with_remote` | Sync with remote adapter (e.g. Notion) |
+| `get_token_usage` | Roll up hench run token totals per PRD item |
 | `get_capabilities` | Server capabilities and configuration |

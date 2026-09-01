@@ -27,7 +27,7 @@
 
 import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js";
 import { ClaudeClientError } from "./types.js";
-import type { LLMProvider, ProviderInfo, StreamChunk } from "./provider-interface.js";
+import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { CodexConfig } from "./llm-types.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
@@ -35,7 +35,7 @@ const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_TOKENS = 8192;
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
-const DEFAULT_MODEL = "gpt-4o";
+const DEFAULT_MODEL = "gpt-5.6-terra";
 
 // ── Options ───────────────────────────────────────────────────────────────
 
@@ -152,7 +152,7 @@ export function createOpenAiApiProvider(
   const defaultModel = codexConfig?.model ?? DEFAULT_MODEL;
 
   const info: ProviderInfo = {
-    vendor: "codex",
+    vendor: LLM_VENDOR.CODEX,
     mode: "api",
     ...(defaultModel ? { model: defaultModel } : {}),
     capabilities: ["streaming", "function-calling"],

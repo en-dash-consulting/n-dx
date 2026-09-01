@@ -22,7 +22,7 @@ import {resolve, join} from "node:path";import {
 import { CLIError } from "../errors.js";
 import { cmdInit } from "./init.js";
 import { info } from "../output.js";
-import { loadLLMConfig, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn } from "@n-dx/llm-client";
+import { DEFAULT_LLM_VENDOR, loadLLMConfig, printVendorModelHeader, resolveVendorModel, bold, dim, green, cyan, classifyLLMError, warn } from "@n-dx/llm-client";
 import type { RiskJustificationEntry, ZoneType } from "../sourcevision-core.js";
 import {
   runInventoryPhase,
@@ -179,7 +179,7 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
         if (filter.type === "all") process.exit(1);
       } else if (err instanceof PhaseError) {
         // Classify the underlying error for LLM-specific guidance
-        const vendor = getLLMVendor() ?? "claude";
+        const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
         const classified = classifyLLMError(
           new Error(err.reason),
           vendor,
@@ -196,7 +196,7 @@ async function executePhases(ctx: AnalyzeContext, filter: PhaseFilter, extraArgs
       } else {
         // Unrecognized error — try LLM classification before rethrowing
         const errObj = err instanceof Error ? err : new Error(String(err));
-        const vendor = getLLMVendor() ?? "claude";
+        const vendor = getLLMVendor() ?? DEFAULT_LLM_VENDOR;
         const classified = classifyLLMError(errObj, vendor);
         if (classified.category !== "unknown") {
           console.error(`  Phase ${phase} failed: ${classified.message}`);

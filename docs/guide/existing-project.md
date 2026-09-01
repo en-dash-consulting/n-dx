@@ -10,7 +10,7 @@ If your project is brand new or empty, use the [Quickstart](./quickstart) instea
 
 ## Prerequisites
 
-- **Node.js ≥ 18** (Node 22 LTS recommended)
+- **Node.js ≥ 22** (22 LTS)
 - **pnpm ≥ 10** — [install pnpm](https://pnpm.io/installation)
 - **A clean working tree.** Commit or stash any in-progress work first — `ndx init` writes new files at the repo root and inside a few dot-directories.
 
@@ -207,6 +207,6 @@ Each skill below maps to a step in this guide. Edit the linked file in your proj
 | `/ndx-config` | [`.agents/skills/ndx-config/SKILL.md`](./skills#ndx-config) | LLM setup: sets vendor, API key, model, and CLI path during init |
 | `/ndx-work` | [`.agents/skills/ndx-work/SKILL.md`](./skills#ndx-work) | Post-onboarding: executes the first tasks from the accepted PRD |
 
-Related guides: [Codebase Onboarding](./onboarding) (interactive zone exploration after the baseline is committed), [Cleaning Up a Vibe-Coded App](./vibe-cleanup) (heavier remediation when pre-flight findings are extensive), [Change Management](./change-management) (keeping the PRD aligned over time).
+Related guides: [Codebase Onboarding](./onboarding) (interactive zone exploration after the baseline is committed), [Cleaning Up a Vibe-Coded App](./vibe-cleanup) (heavier remediation when pre-flight findings are extensive), [Change Management](./change-management) (keeping the PRD aligned over time), [n-dx vs Spec Kit](./n-dx-vs-spec-kit) (how n-dx differs from Spec Kit, OpenSpec, and Kiro).
 
 For the full skill inventory and customization guidance, see the [Skills Reference](./skills).

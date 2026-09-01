@@ -41,3 +41,7 @@ packages/*/bin/*.js         text eol=lf
 packages/*/src/cli/index.ts text eol=lf
 packages/core/cli.js        text eol=lf
 packages/core/export.js     text eol=lf
+
+# PRD tree markdown merges through the rex-prd driver (three-way,
+# frontmatter-aware). The driver is registered in git config by 'ndx init'.
+.rex/prd_tree/** merge=rex-prd

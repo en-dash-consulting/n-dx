@@ -727,6 +727,37 @@ export interface CleanupTransformationResult {
   error?: string;
 }
 
+/**
+ * What the adversarial review pass did, recorded on the run it reviewed.
+ *
+ * A discriminated pair of shapes rather than one shape with optional fields:
+ * a failed review has no finding counts, and a successful one has no failure
+ * reason. Collapsing them would make `findingCount: 0` ambiguous between "the
+ * attack found nothing" and "the reviewer never ran".
+ */
+export type RunReviewRecord =
+  | {
+      /** Model the reviewer ran on. Empty for the local vendor. */
+      model: string;
+      /** True when the reviewer resumed the work session rather than starting fresh. */
+      resumedSession: boolean;
+      /** Findings surviving both passes, including the ones deliberately dropped. */
+      findingCount: number;
+      /** Must-fix findings the pass could not repair. Non-zero needs a human. */
+      unresolvedCount: number;
+      /** True when the reviewer edited a file. */
+      fixesApplied: boolean;
+      /** Absolute path of the JSON report the reviewer wrote. */
+      reportPath: string;
+      failed?: undefined;
+    }
+  | {
+      /** Why the pass produced no usable report. */
+      failed: string;
+      /** Human-readable detail for the failure. */
+      detail: string;
+    };
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -782,6 +813,17 @@ export interface RunRecord {
   /** Run-level diagnostics for token parsing and vendor observability. */
   diagnostics?: RunDiagnostics;
   /**
+   * Outcome of the adversarial review pass (`ndx work --review`).
+   *
+   * Absent when `--review` was not passed. Present-and-failed is a distinct,
+   * meaningful state: a review that could not run must not be readable as a
+   * review that found nothing, and the terminal output where the warning was
+   * printed does not survive the session.
+   *
+   * v1 additive field — records without it load normally.
+   */
+  review?: RunReviewRecord;
+  /**
    * Full RuntimeEvent stream captured during the run.
    *
    * Only populated when verbose/debug mode is enabled (to avoid bloating
@@ -800,16 +842,36 @@ export interface RunRecord {
    */
   invocationContext?: "cli" | "api";
   /**
-   * True when the record was written by an assisted execution path (the
-   * `/ndx-work` skill driving the task through Claude Code) rather than by a
-   * spawned hench agent. Assisted runs are auditable in run history but their
-   * `tokenUsage` is empty — Claude Code does not expose its own token usage to
-   * the running skill. Distinguishes a 0-token assisted record from a genuine
-   * hench run so token analytics don't read it as an anomaly.
+   * True when the record was written by an assisted execution path (a skill
+   * driving the work through Claude Code) rather than by a spawned hench agent.
+   *
+   * Assisted runs DO carry token usage: Claude Code does not hand a skill its
+   * counts, but it writes them to the session transcript, which `hench record`
+   * reads (see `store/session-usage.ts`). The flag therefore marks provenance —
+   * assisted vs agent — not the absence of usage. It stays useful for exactly
+   * that: `turns` and `toolCalls` are thin on these records, so analytics that
+   * expect per-turn detail should branch on it.
+   *
+   * A 0-token assisted record is still possible and still valid — no transcript
+   * was found, or `--no-tokens` was passed — and is not an anomaly.
    *
    * v1 additive field — old records without this field load normally.
    */
   assisted?: boolean;
+  /**
+   * Actor identity that started this run, e.g. `"Jane Doe <jane@example.com>"`.
+   * Resolved from git `user.name`/`user.email`, falling back to the OS
+   * username, then `"unknown"`. See `process/actor-identity.ts`.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  actor?: string;
+  /**
+   * Host name the run executed on (`os.hostname()`).
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  host?: string;
 }
 
 export interface TaskBriefTask {

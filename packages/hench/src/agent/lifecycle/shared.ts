@@ -23,6 +23,7 @@ import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { getCurrentHead, execShellCmd, execStdout } from "../../process/exec.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
+import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
@@ -33,7 +34,7 @@ import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import type { ReviewDiff } from "../analysis/review.js";
-import { defaultRegistry, resolveVendorModel } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, defaultRegistry, resolveVendorModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
@@ -67,7 +68,7 @@ export function buildCoAuthoredByTrailerLine(): string {
 /**
  * Shorten a model ID for stream-log labels by dropping numeric version
  * identifiers. Examples: "claude-sonnet-4-6" → "claude-sonnet",
- * "claude-haiku-4-20250414" → "claude-haiku", "gpt-5.4-mini" →
+ * "claude-haiku-4-5" → "claude-haiku", "gpt-5.6-luna" →
  * "gpt-mini". Falls back to the fallback label when model is empty.
  */
 export function formatModelLabel(model?: string, fallback = "Agent"): string {
@@ -89,8 +90,27 @@ export interface SharedLoopOptions {
   taskId?: string;
   dryRun?: boolean;
   model?: string;
-  /** Show diff and prompt for approval before finalizing. */
-  review?: boolean;
+  /**
+   * Show the diff and prompt for approval before finalizing (`--approve-diff`).
+   *
+   * Renamed from `review` when `--review` was reassigned to the adversarial
+   * review pass. The two are independent and may both be set: the review pass
+   * runs first (so its fixes are part of what the human sees), then the diff
+   * gate asks whether to keep the result.
+   */
+  approveDiff?: boolean;
+  /**
+   * Run the adversarial review pass after the task's changes validate and
+   * before the commit prompt (`--review`). See
+   * `agent/analysis/adversarial-review.ts`.
+   */
+  reviewPass?: boolean;
+  /**
+   * Model the review pass runs on (`--review-model`). When unset, resolved
+   * from `llm.<vendor>.reviewModel`, `llm.reviewModel`, then the vendor's
+   * recommended default in `REVIEW_MODELS`.
+   */
+  reviewModel?: string;
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
   excludeTaskIds?: Set<string>;
   /** Restrict task selection to this epic (ID). */
@@ -329,6 +349,11 @@ export interface InitRunOptions {
   taskTitle: string;
   model: string;
   henchDir: string;
+  /**
+   * Project directory to resolve actor identity from (git `user.name`/
+   * `user.email` config). Defaults to the process cwd when omitted.
+   */
+  projectDir?: string;
   /** LLM vendor for this run (e.g. "claude", "codex"). Captured in diagnostics and run.vendor. */
   vendor?: string;
   /** Sandbox mode in effect (e.g. "workspace-write"). Captured in diagnostics. */
@@ -372,6 +397,8 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     invocationContext: opts.invocationContext,
     vendor: opts.vendor,
     weight: opts.weight ?? "standard",
+    actor: await resolveActor(opts.projectDir ?? "."),
+    host: resolveHost(),
   };
 
   // Emit invocation context to the output stream for CLI and dashboard visibility
@@ -672,7 +699,7 @@ export async function runPostTaskTestsIfNeeded(
  */
 async function retrieveCodexTokensIfNeeded(run: RunRecord, projectDir: string): Promise<void> {
   // Check if any turn used Codex as the vendor
-  const isCodexRun = run.turnTokenUsage?.some((t) => t.vendor === "codex") ?? false;
+  const isCodexRun = run.turnTokenUsage?.some((t) => t.vendor === LLM_VENDOR.CODEX) ?? false;
   if (!isCodexRun) {
     return;
   }
@@ -1130,8 +1157,17 @@ async function promptPreRunCommitChoice(opts: PreRunPromptOptions): Promise<PreR
  * Best-effort LLM commit subject for pre-existing changes. Falls back to a
  * deterministic message when no provider/credentials are available or the
  * call fails — the gate must never block or error on message generation.
+ *
+ * Commit-message generation is a mechanical single-shot call, so it runs on
+ * the vendor's light tier (e.g. haiku) rather than the run's standard model.
+ * The caller passes the run's resolved model; when that matches the
+ * config-derived standard resolution (i.e. no explicit --model override was
+ * given), the light tier is used instead. A model that differs from the
+ * standard resolution is an explicit operator override and is honored as-is.
+ *
+ * Exported for testing.
  */
-async function proposePreRunCommitMessage(
+export async function proposePreRunCommitMessage(
   diff: ReviewDiff,
   henchDir: string,
   model?: string,
@@ -1139,7 +1175,16 @@ async function proposePreRunCommitMessage(
   try {
     const llmConfig = await loadLLMConfig(henchDir);
     const provider = defaultRegistry.getActiveProvider(llmConfig);
-    const resolvedModel = model ?? resolveVendorModel(resolveLLMVendor(llmConfig), llmConfig);
+    const vendor = resolveLLMVendor(llmConfig);
+    const standardModel = resolveVendorModel(vendor, llmConfig);
+    const isExplicitOverride = Boolean(model) && model !== standardModel;
+    const resolvedModel = isExplicitOverride
+      ? (model as string)
+      : resolveVendorModel(vendor, llmConfig, "light");
+    if (!isExplicitOverride) {
+      // Tier visibility — mirrors the vendor header's "(light tier)" label.
+      detail(`Commit message model: ${resolvedModel} (light tier)`);
+    }
     const prompt =
       "Write a single-line git commit subject (max 72 chars, conventional-commit " +
       "style, no body, no surrounding quotes or backticks) summarizing these " +

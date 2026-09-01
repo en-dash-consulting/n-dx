@@ -4,6 +4,22 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initConfig } from "../../../src/store/config.js";
 
+const { mockResolveActor, mockResolveHost } = vi.hoisted(() => ({
+  mockResolveActor: vi.fn(async () => "Test Actor <test@example.com>"),
+  mockResolveHost: vi.fn(() => "test-host"),
+}));
+
+// initRunRecord resolves actor/host via git config and os.hostname(); stub
+// both so run records in this suite are deterministic across environments.
+vi.mock("../../../src/process/actor-identity.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/process/actor-identity.js")>();
+  return {
+    ...actual,
+    resolveActor: mockResolveActor,
+    resolveHost: mockResolveHost,
+  };
+});
+
 /**
  * Tests for the shared lifecycle module that extracts common validation
  * and orchestration logic used by both API and CLI agent loops.
@@ -237,6 +253,28 @@ describe("shared lifecycle", () => {
       const savedRun = JSON.parse(savedContent);
       expect(savedRun.status).toBe("running");
       expect(savedRun.taskId).toBe("task-1");
+    });
+
+    it("stamps actor and host at run start", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+      const { readFile } = await import("node:fs/promises");
+
+      const { run } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "claude-sonnet-4-6",
+        henchDir,
+        projectDir,
+      });
+
+      expect(run.actor).toBe("Test Actor <test@example.com>");
+      expect(run.host).toBe("test-host");
+
+      // Persisted run file carries the same attribution.
+      const savedFile = join(henchDir, "runs", `${run.id}.json`);
+      const savedRun = JSON.parse(await readFile(savedFile, "utf-8"));
+      expect(savedRun.actor).toBe("Test Actor <test@example.com>");
+      expect(savedRun.host).toBe("test-host");
     });
   });
 

@@ -50,31 +50,31 @@ Every directory name is derived deterministically from the item's **title** and,
 | 7 | Collapse consecutive hyphens to one |
 | 8 | Strip leading and trailing hyphens |
 | 9 | If the result is empty, use `untitled` |
-| 10 | Truncate to <= 40 characters at a hyphen boundary |
-| 11 | For long titles or sibling slug collisions, reserve room for `-{id6}` and append `id6 = id.replace(/[^a-z0-9]/g, "").slice(0, 6)` |
+| 10 | Reserve room for the id suffix and truncate the title body to fit within 40 characters at a hyphen boundary |
+| 11 | Append `-{id6}` where `id6 = id.replace(/[^a-z0-9]/g, "").slice(0, 6)` — **unconditionally, for every item** |
 
-For normal non-colliding titles, the slug remains title-only. Long titles and colliding sibling titles receive the ID suffix. If a malformed PRD contains duplicate title/ID pairs under the same parent, the serializer appends a final positional suffix to keep the migration lossless.
+Every slug is id-qualified. Title-only slugs (the pre-collaboration scheme, where the suffix appeared only for long titles or same-tree sibling collisions) let same-titled items created on divergent branches collide on identical paths, so a git merge silently unified two distinct items; the unconditional suffix makes paths collision-free across branches, and renames keep an item recognizable by its suffix. Trees written under the old scheme are renamed in one deliberate pass by `rex migrate-slugs` (idempotent — a second run is a no-op). If a malformed PRD contains duplicate title/ID pairs under the same parent, the serializer appends a final positional suffix to keep the migration lossless.
 
 ### Examples
 
 | Title | ID prefix | Slug |
 |-------|-----------|------|
-| `Web Dashboard` | `4d62fa6c` | `web-dashboard` |
+| `Web Dashboard` | `4d62fa6c` | `web-dashboard-4d62fa` |
 | `Hot-reload MCP tool schemas on HTTP transport without server restart` | `5dd63e4e` | `hot-reload-mcp-tool-schemas-on-5dd63e` |
-| `Héros & Légendes` | `a1b2c3d4` | `heros-legendes` |
-| `日本語タイトル` | `f0e1d2c3` | `untitled` |
-| `--- !!!` | `11223344` | `untitled` |
+| `Héros & Légendes` | `a1b2c3d4` | `heros-legendes-a1b2c3` |
+| `日本語タイトル` | `f0e1d2c3` | `untitled-f0e1d2` |
+| `--- !!!` | `11223344` | `untitled-112233` |
 
 **Long-title trace** (`Hot-reload MCP…`):
 - After title normalization: `hot-reload-mcp-tool-schemas-on-http-transport-without-server-restart`
-- The title exceeds the slug limit, so the serializer reserves room for `-5dd63e`
+- The serializer reserves room for `-5dd63e` (every slug carries the suffix)
 - Prefix limit before suffix: 33 characters
 - Body after boundary truncation: `hot-reload-mcp-tool-schemas-on`
 - Final slug: `hot-reload-mcp-tool-schemas-on-5dd63e`
 
 ### Collision Resistance
 
-The `{id6}` suffix is derived from sanitized PRD IDs. It is applied only for long titles and sibling title collisions, which keeps common paths readable while preserving deterministic uniqueness where the title alone is insufficient.
+The `{id6}` suffix is derived from sanitized PRD IDs and applied to every slug. Uniqueness therefore does not depend on titles at all: two items may share a title — across branches, or as siblings — and still serialize to distinct paths. Six hex-ish characters of a UUID keep the accidental-collision probability negligible at PRD scale; in the pathological case of two items whose ids share their first six safe characters under the same parent, the positional dedup suffix still keeps their directories distinct.
 
 ---
 
@@ -873,6 +873,20 @@ The parser (folder tree → PRD) must:
 | `## Children` body block | when children exist | when children exist | when children exist | — | when children exist |
 
 ---
+
+## Post-Merge Validation
+
+A git merge of the tree can leave corruption no rex code path produces: duplicate IDs (both branches created or moved the same item at different paths), directories whose `index.md` was lost in conflict resolution, files at the wrong nesting depth, `blockedBy` references to items the other branch deleted, and unresolved conflict markers. `rex validate --post-merge` scans the raw tree for all five classes; `--repair` fixes the deterministic ones (empty orphaned directories are removed, `level` is rewritten to the depth-implied value, dangling `blockedBy` ids are dropped) and refuses the ambiguous ones (duplicate IDs, conflict markers, orphaned directories that still contain items) with instructions.
+
+Exit codes are hook-friendly — 0 means clean (including a repo with no PRD tree at all), 1 means issues remain — so it wires directly into an optional git post-merge hook:
+
+```sh
+#!/bin/sh
+# .git/hooks/post-merge  (chmod +x)
+rex validate --post-merge || echo "PRD tree needs attention: run 'rex validate --post-merge --repair'"
+```
+
+A post-merge hook cannot abort the merge (it runs after the fact); the exit code exists so CI or wrapper scripts can gate on it. Pair with the `rex-prd` merge driver (registered by `ndx init`), which prevents most of these states from arising in the first place.
 
 ## Related Documentation
 

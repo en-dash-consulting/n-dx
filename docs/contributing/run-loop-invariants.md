@@ -1,6 +1,6 @@
 # Hench Run-Loop Invariants
 
-The multi-iteration hench run loop enforces three invariants that prevent task-repetition waste and ensure correct completion tracking. This document is the authoritative reference for contributors modifying loop logic. It also serves as the source content for the `.claude/skills/run-loop-invariants/SKILL.md` assistant skill.
+The multi-iteration hench run loop enforces three invariants that prevent task-repetition waste and ensure correct completion tracking. This document is the authoritative reference for contributors modifying loop logic.
 
 **Key files:**
 - `packages/hench/src/cli/commands/run.ts` — outer loop, attempt tracking, exclusion sets
@@ -126,4 +126,4 @@ Regression tests:
 
 ## Assistant skill
 
-This content is mirrored at `.claude/skills/run-loop-invariants/SKILL.md` for use by Claude Code assistants. If that file is absent, copy this document's content (minus this section) into that path.
+There is no `run-loop-invariants` skill — this document is the single source. Earlier revisions claimed it was mirrored to `.claude/skills/run-loop-invariants/SKILL.md`; that path has never existed. If you add such a skill, generate it from this file rather than forking the content.

@@ -6,10 +6,33 @@
  * their import paths while consolidating the implementation.
  */
 
-export { setQuiet, isQuiet, info, result } from "@n-dx/llm-client";
+export {
+  setQuiet, isQuiet,
+  setVerbose, isVerbose,
+  setDebug, isDebug,
+  info, result, verbose, debug,
+} from "@n-dx/llm-client";
 
-import { isQuiet, info } from "@n-dx/llm-client";
+import { isQuiet, isVerbose, info, verbose } from "@n-dx/llm-client";
 import ora from "ora";
+
+/**
+ * Await a long-running operation, printing a periodic "still running" tick
+ * under --verbose so a slow step can be told apart from a hung one. No-op
+ * (besides awaiting) unless verbose mode is active.
+ */
+export async function withHeartbeat<T>(label: string, promise: Promise<T>, intervalMs = 15_000): Promise<T> {
+  if (!isVerbose()) return promise;
+  const startMs = Date.now();
+  const interval = setInterval(() => {
+    verbose(`  … ${label} (${Math.round((Date.now() - startMs) / 1000)}s elapsed)`);
+  }, intervalMs);
+  try {
+    return await promise;
+  } finally {
+    clearInterval(interval);
+  }
+}
 
 export interface Spinner {
   /** Update the spinner message while it's running. */

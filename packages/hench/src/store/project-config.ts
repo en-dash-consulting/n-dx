@@ -11,6 +11,8 @@ import { dirname } from "node:path";
 import {
   loadClaudeConfig as loadClaudeConfigFromDir,
   loadLLMConfig as loadLLMConfigFromDir,
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
   resolveApiKey as sharedResolveApiKey,
   resolveCliPath as sharedResolveCliPath,
 } from "../prd/llm-gateway.js";
@@ -53,7 +55,7 @@ export async function loadLLMConfig(
 }
 
 export function resolveLLMVendor(llmConfig: LLMConfig): LLMVendor {
-  return llmConfig.vendor ?? "claude";
+  return llmConfig.vendor ?? DEFAULT_LLM_VENDOR;
 }
 
 /**
@@ -68,12 +70,12 @@ export function resolveLLMVendor(llmConfig: LLMConfig): LLMVendor {
  */
 export function resolveVendorCliPath(llmConfig: LLMConfig, henchConfig?: HenchConfig): string {
   const vendor = resolveLLMVendor(llmConfig);
-  if (vendor === "codex") {
+  if (vendor === LLM_VENDOR.CODEX) {
     return llmConfig.codex?.cli_path ?? "codex";
   }
   // Google and local use the REST API — no CLI binary. Return empty string so
   // callers that check cli availability will surface a clear "vendor has no CLI" error.
-  if (vendor === "google" || vendor === "local") {
+  if (vendor === LLM_VENDOR.GOOGLE || vendor === LLM_VENDOR.LOCAL) {
     return "";
   }
   const configured = sharedResolveCliPath(llmConfig.claude ?? {});
@@ -97,19 +99,19 @@ export function resolveVendorCliEnv(llmConfig: LLMConfig): NodeJS.ProcessEnv {
   // inside an interactive Claude Code session (breaks background/server usage).
   const { CLAUDECODE: _, ...baseEnv } = process.env;
   const vendor = resolveLLMVendor(llmConfig);
-  if (vendor === "codex") {
+  if (vendor === LLM_VENDOR.CODEX) {
     const apiKey = llmConfig.codex?.api_key;
     if (apiKey) {
       return { ...baseEnv, OPENAI_API_KEY: apiKey };
     }
-  } else if (vendor === "google") {
+  } else if (vendor === LLM_VENDOR.GOOGLE) {
     const apiKey = llmConfig.google?.api_key;
     if (apiKey) {
       // Honor the configured env var name; default matches createGoogleApiProvider.
       const apiKeyEnvVar = llmConfig.google?.apiKeyEnv ?? "GEMINI_API_KEY";
       return { ...baseEnv, [apiKeyEnvVar]: apiKey };
     }
-  } else if (vendor === "local") {
+  } else if (vendor === LLM_VENDOR.LOCAL) {
     // Local server uses an optional bearer token injected directly by the
     // local-api-provider; no env-variable injection needed here.
   } else {

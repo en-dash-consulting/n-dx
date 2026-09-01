@@ -11,6 +11,7 @@
 import { validateTokenReporting, validateVendorAttribution } from "./token-validation.js";
 import type { RunRecord } from "../schema/index.js";
 import { detail, stream } from "../types/output.js";
+import { LLM_VENDOR } from "../prd/llm-gateway.js";
 
 /**
  * Perform post-run token validation.
@@ -26,7 +27,7 @@ export function validateRunTokensPostRun(run: RunRecord, enabled = true): void {
   if (!enabled) return;
 
   try {
-    const isCodex = run.turnTokenUsage?.some((t) => t.vendor === "codex") ?? false;
+    const isCodex = run.turnTokenUsage?.some((t) => t.vendor === LLM_VENDOR.CODEX) ?? false;
     if (!isCodex) {
       // Skip validation for Claude runs — they're expected and validated separately
       return;

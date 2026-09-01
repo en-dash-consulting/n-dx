@@ -41,7 +41,8 @@ export async function cmdStatus(
     const taskLine = formatTaskLine(run.taskTitle, run.taskId, taskExists);
 
     result(`${icon} ${run.id.slice(0, 8)}  ${taskLine}`);
-    info(`  ${colorStatus(run.status)} | ${run.turns} turns | ${duration} | ${run.model}`);
+    const actorSuffix = run.actor ? ` | ${run.actor}` : "";
+    info(`  ${colorStatus(run.status)} | ${run.turns} turns | ${duration} | ${run.model}${actorSuffix}`);
     const totalTokens = run.tokenUsage.input + run.tokenUsage.output;
     info(`  tokens: ${run.tokenUsage.input} in / ${run.tokenUsage.output} out (${totalTokens} total)`);
     if (run.error) {

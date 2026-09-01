@@ -23,6 +23,7 @@ import {
 } from "../../quota/index.js";
 import { section, subsection, stream, detail, info } from "../../types/output.js";
 import type { RunRecord } from "../../schema/index.js";
+import { LLM_VENDOR } from "../../prd/llm-gateway.js";
 
 interface ValidateTokensOptions {
   format?: string;
@@ -35,7 +36,7 @@ function findCodexAndClaudeRunPairs(runs: RunRecord[]): Array<[RunRecord, RunRec
   const byTaskId = new Map<string, { codex: RunRecord[]; claude: RunRecord[] }>();
 
   for (const run of runs) {
-    const isCodex = run.turnTokenUsage?.some((t) => t.vendor === "codex") ?? false;
+    const isCodex = run.turnTokenUsage?.some((t) => t.vendor === LLM_VENDOR.CODEX) ?? false;
     const key = run.taskId;
 
     if (!byTaskId.has(key)) {
@@ -100,7 +101,7 @@ function formatTextReport(options: ValidateTokensOptions, runs: RunRecord[]) {
 
     for (const run of runs) {
       const result = validateTokenReporting(run);
-      const isCodex = run.turnTokenUsage?.some((t) => t.vendor === "codex") ?? false;
+      const isCodex = run.turnTokenUsage?.some((t) => t.vendor === LLM_VENDOR.CODEX) ?? false;
 
       const vendorLabel = isCodex ? "[Codex]" : "[Claude]";
       const statusLabel = result.ok ? "✓" : "✗";
@@ -143,14 +144,14 @@ function formatJsonReport(options: ValidateTokensOptions, runs: RunRecord[]) {
 
   const runsReport = runs.map((run) => {
     const result = validateTokenReporting(run);
-    const isCodex = run.turnTokenUsage?.some((t) => t.vendor === "codex") ?? false;
+    const isCodex = run.turnTokenUsage?.some((t) => t.vendor === LLM_VENDOR.CODEX) ?? false;
     const attributionIssues = validateVendorAttribution(run);
 
     return {
       id: run.id,
       taskId: run.taskId,
       taskTitle: run.taskTitle,
-      vendor: isCodex ? "codex" : "claude",
+      vendor: isCodex ? LLM_VENDOR.CODEX : LLM_VENDOR.CLAUDE,
       validation: {
         ok: result.ok,
         issues: result.issues,
@@ -203,7 +204,7 @@ export async function cmdValidateTokens(henchDir: string, flags: ValidateTokensO
   }
 
   const runs = codexOnly
-    ? allRuns.filter((r) => r.turnTokenUsage?.some((t) => t.vendor === "codex") ?? false)
+    ? allRuns.filter((r) => r.turnTokenUsage?.some((t) => t.vendor === LLM_VENDOR.CODEX) ?? false)
     : allRuns;
 
   // Format and output

@@ -19,6 +19,7 @@ import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./response-utils.js";
 import { AggregationResultCache } from "./aggregation-cache.js";
+import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor } from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors rex/core/token-usage but kept local to avoid cross-package import)
@@ -750,33 +751,29 @@ function parseQuery(url: string): URLSearchParams {
 
 function loadConfiguredModel(projectDir: string): ConfiguredModel {
   const path = join(projectDir, ".n-dx.json");
-  if (!existsSync(path)) return { vendor: "claude", model: "default" };
+  if (!existsSync(path)) return { vendor: DEFAULT_LLM_VENDOR, model: "default" };
   try {
     const raw = readFileSync(path, "utf-8");
     const root = JSON.parse(raw) as Record<string, unknown>;
     const llm = root.llm as Record<string, unknown> | undefined;
     const llmVendor = llm?.vendor;
-    const vendor =
-      llmVendor === "codex" ? "codex"
-      : llmVendor === "google" ? "google"
-      : llmVendor === "local" ? "local"
-      : "claude";
+    const vendor = isLLMVendor(llmVendor) ? llmVendor : DEFAULT_LLM_VENDOR;
     const llmVendorCfg = llm?.[vendor] as Record<string, unknown> | undefined;
     const llmVendorModel = llmVendorCfg?.model;
     if (typeof llmVendorModel === "string" && llmVendorModel) {
       return { vendor, model: llmVendorModel };
     }
     const legacyClaude = root.claude as Record<string, unknown> | undefined;
-    if (vendor === "claude" && typeof legacyClaude?.model === "string" && legacyClaude.model) {
+    if (vendor === LLM_VENDOR.CLAUDE && typeof legacyClaude?.model === "string" && legacyClaude.model) {
       return { vendor, model: legacyClaude.model };
     }
     // Local vendor with no model configured — LM Studio uses whatever is loaded
-    if (vendor === "local") {
+    if (vendor === LLM_VENDOR.LOCAL) {
       return { vendor, model: "default (LM Studio)" };
     }
     return { vendor, model: "default" };
   } catch {
-    return { vendor: "claude", model: "default" };
+    return { vendor: DEFAULT_LLM_VENDOR, model: "default" };
   }
 }
 

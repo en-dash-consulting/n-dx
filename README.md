@@ -1,7 +1,6 @@
-# n-dx 
-[![Socket Badge](https://badge.socket.dev/npm/package/@n-dx/core/0.4.0)](https://badge.socket.dev/npm/package/@n-dx/core/0.4.0)
+# n-dx
 
-[![Socket Badge](https://badge.socket.dev/npm/package/@n-dx/core/0.4.0)](https://badge.socket.dev/npm/package/@n-dx/core/0.4.0)
+[![Socket Badge](https://socket.dev/api/badge/npm/package/@n-dx/core)](https://socket.dev/npm/package/@n-dx/core)
 
 AI-powered development toolkit. Analyze a codebase, build a PRD, execute tasks autonomously.
 
@@ -30,7 +29,7 @@ ndx destroy-sample .
 
 ## Requirements
 
-**Node.js ≥ 18** (Node 22 LTS recommended) · **pnpm ≥ 10**
+**Node.js ≥ 22** (22 LTS recommended) · **pnpm ≥ 10**
 
 ### Platform Support
 
@@ -93,7 +92,7 @@ See [`.local_testing/README.md`](.local_testing/) for advanced usage:
 
 ## Quick Start
 
-**Prerequisites:** Node.js ≥ 18 (22 LTS recommended).
+**Prerequisites:** Node.js ≥ 22 (22 LTS recommended).
 
 **Recommended:** install `@n-dx/core` globally with npm.
 
@@ -242,6 +241,38 @@ ndx config llm.codex.cli_path codex .
 | `ndx ci [dir]` | Run analysis pipeline and validate PRD health |
 | `ndx config [key] [value]` | View and edit settings (`--json`, `--help`) |
 | `ndx export [dir]` | Export static deployable dashboard (`--out-dir`, `--deploy=github`) |
+| `ndx iso [dir]` | Render a standalone isometric architecture map (`--source=auto\|sourcevision\|scan`, `--max-nodes=N`, `--no-externals`) |
+| `ndx auth [dir]` | Check and configure LLM provider credentials |
+| `ndx web [dir]` | Dashboard server control (lower-level counterpart to `ndx start`) |
+| `ndx install-sample [dir]` | Install the sandboxed sample app and its PRD items |
+| `ndx destroy-sample [dir]` | Remove the sample app and its PRD items |
+| `ndx pair-programming "<desc>" [dir]` | Run two vendors against one task, primary + reviewer |
+| `ndx bicker [dir]` | Adversarial cross-vendor review of a change |
+| `ndx reset [dir]` | Remove `.sourcevision/` and start fresh |
+
+### PRD management
+
+These are delegated to rex; `ndx <command>` and `rex <command>` are equivalent.
+
+| Command | Description |
+|---------|-------------|
+| `ndx next [dir]` | Print the next actionable task |
+| `ndx tree [dir]` | Show the full PRD hierarchy with colour-coded status |
+| `ndx update <id> [dir]` | Update item status, priority, or title |
+| `ndx remove <id> [dir]` | Remove an item and its children |
+| `ndx move <id> [dir]` | Reparent an item under a new parent |
+| `ndx reshape [dir]` | LLM-powered PRD restructuring (merge, split, regroup) |
+| `ndx reorganize [dir]` | Detect and fix structural issues |
+| `ndx prune [dir]` | Remove completed subtrees (archived to `.rex/archive.json`) |
+| `ndx validate [dir]` | Check PRD integrity (DAG, schema) |
+| `ndx fix [dir]` | Auto-fix common PRD issues |
+| `ndx health [dir]` | PRD structure health score |
+| `ndx report [dir]` | Generate a JSON health report |
+| `ndx verify [dir]` | Run tests mapped to acceptance criteria |
+| `ndx show <run-id> [dir]` | Show full details of a hench run |
+
+Run `ndx <command> --help` for full flags on any command, or `ndx help <keyword>`
+to search. `ndx --help` lists everything.
 
 ### Direct Tool Access
 
@@ -304,6 +335,23 @@ Codex reads `.codex/config.toml` automatically — no manual registration requir
 | `.hench/` | hench | `config.json`, `runs/` |
 
 > **Legacy PRD migration.** If upgrading from a previous layout using `.rex/prd.md` (flat Markdown) or `.rex/prd.json`, run `rex migrate-to-folder-tree` to convert to the folder tree format. The command optionally deletes the legacy source file after migration. See the [rex README](packages/rex) for details.
+
+### The PRD, by example
+
+n-dx manages its own PRD with n-dx, so this repository doubles as a reference
+for the format. Read these two together — they are the same project at both
+ends of the workflow:
+
+| Artifact | What it is |
+|----------|-----------|
+| [`prd.md`](prd.md) | The hand-written v1 spec that seeded the project. This is what a human writes, and the shape `ndx add --file=` / `ndx plan --file=` expect when importing an existing document. |
+| [`.rex/prd_tree/`](.rex/prd_tree) | The live, tool-managed tree — slug-named folders with YAML front-matter, generated child tables, and status the agent reads and updates as it works. |
+
+You interact with the tree through `ndx status` / `ndx tree` / `ndx next` /
+`ndx add` / `ndx work`, through the rex MCP tools from an assistant session, or
+by editing the Markdown directly — it is a normal git surface, so diffs and
+review work as usual. The [PRD storage layout guide](docs/guide/prd-storage.md)
+explains the rules the tree follows and when each surface is appropriate.
 
 ## .gitignore Setup
 

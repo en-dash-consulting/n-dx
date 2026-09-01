@@ -49,6 +49,12 @@ export interface ClaudeConfig {
    * instead of TIER_MODELS.claude.light.
    */
   lightModel?: string;
+  /**
+   * Model override for the adversarial review pass (`ndx work --review`).
+   * When set, the reviewer runs on this model instead of the recommended
+   * default in `REVIEW_MODELS`. The `--review-model` CLI flag outranks it.
+   */
+  reviewModel?: string;
 }
 
 // ── Provider types ───────────────────────────────────────────────────────────

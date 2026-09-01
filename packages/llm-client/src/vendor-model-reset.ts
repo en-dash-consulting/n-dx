@@ -11,7 +11,7 @@
  */
 
 import { resolveModel } from "./config.js";
-import type { LLMVendor } from "./llm-types.js";
+import { LLM_VENDOR, type LLMVendor } from "./llm-types.js";
 
 /**
  * Check if a model string is compatible with a given vendor.
@@ -27,15 +27,15 @@ export function isModelCompatibleWithVendor(
   const trimmed = model?.trim();
   if (!trimmed) return false;
 
-  if (vendor === "claude") {
+  if (vendor === LLM_VENDOR.CLAUDE) {
     return resolveModel(trimmed).startsWith("claude-");
   }
 
-  if (vendor === "google") {
+  if (vendor === LLM_VENDOR.GOOGLE) {
     return trimmed.startsWith("gemini-");
   }
 
-  if (vendor === "local") {
+  if (vendor === LLM_VENDOR.LOCAL) {
     // Local (LM Studio): any non-empty model string is accepted — the user
     // knows what is loaded. An empty string means "use whatever is active".
     return true;

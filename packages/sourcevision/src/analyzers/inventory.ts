@@ -5,7 +5,7 @@
 
 import { readFile, readdir, stat } from "node:fs/promises";
 import {join, relative, extname, basename} from "node:path";import { createHash } from "node:crypto";
-import { PROJECT_DIRS } from "@n-dx/llm-client";
+import { PROJECT_DIRS, isVerbose, verbose } from "@n-dx/llm-client";
 import type { FileEntry, FileRole, Inventory } from "../schema/index.js";
 import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
@@ -599,7 +599,15 @@ export async function analyzeInventory(
   let added = 0;
   let touched = 0;
 
-  for (const relPath of filePaths) {
+  const verboseScan = isVerbose();
+  let lastTickMs = Date.now();
+
+  for (let i = 0; i < filePaths.length; i++) {
+    const relPath = filePaths[i];
+    if (verboseScan && Date.now() - lastTickMs >= 2000) {
+      verbose(`  … scanning files (${i}/${filePaths.length})`);
+      lastTickMs = Date.now();
+    }
     const fullPath = join(absDir, relPath);
     const st = await stat(fullPath);
     const mtime = Math.floor(st.mtimeMs);

@@ -95,6 +95,12 @@ export type {
   StreamChunk,
   LLMProvider,
 } from "./provider-interface.js";
+export {
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  LLM_VENDORS,
+  isLLMVendor,
+} from "./provider-interface.js";
 
 // Provider registry and selection
 export type { ProviderFactory } from "./provider-registry.js";
@@ -153,8 +159,10 @@ export {
   resolveCliPath,
   resolveModel,
   resolveVendorModel,
+  resolveReviewModel,
   NEWEST_MODELS,
   TIER_MODELS,
+  REVIEW_MODELS,
   GOOGLE_MODELS,
   VENDOR_CONTEXT_CHAR_LIMITS,
   MODEL_CONTEXT_WINDOWS,
@@ -307,13 +315,19 @@ export {
   mergeWithOverrides,
 } from "./project-config.js";
 
-// CLI output control (quiet mode)
+// CLI output control (quiet/verbose/debug modes)
 export {
   setQuiet,
   isQuiet,
+  setVerbose,
+  isVerbose,
+  setDebug,
+  isDebug,
   info,
   result,
   warn,
+  verbose,
+  debug,
 } from "./output.js";
 
 // Brand and animation

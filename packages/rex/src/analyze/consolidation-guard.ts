@@ -106,6 +106,9 @@ ${OUTPUT_INSTRUCTION}`;
  * If the total task count exceeds the configured ceiling, triggers a
  * secondary LLM consolidation pass. If the LLM cannot reduce below the
  * ceiling, the best-effort result is returned with a warning.
+ *
+ * Mechanical single-shot call: when no explicit model is given, routes to the
+ * vendor's light-tier model (e.g. haiku) instead of the standard tier.
  */
 export async function applyConsolidationGuard(
   proposals: Proposal[],
@@ -136,7 +139,7 @@ export async function applyConsolidationGuard(
     originalTaskCount,
   );
 
-  const result = await spawnClaude(prompt, model);
+  const result = await spawnClaude(prompt, model, undefined, "light");
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
   const consolidated = parseProposalResponse(result.text);

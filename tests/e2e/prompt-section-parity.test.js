@@ -112,10 +112,7 @@ describe("instruction file section-level content equivalence", () => {
    */
   const sharedSectionHeadings = [
     "Packages",
-    "Monorepo Structure",
-    "Command Aliases",
     "n-dx Orchestration Commands",
-    "Direct Tool Access",
     "Key Files",
   ];
 
@@ -142,19 +139,23 @@ describe("instruction file section-level content equivalence", () => {
     }
   });
 
-  it("Monorepo Structure mentions all 6 packages", () => {
-    const claudeStruct = claudeSections.get("Monorepo Structure");
-    const agentsStruct = agentsSections.get("Monorepo Structure");
+  it("Packages section mentions all 6 packages", () => {
+    // Formerly a separate "Monorepo Structure" section (a packages/ tree
+    // listing) — that section was trimmed as derivable content, but the
+    // same package names all still appear within "Packages" via the
+    // nested Architecture diagram and Package conventions table.
+    const claudePkgs = claudeSections.get("Packages");
+    const agentsPkgs = agentsSections.get("Packages");
     const allPackages = ["core", "sourcevision", "rex", "hench", "llm-client", "web"];
     for (const pkg of allPackages) {
-      expect(claudeStruct, `CLAUDE.md structure missing: ${pkg}`).toContain(pkg);
-      expect(agentsStruct, `AGENTS.md structure missing: ${pkg}`).toContain(pkg);
+      expect(claudePkgs, `CLAUDE.md Packages missing: ${pkg}`).toContain(pkg);
+      expect(agentsPkgs, `AGENTS.md Packages missing: ${pkg}`).toContain(pkg);
     }
   });
 
-  it("Monorepo Structure sections share the same architecture diagram markers", () => {
-    const claudeStruct = claudeSections.get("Monorepo Structure");
-    const agentsStruct = agentsSections.get("Monorepo Structure");
+  it("Packages sections share the same architecture diagram markers", () => {
+    const claudePkgs = claudeSections.get("Packages");
+    const agentsPkgs = agentsSections.get("Packages");
     const architectureMarkers = [
       "Four-tier dependency hierarchy",
       "Orchestration",
@@ -164,56 +165,18 @@ describe("instruction file section-level content equivalence", () => {
       "packages/core/",
     ];
     for (const marker of architectureMarkers) {
-      expect(claudeStruct, `CLAUDE.md structure missing: ${marker}`).toContain(marker);
-      expect(agentsStruct, `AGENTS.md structure missing: ${marker}`).toContain(marker);
-    }
-  });
-
-  it("Command Aliases are identical between both files", () => {
-    const claudeAliases = claudeSections.get("Command Aliases");
-    const agentsAliases = agentsSections.get("Command Aliases");
-    // Normalize whitespace for comparison (trim trailing newlines etc.)
-    expect(claudeAliases.trim()).toBe(agentsAliases.trim());
-  });
-
-  it("n-dx Orchestration Commands sections list the same commands", () => {
-    const claudeCommands = claudeSections.get("n-dx Orchestration Commands");
-    const agentsCommands = agentsSections.get("n-dx Orchestration Commands");
-    const expectedCommands = [
-      "ndx init", "ndx analyze", "ndx recommend", "ndx add",
-      "ndx plan", "ndx work", "ndx self-heal",
-      "ndx start", "ndx status", "ndx usage", "ndx sync",
-      "ndx refresh", "ndx dev", "ndx ci", "ndx config", "ndx export",
-    ];
-    for (const cmd of expectedCommands) {
-      expect(claudeCommands, `CLAUDE.md commands missing: ${cmd}`).toContain(cmd);
-      expect(agentsCommands, `AGENTS.md commands missing: ${cmd}`).toContain(cmd);
-    }
-  });
-
-  it("Direct Tool Access sections list the same tool binaries", () => {
-    const claudeTools = claudeSections.get("Direct Tool Access");
-    const agentsTools = agentsSections.get("Direct Tool Access");
-    const toolBinaries = ["rex", "hench", "sourcevision"];
-    for (const tool of toolBinaries) {
-      expect(claudeTools, `CLAUDE.md tools missing: ${tool}`).toContain(tool);
-      expect(agentsTools, `AGENTS.md tools missing: ${tool}`).toContain(tool);
+      expect(claudePkgs, `CLAUDE.md Packages missing: ${marker}`).toContain(marker);
+      expect(agentsPkgs, `AGENTS.md Packages missing: ${marker}`).toContain(marker);
     }
   });
 
   it("Key Files sections reference the same critical paths", () => {
+    // Narrowed to paths currently in both files' Key Files table — the
+    // original list (.sourcevision/*, .rex/workflow.md, .hench/*) reflected
+    // an older, broader table that has since been trimmed.
     const claudeFiles = claudeSections.get("Key Files");
     const agentsFiles = agentsSections.get("Key Files");
-    const criticalPaths = [
-      ".sourcevision/CONTEXT.md",
-      ".sourcevision/manifest.json",
-      ".rex/prd.json",
-      ".rex/workflow.md",
-      ".rex/config.json",
-      ".hench/config.json",
-      ".hench/runs/",
-      ".n-dx.json",
-    ];
+    const criticalPaths = [".rex/prd_tree/", ".rex/prd.json", ".n-dx.json"];
     for (const path of criticalPaths) {
       expect(claudeFiles, `CLAUDE.md key files missing: ${path}`).toContain(path);
       expect(agentsFiles, `AGENTS.md key files missing: ${path}`).toContain(path);
@@ -221,13 +184,10 @@ describe("instruction file section-level content equivalence", () => {
   });
 
   it("shared H3 sections are present in both files", () => {
-    const sharedH3 = [
-      "Architecture",
-      "Package conventions",
-      "Rex commands",
-      "Sourcevision commands",
-      "Hench commands",
-    ];
+    // "Rex commands"/"Sourcevision commands"/"Hench commands" H3s were
+    // trimmed from project-guidance.md in favor of pointing users at
+    // `--help`/README — see cli-doc-sync.test.js's removal for the same reason.
+    const sharedH3 = ["Architecture", "Package conventions"];
     for (const heading of sharedH3) {
       expect(
         claudeH3Sections.has(heading),
@@ -237,16 +197,6 @@ describe("instruction file section-level content equivalence", () => {
         agentsH3Sections.has(heading),
         `AGENTS.md missing H3: ${heading}`,
       ).toBe(true);
-    }
-  });
-
-  it("Rex commands subsection lists the same commands", () => {
-    const claudeRex = claudeH3Sections.get("Rex commands");
-    const agentsRex = agentsH3Sections.get("Rex commands");
-    const rexCommands = ["init", "status", "next", "add", "update", "analyze", "recommend", "mcp"];
-    for (const cmd of rexCommands) {
-      expect(claudeRex, `CLAUDE.md Rex commands missing: ${cmd}`).toContain(cmd);
-      expect(agentsRex, `AGENTS.md Rex commands missing: ${cmd}`).toContain(cmd);
     }
   });
 });
@@ -271,10 +221,11 @@ describe("workflow content parity across instruction files", () => {
     });
   }
 
-  it("both files reference the workflow discipline file (.rex/workflow.md)", () => {
-    expect(claudeContent).toContain(".rex/workflow.md");
-    expect(agentsContent).toContain(".rex/workflow.md");
-  });
+  // Note: ".rex/workflow.md" is referenced only by AGENTS.md's "## Workflow"
+  // section — CLAUDE.md delivers the same task-execution discipline through
+  // the system prompt at runtime rather than in the instruction file itself
+  // (see "AGENTS.md workflow includes commit step" below), so this is not
+  // shared content to assert parity on.
 
   /**
    * Key workflow steps (actions) that both vendors must know about,
@@ -335,10 +286,16 @@ describe("source derivation parity", () => {
   });
 
   it("package descriptions are byte-identical between both files", () => {
-    // The Packages section is copied verbatim from project-guidance.md
-    // to both files. The content should be identical.
-    const claudePkgs = claudeSections.get("Packages");
-    const agentsPkgs = agentsSections.get("Packages");
+    // The package-description bullet list at the top of "## Packages" is
+    // copied verbatim from project-guidance.md to both files and should be
+    // identical — but the H2 section as a whole now diverges beyond that
+    // point (CLAUDE.md nests several Claude-only H3/H4/H5 subsections, e.g.
+    // zone fragility governance and Gateway modules, that AGENTS.md doesn't
+    // include), so only the shared bullet-list prefix (before the first H3)
+    // is compared, not the full section.
+    const bulletListPrefix = (section) => section.split(/\n### /)[0];
+    const claudePkgs = bulletListPrefix(claudeSections.get("Packages"));
+    const agentsPkgs = bulletListPrefix(agentsSections.get("Packages"));
     expect(claudePkgs).toBe(agentsPkgs);
   });
 

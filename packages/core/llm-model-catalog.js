@@ -32,21 +32,21 @@
 /** @type {Record<string, ModelEntry[]>} */
 export const LLM_MODEL_CATALOG = {
   codex: [
-    { id: "gpt-5.5", label: "GPT-5.5", recommended: true },
-    { id: "gpt-5.4", label: "GPT-5.4", recommended: false },
-    { id: "gpt-5.4-mini", label: "GPT-5.4 Mini", recommended: false },
-    { id: "gpt-5.3-codex", label: "GPT-5.3 Codex", recommended: false },
+    { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", recommended: true },
+    { id: "gpt-5.6-sol", label: "GPT-5.6 Sol", recommended: false },
+    { id: "gpt-5.6-luna", label: "GPT-5.6 Luna", recommended: false },
+    { id: "gpt-5.5", label: "GPT-5.5", recommended: false },
   ],
   claude: [
     { id: "claude-sonnet-5", label: "Claude Sonnet 5", recommended: true },
-    { id: "claude-opus-4-8", label: "Claude Opus 4.8", recommended: false },
+    { id: "claude-opus-5", label: "Claude Opus 5", recommended: false },
     { id: "claude-fable-5", label: "Claude Fable 5", recommended: false },
     { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", recommended: false },
   ],
   google: [
     { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", recommended: true },
-    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", recommended: false },
-    { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash", recommended: false },
+    { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash", recommended: false },
+    { id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash Lite", recommended: false },
   ],
   // Local vendor: no static catalog — available models are fetched live from the
   // running LM Studio / Ollama server at /v1/models during `ndx init`.

@@ -79,10 +79,16 @@ function formatModel(model: string | null, vendor: string | null): string {
 }
 
 /** Short vendor label for the badge (blank for claude — already implied by model name). */
+const DISPLAY_VENDOR = {
+  CLAUDE: "claude",
+  CODEX: "codex",
+  LOCAL: "local",
+} as const;
+
 function vendorPrefix(vendor: string | null): string {
-  if (!vendor || vendor === "claude") return "";
-  if (vendor === "codex") return "codex · ";
-  if (vendor === "local") return "local · ";
+  if (!vendor || vendor === DISPLAY_VENDOR.CLAUDE) return "";
+  if (vendor === DISPLAY_VENDOR.CODEX) return "codex · ";
+  if (vendor === DISPLAY_VENDOR.LOCAL) return "local · ";
   return `${vendor} · `;
 }
 

@@ -14,4 +14,4 @@ acceptanceCriteria: []
 | Title | Status |
 |-------|--------|
 | [Task-Level Utilization Chips and Details Fallback UX](./task-level-utilization-chips-2e6e21.md) | completed |
-| [Vendor/Model Budget Resolution Rules](./vendor-model-budget-resolution-rules.md) | completed |
+| [Vendor/Model Budget Resolution Rules](./vendor-model-budget-resolution-998b67.md) | completed |

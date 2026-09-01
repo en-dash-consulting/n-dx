@@ -205,3 +205,13 @@ The execution panel polling gap (3-second interval continues under pressure) is 
 | High | 4 | Browser compatibility, silent error swallowing, listener propagation |
 | Medium | 5 | Config overlap, schema fragility, false positives, broadcast pressure |
 | Low | 3 | Fallback constants, passive warnings, ring buffer limits |
+
+---
+
+**Related memory documentation**
+
+- [Memory Management Architecture](/architecture/memory-architecture) — system overview across the three tiers
+- [Risks and Flaws](/contributing/memory-system-risks) — known issues by severity
+- [Areas of Improvement](/contributing/memory-system-improvements) — prioritized fixes, each referencing a risk
+- [Refresh Memory Analysis](/contributing/refresh-memory-analysis) — dated profiling of `ndx refresh`
+- [Memory OS Behavior](/process/memory-os-behavior) — platform-specific reporting caveats

@@ -242,7 +242,15 @@ describe("RunChangeDetector", () => {
       // a fractional mtimeMs while utimes stores whole milliseconds, so pinning only
       // the second write would leave the snapshots different and the change would be
       // detected for the wrong reason.
-      const pinned = new Date(Math.floor((await stat(runFile)).mtimeMs));
+      //
+      // The instant is fixed rather than read back from the file so it also sits
+      // inside the granularity window deterministically. Detecting this rewrite
+      // needs the FIRST scan to carry a hash (mtime and size are equal, so the hash
+      // is the only thing left to compare), and that only happens within
+      // MTIME_GRANULARITY_MS (16ms) of the write — a bound a loaded CI runner
+      // misses. When it did, `second.changes` came back empty and the failure read
+      // as a broken detector rather than a missed deadline.
+      const pinned = new Date(Date.now() + 60_000);
       await utimes(runFile, pinned, pinned);
 
       const det = detector();
@@ -264,6 +272,56 @@ describe("RunChangeDetector", () => {
       ]);
     });
 
+    it("treats an unreadable file as no evidence of change, not as a change", async () => {
+      // `hashFile` returns null when the bytes cannot be read, and its docblock
+      // says the caller treats that as "no usable hash" rather than as a change.
+      // The caller did the opposite: the comparison guarded the PREVIOUS hash
+      // against null but not the new one, so a previously-hashed file whose read
+      // now fails compared `"abc" !== null` and was reported modified.
+      //
+      // A null hash is the absence of evidence. The file's mtime and size are
+      // unchanged, so there is nothing to suggest it was rewritten — only that
+      // this scan could not check.
+      const runFile = join(runsDir, "run-a.json");
+      await writeRunFile("run-a.json", '{"id":"aaa"}');
+      // Pin the mtime deterministically INSIDE the granularity window rather than
+      // relying on the scan landing within MTIME_GRANULARITY_MS (16ms) of the
+      // write. Racing that bound made this case flaky on loaded CI runners — the
+      // write-to-scan gap already reaches ~9ms on an idle machine, and once it
+      // exceeds 16ms no hash is carried and the precondition below fails with
+      // `expected 'undefined' to be 'string'`. A fixed instant is also stable
+      // across all three scans, which this case needs (the comparison comes down
+      // to mtime/size equality, so only the freshness check reads it relationally).
+      // Counterpart of the `Date.now() - 60_000` ageing trick in the case below.
+      const pinned = new Date(Date.now() + 60_000);
+      await utimes(runFile, pinned, pinned);
+
+      const det = detector();
+      const first = await det.detectChanges();
+      await det.saveCheckpoint(first.checkpoint);
+
+      // Precondition: the checkpoint really is carrying a hash, so this exercises
+      // the branch it is meant to. Without it the case could pass vacuously.
+      expect(typeof first.checkpoint.files["run-a.json"]?.contentHash).toBe("string");
+
+      // The read fails while stat still succeeds — a locked file, a permissions
+      // change, an I/O error. Injected because reproducing it from the filesystem
+      // is platform-specific, while the branch under test is not.
+      const failing = det as unknown as { hashFile: (file: string) => Promise<string | null> };
+      const realHashFile = failing.hashFile.bind(failing);
+      failing.hashFile = async () => null;
+
+      const second = await det.detectChanges();
+      expect(second.changes).toEqual([]);
+
+      // And once the file can be read again, with the same bytes, it is still not
+      // a change — the unreadable scan must not have poisoned the checkpoint.
+      failing.hashFile = realHashFile;
+      await det.saveCheckpoint(second.checkpoint);
+      const third = await det.detectChanges();
+      expect(third.changes).toEqual([]);
+    });
+
     it("carries a hash only while the mtime is fresh, then drops it", async () => {
       // The hash exists solely for the window where mtime cannot settle the
       // question. If it were carried forever, every scan would read every run file
@@ -272,10 +330,22 @@ describe("RunChangeDetector", () => {
       // on an old file" would also pass if hashing did not exist at all.
       const runFile = join(runsDir, "run-a.json");
       await writeRunFile("run-a.json", '{"id":"aaa"}');
+      // Future pin: "just written" is only inside the granularity window if the
+      // scan starts within milliseconds, which a busy host does not guarantee.
+      const future = new Date(Date.now() + 5000);
+      await utimes(runFile, future, future);
+
+      // Pin forward instead of trusting "just written": the write-to-scan gap has
+      // to stay under MTIME_GRANULARITY_MS (16ms) for a hash to be carried, and a
+      // loaded CI runner misses that. Both phases are now driven by utimes rather
+      // than by elapsed real time — forward for the in-window phase, backward for
+      // the aged phase below.
+      const inWindow = new Date(Date.now() + 60_000);
+      await utimes(runFile, inWindow, inWindow);
 
       const det = detector();
       const fresh = await det.detectChanges();
-      // Just written, so inside the granularity window: hash carried.
+      // Inside the granularity window: hash carried.
       expect(typeof fresh.checkpoint.files["run-a.json"]?.contentHash).toBe("string");
       expect(fresh.checkpoint.files["run-a.json"]?.mtimeMayBeShared).toBe(true);
       await det.saveCheckpoint(fresh.checkpoint);

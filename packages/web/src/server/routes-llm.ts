@@ -16,6 +16,7 @@ import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { invalidateAuthCheckCache } from "./routes-commands.js";
+import { LLM_VENDOR } from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,12 +37,14 @@ export interface LocalVendorConfig {
 
 /** Shape returned by GET /api/llm/config. */
 export interface LlmConfigResponse {
-  /** Active LLM vendor: "claude", "codex", "local", or null if unset. */
+  /** Active LLM vendor: "claude", "codex", "google", "local", or null if unset. */
   vendor: string | null;
   /** Claude-specific settings from llm.claude.* */
   claude: VendorConfig;
   /** Codex-specific settings from llm.codex.* */
   codex: VendorConfig;
+  /** Google Gemini settings from llm.google.* */
+  google: VendorConfig;
   /** Local server settings from llm.local.* */
   local: LocalVendorConfig;
   /**
@@ -64,7 +67,12 @@ interface LlmConfigPutBody {
 // ---------------------------------------------------------------------------
 
 const NDX_CONFIG = ".n-dx.json";
-const VALID_VENDORS = new Set(["claude", "codex", "local"]);
+const VALID_VENDORS: ReadonlySet<string> = new Set([
+  LLM_VENDOR.CLAUDE,
+  LLM_VENDOR.CODEX,
+  LLM_VENDOR.GOOGLE,
+  LLM_VENDOR.LOCAL,
+]);
 
 /** Writable paths. Auth fields (api_key, api_endpoint, cli_path) are excluded. */
 const VALID_PATHS = new Set([
@@ -73,6 +81,8 @@ const VALID_PATHS = new Set([
   "llm.claude.lightModel",
   "llm.codex.model",
   "llm.codex.lightModel",
+  "llm.google.model",
+  "llm.google.lightModel",
   "llm.local.model",
   "llm.local.lightModel",
   "llm.local.host",
@@ -142,6 +152,7 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmClaude = (llm["claude"] ?? {}) as Record<string, unknown>;
   const llmCodex = (llm["codex"] ?? {}) as Record<string, unknown>;
+  const llmGoogle = (llm["google"] ?? {}) as Record<string, unknown>;
   const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
   const legacyClaude = (config["claude"] ?? {}) as Record<string, unknown>;
 
@@ -154,6 +165,10 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
     codex: {
       model: getString(llmCodex, "model"),
       lightModel: getString(llmCodex, "lightModel"),
+    },
+    google: {
+      model: getString(llmGoogle, "model"),
+      lightModel: getString(llmGoogle, "lightModel"),
     },
     local: {
       model: getString(llmLocal, "model"),

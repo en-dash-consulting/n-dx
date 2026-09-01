@@ -63,16 +63,21 @@ function run(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, "config", ...args], {
     encoding: "utf-8",
     timeout: DEFAULT_TIMEOUT,
+    // execFileSync sends child stderr to the parent's stderr unless stdio is
+    // set, so without this the CLI's own notices print into the vitest report
+    // and read as failures of the run rather than output of a fixture.
+    stdio: "pipe",
     ...opts,
   });
 }
 
-function runFail(args) {
+function runFail(args, opts = {}) {
   try {
     execFileSync("node", [CLI_PATH, "config", ...args], {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
+      ...opts,
     });
     throw new Error("Expected command to fail");
   } catch (err) {
@@ -151,6 +156,70 @@ describe("n-dx config", () => {
 
   afterEach(async () => {
     await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  // ── Positional disambiguation ──────────────────────────────────────────────
+
+  // `n-dx config [dir]` and `n-dx config <key>` share the same slot. Resolving
+  // that tie by disk existence alone made a directory shadow a config key: in a
+  // project containing a `hench/` subdirectory, `n-dx config hench` read the
+  // directory, dropped the key, and reported the project as uninitialized.
+  describe("single positional: key vs directory", () => {
+    it("resolves a known key as a key even when a directory of that name exists", async () => {
+      await mkdir(join(tmpDir, "hench"), { recursive: true });
+      const output = run(["hench"], { cwd: tmpDir });
+      expect(output).toContain("hench");
+      expect(output).not.toContain("No n-dx configuration found");
+    });
+
+    it("resolves a dotted key as a key even when a directory of that exact name exists", async () => {
+      // The directory is named `rex.project`, so existence alone would shadow
+      // the dotted key the same way a bare section name was shadowed.
+      await mkdir(join(tmpDir, "rex.project"), { recursive: true });
+      const output = run(["rex.project"], { cwd: tmpDir });
+      expect(output).toContain("test-project");
+    });
+
+    it("pre-dispatch does not report an initialized project stale when a key shadows a directory", async () => {
+      // The handler already resolved the key correctly; the PRE-DISPATCH layer
+      // (config reads, staleness check) used disk existence alone and pointed
+      // at ./hench, printing "Project setup incomplete" for a fully
+      // initialized project. Both layers must apply the same key-beats-
+      // directory tiebreaker.
+      await mkdir(join(tmpDir, "hench"), { recursive: true });
+      await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+      const res = spawnSync("node", [CLI_PATH, "config", "hench"], {
+        cwd: tmpDir,
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+      });
+      expect(res.stderr ?? "").not.toContain("Project setup incomplete");
+      expect(res.stdout).toContain("hench");
+    });
+
+    it("pre-dispatch applies the same tiebreaker to a dotted key with a same-named directory", async () => {
+      await mkdir(join(tmpDir, "rex.project"), { recursive: true });
+      await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+      const res = spawnSync("node", [CLI_PATH, "config", "rex.project"], {
+        cwd: tmpDir,
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+      });
+      expect(res.stderr ?? "").not.toContain("Project setup incomplete");
+    });
+
+    it("still resolves an explicit ./ path as a directory", async () => {
+      await mkdir(join(tmpDir, "hench"), { recursive: true });
+      const stderr = runFail(["./hench"], { cwd: tmpDir });
+      expect(stderr).toContain("No n-dx configuration found");
+    });
+
+    it("still resolves a directory name that is not a config key", async () => {
+      const nested = join(tmpDir, "packages");
+      await mkdir(nested, { recursive: true });
+      const stderr = runFail(["packages"], { cwd: tmpDir });
+      expect(stderr).toContain("No n-dx configuration found");
+    });
   });
 
   // ── Show all ───────────────────────────────────────────────────────────────
@@ -948,7 +1017,7 @@ describe("n-dx config", () => {
     it("shows model examples", () => {
       const output = run(["--help"]);
       expect(output).toContain("claude-sonnet-5");
-      expect(output).toContain("claude-opus-4-8");
+      expect(output).toContain("claude-opus-5");
     });
 
     it("includes api_endpoint example", () => {

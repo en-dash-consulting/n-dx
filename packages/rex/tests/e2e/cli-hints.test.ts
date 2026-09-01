@@ -13,17 +13,31 @@ import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 
 const CLI_PATH = join(import.meta.dirname, "../../dist/cli/index.js");
+
+/** Per-test temp project; module-scoped so runResult can default `cwd` to it. */
+let tmpDir: string;
 const UNKNOWN_COMMAND_CODE = "NDX_CLI_UNKNOWN_COMMAND";
 const TIMEOUT = 10_000;
 
+/**
+ * Run the rex CLI.
+ *
+ * `cwd` defaults to the per-test temp project. Rex checks "is this directory
+ * initialized?" *before* it validates the command name, so unknown-command
+ * assertions only reach the hint path from inside an initialized project.
+ * Leaving cwd unset would inherit the vitest process cwd (`packages/rex`) and
+ * make these tests depend on whatever happens to be on disk there.
+ */
 function runResult(
   args: string[],
+  cwd: string = tmpDir,
 ): { stdout: string; stderr: string; code: number } {
   try {
     const stdout = execFileSync("node", [CLI_PATH, ...args], {
       encoding: "utf-8",
       timeout: TIMEOUT,
       stdio: "pipe",
+      cwd,
     });
     return { stdout, stderr: "", code: 0 };
   } catch (err: unknown) {
@@ -33,10 +47,14 @@ function runResult(
 }
 
 describe("rex CLI hint surfacing and follow-through", () => {
-  let tmpDir: string;
-
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-hints-"));
+    // Initialize so unknown-command hints are reachable (see runResult docs).
+    execFileSync("node", [CLI_PATH, "init", tmpDir], {
+      encoding: "utf-8",
+      timeout: TIMEOUT,
+      stdio: "pipe",
+    });
   });
 
   afterEach(async () => {
@@ -53,8 +71,6 @@ describe("rex CLI hint surfacing and follow-through", () => {
     });
 
     it("follow-through: hinted 'status' exits 0 after init", () => {
-      const init = runResult(["init", tmpDir]);
-      expect(init.code).toBe(0);
       const { code } = runResult(["status", tmpDir]);
       expect(code).toBe(0);
     });
@@ -68,8 +84,6 @@ describe("rex CLI hint surfacing and follow-through", () => {
     });
 
     it("follow-through: hinted 'validate' exits 0 after init", () => {
-      const init = runResult(["init", tmpDir]);
-      expect(init.code).toBe(0);
       const { code } = runResult(["validate", tmpDir]);
       expect(code).toBe(0);
     });
@@ -83,8 +97,6 @@ describe("rex CLI hint surfacing and follow-through", () => {
     });
 
     it("follow-through: hinted 'next' does not error with unknown-command after init", () => {
-      const init = runResult(["init", tmpDir]);
-      expect(init.code).toBe(0);
       const { stderr } = runResult(["next", tmpDir]);
       // 'next' may exit non-0 when no tasks are pending, but it must not be
       // an unknown-command error — the hint was correct.

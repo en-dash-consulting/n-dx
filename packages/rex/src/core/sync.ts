@@ -1,5 +1,6 @@
 import type { PRDItem, LogEntry } from "../schema/index.js";
 import { walkTree } from "./tree.js";
+import { resolveActor } from "./identity.js";
 
 /**
  * Sync metadata attached to PRDItems via the `[key: string]: unknown` index.
@@ -8,6 +9,8 @@ import { walkTree } from "./tree.js";
 export interface SyncMetadata {
   /** ISO 8601 timestamp of last local modification */
   lastModified?: string;
+  /** Actor (git identity or OS user) who made the last local modification */
+  lastModifiedBy?: string;
   /** ISO 8601 timestamp of last successful sync to/from remote */
   lastSyncedAt?: string;
   /** Opaque identifier for the item in the remote system (e.g. Notion page ID) */
@@ -39,6 +42,7 @@ export interface SyncResult {
  */
 const SYNC_META_FIELDS = new Set([
   "lastModified",
+  "lastModifiedBy",
   "lastSyncedAt",
   "remoteId",
   "children",
@@ -211,17 +215,56 @@ export function conflictToLogEntry(conflict: ConflictRecord): LogEntry {
   };
 }
 
+/** The two fields stamped by {@link stampModified}. */
+export interface ModifiedFields {
+  lastModified: string;
+  lastModifiedBy: string;
+}
+
 /**
- * Stamp the current time as lastModified on an item.
- * Used by store operations to track when items change locally.
+ * Resolve the `lastModified` / `lastModifiedBy` field values without
+ * requiring a full {@link PRDItem}. Used by store adapters that apply a
+ * partial update (e.g. `Object.assign`-style merges) rather than
+ * constructing the full merged item up front.
  */
-export function stampModified(
+export async function stampModifiedFields(
+  timestamp?: string,
+  actor?: string,
+): Promise<ModifiedFields> {
+  return {
+    lastModified: timestamp ?? new Date().toISOString(),
+    lastModifiedBy: actor ?? (await resolveActor()),
+  };
+}
+
+/**
+ * Stamp the current time and resolved actor as lastModified/lastModifiedBy
+ * on an item. Used by store operations to track when — and by whom — items
+ * change locally.
+ */
+export async function stampModified(
   item: PRDItem,
   timestamp?: string,
-): PRDItem {
+  actor?: string,
+): Promise<PRDItem> {
   return {
     ...item,
-    lastModified: timestamp ?? new Date().toISOString(),
+    ...(await stampModifiedFields(timestamp, actor)),
+  };
+}
+
+/**
+ * Stamp the resolved actor identity onto a log entry, unless the entry
+ * already carries an explicit `actor` (e.g. one reconstructed from a
+ * remote sync, authored by someone else).
+ */
+export async function stampActor(
+  entry: LogEntry,
+  actor?: string,
+): Promise<LogEntry> {
+  return {
+    actor: actor ?? (await resolveActor()),
+    ...entry,
   };
 }
 

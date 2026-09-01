@@ -79,7 +79,7 @@ describe("loadLLMConfig", () => {
         llm: {
           codex: {
             model: "gpt-5.5",
-            lightModel: "gpt-5.4-mini",
+            lightModel: "gpt-5.6-luna",
           },
         },
       }, null, 2),
@@ -88,7 +88,7 @@ describe("loadLLMConfig", () => {
 
     const cfg = await loadLLMConfig(tmpDir);
     expect(cfg.codex?.model).toBe("gpt-5.5");
-    expect(cfg.codex?.lightModel).toBe("gpt-5.4-mini");
+    expect(cfg.codex?.lightModel).toBe("gpt-5.6-luna");
   });
 
   it("ignores non-string lightModel values", async () => {
@@ -223,7 +223,7 @@ describe("loadLLMConfig", () => {
 
     const cfg = await loadLLMConfig(tmpDir);
     // gpt-5-codex is a legacy alias normalized to NEWEST_MODELS.codex
-    expect(cfg.model).toBe("gpt-5.5");
+    expect(cfg.model).toBe("gpt-5.6-terra");
   });
 
   it("ignores non-string and empty top-level llm.model values", async () => {

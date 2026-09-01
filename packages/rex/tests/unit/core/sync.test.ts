@@ -1,4 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+
+vi.mock("../../../src/core/identity.js", () => ({
+  resolveActor: vi.fn().mockResolvedValue("Test Actor <test@example.com>"),
+}));
+
 import {
   detectChangedFields,
   isModifiedSinceSync,
@@ -7,6 +12,7 @@ import {
   conflictToLogEntry,
   stampModified,
   stampSynced,
+  stampActor,
   extractSyncMeta,
 } from "../../../src/core/sync.js";
 import type { PRDItem } from "../../../src/schema/index.js";
@@ -419,29 +425,66 @@ describe("conflictToLogEntry", () => {
 });
 
 describe("stampModified", () => {
-  it("sets lastModified to current time", () => {
+  it("sets lastModified to current time", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
 
     const item = makeItem({ id: "t1", title: "Task" });
-    const stamped = stampModified(item);
+    const stamped = await stampModified(item);
     expect(stamped.lastModified).toBe("2024-06-15T12:00:00.000Z");
     expect(stamped.id).toBe("t1");
 
     vi.useRealTimers();
   });
 
-  it("accepts explicit timestamp", () => {
+  it("accepts explicit timestamp", async () => {
     const item = makeItem({ id: "t1", title: "Task" });
-    const stamped = stampModified(item, "2024-01-01T00:00:00Z");
+    const stamped = await stampModified(item, "2024-01-01T00:00:00Z");
     expect(stamped.lastModified).toBe("2024-01-01T00:00:00Z");
   });
 
-  it("does not mutate original item", () => {
+  it("does not mutate original item", async () => {
     const item = makeItem({ id: "t1", title: "Task" });
-    const stamped = stampModified(item, "2024-01-01T00:00:00Z");
+    const stamped = await stampModified(item, "2024-01-01T00:00:00Z");
     expect(item.lastModified).toBeUndefined();
     expect(stamped).not.toBe(item);
+  });
+
+  it("stamps lastModifiedBy with the resolved actor", async () => {
+    const item = makeItem({ id: "t1", title: "Task" });
+    const stamped = await stampModified(item);
+    expect(stamped.lastModifiedBy).toBe("Test Actor <test@example.com>");
+  });
+
+  it("accepts an explicit actor override", async () => {
+    const item = makeItem({ id: "t1", title: "Task" });
+    const stamped = await stampModified(item, undefined, "someone-else");
+    expect(stamped.lastModifiedBy).toBe("someone-else");
+  });
+});
+
+describe("stampActor", () => {
+  it("stamps actor with the resolved identity", async () => {
+    const entry = { timestamp: "2024-01-01T00:00:00Z", event: "item_added" };
+    const stamped = await stampActor(entry);
+    expect(stamped.actor).toBe("Test Actor <test@example.com>");
+    expect(stamped.event).toBe("item_added");
+  });
+
+  it("does not override an explicit actor already on the entry", async () => {
+    const entry = {
+      timestamp: "2024-01-01T00:00:00Z",
+      event: "sync_conflict",
+      actor: "remote-system",
+    };
+    const stamped = await stampActor(entry);
+    expect(stamped.actor).toBe("remote-system");
+  });
+
+  it("accepts an explicit actor override argument", async () => {
+    const entry = { timestamp: "2024-01-01T00:00:00Z", event: "item_added" };
+    const stamped = await stampActor(entry, "explicit-actor");
+    expect(stamped.actor).toBe("explicit-actor");
   });
 });
 

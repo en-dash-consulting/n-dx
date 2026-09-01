@@ -285,10 +285,7 @@ describe("AGENTS.md format stability", () => {
   const expectedSections = [
     "# n-dx",
     "## Packages",
-    "## Monorepo Structure",
-    "## Command Aliases",
     "## n-dx Orchestration Commands",
-    "## Direct Tool Access",
     "## Key Files",
     "## Workflow",
     "## Available Skills",
