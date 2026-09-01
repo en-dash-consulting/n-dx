@@ -2,7 +2,7 @@
 id: "cdca501f-3694-44c9-af19-ef9feeb4be59"
 level: "task"
 title: "PRD tree slug migration took three full-document saves to converge"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "e2e-finding"
@@ -10,6 +10,11 @@ tags:
   - "slug-naming"
   - "severity:medium"
 source: "ndx-capture"
+startedAt: "2026-09-01T01:45:47.790Z"
+completedAt: "2026-09-01T02:02:01.734Z"
+endedAt: "2026-09-01T02:02:01.734Z"
+resolutionType: "code-change"
+resolutionDetail: "Commit 7fb079f6. (1) Why three saves: it never needed three — they oscillated rather than converged. 6a6ba0a3 removed the id6 suffix, 59163d61 restored it, 4b1a5c00 removed it again, directories flipping identically. That is two writers with different slug rules alternating; the bare untruncated form is pre-#343 slugify (normalizeTitleSlug without appendShortIdSuffix or truncation), so one writer ran a build from before e02a5fee. The task's own \"incomplete migration finishing in stages\" reading is retracted. (2) Whole tree, confirmed and documented: writeTree passes the ENTIRE document to serializeFolderTree and removes every entry the document does not account for; addItem/updateItem/removeItem are read-modify-write over the whole document. The module contract claimed the opposite (\"single-item mutations avoid full-tree re-serialization when possible\") — that false line is what made a partial-write explanation plausible, and it is now corrected. (3) Fresh clone verified stable: a pristine copy of the committed tree, loaded and saved unchanged by the current build, produced 0 changed paths, 1401 items before and after. (4) Absence of pre-migration names confirmed: all 1401 entries carry -{id6}. The 4 apparent exceptions are false positives from a hex-only regex — human-readable ids (feat-full-pipeline-subdivision) give alphabetic suffixes (featfu). (5) Operator legibility shipped: SerializeResult now tracks filesRemoved and itemsWritten, and the store prints the item-count/removal-count comparison at migration scale, so the check that previously had to be done by hand (972 before, 972 after) is printed at the moment it is needed. Five unit tests cover the threshold and the files-not-just-directories counting."
 acceptanceCriteria:
   - "Established why the migration needed three full-document saves rather than one"
   - "Confirmed whether a save rewrites the whole tree or only loaded subtrees, and documented which"
@@ -17,6 +22,6 @@ acceptanceCriteria:
   - "Any remaining pre-migration <slug>-<6hex> names in the tree are identified, or their absence confirmed"
   - "A migration-scale rewrite is distinguishable from data loss in whatever the operator sees"
 description: "CORRECTED after further evidence. Originally filed as \"slug naming does not round-trip\", claiming the write path was permanently unstable. That claim was wrong and is retracted — the churn converged.\n\nWhat was observed: three consecutive PRD writes each produced a ~900-file diff, almost entirely renames between two naming forms. On disk, cli-developer-tools-9af1c8/.../apply-color-formatting-to-rex-0225e4.md; written by the store, .../apply-color-formatting-to-rex-cli-output.md. Directories flipped the same way (child-process-cleanup-and-exit-b67648 to child-process-cleanup-and-exit-hygiene). So the reader accepts <slug>-<6hex> while the writer emits an untruncated bare slug.\n\nThe churn appeared across commits 6a6ba0a3 (801 files), 59163d61 (801 files, written by hench run 60c3a951), and 4b1a5c00 (762 deleted / 183 added). After those three, a batch of three PRD writes touching two items produced exactly three changed files — proportional and correct. The write path is therefore stable now; what looked like instability was an incomplete migration finishing in stages. HEAD before all this was \"complete the PRD tree slug migration missed by the #343 squash\", which is consistent.\n\nWhat remains worth answering rather than closing outright:\n1. Why three separate full-document saves were needed instead of one. If a save only rewrites the subtree it loaded, a partial migration can persist indefinitely until every branch happens to be touched — which is what appears to have happened, and would recur on any repo still carrying pre-migration names.\n2. Whether a fresh clone is stable, or whether a first write there reproduces the ~900-file diff.\n3. The operator experience: a single status change producing 762 deletions read as mass data loss during this session and took an item-count comparison (972 before, 972 after) to disprove. Anything that makes a migration rewrite legible as a migration would prevent that.\n\nDowngraded from high to medium: the merge-driver collision risk that motivated the original priority is historical now that the tree has converged."
-lastModified: "2026-08-27T17:14:59.491Z"
+lastModified: "2026-09-01T02:02:01.758Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
