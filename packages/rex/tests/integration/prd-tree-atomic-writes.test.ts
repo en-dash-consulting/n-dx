@@ -16,7 +16,7 @@ import { FolderTreeStore } from "../../src/store/folder-tree-store.js";
 import type { PRDItem } from "../../src/schema/index.js";
 import { SCHEMA_VERSION } from "../../src/schema/index.js";
 import { acquireLock } from "../../src/store/file-lock.js";
-import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
+import { PRD_TREE_DIRNAME, PRD_TREE_LOCK_FILENAME } from "../../src/store/index.js";
 
 // ── Test fixtures ──────────────────────────────────────────────────────────
 
@@ -197,7 +197,7 @@ describe("prd_tree atomic writes and crash-safety", () => {
      * this MORE certainly true, not less — the failure direction is safe.
      */
     it("does not grant the lock to a second writer while the first holds it", async () => {
-      const lockPath = join(rexDir, "prd.lock");
+      const lockPath = join(rexDir, PRD_TREE_LOCK_FILENAME);
 
       const releaseFirst = await acquireLock(lockPath);
 
@@ -238,7 +238,7 @@ describe("prd_tree atomic writes and crash-safety", () => {
     });
 
     it("lock timeout prevents indefinite waiting", async () => {
-      const lockPath = join(rexDir, "prd.lock");
+      const lockPath = join(rexDir, PRD_TREE_LOCK_FILENAME);
 
       // Manually create a stale lock (very old timestamp)
       const staleTime = new Date(Date.now() - 60 * 1000).toISOString(); // 60 seconds ago
@@ -251,7 +251,7 @@ describe("prd_tree atomic writes and crash-safety", () => {
 
       // Lock should be cleaned up
       const entries = await readdir(rexDir);
-      expect(entries).not.toContain("prd.lock");
+      expect(entries).not.toContain(PRD_TREE_LOCK_FILENAME);
     });
 
     it("concurrent mutations don't corrupt PRD state", async () => {
