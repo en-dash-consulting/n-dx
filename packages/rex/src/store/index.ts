@@ -33,6 +33,8 @@ export {
   slugifyTitle,
   resolveSiblingSlugs,
 } from "./folder-tree-serializer.js";
+export { findNonConformingSlugs } from "./folder-tree-serializer.js";
+export type { SlugMismatch } from "./folder-tree-serializer.js";
 export type { SerializeResult } from "./folder-tree-serializer.js";
 export { parseFolderTree } from "./folder-tree-parser.js";
 export type { FolderParseResult, ParseWarning } from "./folder-tree-parser.js";

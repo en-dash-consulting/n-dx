@@ -20,6 +20,6 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Consolidate PRD items that collide on a title-only slug](./consolidate-prd-items-that-f0ca95.md) | pending |
-| [Make the MCP and CLI write paths agree on the slug convention](./make-the-mcp-and-cli-write-c1589e.md) | pending |
+| [Make the MCP and CLI write paths agree on the slug convention](./make-the-mcp-and-cli-write-c1589e.md) | completed |
 | [Point migrate-slugs at the readable convention](./point-migrate-slugs-at-the-ab96ea.md) | pending |
 | [Replace the id-qualified slug with a title-only slug, guarding merge safety in validate](./replace-the-id-qualified-slug-5836fe.md) | pending |
