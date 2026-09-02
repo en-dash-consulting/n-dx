@@ -15,4 +15,4 @@ description: "Establish the accessibility baseline across all dashboard pages by
 
 | Title | Status |
 |-------|--------|
-| [Establish semantic HTML structure, ARIA landmark roles, skip-navigation, and keyboard focus management across all dashboard routes](./establish-semantic-html-ddc95a.md) | completed |
+| [Establish semantic HTML structure, ARIA landmark roles, skip-navigation, and keyboard focus management across all dashboard routes](./establish-semantic-html-structure-aria.md) | completed |

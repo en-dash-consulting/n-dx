@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in refresh: High coupling (0.67) — 3 imports target "web-unit"](./fix-observation-in-refresh-high-dd7a6d.md) | completed |
+| [Fix observation in refresh: High coupling (0.67) — 3 imports target "web-unit"](./fix-observation-in-refresh-high.md) | completed |

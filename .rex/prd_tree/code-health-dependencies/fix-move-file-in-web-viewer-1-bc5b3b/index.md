@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix move-file in web-viewer: File "packages/web/src/viewer/components/prd-tree/status-filter.ts" is pinned to](./fix-move-file-in-web-viewer-755f11.md) | completed |
+| [Fix move-file in web-viewer: File "packages/web/src/viewer/components/prd-tree/status-filter.ts" is pinned to](./fix-move-file-in-web-viewer-file.md) | completed |

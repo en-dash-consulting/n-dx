@@ -17,5 +17,5 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Merge driver core: rex merge-driver command with three-way frontmatter-aware merge](./merge-driver-core-rex-merge-5a73fb.md) | completed |
-| [Register rex-prd merge driver during ndx init (.gitattributes + git config, idempotent)](./register-rex-prd-merge-driver-2e82c5.md) | completed |
+| [Merge driver core: rex merge-driver command with three-way frontmatter-aware merge](./merge-driver-core-rex-merge-driver.md) | completed |
+| [Register rex-prd merge driver during ndx init (.gitattributes + git config, idempotent)](./register-rex-prd-merge-driver-during.md) | completed |

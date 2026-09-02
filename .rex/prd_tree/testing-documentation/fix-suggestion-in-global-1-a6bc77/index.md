@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix suggestion in global: 4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): r](./fix-suggestion-in-global-4-88ecc1.md) | completed |
+| [Fix suggestion in global: 4 zones exceed architectural risk thresholds (cohesion < 0.4, coupling > 0.6): r](./fix-suggestion-in-global-4-zones.md) | completed |

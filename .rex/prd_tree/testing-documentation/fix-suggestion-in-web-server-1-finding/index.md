@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix suggestion in web-server: Zone "Web Server" (web-server) has critical risk (score: 0.67, cohesion: 0.33, c](./fix-suggestion-in-web-server-0ee4d1.md) | completed |
+| [Fix suggestion in web-server: Zone "Web Server" (web-server) has critical risk (score: 0.67, cohesion: 0.33, c](./fix-suggestion-in-web-server-zone-web.md) | completed |

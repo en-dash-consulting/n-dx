@@ -14,4 +14,4 @@ description: "Surface per-item token usage and duration in the web dashboard so 
 
 | Title | Status |
 |-------|--------|
-| [Render token usage and duration columns on the PRD tree view](./render-token-usage-and-duration-4fdeed.md) | completed |
+| [Render token usage and duration columns on the PRD tree view](./render-token-usage-and-duration.md) | completed |

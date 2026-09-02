@@ -13,5 +13,5 @@ description: "Fix the ndx add orchestration command which currently throws a mis
 
 | Title | Status |
 |-------|--------|
-| [Add regression test for ndx add CLI delegation](./add-regression-test-for-ndx-add-caf631.md) | completed |
-| [Diagnose and fix ndx add spawn delegation in cli.js](./diagnose-and-fix-ndx-add-spawn-ed5194.md) | completed |
+| [Add regression test for ndx add CLI delegation](./add-regression-test-for-ndx-add-cli.md) | completed |
+| [Diagnose and fix ndx add spawn delegation in cli.js](./diagnose-and-fix-ndx-add-spawn.md) | completed |

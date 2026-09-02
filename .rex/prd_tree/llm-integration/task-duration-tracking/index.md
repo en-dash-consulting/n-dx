@@ -14,5 +14,5 @@ description: "Record start and end timestamps for work on a task so the system c
 
 | Title | Status |
 |-------|--------|
-| [Aggregate durations up the PRD tree and expose alongside token usage](./aggregate-durations-up-the-prd-8f8ab3.md) | completed |
-| [Record task start and end timestamps from hench runs and status transitions](./record-task-start-and-end-89bd6c.md) | completed |
+| [Aggregate durations up the PRD tree and expose alongside token usage](./aggregate-durations-up-the-prd-tree.md) | completed |
+| [Record task start and end timestamps from hench runs and status transitions](./record-task-start-and-end-timestamps.md) | completed |

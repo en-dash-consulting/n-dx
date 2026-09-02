@@ -14,4 +14,4 @@ description: "Extend the existing Windows Docker gauntlet to include a macOS-rep
 
 | Title | Status |
 |-------|--------|
-| [Build Linux/macOS-representative Docker container with ndx base command tests](./build-linux-macos-c17d87.md) | completed |
+| [Build Linux/macOS-representative Docker container with ndx base command tests](./build-linux-macos-representative.md) | completed |

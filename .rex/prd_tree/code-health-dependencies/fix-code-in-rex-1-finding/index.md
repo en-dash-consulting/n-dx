@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix code in rex: packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree, ](./fix-code-in-rex-packages-rex-4fc913.md) | completed |
+| [Fix code in rex: packages/rex/src/cli/commands/ imports from 40+ internal submodules (core/tree, ](./fix-code-in-rex-packages-rex-src-cli.md) | completed |

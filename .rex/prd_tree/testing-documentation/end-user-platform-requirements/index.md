@@ -14,5 +14,5 @@ description: "Surface clear, accurate OS and runtime version requirements so use
 
 | Title | Status |
 |-------|--------|
-| [Define and document supported OS matrix in README and docs](./define-and-document-supported-b5b467.md) | completed |
-| [Document Node.js and pnpm version prerequisites for end users](./document-node-js-and-pnpm-ca9e53.md) | completed |
+| [Define and document supported OS matrix in README and docs](./define-and-document-supported-os.md) | completed |
+| [Document Node.js and pnpm version prerequisites for end users](./document-node-js-and-pnpm-version.md) | completed |

@@ -14,5 +14,5 @@ description: "Extend the PRD item schema and write paths so each item records th
 
 | Title | Status |
 |-------|--------|
-| [Add branch and source-file fields to PRD item schema and storage](./add-branch-and-source-file-95037b.md) | completed |
-| [Populate branch attribution on item create and edit across all write paths](./populate-branch-attribution-on-07714a.md) | completed |
+| [Add branch and source-file fields to PRD item schema and storage](./add-branch-and-source-file-fields-to.md) | completed |
+| [Populate branch attribution on item create and edit across all write paths](./populate-branch-attribution-on-item.md) | completed |

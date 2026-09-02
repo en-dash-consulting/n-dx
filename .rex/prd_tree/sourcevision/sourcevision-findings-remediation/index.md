@@ -24,11 +24,11 @@ description: "Umbrella epic for completed sourcevision analysis findings — obs
 | [Address anti-pattern issues (10 findings)](./address-anti-pattern-issues-10-292449.md) | completed |
 | [Address anti-pattern issues (10 findings)](./address-anti-pattern-issues-10-731ea4.md) | completed |
 | [Address anti-pattern issues (10 findings)](./address-anti-pattern-issues-10-b290a8.md) | completed |
-| [Address anti-pattern issues (11 findings)](./address-anti-pattern-issues-11-7db09c.md) | completed |
+| [Address anti-pattern issues (11 findings)](./address-anti-pattern-issues-11-findings.md) | completed |
 | [Address anti-pattern issues (12 findings)](./address-anti-pattern-issues-12-39caaa.md) | completed |
 | [Address anti-pattern issues (12 findings)](./address-anti-pattern-issues-12-ef00ef.md) | completed |
-| [Address anti-pattern issues (13 findings)](./address-anti-pattern-issues-13-b5dae0.md) | completed |
-| [Address anti-pattern issues (16 findings)](./address-anti-pattern-issues-16-b6a036.md) | completed |
+| [Address anti-pattern issues (13 findings)](./address-anti-pattern-issues-13-findings.md) | completed |
+| [Address anti-pattern issues (16 findings)](./address-anti-pattern-issues-16-findings.md) | completed |
 | [Address anti-pattern issues (2 findings)](./address-anti-pattern-issues-2-findings.md) | completed |
 | [Address anti-pattern issues (7 findings)](./address-anti-pattern-issues-7-findings.md) | completed |
 | [Address anti-pattern issues (8 findings)](./address-anti-pattern-issues-8-findings.md) | completed |
@@ -78,7 +78,7 @@ description: "Umbrella epic for completed sourcevision analysis findings — obs
 | [Address pattern issues (4 findings)](./address-pattern-issues-4-findings-e991d8.md) | completed |
 | [Address pattern issues (5 findings)](./address-pattern-issues-5-findings-0debca.md) | completed |
 | [Address pattern issues (5 findings)](./address-pattern-issues-5-findings-c04e84.md) | completed |
-| [Address relationship issues (11 findings)](./address-relationship-issues-11-510283.md) | completed |
+| [Address relationship issues (11 findings)](./address-relationship-issues-11-findings.md) | completed |
 | [Address relationship issues (12 findings)](./address-relationship-issues-12-610c13.md) | completed |
 | [Address relationship issues (12 findings)](./address-relationship-issues-12-ab1586.md) | completed |
 | [Address relationship issues (3 findings)](./address-relationship-issues-3-251fbe.md) | completed |

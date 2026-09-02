@@ -18,5 +18,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Actor attribution on hench RunRecord](./actor-attribution-on-hench-runrecord.md) | completed |
-| [Actor resolution and lastModifiedBy in rex](./actor-resolution-and-3bb125.md) | completed |
-| [Stamp lastModified on FolderTreeStore writes](./stamp-lastmodified-on-3cd289.md) | completed |
+| [Actor resolution and lastModifiedBy in rex](./actor-resolution-and-lastmodifiedby-in.md) | completed |
+| [Stamp lastModified on FolderTreeStore writes](./stamp-lastmodified-on-foldertreestore.md) | completed |

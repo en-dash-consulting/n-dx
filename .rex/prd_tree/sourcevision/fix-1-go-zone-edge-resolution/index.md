@@ -14,5 +14,5 @@ description: "Go import edges target package directories rather than individual 
 
 | Title | Status |
 |-------|--------|
-| [Add test coverage for Go zone edge resolution](./add-test-coverage-for-go-zone-95dde9.md) | completed |
-| [Implement Go directory-to-files resolver and update zone pipeline](./implement-go-directory-to-files-9c2806.md) | completed |
+| [Add test coverage for Go zone edge resolution](./add-test-coverage-for-go-zone-edge.md) | completed |
+| [Implement Go directory-to-files resolver and update zone pipeline](./implement-go-directory-to-files.md) | completed |

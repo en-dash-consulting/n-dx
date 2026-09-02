@@ -14,5 +14,5 @@ description: "Projects containing both Go and TypeScript files (e.g., a Go CLI w
 
 | Title | Status |
 |-------|--------|
-| [Add test coverage for mixed-language detection](./add-test-coverage-for-mixed-44a1fc.md) | completed |
-| [Implement multi-language detection and extend Manifest schema](./implement-multi-language-d56717.md) | completed |
+| [Add test coverage for mixed-language detection](./add-test-coverage-for-mixed-language.md) | completed |
+| [Implement multi-language detection and extend Manifest schema](./implement-multi-language-detection-and.md) | completed |

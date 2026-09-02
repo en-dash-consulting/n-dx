@@ -15,5 +15,5 @@ description: "A dedicated CLI command that renders the full PRD hierarchy as a c
 
 | Title | Status |
 |-------|--------|
-| [Apply ANSI color-coding and in-progress markers to `ndx tree` output](./apply-ansi-color-coding-and-in-1ccc2f.md) | completed |
-| [Implement `rex tree` / `ndx tree` command that walks prd_tree and prints an indented hierarchy](./implement-rex-tree-ndx-tree-27de7e.md) | completed |
+| [Apply ANSI color-coding and in-progress markers to `ndx tree` output](./apply-ansi-color-coding-and-in.md) | completed |
+| [Implement `rex tree` / `ndx tree` command that walks prd_tree and prints an indented hierarchy](./implement-rex-tree-ndx-tree-command.md) | completed |

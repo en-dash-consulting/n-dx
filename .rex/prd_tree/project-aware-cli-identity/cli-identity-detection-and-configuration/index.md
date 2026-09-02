@@ -15,5 +15,5 @@ description: "n-dx is a toolkit that can be embedded in any project under any CL
 
 | Title | Status |
 |-------|--------|
-| [Detect project CLI name from package.json bin field and expose in .n-dx.json schema](./detect-project-cli-name-from-2238b4.md) | completed |
-| [Propagate resolved CLI name into hench agent prompts and task briefs](./propagate-resolved-cli-name-7828db.md) | completed |
+| [Detect project CLI name from package.json bin field and expose in .n-dx.json schema](./detect-project-cli-name-from-package.md) | completed |
+| [Propagate resolved CLI name into hench agent prompts and task briefs](./propagate-resolved-cli-name-into-hench.md) | completed |

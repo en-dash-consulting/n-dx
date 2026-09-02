@@ -15,5 +15,5 @@ description: "Implement a Google Gemini vendor adapter in @n-dx/llm-client follo
 
 | Title | Status |
 |-------|--------|
-| [Add Google model tier constants, context-window sizes, and budget definitions to llm-client](./add-google-model-tier-constants-e3b7ea.md) | completed |
-| [Implement Google Gemini vendor adapter in llm-client](./implement-google-gemini-vendor-1fcf2f.md) | completed |
+| [Add Google model tier constants, context-window sizes, and budget definitions to llm-client](./add-google-model-tier-constants.md) | completed |
+| [Implement Google Gemini vendor adapter in llm-client](./implement-google-gemini-vendor-adapter.md) | completed |

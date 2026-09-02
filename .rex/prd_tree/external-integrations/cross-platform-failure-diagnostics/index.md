@@ -14,5 +14,5 @@ description: "Refocus smoke parity validation on standardized error semantics so
 
 | Title | Status |
 |-------|--------|
-| [Document error code meanings and remediation expectations](./document-error-code-meanings-47b55b.md) | completed |
-| [Refactor smoke parity checks to compare normalized error codes](./refactor-smoke-parity-checks-to-0886fe.md) | completed |
+| [Document error code meanings and remediation expectations](./document-error-code-meanings-and.md) | completed |
+| [Refactor smoke parity checks to compare normalized error codes](./refactor-smoke-parity-checks-to.md) | completed |

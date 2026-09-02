@@ -14,7 +14,7 @@ description: "Make Hench capable of executing tasks in Go projects: update guard
 
 | Title | Status |
 |-------|--------|
-| [Add Go guard defaults and language-aware config to Hench](./add-go-guard-defaults-and-fcfc2e.md) | completed |
+| [Add Go guard defaults and language-aware config to Hench](./add-go-guard-defaults-and-language.md) | completed |
 | [Add Go test runner support to Hench](./add-go-test-runner-support-to-hench.md) | completed |
-| [Make Hench agent prompts language-aware for Go projects](./make-hench-agent-prompts-ea5ba3.md) | completed |
-| [Write tests for Hench Go guard defaults, test runner, and language-aware prompts](./write-tests-for-hench-go-guard-121aef.md) | completed |
+| [Make Hench agent prompts language-aware for Go projects](./make-hench-agent-prompts-language.md) | completed |
+| [Write tests for Hench Go guard defaults, test runner, and language-aware prompts](./write-tests-for-hench-go-guard.md) | completed |

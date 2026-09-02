@@ -18,5 +18,5 @@ parentId: "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6"
 | [Command Validation](./command-validation.md) | completed |
 | [Configuration Management](./configuration-management.md) | completed |
 | [Error Handling Improvements](./error-handling-improvements.md) | completed |
-| [Refactor rex package to expose proper public API](./refactor-rex-package-to-expose-fdd4fe.md) | completed |
+| [Refactor rex package to expose proper public API](./refactor-rex-package-to-expose-proper.md) | completed |
 | [Smart Add Interface](./smart-add-interface.md) | completed |

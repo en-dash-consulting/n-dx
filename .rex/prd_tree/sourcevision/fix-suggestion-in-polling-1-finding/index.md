@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix suggestion in polling: Zone "Polling" (polling) has catastrophic risk (score: 0.75, cohesion: 0.25, cou](./fix-suggestion-in-polling-zone-952af9.md) | completed |
+| [Fix suggestion in polling: Zone "Polling" (polling) has catastrophic risk (score: 0.75, cohesion: 0.25, cou](./fix-suggestion-in-polling-zone-polling.md) | completed |

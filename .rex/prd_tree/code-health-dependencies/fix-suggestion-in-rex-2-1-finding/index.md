@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix suggestion in rex-2: Zone "rex-2" has a numeric suffix indicating an overflow community — pin its fil](./fix-suggestion-in-rex-2-zone-cf1fe8.md) | completed |
+| [Fix suggestion in rex-2: Zone "rex-2" has a numeric suffix indicating an overflow community — pin its fil](./fix-suggestion-in-rex-2-zone-rex-2-has.md) | completed |

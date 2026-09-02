@@ -23,19 +23,19 @@ description: "Combined fix for GitHub issues #37 (P0), #68, #69 — all one root
 
 | Title | Status |
 |-------|--------|
-| [Close remaining unhardened shell-string spawn sites](./close-remaining-unhardened-2d5988/index.md) | completed |
-| [Collapse the Windows quoting twin to a single implementation](./collapse-the-windows-quoting-099473/index.md) | completed |
-| [Unify cross-OS process-tree termination behind one contract](./unify-cross-os-process-tree-e54028/index.md) | completed |
-| [Add centralized spawnCli Windows-safe helper](./add-centralized-spawncli-752587.md) | completed |
-| [Add diagnoseCliInvocation helper and wire it into spawn error paths (closes #68)](./add-diagnosecliinvocation-5a7bcd.md) | completed |
+| [Close remaining unhardened shell-string spawn sites](./close-remaining-unhardened-shell/index.md) | completed |
+| [Collapse the Windows quoting twin to a single implementation](./collapse-the-windows-quoting-twin-to-a/index.md) | completed |
+| [Unify cross-OS process-tree termination behind one contract](./unify-cross-os-process-tree/index.md) | completed |
+| [Add centralized spawnCli Windows-safe helper](./add-centralized-spawncli-windows-safe.md) | completed |
+| [Add diagnoseCliInvocation helper and wire it into spawn error paths (closes #68)](./add-diagnosecliinvocation-helper-and.md) | completed |
 | [Changeset and cross-shell validation](./changeset-and-cross-shell-validation.md) | completed |
-| [Codex hench adapter: deliver prompt via stdin instead of argv (cmd.exe newline injection)](./codex-hench-adapter-deliver-4cfcaa.md) | completed |
-| [DEP0190 guard test: fail if any CLI spawn reintroduces shell:true](./dep0190-guard-test-fail-if-any-ba6e02.md) | completed |
-| [Fix quoteWindowsToken: unconditional quoting + ArgvQuote backslash rules (both copies) with parity test](./fix-quotewindowstoken-acf2fb.md) | completed |
-| [Fix Windows not-found diagnostics: hench close-path detection, pattern anchoring, absolute-path diagnosis, codex stdin guard](./fix-windows-not-found-3bc11e.md) | completed |
-| [PR #299 post-review: merge latest main (Hal's #298 overlap) and review cleanup](./pr-299-post-review-merge-latest-a98240.md) | completed |
-| [Remove claude-cli-adapter manual --allowed-tools pre-quoting (double-quoting regression)](./remove-claude-cli-adapter-6b7def.md) | completed |
-| [Restore Ctrl-C delivery to tree-killable children in exec()](./restore-ctrl-c-delivery-to-tree-61c0f5.md) | completed |
-| [Route remaining in-scope spawn sites: pair-programming.js and sourcevision rex spawns](./route-remaining-in-scope-spawn-ab2081.md) | completed |
-| [Route the four CLI spawn sites through spawnCli](./route-the-four-cli-spawn-sites-a585ca.md) | completed |
-| [Stop web.js reporting "did not exit" from a kill result cli.js deems unknowable](./stop-web-js-reporting-did-not-2df9f0.md) | completed |
+| [Codex hench adapter: deliver prompt via stdin instead of argv (cmd.exe newline injection)](./codex-hench-adapter-deliver-prompt-via.md) | completed |
+| [DEP0190 guard test: fail if any CLI spawn reintroduces shell:true](./dep0190-guard-test-fail-if-any-cli.md) | completed |
+| [Fix quoteWindowsToken: unconditional quoting + ArgvQuote backslash rules (both copies) with parity test](./fix-quotewindowstoken-unconditional.md) | completed |
+| [Fix Windows not-found diagnostics: hench close-path detection, pattern anchoring, absolute-path diagnosis, codex stdin guard](./fix-windows-not-found-diagnostics.md) | completed |
+| [PR #299 post-review: merge latest main (Hal's #298 overlap) and review cleanup](./pr-299-post-review-merge-latest-main.md) | completed |
+| [Remove claude-cli-adapter manual --allowed-tools pre-quoting (double-quoting regression)](./remove-claude-cli-adapter-manual.md) | completed |
+| [Restore Ctrl-C delivery to tree-killable children in exec()](./restore-ctrl-c-delivery-to-tree.md) | completed |
+| [Route remaining in-scope spawn sites: pair-programming.js and sourcevision rex spawns](./route-remaining-in-scope-spawn-sites.md) | completed |
+| [Route the four CLI spawn sites through spawnCli](./route-the-four-cli-spawn-sites-through.md) | completed |
+| [Stop web.js reporting "did not exit" from a kill result cli.js deems unknowable](./stop-web-js-reporting-did-not-exit.md) | completed |

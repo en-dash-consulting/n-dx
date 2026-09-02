@@ -14,4 +14,4 @@ acceptanceCriteria: []
 | Title | Status |
 |-------|--------|
 | [Globalize Token Usage Route Ownership](./globalize-token-usage-route-ownership.md) | completed |
-| [Legacy URL Compatibility and Routing Regression Coverage](./legacy-url-compatibility-and-4b2c16.md) | completed |
+| [Legacy URL Compatibility and Routing Regression Coverage](./legacy-url-compatibility-and-routing.md) | completed |

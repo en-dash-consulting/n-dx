@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in web-unit: High coupling (0.6) — 5 imports target "web-server"](./fix-observation-in-web-unit-67634a.md) | completed |
+| [Fix observation in web-unit: High coupling (0.6) — 5 imports target "web-server"](./fix-observation-in-web-unit-high.md) | completed |

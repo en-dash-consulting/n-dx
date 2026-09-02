@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix code in prd-tree-search: SearchFacets now has three canonical import paths after the prd-tree/index.ts ba (+1 more)](./fix-code-in-prd-tree-search-f6ad26.md) | completed |
+| [Fix code in prd-tree-search: SearchFacets now has three canonical import paths after the prd-tree/index.ts ba (+1 more)](./fix-code-in-prd-tree-search.md) | completed |

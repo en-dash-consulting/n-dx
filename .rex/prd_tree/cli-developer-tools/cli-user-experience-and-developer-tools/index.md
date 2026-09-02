@@ -15,5 +15,5 @@ acceptanceCriteria: []
 |-------|--------|
 | [Configuration management](./configuration-management.md) | completed |
 | [Error handling improvements](./error-handling-improvements.md) | completed |
-| [Interactive help navigation and discovery](./interactive-help-navigation-and-4ade01.md) | completed |
+| [Interactive help navigation and discovery](./interactive-help-navigation-and.md) | completed |
 | [Output and formatting](./output-and-formatting.md) | completed |

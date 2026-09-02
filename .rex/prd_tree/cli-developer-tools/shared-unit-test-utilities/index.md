@@ -14,6 +14,6 @@ description: "Reduce duplication across unit tests by consolidating repeated con
 
 | Title | Status |
 |-------|--------|
-| [Inventory duplicated unit-test constants across suites](./inventory-duplicated-unit-test-7ed4c8.md) | completed |
-| [Update unit test callers to use shared utilities](./update-unit-test-callers-to-use-9311f3.md) | completed |
-| [Validate behavioral equivalence after test utility extraction](./validate-behavioral-equivalence-4094da.md) | completed |
+| [Inventory duplicated unit-test constants across suites](./inventory-duplicated-unit-test.md) | completed |
+| [Update unit test callers to use shared utilities](./update-unit-test-callers-to-use-shared.md) | completed |
+| [Validate behavioral equivalence after test utility extraction](./validate-behavioral-equivalence-after.md) | completed |

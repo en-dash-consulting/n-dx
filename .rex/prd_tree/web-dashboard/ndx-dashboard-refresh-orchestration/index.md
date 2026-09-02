@@ -13,7 +13,7 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Dashboard Data and PR Markdown Refresh Flow](./dashboard-data-and-pr-markdown-be4e19.md) | completed |
-| [Live Server Compatibility and Operator Feedback](./live-server-compatibility-and-8e648a.md) | completed |
-| [Refresh Command Surface and Execution Planning](./refresh-command-surface-and-10506b.md) | completed |
+| [Dashboard Data and PR Markdown Refresh Flow](./dashboard-data-and-pr-markdown-refresh.md) | completed |
+| [Live Server Compatibility and Operator Feedback](./live-server-compatibility-and-operator.md) | completed |
+| [Refresh Command Surface and Execution Planning](./refresh-command-surface-and-execution.md) | completed |
 | [UI Build and Asset Refresh Orchestration](./ui-build-and-asset-refresh-orchestration.md) | completed |

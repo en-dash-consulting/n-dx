@@ -21,14 +21,14 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Artifact diet — cap sourcevision artifacts and startup context](./artifact-diet-cap-sourcevision-eda610/index.md) | completed |
-| [Eliminate per-task cold spawns (warm-parent fork + session batching)](./eliminate-per-task-cold-spawns-00d910/index.md) | completed |
-| [Wire tiered model resolution (task class → tier → model)](./wire-tiered-model-resolution-462b95/index.md) | completed |
-| [Cap total spawns per task and retry via --resume](./cap-total-spawns-per-task-and-7dcba8.md) | completed |
-| [codex exec rejects the --full-auto flag, breaking autonomous codex spawns](./codex-exec-rejects-the-full-c86273.md) | completed |
-| [Extend the batch session strategy to the codex CLI](./extend-the-batch-session-662bb4.md) | completed |
-| [JSON prompt discipline — compact JSON in and out](./json-prompt-discipline-compact-0284c3.md) | completed |
-| [List the known task classes in ndx config and flag an unrecognized route as probably-new, with the closest match](./list-the-known-task-classes-in-949f60.md) | completed |
-| [Route commit messages and rex mechanical calls to the light tier](./route-commit-messages-and-rex-2db5af.md) | completed |
-| [Targeted retry escalation ladder — no more identical-prompt retries](./targeted-retry-escalation-7fa8f0.md) | completed |
-| [Token rollups and cost estimate exclude cache tokens, undercounting spend ~50x](./token-rollups-and-cost-estimate-2e9214.md) | completed |
+| [Artifact diet — cap sourcevision artifacts and startup context](./artifact-diet-cap-sourcevision/index.md) | completed |
+| [Eliminate per-task cold spawns (warm-parent fork + session batching)](./eliminate-per-task-cold-spawns-warm/index.md) | completed |
+| [Wire tiered model resolution (task class → tier → model)](./wire-tiered-model-resolution-task/index.md) | completed |
+| [Cap total spawns per task and retry via --resume](./cap-total-spawns-per-task-and-retry.md) | completed |
+| [codex exec rejects the --full-auto flag, breaking autonomous codex spawns](./codex-exec-rejects-the-full-auto-flag.md) | completed |
+| [Extend the batch session strategy to the codex CLI](./extend-the-batch-session-strategy-to.md) | completed |
+| [JSON prompt discipline — compact JSON in and out](./json-prompt-discipline-compact-json-in.md) | completed |
+| [List the known task classes in ndx config and flag an unrecognized route as probably-new, with the closest match](./list-the-known-task-classes-in-ndx.md) | completed |
+| [Route commit messages and rex mechanical calls to the light tier](./route-commit-messages-and-rex.md) | completed |
+| [Targeted retry escalation ladder — no more identical-prompt retries](./targeted-retry-escalation-ladder-no.md) | completed |
+| [Token rollups and cost estimate exclude cache tokens, undercounting spend ~50x](./token-rollups-and-cost-estimate.md) | completed |

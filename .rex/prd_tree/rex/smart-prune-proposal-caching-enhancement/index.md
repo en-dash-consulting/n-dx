@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Integration tests for smart prune caching workflow](./integration-tests-for-smart-c79dec.md) | completed |
-| [LLM Proposal Caching for Prune Operations](./llm-proposal-caching-for-prune-3691e7.md) | completed |
+| [Integration tests for smart prune caching workflow](./integration-tests-for-smart-prune.md) | completed |
+| [LLM Proposal Caching for Prune Operations](./llm-proposal-caching-for-prune.md) | completed |

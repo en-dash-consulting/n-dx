@@ -14,5 +14,5 @@ description: "Capture and aggregate LLM token usage (input, output, cached, tota
 
 | Title | Status |
 |-------|--------|
-| [Attribute hench run token usage to the active PRD task](./attribute-hench-run-token-usage-34344b.md) | completed |
-| [Roll up token usage from subtasks to tasks, features, and epics](./roll-up-token-usage-from-610224.md) | completed |
+| [Attribute hench run token usage to the active PRD task](./attribute-hench-run-token-usage-to-the.md) | completed |
+| [Roll up token usage from subtasks to tasks, features, and epics](./roll-up-token-usage-from-subtasks-to.md) | completed |

@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix suggestion in global: Hub function: jsonResponse in packages/web/src/server/response-utils.ts is calle](./fix-suggestion-in-global-hub-d99f1e.md) | completed |
+| [Fix suggestion in global: Hub function: jsonResponse in packages/web/src/server/response-utils.ts is calle](./fix-suggestion-in-global-hub-function.md) | completed |

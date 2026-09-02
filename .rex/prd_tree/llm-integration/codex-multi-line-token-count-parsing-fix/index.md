@@ -14,4 +14,4 @@ description: "Codex CLI emits token usage across two lines: the label 'tokens us
 
 | Title | Status |
 |-------|--------|
-| [Fix Codex output parser to capture next-line token count after 'tokens used' label](./fix-codex-output-parser-to-9c999a.md) | completed |
+| [Fix Codex output parser to capture next-line token count after 'tokens used' label](./fix-codex-output-parser-to-capture.md) | completed |

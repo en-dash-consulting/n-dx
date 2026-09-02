@@ -15,5 +15,5 @@ description: "Expand the contributor-facing documentation page to ensure five st
 
 | Title | Status |
 |-------|--------|
-| [Add What to Focus On and How To Contribute sections to contributor page](./add-what-to-focus-on-and-how-to-1fc7b6.md) | completed |
-| [Audit contributor page and add Prerequisites, Setup Steps, and Development Setup sections](./audit-contributor-page-and-add-10e8d9.md) | completed |
+| [Add What to Focus On and How To Contribute sections to contributor page](./add-what-to-focus-on-and-how-to.md) | completed |
+| [Audit contributor page and add Prerequisites, Setup Steps, and Development Setup sections](./audit-contributor-page-and-add.md) | completed |

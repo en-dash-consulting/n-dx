@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in hench: 9 entry points — wide API surface, consider consolidating exports](./fix-observation-in-hench-9-c44226.md) | completed |
+| [Fix observation in hench: 9 entry points — wide API surface, consider consolidating exports](./fix-observation-in-hench-9-entry.md) | completed |

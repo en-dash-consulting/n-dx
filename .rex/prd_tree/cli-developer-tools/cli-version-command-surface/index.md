@@ -14,5 +14,5 @@ description: "Expose the installed n-dx version through standard top-level CLI f
 
 | Title | Status |
 |-------|--------|
-| [Add regression coverage and help text for version flags](./add-regression-coverage-and-740475.md) | completed |
-| [Implement top-level version flag handling for ndx and n-dx](./implement-top-level-version-4a9be3.md) | completed |
+| [Add regression coverage and help text for version flags](./add-regression-coverage-and-help-text.md) | completed |
+| [Implement top-level version flag handling for ndx and n-dx](./implement-top-level-version-flag.md) | completed |

@@ -14,5 +14,5 @@ description: "ndx init fails to locate the claude CLI on machines where it is in
 
 | Title | Status |
 |-------|--------|
-| [Emit actionable diagnostics when Claude CLI cannot be located](./emit-actionable-diagnostics-caadeb.md) | completed |
-| [Implement multi-location Claude CLI discovery chain with configurable override](./implement-multi-location-claude-ac39fe.md) | completed |
+| [Emit actionable diagnostics when Claude CLI cannot be located](./emit-actionable-diagnostics-when.md) | completed |
+| [Implement multi-location Claude CLI discovery chain with configurable override](./implement-multi-location-claude-cli.md) | completed |

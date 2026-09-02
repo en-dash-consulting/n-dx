@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix documentation in global: Add a policy note to CLAUDE.md's dual-fragility governance section clarifying wh (+7 more)](./fix-documentation-in-global-add-907a29.md) | completed |
+| [Fix documentation in global: Add a policy note to CLAUDE.md's dual-fragility governance section clarifying wh (+7 more)](./fix-documentation-in-global-add-a.md) | completed |

@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix suggestion in web-server: Zone "Web Server Composition Root" (web-server) has catastrophic risk (score: 0.](./fix-suggestion-in-web-server-bca365.md) | completed |
+| [Fix suggestion in web-server: Zone "Web Server Composition Root" (web-server) has catastrophic risk (score: 0.](./fix-suggestion-in-web-server-zone-web.md) | completed |

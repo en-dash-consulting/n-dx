@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix move-file in web-viewer: File "packages/web/src/viewer/components/progressive-loader.ts" is pinned to zon](./fix-move-file-in-web-viewer-81b1d6.md) | completed |
+| [Fix move-file in web-viewer: File "packages/web/src/viewer/components/progressive-loader.ts" is pinned to zon](./fix-move-file-in-web-viewer-file.md) | completed |

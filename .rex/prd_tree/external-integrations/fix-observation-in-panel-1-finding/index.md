@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in panel: High coupling (0.71) — 9 imports target "web"](./fix-observation-in-panel-high-c3de1b.md) | completed |
+| [Fix observation in panel: High coupling (0.71) — 9 imports target "web"](./fix-observation-in-panel-high-coupling.md) | completed |

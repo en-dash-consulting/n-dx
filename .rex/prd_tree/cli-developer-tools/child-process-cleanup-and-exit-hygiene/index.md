@@ -14,6 +14,6 @@ description: "Ensure `n-dx` tears down all spawned child processes and lingering
 
 | Title | Status |
 |-------|--------|
-| [Add regression coverage for parent-exit cleanup and orphan prevention](./add-regression-coverage-for-94cad8.md) | completed |
-| [Harden SourceVision test execution against lingering workers and orphaned threads](./harden-sourcevision-test-d36184.md) | completed |
-| [Implement unified child-process teardown for n-dx command lifecycles](./implement-unified-child-process-78ecaa.md) | completed |
+| [Add regression coverage for parent-exit cleanup and orphan prevention](./add-regression-coverage-for-parent.md) | completed |
+| [Harden SourceVision test execution against lingering workers and orphaned threads](./harden-sourcevision-test-execution.md) | completed |
+| [Implement unified child-process teardown for n-dx command lifecycles](./implement-unified-child-process.md) | completed |

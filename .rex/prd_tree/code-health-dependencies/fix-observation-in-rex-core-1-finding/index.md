@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in rex-core: High coupling (0.67) — 2 imports target "rex-fix"](./fix-observation-in-rex-core-4099aa.md) | completed |
+| [Fix observation in rex-core: High coupling (0.67) — 2 imports target "rex-fix"](./fix-observation-in-rex-core-high.md) | completed |

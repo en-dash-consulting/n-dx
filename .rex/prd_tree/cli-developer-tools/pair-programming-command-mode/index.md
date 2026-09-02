@@ -13,6 +13,6 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Implement structured inter-model handoff so reviewer findings are fed back to the primary](./implement-structured-inter-75c7df.md) | completed |
-| [Inject ndx project context into pair-programming primary and reviewer executions](./inject-ndx-project-context-into-55b88b.md) | completed |
-| [Invoke the reviewer LLM with a validation-only constraint prompt](./invoke-the-reviewer-llm-with-a-3a80b8.md) | completed |
+| [Implement structured inter-model handoff so reviewer findings are fed back to the primary](./implement-structured-inter-model.md) | completed |
+| [Inject ndx project context into pair-programming primary and reviewer executions](./inject-ndx-project-context-into-pair.md) | completed |
+| [Invoke the reviewer LLM with a validation-only constraint prompt](./invoke-the-reviewer-llm-with-a.md) | completed |

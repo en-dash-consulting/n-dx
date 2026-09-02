@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [JSON-based branch work tracking infrastructure](./json-based-branch-work-tracking-98e69d.md) | completed |
+| [JSON-based branch work tracking infrastructure](./json-based-branch-work-tracking.md) | completed |
 | [Rex completion data integration](./rex-completion-data-integration.md) | completed |

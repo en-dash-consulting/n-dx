@@ -15,5 +15,5 @@ description: "Newly generated Google AI API keys are rejected by the ndx validat
 
 | Title | Status |
 |-------|--------|
-| [Add regression tests for Google API key validation across config and init paths](./add-regression-tests-for-google-315102.md) | completed |
-| [Diagnose and fix Google API key format validation rejecting valid keys](./diagnose-and-fix-google-api-key-edd062.md) | completed |
+| [Add regression tests for Google API key validation across config and init paths](./add-regression-tests-for-google-api.md) | completed |
+| [Diagnose and fix Google API key format validation rejecting valid keys](./diagnose-and-fix-google-api-key-format.md) | completed |

@@ -15,5 +15,5 @@ description: "Add a centralized documentation page that catalogs all skills bund
 
 | Title | Status |
 |-------|--------|
-| [Build skills overview documentation page with per-skill descriptions and customization guidance](./build-skills-overview-549468.md) | completed |
-| [Link skills reference from every instruction and workflow documentation page](./link-skills-reference-from-d0319f.md) | completed |
+| [Build skills overview documentation page with per-skill descriptions and customization guidance](./build-skills-overview-documentation.md) | completed |
+| [Link skills reference from every instruction and workflow documentation page](./link-skills-reference-from-every.md) | completed |

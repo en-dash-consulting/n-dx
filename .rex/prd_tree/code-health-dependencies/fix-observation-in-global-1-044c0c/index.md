@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in global: Bidirectional coupling: "viewer-ui-hub" ↔ "web-viewer" (5+5 crossings) — conside](./fix-observation-in-global-c45f46.md) | completed |
+| [Fix observation in global: Bidirectional coupling: "viewer-ui-hub" ↔ "web-viewer" (5+5 crossings) — conside](./fix-observation-in-global.md) | completed |

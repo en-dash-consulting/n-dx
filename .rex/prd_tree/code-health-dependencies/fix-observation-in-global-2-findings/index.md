@@ -16,4 +16,4 @@ recommendationMeta: "[object Object]"
 
 | Title | Status |
 |-------|--------|
-| [Fix observation in global: Bidirectional coupling: "hench" ↔ "hench-cli-errors" (6+5 crossings) — consider  (+1 more)](./fix-observation-in-global-00474b.md) | completed |
+| [Fix observation in global: Bidirectional coupling: "hench" ↔ "hench-cli-errors" (6+5 crossings) — consider  (+1 more)](./fix-observation-in-global.md) | completed |

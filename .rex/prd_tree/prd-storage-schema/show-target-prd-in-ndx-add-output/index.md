@@ -14,6 +14,6 @@ description: "Surface which PRD file (canonical or branch-scoped) receives newly
 
 | Title | Status |
 |-------|--------|
-| [Add regression tests asserting the 'Added to:' path resolves on disk for all PRD item levels](./add-regression-tests-asserting-0e2b33.md) | completed |
-| [Display target PRD path in ndx add command output](./display-target-prd-path-in-ndx-efc7df.md) | completed |
-| [Fix ndx add 'Added to:' line to print copy-pasteable folder-tree path of the created item](./fix-ndx-add-added-to-line-to-76bc42.md) | completed |
+| [Add regression tests asserting the 'Added to:' path resolves on disk for all PRD item levels](./add-regression-tests-asserting-the.md) | completed |
+| [Display target PRD path in ndx add command output](./display-target-prd-path-in-ndx-add.md) | completed |
+| [Fix ndx add 'Added to:' line to print copy-pasteable folder-tree path of the created item](./fix-ndx-add-added-to-line-to-print.md) | completed |

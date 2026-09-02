@@ -13,5 +13,5 @@ acceptanceCriteria: []
 
 | Title | Status |
 |-------|--------|
-| [Event-metadata-driven utilization aggregation](./event-metadata-driven-1ed80b.md) | completed |
+| [Event-metadata-driven utilization aggregation](./event-metadata-driven-utilization.md) | completed |
 | [Per-event vendor/model metadata capture](./per-event-vendor-model-metadata-capture.md) | completed |
