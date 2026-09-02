@@ -118,6 +118,48 @@ function htmlResponse(res: ServerResponse, html: string): void {
 }
 
 /**
+ * Header marking a successful response that contains no map.
+ *
+ * "This project has nothing to map yet" is a state of the map, not a missing
+ * resource, so it answers 200 rather than 404. That is not pedantry: a 4xx on a
+ * `fetch` writes a network error into the browser console, and
+ * `tests/e2e-ui/navigation.spec.ts` requires every view to load with none. The
+ * header lets the viewer render its own empty state while the body stays a
+ * usable page for anyone who opens the URL directly.
+ */
+export const ISO_MAP_EMPTY_HEADER = "x-iso-map-empty";
+
+/** Why there is no map. The viewer picks its copy from this. */
+export type IsoMapEmptyReason = "no-analysis" | "no-source";
+
+function emptyStatePage(message: string): string {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nothing to map yet</title>
+<style>
+  :root{color-scheme:light dark}
+  body{margin:0;display:grid;place-items:center;min-height:100vh;
+    font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+  main{max-width:46ch;padding:2rem;text-align:center}
+  h1{font-size:1.1rem;margin:0 0 .6rem}
+  p{margin:0;opacity:.75}
+</style></head>
+<body><main><h1>Nothing to map yet</h1><p>${message}</p></main></body></html>
+`;
+}
+
+/** Answer 200 with an empty-state page and the marker header. */
+function emptyResponse(res: ServerResponse, reason: IsoMapEmptyReason, message: string): void {
+  res.writeHead(200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-cache",
+    [ISO_MAP_EMPTY_HEADER]: reason,
+  });
+  res.end(emptyStatePage(message));
+}
+
+/**
  * Handle `GET /api/iso-map`.
  *
  * Returns `true` when the request was claimed (and answered), `false` when it
@@ -154,19 +196,19 @@ export function handleIsoMapRoute(
     if (!input) {
       // Only reachable for source=sourcevision: the caller demanded analysis
       // data and there is none.
-      errorResponse(
+      emptyResponse(
         res,
-        404,
-        "No sourcevision analysis found. Run `ndx analyze .` first, or request ?source=scan to map the project directly.",
+        "no-analysis",
+        "No sourcevision analysis found. Run analyze first, or request ?source=scan to map the project directly.",
       );
       return true;
     }
 
     if (!input.zones.some((zone) => zone.files.length > 0)) {
-      errorResponse(
+      emptyResponse(
         res,
-        404,
-        "Nothing to map: no source files were found in this project. Run `ndx analyze .` to produce a zone map, or check that the server's project directory is correct.",
+        "no-source",
+        "No source files were found in this project. Run analyze to produce a zone map, or check that the server's project directory is correct.",
       );
       return true;
     }

@@ -14,7 +14,7 @@ Swap between using the local development build of n-dx and the published npm ver
 
 ## Switch to local dev build
 
-1. Ensure the local build is current: `pnpm build --filter @n-dx/core`
+1. Ensure the local build is current: `pnpm build` (`@n-dx/core` is plain JS, but it spawns the other packages' `dist/`, so they must be built)
 2. Remove the npm-installed version if present: `pnpm remove -g @n-dx/core`
 3. Link from the core package directory: `cd packages/core && pnpm link --global`
 4. Verify: `pnpm ls -g --depth=0` should show `@n-dx/core link:...packages/core`
@@ -45,7 +45,7 @@ The `pnpm` commands above are cross-platform and identical on Windows. Only two 
 Switch to local dev build:
 
 ```powershell
-pnpm build --filter @n-dx/core
+pnpm build
 pnpm remove -g @n-dx/core          # ignore error if not installed
 cd packages\core
 pnpm link --global
@@ -74,5 +74,6 @@ Notes for Windows:
 
 - Always use `pnpm` (not `npm`) for global link/install — this repo uses pnpm and binaries resolve through pnpm's global bin directory
 - The global package name must be `@n-dx/core` (from `packages/core/package.json`) — never link from the monorepo root (which has name `n-dx` and no bin entries)
-- After switching to local, remember to `pnpm build` after code changes for them to take effect via the global link
+- After switching to local, remember to `pnpm build` after code changes for them to take effect via the global link. `packages/core` itself needs no rebuild — it is plain JS — but it spawns `rex`, `hench` and `sourcevision` from their `dist/`, so a change in any of those does need one.
+- Note the flag order if you filter: `pnpm --filter @n-dx/core build`, not `pnpm build --filter @n-dx/core`. The latter forwards `--filter` to the package's own build script and fails with `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`
 - The link registers these binaries: `ndx`, `n-dx`, `rex`, `hench`, `sourcevision`, `sv`

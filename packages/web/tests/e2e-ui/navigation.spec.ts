@@ -38,6 +38,7 @@ test.afterAll(async () => {
 const VIEWS = [
   "overview",
   "graph",
+  "iso-map",
   "zones",
   "analysis",
   "files",
@@ -66,6 +67,7 @@ const VIEWS = [
   "llm-provider",
   "project-settings",
   "merge-graph",
+  "pr-markdown",
 ];
 
 for (const view of VIEWS) {

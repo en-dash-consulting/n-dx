@@ -39,13 +39,14 @@ import {
   ISO_MAP_SOURCE_LABELS,
   buildIsoMapUrl,
   clampMaxNodes,
+  ISO_MAP_EMPTY_HEADER,
   isIsoMapSource,
   isoMapDownloadName,
   type IsoMapControls,
   type IsoMapSource,
 } from "./iso-map-url.js";
 
-type LoadState = "loading" | "ready" | "error";
+type LoadState = "loading" | "ready" | "empty" | "error";
 
 interface IsoMapError {
   status: number;
@@ -101,8 +102,24 @@ export function IsoMapView() {
         setState("error");
         return;
       }
+      // A 200 carrying the marker header means the request succeeded and there
+      // is simply no map to show — an empty state, not a failure.
+      const emptyReason = res.headers.get(ISO_MAP_EMPTY_HEADER);
       const text = await res.text();
       if (!mountedRef.current || seq !== requestSeqRef.current) return;
+      if (emptyReason) {
+        setHtml(null);
+        setError({
+          status: res.status,
+          message:
+            emptyReason === "no-analysis"
+              ? "No analysis found for this project."
+              : "No source files were found in this project.",
+          suggestScan: emptyReason === "no-analysis",
+        });
+        setState("empty");
+        return;
+      }
       setHtml(text);
       setState("ready");
     } catch (err) {
@@ -262,10 +279,10 @@ export function IsoMapView() {
           )
         : null,
 
-      state === "error" && error
-        ? h("div", { class: "card iso-map-error", role: "alert" },
+      (state === "error" || state === "empty") && error
+        ? h("div", { class: "card iso-map-error", role: state === "empty" ? "status" : "alert" },
             h("h3", { class: "section-header-sm" },
-              error.status === 404 ? "Nothing to map yet" : "Could not build the map",
+              state === "empty" ? "Nothing to map yet" : "Could not build the map",
             ),
             h("p", null, error.message),
             error.suggestScan

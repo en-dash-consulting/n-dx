@@ -451,6 +451,12 @@ export type IsoSourceMode = "auto" | "sourcevision" | "scan";
 /**
  * Load input for a project, honouring an explicit mode.
  * Returns null only when `sourcevision` was demanded and is not available.
+ *
+ * `ndx init` writes empty `.sourcevision/` data files before anything has been
+ * analyzed, so the presence of those files is not evidence that an analysis
+ * happened. Auto mode therefore falls back to a scan when the analysis parses
+ * but contains no zones — otherwise a freshly-initialized project reports
+ * "nothing to map" while sitting on a tree full of source.
  */
 export function loadIsoInput(
   root: string,
@@ -459,7 +465,7 @@ export function loadIsoInput(
 ): IsoModelInput | null {
   if (mode === "scan") return loadFromScan(root, options);
   const fromAnalysis = loadFromSourcevision(root, options);
-  if (fromAnalysis) return fromAnalysis;
-  if (mode === "sourcevision") return null;
+  if (mode === "sourcevision") return fromAnalysis;
+  if (fromAnalysis && fromAnalysis.zones.length > 0) return fromAnalysis;
   return loadFromScan(root, options);
 }

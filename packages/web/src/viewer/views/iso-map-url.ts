@@ -21,6 +21,18 @@ export type IsoMapSource = "auto" | "sourcevision" | "scan";
 /** Server route backing the map. */
 export const ISO_MAP_ENDPOINT = "/api/iso-map";
 
+/**
+ * Header the route sets on a 200 that carries no map.
+ *
+ * "Nothing to map yet" answers 200 rather than 404 because a 4xx on a `fetch`
+ * writes a network error into the browser console, and every view has to load
+ * with none (`tests/e2e-ui/navigation.spec.ts`). Mirrored from
+ * `src/server/routes-iso-map.ts` rather than imported, for the same reason the
+ * bounds below are: the viewer must not carry a runtime import from
+ * `src/server/`. `routes-iso-map.test.ts` pins the two together.
+ */
+export const ISO_MAP_EMPTY_HEADER = "x-iso-map-empty";
+
 /** Selectable source modes, in the order they appear in the UI. */
 export const ISO_MAP_SOURCES: readonly IsoMapSource[] = ["auto", "sourcevision", "scan"];
 

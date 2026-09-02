@@ -11,6 +11,7 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { IsoMapView } from "../../../src/viewer/views/iso-map.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
+import { ISO_MAP_EMPTY_HEADER } from "../../../src/viewer/views/iso-map-url.js";
 import { SOURCEVISION_TABS } from "../../../src/viewer/views/index.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import { buildValidViews } from "../../../src/shared/index.js";
@@ -20,6 +21,18 @@ const MAP_HTML = "<!doctype html><title>map</title><body><div id=\"stage\"></div
 
 function htmlResponse(body = MAP_HTML): Response {
   return new Response(body, { status: 200, headers: { "Content-Type": "text/html" } });
+}
+
+/**
+ * A 200 carrying the marker header: the route answered, there is just no map.
+ * It is not a 4xx because a failed fetch writes a console error, and every
+ * view must load with none (tests/e2e-ui/navigation.spec.ts).
+ */
+function emptyResponse(reason: "no-analysis" | "no-source"): Response {
+  return new Response("<!doctype html><html><body>Nothing to map yet</body></html>", {
+    status: 200,
+    headers: { "Content-Type": "text/html", [ISO_MAP_EMPTY_HEADER]: reason },
+  });
 }
 
 function errorResponse(status: number, error: string): Response {
@@ -210,21 +223,29 @@ describe("IsoMapView", () => {
 
   // ── Error states ───────────────────────────────────────────────────
 
-  it("renders the route's 404 guidance as UI, not a raw error frame", async () => {
-    queueIsoResponse(() => Promise.resolve(errorResponse(
-      404,
-      "No sourcevision analysis found. Run `ndx analyze .` first, or request ?source=scan to map the project directly.",
-    )));
+  it("renders the empty state as UI, not as the route's placeholder frame", async () => {
+    queueIsoResponse(() => Promise.resolve(emptyResponse("no-analysis")));
     mount();
     await settle();
 
-    const alert = root.querySelector(".iso-map-error");
-    expect(alert).toBeTruthy();
-    expect(alert?.getAttribute("role")).toBe("alert");
+    const card = root.querySelector(".iso-map-error");
+    expect(card).toBeTruthy();
+    // Not an error: nothing failed, so it announces politely rather than alerting.
+    expect(card?.getAttribute("role")).toBe("status");
     expect(root.textContent).toContain("Nothing to map yet");
-    expect(root.textContent).toContain("No sourcevision analysis found");
+    expect(root.textContent).toContain("No analysis found");
     expect(root.textContent).toContain("Direct scan");
     expect(root.querySelector("iframe")).toBeNull();
+  });
+
+  it("does not suggest a scan when there is no source to scan", async () => {
+    queueIsoResponse(() => Promise.resolve(emptyResponse("no-source")));
+    mount();
+    await settle();
+
+    expect(root.textContent).toContain("Nothing to map yet");
+    expect(root.textContent).toContain("No source files were found");
+    expect(root.textContent).not.toContain("Direct scan” and generate again");
   });
 
   it("surfaces a 500 without the scan suggestion", async () => {

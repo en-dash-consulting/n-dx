@@ -2395,8 +2395,8 @@ function loadFromScan(root, options = {}) {
 function loadIsoInput(root, mode = "auto", options = {}) {
   if (mode === "scan") return loadFromScan(root, options);
   const fromAnalysis = loadFromSourcevision(root, options);
-  if (fromAnalysis) return fromAnalysis;
-  if (mode === "sourcevision") return null;
+  if (mode === "sourcevision") return fromAnalysis;
+  if (fromAnalysis && fromAnalysis.zones.length > 0) return fromAnalysis;
   return loadFromScan(root, options);
 }
 

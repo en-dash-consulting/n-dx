@@ -13,7 +13,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleIsoMapRoute, parseIsoParams, MAX_MAX_NODES } from "../../../src/server/routes-iso-map.js";
+import { handleIsoMapRoute, parseIsoParams, MAX_MAX_NODES, ISO_MAP_EMPTY_HEADER }
+  from "../../../src/server/routes-iso-map.js";
+import { ISO_MAP_EMPTY_HEADER as VIEWER_EMPTY_HEADER }
+  from "../../../src/viewer/views/iso-map-url.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 import {
   ISO_MAP_DEFAULTS,
@@ -219,6 +222,14 @@ describe("GET /api/iso-map", () => {
   });
 });
 
+describe("empty-state header contract", () => {
+  it("the viewer's mirrored header name matches the route's", () => {
+    // iso-map-url.ts duplicates this rather than importing it, because the
+    // viewer must not carry a runtime import from src/server/.
+    expect(VIEWER_EMPTY_HEADER).toBe(ISO_MAP_EMPTY_HEADER);
+  });
+});
+
 describe("GET /api/iso-map without analysis", () => {
   let tmpDir: string;
   let server: Server;
@@ -242,19 +253,32 @@ describe("GET /api/iso-map without analysis", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("returns 404 with guidance when source=sourcevision and no analysis exists", async () => {
+  // "Nothing to map yet" answers 200 with a marker header, not 404: a 4xx on a
+  // fetch writes a network error into the browser console, and
+  // tests/e2e-ui/navigation.spec.ts requires every view to load with none.
+  it("marks an empty response when source=sourcevision and no analysis exists", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/iso-map?source=sourcevision`);
-    expect(res.status).toBe(404);
-    const data = await res.json() as { error: string };
-    expect(data.error).toContain("No sourcevision analysis found");
-    expect(data.error).toContain("source=scan");
+    expect(res.status).toBe(200);
+    expect(res.headers.get(ISO_MAP_EMPTY_HEADER)).toBe("no-analysis");
+    const body = await res.text();
+    expect(body).toContain("Nothing to map yet");
+    expect(body).toContain("source=scan");
   });
 
-  it("returns 404 with guidance when auto falls through to a scan that finds nothing", async () => {
+  it("marks an empty response when auto falls through to a scan that finds nothing", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/iso-map`);
-    expect(res.status).toBe(404);
-    const data = await res.json() as { error: string };
-    expect(data.error).toContain("Nothing to map");
+    expect(res.status).toBe(200);
+    expect(res.headers.get(ISO_MAP_EMPTY_HEADER)).toBe("no-source");
+    expect(await res.text()).toContain("No source files were found");
+  });
+
+  it("still serves a complete HTML document for the empty state", async () => {
+    // Anyone opening the URL directly gets a readable page, not a JSON blob.
+    const res = await fetch(`http://127.0.0.1:${port}/api/iso-map`);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const body = await res.text();
+    expect(body.startsWith("<!doctype html>")).toBe(true);
+    expect(body).toContain("</html>");
   });
 });
 
