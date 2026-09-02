@@ -13,6 +13,7 @@ import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./
 import { createDataWatcher, handleDataRoute } from "./routes-data.js";
 import { handleRexRoute, shutdownRexExecution } from "./routes-rex/index.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
+import { handleIsoMapRoute } from "./routes-iso-map.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
@@ -622,6 +623,7 @@ async function handleApiRoutes(
     },
   }))) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
+  if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleRexRoute(req, res, ctx, ws.broadcast))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), handleHenchRoute(req, res, ctx, ws.broadcast, { onStatusInvalidate: clearStatusCache }))) return true;

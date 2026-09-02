@@ -67,6 +67,14 @@ const ALLOWED = new Set([
   "packages/sourcevision/src/analyzers/branch-work-filter.ts",
   "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
   "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
+  // Iso map — reads the HEAD commit time and origin remote so the rendered page
+  // is reproducible (timestamp) and can link to source. Bundled verbatim into
+  // the generated skill script below.
+  "packages/sourcevision/src/export/iso-sources.ts",
+  // Generated artifact: the standalone iso-map skill, bundled from
+  // packages/sourcevision/src/export/ by scripts/build-iso-skill.mjs. It
+  // inherits the git usage above; edit the TypeScript, not this file.
+  ".claude/skills/iso-map/scripts/iso-map.mjs",
   // Windows-safe CLI helper — wraps execFileSync with cmd.exe routing for .cmd shims
   "packages/sourcevision/src/util/exec-cli.ts",
   // Web server routes — spawn CLI subprocesses for domain tool execution
@@ -1266,6 +1274,8 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/commands/smart-add.ts", "Lazy-loads LLM client for smart add proposals"],
   ["packages/rex/src/cli/commands/validate-interactive.ts", "Lazy-loads LLM client for interactive validation"],
   ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
+  // Sourcevision CLI — lazy-loads the isometric renderer
+  ["packages/sourcevision/src/cli/commands/iso.ts", "Lazy-loads the iso model builder and HTML renderer — only needed for the opt-in `sv iso` command, never during analyze"],
   // Core — lazy-loads utilities
   ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers when the vendor changes, plus the shared auth-failure guidance and the cli-brand color palette on the preflight-failure error path"],
   ["packages/core/cli.js", "Lazy-loads cli-ink.js (Ink + React TUI renderer) only during `ndx init` when stdout is a TTY and --quiet is unset — avoids React/Ink import cost on every CLI invocation and in non-interactive environments"],

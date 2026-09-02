@@ -135,6 +135,7 @@ const SOURCEVISION_SUBCOMMANDS = [
   "serve",
   "validate",
   "export-pdf",
+  "iso",
   "pr-markdown",
   "git-credential-helper",
   "reset",

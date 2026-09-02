@@ -14,6 +14,7 @@ export type ViewId =
   | "files"
   | "routes"
   | "architecture"
+  | "iso-map"
   | "problems"
   | "suggestions"
   | "pr-markdown"

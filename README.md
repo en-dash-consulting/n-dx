@@ -241,6 +241,7 @@ ndx config llm.codex.cli_path codex .
 | `ndx ci [dir]` | Run analysis pipeline and validate PRD health |
 | `ndx config [key] [value]` | View and edit settings (`--json`, `--help`) |
 | `ndx export [dir]` | Export static deployable dashboard (`--out-dir`, `--deploy=github`) |
+| `ndx iso [dir]` | Render a standalone isometric architecture map (`--source=auto\|sourcevision\|scan`, `--max-nodes=N`, `--no-externals`) |
 | `ndx auth [dir]` | Check and configure LLM provider credentials |
 | `ndx web [dir]` | Dashboard server control (lower-level counterpart to `ndx start`) |
 | `ndx install-sample [dir]` | Install the sandboxed sample app and its PRD items |

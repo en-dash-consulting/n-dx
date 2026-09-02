@@ -16,11 +16,20 @@ export interface SourceVisionTab {
   label: string;
   minPass: number;
   featureGate?: string;
+  /**
+   * When true, hide this tab in deployed (static export) mode.
+   *
+   * Set for views whose content is built on demand by the server and therefore
+   * cannot exist in an `ndx export` bundle. The view itself still renders an
+   * explanatory card if reached by direct URL.
+   */
+  requiresServer?: boolean;
 }
 
 export const SOURCEVISION_TABS: readonly SourceVisionTab[] = [
   { id: "overview", icon: "\u25A3", label: "Overview", minPass: 0 },
   { id: "graph", icon: "\u25A7", label: "Map", minPass: 0 },
+  { id: "iso-map", icon: "\u25E7", label: "Isometric Map", minPass: 0, requiresServer: true },
   { id: "zones", icon: "\u2B22", label: "Zones", minPass: 0 },
   { id: "files", icon: "\u2630", label: "Files", minPass: 0 },
   { id: "routes", icon: "\u25C7", label: "Routes", minPass: 0 },
