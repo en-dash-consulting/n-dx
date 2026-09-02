@@ -29,7 +29,13 @@ import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
 } from "../../src/prd/llm-gateway.js";
-import type { ExecutionPolicy, PromptSection, PromptSectionName } from "../../src/prd/llm-gateway.js";
+import type {
+  ApprovalPolicy,
+  ExecutionPolicy,
+  PromptSection,
+  PromptSectionName,
+  SandboxMode,
+} from "../../src/prd/llm-gateway.js";
 
 /** Is codex on PATH? */
 function codexAvailable(): boolean {
@@ -74,13 +80,29 @@ const envelope = createPromptEnvelope([
   { name: "brief" as PromptSectionName, content: "task" } as PromptSection,
 ]);
 
-const POLICIES: Array<[string, ExecutionPolicy]> = [
-  ["default (workspace-write + never)", DEFAULT_EXECUTION_POLICY],
-  ["read-only + on-request", { ...DEFAULT_EXECUTION_POLICY, sandbox: "read-only", approvals: "on-request" }],
-  ["workspace-write + on-request", { ...DEFAULT_EXECUTION_POLICY, approvals: "on-request" }],
-  ["danger-full-access + never", { ...DEFAULT_EXECUTION_POLICY, sandbox: "danger-full-access", approvals: "never" }],
-  ["danger-full-access + on-request", { ...DEFAULT_EXECUTION_POLICY, sandbox: "danger-full-access", approvals: "on-request" }],
-];
+/**
+ * Every policy the types permit, not a hand-picked sample.
+ *
+ * `ndx work` only ever uses the default (`workspace-write` + `never`) —
+ * `cli-loop.ts` overrides `allowedCommands` and leaves sandbox and approvals
+ * alone — so the default alone would cover today's normal flow. Enumerating
+ * the full cross product costs four extra probes and means a future config
+ * surface, flag, or default change cannot reach a combination this test has
+ * never sent to codex.
+ *
+ * Adding a `SandboxMode` or `ApprovalPolicy` variant widens this automatically.
+ */
+const SANDBOXES: SandboxMode[] = ["read-only", "workspace-write", "danger-full-access"];
+const APPROVALS: ApprovalPolicy[] = ["on-request", "never"];
+
+const POLICIES: Array<[string, ExecutionPolicy]> = SANDBOXES.flatMap((sandbox) =>
+  APPROVALS.map((approvals): [string, ExecutionPolicy] => [
+    sandbox === DEFAULT_EXECUTION_POLICY.sandbox && approvals === DEFAULT_EXECUTION_POLICY.approvals
+      ? `${sandbox} + ${approvals} (the ndx work default)`
+      : `${sandbox} + ${approvals}`,
+    { ...DEFAULT_EXECUTION_POLICY, sandbox, approvals },
+  ]),
+);
 
 describe.skipIf(!HAS_CODEX)("codex flag surface (installed CLI)", () => {
   it("reports which codex it checked", () => {
