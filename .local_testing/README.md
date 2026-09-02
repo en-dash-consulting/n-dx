@@ -278,9 +278,29 @@ The gauntlet scripts stream test output in real-time:
 [✓] Cleaned up container: ndx-gauntlet-test
 ```
 
-## CI/CD Integration
+## Relationship to CI
 
-These scripts can be integrated into CI/CD pipelines:
+This directory is **not** what runs in CI, and the two cover different things. Use it to reproduce a platform failure locally, not to predict what CI will check.
+
+What [`ci.yml`](../.github/workflows/ci.yml) actually runs across platforms:
+
+| Job | Runner | Contents |
+|-----|--------|----------|
+| `Build & Validate` | `ubuntu-latest` | obfuscation check, build, publish source-map check, typecheck, docs build, `pnpm pr-check`, per-package suites, root e2e / integration, changeset gates |
+| `CLI Smoke (macOS)` | `macos-latest` | smoke collection **with per-OS baseline assertions**; root e2e / integration only on merges to `main` (macOS bills at 10× Linux) |
+| `CLI Smoke (Windows)` | `windows-latest` | smoke collection with per-OS baseline assertions, root e2e / integration, per-package suites — all on every run |
+| `CLI Smoke Parity` | `ubuntu-latest` | cross-OS comparison only: canonical sequence, `comparable` projection, normalized failure codes, raw separator / line-ending fingerprint |
+
+Two consequences worth knowing before you rely on either surface:
+
+- The per-OS CLI contract is asserted in the smoke **collect** step, so a platform-specific regression fails the platform that broke it. It is no longer checked in the parity job, where it was skipped whenever a smoke job was already red.
+- A POSIX-semantics defect can pass PR CI and be caught on the merge-to-`main` run instead. If you are changing spawn, process-lifecycle, or path-handling code, run the root suite locally — via the containers here or directly — rather than waiting on the macOS PR job.
+
+Full detail: [`docs/contributing/cli-smoke-parity.md`](../docs/contributing/cli-smoke-parity.md) and the cost/value rationale in [`docs/contributing/cross-os-pipeline-review-2026-09.md`](../docs/contributing/cross-os-pipeline-review-2026-09.md).
+
+### Invoking these scripts from a pipeline
+
+The containers here are host-agnostic and can be driven from any CI system:
 
 ```bash
 #!/bin/bash
@@ -293,6 +313,8 @@ if [ $exit_code -ne 0 ]; then
     exit 1
 fi
 ```
+
+Note that `ci.yml` does **not** do this — it runs the suites directly on hosted runners. Docker-in-CI here would pay the ~2GB Windows Server Core pull on every run for no additional signal.
 
 ## Notes
 

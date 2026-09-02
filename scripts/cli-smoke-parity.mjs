@@ -75,6 +75,27 @@ export function normalizeText(text, placeholders = []) {
   return normalized.replace(/[ \t]+\n/g, "\n").trim();
 }
 
+/**
+ * Separator/line-ending fingerprint of a raw stream, taken BEFORE normalizeText.
+ *
+ * normalizeText rewrites every `\r\n` to `\n` and every `\` to `/` so that temp
+ * paths and native line endings do not show up as parity diffs. The cost is that
+ * it also erases the one bug class this whole matrix is named for: a hardcoded
+ * `\r\n` or a Windows separator leaking into output that should be uniform. This
+ * counts those characters on the raw stream so the comparison can see them.
+ *
+ * Runtime noise is stripped first — a Node deprecation warning present on one
+ * platform and absent on the other would otherwise shift both counts. Nothing
+ * here touches separators, so the fingerprint stays faithful.
+ */
+export function describeShape(text) {
+  const raw = stripKnownRuntimeNoise(String(text ?? ""));
+  return {
+    crlfCount: (raw.match(/\r\n/g) ?? []).length,
+    backslashCount: (raw.match(/\\/g) ?? []).length,
+  };
+}
+
 function findJsonPayloadBounds(text) {
   const start = text.search(/[{\[]/);
   if (start === -1) {
@@ -260,6 +281,14 @@ async function collectCase(smokeCase, executeCli) {
       exitCode: result.exitCode,
       stdoutNormalized: normalizeText(result.stdout, placeholders),
       stderrNormalized: normalizeText(result.stderr, placeholders),
+      ...(smokeCase.shapeParity
+        ? {
+          shape: {
+            stdout: describeShape(result.stdout),
+            stderr: describeShape(result.stderr),
+          },
+        }
+        : {}),
     };
     const failure = normalized.exitCode === 0
       ? undefined
@@ -304,15 +333,35 @@ function describeSmokeCase(smokeCase) {
     args: smokeCase.args({ tempDir: "<TMPDIR>" }),
     expectedExitCode: smokeCase.expectedExitCode,
     expected: stableValue(smokeCase.expected),
+    // Part of the canonical sequence so a platform running a comparator that
+    // disagrees about which cases carry a shape fingerprint fails compareSequence
+    // instead of silently skipping the check.
+    shapeParity: smokeCase.shapeParity === true,
   };
 }
 
+// `shapeParity: true` opts a case into the raw separator/line-ending comparison
+// (see describeShape). Only set it on cases whose output embeds no filesystem
+// path. The fixture cases below are deliberately excluded: they print the temp
+// directory, so on Windows their stderr carries native backslashes (measured
+// 2026-09-02: 12 of them in status-missing-rex, all from the two embedded temp
+// paths) which are correct native rendering, not drift. Comparing counts there
+// would fail on working behaviour.
+//
+// The six path-free cases all measured 0 backslashes and 0 CRLF on Windows 11,
+// so any nonzero count on either platform means output grew a hardcoded
+// separator. If a message here ever legitimately gains a path, drop its flag in
+// the same change rather than loosening the check.
 export const SMOKE_CASES = [
   {
     id: "version-text",
     args: () => ["version"],
     expectedExitCode: 0,
-    expected: { stdoutExact: CORE_PACKAGE_JSON.version },
+    // stderrExact pins "prints nothing to stderr" as a per-OS assertion. The
+    // cross-artifact diff cannot do this: it only proves both platforms are
+    // equally noisy, not that either is clean.
+    expected: { stdoutExact: CORE_PACKAGE_JSON.version, stderrExact: "" },
+    shapeParity: true,
     comparable(result) {
       return { stdout: result.stdoutNormalized, stderr: result.stderrNormalized };
     },
@@ -322,6 +371,7 @@ export const SMOKE_CASES = [
     args: () => ["version", "--json"],
     expectedExitCode: 0,
     expected: { stdoutJson: { version: CORE_PACKAGE_JSON.version } },
+    shapeParity: true,
     comparable(result) {
       return { stdoutJson: parseJsonPayload(result.stdoutNormalized, "version-json") };
     },
@@ -334,6 +384,7 @@ export const SMOKE_CASES = [
       stderrCode: CLI_ERROR_CODES.UNKNOWN_COMMAND,
       stderrIncludes: ["Unknown command: foobar", "Hint:"],
     },
+    shapeParity: true,
     comparable(result) {
       return { failure: extractFailureMetadata(result.stderrNormalized) };
     },
@@ -346,6 +397,7 @@ export const SMOKE_CASES = [
       stderrCode: CLI_ERROR_CODES.UNKNOWN_COMMAND,
       stderrIncludes: ["Unknown command: statis", "Did you mean", "status"],
     },
+    shapeParity: true,
     comparable(result) {
       return { failure: extractFailureMetadata(result.stderrNormalized) };
     },
@@ -361,6 +413,7 @@ export const SMOKE_CASES = [
         "rex <command> --help",
       ],
     },
+    shapeParity: true,
     comparable(result) {
       return { stdout: result.stdoutNormalized };
     },
@@ -372,6 +425,7 @@ export const SMOKE_CASES = [
     expected: {
       stdoutIncludes: ["ndx plan", "USAGE", "EXAMPLES", "See also:"],
     },
+    shapeParity: true,
     comparable(result) {
       return { stdout: result.stdoutNormalized };
     },
@@ -513,6 +567,13 @@ function compareExpected(caseDefinition, collectedCase, artifactLabel) {
     issues.push(`${artifactLabel}:${caseDefinition.id} stdout did not match expected static text`);
   }
 
+  if (caseDefinition.expected.stderrExact !== undefined
+      && collectedCase.stderrNormalized !== caseDefinition.expected.stderrExact) {
+    issues.push(
+      `${artifactLabel}:${caseDefinition.id} stderr did not match expected static text (got ${JSON.stringify(collectedCase.stderrNormalized)})`,
+    );
+  }
+
   for (const expectedText of caseDefinition.expected.stdoutIncludes ?? []) {
     if (!collectedCase.stdoutNormalized.includes(expectedText)) {
       issues.push(`${artifactLabel}:${caseDefinition.id} stdout missing "${expectedText}"`);
@@ -546,6 +607,30 @@ function compareExpected(caseDefinition, collectedCase, artifactLabel) {
   return issues;
 }
 
+/**
+ * Per-OS baseline check, run by `collect` on the platform that produced the
+ * artifact.
+ *
+ * This used to run inside `compare`, two jobs downstream, which mis-attributed
+ * every failure: a Windows-only CLI regression left "CLI Smoke (Windows)" green
+ * and turned "CLI Smoke Parity" red on an ubuntu runner. Worse, `smoke-parity`
+ * `needs` both smoke jobs, so the baseline went unenforced on exactly the runs
+ * where a platform was already red — the check was silenced by the failure it
+ * existed to catch. Keep it here.
+ */
+export function validateBaseline(artifact, artifactLabel = artifact.platform ?? "artifact") {
+  const issues = [];
+  for (const smokeCase of SMOKE_CASES) {
+    const collectedCase = artifact.cases.find((entry) => entry.id === smokeCase.id);
+    if (!collectedCase) {
+      issues.push(`${artifactLabel}:missing collected case ${smokeCase.id}`);
+      continue;
+    }
+    issues.push(...compareExpected(smokeCase, collectedCase, artifactLabel));
+  }
+  return issues;
+}
+
 function projectComparableForParity(comparable) {
   if (!comparable || typeof comparable !== "object") {
     return comparable;
@@ -563,6 +648,11 @@ function projectComparableForParity(comparable) {
   return comparable;
 }
 
+/**
+ * Cross-OS comparison only. The per-OS baseline contract is enforced by
+ * `validateBaseline` inside `collect`, on the platform that produced the
+ * artifact — see that function for why it does not belong here.
+ */
 export function compareArtifacts(macArtifact, windowsArtifact) {
   const issues = [];
   issues.push(...compareSequence(macArtifact, "macos"));
@@ -577,8 +667,15 @@ export function compareArtifacts(macArtifact, windowsArtifact) {
       continue;
     }
 
-    issues.push(...compareExpected(smokeCase, macCase, "macos"));
-    issues.push(...compareExpected(smokeCase, windowsCase, "windows"));
+    // Before the failure-code branch below, which short-circuits: a case can be
+    // both a failure case and shape-compared.
+    diffValues(
+      `parity:${smokeCase.id}.shape`,
+      stableValue(macCase.shape),
+      stableValue(windowsCase.shape),
+      issues,
+      { left: "macos", right: "windows" },
+    );
 
     const macComparable = stableValue(projectComparableForParity(macCase.comparable));
     const windowsComparable = stableValue(projectComparableForParity(windowsCase.comparable));
@@ -623,7 +720,20 @@ async function main(argv) {
         cliCommand === process.execPath ? [CLI_PATH] : [],
       ),
     });
+    // Write BEFORE asserting, deliberately. A baseline failure means the CLI on
+    // this platform is broken, and the artifact is the evidence — it records the
+    // exact stdout/stderr that failed. Writing first keeps it uploadable (the
+    // ci.yml upload steps run with `if: always()` for this reason) instead of
+    // leaving a red job with nothing to inspect. The step still exits non-zero,
+    // so the platform that broke is the platform that goes red.
     writeFileSync(rest[outputIndex + 1], JSON.stringify(artifact, null, 2) + "\n", "utf-8");
+
+    const baselineIssues = validateBaseline(artifact, process.platform);
+    if (baselineIssues.length > 0) {
+      throw new Error(
+        `CLI smoke baseline failed on ${process.platform}:\n- ${baselineIssues.join("\n- ")}`,
+      );
+    }
     return;
   }
 

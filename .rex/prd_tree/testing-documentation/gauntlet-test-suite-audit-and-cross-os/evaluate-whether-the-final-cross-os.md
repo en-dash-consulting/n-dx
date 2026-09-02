@@ -1,0 +1,27 @@
+---
+id: "e57210b1-621a-4e6d-bf8d-359ddf40d651"
+level: "task"
+title: "Evaluate whether the final cross-OS pipeline validation step earns its CI cost"
+status: "completed"
+priority: "high"
+tags:
+  - "ci"
+  - "cross-os"
+  - "pipeline"
+  - "gauntlet"
+source: "smart-add"
+startedAt: "2026-09-02T19:52:49.763Z"
+completedAt: "2026-09-02T20:13:11.305Z"
+endedAt: "2026-09-02T20:13:11.305Z"
+resolutionType: "acknowledgment"
+resolutionDetail: "Recommendation written to docs/contributing/cross-os-pipeline-review-2026-09.md. Verdict: KEEP smoke-parity (1 of 71 billed min/run) and tighten it; NARROW smoke-macos by gating only its root-suite step to push:main (71 -> ~41 billed min per PR); KEEP smoke-windows unconditional. Key finding: the cross-artifact comparison adds unique signal on only 3 of 8 cases (#1 stderr, #5/#6 full help text), all static OS-independent text — the two highest-value cases (status-missing-rex, status-json) have fully-specified baselines, so parity is logically subsumed for them. Two structural defects found: collect asserts nothing, so a Windows-only CLI regression reds an ubuntu job (S1); and smoke-parity `needs` both smoke jobs, so the baseline contract goes unenforced on exactly the runs where a platform is red (S2). Proposed YAML/script changes listed, not applied. Live GitHub run history was unavailable (network egress blocked, no gh CLI) — used run IDs and billed-minute figures recorded in the Cross-OS Behavioral Parity epic plus git history instead."
+acceptanceCriteria:
+  - "Pipeline stage definition is read and each assertion type is categorised (parity check, smoke test, structural, etc.)"
+  - "At least one recent CI run history is reviewed to identify which assertions have actually caught regressions vs. always passed"
+  - "Written recommendation is produced with a keep/tighten/narrow/remove verdict and supporting rationale"
+  - "Recommendation addresses whether the macOS and Windows stages must both run on every PR or can be gated"
+  - "Any proposed changes to the pipeline YAML are listed in the recommendation (not yet applied)"
+description: "Review the final pipeline stage that validates CLI behaviour parity across Windows and macOS runners. Determine whether it catches real regressions that earlier stages miss, whether its current assertions are tight enough to be meaningful, and whether the cost (image build time, runner minutes, maintenance) is justified. Recommend: keep as-is, tighten assertions, narrow scope, or remove and absorb coverage into unit/integration layers."
+lastModified: "2026-09-02T20:13:11.342Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---

@@ -1,6 +1,6 @@
 # CLI Smoke Parity
 
-> Cost/value review of this stage, with proposed changes: [Cross-OS Pipeline Review — 2026-09](./cross-os-pipeline-review-2026-09.md).
+> Cost/value review of this stage: [Cross-OS Pipeline Review — 2026-09](./cross-os-pipeline-review-2026-09.md). Its recommendations are applied as of 2026-09-02.
 
 The macOS and Windows smoke jobs in [ci.yml](../../.github/workflows/ci.yml) must run the same canonical `ndx` validation sequence by invoking:
 
@@ -10,7 +10,20 @@ node scripts/cli-smoke-parity.mjs collect --output <artifact-path>
 
 `collect` defaults to running the source-checkout CLI entrypoint via the current Node executable. Use `--cli-command <command>` only when you explicitly need to exercise a separately installed CLI binary.
 
-The collector records the canonical sequence in each artifact under `sequence`. That sequence is the documented baseline used by CI parity comparison.
+The collector records the canonical sequence in each artifact under `sequence`, **and asserts the baseline contract on the platform that produced it**. The sequence is the structural contract used by the CI parity comparison.
+
+## Where each check runs
+
+This split is deliberate and load-bearing — a per-OS contract enforced in the comparison job is attributed to the wrong platform and is skipped exactly when a platform is already red.
+
+| Check | Command | Job |
+|---|---|---|
+| Per-OS baseline: exit code, `stdoutExact`/`stderrExact`, required substrings, `stderrCode`, `stdoutJson` literal | `collect` (`validateBaseline`) | `CLI Smoke (macOS)` / `CLI Smoke (Windows)` |
+| Canonical sequence metadata equality | `compare` (`compareSequence`) | `CLI Smoke Parity` |
+| `comparable` projection and normalized failure codes, macOS vs Windows | `compare` (`compareArtifacts`) | `CLI Smoke Parity` |
+| Raw separator / line-ending fingerprint, macOS vs Windows | `compare` (`shape`) | `CLI Smoke Parity` |
+
+On a baseline failure the collector writes the artifact and *then* exits non-zero, and the upload steps run with `if: always()`, so the artifact recording the broken output is still published for diagnosis.
 
 ## Artifact Semantics
 
@@ -20,8 +33,19 @@ Each collected case keeps two views of the same run:
 - `comparable.stdout` and `comparable.stdoutJson` are parity-critical for successful scenarios. CI compares them across platforms exactly.
 - `comparable.failure.code` is parity-critical for failed scenarios. CI compares only the normalized error code across platforms.
 - `failure.detail` is intentionally not parity-critical. It is allowed to drift between macOS and Windows when the underlying failure meaning is still the same.
+- `shape` is present only on cases marked `shapeParity` and holds `{ crlfCount, backslashCount }` for each raw stream. It is parity-critical.
 
 Use that split deliberately: artifact detail is for diagnosis, while the `comparable` projection is the cross-platform contract.
+
+## Normalization limitation, and the shape fingerprint
+
+`normalizeText` rewrites every `\r\n` to `\n` and every `\` to `/` before anything is compared. That is what lets CI ignore expected OS-specific differences — temp paths, shell wording, native process messages — while still failing on real semantic drift. The cost is that it also erases the bug class this matrix is named for: a hardcoded `\r\n` or a stray Windows separator in user-facing output is normalized away, not detected.
+
+`shape` closes that gap. It counts `\r\n` and `\` on the raw stream (after runtime-noise stripping, which does not touch separators) and compares those counts across platforms.
+
+It is opt-in per case via `shapeParity: true`, and only correct for cases whose output embeds **no filesystem path**. The two fixture cases are excluded: they print the temp directory, so on Windows their stderr legitimately carries native backslashes — measured 2026-09-02, `status-missing-rex` emits 12, all from the two embedded temp paths. Comparing counts there would fail on working behaviour. The six path-free cases measured 0 backslashes and 0 CRLF on Windows 11, so any nonzero count now means output grew a hardcoded separator.
+
+If a message in a `shapeParity` case ever legitimately gains a path, drop that case's flag in the same change rather than loosening the check. `shapeParity` is recorded in the `sequence` metadata, so two platforms disagreeing about which cases are shape-compared fails `compareSequence` rather than silently skipping the check.
 
 ## Canonical Sequence
 
@@ -42,14 +66,14 @@ Each step carries a stable expectation embedded in the artifact sequence:
 - required stdout or stderr substrings for text commands
 - projected JSON contract for structured commands
 
-`node scripts/cli-smoke-parity.mjs compare --mac <mac-artifact> --windows <windows-artifact>` validates:
+`collect` asserts this contract against the platform it runs on and exits non-zero if any case violates it.
+
+`node scripts/cli-smoke-parity.mjs compare --mac <mac-artifact> --windows <windows-artifact>` then validates cross-OS agreement only:
 
 - both artifacts were collected with the same canonical sequence metadata
-- each platform still matches the baseline contract
 - success-case comparable payloads are equal across macOS and Windows
 - failure-case parity compares normalized error codes instead of raw stderr detail
-
-This lets CI ignore expected OS-specific differences such as temp paths, shell wording, and native process messages while still failing on real semantic drift.
+- the raw separator / line-ending fingerprint is equal for every `shapeParity` case
 
 When parity fails, the comparator reports the scenario name and either the exact field path that diverged or an explicit normalized error code mismatch.
 

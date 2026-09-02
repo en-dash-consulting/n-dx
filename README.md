@@ -35,10 +35,12 @@ ndx destroy-sample .
 
 | Platform | Support | Notes |
 |----------|---------|-------|
-| macOS | ✅ Supported | CI smoke tests on `macos-latest` |
-| Linux | ✅ Supported | Full CI (build, typecheck, unit tests) on `ubuntu-latest` |
+| macOS | ✅ Supported | CI smoke tests on `macos-latest` every run; the root e2e / integration suite runs on merges to `main` rather than on every PR (macOS bills at 10× Linux) |
+| Linux | ✅ Supported | Full CI (build, typecheck, unit tests, root e2e / integration) on `ubuntu-latest` every run |
 | Windows — WSL2 | ✅ Supported | Runs as Linux; no separate CI coverage needed |
-| Windows — native | ⚠️ Experimental | CLI smoke tests pass in CI with macOS parity checks; process group management and shell spawning differ from POSIX; `ndx work` agent loop has reduced native test coverage |
+| Windows — native | ⚠️ Experimental | CLI smoke tests plus the root and per-package suites run in CI on every run, with macOS parity checks; process group management and shell spawning differ from POSIX; `ndx work` agent loop has reduced native test coverage |
+
+CI structure for the cross-OS stage — which checks run in which job, and why — is documented in [`docs/contributing/cli-smoke-parity.md`](docs/contributing/cli-smoke-parity.md).
 
 For a supported Linux environment on Windows, use **WSL2** (recommended) or the Docker infrastructure in [`.local_testing/`](.local_testing/).
 

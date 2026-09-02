@@ -1,5 +1,17 @@
 # Cross-OS Pipeline Review — 2026-09-02
 
+> **STATUS: applied 2026-09-02.** T1, T2, T3 and the `smoke-macos` step gate are all
+> in the pipeline; see [cli-smoke-parity.md](./cli-smoke-parity.md) for the resulting
+> structure. One deviation from §5, deliberate: T1 writes the artifact *before*
+> asserting the baseline rather than after, and the upload steps gained
+> `if: always()`. §5 item 4 flagged the ordering as needing confirmation — writing
+> first gives the same red job on the same platform while keeping the artifact that
+> records the broken output, which is the whole diagnostic value. Verified on
+> Windows: exit 1, error names `win32`, all 8 cases still recorded.
+>
+> This document is retained as the rationale record. It describes the pipeline as it
+> was before the change; do not read §1's assertion table as current.
+
 Does the final cross-OS validation stage earn its CI cost?
 
 Scope: the `smoke-macos` → `smoke-windows` → `smoke-parity` chain in
