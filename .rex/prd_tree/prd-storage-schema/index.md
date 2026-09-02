@@ -27,7 +27,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Folder-Level index.md Summary Aggregation](./folder-level-index-md-summary/index.md) | completed |
 | [Folder-Per-Task Hierarchy Enforcement](./folder-per-task-hierarchy-enforcement/index.md) | completed |
 | [Folder Tree Migration, Initialization, and Auto-Trigger](./folder-tree-migration-initialization/index.md) | completed |
-| [Human-readable PRD tree slugs](./human-readable-prd-tree-slugs/index.md) | pending |
+| [Human-readable PRD tree slugs](./human-readable-prd-tree-slugs/index.md) | completed |
 | [JSON Write Path Removal and Markdown-Only Enforcement](./json-write-path-removal-and-markdown/index.md) | completed |
 | [Legacy Migration and Multi-File Integration Validation](./legacy-migration-and-multi-file/index.md) | completed |
 | [Markdown Schema Design and Bidirectional Serialization](./markdown-schema-design-and/index.md) | completed |

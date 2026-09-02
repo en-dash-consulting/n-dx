@@ -23,6 +23,12 @@
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { resolveStore, PRD_TREE_DIRNAME } from "../../store/index.js";
+import {
+  findUnresolvableSiblingCollisions,
+  fingerprintTree,
+  diffFingerprints,
+  isLossless,
+} from "../../core/slug-migration.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
@@ -49,12 +55,51 @@ export async function cmdMigrateSlugs(
     );
   }
 
+  // Refuse before touching anything if the tree holds a collision the slug
+  // rule cannot resolve. Same-titled siblings are ordinary — they take an
+  // `-{id6}` suffix. Siblings sharing a title *and* an id are not: the
+  // serializer would fall back to position suffixes, making those paths depend
+  // on array order.
+  const beforeDoc = await store.loadDocument();
+  const unresolvable = findUnresolvableSiblingCollisions(beforeDoc.items);
+  if (unresolvable.length > 0) {
+    const offenders = unresolvable
+      .slice(0, 10)
+      .map((c) => `  ${c.slug} — id "${c.id}" claimed by ${c.count} siblings: ${c.titles.join(", ")}`)
+      .join("\n");
+    throw new CLIError(
+      `${unresolvable.length} sibling collision${unresolvable.length === 1 ? "" : "s"} cannot be resolved by the slug rule.`,
+      `Two siblings share both a title and an id, so they compile to the same slug:\n${offenders}\n` +
+        `Give them distinct ids (or merge them) and re-run. 'rex validate' reports the same duplicate ids.`,
+    );
+  }
+  const beforePrints = fingerprintTree(beforeDoc.items);
+
   // Snapshot first so `rex restore` can undo a migration gone wrong.
   await ensureSnapshot(rexDir, "migrate-slugs", flags);
 
   // Load + save under one lock: the serializer emits current-rule paths and
   // removes the entries it loaded from the superseded ones.
   await store.withTransaction(async () => {});
+
+  // Prove the rename was lossless by reading the tree back. Git similarity
+  // scores cannot do this: a container's index.md lists its children's paths,
+  // so renaming a child rewrites its parent and reports below R100 while
+  // nothing has actually been lost.
+  const afterDoc = await store.loadDocument();
+  const diff = diffFingerprints(beforePrints, fingerprintTree(afterDoc.items));
+  if (!isLossless(diff)) {
+    const parts = [
+      diff.lost.length > 0 ? `${diff.lost.length} lost (${diff.lost.slice(0, 5).join(", ")})` : "",
+      diff.gained.length > 0 ? `${diff.gained.length} appeared (${diff.gained.slice(0, 5).join(", ")})` : "",
+      diff.changed.length > 0 ? `${diff.changed.length} altered (${diff.changed.slice(0, 5).join(", ")})` : "",
+    ].filter(Boolean);
+    throw new CLIError(
+      `The rename was not lossless: ${parts.join("; ")}.`,
+      `A slug migration must only move files. Restore the pre-migration snapshot with 'rex restore' and report this — ` +
+        `the tree on disk no longer round-trips through the parser.`,
+    );
+  }
 
   const after = await listTree(treeRoot);
   const beforeSet = new Set(before);
@@ -63,7 +108,19 @@ export async function cmdMigrateSlugs(
   const unchanged = before.filter((p) => beforeSet.has(p) && afterSet.has(p)).length;
 
   if (flags.format === "json") {
-    result(JSON.stringify({ entriesRenamed: renamed, entriesUnchanged: unchanged }, null, 2));
+    result(
+      JSON.stringify(
+        {
+          entriesRenamed: renamed,
+          entriesUnchanged: unchanged,
+          // A non-lossless rename throws above, so reaching here proves it.
+          itemsVerified: beforePrints.size,
+          lossless: true,
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
@@ -72,7 +129,8 @@ export async function cmdMigrateSlugs(
     return;
   }
   result(`Renamed ${renamed} entr${renamed === 1 ? "y" : "ies"} to readable slugs (${unchanged} already canonical).`);
-  info("Commit the renamed tree, then run 'rex validate' to confirm no two items share a path.");
+  info(`Verified lossless: all ${beforePrints.size} items round-tripped with their fields intact.`);
+  info("Commit the renamed tree. Expect sub-R100 similarity on container index.md files — they list their children's paths.");
 }
 
 /** All tree-entry paths (relative), sorted — dotfiles and non-md noise excluded. */
