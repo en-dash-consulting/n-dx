@@ -18,9 +18,14 @@ import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
 import { info, result as output, setQuiet } from "../output.js";
-import { section } from "../../types/output.js";
+import { section, detail } from "../../types/output.js";
+import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
+import {
+  trimDocument,
+  MAX_CONTEXT_FILE_CHARS,
+} from "../../agent/planning/context-caps.js";
 import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../store/project-config.js";
-import { LLM_VENDOR, printVendorModelHeader, resolveModel, resolveVendorModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, printVendorModelHeader, resolveModel, resolveTaskModel, bold, green, red, colorStatus, colorSuccess, colorWarn, colorPink, isColorEnabled, isModelCompatibleWithVendor, createSpinner } from "../../prd/llm-gateway.js";
 import { ExecutionQueue } from "../../queue/execution-queue.js";
 import { formatQueueStatus } from "../../queue/format.js";
 import { resolveSchedulingPriority } from "../../queue/priority-scheduler.js";
@@ -948,7 +953,12 @@ export async function cmdRun(
       : llmVendor === LLM_VENDOR.CODEX
         ? flags["codex-model"]
         : flags["google-model"]);
-  const configuredModel = resolveVendorModel(llmVendor, llmConfig);
+  // The agent loop is the `agent.execute` task class: standard tier by
+  // default (identical to the previous resolveVendorModel result), but
+  // routable — `llm.routes["agent.execute"] = "heavy"` reaches the heavy
+  // tier with no code change. The resolved tier is recorded on the run.
+  const agentResolution = resolveTaskModel("agent.execute", llmConfig, { vendor: llmVendor });
+  const configuredModel = agentResolution.model;
   const resolvedModel = cliModelOverride ? resolveModel(cliModelOverride) : configuredModel;
   const hasConfiguredModel =
     !!llmConfig?.model
@@ -1053,6 +1063,9 @@ export async function cmdRun(
   // --allow-dirty lets autonomous runs start against an uncommitted working
   // tree instead of aborting at the pre-run commit gate.
   const allowDirty = flags["allow-dirty"] === "true";
+  // --fresh discards the cached orientation session so this run re-orients
+  // before forking task spawns from it.
+  const fresh = flags["fresh"] === "true";
   const model = resolvedModel;
   // Always pass the resolved model to the spawned vendor CLI so the user's
   // configured choice (top-level or vendor-pinned) survives the spawn. The
@@ -1241,7 +1254,18 @@ export async function cmdRun(
   if (contextFilePath) {
     if (existsSync(contextFilePath)) {
       try {
-        extraContext = readFileSync(contextFilePath, "utf-8");
+        // Size-guarded: `ndx work` pipes the entire CONTEXT.md plus the PRD
+        // tree through this flag, and the result is re-sent on every task and
+        // every retry. Trim with a stated marker rather than inlining
+        // whatever happens to be on disk.
+        const raw = readFileSync(contextFilePath, "utf-8");
+        extraContext = trimDocument(raw, MAX_CONTEXT_FILE_CHARS, "context file");
+        if (raw.length > MAX_CONTEXT_FILE_CHARS) {
+          info(
+            `⚠ Context file trimmed: ${raw.length} chars → ${MAX_CONTEXT_FILE_CHARS} ` +
+              `(${contextFilePath})`,
+          );
+        }
       } catch (err) {
         info(`⚠ Could not read context file "${contextFilePath}": ${(err as Error).message}`);
       }
@@ -1383,6 +1407,15 @@ export async function cmdRun(
     if (gate === "stop") {
       info("Stopped before running. Commit or discard your changes, then re-run.");
       return;
+    }
+
+    // --fresh: drop the cached orientation session exactly once, here, before
+    // any task runs. Clearing per task instead would make every task in a
+    // loop re-orient, which is the opposite of what the flag is for — the
+    // first task then re-orients on the cache miss and the rest reuse it.
+    if (fresh) {
+      await clearSessionCache(henchDir);
+      detail("Discarded the cached orientation session (--fresh)");
     }
 
     if (epicByEpic) {

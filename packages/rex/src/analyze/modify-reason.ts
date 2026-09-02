@@ -29,6 +29,8 @@ import {
   MAX_RETRIES,
 } from "./reason.js";
 import { validateModificationRequest } from "./validate-modification.js";
+import { withEscalation } from "./escalate.js";
+import { info } from "@n-dx/llm-client";
 
 // ── Types ──
 
@@ -72,7 +74,7 @@ export function buildModifyPrompt(
     projectContext?: string;
   },
 ): string {
-  const proposalJson = JSON.stringify(proposals, null, 2);
+  const proposalJson = JSON.stringify(proposals);
 
   const existingBlock = options?.existingSummary
     ? `\nExisting PRD (for deduplication — do NOT include these items):\n${options.existingSummary}\n`
@@ -211,35 +213,33 @@ export async function modifyProposals(
     projectContext: projectContext || undefined,
   });
 
-  // LLM call with retries on parse failure
-  let lastError: Error | undefined;
+  // Retries go through the escalation ladder rather than resending this
+  // prompt unchanged: each attempt carries the previous parse failure, so the
+  // model is told what was wrong instead of being asked the same question and
+  // likely producing the same unparseable answer.
+  const escalation = await withEscalation({
+    prompt,
+    taskClass: "prd.modify",
+    model: options.model,
+    maxAttempts: maxRetries + 1,
+    validate: (text) => parseProposalResponse(text),
+    // Only parse/validation failures are worth another attempt; network and
+    // auth failures propagate to the caller, which has real remediation.
+    isValidationError: (err) => isParseError(err),
+    onEscalate: ({ attempt, error }) => {
+      info(`Modify: retrying on the standard tier (attempt ${attempt}) — ${error}`);
+    },
+  });
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const result = await spawnClaude(prompt, options.model);
-      accumulateTokenUsage(tokenUsage, result.tokenUsage);
-
-      const modified = parseProposalResponse(result.text);
-      const qualityIssues = validateProposalQuality(modified);
-
-      return {
-        proposals: modified,
-        originalProposals: proposals,
-        tokenUsage,
-        qualityIssues,
-      };
-    } catch (err) {
-      lastError = err as Error;
-      // Only retry on parse/validation errors, not on network/auth errors
-      if (!isParseError(lastError)) {
-        throw lastError;
-      }
-      // Token usage is accumulated even on failures (LLM was called)
-    }
-  }
-
-  // All retries exhausted
-  throw lastError!;
+  return {
+    proposals: escalation.value,
+    originalProposals: proposals,
+    // The ladder's ledger is carried through whole: every attempt was billed,
+    // and folding them into one entry would understate the call count that
+    // token reporting aggregates.
+    tokenUsage: escalation.tokenUsage,
+    qualityIssues: validateProposalQuality(escalation.value),
+  };
 }
 
 /**

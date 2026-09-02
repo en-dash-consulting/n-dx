@@ -74,7 +74,7 @@ export function buildDecompositionPrompt(
   task: ProposalTask,
   thresholdWeeks: number,
 ): string {
-  const taskJson = JSON.stringify(task, null, 2);
+  const taskJson = JSON.stringify(task);
 
   return `You are a product requirements analyst. The following task has a level-of-effort (LoE) estimate that exceeds the project's threshold of ${thresholdWeeks} engineer-week${thresholdWeeks === 1 ? "" : "s"}. Break it down into smaller, independently deliverable child tasks.
 
@@ -94,7 +94,7 @@ Rules:
 
 ${TASK_QUALITY_RULES}
 
-Respond with ONLY a valid JSON array of task objects. No explanation, no markdown fences — just the JSON.`;
+Respond with ONLY a valid, minified JSON array of task objects — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, and do not restate the input task — just the JSON.`;
 }
 
 // ── Response parsing ──
@@ -166,6 +166,10 @@ export async function decomposeTask(
   const prompt = buildDecompositionPrompt(task, thresholdWeeks);
   const tokenUsage = emptyAnalyzeTokenUsage();
 
+  // Deliberately not declaring `taskClass: "prd.decompose"` yet: the registry
+  // routes that class light, and flipping this recursive fan-out to the light
+  // tier belongs to the light-tier routing feature, gated on the escalation
+  // ladder validating decomposition output.
   const result: ClaudeResult = await spawnClaude(
     prompt,
     model,

@@ -9,6 +9,7 @@
 import {
   aggregateTokenUsage,
   checkBudget,
+  totalTokens,
 } from "../../core/token-usage.js";
 import { loadTokenUsageConfig, readTokenUsageLog } from "../../core/token-store.js";
 import type {
@@ -26,7 +27,11 @@ function fmt(n: number): string {
  * Returns an array of lines (without trailing newlines).
  */
 export function formatAggregateTokenUsage(usage: AggregateTokenUsage): string[] {
-  const total = usage.totalInputTokens + usage.totalOutputTokens;
+  const total =
+    usage.totalInputTokens +
+    usage.totalOutputTokens +
+    usage.totalCacheCreationTokens +
+    usage.totalCacheReadTokens;
 
   if (total === 0) {
     return ["Token usage: none recorded"];
@@ -34,27 +39,38 @@ export function formatAggregateTokenUsage(usage: AggregateTokenUsage): string[] 
 
   const lines: string[] = [];
 
-  lines.push(
-    `Token usage: ${fmt(total)} tokens (${fmt(usage.totalInputTokens)} in / ${fmt(usage.totalOutputTokens)} out)`,
-  );
+  // The split is spelled out rather than collapsed: the four kinds are billed
+  // at four different rates, and on a warm agent loop cache reads dominate the
+  // count while contributing least per token. One number would mislead in both
+  // directions. Cache segments are omitted entirely when zero so projects that
+  // never cache keep the original two-part line.
+  const segments = [
+    `${fmt(usage.totalInputTokens)} in`,
+    `${fmt(usage.totalOutputTokens)} out`,
+  ];
+  if (usage.totalCacheCreationTokens > 0) {
+    segments.push(`${fmt(usage.totalCacheCreationTokens)} cache write`);
+  }
+  if (usage.totalCacheReadTokens > 0) {
+    segments.push(`${fmt(usage.totalCacheReadTokens)} cache read`);
+  }
+
+  lines.push(`Token usage: ${fmt(total)} tokens (${segments.join(" / ")})`);
 
   // Per-package breakdown — only show packages with usage
   const { rex, hench, sv } = usage.packages;
   const parts: string[] = [];
 
-  if (sv.inputTokens + sv.outputTokens > 0) {
-    const svTotal = sv.inputTokens + sv.outputTokens;
-    parts.push(`sv: ${fmt(svTotal)} (${sv.calls} calls)`);
+  if (totalTokens(sv) > 0) {
+    parts.push(`sv: ${fmt(totalTokens(sv))} (${sv.calls} calls)`);
   }
 
-  if (rex.inputTokens + rex.outputTokens > 0) {
-    const rexTotal = rex.inputTokens + rex.outputTokens;
-    parts.push(`rex: ${fmt(rexTotal)} (${rex.calls} calls)`);
+  if (totalTokens(rex) > 0) {
+    parts.push(`rex: ${fmt(totalTokens(rex))} (${rex.calls} calls)`);
   }
 
-  if (hench.inputTokens + hench.outputTokens > 0) {
-    const henchTotal = hench.inputTokens + hench.outputTokens;
-    parts.push(`hench: ${fmt(henchTotal)} (${hench.calls} runs)`);
+  if (totalTokens(hench) > 0) {
+    parts.push(`hench: ${fmt(totalTokens(hench))} (${hench.calls} runs)`);
   }
 
   if (parts.length > 0) {

@@ -26,17 +26,56 @@ async function postWriteHealthWarning(dir: string, isJson: boolean): Promise<voi
 }
 
 /**
+ * How long to stay silent before telling the operator we are waiting on stdin.
+ */
+const STDIN_SILENCE_NOTICE_MS = 2_000;
+
+/**
  * Read all data from stdin when input is piped (not a TTY).
  * Returns trimmed text, or empty string if stdin is a terminal.
+ *
+ * The read runs to EOF and is never cut short: a bound on the wait would
+ * discard input from a slow producer, and losing a piped document is worse
+ * than waiting for it. What is bounded is the *silence* — if nothing has
+ * arrived after a couple of seconds we say so on stderr, once, so a caller
+ * holding an open pipe sees why nothing is happening instead of staring at a
+ * process that looks wedged.
+ *
+ * The hang this addresses was not really about stdin timing anyway: `rex add`
+ * read stdin before deciding its mode, so manual mode waited on input it would
+ * never use. That is fixed at the call site in `dispatchAdd`; this only makes
+ * the remaining, legitimate waits legible.
  */
 function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return Promise.resolve("");
 
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    process.stdin.on("data", (chunk: Buffer) => chunks.push(chunk));
-    process.stdin.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8").trim()));
-    process.stdin.on("error", reject);
+    let settled = false;
+
+    const notice = setTimeout(() => {
+      if (chunks.length === 0 && !settled) {
+        process.stderr.write(
+          "rex: waiting for piped input on stdin — close the pipe (or press Ctrl-D) to continue.\n",
+        );
+      }
+    }, STDIN_SILENCE_NOTICE_MS);
+
+    const settle = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(notice);
+      fn();
+    };
+
+    process.stdin.on("data", (chunk: Buffer) => {
+      chunks.push(chunk);
+      clearTimeout(notice); // Input is arriving; no need to explain the wait.
+    });
+    process.stdin.on("end", () =>
+      settle(() => resolve(Buffer.concat(chunks).toString("utf-8").trim())),
+    );
+    process.stdin.on("error", (err) => settle(() => reject(err)));
   });
 }
 
@@ -141,9 +180,6 @@ async function dispatchAdd(
   const firstArg = positional[0];
   const hasFileFlag = !!(multiFlags.file?.length || flags.file);
 
-  // Read piped stdin if available (non-blocking for TTY)
-  const stdinText = await readStdin();
-
   // Manual mode detection:
   //   1. Positional level:  rex add task --title="..." --parent=<id>
   //   2. --level flag:      rex add --level=task --title="..." --parent=<id>
@@ -152,6 +188,21 @@ async function dispatchAdd(
   const flagLevel = flags.level && isItemLevel(flags.level);
   const isManualMode = positionalLevel || flagLevel || flags.title;
 
+  // An unrecognised --level is a typo, not a description. Without this it fell
+  // through to smart mode, which then waited on stdin for a description that
+  // was never coming — the typo surfaced as a hang rather than as an error.
+  if (flags.level && !flagLevel) {
+    throw new CLIError(
+      `Invalid --level "${flags.level}".`,
+      "Valid levels are: epic, feature, task, subtask.",
+    );
+  }
+
+  // Mode is decided entirely by argv, and stdin is read only by the branch that
+  // can use it. Reading before this point made every invocation wait on the
+  // piped-description form: with `stdio: "pipe"` and no writer, manual mode
+  // hung forever with no output — including on argv errors, which never got as
+  // far as being reported.
   if (isManualMode) {
     const level = positionalLevel ? firstArg : flags.level;
     const dir =
@@ -162,6 +213,9 @@ async function dispatchAdd(
     await cmdAdd(dir, level, flags);
     return;
   }
+
+  // Smart mode is the only consumer of piped input.
+  const stdinText = await readStdin();
 
   if (firstArg || flags.description || hasFileFlag || stdinText) {
     const { dir, descriptions } = resolveSmartAddArgs(positional, flags, multiFlags, stdinText);

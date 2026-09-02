@@ -59,6 +59,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--model=<model>", description: "Override the Claude model" },
       { flag: "--permission-mode=<mode>", description: "Claude permission posture: default | acceptEdits | bypassPermissions | plan (autonomous runs default to acceptEdits)" },
       { flag: "--allow-dirty", description: "Start with an uncommitted working tree: autonomous runs (--auto/--loop/--epic-by-epic) abort by default, and this flag also overrides hench.git.requireCleanTree and hench.git.checkpointThreshold escalation" },
+      { flag: "--fresh", description: "Discard the cached orientation session and orient again before forking task spawns (see hench.sessionStrategy)" },
     ],
     sections: [
       {

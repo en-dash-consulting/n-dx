@@ -1,0 +1,27 @@
+---
+id: "134db348-9786-4723-9d68-501931faa499"
+level: "subtask"
+title: "Un-skip the 6 Windows process-cleanup e2e cases with grandchild assertions (TDD red step)"
+status: "completed"
+priority: "high"
+tags:
+  - "windows"
+  - "process-lifecycle"
+  - "testing"
+  - "tdd"
+  - "core"
+source: "exploration-2026-08-17"
+startedAt: "2026-08-17T18:27:27.113Z"
+completedAt: "2026-08-17T18:43:09.399Z"
+endedAt: "2026-08-17T18:43:09.399Z"
+resolutionType: "code-change"
+resolutionDetail: "All 6 cases now execute and pass on Windows (commit 102f9ec4); root suite 2025 passed / 5 skipped / 0 failed, up from 2019 passed / 11 skipped. The real blocker was that the fixtures could not run on Windows at all: --import needed a file:// URL (ERR_UNSUPPORTED_ESM_URL_SCHEME) and all three preload regexes hardcoded forward slashes. AC4 (cases must be RED, demonstrating the leak) is NOT satisfiable and was not engineered: process.kill(pid,\"SIGINT\") is TerminateProcess on Windows so the handler never runs (parent exits 1, not 128+2), and the host Job Object reaps the tree regardless of ndx — verified with a probe containing no n-dx code. Documented in the test headers and pushed into the sibling terminateTree task, whose verification strategy was rewritten to assert the strategy RAN rather than rely on liveness."
+acceptanceCriteria:
+  - "All 6 previously-skipped cases across the 3 files execute on Windows (no longer reported as skipped)"
+  - "Assertions identify surviving child/grandchild PIDs without relying on process groups (tasklist or process.kill(pid, 0))"
+  - "Assertions account for the intermediate cmd.exe wrapper process in the Windows spawn recipe"
+  - "The cases fail on current main on Windows, demonstrating the leak — and that failure is visible rather than silently skipped"
+  - "POSIX behavior of all 6 cases is unchanged and still green"
+  - "No assertion was weakened to achieve a green run"
+description: "THREE files gate their whole suite behind `describe.skipIf(platform() === \"win32\")`, totalling SIX skipped cases on Windows (measured: 6 skipped, 0 run):\n\n- tests/e2e/cli-child-cleanup.test.js:95 — \"terminates the SourceVision child after a successful run\", \"terminates the SourceVision child after an erroring run\", \"force-kills the SourceVision child after SIGINT interruption\"\n- tests/e2e/cli-orphan-cleanup.test.js:125 — \"reaps grandchild processes after SIGINT interruption within 5 seconds\"\n- tests/e2e/cli-ci-child-cleanup.test.js:152 — \"terminates the ci subprocess after a successful run\", \"force-kills the ci subprocess after SIGINT interruption\"\n\nWindows tree-cleanup therefore has zero coverage, which is why the grandchild leak went unnoticed. (Note: even un-skipped, these only run locally on Windows today — CI executes the test suite on ubuntu only. See the sibling CI-matrix task under the Cross-OS Behavioral Parity epic; that task is what makes these assertions actually gate merges.)\n\nThis is the TDD red step for the sibling `terminateTree` task and must land FIRST. Establish the failing assertions that prove the leak before changing any termination code — otherwise the implementation swaps a known-incomplete behavior for an unverified one.\n\nWork: enable the Windows path in each file's skip guard. Because `detached: true` is omitted on win32 (cli.js SPAWN_DETACHED) there is no process group to signal, so assertions must identify survivors by PID rather than pgid — spawn a known grandchild, capture its PID, signal the ndx parent, then poll liveness via `tasklist /FI \"PID eq <pid>\"` or `process.kill(pid, 0)`.\n\nEXPECTED OUTCOME: these FAIL on Windows when first un-skipped. That failure is the deliverable — it documents the leak. Land them red-and-quarantined (or behind an explicit todo/allowlist CI reports rather than hides) so the sibling implementation task has a target to turn green. Do NOT weaken assertions to make them pass.\n\nWindows-specific flake sources the POSIX versions never hit: cmd.exe wrapper processes inserted by the spawn recipe sit between ndx and the real grandchild, so the tree is one level deeper than on POSIX; PID reuse over a 5s poll window; and `tasklist`/`taskkill` output being localized on non-English Windows."
+---

@@ -1,0 +1,14 @@
+---
+id: "0deece15-2acc-4b40-bd91-d6b6f32a1677"
+level: "task"
+title: "Verify the review pass end-to-end against a real ndx work run"
+status: "completed"
+priority: "high"
+startedAt: "2026-08-28T18:00:08.210Z"
+completedAt: "2026-08-28T18:23:52.013Z"
+endedAt: "2026-08-28T18:23:52.013Z"
+acceptanceCriteria: []
+description: "Everything so far is verified by unit tests and by probing the Claude CLI directly (session_id is on every stream-json line; resume with a different model retains context, confirmed by cache reads). The spawn path itself has not been exercised end-to-end: run ndx work with review enabled against a real task and confirm the reviewer resumes, writes a parseable report, applies a must-fix repair before the commit prompt, and charges its tokens to the run."
+lastModified: "2026-08-28T18:23:52.019Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---

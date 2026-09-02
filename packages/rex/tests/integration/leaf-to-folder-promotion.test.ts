@@ -69,7 +69,7 @@ describe("Leaf-to-folder promotion via addItem", () => {
     };
     await store.saveDocument({ schema: "rex/v1", title: "Promotion Test", items: [epic] });
 
-    const featureDir = join(treeRoot, slugify(epic.title, epic.id), slugify("Feature", epic.children![0].id));
+    const featureDir = join(treeRoot, slugify(epic.title), slugify("Feature", epic.children![0].id));
     const taskSlug = slugify("Original Task", epic.children![0].children![0].id);
     const leafTaskPath = join(featureDir, `${taskSlug}.md`);
 
@@ -172,7 +172,7 @@ describe("Leaf-to-folder promotion via addItem", () => {
     };
     await store.saveDocument({ schema: "rex/v1", title: "Promotion Test", items: [epic] });
 
-    const featureDir = join(treeRoot, slugify(epic.title, epic.id), slugify("Feature", epic.children![0].id));
+    const featureDir = join(treeRoot, slugify(epic.title), slugify("Feature", epic.children![0].id));
     const taskSlug = slugify("Branch Task", "cccccccc-cccc-cccc-cccc-cccccccccccc");
     const taskDir = join(featureDir, taskSlug);
 
@@ -225,7 +225,7 @@ describe("Leaf-to-folder promotion via addItem", () => {
     };
     await store.saveDocument({ schema: "rex/v1", title: "Promotion Test", items: [epic] });
 
-    const epicDir = join(treeRoot, slugify(epic.title, epic.id));
+    const epicDir = join(treeRoot, slugify(epic.title));
     const taskSlug = slugify("Detail-Heavy Task", "ffffffff-ffff-ffff-ffff-ffffffffffff");
     const beforeContent = await readFile(join(epicDir, `${taskSlug}.md`), "utf-8");
 

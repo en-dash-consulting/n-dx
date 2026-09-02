@@ -87,7 +87,37 @@ export interface CodexCliProviderOptions {
  *
  * @see docs/analysis/claude-codex-runtime-identity-discovery.md §6.3
  */
-export function mapSandboxToCodexFlag(mode: SandboxMode): string {
+/**
+ * The `--sandbox` values `codex exec` accepts.
+ *
+ * From `codex exec --help`: `[possible values: read-only, workspace-write,
+ * danger-full-access]`.
+ */
+export type CodexSandboxMode = "read-only" | "workspace-write" | "danger-full-access";
+
+/**
+ * The `approval_policy` config values codex accepts.
+ *
+ * Not a stylistic narrowing — this union is the guard. Returning a string
+ * codex rejects kills the spawn at config-load time, before the model is
+ * reached, and it happened: the mappers once returned `"default"` and
+ * `"full-auto"`, which are `codex exec` *flag* names rather than
+ * `approval_policy` variants. Typing the return makes that a compile error on
+ * every machine, including CI, where codex is not installed and the
+ * drift test in `codex-flag-surface.test.ts` skips.
+ *
+ * Read off codex-cli 0.147.0's own rejection of a bogus value:
+ * ``unknown variant `x`, expected one of `untrusted`, `on-failure`,
+ * `on-request`, `granular`, `never` ``.
+ */
+export type CodexApprovalPolicy =
+  | "untrusted"
+  | "on-failure"
+  | "on-request"
+  | "granular"
+  | "never";
+
+export function mapSandboxToCodexFlag(mode: SandboxMode): CodexSandboxMode {
   switch (mode) {
     case "read-only":
       return "read-only";
@@ -99,37 +129,54 @@ export function mapSandboxToCodexFlag(mode: SandboxMode): string {
 }
 
 /**
- * Map an n-dx {@link ApprovalPolicy} to the closest Codex execution preset.
+ * Map an n-dx {@link ApprovalPolicy} to a Codex `approval_policy` config value.
  *
- * Mapping:
- * - `"on-request"` → `"default"` (use plain `--sandbox`; Codex decides when to prompt)
- * - `"never"` → `"full-auto"` (low-friction unattended execution where supported)
+ * Codex exec has no approval *flag* — the policy is a config key, set with
+ * `-c approval_policy=<value>`. Its accepted variants, read off the CLI's own
+ * rejection message on codex-cli 0.147.0, are `untrusted`, `on-failure`,
+ * `on-request`, `granular`, and `never`; n-dx's two policy names happen to be
+ * spelled identically to the two we need.
+ *
+ * This used to return the preset names `"default"` and `"full-auto"`. Those
+ * were names of `codex exec` flags, not config values, and both are gone from
+ * the exec surface — see {@link compileCodexPolicyFlags}.
  */
-export function mapApprovalToCodexFlag(policy: ApprovalPolicy): string {
+export function mapApprovalToCodexFlag(policy: ApprovalPolicy): CodexApprovalPolicy {
   switch (policy) {
     case "on-request":
-      return "default";
+      return "on-request";
     case "never":
-      return "full-auto";
+      return "never";
   }
 }
 
 /**
- * Compile an n-dx {@link ExecutionPolicy} into Codex CLI flags.
+ * Compile an n-dx {@link ExecutionPolicy} into `codex exec` flags.
  *
- * Codex no longer exposes a dedicated `--approval-policy` exec flag (nor a
- * `--full-auto` shortcut), so this compiler maps the normalized policy
- * object onto the supported CLI surface:
+ * Both halves of the policy are always stated explicitly:
  *
- * - `danger-full-access + never` → `--dangerously-bypass-approvals-and-sandbox`
- * - all other combinations, including `workspace-write + never` → explicit
- *   `--sandbox <mode>` (`codex exec` is non-interactive already, so there is
- *   no separate approval prompt to suppress)
+ * - sandbox → `--sandbox <mode>`
+ * - approvals → `-c approval_policy=<value>` (no exec flag exists for it)
+ *
+ * The one preset kept is `danger-full-access + never`, which maps to
+ * `--dangerously-bypass-approvals-and-sandbox` — still on the exec surface,
+ * and the only way to express "no sandbox at all".
+ *
+ * `workspace-write + never` — the autonomous default — used to compile to
+ * `--full-auto`. codex-cli 0.147.0 removed that flag from `codex exec`, so
+ * every unattended spawn died on argument parsing before reaching the model.
+ * Stating sandbox and approvals separately is also more robust than a preset:
+ * a preset is a name codex can retire, while `--sandbox` and `approval_policy`
+ * are the underlying settings it is composed from.
+ *
+ * Note `codex exec resume` accepts neither `--sandbox` nor an approval flag —
+ * policy belongs to the thread being resumed — so the resume path passes no
+ * policy flags and does not call this function.
  *
  * @example
  * ```ts
  * compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY)
- * // → ["--sandbox", "workspace-write"]
+ * // → ["--sandbox", "workspace-write", "-c", "approval_policy=never"]
  * ```
  */
 export function compileCodexPolicyFlags(policy: ExecutionPolicy): string[] {
@@ -137,7 +184,12 @@ export function compileCodexPolicyFlags(policy: ExecutionPolicy): string[] {
     return ["--dangerously-bypass-approvals-and-sandbox"];
   }
 
-  return ["--sandbox", mapSandboxToCodexFlag(policy.sandbox)];
+  return [
+    "--sandbox",
+    mapSandboxToCodexFlag(policy.sandbox),
+    "-c",
+    `approval_policy=${mapApprovalToCodexFlag(policy.approvals)}`,
+  ];
 }
 
 function isDebugEnabled(): boolean {

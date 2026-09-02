@@ -97,18 +97,19 @@ describe("rex migrate-slugs", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  it("renames every entry to an id-qualified slug and the parser reads the result identically", async () => {
+  it("renames every entry to the title-only slug and the parser reads the result identically", async () => {
     const before = await new FolderTreeStore(rexDir).loadDocument();
 
     await cmdMigrateSlugs(projectDir, {});
 
     const entries = await listTree(treeRoot);
-    expect(entries).toContain("auth-feature-aaaaaa");
-    expect(entries).toContain("auth-feature-aaaaaa/login-task-bbbbbb.md");
-    expect(entries).toContain("solo-epic-cccccc.md");
-    // No title-only leftovers.
-    expect(entries).not.toContain("auth-feature");
-    expect(entries).not.toContain("solo-epic.md");
+    // Titles unique among their siblings carry no id component.
+    expect(entries).toContain("auth-feature");
+    expect(entries).toContain("auth-feature/login-task.md");
+    expect(entries).toContain("solo-epic.md");
+    // No id-qualified leftovers.
+    expect(entries).not.toContain("auth-feature-aaaaaa");
+    expect(entries).not.toContain("solo-epic-cccccc.md");
 
     // The parsed document is unchanged by the rename: same items, same shape.
     const after = new FolderTreeStore(rexDir);
@@ -126,5 +127,90 @@ describe("rex migrate-slugs", () => {
     const second = await listTree(treeRoot);
 
     expect(second).toEqual(first);
+  });
+
+  it("reports the rename as verified lossless", async () => {
+    const lines: string[] = [];
+    (console.log as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (...args: unknown[]) => void lines.push(args.join(" ")),
+    );
+
+    await cmdMigrateSlugs(projectDir, { format: "json" });
+
+    const payload = JSON.parse(lines.join("\n"));
+    // The fixture tree is already title-only, so nothing needs renaming — the
+    // losslessness proof is reported either way, which is the contract here.
+    expect(payload.lossless).toBe(true);
+    expect(payload.itemsVerified).toBe(3);
+    expect(payload.entriesRenamed).toBe(0);
+  });
+
+  it("refuses, naming the offenders, when siblings share a title and an id", async () => {
+    // The suffix cannot separate these: same normalised title, same id, so the
+    // same `-{id6}`. The serializer would fall back to position suffixes and
+    // make those paths depend on array order.
+    await writeFile(
+      join(treeRoot, "solo-epic-twin.md"),
+      [
+        "---",
+        'id: "cccccccc-0000-0000-0000-000000000000"',
+        'title: "Solo Epic"',
+        'level: "epic"',
+        'status: "pending"',
+        "---",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    await expect(cmdMigrateSlugs(projectDir, {})).rejects.toThrow(
+      /cannot be resolved by the slug rule/,
+    );
+  });
+
+  it("leaves the tree untouched when it refuses", async () => {
+    await writeFile(
+      join(treeRoot, "solo-epic-twin.md"),
+      [
+        "---",
+        'id: "cccccccc-0000-0000-0000-000000000000"',
+        'title: "Solo Epic"',
+        'level: "epic"',
+        'status: "pending"',
+        "---",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+    const before = await listTree(treeRoot);
+
+    await expect(cmdMigrateSlugs(projectDir, {})).rejects.toThrow();
+
+    // The guard runs before the snapshot and before the transaction.
+    expect(await listTree(treeRoot)).toEqual(before);
+  });
+
+  it("does not refuse on same-titled siblings with distinct ids", async () => {
+    // The ordinary collision the -{id6} suffix exists for. Refusing here would
+    // block migration of any healthy tree.
+    await writeFile(
+      join(treeRoot, "solo-epic-other.md"),
+      [
+        "---",
+        'id: "dddddddd-0000-0000-0000-000000000000"',
+        'title: "Solo Epic"',
+        'level: "epic"',
+        'status: "pending"',
+        "---",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    await expect(cmdMigrateSlugs(projectDir, {})).resolves.toBeUndefined();
+
+    const entries = await listTree(treeRoot);
+    expect(entries).toContain("solo-epic-cccccc.md");
+    expect(entries).toContain("solo-epic-dddddd.md");
   });
 });

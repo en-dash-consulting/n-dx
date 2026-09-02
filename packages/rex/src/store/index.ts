@@ -1,6 +1,6 @@
 export type { PRDStore, StoreCapabilities } from "./contracts.js";
 export { FileStore, ensureRexDir, PRD_FILENAME } from "./file-adapter.js";
-export { PRD_TREE_DIRNAME } from "./paths.js";
+export { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
 export {
   sanitizeBranchName,
   resolveGitBranch,
@@ -33,6 +33,8 @@ export {
   slugifyTitle,
   resolveSiblingSlugs,
 } from "./folder-tree-serializer.js";
+export { findNonConformingSlugs, findTreeIdentityFaults } from "./folder-tree-serializer.js";
+export type { SlugMismatch } from "./folder-tree-serializer.js";
 export type { SerializeResult } from "./folder-tree-serializer.js";
 export { parseFolderTree } from "./folder-tree-parser.js";
 export type { FolderParseResult, ParseWarning } from "./folder-tree-parser.js";

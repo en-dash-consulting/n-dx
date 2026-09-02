@@ -15,6 +15,7 @@
 import { z } from "zod";
 import type { PRDItem } from "../schema/index.js";
 import { spawnClaude, resolveConfiguredModel, extractJson } from "./reason.js";
+import { withEscalation } from "./escalate.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -103,40 +104,48 @@ export async function proposeSiblingRenames(
   model?: string,
 ): Promise<SiblingRenameProposal> {
   const prompt = buildRenamePrompt(itemA, itemB);
-  const resolvedModel = resolveConfiguredModel(model, "light");
 
-  const llmResult = await spawnClaude(prompt, resolvedModel);
-  const jsonText = extractJson(llmResult.text);
+  // Light-tier call with an escalation ladder: a schema failure retries on the
+  // standard tier carrying the validation error, so cheap-first routing is
+  // safe — a light model that cannot satisfy the contract hands off rather
+  // than failing the rename.
+  const escalation = await withEscalation({
+    prompt,
+    taskClass: "prd.rename",
+    model,
+    validate: (text) => {
+      const jsonText = extractJson(text);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(jsonText);
+      } catch {
+        throw new Error(
+          `Response did not contain valid JSON. Received: ${text.slice(0, 200)}`,
+        );
+      }
+      const result = RenameResponseSchema.safeParse(parsed);
+      if (!result.success) {
+        throw new Error(`Response failed schema validation: ${result.error.message}`);
+      }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonText);
-  } catch {
-    throw new Error(
-      `LLM rename response did not contain valid JSON.\n` +
-      `Raw response (first 300 chars): ${llmResult.text.slice(0, 300)}`,
-    );
-  }
+      // Semantic check, inside the contract rather than after it: two titles
+      // that normalize to the same string satisfy the schema but do not solve
+      // the collision this call exists to solve. Checking here means the
+      // standard tier gets a chance at it; checking afterwards, as this used
+      // to, failed the rename outright.
+      const { titleA, titleB } = result.data;
+      const normalA = titleA.toLowerCase().trim().replace(/\s+/g, " ");
+      const normalB = titleB.toLowerCase().trim().replace(/\s+/g, " ");
+      if (normalA === normalB) {
+        throw new Error(
+          `Both proposed titles normalize to "${normalA}" — they must differ ` +
+          "from each other to resolve the collision.",
+        );
+      }
+      return result.data;
+    },
+  });
 
-  const validation = RenameResponseSchema.safeParse(parsed);
-  if (!validation.success) {
-    throw new Error(
-      `LLM rename response failed validation: ${validation.error.message}.\n` +
-      `Parsed value: ${JSON.stringify(parsed)}`,
-    );
-  }
-
-  const { titleA, titleB, reasoning } = validation.data;
-
-  // Ensure the proposed titles are actually different from each other.
-  const normalA = titleA.toLowerCase().trim().replace(/\s+/g, " ");
-  const normalB = titleB.toLowerCase().trim().replace(/\s+/g, " ");
-  if (normalA === normalB) {
-    throw new Error(
-      `LLM rename produced a collision: both titles normalized to "${normalA}". ` +
-      `Cannot resolve title collision for items "${itemA.id}" and "${itemB.id}".`,
-    );
-  }
-
+  const { titleA, titleB, reasoning } = escalation.value;
   return { titleA, titleB, reasoning };
 }

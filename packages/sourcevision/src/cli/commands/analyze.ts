@@ -38,6 +38,9 @@ import {
 import type { AnalyzeContext } from "./analyze-phases.js";
 import { generatePrMarkdownFile } from "./pr-markdown.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
+import { generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
+import { callClaude } from "../../analyzers/claude-client.js";
+import type { Manifest } from "../sourcevision-core.js";
 
 type PhaseFilter =
   | { type: "all" }
@@ -265,7 +268,7 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
   await executePhases(ctx, filter, extraArgs);
 
   if (filter.type === "all") {
-    generateOutputFiles(ctx);
+    await generateOutputFiles(ctx);
     await generatePrMarkdownStep(ctx);
   }
 
@@ -340,7 +343,57 @@ async function generatePrMarkdownStep(ctx: AnalyzeContext): Promise<void> {
 
 // ── Output generation ────────────────────────────────────────────────
 
-function generateOutputFiles(ctx: AnalyzeContext): void {
+/**
+ * Distil and persist the startup primer, best-effort.
+ *
+ * Consumers (the `ndx work` context pipe) fall back to CONTEXT.md when no
+ * primer exists, so every failure path here is a silent skip: no LLM
+ * configured, a refusal, or output that breaks the primer contract. The only
+ * visible outcome is a one-line note when a primer is written or reused.
+ */
+async function writePrimerIfPossible(
+  ctx: AnalyzeContext,
+  manifest: Manifest,
+  contextMd: string,
+): Promise<void> {
+  try {
+    const primerPath = join(ctx.svDir, PRIMER_FILE);
+    const cachedPrimer = existsSync(primerPath) ? readFileSync(primerPath, "utf-8") : null;
+
+    // Only distil when this analysis already made successful LLM calls.
+    //
+    // That is the one reliable signal that a working, authenticated model is
+    // reachable: the vendor and auth-mode getters both fall back to defaults
+    // when nothing is configured, so consulting them would have this attempt
+    // a spawn in every environment without one — including `ndx ci` and the
+    // test suite, where it costs a timeout rather than a primer. A cached
+    // primer is still served in those runs; only generation is gated.
+    if (ctx.tokenUsage.calls === 0) {
+      if (!cachedPrimer) {
+        info(`${dim("[primer]")} skipped — no LLM calls in this analysis`);
+      }
+      return;
+    }
+
+    const result = await generatePrimer({
+      contextMd,
+      manifest,
+      cachedPrimer,
+      call: (prompt) => callClaude(prompt, undefined, { taskClass: "context.distill" }),
+    });
+
+    if (result.status === "generated") {
+      writeFileSync(primerPath, result.primer);
+      info(`${dim("[output]")} ${PRIMER_FILE} (distilled startup context) → ${dim(ctx.svDir)}`);
+    } else if (result.status === "skipped") {
+      info(`${dim("[primer]")} skipped — ${result.reason}`);
+    }
+  } catch {
+    // Never fail an analysis for a primer.
+  }
+}
+
+async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
   try {
     const manifestPath = join(ctx.svDir, DATA_FILES.manifest);
     const inventoryPath = join(ctx.svDir, DATA_FILES.inventory);
@@ -415,6 +468,12 @@ function generateOutputFiles(ctx: AnalyzeContext): void {
 
     const contextMd = generateContext(manifest, inventory, importsData, zonesData, componentsData, classData);
     writeFileSync(join(ctx.svDir, SUPPLEMENTARY_FILES[1]), contextMd);
+
+    // Distil a short primer for agent startup context. Best-effort by design:
+    // consumers fall back to CONTEXT.md, so no primer is a known-good state
+    // and this must never fail an analysis. Skipped entirely when the run made
+    // no LLM calls (`--lite`), since there is no configured model to ask.
+    await writePrimerIfPossible(ctx, manifest, contextMd);
 
     // Emit per-zone output files
     if (zonesData.zones.length > 0) {

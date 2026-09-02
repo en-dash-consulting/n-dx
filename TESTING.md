@@ -389,6 +389,86 @@ an agent running the suite inside Claude Code — ever saw the failure.
   inside a 16 ms window, or on a hash being carried, asserts that precondition
   explicitly — otherwise it reports success from a state it never reached.
 
+### Which architecture gates run where
+
+`tests/e2e/architecture-policy.test.js` holds two kinds of gate, and they do
+not have the same reach:
+
+| Gate | Input | Runs in CI? |
+|---|---|---|
+| Spawn-only enforcement, intra-package layering, gateway rules, export-count boundaries, dynamic-import declarations, analyzer/test pairing | committed source under `packages/` | ✅ always |
+| Zone import cycles, non-web family coupling, web zone load order, zone cohesion threshold, `COHESION_EXCEPTIONS` staleness | `.sourcevision/zones.json`, `.sourcevision/zones/` | ⏭️ skipped — developer machines only |
+
+The five zone gates depend on analysis output. `.sourcevision/*` is gitignored
+(only `.gitignore` and `hints.md` are tracked) and no CI step runs
+`ndx analyze`, so their input does not exist in CI. They used to `return` on
+missing input, which vitest counts as a **pass** — so they reported green in CI
+while checking nothing, and a `hench-agent` zone sitting at cohesion 0.25 went
+unnoticed. They now call `ctx.skip()`, so the run reports "skipped" rather than
+claiming a check it never made.
+
+**Why CI does not generate the analysis to enforce them.** Zone IDs and metrics
+are Louvain outputs: they shift between runs as the import graph moves, zones
+merge and split, and the repo's own governance docs tell you to re-read
+`.sourcevision/zones.json` rather than trust a written-down number. Gating CI
+on a threshold over an unstable partition buys flaky failures, not
+architecture. The zone gates are a **local review tool**: run
+`ndx analyze --deep .` and then the suite to exercise them.
+
+The committed-source gates take the opposite treatment. A missing input there
+is not a legitimate absence — it means a declaration has gone stale (a boundary
+named over a moved file, a renamed directory) — so those gates assert the path
+exists and fail loudly. `tests/unit/architecture-gate-reporting.test.js` keeps
+both halves honest: it fails if any gate goes back to returning silently.
+
+### Family 5 — the suite leaking into the developer's environment
+
+The inverse of Family 4, and harder to notice: the tests pass, so nothing
+points at them. Only the developer's tooling breaks.
+
+**Symptom:** after running the suite, `claude mcp list` in your own repo shows
+`rex` and `sourcevision` as `✘ Failed to connect — CONNECTION_CLOSED`, pointed
+at a `/var/folders/.../T/ndx-init-e2e-*` directory that no longer exists. Every
+MCP tool call fails for the rest of the session.
+
+**Cause:** `ndx init` registers MCP servers by shelling out to the real
+`claude` binary — `claude mcp remove` across all scopes, then `claude mcp add`.
+The init E2E tests stub `claude` by putting a fake first on `PATH`, which is
+*almost* enough. `discoverClaudeCli` treats a PATH binary that fails
+`--version` as absent and falls through to well-known install locations, so a
+test whose fake deliberately exits non-zero — the auth-failure cases do — walks
+straight past the stub to the real CLI. It then wrote into the developer's
+`~/.claude.json`, and because local scope is keyed per-directory it landed
+under whichever directory the suite was launched from.
+
+**Rules:**
+
+- **Sandbox the config directory, do not rely on stubbing the binary.**
+  `CLAUDE_CONFIG_DIR` points claude at a throwaway config; `withSandboxedClaudeConfig()`
+  in `tests/e2e/e2e-helpers.js` applies it to every CLI spawn and overrides a
+  test-supplied `env`, because no E2E test has a reason to write the real
+  config. A file that defines its own runners must route them through it too —
+  `cli-init.test.js` does.
+- **A stub that fails is not a stub.** Discovery escalates on failure. When a
+  test needs a vendor CLI to fail, make it fail at the operation under test and
+  still answer `--version`, or pin discovery with `CLAUDE_CLI_PATH`.
+- **Assert the absence of the side effect.** `tests/e2e/mcp-registration-scope.test.js`
+  checks that init registers against the project being initialised rather than
+  the caller's working directory — the product bug that made the leak land
+  where it did.
+
+**Recovery, if an earlier run already clobbered your config:** the bad entries
+are per-project in `~/.claude.json`. Re-register from the affected project —
+
+```sh
+cd /path/to/your/project
+claude mcp remove rex; claude mcp remove sourcevision
+ndx init .            # re-registers both against this project
+claude mcp list       # both should report ✔ Connected
+```
+
+No manual JSON editing is needed, and nothing else in the config is touched.
+
 ### Integration Test Growth Policy
 
 The integration test count should grow proportionally with cross-package

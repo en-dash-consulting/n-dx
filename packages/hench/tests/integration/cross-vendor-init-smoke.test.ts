@@ -216,17 +216,16 @@ describe("cross-vendor init-to-run smoke", () => {
     it("default execution policy compiles to valid Codex flags", () => {
       const flags = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY);
 
+      // Neither of these is on the `codex exec` surface: --approval-policy
+      // never was, and --full-auto was removed in codex-cli 0.147.0.
       expect(flags).not.toContain("--approval-policy");
       expect(flags).not.toContain("--full-auto");
-      expect(flags).toContain("--sandbox");
-      expect(flags).toHaveLength(2);
+      expect(flags).toEqual(["--sandbox", "workspace-write", "-c", "approval_policy=never"]);
     });
 
-    it("compiled flags use the current explicit --sandbox workspace-write flag", () => {
+    it("leads with --sandbox so the sandbox is stated before anything else", () => {
       const flags = compileCodexPolicyFlags(DEFAULT_EXECUTION_POLICY);
-      const sandboxFlagIndex = flags.indexOf("--sandbox");
-      expect(sandboxFlagIndex).toBe(0);
-      expect(flags[sandboxFlagIndex + 1]).toBe("workspace-write");
+      expect(flags.indexOf("--sandbox")).toBe(0);
     });
   });
 

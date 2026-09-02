@@ -94,6 +94,10 @@ const VALID_VENDORS: ReadonlySet<string> = new Set([
 /** Writable paths. Auth fields (api_key, api_endpoint, cli_path) are excluded. */
 const VALID_PATHS = new Set([
   "llm.vendor",
+  // Standard-tier shorthand for the active vendor. Was writable via the CLI
+  // but absent here, so the dashboard could not see or set the field with the
+  // highest precedence over the model actually used.
+  "llm.model",
   "llm.claude.model",
   "llm.claude.lightModel",
   "llm.codex.model",
@@ -110,9 +114,100 @@ const VALID_PATHS = new Set([
   "llm.local.verifier.model",
   "llm.local.verifier.maxCycles",
   "llm.autoFailover",
+  "llm.escalation.enabled",
+  "llm.escalation.maxSteps",
   "claude.model",
   "claude.lightModel",
 ]);
+
+/** Routing tiers a `llm.routes.<class>` value may name. */
+const TASK_TIERS: ReadonlySet<string> = new Set(["light", "standard", "heavy", "free"]);
+
+/** Effort levels a `llm.effort.<class>` value may name. */
+const EFFORT_LEVELS: ReadonlySet<string> = new Set(["low", "medium", "high", "xhigh", "max"]);
+
+/**
+ * Path families whose trailing segments are variable, so they cannot be
+ * enumerated in {@link VALID_PATHS}: `llm.tiers.<vendor>.<tier>`,
+ * `llm.routes.<class>`, and `llm.effort.<class>`.
+ */
+const PARAMETERIZED_PREFIXES = ["llm.tiers.", "llm.routes.", "llm.effort."] as const;
+
+/**
+ * Sections holding a flat map keyed by task class.
+ *
+ * Task classes contain dots (`agent.execute`), and so does the path syntax, so
+ * these paths must set one literal key rather than nesting — nested config is
+ * silently ignored by the flat-map extractor in `loadLLMConfig`, which would
+ * make the write appear to succeed and do nothing.
+ */
+const FLAT_MAP_PREFIXES = ["llm.routes.", "llm.effort."] as const;
+
+function isWritablePath(path: string): boolean {
+  if (VALID_PATHS.has(path)) return true;
+  return PARAMETERIZED_PREFIXES.some(
+    (prefix) => path.startsWith(prefix) && path.length > prefix.length,
+  );
+}
+
+/** Split a path into object keys, keeping flat-map task classes intact. */
+function splitConfigPath(path: string): string[] {
+  for (const prefix of FLAT_MAP_PREFIXES) {
+    if (path.startsWith(prefix) && path.length > prefix.length) {
+      return [...prefix.slice(0, -1).split("."), path.slice(prefix.length)];
+    }
+  }
+  return path.split(".");
+}
+
+/**
+ * Reject a parameterized path or value the resolver could not honor.
+ * Returns an error message, or null when the change is acceptable.
+ */
+function validateRoutingChange(path: string, value: unknown): string | null {
+  if (path.startsWith("llm.tiers.")) {
+    const rest = path.slice("llm.tiers.".length);
+    const segments = rest.split(".");
+    if (segments.length !== 2) {
+      return `Invalid path "${path}". Expected llm.tiers.<vendor>.<tier>.`;
+    }
+    const [vendor, tier] = segments;
+    if (!VALID_VENDORS.has(vendor)) {
+      return `Unknown vendor "${vendor}" in "${path}". Expected one of: ${[...VALID_VENDORS].join(", ")}.`;
+    }
+    if (!TASK_TIERS.has(tier)) {
+      return `Unknown tier "${tier}" in "${path}". Expected one of: ${[...TASK_TIERS].join(", ")}.`;
+    }
+    if (typeof value !== "string" || !value.trim()) {
+      return `Value for "${path}" must be a non-empty model ID.`;
+    }
+    return null;
+  }
+
+  if (path.startsWith("llm.routes.")) {
+    if (typeof value !== "string" || !TASK_TIERS.has(value)) {
+      return `Value for "${path}" must be one of: ${[...TASK_TIERS].join(", ")}; got ${JSON.stringify(value)}.`;
+    }
+    return null;
+  }
+
+  if (path.startsWith("llm.effort.")) {
+    if (typeof value !== "string" || !EFFORT_LEVELS.has(value)) {
+      return `Value for "${path}" must be one of: ${[...EFFORT_LEVELS].join(", ")}; got ${JSON.stringify(value)}.`;
+    }
+    return null;
+  }
+
+  if (path === "llm.escalation.maxSteps") {
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 0) {
+      return `Value for "${path}" must be a non-negative integer, got ${JSON.stringify(value)}.`;
+    }
+    return null;
+  }
+
+  return null;
+}
 
 /** Paths that accept numeric values (stored as numbers in JSON). */
 const NUMERIC_PATHS = new Set([
@@ -120,10 +215,14 @@ const NUMERIC_PATHS = new Set([
   "llm.local.maxContextTokens",
   "llm.local.verifier.port",
   "llm.local.verifier.maxCycles",
+  "llm.escalation.maxSteps",
 ]);
 
 /** Numeric paths validated as a TCP port (1–65535) rather than a plain positive integer. */
 const PORT_PATHS = new Set(["llm.local.port", "llm.local.verifier.port"]);
+
+/** Paths that accept boolean values. */
+const BOOLEAN_PATHS = new Set(["llm.autoFailover", "llm.escalation.enabled"]);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -177,7 +276,7 @@ function getNumber(obj: Record<string, unknown>, key: string): number | null {
 
 /** Set a nested value by dot-separated path, creating intermediate objects. */
 function setByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const parts = path.split(".");
+  const parts = splitConfigPath(path);
   let current: Record<string, unknown> = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     const part = parts[i];
@@ -191,7 +290,7 @@ function setByPath(obj: Record<string, unknown>, path: string, value: unknown): 
 
 /** Delete a nested key by dot-separated path. */
 function deleteByPath(obj: Record<string, unknown>, path: string): void {
-  const parts = path.split(".");
+  const parts = splitConfigPath(path);
   let current: unknown = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     if (current == null || typeof current !== "object") return;
@@ -568,11 +667,11 @@ export async function handleLlmRoute(
       }
 
       for (const [path, value] of Object.entries(parsed.changes)) {
-        if (!VALID_PATHS.has(path)) {
-          errorResponse(res, 400, `Unknown LLM config path: "${path}". Valid paths: ${[...VALID_PATHS].join(", ")}`);
+        if (!isWritablePath(path)) {
+          errorResponse(res, 400, `Unknown LLM config path: "${path}". Valid paths: ${[...VALID_PATHS].join(", ")}, or llm.tiers.<vendor>.<tier> / llm.routes.<class> / llm.effort.<class>`);
           return true;
         }
-        if (path === "llm.autoFailover") {
+        if (BOOLEAN_PATHS.has(path)) {
           if (value !== null && typeof value !== "boolean") {
             errorResponse(res, 400, `Value for "${path}" must be a boolean or null, got ${typeof value}`);
             return true;
@@ -583,7 +682,7 @@ export async function handleLlmRoute(
             errorResponse(res, 400, `Value for "${path}" must be a number or null, got ${typeof value}`);
             return true;
           }
-          if (value !== null) {
+          if (value !== null && PORT_PATHS.has(path)) {
             const n = Number(value);
             const isPort = PORT_PATHS.has(path);
             const valid = isPort ? Number.isInteger(n) && n >= 1 && n <= 65535 : Number.isInteger(n) && n >= 1;
@@ -602,6 +701,15 @@ export async function handleLlmRoute(
         if (path === "llm.vendor" && value !== null && !VALID_VENDORS.has(value.toString())) {
           errorResponse(res, 400, `llm.vendor must be one of: ${[...VALID_VENDORS].join(", ")}; got "${value}"`);
           return true;
+        }
+        // Routing paths carry their own shape and enum rules. Skipped for a
+        // null/"" value, which is a delete rather than a set.
+        if (value !== null && value !== "") {
+          const routingError = validateRoutingChange(path, value);
+          if (routingError) {
+            errorResponse(res, 400, routingError);
+            return true;
+          }
         }
       }
 

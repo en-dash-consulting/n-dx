@@ -15,6 +15,17 @@ import { buildClassificationMap } from "./classify.js";
 import { deriveNextSteps } from "./next-steps.js";
 import { computeZoneAggregates, RISK_THRESHOLDS } from "./risk-scoring.js";
 
+/**
+ * Maximum rows in the file-inventory table.
+ *
+ * Chosen so ordinary repositories are listed in full while a large one stays
+ * bounded: the table is this file's largest section by far, and llms.txt is
+ * read by agents, so every row past the point of usefulness is a token cost
+ * paid on every run that reads it. Above the cap the file states what it
+ * dropped and points at the per-file MCP tools.
+ */
+export const LLMS_TXT_MAX_INVENTORY_ROWS = 400;
+
 export function generateLlmsTxt(
   manifest: Manifest,
   inventory: Inventory,
@@ -298,12 +309,30 @@ function buildFileInventory(inventory: Inventory, zones: Zones, classifications?
 
   const archetypeMap = buildClassificationMap(classifications);
 
+  // Cap the table. This is the single largest section of the file — measured
+  // at 75 KB of a 108 KB llms.txt — and it is consumed by agents, where its
+  // size is a per-run token cost rather than a scroll length. Zone membership
+  // and archetype counts above already summarize the whole repository, so the
+  // rows past the cap add per-file detail, not orientation.
+  const shown = inventory.files.slice(0, LLMS_TXT_MAX_INVENTORY_ROWS);
+  const omitted = inventory.files.length - shown.length;
+
   lines.push("| Path | Role | Archetype | Zone |");
   lines.push("|------|------|-----------|------|");
-  for (const file of inventory.files) {
+  for (const file of shown) {
     const zone = fileToZone.get(file.path) ?? "";
     const archetype = archetypeMap.get(file.path) ?? "";
     lines.push(`| \`${file.path}\` | ${file.role} | ${archetype} | ${zone} |`);
+  }
+  if (omitted > 0) {
+    lines.push("");
+    // Both numbers matter: without the total, a reader cannot tell whether a
+    // missing path is absent from the repository or merely unlisted here.
+    lines.push(
+      `_${omitted} of ${inventory.files.length} files not listed ` +
+        `(table capped at ${LLMS_TXT_MAX_INVENTORY_ROWS} rows). ` +
+        "Use the sourcevision `search_files` or `get_file_info` tools for the rest._",
+    );
   }
   lines.push("");
 

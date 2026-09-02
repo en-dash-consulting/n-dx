@@ -997,3 +997,78 @@ describe("session resume (--resume)", () => {
     expect(config.args[config.args.indexOf("--resume") + 1]).toBe("sess-2");
   });
 });
+
+describe("session fork (--fork-session)", () => {
+  const base = {
+    systemPrompt: "SYS",
+    promptText: "TASK",
+    allowedTools: ["Bash(git:*)", "Read"],
+  };
+
+  it("omits --fork-session when forking is not requested", () => {
+    const { args } = buildClaudeCliArgs({ ...base, resumeSessionId: "p1" }, "darwin");
+
+    expect(args).not.toContain("--fork-session");
+  });
+
+  it("suppresses --fork-session when there is no session to fork from", () => {
+    // Forking is a modifier on resume: without a parent it would silently
+    // do nothing, so emitting it would misreport what the spawn did.
+    const { args } = buildClaudeCliArgs({ ...base, forkSession: true }, "darwin");
+
+    expect(args).not.toContain("--fork-session");
+    expect(args).not.toContain("--resume");
+  });
+
+  it("appends --fork-session after --resume when both are set", () => {
+    const { args } = buildClaudeCliArgs(
+      { ...base, resumeSessionId: "parent-1", forkSession: true },
+      "darwin",
+    );
+
+    expect(args[args.indexOf("--resume") + 1]).toBe("parent-1");
+    expect(args.indexOf("--fork-session")).toBeGreaterThan(args.indexOf("--resume"));
+  });
+
+  it("forks on Windows too, with the prompt still on stdin", () => {
+    const { args, stdinContent } = buildClaudeCliArgs(
+      { ...base, resumeSessionId: "parent-1", forkSession: true },
+      "win32",
+    );
+
+    expect(args).toContain("--fork-session");
+    expect(stdinContent).toBe(`SYS${WINDOWS_STDIN_PROMPT_SEPARATOR}TASK`);
+  });
+
+  it("passes forkSession through buildSpawnConfig", () => {
+    const config = claudeCliAdapter.buildSpawnConfig(
+      { sections: [{ name: "system", content: "SYS" }, { name: "brief", content: "TASK" }] },
+      { sandbox: "workspace-write", approvals: "never", allowedCommands: ["git"] } as never,
+      { resumeSessionId: "parent-2", forkSession: true },
+    );
+
+    expect(config.args).toContain("--fork-session");
+    expect(config.args[config.args.indexOf("--resume") + 1]).toBe("parent-2");
+  });
+});
+
+describe("claudeCliAdapter.extractSessionId", () => {
+  it("reads session_id from a stream line", () => {
+    expect(claudeCliAdapter.extractSessionId?.({ type: "system", session_id: "abc-123" })).toBe(
+      "abc-123",
+    );
+  });
+
+  it("returns undefined when the line carries no id", () => {
+    expect(claudeCliAdapter.extractSessionId?.({ type: "assistant" })).toBeUndefined();
+    expect(claudeCliAdapter.extractSessionId?.({ session_id: "" })).toBeUndefined();
+    expect(claudeCliAdapter.extractSessionId?.(null)).toBeUndefined();
+    expect(claudeCliAdapter.extractSessionId?.("not an object")).toBeUndefined();
+  });
+
+  it("does not accept codex's thread_id key", () => {
+    expect(
+      claudeCliAdapter.extractSessionId?.({ type: "thread.started", thread_id: "codex-shape" }),
+    ).toBeUndefined();
+  });
+});

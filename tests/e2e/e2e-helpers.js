@@ -12,6 +12,7 @@
 
 import { execFileSync } from "node:child_process";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -37,6 +38,56 @@ export const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 export const DEFAULT_TIMEOUT = Number(process.env["NDX_E2E_TIMEOUT_MS"] ?? 45000);
 
 // ---------------------------------------------------------------------------
+// Claude config sandbox
+// ---------------------------------------------------------------------------
+
+/**
+ * Throwaway `CLAUDE_CONFIG_DIR` for every CLI spawn in the E2E suite.
+ *
+ * `ndx init` registers MCP servers by shelling out to the real `claude` binary
+ * (`claude mcp remove` across all scopes, then `claude mcp add`). Without this,
+ * an init test writes into the developer's own `~/.claude.json`: it removed
+ * their `rex` / `sourcevision` registrations and replaced them with entries
+ * pointing at the test's temp directory, which is deleted moments later. The
+ * result is two dead MCP servers in whatever project the suite was run from,
+ * and it recurred on every run — silently, because the tests passed.
+ *
+ * PATH stubbing was supposed to prevent this and mostly did, but it is not a
+ * sufficient guard: `discoverClaudeCli` treats a PATH binary that fails
+ * `--version` as absent and falls through to well-known install locations. A
+ * test whose fake `claude` deliberately exits non-zero — as the auth-failure
+ * tests do — therefore reaches the real binary. Isolating the config directory
+ * makes the leak structurally impossible instead of relying on every future
+ * test stubbing correctly.
+ *
+ * One directory per test process, created lazily.
+ */
+let claudeConfigSandbox;
+
+/** Path to this process's sandboxed Claude config directory. */
+export function claudeConfigDir() {
+  claudeConfigSandbox ??= mkdtempSync(join(tmpdir(), "ndx-e2e-claude-cfg-"));
+  return claudeConfigSandbox;
+}
+
+/**
+ * Merge the Claude config sandbox into spawn options.
+ *
+ * `CLAUDE_CONFIG_DIR` is applied last so it wins over a test-supplied `env`:
+ * no E2E test has a legitimate reason to write the developer's real config,
+ * and a test that overrides `env` wholesale would otherwise silently opt out.
+ *
+ * @param {object} opts - execFileSync / spawnSync options
+ * @returns {object} opts with a sandboxed CLAUDE_CONFIG_DIR
+ */
+export function withSandboxedClaudeConfig(opts = {}) {
+  return {
+    ...opts,
+    env: { ...(opts.env ?? process.env), CLAUDE_CONFIG_DIR: claudeConfigDir() },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // CLI execution helpers
 // ---------------------------------------------------------------------------
 
@@ -52,7 +103,7 @@ export function run(args, opts = {}) {
     encoding: "utf-8",
     timeout: DEFAULT_TIMEOUT,
     stdio: "pipe",
-    ...opts,
+    ...withSandboxedClaudeConfig(opts),
   });
 }
 
@@ -70,7 +121,7 @@ export function runFail(args, opts = {}) {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
-      ...opts,
+      ...withSandboxedClaudeConfig(opts),
     });
     throw new Error("Expected command to fail");
   } catch (err) {
@@ -92,7 +143,7 @@ export function runResult(args, opts = {}) {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
-      ...opts,
+      ...withSandboxedClaudeConfig(opts),
     });
     return { stdout, stderr: "", code: 0 };
   } catch (err) {
