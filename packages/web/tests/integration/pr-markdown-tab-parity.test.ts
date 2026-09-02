@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  bootViewer,
+  ensureBrowserStubs,
+  findNavItem,
+  jsonResponse,
+  teardownViewer,
+  waitFor,
+} from "../helpers/viewer-boot.js";
 
 interface PrStatePayload {
   signature: string;
@@ -13,104 +21,6 @@ interface MockApiOptions {
   scope?: string | null;
   state?: PrStatePayload;
   markdown?: string | null;
-}
-
-function createStorageStub(): Storage {
-  const store = new Map<string, string>();
-  return {
-    get length() {
-      return store.size;
-    },
-    clear() {
-      store.clear();
-    },
-    getItem(key: string) {
-      return store.get(key) ?? null;
-    },
-    key(index: number) {
-      return Array.from(store.keys())[index] ?? null;
-    },
-    removeItem(key: string) {
-      store.delete(key);
-    },
-    setItem(key: string, value: string) {
-      store.set(key, value);
-    },
-  };
-}
-
-function ensureBrowserStubs(): void {
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    value: createStorageStub(),
-  });
-  Object.defineProperty(window, "localStorage", {
-    configurable: true,
-    value: globalThis.localStorage,
-  });
-
-  if (typeof window.matchMedia !== "function") {
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      value: (query: string) => ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: () => {},
-        removeListener: () => {},
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        dispatchEvent: () => false,
-      }),
-    });
-  }
-
-  if (typeof HTMLElement.prototype.scrollTo !== "function") {
-    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
-      configurable: true,
-      value: () => {},
-    });
-  }
-}
-
-function jsonResponse(body: unknown, status: number = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
-
-function wait(ms: number = 0): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitFor(predicate: () => boolean, timeoutMs: number = 8_000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (predicate()) return;
-    if (vi.isFakeTimers()) {
-      await vi.advanceTimersByTimeAsync(20);
-    } else {
-      await wait(20);
-    }
-  }
-  throw new Error(`Timed out after ${timeoutMs}ms`);
-}
-
-function findNavItem(label: string): HTMLElement | null {
-  const navItems = Array.from(document.querySelectorAll(".nav-item"));
-  return (navItems.find((item) => item.textContent?.includes(label)) ?? null) as HTMLElement | null;
-}
-
-async function bootViewer(url: string, fetchImpl: typeof fetch): Promise<void> {
-  document.body.innerHTML = '<div id="app"></div>';
-  window.history.replaceState({}, "", url);
-  vi.stubGlobal("fetch", fetchImpl);
-
-  vi.resetModules();
-  await import("../../src/viewer/main.js");
-
-  await waitFor(() => document.querySelector(".sidebar") !== null);
 }
 
 function createMockApi(options: MockApiOptions = {}): typeof fetch {
@@ -165,7 +75,8 @@ describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
     vi.useRealTimers();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await teardownViewer();
     document.body.innerHTML = "";
     vi.unstubAllGlobals();
     vi.useRealTimers();
@@ -242,6 +153,19 @@ describe("PR Markdown tab parity integration", { timeout: 120_000 }, () => {
 
     await bootViewer("/pr-markdown", failingFetch);
     await waitFor(() => document.body.textContent?.includes("Unable to load PR markdown") ?? false);
+  });
+
+  // Guards the boot harness itself: a mounted viewer that outlives the test file
+  // flushes its effects after vitest tears jsdom down, which raises an uncaught
+  // "window is not defined" and fails the run even when every test passes.
+  it("unmounts the viewer on teardown so no effects outlive the test", async () => {
+    await bootViewer("/pr-markdown", createMockApi());
+    expect(document.querySelector(".sidebar")).not.toBeNull();
+
+    await teardownViewer();
+
+    expect(document.getElementById("app")).toBeNull();
+    expect(document.querySelector(".sidebar")).toBeNull();
   });
 
   it("does not render a manual refresh button", async () => {

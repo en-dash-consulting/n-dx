@@ -1,101 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  bootViewer,
+  ensureBrowserStubs,
+  jsonResponse,
+  teardownViewer,
+  waitFor,
+} from "../helpers/viewer-boot.js";
 
 interface MockApiOptions {
   scope?: string | null;
-}
-
-function createStorageStub(): Storage {
-  const store = new Map<string, string>();
-  return {
-    get length() {
-      return store.size;
-    },
-    clear() {
-      store.clear();
-    },
-    getItem(key: string) {
-      return store.get(key) ?? null;
-    },
-    key(index: number) {
-      return Array.from(store.keys())[index] ?? null;
-    },
-    removeItem(key: string) {
-      store.delete(key);
-    },
-    setItem(key: string, value: string) {
-      store.set(key, value);
-    },
-  };
-}
-
-function ensureBrowserStubs(): void {
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    value: createStorageStub(),
-  });
-  Object.defineProperty(window, "localStorage", {
-    configurable: true,
-    value: globalThis.localStorage,
-  });
-
-  if (typeof window.matchMedia !== "function") {
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      value: (query: string) => ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: () => {},
-        removeListener: () => {},
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        dispatchEvent: () => false,
-      }),
-    });
-  }
-
-  if (typeof HTMLElement.prototype.scrollTo !== "function") {
-    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
-      configurable: true,
-      value: () => {},
-    });
-  }
-}
-
-function jsonResponse(body: unknown, status: number = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
-
-function wait(ms: number = 0): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitFor(predicate: () => boolean, timeoutMs: number = 8_000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (predicate()) return;
-    if (vi.isFakeTimers()) {
-      await vi.advanceTimersByTimeAsync(20);
-    } else {
-      await wait(20);
-    }
-  }
-  throw new Error(`Timed out after ${timeoutMs}ms`);
-}
-
-async function bootViewer(url: string, fetchImpl: typeof fetch): Promise<void> {
-  document.body.innerHTML = '<div id="app"></div>';
-  window.history.replaceState({}, "", url);
-  vi.stubGlobal("fetch", fetchImpl);
-
-  vi.resetModules();
-  await import("../../src/viewer/main.js");
-
-  await waitFor(() => document.querySelector(".sidebar") !== null);
 }
 
 function createMockApi(options: MockApiOptions = {}): typeof fetch {
@@ -155,7 +69,8 @@ describe("token usage route regression", { timeout: 120_000 }, () => {
     vi.useRealTimers();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await teardownViewer();
     document.body.innerHTML = "";
     vi.unstubAllGlobals();
     vi.useRealTimers();
