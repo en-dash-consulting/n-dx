@@ -44,3 +44,4 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Single-Child Index Suppression and Front-Matter Deduplication Fix](./single-child-index-suppression-and/index.md) | completed |
 | [Test Suite Updates for Folder-Tree PRD Storage](./test-suite-updates-for-folder-tree-prd/index.md) | completed |
 | [Title-Based PRD Item File Naming Convention](./title-based-prd-item-file-naming/index.md) | completed |
+| [Make finding-derived task titles distinctive at generation time](./make-finding-derived-task-titles.md) | pending |

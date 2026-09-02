@@ -20,7 +20,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Consolidate PRD items that collide on a title-only slug](./consolidate-prd-items-that-collide-on.md) | completed |
-| [Give the title-only slug rule a disambiguator for legitimately same-titled siblings](./give-the-title-only-slug-rule-a.md) | pending |
+| [Give the title-only slug rule a disambiguator for legitimately same-titled siblings](./give-the-title-only-slug-rule-a.md) | completed |
 | [Make the MCP and CLI write paths agree on the slug convention](./make-the-mcp-and-cli-write-paths-agree.md) | completed |
 | [Point migrate-slugs at the readable convention](./point-migrate-slugs-at-the-readable.md) | pending |
 | [Replace the id-qualified slug with a title-only slug, guarding merge safety in validate](./replace-the-id-qualified-slug-with-a.md) | completed |
