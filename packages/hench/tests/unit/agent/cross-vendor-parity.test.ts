@@ -141,7 +141,7 @@ describe("cross-vendor execution policy parity", () => {
 
   it("standard policy compiles to correct Codex flags", () => {
     const flags = compileCodexPolicyFlags(STANDARD_POLICY);
-    expect(flags).toEqual(["--full-auto"]);
+    expect(flags).toEqual(["--sandbox", "workspace-write"]);
   });
 
   it("read-only policy compiles to correct Codex flags", () => {

@@ -117,6 +117,47 @@ describe("hench init", () => {
     expect(output).toContain("already initialized");
   });
 
+  it("adds .hench/ runtime artifacts to .gitignore", async () => {
+    // Regression: `.hench/locks/` is created the instant a run starts,
+    // before any real work happens. Without this, it shows up as an
+    // untracked path on the very first `hench run`/`ndx work` on a fresh
+    // project — and hench's own git-dirty guard (agent/lifecycle/shared.ts)
+    // then refuses to start, self-blocking on an artifact it just created.
+    // Confirmed live against a real external project during this session.
+    execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
+
+    const gitignore = await readFile(join(testDir, ".gitignore"), "utf-8");
+    expect(gitignore).toContain(".hench/locks/");
+    expect(gitignore).toContain(".hench/runs/");
+    expect(gitignore).toContain(".hench/usage-cursors/");
+    expect(gitignore).toContain(".hench-commit-msg.txt");
+  });
+
+  it("appends to an existing .gitignore without clobbering it", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(join(testDir, ".gitignore"), "node_modules\n.env\n", "utf-8");
+
+    execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
+
+    const gitignore = await readFile(join(testDir, ".gitignore"), "utf-8");
+    expect(gitignore).toContain("node_modules");
+    expect(gitignore).toContain(".env");
+    expect(gitignore).toContain(".hench/locks/");
+  });
+
+  it("does not duplicate .gitignore entries on re-init", async () => {
+    execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
+    const first = await readFile(join(testDir, ".gitignore"), "utf-8");
+
+    // hench init is a no-op past the first run (".hench/ already
+    // initialized, skipping"), so re-running must not touch .gitignore.
+    execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
+    const second = await readFile(join(testDir, ".gitignore"), "utf-8");
+
+    expect(second).toBe(first);
+    expect(second.match(/\.hench\/locks\//g)?.length).toBe(1);
+  });
+
   it("preserves valid config on re-run", async () => {
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
 

@@ -21,6 +21,7 @@ import {
   restoreFromBackup,
   getAvailableBackups,
   pruneBackups,
+  isValidSnapshotId,
 } from "../../src/core/backup-snapshots.js";
 
 describe("backup-snapshots", () => {
@@ -296,5 +297,87 @@ describe("backup-snapshots", () => {
     const entries = await readdir(treeRoot);
     expect(entries).toContain("epic_test");
     expect(entries).not.toContain("epic_added");
+  });
+
+  // ── Path-traversal protection (security regression) ──────────────────────
+  //
+  // `id` reaches `restoreFromBackup` from external, untrusted callers (the
+  // CLI arg, or the web dashboard's JSON request body) and used to be joined
+  // straight into a path that gets recursively force-deleted. isValidSnapshotId
+  // must reject anything that could escape `.rex/.backups/` before any join
+  // or fs call happens.
+
+  describe("isValidSnapshotId", () => {
+    it("accepts a normally-encoded snapshot id", () => {
+      expect(isValidSnapshotId("2026-08-05T17-27-18-959Z")).toBe(true);
+    });
+
+    it("accepts a legacy raw ISO timestamp with colons", () => {
+      expect(isValidSnapshotId("2026-08-05T17:27:18.959Z")).toBe(true);
+    });
+
+    it("rejects an empty id", () => {
+      expect(isValidSnapshotId("")).toBe(false);
+    });
+
+    it("rejects an id containing a forward slash", () => {
+      expect(isValidSnapshotId("abc/def")).toBe(false);
+    });
+
+    it("rejects an id containing a backslash", () => {
+      expect(isValidSnapshotId("abc\\def")).toBe(false);
+    });
+
+    it("rejects an id containing two consecutive dots", () => {
+      expect(isValidSnapshotId("abc..def")).toBe(false);
+    });
+
+    it("rejects an id containing a NUL byte", () => {
+      expect(isValidSnapshotId("abc\0def")).toBe(false);
+    });
+  });
+
+  describe("restoreFromBackup rejects traversal ids before touching disk", () => {
+    let sentinelDir: string;
+    let sentinelFile: string;
+
+    beforeEach(async () => {
+      // A directory OUTSIDE this test's own .rex tree — a stand-in for an
+      // arbitrary attacker-chosen target. If restoreFromBackup ever ran its
+      // rm/cp before validating id, a crafted traversal id could reach (and
+      // recursively delete) something like this.
+      sentinelDir = join(tmpdir(), `rex-backup-sentinel-${randomBytes(8).toString("hex")}`);
+      await mkdir(sentinelDir, { recursive: true });
+      sentinelFile = join(sentinelDir, "do-not-touch.txt");
+      await writeFile(sentinelFile, "sentinel");
+    });
+
+    afterEach(async () => {
+      await rm(sentinelDir, { recursive: true, force: true }).catch(() => {});
+    });
+
+    it("rejects an id containing a parent-directory traversal sequence", async () => {
+      await expect(restoreFromBackup(rexDir, "../../../etc/passwd")).rejects.toThrow(
+        /Invalid snapshot id/,
+      );
+
+      // Nothing outside .rex — including the sentinel — was touched.
+      expect((await stat(sentinelDir)).isDirectory()).toBe(true);
+      expect(await readFile(sentinelFile, "utf-8")).toBe("sentinel");
+    });
+
+    it("rejects an id containing a forward slash", async () => {
+      await expect(restoreFromBackup(rexDir, "abc/def")).rejects.toThrow(/Invalid snapshot id/);
+
+      expect((await stat(sentinelDir)).isDirectory()).toBe(true);
+      expect(await readFile(sentinelFile, "utf-8")).toBe("sentinel");
+    });
+
+    it("rejects an id containing two consecutive dots", async () => {
+      await expect(restoreFromBackup(rexDir, "abc..def")).rejects.toThrow(/Invalid snapshot id/);
+
+      expect((await stat(sentinelDir)).isDirectory()).toBe(true);
+      expect(await readFile(sentinelFile, "utf-8")).toBe("sentinel");
+    });
   });
 });

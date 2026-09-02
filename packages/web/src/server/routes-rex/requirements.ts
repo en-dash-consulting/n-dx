@@ -8,7 +8,8 @@ import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { findItemById, appendLog } from "./rex-route-helpers.js";
-import { loadPRDSync, savePRDSync } from "../prd-io.js";
+import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
+import { resolveStore } from "../rex-gateway.js";
 
 import {
   type PRDItem,
@@ -176,13 +177,10 @@ async function handleAddRequirement(
   itemId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
-
-  const item = findItemById(doc.items, itemId);
+  // Use the PRDStore so writes go to the correct backend (prd_tree/ or
+  // prd.md) rather than always writing to prd.md via savePRDSync.
+  const store = await resolveStore(ctx.rexDir);
+  const item = await store.getItem(itemId);
   if (!item) {
     errorResponse(res, 404, `Item "${itemId}" not found`);
     return true;
@@ -228,12 +226,14 @@ async function handleAddRequirement(
     if (input.threshold !== undefined) requirement.threshold = input.threshold;
     if (input.priority && isPriority(input.priority)) requirement.priority = input.priority;
 
-    if (!Array.isArray(item.requirements)) {
-      item.requirements = [];
-    }
-    (item.requirements as RequirementRecord[]).push(requirement);
+    const existingRequirements = Array.isArray(item.requirements)
+      ? (item.requirements as RequirementRecord[])
+      : [];
+    const updatedRequirements = [...existingRequirements, requirement];
 
-    savePRDSync(ctx.rexDir, doc);
+    await store.updateItem(itemId, { requirements: updatedRequirements } as Partial<PRDItem>);
+    const updatedDoc = await store.loadDocument();
+    refreshPRDCache(ctx.rexDir, updatedDoc);
 
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
@@ -265,13 +265,10 @@ async function handleUpdateRequirement(
   reqId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
-
-  const item = findItemById(doc.items, itemId);
+  // Use the PRDStore so writes go to the correct backend (prd_tree/ or
+  // prd.md) rather than always writing to prd.md via savePRDSync.
+  const store = await resolveStore(ctx.rexDir);
+  const item = await store.getItem(itemId);
   if (!item) {
     errorResponse(res, 404, `Item "${itemId}" not found`);
     return true;
@@ -303,10 +300,12 @@ async function handleUpdateRequirement(
     }
 
     // Apply updates (preserve id)
-    const existing = reqs[reqIdx];
-    Object.assign(existing, updates, { id: reqId });
+    const existing = { ...reqs[reqIdx], ...updates, id: reqId };
+    const updatedRequirements = reqs.map((r, idx) => (idx === reqIdx ? existing : r));
 
-    savePRDSync(ctx.rexDir, doc);
+    await store.updateItem(itemId, { requirements: updatedRequirements } as Partial<PRDItem>);
+    const updatedDoc = await store.loadDocument();
+    refreshPRDCache(ctx.rexDir, updatedDoc);
 
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
@@ -330,20 +329,17 @@ async function handleUpdateRequirement(
 }
 
 /** DELETE /api/rex/items/:id/requirements/:reqId */
-function handleDeleteRequirement(
+async function handleDeleteRequirement(
   res: ServerResponse,
   ctx: ServerContext,
   itemId: string,
   reqId: string,
   broadcast?: WebSocketBroadcaster,
-): boolean {
-  const doc = loadPRDSync(ctx.rexDir);
-  if (!doc) {
-    errorResponse(res, 404, "No PRD data found");
-    return true;
-  }
-
-  const item = findItemById(doc.items, itemId);
+): Promise<boolean> {
+  // Use the PRDStore so writes go to the correct backend (prd_tree/ or
+  // prd.md) rather than always writing to prd.md via savePRDSync.
+  const store = await resolveStore(ctx.rexDir);
+  const item = await store.getItem(itemId);
   if (!item) {
     errorResponse(res, 404, `Item "${itemId}" not found`);
     return true;
@@ -356,12 +352,14 @@ function handleDeleteRequirement(
     return true;
   }
 
-  const removed = reqs.splice(reqIdx, 1)[0];
-  if (reqs.length === 0) {
-    delete item.requirements;
-  }
+  const removed = reqs[reqIdx];
+  const updatedRequirements = reqs.filter((_, idx) => idx !== reqIdx);
 
-  savePRDSync(ctx.rexDir, doc);
+  await store.updateItem(itemId, {
+    requirements: updatedRequirements.length > 0 ? updatedRequirements : undefined,
+  } as Partial<PRDItem>);
+  const updatedDoc = await store.loadDocument();
+  refreshPRDCache(ctx.rexDir, updatedDoc);
 
   appendLog(ctx, {
     timestamp: new Date().toISOString(),

@@ -45,6 +45,11 @@ interface CliTimeoutsPutBody {
 
 const DEFAULT_TIMEOUT_MS = 1_800_000; // 30 minutes
 const NO_DEFAULT_TIMEOUT_COMMANDS = ["start", "web", "dev"];
+/** Per-command code defaults overriding DEFAULT_TIMEOUT_MS (mirrors core's COMMAND_TIMEOUT_DEFAULTS). */
+const COMMAND_TIMEOUT_DEFAULTS: Record<string, number> = {
+  work: 14_400_000, // 4 hours — bounded by vendor session limits
+  "self-heal": 14_400_000,
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,6 +99,39 @@ function extractCliTimeouts(projectDir: string): CliTimeoutsResponse {
   };
 }
 
+/**
+ * Resolve the effective timeout (ms) for a CLI command the web server spawns
+ * directly (bypassing `ndx`'s own `withCommandTimeout` wrapper — see
+ * packages/core/cli-timeout.js's `resolveCommandTimeout`, which this
+ * mirrors). Any route that spawns a rex/sourcevision/hench CLI subprocess
+ * and imposes its own timeout should resolve it through here instead of
+ * hardcoding a value — a hardcoded timeout silently ignores the user's
+ * "CLI Timeouts" settings (`.n-dx.json`'s `cli.timeoutMs`/`cli.timeouts`),
+ * which is exactly the bug this fixed: `handleAnalyze` hardcoded 120s while
+ * every other surface documents/honors a 30-minute default, so real
+ * (multi-minute) LLM-refined analyses on non-trivial projects always failed.
+ *
+ * Returns 0 for "no timeout".
+ */
+export function resolveEffectiveCliTimeoutMs(projectDir: string, command: string): number {
+  const { timeoutMs, timeouts, defaultTimeoutMs, noDefaultTimeoutCommands } = extractCliTimeouts(projectDir);
+
+  if (command in timeouts) {
+    return timeouts[command];
+  }
+  if (timeoutMs !== null) {
+    return timeoutMs;
+  }
+  if (noDefaultTimeoutCommands.includes(command)) {
+    return 0;
+  }
+  const commandDefault = COMMAND_TIMEOUT_DEFAULTS[command];
+  if (commandDefault !== undefined) {
+    return commandDefault;
+  }
+  return defaultTimeoutMs;
+}
+
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
@@ -105,7 +143,9 @@ export async function handleCliTimeoutRoute(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  const url = req.url || "/";
+  // Strip the query string — a trailing "?_=1" cache-buster (or any future
+  // query param) must not fall through this exact-equality match to a 404.
+  const url = (req.url || "/").split("?")[0];
   const method = req.method || "GET";
 
   // GET /api/cli/timeouts

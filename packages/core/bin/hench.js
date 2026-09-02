@@ -8,6 +8,7 @@ import { spawn } from "child_process";
 import {
   createChildProcessTracker,
   installTrackedChildProcessHandlers,
+  treeKillSpawnOptions,
 } from "../child-lifecycle.js";
 import { suppressKnownDeprecations } from "@n-dx/llm-client";
 
@@ -21,12 +22,21 @@ if (!existsSync(script)) {
   try { script = _require.resolve("@n-dx/hench/dist/cli/index.js"); } catch {}
 }
 
-const tracker = createChildProcessTracker();
+// treeKill: true (plus spawning with treeKillSpawnOptions() below) so a
+// SIGTERM/SIGINT reaches this process's ENTIRE tree — not just the inner
+// hench CLI, but the claude/codex CLI child it spawns in turn. Without this,
+// a caller that signals this wrapper (e.g. the web dashboard's task Stop
+// button) can kill the wrapper while an in-flight LLM CLI child is orphaned
+// and keeps running.
+const tracker = createChildProcessTracker({ treeKill: true });
 const signalHandlers = installTrackedChildProcessHandlers({
   tracker,
   signals: ["SIGINT", "SIGTERM", "SIGHUP"],
 });
-const child = tracker.register(spawn(process.execPath, [script, ...process.argv.slice(2)], { stdio: "inherit" }));
+const child = tracker.register(spawn(process.execPath, [script, ...process.argv.slice(2)], {
+  ...treeKillSpawnOptions(),
+  stdio: "inherit",
+}));
 
 child.on("close", async (code) => {
   signalHandlers.dispose();

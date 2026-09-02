@@ -37,6 +37,8 @@
     "test": "node ../../scripts/run-vitest-bind-aware.mjs web",
     "test:a11y": "vitest run --testNamePattern \"\\[a11y\\]\"",
     "test:watch": "vitest",
+    "test:e2e-ui": "playwright test",
+    "test:e2e-ui:headed": "playwright test --headed",
     "validate": "pnpm run typecheck && vitest run",
     "prepare": "pnpm run build"
   },
@@ -51,6 +53,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/d3-force": "^3.0.10",
     "@types/d3-selection": "^3.0.11",
     "@types/node": "^26.2.0",

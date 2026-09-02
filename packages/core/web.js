@@ -427,7 +427,15 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   }
 
   // --- Build serve args ---
+  // --debug/--verbose must be forwarded explicitly: --background spawns a
+  // brand-new detached child process below (`serve ...serveArgs`), which
+  // never sees the original `rest` array the user actually typed after
+  // `ndx start`. Without this, `ndx start --background --debug` silently
+  // ran a non-debug server — the flag was parsed into `flags` here, in this
+  // process, and then dropped on the floor.
   const serveArgs = ["serve", `--port=${port}`, absDir];
+  if (flags.debug) serveArgs.push("--debug");
+  else if (flags.verbose) serveArgs.push("--verbose");
 
   // --- Background mode ---
   if (isBackground) {

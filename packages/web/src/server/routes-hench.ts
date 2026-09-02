@@ -55,6 +55,8 @@ import type {
   ItemDurationTotals,
 } from "./rex-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
+import { resolveNdxBin } from "./routes-commands.js";
+import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { ProcessMemoryTracker } from "./process-memory-tracker.js";
 import { ConcurrentExecutionMetrics } from "./concurrent-execution-metrics.js";
 
@@ -1180,16 +1182,24 @@ async function handleExecute(
     return true;
   }
 
-  // Resolve hench binary
-  const henchBin = join(ctx.projectDir, "node_modules", ".bin", "hench");
-  const henchFallback = join(ctx.projectDir, "packages", "hench", "dist", "cli", "index.js");
+  // Go through the `ndx` orchestrator's `work` command rather than spawning
+  // hench directly. `ndx work` forwards flags straight to `hench run` (see
+  // handleWork in packages/core/cli.js) but also does the vendor-config
+  // validation "Start Working" needs — and, critically, resolveNdxBin has a
+  // real cross-install resolution ladder (NDX_CLI_PATH env var set by the
+  // launching CLI, project-local node_modules/.bin/ndx, this server's own
+  // module graph, then the monorepo dogfood path). The hench-specific
+  // equivalent this replaced (`<projectDir>/node_modules/.bin/hench`,
+  // falling back to `<projectDir>/packages/hench/dist/cli/index.js`) only
+  // works for the n-dx monorepo dogfooding itself — every other analyzed
+  // project has no packages/hench directory, so "Start Working" failed
+  // immediately with MODULE_NOT_FOUND.
+  const { bin: binPath, args: prefixArgs } = resolveNdxBin(ctx);
   // Pass --reset-deferred when executing a deferred task so hench resets it to pending before running
-  const args = status === "deferred"
-    ? ["run", `--task=${taskId}`, "--auto", "--reset-deferred", ctx.projectDir]
-    : ["run", `--task=${taskId}`, "--auto", ctx.projectDir];
-
-  const binPath = existsSync(henchBin) ? henchBin : "node";
-  const binArgs = existsSync(henchBin) ? args : [henchFallback, ...args];
+  const workArgs = status === "deferred"
+    ? ["work", `--task=${taskId}`, "--auto", "--reset-deferred", ctx.projectDir]
+    : ["work", `--task=${taskId}`, "--auto", ctx.projectDir];
+  const binArgs = [...prefixArgs, ...workArgs];
 
   // Generate a run ID for tracking (hench will generate its own, but we
   // need one to correlate the response before the process starts writing)
@@ -1267,16 +1277,43 @@ async function handleExecute(
     .then((result) => {
       const entry = activeExecutions.get(taskId);
       if (entry) {
+        // exitCode alone used to be treated as the sole success signal, but
+        // `hench run --auto` (what `ndx work` spawns) exits 0 even when the
+        // task run itself failed — its iteration loop only throws for truly
+        // unexpected errors; a task ending in failed/timeout/budget_exceeded
+        // status is a graceful stop, logged and then a normal return. That
+        // made a failed run show up here as "completed" with a green check,
+        // and its last stdout line (e.g. "Stopping after 1 iteration(s) due
+        // to failed status.") displayed as if it were a routine completion
+        // detail. Fixed at the source too (see run.ts's `process.exitCode`
+        // assignment on that path) so exitCode is correct now, but keep
+        // this non-zero check as the actual success signal rather than
+        // re-deriving it from stdout text.
         const isSuccess = result.exitCode === 0;
         entry.state.status = isSuccess ? "completed" : "failed";
         entry.state.finishedAt = new Date().toISOString();
         entry.state.exitCode = result.exitCode;
-        if (!isSuccess && result.stderr) {
-          entry.state.error = result.stderr.slice(-200);
+        const lastOutLine = result.stdout
+          ? result.stdout.split("\n").filter((l) => l.trim()).at(-1)
+          : undefined;
+        if (!isSuccess) {
+          // stderr is empty for this failure mode (hench logs the reason via
+          // its normal stdout info() logging, not console.error), so fall
+          // back to the last meaningful stdout line rather than leaving the
+          // dashboard with no explanation at all.
+          entry.state.error = (result.stderr ? result.stderr.slice(-200) : undefined)
+            || lastOutLine
+            || "Task run failed";
+          appendLog(ctx, {
+            timestamp: entry.state.finishedAt,
+            event: "task_execution_failed",
+            itemId: taskId,
+            detail: `"${taskTitle}" failed (exit ${result.exitCode}): ${
+              (result.stderr || result.stdout || "").trim().slice(-2000) || "no output captured"
+            }`,
+          });
         }
-        if (result.stdout) {
-          entry.state.lastOutput = result.stdout.split("\n").filter((l) => l.trim()).at(-1) ?? "";
-        }
+        if (lastOutLine) entry.state.lastOutput = lastOutLine;
         broadcastExecState(broadcast, { ...entry.state });
       }
       processMemoryTracker.markCompleted(taskId);
@@ -1290,6 +1327,12 @@ async function handleExecute(
         entry.state.finishedAt = new Date().toISOString();
         entry.state.error = err instanceof Error ? err.message : String(err);
         broadcastExecState(broadcast, { ...entry.state });
+        appendLog(ctx, {
+          timestamp: entry.state.finishedAt,
+          event: "task_execution_failed",
+          itemId: taskId,
+          detail: `"${taskTitle}" failed to run: ${entry.state.error}`,
+        });
       }
       processMemoryTracker.markCompleted(taskId);
       executionMetrics.taskCompleted(taskId);
@@ -2251,13 +2294,13 @@ function handleAudit(res: ServerResponse, runsDir: string): boolean {
 }
 
 /** POST /api/hench/execute/:taskId/terminate — terminate a running task. */
-function handleTerminate(
+async function handleTerminate(
   taskId: string,
   res: ServerResponse,
   runsDir: string,
   broadcast?: WebSocketBroadcaster,
   onStatusInvalidate?: () => void,
-): boolean {
+): Promise<boolean> {
   const entry = activeExecutions.get(taskId);
 
   if (!entry) {
@@ -2302,9 +2345,17 @@ function handleTerminate(
     return true;
   }
 
-  // Kill the managed process
+  // Kill the managed process and wait for it to actually exit (escalating to
+  // SIGKILL if it doesn't respond to SIGTERM within the grace period) before
+  // touching any state below. Deleting the activeExecutions entry before the
+  // process is confirmed dead would let a second run start on the same task
+  // while this one might still be alive — including still-running hench/LLM
+  // CLI children that could keep mutating the PRD tree.
   const pid = entry.handle.pid;
-  const killed = entry.handle.kill("SIGTERM");
+  const killed = pid !== undefined;
+  // Escalates to SIGKILL internally if the process doesn't exit within the
+  // default grace period, so by the time this resolves it is confirmed gone.
+  await killWithFallback(entry.handle);
 
   // Update state
   entry.state.status = "failed";
@@ -2323,7 +2374,7 @@ function handleTerminate(
     pid,
     terminated: true,
     signalSent: killed,
-    method: "sigterm",
+    method: "sigterm-or-sigkill",
     message: "Process terminated",
   });
   return true;

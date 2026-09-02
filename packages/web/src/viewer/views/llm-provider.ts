@@ -19,11 +19,20 @@ interface VendorConfig {
   lightModel: string | null;
 }
 
+interface LocalVerifierVendorConfig {
+  host: string | null;
+  port: number | null;
+  model: string | null;
+  maxCycles: number | null;
+}
+
 interface LocalVendorConfig {
   model: string | null;
   lightModel: string | null;
   host: string | null;
   port: number | null;
+  maxContextTokens: number | null;
+  verifier: LocalVerifierVendorConfig;
 }
 
 interface LlmConfigResponse {
@@ -556,6 +565,18 @@ function LocalSection({
   const model = editValues["local.model"]      ?? config.model             ?? "";
   const light = editValues["local.lightModel"] ?? config.lightModel        ?? "";
 
+  const maxContextTokens = editValues["local.maxContextTokens"]
+    ?? (config.maxContextTokens !== null ? String(config.maxContextTokens) : "");
+  const verifierHost = editValues["local.verifier.host"] ?? config.verifier.host ?? "";
+  const verifierPort = editValues["local.verifier.port"]
+    ?? (config.verifier.port !== null ? String(config.verifier.port) : "");
+  const verifierModel = editValues["local.verifier.model"] ?? config.verifier.model ?? "";
+  const verifierMaxCycles = editValues["local.verifier.maxCycles"]
+    ?? (config.verifier.maxCycles !== null ? String(config.verifier.maxCycles) : "");
+  const verifierDirty = dirtyKeys.has("local.verifier.host") || dirtyKeys.has("local.verifier.port")
+    || dirtyKeys.has("local.verifier.model") || dirtyKeys.has("local.verifier.maxCycles");
+  const verifierConfigured = config.verifier.host !== null || config.verifier.port !== null;
+
   const connDirty = dirtyKeys.has("local.host") || dirtyKeys.has("local.port");
 
   // Model field — select when live list available, text input otherwise
@@ -666,6 +687,86 @@ function LocalSection({
       host, port, model,
       hasDirtyFields: connDirty || dirtyKeys.has("local.model"),
     }),
+
+    h("hr", { class: "llm-rule" }),
+
+    // ── Advanced: context budget + second-model verifier
+    h("p", { class: "llm-section-sub" }, "Advanced"),
+    h("div", { class: `llm-field${dirtyKeys.has("local.maxContextTokens") ? " llm-field-dirty" : ""}` },
+      h("label", { class: "llm-field-label", htmlFor: "local.maxContextTokens" },
+        "Max context tokens",
+        dirtyKeys.has("local.maxContextTokens") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+      ),
+      h("p", { class: "llm-field-desc" },
+        "Check that a brief fits before sending it, so an oversized prompt fails fast with a clear error instead of a cryptic HTTP 400. Match your server's \"Context Length\" setting. Leave blank to skip this check.",
+      ),
+      h("input", {
+        id: "local.maxContextTokens",
+        type: "text",
+        inputMode: "numeric",
+        class: "llm-text-input",
+        value: maxContextTokens,
+        placeholder: "e.g. 32768",
+        onInput: (e: Event) => onChange("local.maxContextTokens", (e.target as HTMLInputElement).value),
+      }),
+    ),
+    h("details", { class: "llm-verifier-details", open: verifierConfigured || verifierDirty },
+      h("summary", { class: "llm-verifier-summary" },
+        "Second-model verifier (optional)",
+        verifierDirty ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+      ),
+      h("p", { class: "llm-field-desc" },
+        "After the primary model finishes, send its solution to a second local endpoint for review before finalizing the run. Good pairing: a smaller/faster model here. Leave all fields blank to disable.",
+      ),
+      h("div", { class: "llm-conn-row" },
+        h("div", { class: `llm-field${dirtyKeys.has("local.verifier.host") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.verifier.host" }, "Host"),
+          h("input", {
+            id: "local.verifier.host",
+            type: "text",
+            class: "llm-text-input",
+            value: verifierHost,
+            placeholder: "localhost",
+            onInput: (e: Event) => onChange("local.verifier.host", (e.target as HTMLInputElement).value),
+          }),
+        ),
+        h("div", { class: `llm-field${dirtyKeys.has("local.verifier.port") ? " llm-field-dirty" : ""}` },
+          h("label", { class: "llm-field-label", htmlFor: "local.verifier.port" }, "Port"),
+          h("input", {
+            id: "local.verifier.port",
+            type: "text",
+            inputMode: "numeric",
+            class: "llm-text-input",
+            value: verifierPort,
+            placeholder: "1235",
+            onInput: (e: Event) => onChange("local.verifier.port", (e.target as HTMLInputElement).value),
+          }),
+        ),
+      ),
+      h(ModelField, {
+        fieldKey: "local.verifier.model",
+        label: "Model",
+        description: "Leave blank to use whichever model is currently loaded on the verifier endpoint.",
+        value: verifierModel,
+        suggestions: [],
+        onChange,
+        dirty: dirtyKeys.has("local.verifier.model"),
+        placeholder: "model-id",
+      }),
+      h("div", { class: `llm-field${dirtyKeys.has("local.verifier.maxCycles") ? " llm-field-dirty" : ""}` },
+        h("label", { class: "llm-field-label", htmlFor: "local.verifier.maxCycles" }, "Max review cycles"),
+        h("p", { class: "llm-field-desc" }, "How many FAIL → revise rounds before finalizing regardless (default: 2)."),
+        h("input", {
+          id: "local.verifier.maxCycles",
+          type: "text",
+          inputMode: "numeric",
+          class: "llm-text-input",
+          value: verifierMaxCycles,
+          placeholder: "2",
+          onInput: (e: Event) => onChange("local.verifier.maxCycles", (e.target as HTMLInputElement).value),
+        }),
+      ),
+    ),
 
     h("hr", { class: "llm-rule" }),
 
@@ -784,6 +885,14 @@ export function LlmProviderView() {
   const handleToggle = useCallback((key: string, val: boolean) => setEditToggles((p) => ({ ...p, [key]: val })), []);
 
   // ── Dirty tracking
+  //
+  // Scoped to `effectiveVendor` (the currently-visible tab) only. editValues
+  // itself is never cleared on tab switch — so a draft edit on a hidden tab
+  // is preserved if the user comes back to it — but it must never leak into
+  // a Save triggered from a *different* tab. Computing dirtyKeys (and thus
+  // handleSave's payload and the "N unsaved changes" count below) only from
+  // the active tab's own fields is what keeps that hidden draft from being
+  // silently included in an unrelated save.
   const dirtyKeys = new Set<string>();
   if (data) {
     for (const vid of [VIEWER_LLM_VENDOR.CLAUDE, VIEWER_LLM_VENDOR.CODEX] as const) {
@@ -792,13 +901,30 @@ export function LlmProviderView() {
         if (k in editValues && editValues[k] !== (data[vid][f] ?? "")) dirtyKeys.add(k);
       }
     }
-    for (const f of ["model", "lightModel", "host"] as const) {
-      const k = `local.${f}`;
-      if (k in editValues && editValues[k] !== (data.local[f] ?? "")) dirtyKeys.add(k);
-    }
-    if ("local.port" in editValues) {
-      const saved = data.local.port !== null ? String(data.local.port) : "1234";
-      if (editValues["local.port"] !== saved) dirtyKeys.add("local.port");
+    if (effectiveVendor === VIEWER_LLM_VENDOR.LOCAL) {
+      for (const f of ["model", "lightModel", "host"] as const) {
+        const k = `local.${f}`;
+        if (k in editValues && editValues[k] !== (data.local[f] ?? "")) dirtyKeys.add(k);
+      }
+      if ("local.port" in editValues) {
+        const saved = data.local.port !== null ? String(data.local.port) : "1234";
+        if (editValues["local.port"] !== saved) dirtyKeys.add("local.port");
+      }
+      if ("local.maxContextTokens" in editValues) {
+        const saved = data.local.maxContextTokens !== null ? String(data.local.maxContextTokens) : "";
+        if (editValues["local.maxContextTokens"] !== saved) dirtyKeys.add("local.maxContextTokens");
+      }
+      for (const f of ["host", "model"] as const) {
+        const k = `local.verifier.${f}`;
+        if (k in editValues && editValues[k] !== (data.local.verifier[f] ?? "")) dirtyKeys.add(k);
+      }
+      for (const f of ["port", "maxCycles"] as const) {
+        const k = `local.verifier.${f}`;
+        if (k in editValues) {
+          const saved = data.local.verifier[f] !== null ? String(data.local.verifier[f]) : "";
+          if (editValues[k] !== saved) dirtyKeys.add(k);
+        }
+      }
     }
   }
   const vendorDirty = pendingVendor !== undefined && pendingVendor !== (data?.vendor ?? null);
@@ -921,7 +1047,10 @@ export function LlmProviderView() {
     showLocal
       ? h(LocalSection, {
           key: VIEWER_LLM_VENDOR.LOCAL,
-          config: data!.local ?? { model: null, lightModel: null, host: null, port: null },
+          config: data!.local ?? {
+            model: null, lightModel: null, host: null, port: null,
+            maxContextTokens: null, verifier: { host: null, port: null, model: null, maxCycles: null },
+          },
           editValues,
           onChange: handleField,
           dirtyKeys,

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { access, readFile, readdir } from "node:fs/promises";
+import { access, readFile, readdir, writeFile } from "node:fs/promises";
 import {configExists, initConfig} from "../../store/config.js";
 import { HENCH_DIR } from "./constants.js";
 import { info } from "../output.js";
@@ -19,6 +19,31 @@ async function hasXcodeProjectMarker(dir: string): Promise<boolean> {
 
 async function fileExists(path: string): Promise<boolean> {
   try { await access(path); return true; } catch { return false; }
+}
+
+/**
+ * Append entries to .gitignore if not already present. Creates .gitignore
+ * if it doesn't exist. Mirrors rex's own `ensureGitignoreEntries` (rex's
+ * cli/commands/init.ts) — duplicated rather than shared across packages,
+ * matching this codebase's existing convention for tiny package-local init
+ * helpers (see detectProjectLanguage's own "mirrors sourcevision's logic
+ * without importing it" comment above).
+ */
+async function ensureGitignoreEntries(dir: string, entries: string[]): Promise<void> {
+  const gitignorePath = join(dir, ".gitignore");
+  let content = "";
+  try {
+    content = await readFile(gitignorePath, "utf-8");
+  } catch {
+    // No .gitignore yet
+  }
+
+  const missing = entries.filter((e) => !content.includes(e));
+  if (missing.length === 0) return;
+
+  const suffix = (content.length > 0 && !content.endsWith("\n") ? "\n" : "")
+    + missing.join("\n") + "\n";
+  await writeFile(gitignorePath, content + suffix, "utf-8");
 }
 
 /**
@@ -68,6 +93,22 @@ export async function cmdInit(
 
   const language = await detectProjectLanguage(dir);
   const config = await initConfig(henchDir, language);
+
+  // Ensure .gitignore covers hench's own runtime artifacts. Without this,
+  // `.hench/locks/` (created the instant a run starts, before any real
+  // work happens) shows up as an untracked path on the very first
+  // `hench run`/`ndx work` on a freshly-initialized project — and hench's
+  // own git-dirty guard (agent/lifecycle/shared.ts) then refuses to start,
+  // self-blocking on an artifact it just created. `.hench/runs/` and
+  // `.hench/usage-cursors/` are the same kind of per-run/per-session output;
+  // `.hench-commit-msg.txt` is the scratch file the agent writes its
+  // proposed commit message to (see the agent system prompt).
+  await ensureGitignoreEntries(dir, [
+    ".hench/runs/",
+    ".hench/locks/",
+    ".hench/usage-cursors/",
+    ".hench-commit-msg.txt",
+  ]);
 
   info("Created .hench/config.json");
   info("Created .hench/runs/");

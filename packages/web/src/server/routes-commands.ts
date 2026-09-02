@@ -3,6 +3,8 @@
  *
  * All endpoints are under /api/commands/.
  *
+ * POST /api/commands/init            — bootstrap ndx init from the dashboard's setup wizard (pre-init only)
+ * GET  /api/commands/init/status     — check running init status
  * POST /api/commands/sv-analyze      — re-run sourcevision analyze (full: true → async, see status)
  * GET  /api/commands/sv-analyze/status — check running full-analysis status
  * POST /api/commands/sync            — rex sync (body: { direction: "push"|"pull"|"sync" })
@@ -28,14 +30,29 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
-import { exec as foundationExec, spawnManaged } from "@n-dx/llm-client";
+import { exec as foundationExec, spawnManaged, isVerbose, isDebug } from "@n-dx/llm-client";
 import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { readCliName } from "./cli-name.js";
+import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 
 const CMD_PREFIX = "/api/commands/";
+
+/**
+ * Flag to append to a spawned command trigger's argv, matching how this
+ * dashboard server itself was launched (`ndx start --verbose` / `--debug`) —
+ * one setting at server-launch time governs every command trigger's
+ * verbosity, rather than a per-click "Verbose output" checkbox in the UI.
+ * `isVerbose()`/`isDebug()` read the same process-wide flags `ndx start`
+ * sets at startup (see `setVerbose`/`setDebug` in web/src/cli/index.ts).
+ */
+function serverVerbosityFlag(): "--debug" | "--verbose" | null {
+  if (isDebug()) return "--debug";
+  if (isVerbose()) return "--verbose";
+  return null;
+}
 
 // ── Self-heal state tracking ──────────────────────────────────────────
 
@@ -68,6 +85,31 @@ const selfHealStatus: SelfHealStatus = {
   output: "",
   error: null,
   stopped: false,
+};
+
+// ── Setup-wizard init state tracking ──────────────────────────────────
+
+const VALID_INIT_PROVIDERS = new Set(["claude", "codex", "google", "local"]);
+const VALID_INIT_ASSISTANTS = new Set(["claude", "codex"]);
+
+interface InitStatus {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  output: string;
+  error: string | null;
+}
+
+// Module-level singleton — one init at a time per server process. The
+// dashboard's setup wizard only ever appears pre-init (the landing page is
+// only served when the project is uninitialized), so this never races with
+// any other command trigger.
+const initStatus: InitStatus = {
+  running: false,
+  startedAt: null,
+  finishedAt: null,
+  output: "",
+  error: null,
 };
 
 // ── Binary resolution helpers ─────────────────────────────────────────
@@ -129,7 +171,7 @@ function resolveRexBin(ctx: ServerContext): { bin: string; args: string[] } {
  *  4. The monorepo dogfood path — valid solely when the analyzed project is
  *     the n-dx repo itself.
  */
-function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
+export function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
   if (process.env.NDX_CLI_PATH) {
     return { bin: "node", args: [process.env.NDX_CLI_PATH] };
   }
@@ -240,13 +282,15 @@ async function handleSvAnalyze(
 ): Promise<boolean> {
   let lite = false;
   let full = false;
+  let deep = false;
   let targetPass: number | undefined;
   try {
     const body = await readBody(req);
     if (body) {
-      const input = JSON.parse(body) as { lite?: boolean; full?: boolean; targetPass?: number };
+      const input = JSON.parse(body) as { lite?: boolean; full?: boolean; deep?: boolean; targetPass?: number };
       lite = !!input.lite;
       full = !!input.full;
+      deep = !!input.deep;
       if (input.targetPass !== undefined) {
         if (!Number.isInteger(input.targetPass) || input.targetPass < 2 || input.targetPass > 4) {
           errorResponse(res, 400, "targetPass must be an integer between 2 and 4");
@@ -264,6 +308,12 @@ async function handleSvAnalyze(
   if (lite) cmdArgs.push("--lite");
   if (full) cmdArgs.push("--full");
   else if (targetPass !== undefined) cmdArgs.push(`--target-pass=${targetPass}`);
+  // Re-analyzes detected sub-packages before the root analysis — combinable
+  // with lite/full/targetPass, and does not itself trigger LLM enrichment
+  // passes, so it doesn't change whether this runs sync vs. as the async job.
+  if (deep) cmdArgs.push("--deep");
+  const verboseFlag = serverVerbosityFlag();
+  if (verboseFlag) cmdArgs.push(verboseFlag);
   cmdArgs.push(ctx.projectDir);
 
   // Both full runs and targeted enrichment runs involve LLM passes that can
@@ -300,7 +350,10 @@ async function handleSvAnalyze(
     // spawnManaged with piped stdio streams stdout chunk-by-chunk, so the
     // status endpoint shows live progress while the passes run — the
     // buffered exec() only hands output over after the child exits.
-    const analyzeTimeout = 1_800_000; // 30 minutes — four LLM enrichment passes
+    // Honors the "CLI Timeouts" settings page's "analyze" entry (30 min
+    // default) instead of hardcoding that default directly, so a user's
+    // explicit cli.timeouts.analyze override actually takes effect here.
+    const analyzeTimeout = resolveEffectiveCliTimeoutMs(ctx.projectDir, "analyze");
     const child = spawnManaged(bin, cmdArgs, {
       cwd: ctx.projectDir,
       timeout: analyzeTimeout,
@@ -470,20 +523,40 @@ async function handleRecommend(
   return true;
 }
 
-/** POST /api/commands/export — ndx export static dashboard */
+/**
+ * POST /api/commands/export — ndx export static dashboard
+ *
+ * `deploy: "github"` additionally pushes the exported output to the
+ * `n-dx-dashboard` branch on the project's git remote (force-push — see
+ * `deployToGitHubPages` in packages/core/export.js). That's a real,
+ * user-visible remote write, so the trigger is opt-in via the request body
+ * and the viewer gates it behind an explicit confirmation step; this route
+ * does not add its own extra confirmation, matching every other
+ * spawn-and-report trigger in this file.
+ */
 async function handleExport(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
   let outDir: string | undefined;
+  let basePath: string | undefined;
+  let cname: string | undefined;
+  let deployGithub = false;
   try {
     const body = await readBody(req);
     if (body) {
-      const input = JSON.parse(body) as { outDir?: string };
+      const input = JSON.parse(body) as { outDir?: string; basePath?: string; cname?: string; deploy?: string };
       if (input.outDir && typeof input.outDir === "string") {
         outDir = input.outDir.trim();
       }
+      if (input.basePath && typeof input.basePath === "string") {
+        basePath = input.basePath.trim();
+      }
+      if (input.cname && typeof input.cname === "string") {
+        cname = input.cname.trim();
+      }
+      deployGithub = input.deploy === "github";
     }
   } catch {
     // Use defaults
@@ -492,12 +565,17 @@ async function handleExport(
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
   const cmdArgs = [...prefixArgs, "export"];
   if (outDir) cmdArgs.push(`--out-dir=${outDir}`);
+  if (basePath) cmdArgs.push(`--base-path=${basePath}`);
+  if (cname) cmdArgs.push(`--cname=${cname}`);
+  if (deployGithub) cmdArgs.push("--deploy=github");
   cmdArgs.push(ctx.projectDir);
 
   try {
     const result = await foundationExec(bin, cmdArgs, {
       cwd: ctx.projectDir,
-      timeout: 120_000,
+      // Deploy pushes to a remote over the network (git worktree + push),
+      // which can run longer than a local-only export.
+      timeout: deployGithub ? 180_000 : 120_000,
       maxBuffer: 10 * 1024 * 1024,
     });
 
@@ -598,7 +676,8 @@ async function handleSelfHeal(
   }
 
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
-  const cmdArgs = [...prefixArgs, "self-heal", String(iterations), ctx.projectDir];
+  const verboseFlag = serverVerbosityFlag();
+  const cmdArgs = [...prefixArgs, "self-heal", String(iterations), ...(verboseFlag ? [verboseFlag] : []), ctx.projectDir];
 
   // Reset status and start background execution
   selfHealStatus.running = true;
@@ -642,7 +721,13 @@ async function handleSelfHeal(
     const wasStopped = selfHealStopRequested;
     selfHealStatus.running = false;
     selfHealStatus.finishedAt = new Date().toISOString();
-    selfHealStatus.output = (result.stdout || "").trim().slice(-5000);
+    // --verbose/--debug output writes to stderr (see llm-client's output.ts
+    // contract), so append it whenever this server itself is running in
+    // that mode — otherwise it would silently never reach the panel.
+    const combinedOutput = verboseFlag && result.stderr
+      ? `${result.stdout || ""}\n--- verbose/debug output (stderr) ---\n${result.stderr}`
+      : (result.stdout || "");
+    selfHealStatus.output = combinedOutput.trim().slice(-5000);
     selfHealStatus.stopped = wasStopped;
     selfHealStatus.error = wasStopped
       ? null
@@ -707,6 +792,161 @@ function handleSelfHealStatus(
   res: ServerResponse,
 ): boolean {
   jsonResponse(res, 200, { ...selfHealStatus });
+  return true;
+}
+
+// ── Init (dashboard setup wizard — bootstraps an uninitialized project) ─
+
+/**
+ * POST /api/commands/init — run `ndx init` from the dashboard's setup
+ * wizard. Only ever called from the landing page shown pre-init (see
+ * `isProjectInitialized` in routes-static.ts), so it never races another
+ * command trigger.
+ *
+ * Spawned with piped stdio (not a TTY), so `ndx init`'s own interactive
+ * prompts never fire — vendor and assistant selection must come from flags,
+ * which is why this handler requires `provider` explicitly rather than
+ * falling back to an interactive default.
+ *
+ * Body: { assistants?: ("claude"|"codex")[], provider: "claude"|"codex"|"google"|"local",
+ *   googleApiKey?: string, localHost?: string, localPort?: number }
+ */
+async function handleInit(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  onProjectInitialized?: () => void,
+): Promise<boolean> {
+  if (initStatus.running) {
+    jsonResponse(res, 409, { error: "Init is already running", startedAt: initStatus.startedAt });
+    return true;
+  }
+
+  let assistants: string[] = ["claude", "codex"];
+  let provider = "";
+  let googleApiKey = "";
+  let localHost = "";
+  let localPort: number | undefined;
+
+  try {
+    const body = await readBody(req);
+    const input = JSON.parse(body) as {
+      assistants?: unknown;
+      provider?: unknown;
+      googleApiKey?: unknown;
+      localHost?: unknown;
+      localPort?: unknown;
+    };
+
+    if (Array.isArray(input.assistants) && input.assistants.length > 0) {
+      const filtered = input.assistants.filter(
+        (a): a is string => typeof a === "string" && VALID_INIT_ASSISTANTS.has(a),
+      );
+      if (filtered.length > 0) assistants = filtered;
+    }
+
+    if (typeof input.provider !== "string" || !VALID_INIT_PROVIDERS.has(input.provider)) {
+      errorResponse(res, 400, `provider must be one of: ${[...VALID_INIT_PROVIDERS].join(", ")}`);
+      return true;
+    }
+    provider = input.provider;
+
+    if (typeof input.googleApiKey === "string") googleApiKey = input.googleApiKey.trim();
+    if (typeof input.localHost === "string") localHost = input.localHost.trim();
+    if (typeof input.localPort === "number" && Number.isInteger(input.localPort) && input.localPort > 0 && input.localPort <= 65535) {
+      localPort = input.localPort;
+    }
+  } catch (err) {
+    errorResponse(res, 400, err instanceof Error ? err.message : "Invalid request body");
+    return true;
+  }
+
+  const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  const cmdArgs = [
+    ...prefixArgs, "init", "--quiet",
+    `--provider=${provider}`,
+    `--assistants=${assistants.join(",")}`,
+    ctx.projectDir,
+  ];
+
+  initStatus.running = true;
+  initStatus.startedAt = new Date().toISOString();
+  initStatus.finishedAt = null;
+  initStatus.output = "";
+  initStatus.error = null;
+
+  // Return 202 immediately, run in background — first-time init runs a
+  // sourcevision analyze pass and can take a while on a large repo.
+  jsonResponse(res, 202, {
+    ok: true,
+    startedAt: initStatus.startedAt,
+    message: "Initializing. Poll /api/commands/init/status for progress.",
+  });
+
+  const initTimeout = 300_000; // 5 minutes — the first sourcevision analyze --fast pass dominates
+  const child = spawnManaged(bin, cmdArgs, {
+    cwd: ctx.projectDir,
+    timeout: initTimeout,
+    stdio: "pipe",
+    onStdout: (chunk) => {
+      initStatus.output = (initStatus.output + chunk).slice(-5000);
+    },
+  });
+
+  child.done.then(async (result) => {
+    const failure = managedChildError(result, initTimeout);
+    if (failure) {
+      initStatus.running = false;
+      initStatus.finishedAt = new Date().toISOString();
+      initStatus.output = (result.stdout || "").trim().slice(-5000);
+      initStatus.error = failure;
+      return;
+    }
+
+    // Post-init: persist the vendor details the wizard collected that
+    // `ndx init` itself never asks for — it doesn't collect API keys or a
+    // local server's host/port (see the LLM Provider settings page, which
+    // covers these same fields post-init). Set here via the same `ndx
+    // config` CLI path that page documents; failures here are non-fatal —
+    // init itself already succeeded, and these can be set from Settings.
+    if (provider === "google" && googleApiKey) {
+      await foundationExec(bin, [...prefixArgs, "config", "llm.google.api_key", googleApiKey, ctx.projectDir], { cwd: ctx.projectDir, timeout: 15_000 }).catch(() => {});
+    }
+    if (provider === "local") {
+      if (localHost) {
+        await foundationExec(bin, [...prefixArgs, "config", "llm.local.host", localHost, ctx.projectDir], { cwd: ctx.projectDir, timeout: 15_000 }).catch(() => {});
+      }
+      if (localPort !== undefined) {
+        await foundationExec(bin, [...prefixArgs, "config", "llm.local.port", String(localPort), ctx.projectDir], { cwd: ctx.projectDir, timeout: 15_000 }).catch(() => {});
+      }
+    }
+
+    initStatus.running = false;
+    initStatus.finishedAt = new Date().toISOString();
+    initStatus.output = (result.stdout || "").trim().slice(-5000);
+    initStatus.error = null;
+
+    // The project is now initialized — re-register the file watchers that
+    // were skipped at server startup (because .rex/.sourcevision/.hench
+    // didn't exist yet) and drop the /api/status cache, so the dashboard
+    // the client reloads into has live updates working immediately instead
+    // of only after a manual server restart.
+    onProjectInitialized?.();
+  }).catch((err: unknown) => {
+    initStatus.running = false;
+    initStatus.finishedAt = new Date().toISOString();
+    initStatus.error = String(err);
+  });
+
+  return true;
+}
+
+/** GET /api/commands/init/status */
+function handleInitStatus(
+  _req: IncomingMessage,
+  res: ServerResponse,
+): boolean {
+  jsonResponse(res, 200, { ...initStatus });
   return true;
 }
 
@@ -782,6 +1022,8 @@ async function handleRefresh(
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
   const cmdArgs = [...prefixArgs, "refresh", "--data-only", "--live-server"];
   if (fast) cmdArgs.push("--fast");
+  const verboseFlag = serverVerbosityFlag();
+  if (verboseFlag) cmdArgs.push(verboseFlag);
   cmdArgs.push(ctx.projectDir);
 
   // Refresh runs sourcevision analyze under the hood — same writer lock.
@@ -825,7 +1067,14 @@ async function handleRefresh(
   child.done.then((result) => {
     refreshStatus.running = false;
     refreshStatus.finishedAt = new Date().toISOString();
-    refreshStatus.output = (result.stdout || "").trim().slice(-5000);
+    // --verbose/--debug output writes to stderr — append it for display
+    // whenever this server itself is running in that mode (phase parsing
+    // above stays stdout-only; that format is structured and would break if
+    // stderr lines were mixed in).
+    const combinedOutput = verboseFlag && result.stderr
+      ? `${result.stdout || ""}\n--- verbose/debug output (stderr) ---\n${result.stderr}`
+      : (result.stdout || "");
+    refreshStatus.output = combinedOutput.trim().slice(-5000);
     refreshStatus.phases = parseRefreshPhases(result.stdout || "");
     refreshStatus.error = managedChildError(result, refreshTimeout);
 
@@ -865,7 +1114,7 @@ function handleRefreshStatus(
  * `ci` and `reshape` both run a long CLI pass and return JSON, so they share
  * one shape rather than each growing its own near-identical singleton.
  */
-interface AsyncJobStatus {
+export interface AsyncJobStatus {
   running: boolean;
   startedAt: string | null;
   finishedAt: string | null;
@@ -876,7 +1125,7 @@ interface AsyncJobStatus {
   error: string | null;
 }
 
-function newJobStatus(): AsyncJobStatus {
+export function newJobStatus(): AsyncJobStatus {
   return { running: false, startedAt: null, finishedAt: null, report: null, output: "", error: null };
 }
 
@@ -887,7 +1136,7 @@ const reshapeStatus = newJobStatus();
  * Start a background CLI job that reports through `status`, or answer 409 when
  * one is already in flight. Returns 202 immediately; the caller polls.
  */
-function startAsyncJob(
+export function startAsyncJob(
   res: ServerResponse,
   status: AsyncJobStatus,
   label: string,
@@ -1352,11 +1601,23 @@ function handleSampleStatus(
 // ── Dispatcher ────────────────────────────────────────────────────────
 
 /** Handle command trigger API requests. Returns true if the request was handled. */
+/** Options threaded into {@link handleCommandsRoute} from start.ts, beyond the plain ctx/broadcast pair. */
+export interface CommandsRouteOptions {
+  /**
+   * Called once, right after `ndx init` (triggered via the dashboard's
+   * setup wizard) finishes successfully. Lets start.ts re-register the file
+   * watchers it skipped at boot because the project wasn't initialized yet,
+   * and drop the /api/status cache — see `handleInit`.
+   */
+  onProjectInitialized?: () => void;
+}
+
 export function handleCommandsRoute(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
+  options?: CommandsRouteOptions,
 ): boolean | Promise<boolean> {
   const url = req.url || "/";
   const method = req.method || "GET";
@@ -1365,6 +1626,12 @@ export function handleCommandsRoute(
 
   const path = url.slice(CMD_PREFIX.length).split("?")[0];
 
+  if (path === "init" && method === "POST") {
+    return handleInit(req, res, ctx, options?.onProjectInitialized);
+  }
+  if (path === "init/status" && method === "GET") {
+    return handleInitStatus(req, res);
+  }
   if (path === "sv-analyze" && method === "POST") {
     return handleSvAnalyze(req, res, ctx, broadcast);
   }

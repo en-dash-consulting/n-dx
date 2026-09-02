@@ -107,6 +107,10 @@ export type { ReshapeProposal } from "@n-dx/rex";
 // ---- Rex MCP tool handlers (direct invocation) -----------------------------
 export { handleEditItem } from "@n-dx/rex";
 
+// ---- Rex PRD tree backup snapshots (undo for reorganize/prune/reshape/fix) --
+export { getAvailableBackups, restoreFromBackup, isValidSnapshotId } from "@n-dx/rex";
+export type { BackupSnapshot } from "@n-dx/rex";
+
 // ---- Rex proposal types (consumed by viewer analyze-panel) ------------------
 export type { Proposal, ProposalFeature, ProposalTask } from "@n-dx/rex";
 

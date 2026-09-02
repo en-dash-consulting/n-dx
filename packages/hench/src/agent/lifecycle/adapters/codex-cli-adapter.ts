@@ -655,8 +655,8 @@ export const codexCliAdapter: VendorAdapter = {
     // pipes stdinContent when it is non-null.
     const prompt = `SYSTEM:\n${systemPrompt}\n\nTASK:\n${taskPrompt}`;
 
-    // Compile explicit sandbox and approval flags from the n-dx policy.
-    // Replaces --full-auto so preset aliases cannot override intent.
+    // Compiles explicit sandbox/approval flags from the n-dx policy rather
+    // than relying on any Codex CLI preset shortcut.
     //
     // policy.allowedGitSubcommands is intentionally not consulted — Codex has no
     // per-command allowlist surface (its safety model is the sandbox/approval

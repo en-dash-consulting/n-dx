@@ -162,6 +162,10 @@ function ExportPanel() {
   const [outDir, setOutDir] = useState("");
   const [pdfState, setPdfState] = useState<OpState>("idle");
   const [pdfOutput, setPdfOutput] = useState<string | null>(null);
+  const [deployGithub, setDeployGithub] = useState(false);
+  const [basePath, setBasePath] = useState("");
+  const [cname, setCname] = useState("");
+  const [confirmingDeploy, setConfirmingDeploy] = useState(false);
 
   /**
    * Generate the sourcevision PDF report. Reports the written path: the viewer
@@ -186,12 +190,18 @@ function ExportPanel() {
     setState("running");
     setError(null);
     setOutput(null);
+    setConfirmingDeploy(false);
 
     try {
       const res = await fetch("/api/commands/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ outDir: outDir.trim() || undefined }),
+        body: JSON.stringify({
+          outDir: outDir.trim() || undefined,
+          basePath: deployGithub ? (basePath.trim() || undefined) : undefined,
+          cname: deployGithub ? (cname.trim() || undefined) : undefined,
+          deploy: deployGithub ? "github" : undefined,
+        }),
       });
 
       const data = await res.json() as Record<string, unknown>;
@@ -206,7 +216,15 @@ function ExportPanel() {
       setError(String(err));
       setState("error");
     }
-  }, [outDir]);
+  }, [outDir, basePath, cname, deployGithub]);
+
+  const handleExportClick = useCallback(() => {
+    if (deployGithub) {
+      setConfirmingDeploy(true);
+      return;
+    }
+    handleExport();
+  }, [deployGithub, handleExport]);
 
   return h("div", { class: "cmd-panel" },
     h("div", { class: "cmd-panel-header" },
@@ -226,21 +244,76 @@ function ExportPanel() {
         onInput: (e: Event) => setOutDir((e.target as HTMLInputElement).value),
         disabled: state === "running",
       }),
+      h("label", { class: "overview-deep-toggle" },
+        h("input", {
+          type: "checkbox",
+          checked: deployGithub,
+          disabled: state === "running",
+          onChange: (e: Event) => {
+            setDeployGithub((e.target as HTMLInputElement).checked);
+            setConfirmingDeploy(false);
+          },
+        }),
+        ` Deploy to GitHub Pages (push to the n-dx-dashboard branch). Equivalent to `,
+        h("code", null, `${cliName} export --deploy=github`), ".",
+      ),
+      deployGithub
+        ? h(Fragment, null,
+            h("label", { class: "cmd-panel-label" }, "Base path (optional \u2014 auto-detected from git remote)"),
+            h("input", {
+              type: "text",
+              class: "cmd-panel-input",
+              placeholder: "/my-repo/",
+              value: basePath,
+              onInput: (e: Event) => setBasePath((e.target as HTMLInputElement).value),
+              disabled: state === "running",
+            }),
+            h("label", { class: "cmd-panel-label" }, "Custom domain / CNAME (optional)"),
+            h("input", {
+              type: "text",
+              class: "cmd-panel-input",
+              placeholder: "dashboard.example.com",
+              value: cname,
+              onInput: (e: Event) => setCname((e.target as HTMLInputElement).value),
+              disabled: state === "running",
+            }),
+          )
+        : null,
     ),
 
-    h("div", { class: "cmd-panel-actions" },
-      h("button", {
-        class: "cmd-btn cmd-btn-primary",
-        onClick: handleExport,
-        disabled: state === "running",
-      }, state === "running" ? "Exporting..." : "Export Dashboard"),
-      h("button", {
-        class: "cmd-btn cmd-btn-secondary",
-        onClick: handleExportPdf,
-        disabled: pdfState === "running",
-        title: `Generate a PDF analysis report (${cliName} sourcevision export-pdf)`,
-      }, pdfState === "running" ? "Generating PDF\u2026" : "Export PDF report"),
-    ),
+    confirmingDeploy
+      ? h("div", { class: "prune-confirmation-warning", role: "alert" },
+          h("div", { class: "prune-confirmation-warning-icon" }, "\u26a0"),
+          h("div", null,
+            h("strong", null, "This force-pushes to a remote branch."),
+            h("p", null,
+              "Exporting will overwrite the n-dx-dashboard branch on this repo's git remote (origin) with the freshly generated dashboard. This is visible to anyone with access to the remote and cannot be undone by this dashboard.",
+            ),
+            h("div", { class: "cmd-panel-actions" },
+              h("button", {
+                class: "cmd-btn cmd-btn-secondary",
+                onClick: () => setConfirmingDeploy(false),
+              }, "Cancel"),
+              h("button", {
+                class: "cmd-btn cmd-btn-primary",
+                onClick: handleExport,
+              }, "Export & Deploy"),
+            ),
+          ),
+        )
+      : h("div", { class: "cmd-panel-actions" },
+          h("button", {
+            class: "cmd-btn cmd-btn-primary",
+            onClick: handleExportClick,
+            disabled: state === "running",
+          }, state === "running" ? "Exporting..." : deployGithub ? "Export & Deploy\u2026" : "Export Dashboard"),
+          h("button", {
+            class: "cmd-btn cmd-btn-secondary",
+            onClick: handleExportPdf,
+            disabled: pdfState === "running",
+            title: `Generate a PDF analysis report (${cliName} sourcevision export-pdf)`,
+          }, pdfState === "running" ? "Generating PDF\u2026" : "Export PDF report"),
+        ),
 
     pdfOutput
       ? h("pre", {

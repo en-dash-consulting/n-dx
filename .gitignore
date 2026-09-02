@@ -47,6 +47,12 @@ scripts/HENCH_CALLGRAPH_FINDINGS.md
 # macOS
 .DS_Store
 
+# Playwright UI test suite (packages/web/tests/e2e-ui) artifacts
+packages/web/test-results/
+packages/web/playwright-report/
+packages/web/blob-report/
+packages/web/playwright/.cache/
+
 # Vendor CLI invocation log (packages/*/cli-log.*) and its rotated generation.
 # Local operational history — never committed.
 claude_commands.log

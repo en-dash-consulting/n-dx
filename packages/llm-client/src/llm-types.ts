@@ -138,6 +138,13 @@ export interface LocalConfig {
    * ```
    */
   verifier?: LocalVerifierConfig;
+  /**
+   * Saved connection profiles ({name, host, port, model}), managed entirely
+   * by the web dashboard's LLM Provider page (Settings → General → Local).
+   * Not read by hench, rex, or any CLI at runtime — applying a profile just
+   * copies its fields into `host`/`port`/`model` above.
+   */
+  profiles?: Array<{ name: string; host: string; port: number; model: string }>;
 }
 
 /** Optional Google Gemini-specific config section in `.n-dx.json`. */

@@ -21,6 +21,7 @@ import {
   initMcpRoutes,
   reloadMcpFactories,
 } from "../../../src/server/routes-mcp.js";
+import { handleRequestSecurity } from "../../../src/server/request-security.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal MCP server with a single no-op tool — enough to complete MCP init. */
@@ -32,21 +33,11 @@ function createMockMcpServer(): McpServer {
   return server;
 }
 
-/** Start a test HTTP server that handles MCP routes + CORS. */
+/** Start a test HTTP server that handles MCP routes + request-origin security. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-      // Mirror the CORS setup from start.ts
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id");
-      res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
-
-      if ((req.method || "GET") === "OPTIONS") {
-        res.writeHead(204);
-        res.end();
-        return;
-      }
+      if (handleRequestSecurity(req, res)) return;
 
       if (await handleMcpRoute(req, res, ctx)) return;
 
@@ -92,8 +83,14 @@ describe("MCP routes", () => {
   it("CORS preflight includes MCP-related headers", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/mcp/rex`, {
       method: "OPTIONS",
+      headers: {
+        Origin: `http://127.0.0.1:${port}`,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Content-Type, Mcp-Session-Id",
+      },
     });
     expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe(`http://127.0.0.1:${port}`);
     expect(res.headers.get("access-control-allow-headers")).toContain("Mcp-Session-Id");
     expect(res.headers.get("access-control-expose-headers")).toContain("Mcp-Session-Id");
     expect(res.headers.get("access-control-allow-methods")).toContain("DELETE");

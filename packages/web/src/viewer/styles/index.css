@@ -44,6 +44,8 @@
 @import "./degradation-banner.css";
 @import "./refresh-queue.css";
 @import "./polling-suspension.css";
+@import "./active-operations.css";
+@import "./git-status.css";
 @import "./search-overlay.css";
 @import "./neolithic-overlay.css";
 @import "./zone-slideout.css";

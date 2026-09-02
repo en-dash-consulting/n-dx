@@ -104,6 +104,23 @@ interface BudgetCheckResult {
 
 type TimePeriod = "day" | "week" | "month";
 
+/** Per-PRD-item token rollup, mirroring the rex `get_token_usage` MCP tool's
+ * self/descendants/total shape. Wire shape served by GET /api/hench/task-usage
+ * (field `rollup`), which is the same data the PRD tree view renders per node —
+ * this table is the aggregate view across every item at once. */
+interface ItemUsageRollupWire {
+  self: { totalTokens: number; runCount: number };
+  descendants: { totalTokens: number; runCount: number };
+  total: { totalTokens: number; runCount: number };
+  duration: { totalMs: number; runningMs: number; isRunning: boolean };
+}
+
+interface ItemUsageRow extends ItemUsageRollupWire {
+  id: string;
+  title: string;
+  level: string;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -120,6 +137,32 @@ function fmtNumber(n: number): string {
 
 function fmtWindow(since: string | null, until: string | null): string {
   return `${since ? new Date(since).toLocaleDateString() : "start"} → ${until ? new Date(until).toLocaleDateString() : "now"}`;
+}
+
+interface PrdItemNode {
+  id: string;
+  title: string;
+  level: string;
+  children?: PrdItemNode[];
+}
+
+/** Flatten the PRD tree into an id → { title, level } map for join with the token rollup. */
+function flattenPrdTitles(items: PrdItemNode[]): Map<string, { title: string; level: string }> {
+  const out = new Map<string, { title: string; level: string }>();
+  const stack = [...items];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    out.set(node.id, { title: node.title, level: node.level });
+    if (node.children) stack.push(...node.children);
+  }
+  return out;
+}
+
+function fmtItemDuration(ms: number): string {
+  if (ms <= 0) return "—";
+  const mins = Math.round(ms / 60000);
+  if (mins < 60) return `${mins}m`;
+  return `${(mins / 60).toFixed(1)}h`;
 }
 
 const PKG_COLORS: Record<string, string> = {
@@ -404,6 +447,8 @@ export function TokenUsageView() {
   const [commands, setCommands] = useState<CommandTokenUsage[]>([]);
   const [buckets, setBuckets] = useState<PeriodBucket[]>([]);
   const [budget, setBudget] = useState<BudgetCheckResult | null>(null);
+  const [itemRows, setItemRows] = useState<ItemUsageRow[]>([]);
+  const [showAllItems, setShowAllItems] = useState(false);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -412,6 +457,36 @@ export function TokenUsageView() {
     params.set("period", period);
     return params;
   }, [since, until, period]);
+
+  const fetchItemRollup = useCallback(async () => {
+    try {
+      const [taskUsageRes, prdRes] = await Promise.all([
+        fetch("/api/hench/task-usage"),
+        fetch("/data/prd.json"),
+      ]);
+      if (!taskUsageRes.ok) return;
+      const taskUsageData = await taskUsageRes.json() as { rollup?: Record<string, ItemUsageRollupWire> };
+      const rollup = taskUsageData.rollup ?? {};
+
+      const titles = prdRes.ok
+        ? flattenPrdTitles(((await prdRes.json()) as { items?: PrdItemNode[] }).items ?? [])
+        : new Map<string, { title: string; level: string }>();
+
+      const rows: ItemUsageRow[] = Object.entries(rollup)
+        .filter(([, r]) => r.total.totalTokens > 0)
+        .map(([id, r]) => ({
+          id,
+          title: titles.get(id)?.title ?? id,
+          level: titles.get(id)?.level ?? "item",
+          ...r,
+        }))
+        .sort((a, b) => b.total.totalTokens - a.total.totalTokens);
+
+      setItemRows(rows);
+    } catch {
+      // Non-fatal — the rest of the view still renders without per-item data
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -422,6 +497,7 @@ export function TokenUsageView() {
       const data = await res.json() as UtilizationResponse;
 
       setUtilization(data);
+      fetchItemRollup();
       setCommands(data.commands ?? []);
       setBudget(data.budget ?? null);
       setBuckets(
@@ -453,7 +529,7 @@ export function TokenUsageView() {
     } finally {
       setLoading(false);
     }
-  }, [queryParams]);
+  }, [queryParams, fetchItemRollup]);
 
   useEffect(() => {
     fetchData();
@@ -723,6 +799,54 @@ export function TokenUsageView() {
                     h("td", { class: "num" }, fmtNumber(c.calls)),
                   );
                 }),
+              ),
+            ),
+          ),
+        )
+      : null,
+
+    // Per-PRD-item rollup (self/descendants/total) — the get_token_usage MCP
+    // tool's aggregate view. The tree view shows this per node; this is the
+    // whole-project table sorted by total consumption.
+    itemRows.length > 0
+      ? h("div", { class: "token-section" },
+          h("div", { class: "section-header-row" },
+            h("h3", null, "Tokens by PRD Item"),
+            itemRows.length > 15
+              ? h("button", {
+                  class: "btn btn-small",
+                  onClick: () => setShowAllItems((v) => !v),
+                }, showAllItems ? "Show top 15" : `Show all ${itemRows.length}`)
+              : null,
+          ),
+          h("div", { class: "token-table-wrapper" },
+            h("table", { class: "token-table" },
+              h("thead", null,
+                h("tr", null,
+                  h("th", null, "Item"),
+                  h("th", null, "Level"),
+                  h("th", { class: "num" }, "Self"),
+                  h("th", { class: "num" }, "Descendants"),
+                  h("th", { class: "num" }, "Total"),
+                  h("th", { class: "num" }, "Runs"),
+                  h("th", { class: "num" }, "Duration"),
+                ),
+              ),
+              h("tbody", null,
+                (showAllItems ? itemRows : itemRows.slice(0, 15)).map((row) =>
+                  h("tr", { key: row.id },
+                    h("td", null, row.title),
+                    h("td", null, row.level),
+                    h("td", { class: "num" }, fmtTokens(row.self.totalTokens)),
+                    h("td", { class: "num" }, fmtTokens(row.descendants.totalTokens)),
+                    h("td", { class: "num" }, fmtTokens(row.total.totalTokens)),
+                    h("td", { class: "num" }, fmtNumber(row.total.runCount)),
+                    h("td", { class: "num" },
+                      fmtItemDuration(row.duration.totalMs),
+                      row.duration.isRunning ? h("span", { class: "budget-warning" }, " ●") : null,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

@@ -79,6 +79,7 @@
 /* Per-vendor active tint — overrides the generic accent tint */
 .llm-vendor-tab-active.llm-vendor-tab-claude { background: color-mix(in srgb, #d97706 14%, transparent); }
 .llm-vendor-tab-active.llm-vendor-tab-codex  { background: color-mix(in srgb, #2563eb 14%, transparent); }
+.llm-vendor-tab-active.llm-vendor-tab-google { background: color-mix(in srgb, #7c3aed 14%, transparent); }
 .llm-vendor-tab-active.llm-vendor-tab-local  { background: color-mix(in srgb, #16a34a 14%, transparent); }
 
 .llm-tab-name { /* no extra style needed */ }
@@ -111,6 +112,7 @@
 
 .llm-vendor-dot-claude { background: #d97706; }
 .llm-vendor-dot-codex  { background: #2563eb; }
+.llm-vendor-dot-google { background: #7c3aed; }
 .llm-vendor-dot-local  { background: #16a34a; }
 
 /* ── Vendor section card ─────────────────────────────────────────── */
@@ -641,3 +643,34 @@
 }
 
 .llm-toast-check { color: var(--color-success, #16a34a); }
+
+/* ── Google API key link ─────────────────────────────────────────── */
+
+.llm-field-desc a {
+  color: var(--color-accent);
+}
+
+/* ── Second-model verifier (collapsible, local vendor advanced section) ── */
+
+.llm-verifier-details {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface);
+}
+
+.llm-verifier-details > *:not(.llm-verifier-summary) {
+  margin-top: var(--spacing-sm);
+}
+
+.llm-verifier-summary {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.llm-verifier-details[open] .llm-verifier-summary {
+  margin-bottom: var(--spacing-xs, 4px);
+}

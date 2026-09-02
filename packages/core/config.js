@@ -920,6 +920,30 @@ const LLM_VALIDATORS = {
   },
   "local.model": validateModel,
   "local.lightModel": validateModel,
+  "local.maxContextTokens": (v) => {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 1) {
+      throw new Error(`Invalid local.maxContextTokens "${v}". Expected a positive integer (e.g. 32768).`);
+    }
+  },
+  "local.verifier.host": (v) => {
+    if (typeof v !== "string" || !v.trim()) {
+      throw new Error(`Invalid local.verifier.host "${v}". Expected a non-empty hostname.`);
+    }
+  },
+  "local.verifier.port": (v) => {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 1 || n > 65535) {
+      throw new Error(`Invalid local.verifier.port "${v}". Expected an integer between 1 and 65535.`);
+    }
+  },
+  "local.verifier.model": validateModel,
+  "local.verifier.maxCycles": (v) => {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 1) {
+      throw new Error(`Invalid local.verifier.maxCycles "${v}". Expected a positive integer (e.g. 2).`);
+    }
+  },
   autoFailover: validateAutoFailover,
 };
 
@@ -1404,6 +1428,18 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     Leave unset to use whichever model is currently loaded
                                     in LM Studio.
   llm.local.lightModel     string    Local model for light-weight tasks (optional)
+  llm.local.maxContextTokens number  Max context window (in tokens) for the local model (optional)
+                                    When set, hench checks the assembled brief fits before
+                                    sending it — failing fast instead of a cryptic HTTP 400.
+                                    Match your local server's "Context Length" setting.
+  llm.local.verifier.host  string    Hostname of a second local server used to review the
+                                    primary model's output before finalizing a run (optional)
+  llm.local.verifier.port  number    Port of the verifier server (optional)
+  llm.local.verifier.model string    Model ID to request from the verifier server (optional)
+  llm.local.verifier.maxCycles number Max FAIL-then-revise cycles per run (default: 2)
+  llm.local.profiles       array     Saved local-server connection profiles, managed entirely
+                                    by the web dashboard's LLM Provider page — not read by
+                                    hench/rex/any CLI at runtime. Not meant to be hand-edited.
   llm.autoFailover         boolean   Enable automatic model/vendor failover on errors (default: false)
                                     When true, hench retries failed runs on fallback models
                                     before surfacing the original error. Disabled by default

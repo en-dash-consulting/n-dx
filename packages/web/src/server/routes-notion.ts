@@ -538,7 +538,9 @@ export async function handleNotionRoute(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  const url = req.url || "/";
+  // Strip the query string — a trailing "?_=1" cache-buster (or any future
+  // query param) must not fall through the exact-equality matches below to a 404.
+  const url = (req.url || "/").split("?")[0];
   const method = req.method || "GET";
 
   // Only handle /api/notion/* routes

@@ -26,6 +26,7 @@ import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
 import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
+import { handleGitRoute } from "./routes-git.js";
 import { handleStatusRoute, clearStatusCache } from "./routes-status.js";
 import { handleConfigRoute } from "./routes-config.js";
 import { handleSearchRoute } from "./routes-search.js";
@@ -40,6 +41,7 @@ import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { createWebSocketManager, WsHealthTracker } from "./websocket.js";
 import { ALL_DATA_FILES } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
+import { handleRequestSecurity } from "./request-security.js";
 
 /**
  * File written by the server process to communicate the actual port it bound to.
@@ -461,6 +463,41 @@ function registerWatchers(
   return { watchers, henchRunsDir, monitorIntervals: [], prdCacheDir };
 }
 
+/**
+ * Re-register the file watchers that {@link registerWatchers} skipped at
+ * server startup because their target directory (`.sourcevision`, `.rex`,
+ * `.hench/runs`) didn't exist yet — the project was uninitialized, so the
+ * server was showing the landing page rather than the dashboard.
+ *
+ * Called once, right after a successful `ndx init` triggered from the
+ * dashboard's setup wizard (see `handleInit` in routes-commands.ts). Without
+ * this, the dashboard the client reloads into after init would work for its
+ * initial data load (every route reads straight from disk), but live
+ * updates — WebSocket broadcasts on PRD/SourceVision changes — would stay
+ * silently dead until the server was restarted by hand, since `fs.watch`
+ * only gets set up once per directory.
+ *
+ * Safe to call exactly once per directory: each of the three registration
+ * functions already no-ops (returns null/[]) when its target still doesn't
+ * exist, so calling this on a directory that already has a watcher would be
+ * the only way to double up — which the setup wizard's own pre-init-only
+ * gating (see `isProjectInitialized`) rules out in practice.
+ */
+function reregisterProjectWatchers(
+  ctx: ServerContext,
+  watcher: ReturnType<typeof createDataWatcher>,
+  ws: ReturnType<typeof createWebSocketManager>,
+  handles: WatcherHandles,
+): void {
+  const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
+  if (sv) handles.watchers.push(sv);
+  for (const w of registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws)) {
+    handles.watchers.push(w);
+  }
+  const hench = registerHenchWatcher(ctx.scope, handles.henchRunsDir, ws);
+  if (hench) handles.watchers.push(hench);
+}
+
 /** Close all file system watchers, monitor intervals, and ephemeral cache on shutdown. */
 function closeWatchers(handles: WatcherHandles): void {
   for (const w of handles.watchers) {
@@ -481,26 +518,15 @@ function closeWatchers(handles: WatcherHandles): void {
   }
 }
 
-function setCorsHeaders(res: ServerResponse): void {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id");
-  res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
-}
-
-function handlePreflight(req: IncomingMessage, res: ServerResponse): boolean {
-  if ((req.method || "GET") !== "OPTIONS") return false;
-  res.writeHead(204);
-  res.end();
-  return true;
-}
-
 function handleConfigEndpoint(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
 ): boolean {
-  if ((req.url !== "/api/config") || (req.method || "GET") !== "GET") return false;
+  // Strip the query string — a trailing "?_=1" cache-buster must not fall
+  // through this exact-equality match to a 404.
+  const path = (req.url || "/").split("?")[0];
+  if ((path !== "/api/config") || (req.method || "GET") !== "GET") return false;
   res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
   res.end(JSON.stringify({ scope: ctx.scope ?? null, initialized: isProjectInitialized(ctx) }));
   return true;
@@ -511,7 +537,8 @@ function handleWsHealthEndpoint(
   res: ServerResponse,
   wsHealthTracker: WsHealthTracker,
 ): boolean {
-  if (req.url !== "/api/ws/health" || (req.method || "GET") !== "GET") return false;
+  const path = (req.url || "/").split("?")[0];
+  if (path !== "/api/ws/health" || (req.method || "GET") !== "GET") return false;
 
   const snapshot = wsHealthTracker.getSnapshot();
   res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
@@ -524,7 +551,8 @@ function handleReloadSignalEndpoint(
   res: ServerResponse,
   ws: ReturnType<typeof createWebSocketManager>,
 ): boolean {
-  if (req.url !== "/api/reload") return false;
+  const path = (req.url || "/").split("?")[0];
+  if (path !== "/api/reload") return false;
 
   if ((req.method || "GET") !== "POST") {
     res.writeHead(405, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
@@ -574,10 +602,12 @@ async function handleApiRoutes(
   ws: ReturnType<typeof createWebSocketManager>,
   assets: ReturnType<typeof resolveStaticAssets>,
   wsHealthTracker: WsHealthTracker,
+  watcherHandles: WatcherHandles,
 ): Promise<boolean> {
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;
   if (await handleProjectRoute(req, res, ctx)) return true;
+  if (await handleScopedRoute(true, handleGitRoute(req, res, ctx))) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleNotionRoute(req, res, ctx))) return true;
@@ -586,7 +616,12 @@ async function handleApiRoutes(
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
   if (await handleLlmRoute(req, res, ctx)) return true;
   if (await handleProjectSettingsRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(true, handleCommandsRoute(req, res, ctx, ws.broadcast))) return true;
+  if (await handleScopedRoute(true, handleCommandsRoute(req, res, ctx, ws.broadcast, {
+    onProjectInitialized: () => {
+      clearStatusCache();
+      reregisterProjectWatchers(ctx, watcher, ws, watcherHandles);
+    },
+  }))) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
@@ -608,13 +643,13 @@ function createHttpServer(
   ws: ReturnType<typeof createWebSocketManager>,
   assets: ReturnType<typeof resolveStaticAssets>,
   wsHealthTracker: WsHealthTracker,
+  watcherHandles: WatcherHandles,
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    setCorsHeaders(res);
-    if (handlePreflight(req, res)) return;
+    if (handleRequestSecurity(req, res)) return;
     if (handleConfigEndpoint(req, res, ctx)) return;
     if (handleReloadSignalEndpoint(req, res, ws)) return;
-    if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker)) return;
+    if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles)) return;
     res.writeHead(404);
     res.end("Not found");
   });
@@ -799,7 +834,7 @@ export async function startServer(
   const mcpSchemaWatchers = startMcpSchemaWatcher();
   for (const w of mcpSchemaWatchers) watcherHandles.watchers.push(w);
 
-  const server = createHttpServer(ctx, watcher, ws, assets, wsHealthTracker);
+  const server = createHttpServer(ctx, watcher, ws, assets, wsHealthTracker, watcherHandles);
 
   return new Promise<StartResult>((resolvePromise, rejectPromise) => {
     server.once("error", (err: NodeJS.ErrnoException) => {

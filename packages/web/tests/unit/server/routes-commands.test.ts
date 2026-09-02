@@ -743,6 +743,133 @@ describe("commands route — sv-analyze full flow (async)", () => {
     const status = await waitForFinish();
     expect(String(status.error)).toContain("no LLM credentials");
   });
+
+  it("forwards deep as --deep on the synchronous quick path", async () => {
+    execMock.mockResolvedValue({ stdout: "quick analysis ok", stderr: "", error: null });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lite: true, deep: true }),
+    });
+    expect(res.status).toBe(200);
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).toContain("--deep");
+    expect(args).toContain("--lite");
+  });
+
+  it("forwards deep as --deep alongside --full on the async path", async () => {
+    stubManagedRun({ stdout: "Pass 4 complete" });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ full: true, deep: true }),
+    });
+    expect(res.status).toBe(202);
+    await waitForFinish();
+    const args = spawnManagedMock.mock.calls[0][1] as string[];
+    expect(args).toContain("--full");
+    expect(args).toContain("--deep");
+  });
+
+  it("omits --deep when not requested", async () => {
+    execMock.mockResolvedValue({ stdout: "ok", stderr: "", error: null });
+
+    await fetch(`http://127.0.0.1:${port}/api/commands/sv-analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).not.toContain("--deep");
+  });
+});
+
+describe("commands route — export", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    execMock.mockReset();
+    tmpDir = await mkdtemp(join(tmpdir(), "commands-export-"));
+    await mkdir(join(tmpDir, ".rex"), { recursive: true });
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    };
+    const started = await startRouteTestServer((req, res) =>
+      handleCommandsRoute(req, res, ctx),
+    );
+    server = started.server;
+    port = started.port;
+  });
+
+  afterEach(async () => {
+    await closeRouteTestServer(server);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("exports without deploy flags by default", async () => {
+    execMock.mockResolvedValue({ stdout: "[export] done", stderr: "", error: null });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(200);
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).toContain("export");
+    expect(args).not.toContain("--deploy=github");
+    expect(args.some((a) => a.startsWith("--base-path="))).toBe(false);
+    expect(args.some((a) => a.startsWith("--cname="))).toBe(false);
+  });
+
+  it("forwards deploy=github, basePath, and cname as CLI flags", async () => {
+    execMock.mockResolvedValue({ stdout: "[export] pushed to n-dx-dashboard", stderr: "", error: null });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deploy: "github", basePath: "/my-repo/", cname: "dash.example.com" }),
+    });
+    expect(res.status).toBe(200);
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).toContain("--deploy=github");
+    expect(args).toContain("--base-path=/my-repo/");
+    expect(args).toContain("--cname=dash.example.com");
+  });
+
+  it("ignores deploy values other than github", async () => {
+    execMock.mockResolvedValue({ stdout: "ok", stderr: "", error: null });
+
+    await fetch(`http://127.0.0.1:${port}/api/commands/export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deploy: "netlify" }),
+    });
+    const args = execMock.mock.calls[0][1] as string[];
+    expect(args).not.toContain("--deploy=github");
+    expect(args.some((a) => a.startsWith("--deploy="))).toBe(false);
+  });
+
+  it("surfaces a failed export", async () => {
+    execMock.mockResolvedValue({ stdout: "", stderr: "no .sourcevision found", error: new Error("exit 1") });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deploy: "github" }),
+    });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(String(body.error)).toContain("no .sourcevision found");
+  });
 });
 
 describe("commands route — manifest (command reference)", () => {

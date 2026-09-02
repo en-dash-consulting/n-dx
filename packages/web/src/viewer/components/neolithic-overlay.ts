@@ -53,7 +53,6 @@ export interface NeolithicOverlayProps {
 }
 
 export function NeolithicOverlay({ visible, onClose }: NeolithicOverlayProps) {
-  console.log("Rendering NeolithicOverlay", { visible });
   const [frame, setFrame] = useState(0);
 
   // Walk animation — cycle legs while the overlay is visible.

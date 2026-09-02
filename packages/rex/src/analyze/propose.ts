@@ -93,23 +93,49 @@ function normalize(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
+/**
+ * Machine-readable tag markers that must never surface as a human-facing
+ * epic title. `finding:<hash>` and `finding-category:<category>` (see
+ * scanners.ts) are internal correlation IDs, not display names — pushed
+ * onto a result's `tags` purely for the accept/re-analyze feedback loop.
+ * When a global-scope finding has no zone, these can end up as `tags[0]`,
+ * so any fallback that reads "the first tag" as a grouping/display name
+ * must skip them (confirmed live: a Project Scan proposal titled its epic
+ * literally "finding:c508fa330029").
+ */
+function isDisplayableTag(tag: string): boolean {
+  return !tag.startsWith("finding:") && !tag.startsWith("finding-category:");
+}
+
+/** First tag suitable for display/grouping, skipping internal ID markers. */
+function firstDisplayableTag(tags: string[] | undefined): string | undefined {
+  return tags?.find(isDisplayableTag);
+}
+
+/** Nicely-cased default epic name for a result with no other grouping signal. */
+function sourceEpicDefault(source: string): string {
+  return source === "sourcevision"
+    ? "SourceVision"
+    : source === "test"
+      ? "Tests"
+      : source === "package"
+        ? "Package"
+        : "Documentation";
+}
+
 function inferEpic(result: ScanResult): string {
   // Explicit epic field takes precedence (set by scanners or LLM)
   if (result.epic) {
     return result.epic;
   }
-  // Use first tag as epic grouping (scanners set this to directory-inferred epic)
-  if (result.tags && result.tags.length > 0) {
-    return result.tags[0];
+  // Use first displayable tag as epic grouping (scanners set this to a
+  // directory-inferred zone/scope name ahead of any internal ID tags).
+  const tag = firstDisplayableTag(result.tags);
+  if (tag) {
+    return tag;
   }
   // Fall back to source type
-  return result.source === "sourcevision"
-    ? "SourceVision"
-    : result.source === "test"
-      ? "Tests"
-      : result.source === "package"
-        ? "Package"
-        : "Documentation";
+  return sourceEpicDefault(result.source);
 }
 
 /**
@@ -337,9 +363,15 @@ export function buildProposals(results: ScanResult[]): Proposal[] {
       epics.find((e) => normalize(e.name) === epicKey)?.name ??
       features.find((f) => f.epic && normalize(f.epic) === epicKey)?.epic ??
       tasks.find((t) => t.epic && normalize(t.epic) === epicKey)?.epic ??
-      features.find((f) => normalize(inferEpic(f)) === epicKey)?.tags?.[0] ??
-      tasks.find((t) => normalize(inferEpic(t)) === epicKey)?.tags?.[0] ??
-      epicKey;
+      firstDisplayableTag(features.find((f) => normalize(inferEpic(f)) === epicKey)?.tags) ??
+      firstDisplayableTag(tasks.find((t) => normalize(inferEpic(t)) === epicKey)?.tags) ??
+      // No usable name found on any matching result — re-derive the
+      // nicely-cased default rather than falling back to the raw
+      // (lowercased) grouping key itself.
+      sourceEpicDefault(
+        (features.find((f) => normalize(inferEpic(f)) === epicKey) ??
+          tasks.find((t) => normalize(inferEpic(t)) === epicKey))?.source ?? "",
+      );
 
     proposals.push({
       epic: {

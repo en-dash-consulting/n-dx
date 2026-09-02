@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
-import { parseDocument, serializeDocument } from "@n-dx/rex";
+import { parseDocument, serializeDocument, resolveStore } from "@n-dx/rex";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function readPRDFromMd(rexDir: string) {
@@ -14,6 +14,18 @@ function readPRDFromMd(rexDir: string) {
   const result = parseDocument(raw);
   if (!result.ok) throw result.error;
   return result.data;
+}
+
+/**
+ * Read the PRD as the store sees it post-mutation. Route handlers write via
+ * the PRDStore, which persists to the folder-tree backend (`.rex/prd_tree/`)
+ * even when the fixture started from a legacy `prd.md` file — the tree is
+ * the sole writable PRD surface, so verifying a write means reading it back
+ * through the store rather than re-parsing the (now-stale) prd.md.
+ */
+async function readPRDFromStore(rexDir: string) {
+  const store = await resolveStore(rexDir);
+  return store.loadDocument();
 }
 
 /** Minimal PRD document fixture. */
@@ -320,7 +332,7 @@ describe("Rex API routes", () => {
       expect(data.absorbedIds).toEqual(["task-2"]);
 
       // Verify task-2 is gone from disk
-      const prd = readPRDFromMd(rexDir);
+      const prd = await readPRDFromStore(rexDir);
       const taskIds = prd.items[0]!.children!.map((t: { id: string }) => t.id);
       expect(taskIds).toContain("task-1");
       expect(taskIds).not.toContain("task-2");
@@ -338,7 +350,7 @@ describe("Rex API routes", () => {
       });
       expect(res.status).toBe(200);
 
-      const prd = readPRDFromMd(rexDir);
+      const prd = await readPRDFromStore(rexDir);
       const task1 = prd.items[0]!.children!.find((t: { id: string }) => t.id === "task-1");
       expect(task1!.title).toBe("Merged Task");
     });
@@ -560,7 +572,7 @@ describe("Rex API routes", () => {
       expect(data.archivedTo).toBe("archive.json");
 
       // Verify task-3 is gone from PRD
-      const prd = readPRDFromMd(rexDir);
+      const prd = await readPRDFromStore(rexDir);
       const taskIds = prd.items[0]!.children!.map((t: { id: string }) => t.id);
       expect(taskIds).not.toContain("task-3");
       expect(taskIds).toContain("task-1");
@@ -975,6 +987,78 @@ describe("Rex API routes", () => {
       expect(res.status).toBe(400);
       const data = await res.json();
       expect(data.error).toContain("empty content");
+    });
+  });
+
+  // ── Restore endpoint: path-traversal rejection (security regression) ────
+  //
+  // `id` used to flow unvalidated into a filesystem path that
+  // restoreFromBackup recursively force-deletes. These confirm the route
+  // rejects a malicious id with 400 before any stat/restore call runs —
+  // no backup fixtures are created on disk for these cases.
+
+  describe("POST /api/rex/restore", () => {
+    it("rejects an id containing a parent-directory traversal sequence", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "../../../etc/passwd" }),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Invalid snapshot id");
+
+      // The live PRD tree is untouched — the route rejected before any
+      // stat/countFiles/restoreFromBackup call could run.
+      const prd = await readPRDFromStore(rexDir);
+      expect(prd.items).toHaveLength(1);
+      expect(prd.items[0]!.id).toBe("epic-1");
+    });
+
+    it("rejects an id containing a forward slash", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "abc/def" }),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Invalid snapshot id");
+    });
+
+    it("rejects an id containing two consecutive dots", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "abc..def" }),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Invalid snapshot id");
+    });
+
+    it("rejects a missing id before validating format", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain("Missing required field: id");
+    });
+
+    it("still returns 404 for a well-formed but nonexistent snapshot id", async () => {
+      // Proves the fix doesn't over-reject legitimate, encoded snapshot ids —
+      // this one passes validation and falls through to the existence check.
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "2026-01-01T00-00-00-000Z" }),
+      });
+      expect(res.status).toBe(404);
+      const data = await res.json();
+      expect(data.error).toContain("Snapshot not found");
     });
   });
 });

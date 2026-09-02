@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
-import { parseDocument, serializeDocument } from "@n-dx/rex";
+import { parseDocument, serializeDocument, resolveStore } from "@n-dx/rex";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function readPRDFromMd(rexDir: string) {
@@ -14,6 +14,18 @@ function readPRDFromMd(rexDir: string) {
   const result = parseDocument(raw);
   if (!result.ok) throw result.error;
   return result.data;
+}
+
+/**
+ * Read the PRD as the store sees it post-mutation. Route handlers write via
+ * the PRDStore, which persists to the folder-tree backend (`.rex/prd_tree/`)
+ * even when the fixture started from a legacy `prd.md` file — the tree is
+ * the sole writable PRD surface, so verifying a write means reading it back
+ * through the store rather than re-parsing the (now-stale) prd.md.
+ */
+async function readPRDFromStore(rexDir: string) {
+  const store = await resolveStore(rexDir);
+  return store.loadDocument();
 }
 
 /** PRD fixture with requirements. */
@@ -172,7 +184,7 @@ describe("Requirements API routes", () => {
     expect(data.requirement.category).toBe("accessibility");
 
     // Verify persisted
-    const prd = readPRDFromMd(rexDir);
+    const prd = await readPRDFromStore(rexDir);
     const task2 = prd.items[0]!.children![1]!;
     expect(task2.requirements).toHaveLength(1);
     expect(task2.requirements![0]!.title).toBe("Accessibility compliance");
@@ -238,7 +250,7 @@ describe("Requirements API routes", () => {
     expect(data.requirement.id).toBe("req-2"); // ID preserved
 
     // Verify persisted
-    const prd = readPRDFromMd(rexDir);
+    const prd = await readPRDFromStore(rexDir);
     const task1 = prd.items[0]!.children![0]!;
     expect(task1.requirements![0]!.title).toBe("Updated coverage requirement");
   });
@@ -272,7 +284,7 @@ describe("Requirements API routes", () => {
     expect(data.ok).toBe(true);
 
     // Verify removed from disk
-    const prd = readPRDFromMd(rexDir);
+    const prd = await readPRDFromStore(rexDir);
     const task1 = prd.items[0]!.children![0]!;
     expect(task1.requirements).toBeUndefined();
   });
