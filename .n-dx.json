@@ -3,7 +3,7 @@
     "vendor": "claude",
     "model": "claude-sonnet-4-6",
     "claude": {
-      "model": "claude-sonnet-4-6"
+      "model": "claude-sonnet-5"
     },
     "codex": {}
   },
@@ -256,6 +256,31 @@
         "tests-fixtures-sv-evals-medium-app-user": "test",
         "tests-fixtures-sv-evals-toy-app-src": "test"
       }
+    },
+    "isoMap": {
+      "_comment": "Architecture the import graph cannot see. Seams are drawn in the direction control flows at runtime; infrastructure is drawn as its own column. Both are assertions, and the map labels them as such.",
+      "injectionSeams": [
+        {
+          "from": "packages/web/src/server/start.ts",
+          "to": "packages/web/src/server/register-scheduler.ts",
+          "callbacks": [
+            "broadcast",
+            "collectAllIds",
+            "loadPRD",
+            "getAggregator"
+          ],
+          "note": "start.ts imports the scheduler, but the scheduler calls back into server wiring at runtime. Injecting keeps the scheduler from importing a higher tier."
+        },
+        {
+          "from": "packages/core/cli.js",
+          "to": "packages/core/pair-programming.js",
+          "callbacks": [
+            "registerChild"
+          ],
+          "note": "cli.js already imports pair-programming, so the child-process tracker can only travel forwards as a callback. Defaults to a no-op, which silently opts a caller out of Ctrl-C cleanup."
+        }
+      ],
+      "infrastructure": []
     }
   },
   "_initVersion": "0.5.1",
@@ -264,6 +289,6 @@
     "name": "n-dx"
   },
   "claude": {
-    "model": "claude-sonnet-4-6"
+    "model": "claude-sonnet-5"
   }
 }
