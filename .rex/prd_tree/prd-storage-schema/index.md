@@ -2,10 +2,12 @@
 id: "a4992835-70eb-4d9d-a79f-d0577b8927bc"
 level: "epic"
 title: "PRD Storage & Schema"
-status: "in_progress"
+status: "completed"
 startedAt: "2026-05-06T13:26:50.051Z"
+completedAt: "2026-09-02T13:09:24.824Z"
+endedAt: "2026-09-02T13:09:24.824Z"
 description: "PRD persistence model: folder-tree storage, markdown serialization, schema evolution, visibility/reporting, branch attribution, and the migration history that produced the current single-source-of-truth tree at .rex/prd_tree/."
-lastModified: "2026-09-01T14:30:38.958Z"
+lastModified: "2026-09-02T13:09:24.829Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
 
@@ -44,4 +46,4 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Single-Child Index Suppression and Front-Matter Deduplication Fix](./single-child-index-suppression-and/index.md) | completed |
 | [Test Suite Updates for Folder-Tree PRD Storage](./test-suite-updates-for-folder-tree-prd/index.md) | completed |
 | [Title-Based PRD Item File Naming Convention](./title-based-prd-item-file-naming/index.md) | completed |
-| [Make finding-derived task titles distinctive at generation time](./make-finding-derived-task-titles.md) | pending |
+| [Make finding-derived task titles distinctive at generation time](./make-finding-derived-task-titles.md) | completed |

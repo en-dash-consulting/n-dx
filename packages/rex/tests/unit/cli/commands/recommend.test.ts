@@ -1148,3 +1148,109 @@ describe("cmdRecommend --actionable-only", () => {
     expect(tasks).toHaveLength(2);
   });
 });
+
+// ── Feature-title distinctiveness ────────────────────────────────────────────
+
+/**
+ * Two runs over the same zone+category used to produce the same feature title.
+ *
+ * `Fix ${category} in ${zone} (N findings)` carries nothing about *which*
+ * findings, so the PRD accumulated four features called "Fix move-file in
+ * web-viewer (1 finding)", each about a different file. The task titles below
+ * a feature already carried the finding message; features had nothing.
+ */
+describe("cmdRecommend feature titles name their subject", () => {
+  let tmpDir: string;
+  let cmdRecommend: typeof import("../../../../src/cli/commands/recommend.js")["cmdRecommend"];
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.doMock("@n-dx/llm-client", async () => ({
+      ...(await vi.importActual<typeof import("@n-dx/llm-client")>("@n-dx/llm-client")),
+      PROJECT_DIRS: { REX: ".rex", SOURCEVISION: ".sourcevision" },
+      formatUsage: () => "",
+      toCanonicalJSON: (value: unknown) => JSON.stringify(value, null, 2),
+      result: () => {},
+      info: () => {},
+      setQuiet: () => {},
+      isQuiet: () => false,
+    }));
+    ({ cmdRecommend } = await import("../../../../src/cli/commands/recommend.js"));
+
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-recommend-titles-"));
+    await writeFixtureProject(tmpDir);
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  /** Write findings that all sit in one zone+category, so they form one feature. */
+  async function writeGroup(
+    findings: Array<{ message: string; file?: string }>,
+  ): Promise<void> {
+    await writeFile(
+      join(tmpDir, ".sourcevision", "zones.json"),
+      JSON.stringify({
+        findings: findings.map((f) => ({
+          severity: "warning",
+          category: "move-file",
+          type: "move-file",
+          scope: "web-viewer",
+          message: f.message,
+          file: f.file,
+        })),
+      }),
+      "utf-8",
+    );
+  }
+
+  it("names the file when the group is about exactly one", async () => {
+    await writeGroup([{ message: "pinned to the wrong zone", file: "packages/web/src/viewer/use-polling.ts" }]);
+
+    await cmdRecommend(tmpDir, { accept: "true" });
+
+    const [feature] = filterByLevel(await readPrdItems(tmpDir), "feature");
+    expect(feature.title).toContain("use-polling.ts");
+    expect(feature.title).toContain("(1 finding)");
+  });
+
+  it("gives two single-file groups different titles", async () => {
+    // The exact shape that produced four identical features.
+    await writeGroup([{ message: "pinned to the wrong zone", file: "a/use-polling.ts" }]);
+    await cmdRecommend(tmpDir, { accept: "true" });
+    const first = filterByLevel(await readPrdItems(tmpDir), "feature")[0].title;
+
+    await rm(tmpDir, { recursive: true, force: true });
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-recommend-titles-"));
+    await writeFixtureProject(tmpDir);
+    await writeGroup([{ message: "pinned to the wrong zone", file: "b/external.ts" }]);
+    await cmdRecommend(tmpDir, { accept: "true" });
+    const second = filterByLevel(await readPrdItems(tmpDir), "feature")[0].title;
+
+    expect(first).not.toBe(second);
+  });
+
+  it("falls back to the first finding's message when files differ", async () => {
+    await writeGroup([
+      { message: "external.ts sits in the wrong zone", file: "a.ts" },
+      { message: "another thing entirely", file: "b.ts" },
+    ]);
+
+    await cmdRecommend(tmpDir, { accept: "true" });
+
+    const [feature] = filterByLevel(await readPrdItems(tmpDir), "feature");
+    expect(feature.title).toContain("external.ts sits in the wrong zone");
+    expect(feature.title).toContain("(2 findings)");
+  });
+
+  it("keeps the bare title when findings offer no subject at all", async () => {
+    await writeGroup([{ message: "" }, { message: "" }]);
+
+    await cmdRecommend(tmpDir, { accept: "true" });
+
+    const [feature] = filterByLevel(await readPrdItems(tmpDir), "feature");
+    expect(feature.title).toBe("Fix move-file in web-viewer (2 findings)");
+  });
+});

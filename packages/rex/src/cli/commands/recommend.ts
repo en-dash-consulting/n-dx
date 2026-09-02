@@ -259,6 +259,32 @@ function findingZone(f: Finding): string {
   return f.scope ?? "global";
 }
 
+/**
+ * Name what a zone+category group is actually about, so two runs over the same
+ * group do not produce the same title.
+ *
+ * `Fix ${category} in ${zone}` is identical for every run that finds anything
+ * of that category in that zone, which is how the PRD ended up with four
+ * features called "Fix move-file in web-viewer (1 finding)" — each about a
+ * different file. The tasks below already avoid this by carrying the finding's
+ * own message; features had nothing.
+ *
+ * Prefers the file when the group is about exactly one, since that is what
+ * distinguished those four. Falls back to the first finding's message, the
+ * same discriminator the task titles use. Returns undefined when the findings
+ * offer neither, in which case there is genuinely nothing to say and the bare
+ * title stands.
+ */
+function groupSubject(items: Finding[]): string | undefined {
+  const files = new Set(items.map((f) => f.file).filter((f): f is string => Boolean(f)));
+  if (files.size === 1) {
+    const only = [...files][0];
+    return only.split("/").pop() || only;
+  }
+  const message = items[0]?.message?.trim();
+  return message ? message.slice(0, 60) : undefined;
+}
+
 function mapFindingsToRecommendations(
   findings: Finding[],
   maxFindingsPerTask = 3,
@@ -302,10 +328,15 @@ function mapFindingsToRecommendations(
       featureSeverity[f.severity] = (featureSeverity[f.severity] ?? 0) + 1;
     }
 
+    const subject = groupSubject(items);
+    const countSuffix = `(${items.length} finding${items.length === 1 ? "" : "s"})`;
+
     recommendations.push({
       id: featureId,
       parentId: epicId,
-      title: `Fix ${category} in ${zone} (${items.length} finding${items.length === 1 ? "" : "s"})`,
+      title: subject
+        ? `Fix ${category} in ${zone}: ${subject} ${countSuffix}`
+        : `Fix ${category} in ${zone} ${countSuffix}`,
       level: "feature",
       description: items.map((f) => `- ${f.message}`).join("\n"),
       priority: hasCritical ? "critical" : "high",
