@@ -139,6 +139,34 @@ describe.skipIf(!HAS_CODEX)("codex flag surface (installed CLI)", () => {
     }
   });
 
+  // `--help` documents flags, not the values a `-c key=value` expression may
+  // carry, so the checks above cannot see a wrong config *value*. That blind
+  // spot is not hypothetical: `mapApprovalToCodexFlag` returned "default" and
+  // "full-auto" — flag names, not `approval_policy` variants — and codex
+  // rejects both. `--strict-config` makes the CLI adjudicate: it validates
+  // every `-c` override and exits before reading a prompt, so this costs one
+  // process and never reaches the model.
+  it("codex accepts every -c override the compiler emits, value included", () => {
+    for (const [label, policy] of POLICIES) {
+      const args = compileCodexPolicyFlags(policy);
+      const overrides = args.filter((a, i) => args[i - 1] === "-c");
+
+      for (const override of overrides) {
+        const probe = spawnSync("codex", ["exec", "--strict-config", "-c", override], {
+          encoding: "utf-8",
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        const output = `${probe.stdout ?? ""}${probe.stderr ?? ""}`;
+
+        expect(
+          output,
+          `${label}: codex rejected "-c ${override}". Its own message names the ` +
+            `accepted variants — map n-dx's policy onto one of those.`,
+        ).not.toMatch(/unknown (variant|configuration field)/);
+      }
+    }
+  });
+
   it("--full-auto is gone from codex exec — the flag this test was written for", () => {
     // Pins the specific regression. If a future codex restores --full-auto
     // this fails, and the mapping can be reconsidered deliberately rather
