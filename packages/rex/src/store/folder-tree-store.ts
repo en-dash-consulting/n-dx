@@ -26,7 +26,7 @@ import { findItem, insertChild, updateInTree, removeFromTree } from "../core/tre
 import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
-import { PRD_TREE_DIRNAME } from "./paths.js";
+import { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 import { stampModified, stampActor } from "../core/sync.js";
 
@@ -105,7 +105,7 @@ export class FolderTreeStore implements PRDStore {
     }
     // The lock file lives in rexDir, which may not exist on first save.
     await mkdir(this.rexDir, { recursive: true });
-    await withLock(this.path("prd.lock"), () => this.writeTree(doc));
+    await withLock(prdLockPath(this.rexDir), () => this.writeTree(doc));
   }
 
   async getItem(id: string): Promise<PRDItem | null> {
@@ -243,7 +243,7 @@ export class FolderTreeStore implements PRDStore {
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
     // The lock file lives in rexDir, which may not exist on first write.
     await mkdir(this.rexDir, { recursive: true });
-    const lockPath = this.path("prd.lock");
+    const lockPath = prdLockPath(this.rexDir);
     return withLock(lockPath, async () => {
       const doc = await this.loadDocument();
       const result = await fn(doc);

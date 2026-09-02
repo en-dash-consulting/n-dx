@@ -19,6 +19,8 @@
 # Agent runs, locks, and session state
 .hench/runs/
 .hench/locks/
+# Adversarial-review reports, one JSON per run (`ndx work --review`)
+.hench/reviews/
 # Per-session token-usage watermarks written by `hench record`
 .hench/usage-cursors/
 .hench-commit-msg.txt
@@ -26,7 +28,7 @@
 # Rex ephemeral state
 .rex/.backups/
 .rex/.cache/
-.rex/prd.json.lock
+.rex/*.lock
 .rex/pending-proposals.json
 .rex/acknowledged-findings.json
 .rex/execution-log*.jsonl

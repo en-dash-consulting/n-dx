@@ -7,6 +7,7 @@ import {
   groupByCommand,
   groupByTimePeriod,
   checkBudget,
+  totalTokens,
 } from "../../core/token-usage.js";
 import { loadTokenUsageConfig, readTokenUsageLog } from "../../core/token-store.js";
 import { formatAggregateTokenUsage, formatBudgetWarnings } from "./token-format.js";
@@ -28,6 +29,23 @@ function fmt(n: number): string {
 }
 
 /**
+ * Render the billed-token split for one usage record. Cache segments appear
+ * only when non-zero, so a project that never caches keeps the familiar
+ * "N in / N out" shape.
+ */
+function splitTokens(usage: {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+}): string {
+  const parts = [`${fmt(usage.inputTokens)} in`, `${fmt(usage.outputTokens)} out`];
+  if (usage.cacheCreationTokens > 0) parts.push(`${fmt(usage.cacheCreationTokens)} cache write`);
+  if (usage.cacheReadTokens > 0) parts.push(`${fmt(usage.cacheReadTokens)} cache read`);
+  return parts.join(" / ");
+}
+
+/**
  * Format detailed per-package breakdown for tree output.
  * Shows input/output split and call count for each package with usage.
  */
@@ -40,10 +58,10 @@ function formatPackageDetail(usage: AggregateTokenUsage): string[] {
   ];
 
   for (const { name, pkg, unit } of entries) {
-    const total = pkg.inputTokens + pkg.outputTokens;
+    const total = totalTokens(pkg);
     if (total === 0) continue;
     lines.push(
-      `  ${name}: ${fmt(total)} tokens (${fmt(pkg.inputTokens)} in / ${fmt(pkg.outputTokens)} out) — ${pkg.calls} ${unit}`,
+      `  ${name}: ${fmt(total)} tokens (${splitTokens(pkg)}) — ${pkg.calls} ${unit}`,
     );
   }
 
@@ -57,10 +75,10 @@ function formatCommandDetail(commands: CommandTokenUsage[]): string[] {
   const lines: string[] = [];
 
   for (const cmd of commands) {
-    const total = cmd.inputTokens + cmd.outputTokens;
+    const total = totalTokens(cmd);
     const unit = cmd.package === "hench" ? "runs" : "calls";
     lines.push(
-      `  ${cmd.package} ${cmd.command}: ${fmt(total)} tokens (${fmt(cmd.inputTokens)} in / ${fmt(cmd.outputTokens)} out) — ${cmd.calls} ${unit}`,
+      `  ${cmd.package} ${cmd.command}: ${fmt(total)} tokens (${splitTokens(cmd)}) — ${cmd.calls} ${unit}`,
     );
   }
 
@@ -74,9 +92,19 @@ function formatPeriodBuckets(buckets: PeriodBucket[]): string[] {
   const lines: string[] = [];
 
   for (const bucket of buckets) {
-    const total = bucket.usage.totalInputTokens + bucket.usage.totalOutputTokens;
+    const u = bucket.usage;
+    const total =
+      u.totalInputTokens +
+      u.totalOutputTokens +
+      u.totalCacheCreationTokens +
+      u.totalCacheReadTokens;
     lines.push(
-      `  ${bucket.period}: ${fmt(total)} tokens (${fmt(bucket.usage.totalInputTokens)} in / ${fmt(bucket.usage.totalOutputTokens)} out) — ${bucket.estimatedCost.total}`,
+      `  ${bucket.period}: ${fmt(total)} tokens (${splitTokens({
+        inputTokens: u.totalInputTokens,
+        outputTokens: u.totalOutputTokens,
+        cacheCreationTokens: u.totalCacheCreationTokens,
+        cacheReadTokens: u.totalCacheReadTokens,
+      })}) — ${bucket.estimatedCost.total}`,
     );
   }
 
@@ -156,6 +184,8 @@ export async function cmdUsage(
           total: b.estimatedCost.total,
           inputCost: b.estimatedCost.inputCost,
           outputCost: b.estimatedCost.outputCost,
+          cacheWriteCost: b.estimatedCost.cacheWriteCost,
+          cacheReadCost: b.estimatedCost.cacheReadCost,
         },
       }));
       output.group = group;

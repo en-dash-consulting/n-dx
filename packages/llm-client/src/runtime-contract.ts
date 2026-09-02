@@ -109,9 +109,14 @@ export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access"
  *
  * These map to vendor-specific CLI flags:
  * - Claude: `--allowed-tools` allowlist (tools not listed require approval)
- * - Codex: `--dangerously-bypass-approvals-and-sandbox` where supported,
- *   otherwise plain `--sandbox` (`codex exec` has no separate approval-prompt
- *   surface, so `never` reduces to an explicit sandbox mode)
+ * - Codex: `--dangerously-bypass-approvals-and-sandbox` for
+ *   `danger-full-access` + `never`, otherwise `--sandbox <mode>` plus
+ *   `-c approval_policy=<value>`
+ *
+ * `codex exec` has no approval *flag*, which is why the policy travels as a
+ * `-c` config override — but it does raise approval requests (hence its
+ * `--approve-for-me`), so `never` is load-bearing for an unattended run
+ * rather than a no-op that reduces to the sandbox mode.
  */
 export type ApprovalPolicy = "on-request" | "never";
 

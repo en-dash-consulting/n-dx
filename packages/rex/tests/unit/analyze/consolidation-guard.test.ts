@@ -95,7 +95,7 @@ describe("buildConsolidationGuardPrompt", () => {
     const proposals = [makeProposal("Auth", 2)];
     const prompt = buildConsolidationGuardPrompt(proposals, 10, 2);
 
-    expect(prompt).toContain('"title": "Auth"');
+    expect(prompt).toContain('"title":"Auth"');
   });
 
   it("includes task quality rules and few-shot example", () => {

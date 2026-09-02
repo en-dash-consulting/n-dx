@@ -23,7 +23,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { buildIsoSkill } from "../../scripts/build-iso-skill.mjs";
@@ -31,6 +31,7 @@ import { buildIsoSkill } from "../../scripts/build-iso-skill.mjs";
 const ROOT = join(import.meta.dirname, "../..");
 const SKILL_DIR = join(ROOT, ".claude/skills/iso-map");
 const SCRIPT = join(SKILL_DIR, "scripts/iso-map.mjs");
+const BUILDER = join(ROOT, "scripts/build-iso-skill.mjs");
 
 describe("iso-map skill", { timeout: 120_000 }, () => {
   it("the committed bundle matches what the generator produces", async () => {
@@ -56,6 +57,68 @@ describe("iso-map skill", { timeout: 120_000 }, () => {
     expect(imports.length).toBeGreaterThan(0);
     for (const spec of imports) {
       expect(spec.startsWith("node:"), `unexpected runtime dependency: ${spec}`).toBe(true);
+    }
+  });
+
+  // The suite otherwise imports buildIsoSkill() directly, so the CLI path was
+  // never executed. That let an entrypoint guard comparing import.meta.url to
+  // `file://${argv[1]}` ship: it never matched on Windows, so the script exited
+  // 0 having done nothing, while CLAUDE.md, the generated banner and this
+  // test's own failure message all told you to run it.
+  it("runs as a spawned script rather than exiting silently", () => {
+    const out = execFileSync(process.execPath, [BUILDER, "--check"], {
+      cwd: ROOT,
+      encoding: "utf-8",
+      timeout: 120_000,
+    });
+    expect(out).toContain("iso-skill: up to date.");
+  });
+
+  // Reached through a path containing a space, so this fails on POSIX too and
+  // not only on Windows: the old guard concatenated `file://` + argv[1], which
+  // leaves the space unencoded, while import.meta.url percent-encodes it.
+  it("runs when invoked through a path containing a space", () => {
+    const box = mkdtempSync(join(tmpdir(), "iso skill "));
+    const linked = join(box, "repo");
+    try {
+      symlinkSync(ROOT, linked, "dir");
+    } catch {
+      rmSync(box, { recursive: true, force: true });
+      return; // no symlink permission (some CI sandboxes) — nothing to assert
+    }
+    try {
+      const out = execFileSync(
+        process.execPath,
+        [join(linked, "scripts/build-iso-skill.mjs"), "--check"],
+        { cwd: ROOT, encoding: "utf-8", timeout: 120_000 },
+      );
+      expect(out).toContain("iso-skill: up to date.");
+    } finally {
+      rmSync(box, { recursive: true, force: true });
+    }
+  });
+
+  it("reports staleness through the CLI, not just the imported function", async () => {
+    const original = readFileSync(SCRIPT, "utf-8");
+    writeFileSync(SCRIPT, `${original}\n// drift\n`, "utf-8");
+    try {
+      let status = 0;
+      let output = "";
+      try {
+        execFileSync(process.execPath, [BUILDER, "--check"], {
+          cwd: ROOT,
+          encoding: "utf-8",
+          timeout: 120_000,
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+      } catch (err) {
+        status = err.status ?? 1;
+        output = `${err.stdout ?? ""}${err.stderr ?? ""}`;
+      }
+      expect(status).not.toBe(0);
+      expect(output).toContain("out of date");
+    } finally {
+      writeFileSync(SCRIPT, original, "utf-8");
     }
   });
 

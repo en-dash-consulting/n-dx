@@ -150,6 +150,7 @@ export type {
 export {
   resolveModel,
   resolveVendorModel,
+  resolveTaskModel,
   resolveReviewModel,
   NEWEST_MODELS,
   TIER_MODELS,

@@ -49,8 +49,8 @@ describe("buildDecompositionPrompt", () => {
     const task = makeTask();
     const prompt = buildDecompositionPrompt(task, 2);
 
-    expect(prompt).toContain('"title": "Implement authentication system"');
-    expect(prompt).toContain('"loe": 4');
+    expect(prompt).toContain('"title":"Implement authentication system"');
+    expect(prompt).toContain('"loe":4');
   });
 
   it("includes the threshold in the prompt", () => {
@@ -110,7 +110,7 @@ describe("buildDecompositionPrompt", () => {
     const task = makeTask();
     const prompt = buildDecompositionPrompt(task, 2);
 
-    expect(prompt).toContain("ONLY a valid JSON array");
+    expect(prompt).toContain("ONLY a valid, minified JSON array");
   });
 
   it("instructs not to add new functionality", () => {

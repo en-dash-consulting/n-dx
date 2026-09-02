@@ -406,8 +406,13 @@ export const TASK_QUALITY_RULES = `Task quality:
 
 /**
  * Strict output format instruction shared by all PRD prompts.
+ *
+ * Asks for minified JSON, not merely valid JSON. Output tokens cost roughly
+ * 5x input on every tier, so the response format is where the saving is:
+ * indentation on a nested proposal array is a meaningful share of the
+ * response, and it buys nothing that `JSON.parse` cares about.
  */
-export const OUTPUT_INSTRUCTION = `Respond with ONLY a valid JSON array. No explanation, no markdown fences, no commentary — just the JSON.`;
+export const OUTPUT_INSTRUCTION = `Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON.`;
 
 // ── Text / Markdown utilities ──
 

@@ -4,7 +4,7 @@ import { mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir, homedir } from "node:os";
-import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
+import { DEFAULT_TIMEOUT, withSandboxedClaudeConfig } from "./e2e-helpers.js";
 
 const isWin = process.platform === "win32";
 const PATH_SEP = isWin ? ";" : ":";
@@ -60,7 +60,7 @@ function run(args, opts = {}) {
     encoding: "utf-8",
     timeout: DEFAULT_TIMEOUT,
     stdio: "pipe",
-    ...opts,
+    ...withSandboxedClaudeConfig(opts),
   });
 }
 
@@ -88,7 +88,7 @@ function runCapture(args, opts = {}) {
     encoding: "utf-8",
     timeout: DEFAULT_TIMEOUT,
     stdio: "pipe",
-    ...opts,
+    ...withSandboxedClaudeConfig(opts),
   });
   return { stdout: res.stdout ?? "", stderr: res.stderr ?? "", status: res.status };
 }

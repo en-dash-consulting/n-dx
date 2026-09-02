@@ -28,7 +28,7 @@ import { toolRexAppendLog } from "../../tools/rex.js";
 import {checkTokenBudget} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
-import { section, subsection, stream, info, withHeartbeat } from "../../types/output.js";
+import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
 import { isSpinningRun } from "../analysis/spin.js";
 import {
   buildReviewSystemPrompt,
@@ -36,9 +36,30 @@ import {
   readReviewReport,
   reviewReportPath,
   formatReviewSummary,
-  unresolvedFindings,
+  classifyUnresolved,
+  formatUnresolvedWarning,
 } from "../analysis/adversarial-review.js";
 import type { ReviewPassOutcome } from "../analysis/adversarial-review.js";
+import { snapshotDirtyState, diffDirtyState } from "../analysis/review-repairs.js";
+import type { DirtySnapshot } from "../analysis/review-repairs.js";
+import { ensureWarmParent } from "./orientation.js";
+import {
+  resolveSessionStrategy,
+  clearSessionCache,
+  readBatchChain,
+  advanceBatchChain,
+  clearBatchChain,
+  isBatchChainUsable,
+} from "./session-cache.js";
+import { buildTaskBoundaryDivider } from "./batch-divider.js";
+import {
+  createSpawnLedger,
+  recordSpawn,
+  spawnBudgetExhausted,
+  describeSpawnBudget,
+  type SpawnReason,
+} from "./spawn-budget.js";
+import { DEFAULT_TASKS_PER_SESSION } from "./session-cache.js";
 import { mkdir, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
@@ -49,7 +70,7 @@ import {
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
-import { LLM_VENDOR, resolveVendorModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -241,6 +262,34 @@ export function buildRetryNotice(
     `Files written to disk by the prior attempt still exist. ` +
     `Check the current state of files before re-doing any work.\n---`
   );
+}
+
+/**
+ * Whether a retry should carry the cold-restart notice.
+ *
+ * The notice tells a *fresh* session that files from a prior attempt already
+ * exist on disk. A resumed session **was** that attempt, so sending it would
+ * restate what the model just did and grow the prompt on every retry — the
+ * exact cost retry-via-resume exists to remove.
+ */
+export function shouldSendRetryNotice(
+  attempt: number,
+  retryResumeSessionId: string | undefined,
+): boolean {
+  return attempt > 0 && !retryResumeSessionId;
+}
+
+/**
+ * Session a retry should resume, or undefined for a cold retry.
+ *
+ * Resume is Claude-CLI-only today; other vendors have no equivalent on this
+ * path and fall back to a cold spawn, which is why the notice still exists.
+ */
+export function resolveRetryResume(
+  vendor: string,
+  lastSessionId: string | undefined,
+): string | undefined {
+  return vendor === LLM_VENDOR.CLAUDE && lastSessionId ? lastSessionId : undefined;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -880,10 +929,20 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
      *
      * Only the first value is kept: a single spawn is a single session, and
      * ignoring later lines means a malformed or adversarial payload late in
-     * the stream cannot redirect a subsequent `--resume` at another session.
+     * the stream cannot redirect a subsequent resume at another session.
+     *
+     * Which event and key carry the id is the adapter's business — Claude
+     * stamps `session_id` on many lines, codex emits one `thread.started`
+     * with `thread_id`. An adapter that declares nothing falls back to the
+     * Claude shape, which is what this function used to hardcode.
      */
     function captureSessionId(rawJson: unknown): void {
       if (result.sessionId) return;
+      if (adapter.extractSessionId) {
+        const id = adapter.extractSessionId(rawJson);
+        if (id) result.sessionId = id;
+        return;
+      }
       if (!rawJson || typeof rawJson !== "object") return;
       const id = (rawJson as Record<string, unknown>).session_id;
       if (typeof id === "string" && id) result.sessionId = id;
@@ -1133,6 +1192,16 @@ async function runAdversarialReviewPass(
       `${ctx.reviewModel || "the loaded model"}...`,
   );
 
+  // Bracket the reviewer spawn with working-tree snapshots so its repairs can
+  // be identified — and committed — without sweeping pre-existing dirt. A
+  // failed snapshot degrades to "repairs unknown", never to a failed review.
+  let preReviewState: DirtySnapshot | undefined;
+  try {
+    preReviewState = await snapshotDirtyState(inv.projectDir);
+  } catch {
+    preReviewState = undefined;
+  }
+
   let result: SpawnResult;
   try {
     result = await withHeartbeat(
@@ -1179,22 +1248,35 @@ async function runAdversarialReviewPass(
 
   for (const line of formatReviewSummary(outcome.report)) info(line);
 
-  const unresolved = unresolvedFindings(outcome.report);
-  if (unresolved.length > 0) {
-    info("");
-    info(
-      `⚠ ${unresolved.length} must-fix finding(s) were not repaired. ` +
-        "Inspect them before trusting this commit.",
-    );
+  const unresolved = classifyUnresolved(outcome.report);
+  for (const line of formatUnresolvedWarning(outcome.report)) info(line);
+
+  // What the reviewer actually changed, from the snapshot pair. `.rex/` is
+  // the completion-metadata commit's territory and `.hench/` holds the report
+  // itself; neither is a repair. Computed even when the report claims
+  // `fixesApplied: false` — the tree, not the report, is the authority.
+  let repairedFiles: string[] | undefined;
+  if (preReviewState) {
+    try {
+      const postReviewState = await snapshotDirtyState(inv.projectDir);
+      repairedFiles = diffDirtyState(preReviewState, postReviewState).filter(
+        (path) => !path.startsWith(".rex/") && !path.startsWith(".hench/"),
+      );
+    } catch {
+      repairedFiles = undefined;
+    }
   }
 
   inv.run.review = {
     model: ctx.reviewModel,
     resumedSession: !!resumeSessionId,
     findingCount: outcome.report.findings.length,
-    unresolvedCount: unresolved.length,
+    unresolvedCount: unresolved.all.length,
+    unrepairedMustFixCount: unresolved.unrepairedMustFix.length,
+    failedActionCount: unresolved.failedActions.length,
     fixesApplied: outcome.report.fixesApplied,
     reportPath,
+    repairedFiles,
   };
 
   return outcome;
@@ -1495,6 +1577,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     approvals: policy.approvals,
     parseMode: adapter.parseMode,
     invocationContext: "cli",
+    // The routed tier for the agent loop — "standard" unless llm.routes
+    // reroutes agent.execute — so `ndx usage` can report spend per tier.
+    weight: resolveTaskModel("agent.execute", llmConfig, { vendor }).tier,
   });
 
   // CLI-specific: load config for CLI path and env resolution
@@ -1568,6 +1653,81 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       : `Agent Run${opts.spawnModel ? ` (${opts.spawnModel})` : ""}`,
   );
 
+  // Warm-parent session: when the fork strategy is available, establish (or
+  // reuse) one read-only orientation session and fork every task spawn from
+  // it, so no task re-pays cold-start context or re-explores the repo.
+  // `cliLoop` runs once per task, so the cache — not loop plumbing — is what
+  // makes orientation happen once per loop and persist across invocations.
+  const sessionStrategy = resolveSessionStrategy({
+    vendor,
+    provider: config.provider,
+    configured: config.sessionStrategy,
+  });
+  let warmParentId: string | undefined;
+
+  // Batch strategy: resume the *previous task's* session so the transcript
+  // accumulates, rather than forking a fixed orientation. `cliLoop` runs once
+  // per task, so the chain lives in the cache file and is bounded by
+  // tasksPerSession — an unbounded shared transcript costs more on every later
+  // turn and lets one task's framing bleed into the next.
+  let batchResumeId: string | undefined;
+  let batchTaskNumber = 1;
+  let batchPreviousTaskTitle: string | undefined;
+  const tasksPerSession = config.tasksPerSession ?? DEFAULT_TASKS_PER_SESSION;
+  if (sessionStrategy === "batch") {
+    const chain = await readBatchChain(henchDir);
+    const verdict = isBatchChainUsable(chain, {
+      vendor,
+      model: opts.spawnModel ?? "",
+      tasksPerSession,
+    });
+    if (verdict.usable && chain) {
+      batchResumeId = chain.sessionId;
+      batchTaskNumber = chain.tasksUsed + 1;
+      batchPreviousTaskTitle = chain.lastTaskTitle;
+      detail(
+        `Batch session: continuing ${chain.sessionId.slice(0, 8)} ` +
+          `(task ${batchTaskNumber} of up to ${tasksPerSession})`,
+      );
+    } else {
+      // Any rejection means this task opens a new session. Drop the old chain
+      // so a later failure cannot resume a session we have stopped counting.
+      if (chain) await clearBatchChain(henchDir);
+      detail(`Batch session: starting fresh (${verdict.usable ? "new chain" : verdict.reason})`);
+    }
+  }
+
+  if (sessionStrategy === "fork") {
+    warmParentId = await ensureWarmParent({
+      adapter,
+      vendor,
+      cliBinary,
+      cliEnv,
+      policy,
+      henchDir,
+      projectDir,
+      model: opts.spawnModel ?? "",
+      maxAgeHours: config.parentMaxAgeHours,
+      spawn: (spawnConfig) =>
+        spawnWithAdapter({
+          adapter,
+          spawnConfig,
+          cliBinary,
+          cliEnv,
+          cwd: projectDir,
+          tokenMetadata,
+        }),
+    });
+    if (warmParentId) run.parentSessionId = warmParentId;
+  }
+
+  // A cached parent is validated against its own metadata, not against the
+  // vendor's session store — so a parent the CLI has since forgotten would
+  // otherwise fail every task in the loop. The first forked spawn that fails
+  // drops the cache, disables forking for the rest of the run, and re-spawns
+  // cold without consuming retry budget (the same shape as a plan re-spawn).
+  let forkFallbackUsed = false;
+
   // Plan-mode bookkeeping: when the spawned Claude session emits an
   // ExitPlanMode tool_use we kill the spawn, prompt the user (or auto-accept
   // when no TTY is attached), and re-spawn with permissionMode=acceptEdits
@@ -1576,11 +1736,45 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   let currentPermissionMode = opts.permissionMode;
   let planModeAppendix: string | undefined;
   const MAX_PLAN_RESPAWNS = 2;
+  /**
+   * Plan re-spawns already made, charged against the retry budget.
+   *
+   * The outer loop's effective attempt allowance is reduced by this, so a
+   * task that spends its budget entering plan mode does not additionally get
+   * a full set of failure retries.
+   */
+  let planRespawnsChargedToRetries = 0;
   let planRespawns = 0;
   let cancelledByUser = false;
+  /**
+   * One budget for every spawn this task makes, whatever the reason.
+   *
+   * The retry counter alone cannot bound this: some re-spawn paths
+   * deliberately avoid charging it (a plan-mode interception, the
+   * stale-parent fork fallback) because nothing was learned about the task.
+   * The ledger counts those too, so the allowances add up instead of
+   * multiplying.
+   */
+  const spawnLedger = createSpawnLedger(config.maxSpawnsPerTask);
+  /** Reason attributed to the next spawn. */
+  let nextSpawnReason: SpawnReason = "initial";
+  /**
+   * Session to resume for a retry, when the failed attempt reported one.
+   *
+   * Resuming carries what the attempt already did, so the retry notice's
+   * "check the current state of files before re-doing any work" is both
+   * redundant and a prompt-growth cost on every retry.
+   */
+  let retryResumeSessionId: string | undefined;
+  /**
+   * Session the most recent spawn ran in. On a plain resume the vendor reports
+   * the session it continued, so this is the transcript the next batched task
+   * should join.
+   */
+  let lastSessionId: string | undefined;
 
   try {
-    for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= retryConfig.maxRetries - planRespawnsChargedToRetries; attempt++) {
       let result!: SpawnResult;
       let attemptAccumulator: EventAccumulator | undefined;
 
@@ -1589,10 +1783,27 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
       // triggering ExitPlanMode (or when the plan-respawn cap is hit / the
       // user rejects the plan).
       while (true) {
+        // Batch turns after the first arrive in a conversation that already
+        // finished a task, so the brief needs an explicit boundary or it
+        // reads as a continuation of the previous one.
+        const boundaryDivider = batchResumeId
+          ? buildTaskBoundaryDivider({
+              taskNumber: batchTaskNumber,
+              tasksPerSession,
+              previousTaskTitle: batchPreviousTaskTitle,
+            })
+          : "";
+
+        // The retry notice exists to tell a *fresh* session that files from a
+        // prior attempt are already on disk. A resumed session was that
+        // attempt, so the notice would restate what it just did and grow the
+        // prompt on every retry.
+        const needsRetryNotice = shouldSendRetryNotice(attempt, retryResumeSessionId);
         const briefContent =
-          (attempt === 0
-            ? boundedBriefText
-            : boundedBriefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns)) +
+          boundaryDivider +
+          (needsRetryNotice
+            ? boundedBriefText + buildRetryNotice(attempt, retryConfig.maxRetries, accumulated.turns)
+            : boundedBriefText) +
           (planModeAppendix ? `\n\n${planModeAppendix}` : "");
 
         // Build the per-attempt PromptEnvelope. On the first attempt with
@@ -1609,6 +1820,18 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         const spawnConfig = adapter.buildSpawnConfig(envelope, policy, {
           model: opts.spawnModel,
           permissionMode: currentPermissionMode,
+          // Fork the orientation session rather than continuing it, so the
+          // parent stays reusable by the next task and this spawn gets its
+          // own session id. Retries and plan re-spawns fork the same parent.
+          //
+          // Batch resumes WITHOUT forking on purpose: the point is a single
+          // accumulating transcript, so this task's turns must land in the
+          // session the next task will resume.
+          // Retry-resume wins over the warm parent: continuing the attempt
+          // that just failed is more useful than re-forking orientation, and
+          // it is a plain resume (no fork) because we want that transcript.
+          resumeSessionId: retryResumeSessionId ?? warmParentId ?? batchResumeId,
+          forkSession: !retryResumeSessionId && warmParentId ? true : undefined,
         });
 
         // Capture prompt section diagnostics on the first attempt for run-level storage.
@@ -1629,6 +1852,25 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // Event pipeline: create a per-attempt accumulator. Events from this
         // attempt are pushed here, then merged into runAccumulator after spawn.
         attemptAccumulator = useEventPipeline ? new EventAccumulator() : undefined;
+
+        // Hard cap, checked before spending rather than reported after.
+        if (spawnBudgetExhausted(spawnLedger)) {
+          run.status = "failed";
+          run.error =
+            `Spawn budget exhausted for this task: ${describeSpawnBudget(spawnLedger)}. ` +
+            "Raise hench.maxSpawnsPerTask if this task legitimately needs more, " +
+            "or investigate why it keeps re-spawning.";
+          run.spawnCount = spawnLedger.total;
+          run.spawnBreakdown = { ...spawnLedger.byReason };
+          info(`\n${run.error}`);
+          await toolRexAppendLog(store, taskId, {
+            event: "task_failed",
+            detail: run.error,
+          });
+          cancelledByUser = true;
+          break;
+        }
+        recordSpawn(spawnLedger, nextSpawnReason);
 
         // Generic adapter-based spawn — replaces dispatchVendorSpawn
         result = await withHeartbeat(
@@ -1652,6 +1894,25 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           runAccumulator.push(...attemptAccumulator.events);
         }
 
+        // Stale-parent fallback: the fork failed, and the likeliest cause is
+        // a parent the vendor CLI no longer has. Drop it, stop forking, and
+        // re-spawn cold — without charging this to the retry budget, since
+        // nothing was learned about the task itself.
+        if (result.error && warmParentId && !forkFallbackUsed) {
+          forkFallbackUsed = true;
+          nextSpawnReason = "fork-fallback";
+          warmParentId = undefined;
+          run.parentSessionId = undefined;
+          await clearSessionCache(henchDir);
+          info(
+            `⚠ Forking the warm session failed (${result.error}). ` +
+              "Re-orienting on the next run; continuing this task with a cold spawn.",
+          );
+          continue;
+        }
+
+        if (result.sessionId) lastSessionId = result.sessionId;
+
         accumulateResult(accumulated, result);
 
         if (!result.planModeIntercept) break;
@@ -1673,6 +1934,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         currentPermissionMode = "acceptEdits";
         planModeAppendix = formatPlanModeAppendix(result.planModeIntercept.planText, decision);
         planRespawns++;
+        nextSpawnReason = "plan-respawn";
+        // Charge the retry budget too. Previously plan re-spawns were a
+        // separate per-attempt allowance, so four retries times three plan
+        // re-spawns could reach twelve spawns for one task; consuming an
+        // attempt makes the allowances additive.
+        planRespawnsChargedToRetries++;
         if (planRespawns > MAX_PLAN_RESPAWNS) {
           run.status = "failed";
           run.error =
@@ -1713,7 +1980,14 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           store, taskId, retryConfig, vendor,
         });
         if (action === "break") break;
-        // action === "retry" → continue loop
+        // action === "retry" → continue loop.
+        //
+        // Resume the failed session on vendors that can, so the retry keeps
+        // what the attempt already did instead of rediscovering it. Only the
+        // Claude CLI honors resume today; elsewhere this stays undefined and
+        // the retry is a cold spawn carrying the retry notice.
+        nextSpawnReason = "retry";
+        retryResumeSessionId = resolveRetryResume(vendor, lastSessionId);
       }
     }
   } catch (err) {
@@ -1774,7 +2048,32 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     skipFullTestGate: config.skipFullTestGate,
     commitWatcher,
     baselineUntracked,
+    startingHead,
   });
+
+  // Retry overhead, recorded whatever the outcome: a task that took four
+  // spawns to succeed is a different story from one that took one.
+  run.spawnCount = spawnLedger.total;
+  run.spawnBreakdown = { ...spawnLedger.byReason };
+
+  // Batch bookkeeping, after the run's outcome is known.
+  //
+  // A successful task hands its session to the next one. A failed task does
+  // not: whatever went wrong is now in that transcript, and resuming it would
+  // start the next task inside the failure. The same applies when the vendor
+  // reported no session id — there is nothing to hand on.
+  if (sessionStrategy === "batch") {
+    if (run.status === "completed" && lastSessionId) {
+      await advanceBatchChain(henchDir, {
+        sessionId: lastSessionId,
+        vendor,
+        model: opts.spawnModel ?? "",
+        lastTaskTitle: brief.task.title,
+      }).catch(() => { /* best effort — the next task just starts fresh */ });
+    } else {
+      await clearBatchChain(henchDir);
+    }
+  }
 
   return { run };
 }

@@ -68,7 +68,7 @@ export function buildConsolidationGuardPrompt(
   ceiling: number,
   currentTaskCount: number,
 ): string {
-  const proposalJson = JSON.stringify(proposals, null, 2);
+  const proposalJson = JSON.stringify(proposals);
 
   return `You are a product requirements analyst. The following PRD proposals contain ${currentTaskCount} tasks, which exceeds the project's consolidation ceiling of ${ceiling} tasks. Consolidate them into fewer, larger work packages.
 
@@ -139,7 +139,7 @@ export async function applyConsolidationGuard(
     originalTaskCount,
   );
 
-  const result = await spawnClaude(prompt, model, undefined, "light");
+  const result = await spawnClaude(prompt, model, undefined, { taskClass: "prd.consolidate-check" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
   const consolidated = parseProposalResponse(result.text);

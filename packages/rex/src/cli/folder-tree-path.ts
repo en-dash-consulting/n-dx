@@ -4,7 +4,7 @@
 
 import type { PRDItem } from "../schema/index.js";
 import { findItem } from "../core/tree.js";
-import { slugify, PRD_TREE_DIRNAME } from "../store/index.js";
+import { resolveSiblingSlugs, PRD_TREE_DIRNAME } from "../store/index.js";
 
 /**
  * Compute the folder-tree path for a given item, mirroring the on-disk
@@ -21,13 +21,18 @@ export function getFolderTreePath(items: PRDItem[], itemId: string): string | un
 
   const { item, parents } = entry;
 
+  // A slug is a property of a sibling set, so each level is resolved against
+  // the siblings it actually sits among — walking down from the root rather
+  // than slugifying each ancestor in isolation.
   const pathSegments = [".rex", PRD_TREE_DIRNAME];
+  let level = items;
   for (const ancestor of parents) {
-    pathSegments.push(slugify(ancestor.title, ancestor.id));
+    pathSegments.push(resolveSiblingSlugs(level).get(ancestor.id) ?? "");
+    level = ancestor.children ?? [];
   }
 
   const isLeaf = (item.children?.length ?? 0) === 0;
-  const itemSlug = slugify(item.title, item.id);
+  const itemSlug = resolveSiblingSlugs(level).get(item.id) ?? "";
   pathSegments.push(isLeaf ? `${itemSlug}.md` : itemSlug);
 
   return pathSegments.join("/");

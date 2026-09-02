@@ -1415,7 +1415,7 @@ async function generateSmartAddProposals(params: {
   isJson: boolean;
 }): Promise<Proposal[]> {
   const { dir, existing, parentId, model, descList, filePaths, isJson } = params;
-  const effectiveModel = resolveConfiguredModel(model);
+  const effectiveModel = resolveConfiguredModel(model, { taskClass: "prd.smart-add" });
 
   if (filePaths.length > 0) {
     const resolved = filePaths.map((fp) => resolve(dir, fp));

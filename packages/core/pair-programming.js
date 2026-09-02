@@ -30,19 +30,40 @@ import { tmpdir } from "os";
 // ---------------------------------------------------------------------------
 
 /**
- * Read CONTEXT.md from .sourcevision/.
- * Returns the file content string, or null if the file does not exist.
+ * Read the codebase context to inject into an agent run.
+ *
+ * Prefers `.sourcevision/PRIMER.md` — the distilled startup context, a few
+ * hundred words covering layout, build and test commands, and conventions —
+ * over the full CONTEXT.md. This payload is re-sent on every task and every
+ * retry, and CONTEXT.md is written for breadth (zone metrics, findings, route
+ * tables) rather than for the question a task starting work actually has.
+ *
+ * Falls back to CONTEXT.md whenever no primer exists: `sourcevision analyze`
+ * writes one best-effort, so its absence is an ordinary state (an LLM-free
+ * `--lite` analysis, or a distillation that was skipped) and not an error.
  *
  * @param {string} dir  Project root directory.
- * @returns {{ content: string | null; warning?: string }}
+ * @returns {{ content: string | null; warning?: string; source?: "primer" | "context" }}
  */
 export function readContextMd(dir) {
+  const primerPath = join(dir, ".sourcevision", "PRIMER.md");
+  if (existsSync(primerPath)) {
+    try {
+      const content = readFileSync(primerPath, "utf-8");
+      if (content.trim()) return { content, source: "primer" };
+      // An empty primer is treated as absent rather than as empty context.
+    } catch {
+      // Fall through to CONTEXT.md — a partially written primer must not
+      // deprive the run of context it could otherwise have had.
+    }
+  }
+
   const contextPath = join(dir, ".sourcevision", "CONTEXT.md");
   if (!existsSync(contextPath)) {
     return { content: null, warning: "CONTEXT.md not found in .sourcevision/ — skipping codebase context" };
   }
   try {
-    return { content: readFileSync(contextPath, "utf-8") };
+    return { content: readFileSync(contextPath, "utf-8"), source: "context" };
   } catch (err) {
     return { content: null, warning: `Could not read .sourcevision/CONTEXT.md: ${err.message}` };
   }

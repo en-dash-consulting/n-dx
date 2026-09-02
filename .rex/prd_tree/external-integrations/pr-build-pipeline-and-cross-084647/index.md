@@ -1,0 +1,25 @@
+---
+id: "08464700-9955-4338-87b6-afea0646a6f8"
+level: "feature"
+title: "PR Build Pipeline and Cross-Platform CLI Validation"
+status: "completed"
+source: "smart-add"
+startedAt: "2026-04-07T14:28:53.235Z"
+completedAt: "2026-04-07T14:28:53.235Z"
+acceptanceCriteria: []
+description: "Extend the existing PR validation pipeline with additive cross-platform execution stages that run the same n-dx install and smoke-command flow in MacOS and Windows containerized environments, then verify parity against each other and against the repository's existing static expected responses and exit codes."
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Add MacOS pipeline stage for ndx install-and-run smoke validation](./add-macos-pipeline-stage-for-d10a17.md) | completed |
+| [Add Windows pipeline stage for ndx install-and-run smoke validation](./add-windows-pipeline-stage-for-1a72b5.md) | completed |
+| [Define OS-agnostic CLI error code taxonomy](./define-os-agnostic-cli-error-5392be.md) | completed |
+| [Diagnose smoke parity suite failure and capture reproducible error context](./diagnose-smoke-parity-suite-a30648.md) | completed |
+| [Emit structured smoke artifacts with normalized error codes](./emit-structured-smoke-artifacts-b714bd.md) | completed |
+| [Harden CLI smoke parity JSON collection for macOS and Windows runners](./harden-cli-smoke-parity-json-d050ac.md) | completed |
+| [Implement cross-platform parity assertions for deterministic CLI responses](./implement-cross-platform-parity-e1319d.md) | completed |
+| [Implement targeted fix for smoke parity regression](./implement-targeted-fix-for-774bf7.md) | completed |
+| [Stabilize repeatable parity verification across original macOS and Windows CI steps](./stabilize-repeatable-parity-d01f76.md) | completed |

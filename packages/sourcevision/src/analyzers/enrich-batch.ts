@@ -21,7 +21,7 @@ import {
   buildMetaPrompt,
 } from "./enrich-config.js";
 import type { PassConfig } from "./enrich-config.js";
-import { callClaude, ClaudeClientError, resolveLightModel } from "./claude-client.js";
+import { callClaude, ClaudeClientError } from "./claude-client.js";
 import {tryParseJSON, extractFindings, formatFileLabel} from "./enrich-parsing.js";import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
 
@@ -67,7 +67,7 @@ export async function runMetaEvaluation(
 
   let metaText: string;
   try {
-    const callResult = await callClaude(metaPrompt);
+    const callResult = await callClaude(metaPrompt, undefined, { taskClass: "zone.meta-eval" });
     accumulateTokenUsage(metaTokenUsage, callResult.tokenUsage);
     metaText = callResult.text;
   } catch (err) {
@@ -213,8 +213,11 @@ export async function enrichBatch(
       // than Sonnet. Pass 2+ is analytical (cross-zone relationships,
       // anti-patterns, suggestions) and stays on the standard model so
       // finding quality doesn't regress.
-      const callModel = passNumber === 1 ? resolveLightModel() : undefined;
-      const callResult = await callClaude(prompt, callModel);
+      // Both branches spell the class literally so the task-class registry
+      // contract test can see them.
+      const callResult = passNumber === 1
+        ? await callClaude(prompt, undefined, { taskClass: "zone.enrich-scan" })
+        : await callClaude(prompt, undefined, { taskClass: "zone.enrich-deep" });
       accumulateTokenUsage(batchTokenUsage, callResult.tokenUsage);
       callText = callResult.text;
     } catch (err) {

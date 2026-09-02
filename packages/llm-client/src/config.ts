@@ -9,7 +9,14 @@ import { join } from "node:path";
 import { readFile, access } from "node:fs/promises";
 import { deepMerge } from "./project-config.js";
 import type { ClaudeConfig } from "./types.js";
-import { LLM_VENDOR, type LLMVendor, type LLMConfig, type TaskWeight } from "./llm-types.js";
+import {
+  LLM_VENDOR,
+  DEFAULT_LLM_VENDOR,
+  type LLMVendor,
+  type LLMConfig,
+  type TaskWeight,
+  type TaskTier,
+} from "./llm-types.js";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
 const LOCAL_CONFIG_FILE = ".n-dx.local.json";
@@ -346,6 +353,139 @@ export function resolveVendorModel(
   // Unknown vendor: return whatever is registered, or empty string as a
   // safe sentinel (callers should not reach this branch in practice).
   return (NEWEST_MODELS as Record<string, string>)[vendor] ?? "";
+}
+
+/**
+ * Built-in task class → tier routes (the design's §04 call-site registry).
+ *
+ * Call sites declare *what kind of work a call is* — never a model — and
+ * this registry supplies the default tier; `llm.routes` overrides it per
+ * project. Light-tier classes are mechanical, structured, single-shot calls
+ * whose output is machine-validated; judgment work that a user will read
+ * stays on standard.
+ *
+ * `agent.execute` (the hench loop) deliberately defaults to `standard`, not
+ * `heavy`: stronger-model-fewer-turns is a hypothesis to confirm with
+ * telemetry, and `llm.routes["agent.execute"] = "heavy"` reaches the heavy
+ * tier with no code change once the numbers support it.
+ */
+export const DEFAULT_ROUTES: Record<string, TaskTier> = {
+  // hench
+  "agent.execute": "standard",
+  "git.commit-message": "light",
+  "context.summarize": "light",
+  "context.distill": "standard",
+  // rex
+  "prd.propose": "standard",
+  "prd.consolidate-check": "light",
+  "prd.decompose": "light",
+  "prd.rename": "light",
+  "prd.merge": "light",
+  "prd.assess": "light",
+  "prd.modify": "standard",
+  "prd.clarify": "light",
+  "prd.spec": "standard",
+  "prd.smart-add": "standard",
+  "prd.restructure": "standard",
+  // sourcevision
+  "code.classify": "light",
+  "zone.enrich-scan": "light",
+  "zone.enrich-deep": "standard",
+  "zone.meta-eval": "standard",
+};
+
+/** What `resolveTaskModel` decided for one call. */
+export interface TaskModelResolution {
+  /** Fully-qualified model string, ready for the vendor's API/CLI. */
+  model: string;
+  /**
+   * The routed tier. Reported even when an explicit model overrode the
+   * model choice, so run records can describe routing intent; `free`
+   * appears only when a configured free-tier model actually served it.
+   */
+  tier: TaskTier;
+  /** Effort level from `llm.effort`, when a class rule matches. */
+  effort?: string;
+}
+
+/**
+ * Match a task class against an exact-or-glob-prefix keyed map.
+ * Exact match wins; among globs (`"prd.*"`, `"*"`), the longest prefix wins.
+ */
+function matchTaskClass(
+  taskClass: string,
+  map: Record<string, string> | undefined,
+): string | undefined {
+  if (!map) return undefined;
+  if (map[taskClass] !== undefined) return map[taskClass];
+  let best: { prefixLength: number; value: string } | undefined;
+  for (const [key, value] of Object.entries(map)) {
+    if (!key.endsWith("*")) continue;
+    const prefix = key.slice(0, -1);
+    if (!taskClass.startsWith(prefix)) continue;
+    if (!best || prefix.length > best.prefixLength) {
+      best = { prefixLength: prefix.length, value };
+    }
+  }
+  return best?.value;
+}
+
+function isTaskTier(value: string): value is TaskTier {
+  return value === "light" || value === "standard" || value === "heavy" || value === "free";
+}
+
+/** Vendor-appropriate normalization for an explicitly given model string. */
+function normalizeExplicitModel(vendor: LLMVendor, model: string): string {
+  if (vendor === LLM_VENDOR.CLAUDE) return resolveModel(model);
+  if (vendor === LLM_VENDOR.CODEX) return normalizeCodexModel(model);
+  return model;
+}
+
+/**
+ * Resolve the model for a *task class* — the class→tier→model layer over
+ * {@link resolveVendorModel}.
+ *
+ * Resolution order:
+ * 1. An explicit model (CLI flag) wins outright, normalized for the vendor.
+ * 2. `llm.routes[<class>]` picks the tier — exact match, then longest glob
+ *    prefix — falling back to {@link DEFAULT_ROUTES}, then `standard`. An
+ *    unrecognized tier name degrades to `standard`.
+ * 3. A `free` tier resolves to `llm.tiers.<vendor>.free` when configured and
+ *    otherwise falls through to `light`.
+ * 4. `llm.tiers.<vendor>.<tier>` overrides the tier's model; otherwise the
+ *    tier resolves through `resolveVendorModel` (which honors the legacy
+ *    `lightModel` / `llm.model` slots before the `TIER_MODELS` catalog).
+ *
+ * Never throws: unknown classes route to `standard`, and a tier the vendor
+ * cannot distinguish resolves to the nearest model the vendor has.
+ */
+export function resolveTaskModel(
+  taskClass: string,
+  config?: LLMConfig,
+  opts?: { model?: string; vendor?: LLMVendor },
+): TaskModelResolution {
+  const vendor = opts?.vendor ?? config?.vendor ?? DEFAULT_LLM_VENDOR;
+  const effort = matchTaskClass(taskClass, config?.effort);
+
+  const routed = matchTaskClass(taskClass, config?.routes) ?? DEFAULT_ROUTES[taskClass];
+  let tier: TaskTier = routed !== undefined && isTaskTier(routed) ? routed : "standard";
+
+  if (opts?.model?.trim()) {
+    return { model: normalizeExplicitModel(vendor, opts.model.trim()), tier, effort };
+  }
+
+  if (tier === "free") {
+    const freeModel = config?.tiers?.[vendor]?.free;
+    if (freeModel) return { model: freeModel, tier: "free", effort };
+    tier = "light";
+  }
+
+  const tierOverride = config?.tiers?.[vendor]?.[tier];
+  if (tierOverride) {
+    return { model: normalizeExplicitModel(vendor, tierOverride), tier, effort };
+  }
+
+  return { model: resolveVendorModel(vendor, config, tier), tier, effort };
 }
 
 /**

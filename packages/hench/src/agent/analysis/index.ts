@@ -56,6 +56,8 @@ export {
   reviewReportPath,
   formatReviewSummary,
   unresolvedFindings,
+  classifyUnresolved,
+  formatUnresolvedWarning,
   REVIEW_SEVERITIES,
   REVIEW_VERDICTS,
   REVIEW_ACTIONS,
@@ -65,6 +67,7 @@ export {
 export type {
   ReviewFinding,
   ReviewReport,
+  UnresolvedBreakdown,
   ReviewSeverity,
   ReviewVerdict,
   ReviewAction,

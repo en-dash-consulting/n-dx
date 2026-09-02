@@ -544,61 +544,15 @@ Guidelines:
 /**
  * A compact example included in prompts to show the LLM the expected output
  * shape, quality of titles, and level of detail for tasks.
+ *
+ * Minified deliberately, and on two counts. It is billed as input on every
+ * analyze call, and indentation here is pure cost — the model reads the shape
+ * from the keys, not the whitespace. It is also the format the surrounding
+ * prompt asks the model to *produce*: a pretty-printed example next to
+ * "return minified JSON" is an instruction arguing with its own illustration.
  */
 export const FEW_SHOT_EXAMPLE = `Example output (for reference — do NOT include this example in your response):
-[
-  {
-    "epic": { "title": "User Authentication" },
-    "features": [
-      {
-        "title": "OAuth2 Integration",
-        "description": "Support third-party OAuth2 providers for user login",
-        "tasks": [
-          {
-            "title": "Implement OAuth2 callback handler",
-            "description": "Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.",
-            "acceptanceCriteria": [
-              "Handles Google and GitHub OAuth2 flows end-to-end",
-              "Stores refresh token securely in encrypted session storage",
-              "Returns meaningful error on provider rejection",
-              "Provider adapter interface documented with at least one example"
-            ],
-            "priority": "high",
-            "tags": ["auth", "backend"],
-            "loe": 2,
-            "loeRationale": "Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.",
-            "loeConfidence": "high"
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "epic": { "title": "API Infrastructure", "existingId": "abc-123" },
-    "features": [
-      {
-        "title": "Rate Limiting",
-        "description": "Protect API endpoints from abuse with configurable rate limits",
-        "tasks": [
-          {
-            "title": "Implement token bucket rate limiter middleware",
-            "description": "Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates",
-            "acceptanceCriteria": [
-              "Returns 429 with Retry-After header when limit exceeded",
-              "Configurable per-route limits via middleware options",
-              "Supports both IP-based and API-key-based limiting"
-            ],
-            "priority": "high",
-            "tags": ["api", "security"],
-            "loe": 1.5,
-            "loeRationale": "Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.",
-            "loeConfidence": "medium"
-          }
-        ]
-      }
-    ]
-  }
-]`;
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]`;
 
 // ── Scan result summarization + chunking ──
 
@@ -811,7 +765,7 @@ ${content}
 
 ${OUTPUT_INSTRUCTION}`;
 
-  const result = await spawnClaude(prompt, model);
+  const result = await spawnClaude(prompt, model, undefined, { taskClass: "prd.propose" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
   return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
@@ -998,7 +952,7 @@ ${scanSummary}
 
 ${OUTPUT_INSTRUCTION}`;
 
-    const claudeResult = await spawnClaude(prompt, model);
+    const claudeResult = await spawnClaude(prompt, model, undefined, { taskClass: "prd.propose" });
     accumulateTokenUsage(tokenUsage, claudeResult.tokenUsage);
     allProposals.push(...parseProposalResponse(claudeResult.text));
   }
@@ -1225,7 +1179,7 @@ export async function reasonFromDescriptions(
  * Pure function — no I/O.
  */
 export function buildBreakdownPrompt(proposals: Proposal[]): string {
-  const proposalJson = JSON.stringify(proposals, null, 2);
+  const proposalJson = JSON.stringify(proposals);
 
   return `You are a product requirements analyst. Break down the following PRD proposals into finer-grained, more detailed tasks.
 
@@ -1253,7 +1207,7 @@ ${OUTPUT_INSTRUCTION}`;
  * Pure function — no I/O.
  */
 export function buildConsolidatePrompt(proposals: Proposal[]): string {
-  const proposalJson = JSON.stringify(proposals, null, 2);
+  const proposalJson = JSON.stringify(proposals);
 
   return `You are a product requirements analyst. Consolidate the following PRD proposals into coarser-grained, higher-level tasks.
 
@@ -1292,7 +1246,7 @@ export async function adjustGranularity(
     : buildConsolidatePrompt(proposals);
 
   const tokenUsage = emptyAnalyzeTokenUsage();
-  const result = await spawnClaude(prompt, model);
+  const result = await spawnClaude(prompt, model, undefined, { taskClass: "prd.restructure" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
   return { proposals: parseProposalResponse(result.text), tokenUsage };
 }
@@ -1340,8 +1294,6 @@ const GranularityAssessmentArraySchema = z.array(GranularityAssessmentSchema);
 export function buildAssessmentPrompt(proposals: Proposal[]): string {
   const proposalJson = JSON.stringify(
     proposals.map((p, i) => ({ proposalIndex: i, ...p })),
-    null,
-    2,
   );
 
   return `You are a product requirements analyst specializing in task sizing. Assess whether each proposal's tasks are at the right granularity.
@@ -1376,20 +1328,10 @@ Red flags for MISSING SUBSTANCE:
 - Feature has only 1 task (should be broken down or merged)
 - Tasks lack description or acceptance criteria
 
-Respond with ONLY a valid JSON array of assessment objects, one per proposal:
-[
-  {
-    "proposalIndex": 0,
-    "recommendation": "break_down",
-    "reasoning": "Several tasks cover broad functionality that spans multiple components.",
-    "issues": [
-      "Task 'Implement authentication system' covers login, signup, password reset, and session management — should be separate tasks",
-      "Task 'Add API endpoints' is vague and likely involves multiple distinct endpoints"
-    ]
-  }
-]
+Respond with ONLY a valid, minified JSON array of assessment objects, one per proposal — no whitespace between tokens, no indentation, no line breaks:
+[{"proposalIndex":0,"recommendation":"break_down","reasoning":"Several tasks cover broad functionality that spans multiple components.","issues":["Task 'Implement authentication system' covers login, signup, password reset, and session management — should be separate tasks","Task 'Add API endpoints' is vague and likely involves multiple distinct endpoints"]}]
 
-No explanation or markdown fences — ONLY the JSON array.`;
+Key each object by proposalIndex; do not restate the proposal. No explanation, no markdown fences — ONLY the JSON array.`;
 }
 
 /**
@@ -1493,7 +1435,7 @@ export async function assessGranularity(
   }
 
   const prompt = buildAssessmentPrompt(proposals);
-  const result = await spawnClaude(prompt, model, undefined, "light");
+  const result = await spawnClaude(prompt, model, undefined, { taskClass: "prd.assess" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
   const assessments = parseAssessmentResponse(result.text, proposals);

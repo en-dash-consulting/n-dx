@@ -180,6 +180,44 @@ export interface HenchConfig {
    */
   autoCommit?: boolean;
   /**
+   * How task spawns relate to vendor sessions.
+   *
+   * - `"fork"` (default where supported) — run orientation once, then fork
+   *   that session per task (`--resume <id> --fork-session`), so no task
+   *   re-pays cold-start context or re-explores the repo.
+   * - `"batch"` — execute up to {@link tasksPerSession} tasks in one session,
+   *   feeding each next brief as a follow-up turn. Vendor-neutral.
+   * - `"cold"` — a fresh spawn per task (the original behavior).
+   *
+   * Forking requires a CLI that can resume by session id (Claude today), so
+   * other vendors and the API provider resolve to `"cold"` regardless. See
+   * `resolveSessionStrategy` in `agent/lifecycle/session-cache.ts`.
+   */
+  sessionStrategy?: "fork" | "batch" | "cold";
+  /**
+   * Tasks executed per session under the `"batch"` strategy (default: 4).
+   * Bounded deliberately — a longer shared session saves more cold starts
+   * but accumulates cross-task context that can bleed between them.
+   */
+  tasksPerSession?: number;
+  /**
+   * How long a cached orientation session may be forked before it is
+   * rebuilt, in hours (default: 24). The analysis fingerprint invalidates a
+   * parent when the repo is re-analyzed; this bounds how stale an
+   * orientation can get without one.
+   */
+  parentMaxAgeHours?: number;
+  /**
+   * Ceiling on vendor spawns for a single task (default: 8).
+   *
+   * Every spawn counts — the initial one, failure retries, plan-mode
+   * re-spawns, and fallbacks — because the defect this bounds was
+   * multiplication between independent allowances, not any single one being
+   * too generous. Hitting the ceiling fails the task loudly with the
+   * breakdown rather than continuing to spend.
+   */
+  maxSpawnsPerTask?: number;
+  /**
    * When true, skip the mandatory full test suite gate before commit.
    * Default: false (gate is mandatory). The --skip-test-gate CLI flag sets this.
    * Test gate failure blocks commit unless this flag is set or user selects skip.
@@ -743,12 +781,36 @@ export type RunReviewRecord =
       resumedSession: boolean;
       /** Findings surviving both passes, including the ones deliberately dropped. */
       findingCount: number;
-      /** Must-fix findings the pass could not repair. Non-zero needs a human. */
+      /**
+       * Findings left unresolved for either reason — the sum of the two counts
+       * below. Not a must-fix count: it also carries findings below must-fix
+       * whose action failed. Kept as the single "needs a look" headline.
+       */
       unresolvedCount: number;
+      /**
+       * Must-fix findings the pass could not repair. Non-zero means a defect
+       * is still in the tree and needs a human.
+       */
+      unrepairedMustFixCount: number;
+      /**
+       * Findings below must-fix whose action failed (e.g. the PRD capture
+       * threw). The code is fine; the record of it is not. A failed must-fix
+       * counts under `unrepairedMustFixCount`, never here.
+       */
+      failedActionCount: number;
       /** True when the reviewer edited a file. */
       fixesApplied: boolean;
       /** Absolute path of the JSON report the reviewer wrote. */
       reportPath: string;
+      /**
+       * Repo-relative paths the review pass changed, computed from
+       * working-tree snapshots taken around the reviewer spawn. Excludes
+       * `.rex/` (committed as completion metadata) and `.hench/` (the report
+       * itself). Absent when the snapshot could not be taken.
+       */
+      repairedFiles?: string[];
+      /** Commit that captured the repairs on the autoCommit path. */
+      repairCommit?: string;
       failed?: undefined;
     }
   | {
@@ -799,6 +861,26 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   weight?: string;
+  /**
+   * Orientation session this run's task spawn was forked from, when the
+   * warm-parent strategy was active. Its presence is what makes the saving
+   * auditable: a run with a parent paid no cold start, one without spawned
+   * cold. v1 additive field.
+   */
+  parentSessionId?: string;
+  /**
+   * Total vendor spawns this task made, including retries, plan-mode
+   * re-spawns, and fallbacks. Recorded so `ndx usage` can report retry
+   * overhead: a task that cost four spawns to complete is a different story
+   * from one that cost one. v1 additive field.
+   */
+  spawnCount?: number;
+  /**
+   * Spawns by reason, so the same total can be told apart — six plan-mode
+   * re-spawns and six failure retries call for entirely different fixes.
+   * v1 additive field.
+   */
+  spawnBreakdown?: Record<string, number>;
   retryAttempts?: number;
   /** Structured metadata derived from tool calls at run finalization. */
   structuredSummary?: RunSummaryData;

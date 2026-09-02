@@ -21,7 +21,7 @@ import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage,
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
-import { getCurrentHead, execShellCmd, execStdout } from "../../process/exec.js";
+import { getCurrentHead, execStdout } from "../../process/exec.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
@@ -33,8 +33,11 @@ import { persistRunLog } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
+import { commitReviewRepairs } from "../analysis/review-repairs.js";
+import { discoverChangedFiles } from "../analysis/changed-files.js";
+import { extractCommitSubject } from "./commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
-import { LLM_VENDOR, defaultRegistry, resolveVendorModel } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
@@ -830,8 +833,20 @@ export interface FinalizeRunOptions {
    * {@link captureBaselineUntracked}). Threaded into rollback so only
    * agent-created untracked files are removed on failure — never the user's
    * pre-existing untracked work (issue #303).
+   *
+   * Also used as the exclusion set when discovering this run's changed files:
+   * an untracked file that was already there is the user's, not the run's.
    */
   baselineUntracked?: string[];
+  /**
+   * Commit the run started from (via {@link captureStartingHead}).
+   *
+   * The baseline for changed-file discovery. It has to be the pre-run commit
+   * rather than HEAD: on the autoCommit path the executor commits its own
+   * work before the gate runs, so a HEAD-relative diff reports nothing and
+   * the gate would skip the very run it should be testing.
+   */
+  startingHead?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1178,20 +1193,22 @@ export async function proposePreRunCommitMessage(
     const vendor = resolveLLMVendor(llmConfig);
     const standardModel = resolveVendorModel(vendor, llmConfig);
     const isExplicitOverride = Boolean(model) && model !== standardModel;
-    const resolvedModel = isExplicitOverride
-      ? (model as string)
-      : resolveVendorModel(vendor, llmConfig, "light");
+    const commitResolution = resolveTaskModel("git.commit-message", llmConfig, { vendor });
+    const resolvedModel = isExplicitOverride ? (model as string) : commitResolution.model;
     if (!isExplicitOverride) {
       // Tier visibility — mirrors the vendor header's "(light tier)" label.
-      detail(`Commit message model: ${resolvedModel} (light tier)`);
+      detail(`Commit message model: ${resolvedModel} (${commitResolution.tier} tier)`);
     }
     const prompt =
       "Write a single-line git commit subject (max 72 chars, conventional-commit " +
       "style, no body, no surrounding quotes or backticks) summarizing these " +
       `uncommitted changes:\n\n${diff.stat}\n\n${diff.diff.slice(0, PRE_RUN_COMMIT_DIFF_CHAR_LIMIT)}`;
     const { text } = await provider.complete({ prompt, model: resolvedModel });
-    const firstLine = (text ?? "").split("\n").map((line) => line.trim()).find(Boolean);
-    return firstLine ? firstLine.slice(0, 100) : PRE_RUN_COMMIT_FALLBACK_MESSAGE;
+    // Output contract for the light-tier route: the answer goes straight to
+    // `git commit -m`, so a preamble, fence, or paragraph would land in the
+    // repository's history. Anything that is not a usable single-line subject
+    // yields the generic fallback instead.
+    return extractCommitSubject(text) ?? PRE_RUN_COMMIT_FALLBACK_MESSAGE;
   } catch {
     return PRE_RUN_COMMIT_FALLBACK_MESSAGE;
   }
@@ -1210,6 +1227,40 @@ async function commitPreRunChanges(projectDir: string, message: string): Promise
     cwd: projectDir,
     timeout: 30_000,
   });
+}
+
+/**
+ * Commit the files the adversarial review pass changed, when there are any.
+ * Called on the autoCommit path only: the interactive commit prompt already
+ * sweeps repairs into the task's commit, but on autoCommit the executor
+ * committed its own work before the review ran, so the repairs have no other
+ * owner. A failure here is reported, never thrown — an uncommitted repair is
+ * an inspection burden, not a broken task.
+ */
+export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRecord): Promise<void> {
+  const review = run.review;
+  if (!review || review.failed !== undefined) return;
+  if (!review.repairedFiles || review.repairedFiles.length === 0) return;
+
+  try {
+    const sha = await commitReviewRepairs(projectDir, {
+      paths: review.repairedFiles,
+      runId: run.id,
+      taskId: run.taskId,
+      trailer: buildCoAuthoredByTrailerLine(),
+    });
+    if (sha) {
+      review.repairCommit = sha;
+      detail(
+        `Committed review repairs (${review.repairedFiles.length} file(s), ${sha.slice(0, 8)})`,
+      );
+    }
+  } catch (err) {
+    info(
+      `⚠ Review repairs could not be committed (${(err as Error).message}). ` +
+        `They remain in the working tree: ${review.repairedFiles.join(", ")}`,
+    );
+  }
 }
 
 /**
@@ -1894,28 +1945,32 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   }
 
   // Discover changed files for the test gate.
-  // When the agent loop produced no tool call records (e.g. Codex CLI, which
-  // emits verbose text rather than structured tool events), fall back to
-  // `git diff --name-only HEAD` to discover which files were actually changed.
-  // This ensures the test gate runs even for vendors that do not emit
-  // structured tool events. The check is vendor-agnostic and runs for all modes.
-  if (run.structuredSummary && run.toolCalls.length === 0) {
-    try {
-      const { stdout } = await execShellCmd("git diff --name-only HEAD", {
-        cwd: projectDir,
-        timeout: 10_000,
-      });
-      const gitChangedFiles = stdout.trim().split("\n").filter(Boolean);
-      if (gitChangedFiles.length > 0) {
-        run.structuredSummary.filesChanged = gitChangedFiles;
-        run.structuredSummary.counts = {
-          ...run.structuredSummary.counts,
-          filesChanged: gitChangedFiles.length,
-        };
-      }
-    } catch {
-      // Best-effort: if git is unavailable, the test gate falls back to
-      // the existing filesChanged (empty), which causes it to skip.
+  //
+  // Git is the authority here, not the model's own summary of what it did.
+  // The summary can report nothing while tool calls wrote files, and the
+  // previous fallback only consulted git when the loop recorded no tool
+  // calls at all — which never happens on the Claude CLI, so the gate read
+  // an empty list and skipped on the default path. Repairs made by the
+  // adversarial review pass are invisible to the summary besides: they
+  // happen in a separate spawn, after it was parsed.
+  //
+  // The baseline is the commit the run started from, so the set includes
+  // work the executor committed itself (invisible to `git diff HEAD`) as
+  // well as everything still uncommitted at gate time. `undefined` means
+  // git could not answer — distinct from "nothing changed" — and leaves the
+  // model-reported list in place rather than overriding it with a guess.
+  if (run.structuredSummary) {
+    const gitChangedFiles = await discoverChangedFiles({
+      projectDir,
+      startingHead: opts.startingHead,
+      baselineUntracked: opts.baselineUntracked,
+    });
+    if (gitChangedFiles) {
+      run.structuredSummary.filesChanged = gitChangedFiles;
+      run.structuredSummary.counts = {
+        ...run.structuredSummary.counts,
+        filesChanged: gitChangedFiles.length,
+      };
     }
   }
 
@@ -2063,7 +2118,12 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // On the autoCommit path performCommitPromptIfNeeded is a no-op, so the
   // completion metadata written by updateCompletedTaskStatus would otherwise
   // be left uncommitted. Commit it now in a small dedicated second commit.
+  // Review repairs go first: the executor committed its own work before the
+  // review pass ran and the reviewer is barred from committing, so without
+  // this commit its must-fix repairs would be orphaned in the working tree
+  // and swept into whatever commit happens next.
   if (opts.autoCommit === true && run.status === "completed" && run.taskId) {
+    await commitReviewRepairsIfNeeded(projectDir, run);
     await commitCompletionMetadata(projectDir, run.taskId);
   }
 

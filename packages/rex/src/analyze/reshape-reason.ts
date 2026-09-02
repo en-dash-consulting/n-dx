@@ -24,6 +24,7 @@ import {
   emptyAnalyzeTokenUsage,
   accumulateTokenUsage,
 } from "./reason.js";
+import { withEscalation } from "./escalate.js";
 
 // ── Zod schemas for LLM response validation ──
 
@@ -124,54 +125,10 @@ Guidelines:
 - For splits: ensure child items are at the appropriate hierarchy level.
 - For updates: only propose when there's a meaningful improvement (not cosmetic rewording).
 
-Respond with ONLY a valid JSON array of action objects. No explanation, no markdown fences, no commentary — just the JSON.`;
+Respond with ONLY a valid, minified JSON array of action objects — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON.`;
 
 export const RESHAPE_FEW_SHOT = `Example output (for reference — do NOT include this in your response):
-[
-  {
-    "action": "merge",
-    "survivorId": "abc-123",
-    "mergedIds": ["def-456"],
-    "title": "Implement user authentication with OAuth2",
-    "reason": "Both items describe OAuth2 authentication setup with overlapping acceptance criteria"
-  },
-  {
-    "action": "update",
-    "itemId": "ghi-789",
-    "updates": {
-      "description": "Handle rate limiting for external API calls with exponential backoff",
-      "acceptanceCriteria": ["Returns 429 with retry-after header", "Implements exponential backoff up to 60s"]
-    },
-    "reason": "Original description was too vague — added specific retry strategy and verifiable criteria"
-  },
-  {
-    "action": "split",
-    "sourceId": "mno-345",
-    "children": [
-      {
-        "title": "Validate form inputs on submit",
-        "level": "task",
-        "acceptanceCriteria": ["Required fields rejected with clear error", "Email format validated against RFC 5322"]
-      },
-      {
-        "title": "Show inline error messages on validation failure",
-        "level": "task"
-      }
-    ],
-    "reason": "Original task bundled validation logic and error UX — splitting clarifies scope and ownership"
-  },
-  {
-    "action": "reparent",
-    "itemId": "pqr-678",
-    "newParentId": "stu-901",
-    "reason": "Belongs under the auth epic, not the dashboard epic"
-  },
-  {
-    "action": "obsolete",
-    "itemId": "jkl-012",
-    "reason": "This migration task was for the old database schema which has been replaced by the v2 schema"
-  }
-]`;
+[{"action":"merge","survivorId":"abc-123","mergedIds":["def-456"],"title":"Implement user authentication with OAuth2","reason":"Both items describe OAuth2 authentication setup with overlapping acceptance criteria"},{"action":"update","itemId":"ghi-789","updates":{"description":"Handle rate limiting for external API calls with exponential backoff","acceptanceCriteria":["Returns 429 with retry-after header","Implements exponential backoff up to 60s"]},"reason":"Original description was too vague — added specific retry strategy and verifiable criteria"},{"action":"split","sourceId":"mno-345","children":[{"title":"Validate form inputs on submit","level":"task","acceptanceCriteria":["Required fields rejected with clear error","Email format validated against RFC 5322"]},{"title":"Show inline error messages on validation failure","level":"task"}],"reason":"Original task bundled validation logic and error UX — splitting clarifies scope and ownership"},{"action":"reparent","itemId":"pqr-678","newParentId":"stu-901","reason":"Belongs under the auth epic, not the dashboard epic"},{"action":"obsolete","itemId":"jkl-012","reason":"This migration task was for the old database schema which has been replaced by the v2 schema"}]`;
 
 const SMART_PRUNE_PROMPT = `You are reviewing this PRD to identify items that should be pruned — either because they are obsolete, redundant, or no longer relevant to the project's current direction.
 
@@ -206,7 +163,7 @@ Guidelines:
 - For splits: ensure child items are at the appropriate hierarchy level below the source.
 - Provide a clear "reason" for every action explaining how it improves post-prune organization.
 
-Respond with ONLY a valid JSON array of action objects. No explanation, no markdown fences, no commentary — just the JSON. Return an empty array [] if no consolidation is needed.`;
+Respond with ONLY a valid, minified JSON array of action objects — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON. Return an empty array [] if no consolidation is needed.`;
 
 export interface ReshapeReasonOptions {
   dir?: string;
@@ -255,7 +212,7 @@ export async function reasonForReshape(
     RESHAPE_FEW_SHOT,
   ].filter(Boolean).join("\n");
 
-  const result = await spawnClaude(prompt, options.model);
+  const result = await spawnClaude(prompt, options.model, undefined, { taskClass: "prd.restructure" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
 
   const proposals = parseReshapeResponse(result.text);
@@ -370,6 +327,71 @@ export interface BodyMergeResult {
 }
 
 /**
+ * Upper bound for a merged description. Generous — descriptions here run to a
+ * few hundred characters — so exceeding it means the model ignored "concise"
+ * and returned an essay, not that a legitimate description was long.
+ */
+export const MERGED_DESCRIPTION_MAX_LENGTH = 4000;
+
+/** Lines where the model is announcing the answer instead of giving it. */
+const DESCRIPTION_PREAMBLE_RE =
+  /^(sure|certainly|of course|here('s| is| are)|okay|ok)\b.*$|^.*\b(description|summary)\s*:\s*$/i;
+
+/**
+ * Validate the light-tier body-merge response before it becomes a PRD item's
+ * description.
+ *
+ * This is the validation half of routing the call to the cheap tier: the
+ * result is persisted as the surviving item's body, so unusable output must be
+ * *detected* rather than written. Shape noise the cheap tier tends to add —
+ * code fences, an announcing first line — is stripped; anything still not a
+ * plain-text description throws.
+ *
+ * Throwing is deliberate. `reshape` treats body merge as best-effort and keeps
+ * the item's existing description when this fails, which is a better outcome
+ * than persisting a preamble, a JSON blob, or a sentence cut in half by a
+ * length cap.
+ *
+ * @throws when the response is not a usable plain-text description.
+ */
+export function validateMergedDescription(text: string): string {
+  const withoutFences = (text ?? "")
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("```"))
+    .join("\n");
+
+  // Drop leading announcement lines, then keep the remainder verbatim so a
+  // legitimate multi-paragraph description survives intact.
+  const lines = withoutFences.split("\n");
+  let start = 0;
+  while (start < lines.length) {
+    const line = lines[start].trim();
+    if (!line || DESCRIPTION_PREAMBLE_RE.test(line)) {
+      start++;
+      continue;
+    }
+    break;
+  }
+  const description = lines.slice(start).join("\n").trim();
+
+  if (!description) {
+    throw new Error("LLM body-merge response was empty after stripping formatting.");
+  }
+  if (description.startsWith("{") || description.startsWith("[")) {
+    throw new Error(
+      "LLM body-merge response looks like JSON; the prompt asks for plain text.",
+    );
+  }
+  if (description.length > MERGED_DESCRIPTION_MAX_LENGTH) {
+    throw new Error(
+      `LLM body-merge response is too long (${description.length} chars, ` +
+        `max ${MERGED_DESCRIPTION_MAX_LENGTH}).`,
+    );
+  }
+  return description;
+}
+
+/**
  * Use LLM to generate a merged description for a group of hash-suffix duplicate items.
  * Returns a generic description that covers the combined scope of all items.
  *
@@ -400,12 +422,18 @@ export async function reasonForBodyMerge(
     itemSummary,
   ].join("\n");
 
-  const llmResult = await spawnClaude(prompt, model, undefined, "light");
-  accumulateTokenUsage(tokenUsage, llmResult.tokenUsage);
-
+  // Light-tier with escalation: an unusable description retries on the
+  // standard tier carrying the reason, instead of throwing away the merge.
+  const escalation = await withEscalation({
+    prompt,
+    taskClass: "prd.merge",
+    model,
+    validate: (text: string) => validateMergedDescription(text),
+  });
   return {
-    description: llmResult.text.trim(),
-    tokenUsage,
+    description: escalation.value,
+    // Carried through whole — see modify-reason: every attempt was billed.
+    tokenUsage: escalation.tokenUsage,
   };
 }
 
