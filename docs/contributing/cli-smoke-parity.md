@@ -1,5 +1,7 @@
 # CLI Smoke Parity
 
+> Cost/value review of this stage, with proposed changes: [Cross-OS Pipeline Review — 2026-09](./cross-os-pipeline-review-2026-09.md).
+
 The macOS and Windows smoke jobs in [ci.yml](../../.github/workflows/ci.yml) must run the same canonical `ndx` validation sequence by invoking:
 
 ```bash
