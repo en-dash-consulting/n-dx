@@ -68,8 +68,6 @@ function createDeterministicSmokeRunner({
         };
       case JSON.stringify(["foobar"]):
         return { exitCode: 1, stdout: "", stderr: `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: foobar\nHint:\n` };
-      case JSON.stringify(["statis"]):
-        return { exitCode: 1, stdout: "", stderr: `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: statis\nDid you mean status\n` };
       case JSON.stringify(["help", "rex"]):
         return { exitCode: 0, stdout: "Rex — available commands\nvalidate\nrex <command> --help\n", stderr: "" };
       case JSON.stringify(["help", "plan"]):
@@ -307,22 +305,6 @@ describe("cli smoke parity helpers", () => {
           },
         },
         {
-          id: "typo-suggestion",
-          exitCode: 1,
-          stdoutNormalized: "",
-          stderrNormalized: `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: statis\nDid you mean status`,
-          failure: {
-            code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-            detail: "Unknown command: statis",
-          },
-          comparable: {
-            failure: {
-              code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-              detail: "Unknown command: statis",
-            },
-          },
-        },
-        {
           id: "help-rex",
           exitCode: 0,
           stdoutNormalized: "Rex — available commands\nvalidate\nrex <command> --help",
@@ -549,22 +531,6 @@ describe("cli smoke parity helpers", () => {
           },
         },
         {
-          id: "typo-suggestion",
-          exitCode: 1,
-          stdoutNormalized: "",
-          stderrNormalized: `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: statis\nHint: Did you mean 'ndx status'?`,
-          failure: {
-            code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-            detail: "Unknown command: statis",
-          },
-          comparable: {
-            failure: {
-              code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-              detail: "Unknown command: statis",
-            },
-          },
-        },
-        {
           id: "help-rex",
           exitCode: 0,
           stdoutNormalized: "Rex — available commands\nvalidate\nrex <command> --help",
@@ -684,22 +650,6 @@ describe("cli smoke parity helpers", () => {
           },
         },
         {
-          id: "typo-suggestion",
-          exitCode: 1,
-          stdoutNormalized: "",
-          stderrNormalized: `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: statis\nDid you mean status`,
-          failure: {
-            code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-            detail: "Unknown command: statis",
-          },
-          comparable: {
-            failure: {
-              code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-              detail: "Unknown command: statis",
-            },
-          },
-        },
-        {
           id: "help-rex",
           exitCode: 0,
           stdoutNormalized: "Rex — available commands\nvalidate\nrex <command> --help",
@@ -793,7 +743,7 @@ describe("cli smoke parity helpers", () => {
 
     const versionJsonCase = artifact.cases.find((entry) => entry.id === "version-json");
     const statusJsonCase = artifact.cases.find((entry) => entry.id === "status-json");
-    const typoCase = artifact.cases.find((entry) => entry.id === "typo-suggestion");
+    const unknownCommandCase = artifact.cases.find((entry) => entry.id === "unknown-command");
     const versionTextCase = artifact.cases.find((entry) => entry.id === "version-text");
 
     expect(versionJsonCase.comparable).toEqual({ stdoutJson: { version: CORE_VERSION } });
@@ -832,16 +782,16 @@ describe("cli smoke parity helpers", () => {
     });
     expect(versionTextCase).not.toHaveProperty("failure");
     expect(versionJsonCase).not.toHaveProperty("failure");
-    expect(typoCase.failure).toEqual({
+    expect(unknownCommandCase.failure).toEqual({
       code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-      detail: "Unknown command: statis",
+      detail: "Unknown command: foobar",
     });
-    expect(typoCase).not.toHaveProperty("stdout");
-    expect(typoCase).not.toHaveProperty("stderr");
-    expect(typoCase.comparable).toEqual({
+    expect(unknownCommandCase).not.toHaveProperty("stdout");
+    expect(unknownCommandCase).not.toHaveProperty("stderr");
+    expect(unknownCommandCase.comparable).toEqual({
       failure: {
         code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-        detail: "Unknown command: statis",
+        detail: "Unknown command: foobar",
       },
     });
     expect(artifact.sequence).toEqual([
@@ -867,14 +817,6 @@ describe("cli smoke parity helpers", () => {
         args: ["foobar"],
         expectedExitCode: 1,
         expected: { stderrCode: CLI_ERROR_CODES.UNKNOWN_COMMAND, stderrIncludes: ["Unknown command: foobar", "Hint:"] },
-        shapeParity: true,
-      },
-      {
-        id: "typo-suggestion",
-        fixture: "none",
-        args: ["statis"],
-        expectedExitCode: 1,
-        expected: { stderrCode: CLI_ERROR_CODES.UNKNOWN_COMMAND, stderrIncludes: ["Unknown command: statis", "Did you mean", "status"] },
         shapeParity: true,
       },
       {
@@ -1092,11 +1034,11 @@ describe("cli smoke parity helpers", () => {
       executeCli: createDeterministicSmokeRunner(),
     });
     const windowsArtifact = structuredClone(macArtifact);
-    const typoCase = windowsArtifact.cases.find((entry) => entry.id === "typo-suggestion");
-    typoCase.shape.stderr.crlfCount = 2;
+    const failureCase = windowsArtifact.cases.find((entry) => entry.id === "unknown-command");
+    failureCase.shape.stderr.crlfCount = 2;
 
     expect(compareArtifacts(macArtifact, windowsArtifact)).toContain(
-      "parity:typo-suggestion.shape.stderr.crlfCount differs (macos=0 windows=2)",
+      "parity:unknown-command.shape.stderr.crlfCount differs (macos=0 windows=2)",
     );
   });
 });

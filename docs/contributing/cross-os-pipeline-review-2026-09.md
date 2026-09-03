@@ -86,7 +86,7 @@ the whole object, not just the keys it names.
 | 1 | `version-text` | `stdout`, `stderr` | `stdout` yes (`stdoutExact`); `stderr` **no** | stderr equality only |
 | 2 | `version-json` | `stdoutJson` | yes (full literal) | **none** |
 | 3 | `unknown-command` | `failure.code` | yes (`stderrCode`) | **none** |
-| 4 | `typo-suggestion` | `failure.code` | yes (`stderrCode`) | **none** |
+| 4 | `typo-suggestion` | `failure.code` | yes (`stderrCode`) | **none** — ~~retired 2026-09-03~~ |
 | 5 | `help-rex` | `stdout` (full text) | partially — 3 substrings | full help-text equality |
 | 6 | `plan-help` | `stdout` (full text) | partially — 4 substrings | full help-text equality |
 | 7 | `status-missing-rex` | `failure.code` | yes (`stderrCode`) | **none** |
@@ -94,6 +94,12 @@ the whole object, not just the keys it names.
 
 **The cross-artifact comparison contributes unique signal on 3 of 8 cases — #1's stderr, and
 the full help text of #5 and #6 — all static, OS-independent output.**
+
+> **Update 2026-09-03.** Case #4 (`typo-suggestion`) has since been retired by the gauntlet
+> cleanup task: `tests/e2e/cli-hints.test.js` makes its assertions verbatim on one platform more
+> than this stage covers. The table is kept at its original numbering as the record of what was
+> reviewed; the set is now seven cases, and the "unique signal on 3" finding is unchanged —
+> #4 was one of the cases contributing none.
 
 This inverts the framing in `AUDIT-2026-09.md`, which rated #7 and #8 as the two cases that
 justify the stage. They are the highest-value cases *to collect on both OSes*, and that

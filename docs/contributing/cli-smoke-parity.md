@@ -43,7 +43,7 @@ Use that split deliberately: artifact detail is for diagnosis, while the `compar
 
 `shape` closes that gap. It counts `\r\n` and `\` on the raw stream (after runtime-noise stripping, which does not touch separators) and compares those counts across platforms.
 
-It is opt-in per case via `shapeParity: true`, and only correct for cases whose output embeds **no filesystem path**. The two fixture cases are excluded: they print the temp directory, so on Windows their stderr legitimately carries native backslashes — measured 2026-09-02, `status-missing-rex` emits 12, all from the two embedded temp paths. Comparing counts there would fail on working behaviour. The six path-free cases measured 0 backslashes and 0 CRLF on Windows 11, so any nonzero count now means output grew a hardcoded separator.
+It is opt-in per case via `shapeParity: true`, and only correct for cases whose output embeds **no filesystem path**. The two fixture cases are excluded: they print the temp directory, so on Windows their stderr legitimately carries native backslashes — measured 2026-09-02, `status-missing-rex` emits 12, all from the two embedded temp paths. Comparing counts there would fail on working behaviour. The five path-free cases measured 0 backslashes and 0 CRLF on Windows 11, so any nonzero count now means output grew a hardcoded separator.
 
 If a message in a `shapeParity` case ever legitimately gains a path, drop that case's flag in the same change rather than loosening the check. `shapeParity` is recorded in the `sequence` metadata, so two platforms disagreeing about which cases are shape-compared fails `compareSequence` rather than silently skipping the check.
 
@@ -63,7 +63,7 @@ The stage learned this concretely. `stripKnownRuntimeNoise` used to also remove:
 
 That line was **n-dx's own output**, and it appeared on *every* win32 invocation — `ndx version`, `ndx --help`, `ndx status`, commands that spawn no child at all — because `cli.js` constructed its child-process tracker with `processGroups: true` at module load while `PLATFORM_SUPPORTS_PROCESS_GROUPS` is always false on win32. It was a genuine Windows-only regression in user-facing output, fixed in [`b0efffdd`](https://github.com/en-dash-consulting/n-dx/pull/329) by gating the notice behind `NDX_DEBUG_LIFECYCLE` / `NDX_DEBUG`. The strip had been added as a workaround while the bug was live.
 
-Keeping the strip after the fix inverted its purpose: it left `version-text`'s `stderrExact: ""` baseline structurally incapable of catching the one regression class in this stage's subject matter for which there is concrete historical evidence. Removing it is what makes that assertion load-bearing — and it is the assertion-level answer to "has anything here ever caught a real regression", since the eight smoke cases themselves have never fired on a product defect (see §2 of [the cost/value review](./cross-os-pipeline-review-2026-09.md)).
+Keeping the strip after the fix inverted its purpose: it left `version-text`'s `stderrExact: ""` baseline structurally incapable of catching the one regression class in this stage's subject matter for which there is concrete historical evidence. Removing it is what makes that assertion load-bearing — and it is the assertion-level answer to "has anything here ever caught a real regression", since the smoke cases themselves have never fired on a product defect (see §2 of [the cost/value review](./cross-os-pipeline-review-2026-09.md)).
 
 Verified 2026-09-03: two replay cases in `tests/unit/cli-smoke-parity.test.js` assert that the notice now fails `version-text`'s baseline, and the live collector was re-run on Windows 11 / Node 22 with all eight cases green and the notice absent.
 
@@ -74,11 +74,16 @@ Before adding an entry here, check which side of the boundary the line is on. If
 1. `ndx version`
 2. `ndx version --json`
 3. `ndx foobar`
-4. `ndx statis`
-5. `ndx help rex`
-6. `ndx help plan`
-7. `ndx status <TMPDIR>` with an empty fixture
-8. `ndx status --format=json <TMPDIR>` with a seeded `.rex` fixture
+4. `ndx help rex`
+5. `ndx help plan`
+6. `ndx status <TMPDIR>` with an empty fixture
+7. `ndx status --format=json <TMPDIR>` with a seeded `.rex` fixture
+
+`ndx statis` (`typo-suggestion`) was step 4 until 2026-09-03. It was retired because
+`tests/e2e/cli-hints.test.js` makes its three assertions verbatim and runs on ubuntu, macOS
+**and** Windows — one platform more than this collector — while edit-distance suggestion over a
+static command list carries no OS-shaped data for parity to compare. Step 3 still contributes an
+error-path shape fingerprint. See [the gauntlet audit](../../tests/gauntlet/AUDIT-2026-09.md).
 
 ## Baseline Contract
 

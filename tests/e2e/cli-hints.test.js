@@ -16,6 +16,16 @@ const UNKNOWN_COMMAND_CODE = "NDX_CLI_UNKNOWN_COMMAND";
 
 describe("ndx CLI hint surfacing and follow-through", () => {
   describe("typo-correction hints", () => {
+    // RECEIVING SUITE for the retired `typo-suggestion` CLI-smoke-parity case
+    // (scripts/cli-smoke-parity.mjs, removed 2026-09-03 — see
+    // tests/gauntlet/AUDIT-2026-09.md section D, case 4).
+    //
+    // The 'statis' case immediately below is what replaced it, and it is the
+    // stronger of the two: this file runs under `run-vitest-bind-aware.mjs
+    // root` in the `validate` (ubuntu), `smoke-macos` and `smoke-windows` CI
+    // jobs, whereas the smoke collector ran on macOS and Windows only. Keep
+    // the three assertions (UNKNOWN_COMMAND code, "Did you mean", "status")
+    // together — they are the whole of what the retired case contracted for.
     it("hint text matches valid command: 'statis' → 'status'", () => {
       const { stderr, status } = runFail(["statis"]);
       expect(stderr).toContain(`[${UNKNOWN_COMMAND_CODE}]`);

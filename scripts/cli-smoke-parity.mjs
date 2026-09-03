@@ -372,10 +372,18 @@ function describeSmokeCase(smokeCase) {
 // paths) which are correct native rendering, not drift. Comparing counts there
 // would fail on working behaviour.
 //
-// The six path-free cases all measured 0 backslashes and 0 CRLF on Windows 11,
+// The five path-free cases all measured 0 backslashes and 0 CRLF on Windows 11,
 // so any nonzero count on either platform means output grew a hardcoded
 // separator. If a message here ever legitimately gains a path, drop its flag in
 // the same change rather than loosening the check.
+//
+// REMOVED 2026-09-03 — `typo-suggestion` (`ndx statis`). Its assertions
+// (UNKNOWN_COMMAND code, "Did you mean", "status") are made verbatim by
+// tests/e2e/cli-hints.test.js, which `run-vitest-bind-aware.mjs root` executes
+// on ubuntu, macOS AND Windows — one OS more than this collector covers. The
+// suggestion is edit distance over a static command list, so it carries no
+// OS-shaped data, and `unknown-command` above already contributes an
+// error-path shape fingerprint. See tests/gauntlet/AUDIT-2026-09.md case D#4.
 export const SMOKE_CASES = [
   {
     id: "version-text",
@@ -407,19 +415,6 @@ export const SMOKE_CASES = [
     expected: {
       stderrCode: CLI_ERROR_CODES.UNKNOWN_COMMAND,
       stderrIncludes: ["Unknown command: foobar", "Hint:"],
-    },
-    shapeParity: true,
-    comparable(result) {
-      return { failure: extractFailureMetadata(result.stderrNormalized) };
-    },
-  },
-  {
-    id: "typo-suggestion",
-    args: () => ["statis"],
-    expectedExitCode: 1,
-    expected: {
-      stderrCode: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-      stderrIncludes: ["Unknown command: statis", "Did you mean", "status"],
     },
     shapeParity: true,
     comparable(result) {
