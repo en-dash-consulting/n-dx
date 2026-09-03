@@ -2,7 +2,7 @@
 id: "6f4360a7-c982-41c6-a46c-329115e8aab6"
 level: "feature"
 title: "Windows CLI Spawn Hardening"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "windows"
@@ -13,10 +13,11 @@ tags:
   - "gh:69"
 source: "github-issue-37"
 startedAt: "2026-07-13T15:42:48.255Z"
-endedAt: "2026-08-20T14:00:35.283Z"
+completedAt: "2026-09-03T18:19:36.251Z"
+endedAt: "2026-09-03T18:19:36.251Z"
 acceptanceCriteria: []
 description: "Combined fix for GitHub issues #37 (P0), #68, #69 — all one root cause: n-dx invokes CLI binaries (claude/codex) on Windows via the fragile `shell: process.platform === \"win32\"` pattern at three spawn sites (llm-client cli-provider.ts, llm-client codex-cli-provider.ts, hench cli-loop.ts). That workaround mitigates EINVAL but (a) triggers Node's [DEP0190] deprecation for shell:true+args (#69) and (b) fails to quote binary paths containing spaces (#68). Replace all three fragile guards with one centralized Windows-safe spawn helper that invokes .cmd shims via cmd.exe with a self-quoted verbatim command line. Tracked by GH #37; PR will close #37/#68/#69. Advances #42; rolls up under #92."
-lastModified: "2026-09-03T14:01:57.552Z"
+lastModified: "2026-09-03T18:19:36.275Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -34,7 +35,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [DEP0190 guard test: fail if any CLI spawn reintroduces shell:true](./dep0190-guard-test-fail-if-any-cli.md) | completed |
 | [Fix quoteWindowsToken: unconditional quoting + ArgvQuote backslash rules (both copies) with parity test](./fix-quotewindowstoken-unconditional.md) | completed |
 | [Fix Windows not-found diagnostics: hench close-path detection, pattern anchoring, absolute-path diagnosis, codex stdin guard](./fix-windows-not-found-diagnostics.md) | completed |
-| [Harden execShellCmd for Windows — `sh -c` is unresolvable outside Git Bash](./harden-execshellcmd-for-windows-sh-c.md) | pending |
+| [Harden execShellCmd for Windows — `sh -c` is unresolvable outside Git Bash](./harden-execshellcmd-for-windows-sh-c.md) | completed |
 | [PR #299 post-review: merge latest main (Hal's #298 overlap) and review cleanup](./pr-299-post-review-merge-latest-main.md) | completed |
 | [Remove claude-cli-adapter manual --allowed-tools pre-quoting (double-quoting regression)](./remove-claude-cli-adapter-manual.md) | completed |
 | [Restore Ctrl-C delivery to tree-killable children in exec()](./restore-ctrl-c-delivery-to-tree.md) | completed |

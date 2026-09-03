@@ -115,11 +115,21 @@ describe("execStdout", () => {
 });
 
 describe("execShellCmd", () => {
-  it("wraps command in sh -c", async () => {
+  // The shell is resolved per platform (see buildShellInvocation in
+  // @n-dx/llm-client): `sh -c` where a POSIX shell exists, cmd.exe on a
+  // Windows box without one. These cases pin the re-export through both
+  // branches rather than assuming the host's, which is what made the old
+  // unconditional `sh` assertion pass on Git Bash and fail from PowerShell.
+  it("wraps command in sh -c where a POSIX shell is available", async () => {
     const spawned = fakeSpawn("ok");
     mockSpawn.mockImplementation(spawned.impl);
 
-    await execShellCmd("echo hello | head", { cwd: "/tmp", timeout: 5000 });
+    await execShellCmd("echo hello | head", {
+      cwd: "/tmp",
+      timeout: 5000,
+      _platform: "linux",
+      _posixShellAvailable: true,
+    });
 
     expect(spawned.calls[0]!.cmd).toBe("sh");
     expect(spawned.calls[0]!.args).toEqual(["-c", "echo hello | head"]);
@@ -127,6 +137,51 @@ describe("execShellCmd", () => {
     // No `timeout` key — exec owns the timer. A shell is the case that most needs
     // it: `sh` dies on signal, the command it started does not.
     expect(spawned.calls[0]!.opts).not.toHaveProperty("timeout");
+  });
+
+  it("falls back to cmd.exe on a Windows box with no POSIX shell", async () => {
+    const spawned = fakeSpawn("ok");
+    mockSpawn.mockImplementation(spawned.impl);
+
+    await execShellCmd("pnpm test", {
+      cwd: "C:\\proj",
+      timeout: 5000,
+      _platform: "win32",
+      _posixShellAvailable: false,
+    });
+
+    expect(spawned.calls[0]!.cmd).toBe("cmd.exe");
+    expect(spawned.calls[0]!.args).toEqual(["/d", "/s", "/c", '"pnpm test"']);
+    expect(spawned.calls[0]!.opts.windowsVerbatimArguments).toBe(true);
+  });
+
+  it("marks a shell that could not be spawned as not launched", async () => {
+    // Callers infer pass/fail from exitCode; without this flag an unlaunchable
+    // shell (exitCode 1, no output) is indistinguishable from a failing suite.
+    mockSpawn.mockImplementation(((cmd: string, args: string[]) => {
+      void cmd;
+      void args;
+      const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
+      Object.assign(child, {
+        pid: undefined,
+        stdout: new EventEmitter(),
+        stderr: new EventEmitter(),
+        stdin: { end: () => {} },
+        kill: () => true,
+      });
+      setImmediate(() => child.emit("error", Object.assign(new Error("spawn sh ENOENT"), { code: "ENOENT" })));
+      return child as unknown as ReturnType<typeof spawn>;
+    }) as unknown as typeof spawn);
+
+    const result = await execShellCmd("pnpm test", {
+      cwd: "/tmp",
+      timeout: 5000,
+      _platform: "linux",
+      _posixShellAvailable: true,
+    });
+
+    expect(result.launched).toBe(false);
+    expect(result.exitCode).toBe(1);
   });
 });
 

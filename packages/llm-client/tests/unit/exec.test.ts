@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, buildShellInvocation, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
 import { resolve } from "node:path";
 import { fakeSpawn } from "../helpers/fake-spawn.js";
 
@@ -260,12 +260,60 @@ describe("execStdout", () => {
   });
 });
 
+describe("buildShellInvocation", () => {
+  // Pure function — these run on every platform, which is the point: the win32
+  // decision must be assertable from CI's Linux runner.
+  it("uses sh -c on POSIX", () => {
+    expect(buildShellInvocation("echo hi | head", "linux", true)).toEqual({
+      cmd: "sh",
+      args: ["-c", "echo hi | head"],
+      kind: "posix",
+    });
+  });
+
+  it("prefers sh -c on win32 when a POSIX shell is resolvable", () => {
+    // Git for Windows boxes keep byte-identical POSIX semantics — the fix must
+    // not quietly reinterpret their commands under cmd.exe.
+    expect(buildShellInvocation("ls *.ts", "win32", true)).toEqual({
+      cmd: "sh",
+      args: ["-c", "ls *.ts"],
+      kind: "posix",
+    });
+  });
+
+  it("falls back to cmd.exe on win32 when no POSIX shell is resolvable", () => {
+    expect(buildShellInvocation("npm run test", "win32", false)).toEqual({
+      cmd: "cmd.exe",
+      args: ["/d", "/s", "/c", '"npm run test"'],
+      kind: "cmd",
+    });
+  });
+
+  it("ignores the probe off win32 — POSIX never routes through cmd.exe", () => {
+    for (const platform of ["linux", "darwin"] as const) {
+      expect(buildShellInvocation("echo hi", platform, false).cmd).toBe("sh");
+    }
+  });
+
+  it("wraps the cmd.exe command line in exactly one quote pair", () => {
+    // `/s` strips the outermost pair and leaves the rest verbatim, so quotes
+    // the caller put around a spaced path must survive untouched.
+    const { args } = buildShellInvocation('vitest run "src/a b/x.test.ts"', "win32", false);
+    expect(args[3]).toBe('"vitest run "src/a b/x.test.ts""');
+  });
+});
+
 describe("execShellCmd", () => {
   it("wraps command in sh -c", async () => {
     const spawned = fakeSpawn({ stdout: "ok" });
     mockSpawn.mockImplementation(spawned.impl);
 
-    await execShellCmd("echo hello | head", { cwd: "/tmp", timeout: 5000 });
+    await execShellCmd("echo hello | head", {
+      cwd: "/tmp",
+      timeout: 5000,
+      _platform: "linux",
+      _posixShellAvailable: true,
+    });
 
     expect(spawned.calls[0]!.cmd).toBe("sh");
     expect(spawned.calls[0]!.args).toEqual(["-c", "echo hello | head"]);
@@ -274,15 +322,75 @@ describe("execShellCmd", () => {
     // the case that most needs it — `sh` dies on signal while the command it
     // started does not.
     expect(spawned.calls[0]!.opts).not.toHaveProperty("timeout");
+    // POSIX must not pick up the cmd.exe-only verbatim flag.
+    expect(spawned.calls[0]!.opts).not.toHaveProperty("windowsVerbatimArguments");
   });
 
   it("returns ExecResult from the shell invocation", async () => {
     mockSpawn.mockImplementation(fakeSpawn({ stdout: "hello\n" }).impl);
 
-    const result = await execShellCmd("echo hello", { cwd: "/tmp", timeout: 5000 });
+    const result = await execShellCmd("echo hello", {
+      cwd: "/tmp",
+      timeout: 5000,
+      _platform: "linux",
+      _posixShellAvailable: true,
+    });
 
     expect(result.stdout).toBe("hello\n");
     expect(result.exitCode).toBe(0);
+    expect(result.launched).toBe(true);
+  });
+
+  it("spawns cmd.exe verbatim on a win32 box with no POSIX shell", async () => {
+    const spawned = fakeSpawn({ stdout: "ok" });
+    mockSpawn.mockImplementation(spawned.impl);
+
+    await execShellCmd("npm run test", {
+      cwd: "C:\\proj",
+      timeout: 5000,
+      _platform: "win32",
+      _posixShellAvailable: false,
+    });
+
+    expect(spawned.calls[0]!.cmd).toBe("cmd.exe");
+    expect(spawned.calls[0]!.args).toEqual(["/d", "/s", "/c", '"npm run test"']);
+    // Without this, Node re-quotes the already-self-quoted line and /s strips
+    // the wrong pair.
+    expect(spawned.calls[0]!.opts.windowsVerbatimArguments).toBe(true);
+  });
+
+  it("reports launched:false when the shell itself cannot be spawned", async () => {
+    // The original defect: `sh` missing on Windows produced exitCode 1 with no
+    // output, which every caller read as "the command ran and failed".
+    const enoent = Object.assign(new Error("spawn sh ENOENT"), { code: "ENOENT" });
+    mockSpawn.mockImplementation(fakeSpawn({ spawnError: enoent }).impl);
+
+    const result = await execShellCmd("npm run test", {
+      cwd: "/tmp",
+      timeout: 5000,
+      _platform: "linux",
+      _posixShellAvailable: true,
+    });
+
+    expect(result.launched).toBe(false);
+    expect(result.exitCode).toBe(1);
+    expect(result.error?.message).toContain("ENOENT");
+  });
+
+  it("reports launched:true for a shell that ran and exited non-zero", async () => {
+    // The discriminator has to separate these two cases, not just flag the
+    // failing one — a real test failure must stay reportable as such.
+    mockSpawn.mockImplementation(fakeSpawn({ stderr: "1 failed", code: 1 }).impl);
+
+    const result = await execShellCmd("npm run test", {
+      cwd: "/tmp",
+      timeout: 5000,
+      _platform: "linux",
+      _posixShellAvailable: true,
+    });
+
+    expect(result.launched).toBe(true);
+    expect(result.exitCode).toBe(1);
   });
 });
 
