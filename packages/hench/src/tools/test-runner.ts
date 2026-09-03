@@ -453,7 +453,26 @@ export interface TestGateOptions {
   timeout?: number;
 }
 
-const TEST_GATE_TIMEOUT = 300_000; // 5 minutes
+/**
+ * Budget for the whole-suite gate.
+ *
+ * RAISED 5m → 15m, from measurement. This repo's `npm run test` was timed at
+ * **248s** on an idle machine (2026-09-03, Windows 11, Node v22) — 83% of the
+ * old 300_000 ceiling. The gate runs at the end of an `ndx work` task, when the
+ * agent's own subprocesses are still competing for cores, so the suite is
+ * reliably slower there than when measured by hand. A budget the happy path
+ * already nearly exhausts is a flake generator, not a guardrail.
+ *
+ * This is a HANG guardrail, not a latency SLA — nothing about the project is
+ * asserted by the number, so the cost of setting it generously is only a slower
+ * failure when something is genuinely stuck. 3x the measured duration leaves
+ * room for a suite that grows and for a loaded machine, and still bounds a hang.
+ *
+ * Re-measure before tightening: `npm run test` at the repo root, and compare
+ * against the timeout the gate actually used (it is reported in the timeout
+ * message, which now names both durations).
+ */
+const TEST_GATE_TIMEOUT = 900_000; // 15 minutes — see above; measured 248s idle
 
 /**
  * Vitest JSON reporter output structure.
@@ -485,13 +504,37 @@ function extractPackageName(filepath: string): string {
   return filepath;
 }
 
+/** How much raw runner output to keep when there is nothing structured to show. */
+const RAW_OUTPUT_CHARS = 2000;
+
 /**
- * Parse vitest JSON output and aggregate results by package.
+ * Parse test-runner output and aggregate results by package.
  *
- * Handles both successful JSON parsing and fallback to stderr parsing
- * when JSON is malformed.
+ * Two shapes are handled, and the second is not a degraded case — it is the
+ * normal one for most projects:
+ *
+ * 1. **vitest JSON** (`--reporter=json`), the gate's own default command.
+ * 2. **Anything else.** `autoDetectTestCommand` returns `npm run test` whenever
+ *    package.json has a `test` script, which is most repos and this one — where
+ *    it runs `scripts/run-all-tests.mjs` and prints a human-readable summary.
+ *
+ * NEVER RETURNS AN EMPTY ARRAY for a run that produced output. It used to, and
+ * that was the defect: JSON.parse threw, the fallback looked only at stderr
+ * while this runner writes its summary to stdout, and `[]` came back. The
+ * lifecycle rendered that as `✗ 0/0 package(s) failed` and found no
+ * `failureOutput` to print, so a genuine failure was indistinguishable from a
+ * suite that never launched — and neither told the operator anything. An
+ * unparseable failing run must still hand back the raw output.
+ *
+ * @param passed Whether the command exited zero. Needed because an unparseable
+ *   run still has a known outcome, and a fabricated package entry must not
+ *   claim the opposite of it.
  */
-function parseVitestOutput(stdout: string, stderr: string): TestPackageResult[] {
+function parseVitestOutput(
+  stdout: string,
+  stderr: string,
+  passed: boolean,
+): TestPackageResult[] {
   // Try to parse JSON output from stdout
   if (stdout.trim()) {
     try {
@@ -540,35 +583,70 @@ function parseVitestOutput(stdout: string, stderr: string): TestPackageResult[] 
 
       return Array.from(packages.values());
     } catch {
-      // JSON parse failed — fall through to stderr parsing
+      // Not vitest JSON — fall through to the human-readable path below.
     }
   }
 
-  // Fallback: parse stderr for error messages
-  if (stderr.trim()) {
-    // Extract package names from error patterns like "packages/xyz/..."
-    const pkgMatches = stderr.match(/packages\/([^/\s]+)/g) ?? [];
-    const pkgNames = new Set(
-      pkgMatches.map((m) => m.split("/")[1]).filter(Boolean),
-    );
+  // BOTH streams, not just stderr. Test runners disagree about which one carries
+  // the summary: vitest writes it to stderr, `scripts/run-all-tests.mjs` writes
+  // it to stdout. Reading only stderr meant a failing run through the latter
+  // produced no packages and no output at all.
+  const combined = [stdout.trim(), stderr.trim()].filter(Boolean).join("\n");
 
-    if (pkgNames.size > 0) {
-      return Array.from(pkgNames).map((name) => ({
-        name,
-        passed: false,
-        failureOutput: truncateOutput(stderr, "", 500),
-      }));
-    }
-
-    // Generic failure with no package info
+  if (!combined) {
+    // A command that ran, said nothing, and exited. Still reported rather than
+    // dropped: "no output" is itself the diagnosis when a gate goes red.
     return [{
       name: "workspace",
-      passed: false,
-      failureOutput: truncateOutput(stderr, "", 500),
+      passed,
+      failureOutput: passed ? undefined : "The test command produced no output.",
     }];
   }
 
-  return [];
+  // Truncates the COMBINED text, not `truncateOutput(stdout, stderr, …)` — that
+  // helper takes `stdout || stderr`, so a non-empty stdout discards stderr
+  // entirely. Vitest splits its output across both: the progress lines and the
+  // `×` markers go to stdout, the AssertionError block to stderr. Preferring one
+  // stream showed the operator which test failed but not why.
+  const rawOutput = truncateOutput(combined, "", RAW_OUTPUT_CHARS);
+
+  // A passing run needs no post-mortem — attaching output to a green gate is
+  // noise, and the package list exists only so the count is honest.
+  if (passed) {
+    return [{ name: "workspace", passed: true }];
+  }
+
+  // Name the failing packages when the output identifies them, so the summary
+  // line is useful on its own.
+  //
+  // Scanned per-LINE, and only lines carrying a failure marker. Matching package
+  // names across the whole output would collect every package the run mentions —
+  // a summary listing `PASS @n-dx/hench` through `FAIL @n-dx/rex` would report
+  // all six as failed. Confidently wrong is worse than unspecific: when nothing
+  // matches, this falls back to one `workspace` entry carrying the raw output,
+  // which still shows the operator exactly what happened.
+  const failureLines = combined
+    .split(/\r?\n/)
+    .filter((line) => /(\bFAIL(ED)?\b|✗|×|\bfailed:)/i.test(line));
+
+  const pkgNames = new Set(
+    failureLines.flatMap((line) => [
+      ...(line.match(/packages\/([^/\s]+)/g) ?? []).map((m) => m.split("/")[1]),
+      ...(line.match(/@[a-z0-9-]+\/[a-z0-9-]+/gi) ?? []).map((m) => m.split("/")[1]),
+    ]).filter(Boolean),
+  );
+
+  if (pkgNames.size > 0) {
+    // Raw output goes on the FIRST entry only. Repeating a 2 KB dump per package
+    // buries the one copy the operator needs to read.
+    return Array.from(pkgNames).map((name, i) => ({
+      name,
+      passed: false,
+      failureOutput: i === 0 ? rawOutput : undefined,
+    }));
+  }
+
+  return [{ name: "workspace", passed: false, failureOutput: rawOutput }];
 }
 
 /**
@@ -633,21 +711,46 @@ export async function runTestGate(
     };
   }
 
-  // Handle timeout
+  // Timed out.
+  //
+  // Still FAILS the run, deliberately — unlike a suite that never launched. A
+  // gate that cannot finish inside its budget, on code the agent has just
+  // changed, is a reason to stop and have someone look; a hang is often the
+  // change. Only the reporting changes here.
+  //
+  // What changes: it no longer returns an empty package list, which printed as
+  // `✗ 0/0 package(s) failed` — the same output as every other unreportable
+  // outcome. And whatever arrived before the kill is kept, because a suite that
+  // hangs usually hangs somewhere specific and that place is in the partial
+  // output.
   if (exitCode === null) {
+    // Combined for the same reason as the parse path below: a runner splits its
+    // output across both streams, and preferring one drops half the evidence.
+    const partial = truncateOutput(
+      [stdout.trim(), stderr.trim()].filter(Boolean).join("\n"),
+      "",
+      RAW_OUTPUT_CHARS,
+    );
     return {
       ran: true,
       passed: false,
-      packages: [],
+      packages: [
+        {
+          name: "workspace",
+          passed: false,
+          failureOutput: partial || "No output was produced before the timeout.",
+        },
+      ],
       command,
       totalDurationMs,
-      error: "Test command timed out",
+      error:
+        `Test command timed out after ${formatMs(timeout)} ` +
+        `(ran for ${formatMs(totalDurationMs)})`,
     };
   }
 
-  // Parse output to extract per-package results
-  const packages = parseVitestOutput(stdout, stderr);
   const overallPassed = exitCode === 0;
+  const packages = parseVitestOutput(stdout, stderr, overallPassed);
 
   return {
     ran: true,
@@ -656,6 +759,13 @@ export async function runTestGate(
     command,
     totalDurationMs,
   };
+}
+
+/** Whole seconds for short spans, minutes and seconds beyond one minute. */
+function formatMs(ms: number): string {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
 // ---------------------------------------------------------------------------

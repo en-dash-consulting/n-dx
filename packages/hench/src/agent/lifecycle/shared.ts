@@ -2069,10 +2069,14 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             // `Test gate failed: ` with nothing after it told the operator
             // precisely nothing about why their run died.
             run.status = "failed";
-            run.error =
-              failedPackages.length > 0
-                ? `Test gate failed: ${failedPackages.join(", ")}`
-                : `Test gate failed: ${testGate.error ?? "no package results were reported"}`;
+            // `error` wins when set: it carries the specific diagnosis (a
+            // timeout and its duration), which the package list cannot express.
+            const reason =
+              testGate.error ??
+              (failedPackages.length > 0
+                ? failedPackages.join(", ")
+                : "no package results were reported");
+            run.error = `Test gate failed: ${reason}`;
             gateComplete = true;
           }
         }

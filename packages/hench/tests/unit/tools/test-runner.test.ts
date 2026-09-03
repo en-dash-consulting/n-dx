@@ -683,6 +683,166 @@ describe("runTestGate — launched vs failed", () => {
     expect(result.packages.length).toBeGreaterThan(0);
   });
 
+  /**
+   * The real `npm run test` summary from this repo, which is what
+   * autoDetectTestCommand selects. Not vitest JSON, and the summary is on
+   * STDOUT — the two facts that together produced an empty package list.
+   */
+  const RUN_ALL_TESTS_OUTPUT = [
+    "──────── summary ────────",
+    "",
+    "  PASS  root (tests/**)",
+    "  PASS  @n-dx/hench",
+    "  PASS  @n-dx/llm-client",
+    "  FAIL  @n-dx/rex",
+    "  PASS  @n-dx/sourcevision",
+    "  PASS  @n-dx/web",
+    "",
+    "5/6 suites passed — failed: @n-dx/rex",
+  ].join("\n");
+
+  it("surfaces raw output when the runner is not vitest JSON", async () => {
+    const runTestGate = await withExecResult({
+      stdout: RUN_ALL_TESTS_OUTPUT,
+      stderr: "",
+      exitCode: 1,
+      error: new Error("Command failed"),
+      launched: true,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+    });
+
+    expect(result.ran).toBe(true);
+    expect(result.passed).toBe(false);
+
+    // The defect: this was `[]`, which rendered as `0/0 package(s) failed`.
+    expect(result.packages.length).toBeGreaterThan(0);
+
+    // The operator has to be able to see what actually broke.
+    const output = result.packages.map((p) => p.failureOutput ?? "").join("\n");
+    expect(output).toContain("FAIL  @n-dx/rex");
+    expect(output).toContain("5/6 suites passed");
+  });
+
+  it("names only the failing package, not every package in the summary", async () => {
+    const runTestGate = await withExecResult({
+      stdout: RUN_ALL_TESTS_OUTPUT,
+      stderr: "",
+      exitCode: 1,
+      error: new Error("Command failed"),
+      launched: true,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+    });
+
+    // Scanning the whole output for package names would collect all six, and
+    // report five passing packages as failures.
+    expect(result.packages.map((p) => p.name)).toEqual(["rex"]);
+  });
+
+  it("keeps the assertion message when the runner splits output across streams", async () => {
+    // Vitest does exactly this: `×` markers and progress on stdout, the
+    // AssertionError block on stderr. `truncateOutput(stdout, stderr, n)` takes
+    // `stdout || stderr`, so a non-empty stdout dropped stderr and the operator
+    // was told WHICH test failed but never WHY. Caught by running the real gate
+    // against a deliberately failing test, not by this test — which exists so it
+    // cannot come back.
+    const runTestGate = await withExecResult({
+      stdout: " ❯ tests/unit/x.test.ts (1 test | 1 failed)\n     × adds correctly",
+      stderr: "AssertionError: expected 42 to be 43 // Object.is equality",
+      exitCode: 1,
+      error: new Error("Command failed"),
+      launched: true,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npx vitest run",
+    });
+
+    const output = result.packages[0].failureOutput ?? "";
+    expect(output).toContain("× adds correctly");
+    expect(output).toContain("expected 42 to be 43");
+  });
+
+  it("reports a passing non-JSON run as passing, without attaching output", async () => {
+    const runTestGate = await withExecResult({
+      stdout: "6/6 suites passed",
+      stderr: "",
+      exitCode: 0,
+      error: null,
+      launched: true,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+    });
+
+    expect(result.passed).toBe(true);
+    // Never `0/0`, even on the happy path — the count has to be honest.
+    expect(result.packages.length).toBeGreaterThan(0);
+    expect(result.packages.every((p) => p.passed)).toBe(true);
+    expect(result.packages[0].failureOutput).toBeUndefined();
+  });
+
+  it("reports a silent failing command rather than returning nothing", async () => {
+    const runTestGate = await withExecResult({
+      stdout: "",
+      stderr: "",
+      exitCode: 1,
+      error: new Error("Command failed"),
+      launched: true,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+    });
+
+    expect(result.packages.length).toBeGreaterThan(0);
+    expect(result.packages[0].failureOutput).toContain("no output");
+  });
+
+  it("reports a timeout distinctly, with the partial output and both durations", async () => {
+    const runTestGate = await withExecResult({
+      stdout: "running packages/rex…",
+      stderr: "",
+      exitCode: null,
+      error: new Error("ETIMEDOUT"),
+      launched: true,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+      timeout: 90_000,
+    });
+
+    // A timeout still fails the run — a gate that cannot finish on freshly
+    // changed code is a reason to stop — but says so in its own words.
+    expect(result.ran).toBe(true);
+    expect(result.passed).toBe(false);
+    expect(result.error).toContain("timed out");
+    expect(result.error).toContain("1m 30s");
+
+    // Distinct from a never-launched suite, which reports `ran: false`.
+    expect(result.packages.length).toBeGreaterThan(0);
+    expect(result.packages[0].failureOutput).toContain("running packages/rex");
+  });
+
   it("still reports a genuine zero exit as a pass", async () => {
     const runTestGate = await withExecResult({
       stdout: JSON.stringify({

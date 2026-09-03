@@ -21,4 +21,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Replace rex's wall-clock scaling assertion — it fails the gate under agent CPU load](./replace-rex-s-wall-clock-scaling.md) | completed |
 | [Resolve test command via project config with interactive prompt fallback for unknown or inaccessible suites](./resolve-test-command-via-project.md) | completed |
 | [Test gate must not fail a run for a suite it never executed](./test-gate-must-not-fail-a-run-for-a.md) | completed |
-| [Test gate must surface real failure output when the runner is not vitest --reporter=json](./test-gate-must-surface-real-failure.md) | pending |
+| [Test gate must surface real failure output when the runner is not vitest --reporter=json](./test-gate-must-surface-real-failure.md) | completed |

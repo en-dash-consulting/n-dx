@@ -112,6 +112,22 @@ async function hasXcodeProjectMarker(projectDir: string): Promise<boolean> {
  *
  * Returns undefined when no signal matches; the resolver then prompts or
  * surfaces a clear "configure a test command" error.
+ *
+ * ## Contract with the gate's output parser
+ *
+ * Nothing here appends a machine-readable reporter flag, and that is deliberate.
+ * The commands returned are the project's OWN entry points — `make validate`,
+ * `npm run test`, `cargo test`, `pytest` — and their output format is the
+ * project's business. Adding `--reporter=json` would mean guessing the runner
+ * behind an arbitrary script, and guessing wrong turns a working gate into a
+ * broken one (`npm run test -- --reporter=json` fails outright against a script
+ * that is not vitest).
+ *
+ * So the obligation sits on the parser instead: `parseVitestOutput` reads vitest
+ * JSON when it is offered and falls back to surfacing raw output otherwise. It
+ * must never require a format this function cannot promise. See its docblock —
+ * assuming JSON here was what rendered real failures as `0/0 package(s) failed`
+ * with no reason attached.
  */
 async function autoDetectTestCommand(projectDir: string): Promise<string | undefined> {
   // 1. Makefile `validate` target — strong project-author intent signal.
