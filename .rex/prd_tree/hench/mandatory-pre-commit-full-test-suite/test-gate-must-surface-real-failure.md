@@ -9,7 +9,7 @@ tags:
   - "test-gate"
   - "diagnostics"
 blockedBy:
-  - "f125703d-34c1-4d9b-a452-43b405340525"
+  - "02351b92-4b60-43cf-b1bc-317ea895e39f"
 source: "ndx-capture"
 acceptanceCriteria:
   - "A failing test run whose output cannot be parsed still surfaces raw stdout/stderr (truncated) to the operator rather than rendering as `0/0` with a blank reason"
