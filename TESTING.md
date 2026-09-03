@@ -267,10 +267,18 @@ than the one below it.
 
 - **1. Count work, not time.** Traversal steps, call counts, rendered node
   counts are exact on every machine and cannot flake. `countDOMNodes`' complexity
-  test counts `firstChild`/`nextSibling`/`parentNode` accesses. Reach for a clock
-  only when the cost being guarded is not countable from inside the call — I/O
-  bound work such as the `prd_tree` parse and serialize passes, where what
-  regresses is syscall volume.
+  test counts `firstChild`/`nextSibling`/`parentNode` accesses.
+  `add-auto-reshape.test.ts` counts calls to `similarity`, the pairwise primitive
+  whose call count *is* the complexity — grouping calls it once per colliding
+  pair, comparing every sibling against every other calls it O(n²) times. Reach
+  for a clock only when the cost being guarded is not countable from inside the
+  call — I/O bound work such as the `prd_tree` parse and serialize passes, where
+  what regresses is syscall volume.
+
+  Count the primitive, not the data access. A counter on the primitive survives a
+  refactor that copies the cohort into a local structure; one that counts field
+  reads on the input does not, because the copy makes the reads linear again while
+  the algorithm stays quadratic.
 
 - **2. When you must use a clock, assert GROWTH between two sizes** rather than
   elapsed milliseconds against a constant. Measure two fixture sizes back-to-back
@@ -278,13 +286,23 @@ than the one below it.
   together, so the ratio survives a busy machine while a genuine complexity
   regression still trips it. Worked examples, each with its derivation recorded in
   place: `folder-tree-parser.test.ts` (parse, ~11× size step),
-  `add-auto-reshape.test.ts` (scoped pass, 4× sibling step),
   `write-path-profile.test.ts` (four phases, 39.6× step).
 
   An earlier version of this section banned ratios outright, after a
   linear-scaling check measured 43× against a 30× ceiling. That flake was a bound
   picked without measurement, not a fault in the technique — which is what the
   next rule exists to prevent.
+
+  **A ratio still fails when the thing you time is mostly not the thing you
+  guard.** `add-auto-reshape.test.ts` was the worked example here until it was
+  converted to rule 1. Its readings were dominated by loading the tree (26 vs 101
+  items) rather than by the cohort scan it claimed to guard, so the noise floor
+  sat at the bound: it failed at 8.6× against 8× on an *idle* machine, having
+  already been hardened three times — absolute budget → ratio, shared store → one
+  store per size, single shot → min of 7. Before reaching for a ratio, check that
+  the measured work is dominated by the operation whose complexity is in
+  question; if it is not, no bound will separate signal from noise, and rule 1 is
+  the only way out.
 
 - **3. Derive a ratio bound from measurement in BOTH directions, and record the
   numbers.** Clean runs set the floor: take the worst ratio across at least three
