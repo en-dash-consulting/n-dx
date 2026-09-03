@@ -2,11 +2,12 @@
 id: "4fc05c48-48b0-4da3-8126-4fa237b924d9"
 level: "epic"
 title: "Hench"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-26T15:22:13.999Z"
-completedAt: "2026-07-22T14:48:00.299Z"
 endedAt: "2026-07-22T14:48:00.299Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
+lastModified: "2026-09-03T14:02:19.166Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -32,7 +33,7 @@ description: "Autonomous agent: picks rex tasks, builds briefs with codebase con
 | [Hench Run-Loop Visual Output Refinements](./hench-run-loop-visual-output-refinements/index.md) | completed |
 | [Hench UI Real-time Task Monitoring](./hench-ui-real-time-task-monitoring/index.md) | completed |
 | [Loop Consecutive-Failure Auto-Cancellation](./loop-consecutive-failure-auto/index.md) | completed |
-| [Mandatory Pre-Commit Full Test Suite Gate](./mandatory-pre-commit-full-test-suite/index.md) | completed |
+| [Mandatory Pre-Commit Full Test Suite Gate](./mandatory-pre-commit-full-test-suite/index.md) | pending |
 | [Reliable work loop](./reliable-work-loop/index.md) | completed |
 | [Rex Run Rolling Log Display and Persistent Log Files](./rex-run-rolling-log-display-and/index.md) | completed |
 | [Run Failure Recovery and Rollback](./run-failure-recovery-and-rollback/index.md) | completed |
