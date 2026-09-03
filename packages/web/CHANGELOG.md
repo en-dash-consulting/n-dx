@@ -1,5 +1,103 @@
 # @n-dx/web
 
+## 0.5.2
+
+### Patch Changes
+
+- [#345](https://github.com/en-dash-consulting/n-dx/pull/345) [`0c9c31d`](https://github.com/en-dash-consulting/n-dx/commit/0c9c31da941fc92ec6ce14e6ed2e3d6c3fcfecae) Thanks [@endash-shal](https://github.com/endash-shal)! - Mark where the SourceVision Ask panel and its Rex/Hench siblings will land
+  
+  The PRD gained a "SourceVision Ask Panel" feature — a gated text exchange over
+  the analysed project that can explain a finding in plain language and propose
+  PRD refinements. The code side of this branch is markers only, no behaviour: a
+  placement comment in `SOURCEVISION_TABS` for the gated `Ask` tab, plus adoption
+  markers in `domain-rex.ts` and `domain-hench.ts` for the two surfaces that want
+  the same panel afterwards.
+  
+  The Rex and Hench panels are intentionally absent from the PRD. The sequence is
+  to build the SourceVision one, generalise it, then lift the shared piece out —
+  so the markers record the intent (and, for Rex, that a panel there must reuse
+  the existing `withTransaction` apply path rather than adding a second PRD write
+  surface) without implying scheduled work.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Count and price cache tokens in every usage rollup.
+  
+  Run records carry four token fields — input, output, cacheCreationInput,
+  cacheReadInput — but the rollups summed only the first two, and neither cost
+  estimator priced the cache at all. On this repo `ndx usage` reported 1,212,931
+  tokens and $18.00 across 1,024 runs; the same runs actually hold 668,969,084
+  tokens and cost roughly $237.74. Cache reads alone were 662M of that, 99% of
+  all tokens and completely invisible.
+  
+  Cache tokens are billed, not free: a write costs about 1.25x the input rate and
+  a read about 0.1x. Dropping them did not make the estimate approximate, it made
+  it wrong by more than an order of magnitude — and it hid the one number the
+  cost work moves, since batching and warm-parent forking trade fresh input for
+  cache reads.
+  
+  `PackageTokenUsage`, `AggregateTokenUsage`, and `TokenEvent` now carry
+  `cacheCreationTokens` and `cacheReadTokens` through extraction, grouping, and
+  aggregation. `ModelPricing` gains cache rates and `CostEstimate` reports the
+  two new cost components. CLI output breaks the four kinds out rather than
+  collapsing them, since they bill at four different rates — cache segments are
+  omitted when zero, so a project that never caches keeps the old two-part line.
+  
+  The dashboard already counted cache tokens but never priced them; its
+  `estimateCost` now matches. Because the dashboard keeps a second copy of the
+  aggregation, a new parity test pins the two pricing tables and both cost
+  formulas to each other so they cannot drift into quoting different dollar
+  figures for the same runs.
+
+- [#350](https://github.com/en-dash-consulting/n-dx/pull/350) [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8) Thanks [@dnaniel](https://github.com/dnaniel)! - The isometric map is now a dashboard view instead of a link out to a raw page.
+  
+  **SourceVision → Isometric Map** renders the map inline and puts its generation options in the UI: Source (auto / SourceVision analysis / direct scan), Max nodes (1–500) and an externals toggle, with Generate, Open in new tab and Download HTML. Each request is fetched by the view rather than handed straight to the frame, so "no analysis yet" arrives as a readable card that points at `ndx analyze` or the direct-scan option instead of a JSON error page rendered inside the map. The map document itself runs in a scripts-only sandbox — it needs scripts for pan, zoom and zone selection, and nothing else.
+  
+  The view is hidden from navigation in an exported dashboard, where no server exists to build the map, and the Architecture page's old external link now points at the view.
+
+- [#350](https://github.com/en-dash-consulting/n-dx/pull/350) [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8) Thanks [@dnaniel](https://github.com/dnaniel)! - Fix two isometric-map defects the new UI smoke test exposed.
+  
+  `ndx init` writes empty `.sourcevision/` data files before anything has been analyzed, so `hasSourcevision()` was true on a freshly-initialized project and auto mode never fell back to a scan. A project full of source that had not been analyzed yet reported "nothing to map". Auto now falls back when the analysis parses but contains no zones.
+  
+  `GET /api/iso-map` answered 404 for "this project has nothing to map yet". That is a state of the map, not a missing resource, and a 4xx on a `fetch` writes a network error into the browser console — which `tests/e2e-ui/navigation.spec.ts` requires every view to load without. It now answers 200 with an `x-iso-map-empty` marker header and a readable empty-state page, so the viewer still renders its own empty card and anyone opening the URL directly gets a page rather than a JSON blob. Genuine faults (bad parameter, wrong method, build failure) remain 4xx/5xx.
+  
+  Also adds the `iso-map` and pre-existing `pr-markdown` views to the navigation smoke test, whose list is meant to track every `ViewId`.
+
+- [#350](https://github.com/en-dash-consulting/n-dx/pull/350) [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8) Thanks [@dnaniel](https://github.com/dnaniel)! - Iso map: one implementation, several gaps closed.
+  
+  The standalone skill script is now generated from `packages/sourcevision/src/export/` by `scripts/build-iso-skill.mjs` rather than hand-maintained, so the map has a single source of truth; `tests/e2e/iso-skill-drift.test.js` fails if the committed bundle goes stale, and also executes it. This removed a real divergence where the two copies disagreed on zone colours because one counted archetypes before mapping them to kinds and the other after — kinds are now resolved per file and counted once, which answers "what does this zone do" rather than "what is its most common file type".
+  
+  Also: the project scanner moved into the package (`iso-scan.ts`) and gained tsconfig `paths`, workspace-package and Go `go.mod` resolution, so a monorepo's own packages stop looking third-party; call-graph data, when present, adds per-edge runtime call counts with a Weight: imports/calls toggle and surfaces call-only edges as injected seams; output is reproducible (timestamps default to the HEAD commit time); key files link to source via the git remote; multi-layer edges route through corridors between rows instead of cutting through blocks; and the page gained a light theme, reduced-motion support, kind glyphs alongside colour, a skip link, and a tab order of one stop per zone instead of one per connector.
+  
+  New: `ndx iso`, `sourcevision iso --source=scan`, and `GET /api/iso-map` in the web dashboard.
+
+- [#347](https://github.com/en-dash-consulting/n-dx/pull/347) [`f0cf5d3`](https://github.com/en-dash-consulting/n-dx/commit/f0cf5d3bab556b80251a47206ad5fdc0ee587e93) Thanks [@jeremylumanbailey](https://github.com/jeremylumanbailey)! - Protect the loopback dashboard from cross-origin state changes by rejecting untrusted browser mutations and replacing wildcard CORS with a validated loopback origin.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Expose the task-routing config surface in `ndx config` and the dashboard.
+  
+  `ndx config` now validates `llm.tiers.<vendor>.<tier>`, `llm.routes.<class>`,
+  `llm.effort.<class>`, and `llm.escalation.*`, and documents them in `--help`
+  along with the fact that top-level `llm.model` is a standard-tier shorthand
+  rather than a global override. The dashboard's LLM config route accepts the
+  same keys, plus `llm.model` itself — writable via the CLI but previously absent
+  from the route's allowlist, so the field with the highest precedence over the
+  model actually used was invisible in the UI.
+  
+  Validation is deliberately asymmetric. Values are checked strictly, and so is
+  the shape of a tier path: an unrecognized vendor or tier there is a typo, never
+  a feature. Route and effort *class names* stay open, because glob keys
+  (`prd.*`, `*`) are the documented routing design and this layer cannot see the
+  task-class registry without importing across a tier boundary.
+  
+  Both surfaces also had to learn that task classes contain dots. Since config
+  paths use dots as separators, `llm.routes.agent.execute` would otherwise write
+  a nested `{agent: {execute}}` object — which the flat-map extractor in
+  `loadLLMConfig` silently ignores, making the setting appear to work while
+  changing nothing. Those two sections now treat everything after the section
+  name as one literal key, on both the read and write paths.
+- Updated dependencies [[`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8), [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8), [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8), [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8), [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`f0cf5d3`](https://github.com/en-dash-consulting/n-dx/commit/f0cf5d3bab556b80251a47206ad5fdc0ee587e93), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`0c9c31d`](https://github.com/en-dash-consulting/n-dx/commit/0c9c31da941fc92ec6ce14e6ed2e3d6c3fcfecae), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec)]:
+  - @n-dx/rex@0.5.2
+  - @n-dx/llm-client@0.5.2
+  - @n-dx/sourcevision@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes

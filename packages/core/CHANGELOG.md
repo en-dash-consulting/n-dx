@@ -1,5 +1,239 @@
 # @n-dx/core
 
+## 0.5.2
+
+### Patch Changes
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Add a distilled repo primer and prefer it over CONTEXT.md as agent startup
+  context.
+  
+  `ndx work` pipes CONTEXT.md plus a PRD excerpt into every task spawn. Even
+  capped, that document is written for breadth — zone metrics, findings, route
+  tables, import summaries — while a task starting work needs where things live,
+  how to build and test, and what the conventions are. It needs that on every
+  task and every retry, which is what makes distilling it worth one LLM call.
+  
+  `sourcevision analyze` now writes `.sourcevision/PRIMER.md`, and the
+  orchestrator reads it in preference to CONTEXT.md, falling back silently when
+  absent. The distiller lives in sourcevision rather than beside the pipe it
+  feeds: orchestration is only allowed to spawn CLIs, and sourcevision already
+  owns artifact generation, content-hash caching, and the one `callClaude` choke
+  point with task-class routing. A side benefit is that the primer is now an
+  artifact any consumer can read.
+  
+  Everything about it fails soft. The primer is cached against the analysis
+  fingerprint, so it is regenerated only when the repository is re-analysed.
+  Generation is skipped entirely unless the analysis already made successful LLM
+  calls — the vendor and auth-mode getters both fall back to defaults when
+  nothing is configured, so consulting them would have this attempt a spawn in
+  every environment without a model, including CI. Output shorter than 200 or
+  longer than 12,000 characters is rejected rather than truncated, because a
+  primer cut mid-sentence would be inherited by every task in the loop while a
+  missing one simply falls back to CONTEXT.md.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `.hench/reviews/` to the `ndx init` ignore template, and retire its stale
+  `.rex/prd.json.lock` entry.
+  
+  The adversarial-review pass writes `.hench/reviews/<run-id>.json`, and hench's
+  pre-run gate commits with `git add -A`, so a project that pasted the template
+  into its `.gitignore` would commit machine-local review reports on the next
+  run. The template also still named `.rex/prd.json.lock`, which `FileStore`
+  stopped writing once both stores moved to `prdLockPath()` — now `.rex/*.lock`,
+  which covers the folder-tree lock that is actually created.
+  
+  Nothing tested the template, which is how both entries drifted. It is now
+  pinned against this repo's own `.gitignore`, so a runtime artifact added on one
+  side and missed on the other fails a test instead of shipping.
+
+- [#350](https://github.com/en-dash-consulting/n-dx/pull/350) [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8) Thanks [@dnaniel](https://github.com/dnaniel)! - The isometric map can now show the two things an import graph structurally cannot: injection seams and runtime infrastructure.
+  
+  **Injection seams.** A callback or event seam runs the opposite way at runtime from the import that static analysis sees, so the map used to draw an arrow that was backwards for the behaviour people care about. Seams declared under `sourcevision.isoMap.injectionSeams` in `.n-dx.json` are now drawn in the runtime control-flow direction, in a distinct colour, with a panel listing the injected callbacks and stating plainly that the relationship was declared rather than inferred. `from`/`to` accept a zone id, a file path or a directory prefix.
+  
+  **Runtime infrastructure.** Queues, buckets, caches and databases have no import signature at all. Terraform `resource` blocks are now scanned and classified, and anything IaC does not cover can be declared under `sourcevision.isoMap.infrastructure`. Both render as a trailing column, attributed to the zones whose source names them — weaker evidence than an import, and the panel says so. Resource types with no architectural meaning (IAM roles, security groups) are skipped, and names too short or too generic to match on are refused.
+  
+  A declaration that cannot be drawn — both ends inside one zone, or naming a file no zone owns — is reported in the page footer rather than silently dropped.
+
+- [#350](https://github.com/en-dash-consulting/n-dx/pull/350) [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8) Thanks [@dnaniel](https://github.com/dnaniel)! - Iso map: one implementation, several gaps closed.
+  
+  The standalone skill script is now generated from `packages/sourcevision/src/export/` by `scripts/build-iso-skill.mjs` rather than hand-maintained, so the map has a single source of truth; `tests/e2e/iso-skill-drift.test.js` fails if the committed bundle goes stale, and also executes it. This removed a real divergence where the two copies disagreed on zone colours because one counted archetypes before mapping them to kinds and the other after — kinds are now resolved per file and counted once, which answers "what does this zone do" rather than "what is its most common file type".
+  
+  Also: the project scanner moved into the package (`iso-scan.ts`) and gained tsconfig `paths`, workspace-package and Go `go.mod` resolution, so a monorepo's own packages stop looking third-party; call-graph data, when present, adds per-edge runtime call counts with a Weight: imports/calls toggle and surfaces call-only edges as injected seams; output is reproducible (timestamps default to the HEAD commit time); key files link to source via the git remote; multi-layer edges route through corridors between rows instead of cutting through blocks; and the page gained a light theme, reduced-motion support, kind glyphs alongside colour, a skip link, and a tab order of one stop per zone instead of one per connector.
+  
+  New: `ndx iso`, `sourcevision iso --source=scan`, and `GET /api/iso-map` in the web dashboard.
+
+- [#350](https://github.com/en-dash-consulting/n-dx/pull/350) [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8) Thanks [@dnaniel](https://github.com/dnaniel)! - New opt-in `sourcevision iso` command renders `.sourcevision/iso-map.html`: a standalone, dependency-free isometric map of the codebase. Each architectural zone becomes an extruded 3D block — footprint from file count, height from line count, colour from its dominant archetype — with import relationships drawn as connectors, click-to-inspect detail panels (metrics, insights, findings, key files, cross-zone edges), pan/zoom, and a legend that filters by kind. Never generated by `analyze`.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Register MCP servers against the project being initialised, not the caller's
+  working directory.
+  
+  `registerMcpServers` shelled out to `claude mcp remove` / `claude mcp add`
+  without a `cwd`, so the child inherited whatever directory the shell was in.
+  Local scope — the default for `claude mcp add` — is stored per-directory, so
+  `cd ~/repoA && ndx init ~/repoB` stripped repoA's `rex` and `sourcevision`
+  registrations and replaced them with entries pointing at repoB. Both the remove
+  loop and the add now run with `cwd` set to the resolved project directory, and
+  the add states `--scope local` explicitly rather than relying on the default.
+  
+  This surfaced as the E2E suite destroying developers' own registrations: an
+  init test's temp directory ended up registered in `~/.claude.json` under the
+  repo the suite was launched from, leaving two MCP servers pointed at a deleted
+  path. Recovery for an already-clobbered config is documented in TESTING.md
+  under "Family 5".
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Expose the task-routing config surface in `ndx config` and the dashboard.
+  
+  `ndx config` now validates `llm.tiers.<vendor>.<tier>`, `llm.routes.<class>`,
+  `llm.effort.<class>`, and `llm.escalation.*`, and documents them in `--help`
+  along with the fact that top-level `llm.model` is a standard-tier shorthand
+  rather than a global override. The dashboard's LLM config route accepts the
+  same keys, plus `llm.model` itself — writable via the CLI but previously absent
+  from the route's allowlist, so the field with the highest precedence over the
+  model actually used was invisible in the UI.
+  
+  Validation is deliberately asymmetric. Values are checked strictly, and so is
+  the shape of a tier path: an unrecognized vendor or tier there is a typo, never
+  a feature. Route and effort *class names* stay open, because glob keys
+  (`prd.*`, `*`) are the documented routing design and this layer cannot see the
+  task-class registry without importing across a tier boundary.
+  
+  Both surfaces also had to learn that task classes contain dots. Since config
+  paths use dots as separators, `llm.routes.agent.execute` would otherwise write
+  a nested `{agent: {execute}}` object — which the flat-map extractor in
+  `loadLLMConfig` silently ignores, making the setting appear to work while
+  changing nothing. Those two sections now treat everything after the section
+  name as one literal key, on both the read and write paths.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Add the warm-parent session foundation: `--fork-session` support, the
+  orientation session cache, and the session-strategy config keys.
+  
+  The Claude CLI adapter gains `forkSession`, emitting `--fork-session` after
+  `--resume` so a spawn can inherit a parent transcript under a new session id
+  without mutating the parent. Forking without a session to fork from is
+  suppressed rather than passed through — it would claim a fork that never
+  happened.
+  
+  A new `agent/lifecycle/session-cache.ts` owns which orientation session
+  exists and whether it is still safe to fork. Finding a parent is permissive
+  (absent, unreadable, or corrupt cache files are all simply a miss, costing one
+  orientation spawn); *using* one is strict, because a stale hit would have
+  every task in a loop inherit an orientation describing a repo that has since
+  changed. A parent is rejected, with a named reason, when the sourcevision
+  analysis fingerprint changes, when it ages past `hench.parentMaxAgeHours`,
+  when the vendor or model differs from the one it was built under, or when
+  `--fresh` is requested.
+  
+  New config: `hench.sessionStrategy` (`fork` | `batch` | `cold`),
+  `hench.tasksPerSession` (default 4), and `hench.parentMaxAgeHours` (default
+  24), documented in `ndx config --help`. Strategy resolution degrades rather
+  than errors: forking needs a CLI that resumes by session id, so other vendors
+  and `provider=api` resolve to `cold`.
+  
+  No spawn behavior changes yet — the orientation pass and fork wiring that
+  consume this land next.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Bound the spawns one task can make, and retry by resuming the failed session
+  rather than cold-restarting it.
+  
+  **Breaking-ish behaviour change:** plan-mode re-spawns now consume the retry
+  budget. Previously they were a separate per-attempt allowance, so four retries
+  against up to three plan re-spawns each could reach twelve cold spawns for a
+  single task — every one re-paying the harness prompt, the project
+  instructions, and the repo re-exploration. Making them additive means a task
+  that spends its budget entering plan mode gets correspondingly fewer failure
+  retries than it did before.
+  
+  A hard ceiling sits on top of the retry budget, defaulting to 8 and
+  configurable via `hench.maxSpawnsPerTask`. The two layers are not redundant:
+  some re-spawn paths deliberately *avoid* charging the retry budget, because
+  nothing was learned about the task — a plan-mode interception, the
+  stale-parent fork fallback. The ceiling counts every spawn regardless of why
+  it happened, so no future re-spawn path can reintroduce unbounded
+  multiplication by simply not asking. It is checked before spawning, so it
+  refuses to spend rather than reporting that the spending already happened, and
+  hitting it fails the task with the full breakdown.
+  
+  Transient failures on the Claude CLI now retry by resuming the failed session
+  — a plain resume, not a fork, since branching off the failure would leave the
+  retry without the transcript it exists to continue. The cold-restart retry
+  notice is suppressed on those retries: a resumed session *was* the previous
+  attempt, so telling it that files from a prior attempt still exist and to check
+  the current state before redoing work restates what it just did, and grows the
+  prompt on every retry. Vendors with no resume on this path keep cold retries
+  and keep the notice.
+  
+  Runs now record `spawnCount` and `spawnBreakdown`, so `ndx usage` can report
+  retry overhead — a task that took four spawns to succeed reads differently
+  from one that took one, and six plan re-spawns call for a different fix than
+  six failure retries.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - List the known task classes in `ndx config --help`, and tell users when a
+  route class looks mistyped.
+  
+  `llm.routes.<class>` and `llm.effort.<class>` accept any class name on
+  purpose: glob keys (`prd.*`, `*`) are a routing feature, and a class added to
+  the registry in a newer release has to keep working against an older CLI. The
+  cost of that openness was silence — `ndx config llm.routes.agent.exceute heavy`
+  was accepted, written, and matched nothing, so the user saw success and got the
+  old model.
+  
+  Setting an unrecognized class now prints a note saying so, naming the closest
+  known class when one is within an edit distance of three. Three catches the
+  realistic typos — a transposition, a dropped or doubled character, a wrong
+  suffix — without pointing `zone.enrich-scan` at `code.classify`; beyond it the
+  note still appears and only the suggestion is withheld. It remains advisory in
+  every case: the value is written, the exit status is unchanged, and globs and
+  known classes stay silent.
+  
+  `ndx config --help` now lists all nineteen classes grouped by package with the
+  tier each routes to by default, so the set is discoverable without reading
+  source.
+  
+  The class list is duplicated from `@n-dx/llm-client`'s `DEFAULT_ROUTES` rather
+  than imported, because orchestration-tier scripts must not import from
+  packages — the same reason `LLM_VENDOR` is declared locally in that file. A
+  new integration test fails when the copy drifts, checking not just the keys and
+  tiers but that no known class is ever reported as unknown: that is the failure
+  drift produces, and it hands the user advice that is exactly backwards.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Fork task spawns from a warm orientation session instead of cold-starting
+  every task.
+  
+  A cold task spawn spends its first turns rediscovering the repo — layout,
+  build and test commands, conventions — and pays that again on every retry and
+  every task in a `--loop`. Hench now runs that once, in a read-only orientation
+  session, and spawns each task as a fork of it (`--resume <parent>
+  --fork-session`), so tasks arrive already oriented and every fork presents the
+  same prefix.
+  
+  The orientation prompt is deliberately task-free: mention one task in it and
+  every fork gets a different prefix, and the first task's framing leaks into
+  the rest of the loop. Orientation is also read-only three times over — stated
+  in the system prompt, restated in the task prompt, and spawned in `plan` mode
+  — because that transcript is inherited by everything downstream.
+  
+  `cliLoop` runs once per task, so the cache, not loop plumbing, is what makes
+  orientation happen once per loop; it also persists across separate `ndx work`
+  invocations within the TTL. `ndx work --fresh` discards it, applied once at
+  the start of a run rather than per task, so a loop re-orients exactly once.
+  
+  Two failure modes are handled deliberately. Orientation never fails a run: a
+  spawn that errors, throws, or reports no session id simply yields no parent
+  and tasks spawn cold. And because a cached parent is validated against its own
+  metadata rather than the vendor's session store, a parent the CLI has since
+  forgotten would otherwise fail every task in the loop — so the first failed
+  fork drops the cache, disables forking for the rest of the run, and re-spawns
+  cold without consuming retry budget.
+  
+  Runs record `parentSessionId` when they forked, making the saving auditable.
+  Forking requires a CLI that resumes by session id, so other vendors and
+  `provider=api` continue to spawn cold.
+- Updated dependencies [[`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`0c9c31d`](https://github.com/en-dash-consulting/n-dx/commit/0c9c31da941fc92ec6ce14e6ed2e3d6c3fcfecae), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8), [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8), [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8), [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8), [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8), [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`f0cf5d3`](https://github.com/en-dash-consulting/n-dx/commit/f0cf5d3bab556b80251a47206ad5fdc0ee587e93), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`f0cf5d3`](https://github.com/en-dash-consulting/n-dx/commit/f0cf5d3bab556b80251a47206ad5fdc0ee587e93), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`0c9c31d`](https://github.com/en-dash-consulting/n-dx/commit/0c9c31da941fc92ec6ce14e6ed2e3d6c3fcfecae), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec)]:
+  - @n-dx/rex@0.5.2
+  - @n-dx/web@0.5.2
+  - @n-dx/hench@0.5.2
+  - @n-dx/llm-client@0.5.2
+  - @n-dx/sourcevision@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes

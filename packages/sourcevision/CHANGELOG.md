@@ -1,5 +1,159 @@
 # @n-dx/sourcevision
 
+## 0.5.2
+
+### Patch Changes
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Add a distilled repo primer and prefer it over CONTEXT.md as agent startup
+  context.
+  
+  `ndx work` pipes CONTEXT.md plus a PRD excerpt into every task spawn. Even
+  capped, that document is written for breadth — zone metrics, findings, route
+  tables, import summaries — while a task starting work needs where things live,
+  how to build and test, and what the conventions are. It needs that on every
+  task and every retry, which is what makes distilling it worth one LLM call.
+  
+  `sourcevision analyze` now writes `.sourcevision/PRIMER.md`, and the
+  orchestrator reads it in preference to CONTEXT.md, falling back silently when
+  absent. The distiller lives in sourcevision rather than beside the pipe it
+  feeds: orchestration is only allowed to spawn CLIs, and sourcevision already
+  owns artifact generation, content-hash caching, and the one `callClaude` choke
+  point with task-class routing. A side benefit is that the primer is now an
+  artifact any consumer can read.
+  
+  Everything about it fails soft. The primer is cached against the analysis
+  fingerprint, so it is regenerated only when the repository is re-analysed.
+  Generation is skipped entirely unless the analysis already made successful LLM
+  calls — the vendor and auth-mode getters both fall back to defaults when
+  nothing is configured, so consulting them would have this attempt a spawn in
+  every environment without a model, including CI. Output shorter than 200 or
+  longer than 12,000 characters is rejected rather than truncated, because a
+  primer cut mid-sentence would be inherited by every task in the loop while a
+  missing one simply falls back to CONTEXT.md.
+
+- [#350](https://github.com/en-dash-consulting/n-dx/pull/350) [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8) Thanks [@dnaniel](https://github.com/dnaniel)! - Fix the isometric map being unresponsive to clicks. Blocks listened on both `pointerup` and `click` while selection toggled, so one physical click fired twice and deselected immediately — the map appeared inert. Blocks now listen on `click` only and selection is set rather than toggled. Connectors are also clickable now, with a widened transparent hit target and a panel describing the dependency and both its ends, and the detail panel scrolls into view on narrow layouts where it sits below the map.
+
+- [#350](https://github.com/en-dash-consulting/n-dx/pull/350) [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8) Thanks [@dnaniel](https://github.com/dnaniel)! - The isometric map can now show the two things an import graph structurally cannot: injection seams and runtime infrastructure.
+  
+  **Injection seams.** A callback or event seam runs the opposite way at runtime from the import that static analysis sees, so the map used to draw an arrow that was backwards for the behaviour people care about. Seams declared under `sourcevision.isoMap.injectionSeams` in `.n-dx.json` are now drawn in the runtime control-flow direction, in a distinct colour, with a panel listing the injected callbacks and stating plainly that the relationship was declared rather than inferred. `from`/`to` accept a zone id, a file path or a directory prefix.
+  
+  **Runtime infrastructure.** Queues, buckets, caches and databases have no import signature at all. Terraform `resource` blocks are now scanned and classified, and anything IaC does not cover can be declared under `sourcevision.isoMap.infrastructure`. Both render as a trailing column, attributed to the zones whose source names them — weaker evidence than an import, and the panel says so. Resource types with no architectural meaning (IAM roles, security groups) are skipped, and names too short or too generic to match on are refused.
+  
+  A declaration that cannot be drawn — both ends inside one zone, or naming a file no zone owns — is reported in the page footer rather than silently dropped.
+
+- [#350](https://github.com/en-dash-consulting/n-dx/pull/350) [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8) Thanks [@dnaniel](https://github.com/dnaniel)! - Fix two isometric-map defects the new UI smoke test exposed.
+  
+  `ndx init` writes empty `.sourcevision/` data files before anything has been analyzed, so `hasSourcevision()` was true on a freshly-initialized project and auto mode never fell back to a scan. A project full of source that had not been analyzed yet reported "nothing to map". Auto now falls back when the analysis parses but contains no zones.
+  
+  `GET /api/iso-map` answered 404 for "this project has nothing to map yet". That is a state of the map, not a missing resource, and a 4xx on a `fetch` writes a network error into the browser console — which `tests/e2e-ui/navigation.spec.ts` requires every view to load without. It now answers 200 with an `x-iso-map-empty` marker header and a readable empty-state page, so the viewer still renders its own empty card and anyone opening the URL directly gets a page rather than a JSON blob. Genuine faults (bad parameter, wrong method, build failure) remain 4xx/5xx.
+  
+  Also adds the `iso-map` and pre-existing `pr-markdown` views to the navigation smoke test, whose list is meant to track every `ViewId`.
+
+- [#350](https://github.com/en-dash-consulting/n-dx/pull/350) [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8) Thanks [@dnaniel](https://github.com/dnaniel)! - Iso map: one implementation, several gaps closed.
+  
+  The standalone skill script is now generated from `packages/sourcevision/src/export/` by `scripts/build-iso-skill.mjs` rather than hand-maintained, so the map has a single source of truth; `tests/e2e/iso-skill-drift.test.js` fails if the committed bundle goes stale, and also executes it. This removed a real divergence where the two copies disagreed on zone colours because one counted archetypes before mapping them to kinds and the other after — kinds are now resolved per file and counted once, which answers "what does this zone do" rather than "what is its most common file type".
+  
+  Also: the project scanner moved into the package (`iso-scan.ts`) and gained tsconfig `paths`, workspace-package and Go `go.mod` resolution, so a monorepo's own packages stop looking third-party; call-graph data, when present, adds per-edge runtime call counts with a Weight: imports/calls toggle and surfaces call-only edges as injected seams; output is reproducible (timestamps default to the HEAD commit time); key files link to source via the git remote; multi-layer edges route through corridors between rows instead of cutting through blocks; and the page gained a light theme, reduced-motion support, kind glyphs alongside colour, a skip link, and a tab order of one stop per zone instead of one per connector.
+  
+  New: `ndx iso`, `sourcevision iso --source=scan`, and `GET /api/iso-map` in the web dashboard.
+
+- [#350](https://github.com/en-dash-consulting/n-dx/pull/350) [`3bd5f65`](https://github.com/en-dash-consulting/n-dx/commit/3bd5f65fe3c41f2f0ae93aac6333f7e0c9480fe8) Thanks [@dnaniel](https://github.com/dnaniel)! - New opt-in `sourcevision iso` command renders `.sourcevision/iso-map.html`: a standalone, dependency-free isometric map of the codebase. Each architectural zone becomes an extruded 3D block — footprint from file count, height from line count, colour from its dominant archetype — with import relationships drawn as connectors, click-to-inspect detail panels (metrics, insights, findings, key files, cross-zone edges), pan/zoom, and a legend that filters by kind. Never generated by `analyze`.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Complete light-tier routing: move classification to the light tier, and give
+  the two unguarded light calls real output contracts.
+  
+  `sourcevision`'s classification batches now resolve through the `code.classify`
+  task class. This is the last of the audit's routing-map flips and the safest of
+  them: a fixed-size batch goes in, an enum-constrained list comes out, unknown
+  paths and unknown archetype ids are already dropped per item, and a prompt
+  degradation ladder already handles parse failures — so a wrong answer costs one
+  dropped classification.
+  
+  Routing a call to the cheapest adequate model is only a safe trade while bad
+  output stays detectable, and two light-routed calls had nothing checking them.
+  
+  The commit-subject call feeds `git commit -m` directly, and previously took the
+  first non-empty line and sliced it to 100 characters — so a fenced block, a
+  "Sure! Here's a subject:" preamble, or a markdown bullet would have been
+  committed into the repository's history. It now goes through a contract that
+  strips those tics and enforces one line within the documented 72-character
+  bound, falling back to the generic message when nothing usable survives:
+  refusing to commit would be worse than committing under a generic subject.
+  
+  The body-merge call was worse — whatever the model returned was written verbatim
+  as the surviving PRD item's description, so an empty answer or a JSON blob would
+  have been persisted as the item's body. It now validates, and *throws* on
+  failure rather than repairing: `reshape` already treats body merge as
+  best-effort and keeps the existing description, which beats persisting a
+  preamble or a sentence cut in half by a length cap.
+  
+  The other six light-routed sites were audited and already had contracts — zod
+  schemas for renames, clarify rounds and the assessment pass, and proposal
+  parsing with count checks for the consolidation guard. A new integration test
+  pins the resolved model for every class in the routing map, in both directions:
+  the light routes must be light, and the agent loop, proposal generation, and
+  deep enrichment must not be.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Cap the three sourcevision artifacts that grew without bound with repository
+  size.
+  
+  These files are read by agents, not people, so their size is a token cost paid
+  on every run that consumes them — and each of the three had a section that
+  scaled with the repository while everything around it was already summarized.
+  
+  The `llms.txt` file-inventory table is capped at 400 rows; it was the file's
+  largest section by far, measured at 75 KB of a 108 KB file. `CONTEXT.md`'s
+  routes section is capped at 15 handler groups and 15 routes per group, matching
+  the caps already applied to findings and next steps directly below it — it was
+  the one section in that file with no bound, at 54% of the file on a route-heavy
+  project. The `sourcevision://zones` MCP resource no longer returns the whole of
+  zones.json pretty-printed (~80K tokens in one tool result): it now returns the
+  cross-zone map — identity, cohesion, coupling, file counts, entry points,
+  crossings — as compact JSON, and names the `get_zone` tool for the per-zone
+  files and findings it omits.
+  
+  Every cap states what it dropped, with both the omitted count and the total. A
+  silently truncated index is worse than a large one, because a reader cannot
+  tell whether a path is absent from the repository or merely unlisted.
+
+- [#345](https://github.com/en-dash-consulting/n-dx/pull/345) [`0c9c31d`](https://github.com/en-dash-consulting/n-dx/commit/0c9c31da941fc92ec6ce14e6ed2e3d6c3fcfecae) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop git-backed sourcevision tests timing out on Windows CI
+  
+  `branch-work-collector`, `pr-markdown`, and `pr-markdown-reviewer-output` build
+  real git repositories in a temp directory. The heaviest tests spend 8-13
+  synchronous `git` spawns each — init/config/commit/checkout in the fixture, plus
+  the collector's own `rev-parse` and two speculative `git show` calls. Those run
+  in 230-540ms locally, but Windows process creation and on-access scanning of the
+  temp worktree pushed three of them past vitest's 5000ms default.
+  
+  Sourcevision was the last package with git-spawning integration tests still on
+  that default, so its `testTimeout` now matches hench and rex at 30s. No
+  production code changed.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Thread task classes through every package's LLM choke point, and pass the
+  routing config surfaces through the `.n-dx.json` loader.
+  
+  rex's `spawnClaude`/`resolveConfiguredModel` accept `{ taskClass }` alongside
+  the legacy bare weight (the class wins; an explicit model still beats both),
+  and the analyze call sites now declare their classes — renames, merges,
+  consolidation checks, assessment, and clarify rounds route light by registry
+  default exactly as before, while proposals, modify, spec synthesis, smart-add,
+  and restructuring declare their standard-tier classes. `prd.decompose` is
+  deliberately not declared yet: its registry default is light, and that flip is
+  gated on the escalation ladder. sourcevision's `callClaude` gains the same
+  option, `resolveLightModel` now resolves through `zone.enrich-scan`, and the
+  enrichment passes and meta-evaluation declare their classes. hench resolves
+  the agent loop via `agent.execute` (standard by default — but
+  `llm.routes["agent.execute"] = "heavy"` now reroutes a run with no code
+  change), the pre-run commit message via `git.commit-message`, and CLI-path
+  run records carry the resolved tier in `weight` instead of always "standard".
+  `loadLLMConfig` passes `llm.tiers`, `llm.routes`, `llm.effort`, and
+  `llm.escalation` through its whitelist so the new config actually reaches
+  runtime. A repo-level contract test walks declared task classes and fails on
+  any class missing from `DEFAULT_ROUTES` or any choke point that stops
+  declaring its classes.
+- Updated dependencies [[`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`f0cf5d3`](https://github.com/en-dash-consulting/n-dx/commit/f0cf5d3bab556b80251a47206ad5fdc0ee587e93), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec)]:
+  - @n-dx/llm-client@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes
