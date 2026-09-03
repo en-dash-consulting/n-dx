@@ -160,6 +160,13 @@
   cursor: not-allowed;
 }
 
+/* Anchors that act as buttons (e.g. the isometric map link) need the
+   inline-block box and no underline that <button> gets for free. */
+a.cmd-btn {
+  display: inline-block;
+  text-decoration: none;
+}
+
 .cmd-btn-primary {
   background: var(--accent);
   color: var(--bg);

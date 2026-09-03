@@ -160,6 +160,8 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 
 **Gotcha:** `ndx work` autonomous runs (`--auto`/`--loop`/`--epic-by-epic`) default `--permission-mode` to `acceptEdits` so the spawned Claude session won't stall in plan mode — override with `--permission-mode` or `hench.permissionMode`. This default is enforced repo-wide via the hench system prompt for all CLI-provider runs (see the `/no-plan-mode` skill).
 
+**Gotcha:** `ndx iso` renders a standalone isometric architecture map. Its portable `/iso-map` skill script is **generated** from `packages/sourcevision/src/export/` by `scripts/build-iso-skill.mjs` — edit the TypeScript and re-run it; hand-editing `.claude/skills/iso-map/scripts/iso-map.mjs` fails `tests/e2e/iso-skill-drift.test.js`. Injection seams and runtime infrastructure, which no import graph can show, are declared under `sourcevision.isoMap` in `.n-dx.json`; see [`docs/architecture/iso-map-data-flow.md`](docs/architecture/iso-map-data-flow.md).
+
 ## MCP Servers
 
 Rex and sourcevision expose MCP servers over HTTP (`ndx start`, port 3117 by default) and stdio (auto-registered by `ndx init`). HTTP uses [Streamable HTTP](https://modelcontextprotocol.io/) with session management (`Mcp-Session-Id` header, created automatically on first request). See `README.md` for registration commands.

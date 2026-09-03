@@ -50,6 +50,25 @@ export { deriveNextSteps } from "./analyzers/next-steps.js";
 export { setArchetypeOverride } from "./util/archetype-overrides.js";
 // NextStep type is already exported in the schema-types block below.
 
+// ---- Isometric architecture map -----------------------------------------------
+//
+// Opt-in renderer behind `sourcevision iso`, and the API the web dashboard's
+// /api/iso-map route builds on. Lets a host produce the same map from analysis
+// data it already holds, without shelling out to the CLI.
+
+export { buildIsoModel, ISO_KINDS } from "./export/iso-model.js";
+export { renderIsoMap } from "./export/iso-map.js";
+export { loadIsoInput, loadFromSourcevision, loadFromScan, hasSourcevision } from "./export/iso-sources.js";
+export type { IsoSourceMode, LoadOptions as IsoLoadOptions } from "./export/iso-sources.js";
+export type {
+  IsoModel,
+  IsoModelInput,
+  IsoModelOptions,
+  IsoNode,
+  IsoEdge,
+  IsoKind,
+} from "./export/iso-model.js";
+
 // ---- Schema constants -------------------------------------------------------
 
 export { SCHEMA_VERSION as SV_SCHEMA_VERSION } from "./schema/v1.js";

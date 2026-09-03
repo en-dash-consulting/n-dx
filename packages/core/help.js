@@ -1012,6 +1012,35 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["start"],
   },
+  iso: {
+    tool: "ndx",
+    command: "iso",
+    summary: "render a standalone isometric architecture map",
+    usage: "ndx iso [options] [dir]",
+    description:
+      "Renders a single self-contained HTML page showing each architectural zone\n" +
+      "as an extruded 3D block: footprint from file count, height from line count,\n" +
+      "colour from what the zone mostly does. Import relationships are drawn as\n" +
+      "connectors, and clicking a block or a connector opens its detail.\n" +
+      "\n" +
+      "Uses .sourcevision/ analysis when present. Pass --source=scan to derive\n" +
+      "zones directly from the file tree instead, which works on a project that\n" +
+      "has never been analyzed.",
+    options: [
+      { flag: "--output=<path>, -o=<path>", description: "Write somewhere other than .sourcevision/iso-map.html" },
+      { flag: "--max-nodes=<N>", description: "Cap drawn zones, largest first (default 40)" },
+      { flag: "--no-externals", description: "Omit the shared third-party dependency column" },
+      { flag: "--source=<mode>", description: "auto | sourcevision | scan (default auto)" },
+      { flag: "--link-base=<url>", description: "Base URL for source links (default: the git remote)" },
+      { flag: "--analyzed-at=<t>", description: "Timestamp to stamp (default: the HEAD commit time)" },
+    ],
+    examples: [
+      { command: "ndx iso .", description: "Render the map for the current project" },
+      { command: "ndx iso --max-nodes=15 .", description: "Draw only the 15 largest zones" },
+      { command: "ndx iso --source=scan .", description: "Skip analysis and scan the file tree" },
+    ],
+    related: ["analyze", "start"],
+  },
   export: {
     summary: "export static deployable dashboard",
     description: "Generates a self-contained static directory from the current\nSourceVision and Rex data. Deployable to GitHub Pages, Netlify, S3,\nor any static host. All read-only views work; mutation UI is hidden.",
@@ -1465,6 +1494,7 @@ export function formatMainHelp() {
     ["dev [dir]", "Start dev server with live reload"],
     ["refresh [dir]", "Refresh dashboard artifacts (--ui-only, --data-only)"],
     ["export [dir]", "Export static deployable dashboard (--deploy=github)"],
+    ["iso [dir]", "Render a standalone isometric architecture map"],
   ], pad);
 
   section("TRACK", [

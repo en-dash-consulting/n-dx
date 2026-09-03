@@ -9,6 +9,7 @@
  *   serve [dir]        - Start local viewer server
  *   validate [dir]     - Validate .sourcevision/ output files
  *   export-pdf [dir]   - Export analysis as a PDF report
+ *   iso [dir]          - Render a standalone isometric architecture map
  *   pr-markdown [dir]  - Regenerate PR markdown in .sourcevision/
  *   git-credential-helper - Interactive GitHub credential setup helper
  *   mcp [dir]          - Start MCP server for AI tool integration
@@ -21,6 +22,7 @@ import { cmdReset } from "./commands/reset.js";
 import { cmdAnalyze } from "./commands/analyze.js";
 import { cmdValidate } from "./commands/validate.js";
 import { cmdExportPdf } from "./commands/export-pdf.js";
+import { cmdIso, parseIsoArgs } from "./commands/iso.js";
 import { cmdGitCredentialHelper } from "./commands/git-credential-helper.js";
 import { cmdPrMarkdown } from "./commands/pr-markdown.js";
 import { cmdWorkspace } from "./commands/workspace.js";
@@ -84,6 +86,8 @@ async function cmdMcp(dir: string): Promise<void> {
 }
 
 // Commands that require .sourcevision/ to exist
+// `iso` is absent deliberately: --source=scan derives zones from the file tree
+// and must work on a project that has never been analyzed. cmdIso gates itself.
 const NEEDS_SV_DIR = new Set(["serve", "validate", "reset", "pr-markdown", "mcp"]);
 
 try {
@@ -118,6 +122,9 @@ try {
       break;
     case "export-pdf":
       await cmdExportPdf(targetArg || ".", { output: outputPath });
+      break;
+    case "iso":
+      await cmdIso(targetArg || ".", parseIsoArgs(args.slice(1)));
       break;
     case "pr-markdown":
       await cmdPrMarkdown(targetArg || ".");
@@ -156,7 +163,7 @@ try {
         );
       }
 
-      const SV_COMMANDS = ["init", "analyze", "serve", "validate", "reset", "export-pdf", "pr-markdown", "git-credential-helper", "mcp", "workspace"];
+      const SV_COMMANDS = ["init", "analyze", "serve", "validate", "reset", "export-pdf", "iso", "pr-markdown", "git-credential-helper", "mcp", "workspace"];
       const typoHint = formatTypoSuggestion(command, SV_COMMANDS, "sourcevision ");
       throw new CLIError(
         `Unknown command: ${command}`,

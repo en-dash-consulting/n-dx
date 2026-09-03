@@ -1,0 +1,95 @@
+/* Isometric Map view — generation controls plus the embedded map frame. */
+
+.iso-map-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Controls sit in a standard cmd-panel; the fields flow into a row that wraps
+   to a column on narrow viewports. */
+.iso-map-controls {
+  margin-bottom: var(--space-4);
+}
+
+.iso-map-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+}
+
+.iso-map-fields .cmd-panel-form {
+  min-width: 200px;
+}
+
+.iso-map-fields .cmd-panel-hint {
+  max-width: 34ch;
+}
+
+/* The map is a full standalone document with its own pan/zoom surface, so it
+   gets as much vertical room as the viewport allows rather than a fixed box. */
+.iso-map-surface {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+}
+
+.iso-map-frame {
+  width: 100%;
+  height: clamp(420px, 68vh, 1000px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  display: block;
+}
+
+.iso-map-caption {
+  margin-top: var(--space-2);
+}
+
+.iso-map-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: clamp(420px, 68vh, 1000px);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-dim);
+  font-size: var(--font-base);
+}
+
+/* `.card` carries no shared chrome in this codebase (each view styles its own
+   card), so the error and unavailable states declare theirs here. */
+.iso-map-error,
+.iso-map-unavailable {
+  max-width: 68ch;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.iso-map-error {
+  border-color: var(--orange);
+}
+
+.iso-map-error p,
+.iso-map-unavailable p {
+  margin: var(--space-2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--font-base);
+  line-height: 1.55;
+}
+
+.iso-map-error code,
+.iso-map-unavailable code {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  padding: 2px var(--space-2);
+  border-radius: 4px;
+  color: var(--accent);
+}

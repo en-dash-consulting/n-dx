@@ -5,6 +5,7 @@ import type { Finding } from "../external.js";
 import { FindingsList, BarChart } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
+import { isDeployedMode } from "../deployed-mode.js";
 
 interface ArchitectureProps {
   data: LoadedData;
@@ -59,6 +60,24 @@ export function ArchitectureView({ data, onSelect, navigateTo }: ArchitecturePro
     h("p", { class: "section-sub" },
       `${findings.length} findings from ${zones?.zones.length ?? 0} zones`
     ),
+
+    // Isometric map — now a first-class view with its own generation
+    // controls, so this is a pointer to it rather than a second entry point.
+    // Hidden in deployed (static export) mode, where no server is around to
+    // build the map.
+    isDeployedMode() || !navigateTo
+      ? null
+      : h("p", { class: "cmd-panel-actions" },
+          h("button", {
+            type: "button",
+            class: "cmd-btn cmd-btn-secondary",
+            onClick: () => navigateTo("iso-map"),
+            title: "Open the isometric map of this codebase's zones",
+          },
+            h("span", { "aria-hidden": "true" }, "◧"),
+            " Isometric map",
+          ),
+        ),
 
     // Summary stats
     h("div", { class: "stat-grid" },

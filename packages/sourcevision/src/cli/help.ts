@@ -187,6 +187,32 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: [],
   },
+  iso: {
+    tool: "sourcevision",
+    command: "iso",
+    summary: "render a standalone isometric architecture map",
+    usage: "sourcevision iso [options] [dir]",
+    description:
+      "Renders .sourcevision/iso-map.html: a single self-contained page showing\n" +
+      "each architectural zone as an extruded 3D block. Footprint scales with file\n" +
+      "count, height with line count, and colour with the zone's dominant archetype.\n" +
+      "Import relationships are drawn as connectors; clicking a block opens its\n" +
+      "files, findings and cross-zone edges.\n" +
+      "\n" +
+      "Requires a prior 'analyze' run. Never runs as part of analyze.",
+    options: [
+      { flag: "--output=<path>, -o=<path>", description: "Write the map somewhere other than .sourcevision/iso-map.html" },
+      { flag: "--max-nodes=<N>", description: "Cap drawn zones, largest first (default 40)" },
+      { flag: "--no-externals", description: "Omit the shared third-party dependency column" },
+      { flag: "--quiet, -q", description: "Suppress informational output" },
+    ],
+    examples: [
+      { command: "sourcevision iso .", description: "Render the map for the current project" },
+      { command: "sv iso --max-nodes=20 .", description: "Draw only the 20 largest zones" },
+      { command: "sv iso -o=docs/architecture.html .", description: "Write to a custom path" },
+    ],
+    related: ["analyze", "export-pdf"],
+  },
   workspace: {
     tool: "sourcevision",
     command: "workspace",
@@ -221,6 +247,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   validate: ["analyze"],
   reset: ["init"],
   "export-pdf": ["analyze"],
+  iso: ["analyze", "export-pdf"],
   "pr-markdown": ["serve", "git-credential-helper"],
   "git-credential-helper": ["pr-markdown"],
   mcp: [],
@@ -263,6 +290,7 @@ export function usage(): void {
           { name: "sourcevision serve [dir]", description: "Start local viewer (default: .)" },
           { name: "sourcevision validate [dir]", description: "Validate .sourcevision/ output files" },
           { name: "sourcevision export-pdf [dir]", description: "Export analysis as a PDF report" },
+          { name: "sourcevision iso [dir]", description: "Render a standalone isometric architecture map" },
           { name: "sourcevision pr-markdown [dir]", description: "Regenerate PR markdown at .sourcevision/pr-markdown.md" },
           { name: "sourcevision git-credential-helper", description: "Run interactive GitHub credential setup helper" },
           { name: "sourcevision reset [dir]", description: "Remove .sourcevision/ and start fresh" },

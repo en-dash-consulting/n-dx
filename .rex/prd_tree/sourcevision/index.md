@@ -26,9 +26,11 @@ description: "Static analysis engine: file inventory, import graph, zone detecti
 | [Go Fixture Enhancement](./go-fixture-enhancement/index.md) | completed |
 | [Go Import Parser](./go-import-parser/index.md) | completed |
 | [Import Analyzer Language Dispatch](./import-analyzer-language-dispatch/index.md) | completed |
+| [Isometric map: single source of truth, declared architecture, dashboard view](./isometric-map-single-source-of-truth/index.md) | completed |
 | [Landing page for n-dx](./landing-page-for-n-dx/index.md) | completed |
 | [Live PR Markdown in SourceVision UI](./live-pr-markdown-in-sourcevision-ui/index.md) | completed |
 | [ndx work Model Resolution, Display, and Vendor-Change Reset](./ndx-work-model-resolution-display-and/index.md) | completed |
+| [Optional 3D isometric architecture map generator](./optional-3d-isometric-architecture-map.md) | completed |
 | [Phase 1: Language Registry & Inventory Foundation](./phase-1-language-registry-inventory/index.md) | completed |
 | [PR Markdown Reviewer Context Enrichment](./pr-markdown-reviewer-context-enrichment/index.md) | completed |
 | [PR Markdown View Toggle and Copy UX](./pr-markdown-view-toggle-and-copy-ux/index.md) | completed |
