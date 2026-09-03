@@ -25,5 +25,14 @@ export default defineConfig({
           "tests/e2e/cli-serve.test.ts",
         ]
       : [],
+    // Raised from 5000ms, matching hench and rex. Three suites
+    // (branch-work-collector, pr-markdown, pr-markdown-reviewer-output) build
+    // real git repos in a temp dir: each test spends 8-13 `git` spawns on
+    // init/config/commit/checkout plus the collector's own rev-parse and
+    // `git show` calls. Locally those tests run 230-540ms; on the Windows CI
+    // runner, per-spawn process creation and on-access AV scanning of the temp
+    // worktree multiply that by roughly an order of magnitude, which pushed
+    // the heaviest three past 5 s while the rest of the suite stayed green.
+    testTimeout: 30_000,
   },
 });

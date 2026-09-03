@@ -20,3 +20,10 @@ export { ActivityView } from "./activity.js";
 export { TaskAuditView } from "./task-audit.js";
 export { WorkflowOptimizationView } from "./workflow-optimization.js";
 export { MergeGraphView } from "./merge-graph.js";
+
+// TODO(ask-panel): a Rex-scoped Ask panel gets exported here once the
+// SourceVision one (PRD feature d339458a) is generalised. Note that the
+// PRD-refinement half of that feature already writes through
+// rex-gateway's resolveStore under withTransaction, so a Rex-side panel should
+// reuse that apply path rather than growing a second PRD write surface.
+// Not in the PRD yet by choice; see sourcevision-tabs.ts for the origin marker.
