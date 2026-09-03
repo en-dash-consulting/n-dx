@@ -83,7 +83,7 @@ Before adding an entry here, check which side of the boundary the line is on. If
 `tests/e2e/cli-hints.test.js` makes its three assertions verbatim and runs on ubuntu, macOS
 **and** Windows — one platform more than this collector — while edit-distance suggestion over a
 static command list carries no OS-shaped data for parity to compare. Step 3 still contributes an
-error-path shape fingerprint. See [the gauntlet audit](../../tests/gauntlet/AUDIT-2026-09.md).
+error-path shape fingerprint. See [the gauntlet audit](../analysis//AUDIT-2026-09.md).
 
 ## Baseline Contract
 
