@@ -115,6 +115,13 @@ const SKIP_DIRS = new Set([
   // <name>/` prefix the ALLOWED list doesn't recognize, and reports it as
   // a violation of a rule the real, committed file already satisfies.
   ".claude",
+  // Same category: `.local_testing/` is gitignored scratch space for local
+  // harness runs (`.gitignore` un-ignores only README.md, the Dockerfiles,
+  // docker-compose.yml, run-gauntlet.*, test-base-commands.sh and
+  // .dockerignore — none of which `walk()` collects, since it only takes
+  // .ts/.js/.mjs). A throwaway fixture project left behind in there was
+  // failing this policy on setup scripts that are not committed source.
+  ".local_testing",
 ]);
 
 function walk(dir, files = []) {
