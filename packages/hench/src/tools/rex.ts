@@ -274,10 +274,19 @@ export function createCommandExecutor(projectDir: string): CommandExecutor {
       cwd: projectDir,
       timeout: REQ_CMD_TIMEOUT,
     });
+    // A command that never launched returns exitCode 1 with empty output, and
+    // the CommandExecutor contract has no field to say "could not run" — so the
+    // spawn error is folded into stderr rather than dropped. Without it the
+    // validation records a failed command with no reason attached. Reporting it
+    // properly would mean widening CommandExecutor in rex; the exit code stays 1
+    // either way, so the validation outcome is unchanged.
+    const stderr = result.launched
+      ? result.stderr
+      : `${result.stderr}${result.error?.message ?? "command could not be spawned"}`;
     return {
       exitCode: result.exitCode ?? 1,
       stdout: result.stdout,
-      stderr: result.stderr,
+      stderr,
     };
   };
 }

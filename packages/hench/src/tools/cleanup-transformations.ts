@@ -173,11 +173,24 @@ async function runTypecheck(
   projectDir: string,
   timeout: number,
 ): Promise<{ passed: boolean; error?: string }> {
-  const { exitCode, stderr } = await execShellCmd("pnpm typecheck", {
+  const { exitCode, stderr, launched, error } = await execShellCmd("pnpm typecheck", {
     cwd: projectDir,
     timeout,
     maxBuffer: 5 * 1024 * 1024,
   });
+
+  // Fails CLOSED, deliberately — this gate protects a mutation, so "could not
+  // verify" must roll the batch back exactly as "did not typecheck" does. What
+  // changes is only the message: reporting a spawn failure as type errors sent
+  // the caller hunting for compile errors that were never there.
+  if (!launched) {
+    return {
+      passed: false,
+      error:
+        `Typecheck could not be executed — the command was never launched ` +
+        `(${error?.message ?? "spawn failed"}). Rolled back without verifying types.`,
+    };
+  }
 
   if (exitCode === null) {
     return { passed: false, error: "Typecheck timed out" };

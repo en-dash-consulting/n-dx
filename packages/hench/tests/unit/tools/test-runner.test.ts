@@ -588,3 +588,122 @@ describe("runTestGate", () => {
     expect(result.totalDurationMs).toBeGreaterThanOrEqual(0);
   });
 });
+
+/**
+ * A suite that never started is not a suite that failed.
+ *
+ * `exec` reports a spawn failure as exitCode 1 with empty stdout/stderr — byte
+ * for byte what a real failing exit looks like — so the only thing separating
+ * the two is `ExecResult.launched`. Reading exitCode alone reported "your tests
+ * failed" for a command that never ran, and in autonomous mode that aborted the
+ * run, suppressing the PRD completion write and the commit for work that was
+ * already finished. On Windows without a POSIX shell it fired on every task.
+ *
+ * These drive `launched` directly rather than trying to arrange a real spawn
+ * failure, because the interesting input is exactly the field under test and a
+ * genuine ENOENT is not reproducible across platforms.
+ */
+describe("runTestGate — launched vs failed", () => {
+  let projectDir: string;
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-gate-launched-"));
+    vi.resetModules();
+  });
+
+  afterEach(async () => {
+    vi.doUnmock("../../../src/process/exec.js");
+    vi.resetModules();
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  /** Load runTestGate with execShellCmd stubbed to a fixed ExecResult. */
+  async function withExecResult(result: {
+    stdout: string;
+    stderr: string;
+    exitCode: number | null;
+    error: Error | null;
+    launched: boolean;
+  }) {
+    vi.doMock("../../../src/process/exec.js", () => ({
+      execShellCmd: async () => result,
+    }));
+    return (await import("../../../src/tools/test-runner.js")).runTestGate;
+  }
+
+  it("reports a suite that never launched as inconclusive, not as failing tests", async () => {
+    const runTestGate = await withExecResult({
+      stdout: "",
+      stderr: "",
+      exitCode: 1,
+      error: new Error("spawn sh ENOENT"),
+      launched: false,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+    });
+
+    // `ran: false` is the whole point — it is what stops the lifecycle treating
+    // this as a verdict and failing the run.
+    expect(result.ran).toBe(false);
+
+    // Not a deliberate skip. A skipReason would make the lifecycle report this
+    // as "Skipped: …" and say nothing was wrong.
+    expect(result.skipReason).toBeUndefined();
+
+    // The reason must name the underlying spawn failure — including the shell,
+    // which is what "spawn sh ENOENT" carries — so an operator can act on it.
+    expect(result.error).toContain("never launched");
+    expect(result.error).toContain("spawn sh ENOENT");
+  });
+
+  it("still reports a genuine non-zero exit as a test failure", async () => {
+    const runTestGate = await withExecResult({
+      stdout: "",
+      stderr: "1 test failed in packages/rex",
+      exitCode: 1,
+      error: new Error("Command failed"),
+      launched: true,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+    });
+
+    // The regression guard for the fix above: a command that DID run and exited
+    // non-zero must keep failing the gate. `launched: true` with a non-zero exit
+    // is a real result, not an infrastructure problem.
+    expect(result.ran).toBe(true);
+    expect(result.passed).toBe(false);
+    expect(result.packages.length).toBeGreaterThan(0);
+  });
+
+  it("still reports a genuine zero exit as a pass", async () => {
+    const runTestGate = await withExecResult({
+      stdout: JSON.stringify({
+        numTotalTests: 1,
+        numPassedTests: 1,
+        numFailedTests: 0,
+        testResults: [{ filepath: "packages/rex/x.test.ts", numFailingTests: 0 }],
+      }),
+      stderr: "",
+      exitCode: 0,
+      error: null,
+      launched: true,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+    });
+
+    expect(result.ran).toBe(true);
+    expect(result.passed).toBe(true);
+  });
+});

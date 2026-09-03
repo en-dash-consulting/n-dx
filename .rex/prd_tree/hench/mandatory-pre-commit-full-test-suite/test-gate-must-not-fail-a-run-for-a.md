@@ -2,7 +2,7 @@
 id: "02351b92-4b60-43cf-b1bc-317ea895e39f"
 level: "task"
 title: "Test gate must not fail a run for a suite it never executed"
-status: "pending"
+status: "completed"
 priority: "critical"
 tags:
   - "cross-os"
@@ -12,6 +12,11 @@ tags:
   - "test-gate"
   - "windows"
 source: "ndx-capture"
+startedAt: "2026-09-03T21:16:43.584Z"
+completedAt: "2026-09-03T21:28:09.692Z"
+endedAt: "2026-09-03T21:28:09.692Z"
+resolutionType: "code-change"
+resolutionDetail: "runTestGate reads ExecResult.launched and reports an unexecutable gate as ran:false + reason; finalizeRun treats that as inconclusive so the PRD write and commit proceed and the retry loop terminates. Verified by neutering both halves (ran:true; failed status + 5 retries). All execShellCmd call sites audited: 4 fixed, 1 partial, 1 already correct, 1 annotated and tracked as 813ae0de."
 acceptanceCriteria:
   - "runTestGate propagates the execution error and reports a gate it could not execute as `ran: false` with a reason, never as `passed: false`"
   - "An inconclusive gate does not flip run.status to failed, so the PRD completion write and the commit still proceed"
@@ -25,6 +30,6 @@ acceptanceCriteria:
   - "A unit test asserts that `launched: true` with a non-zero exitCode still produces a normal test-failure outcome (no regression)"
   - "Every other `execShellCmd` call site that branches on exitCode is audited for the same gap; each is either fixed or has a comment stating why exitCode alone is sufficient there"
 description: "Runs `7e18e4cb-1bfa-4614-8ce7-ab406db72daa` and `606de551-d29a-4aca-94f6-31d1d97ce114` (both task `34de0ad2-57d6-4523-8cab-9211452280a3`) each recorded `status: failed` with `error: \"Test gate failed: \"` and `testGate: {ran: true, passed: false, packages: [], command: \"npm run test\", totalDurationMs: 1}` — the suite never started. `runTestGate` (`packages/hench/src/tools/test-runner.ts:586`) destructures only `{stdout, stderr, exitCode}` and discards the `error` returned by `execShellCmd`, then infers pass/fail from `exitCode` alone (`:608`), so an unlaunchable command scores as a test failure. In autonomous mode that aborts immediately (`shared.ts:577`), setting `run.status = \"failed\"` (`shared.ts:2059`), which skips `updateCompletedTaskStatus` (`shared.ts:2080`) and short-circuits `performCommitPromptIfNeeded` (`shared.ts:1543`) — so completed, committed work is never recorded in the PRD, and the loop re-selects the same task until the 3-strike auto-cancel fires (`run.ts:1733`). In both runs the agent had already run the suites green via its own Bash tool and committed `a75fe556`; the task reached `completed` only because the agent called `update_task_status` itself at 13:10:38, ~50s before the harness declared failure. Root cause of the unlaunchable shell is tracked separately as `72422229-4ca2-476d-9fa9-95ff8b6f8362`; this task is the defense-in-depth that turns it into a loud, correct diagnosis instead of a false failure with a suppressed PRD write.\n\n---\n\n`runTestGate` (packages/hench/src/tools/test-runner.ts:608) computes `const overallPassed = exitCode === 0;` and never consults `ExecResult.launched`. When the shell itself cannot be spawned, `exec` returns `{ stdout: \"\", stderr: \"\", exitCode: 1, launched: false }` — indistinguishable from a real failing exit unless `launched` is read.\n\nObserved on Windows without a POSIX shell (`where sh` exits 1; Git for Windows does not put `usr/bin` on PATH). Before commit b5a3a3e0, `execShellCmd` hardcoded `spawn(\"sh\", [\"-c\", cmd])`, so the gate ENOENTed and reported `✗ 0/0 package(s) failed` with an empty `Error: Test gate failed:` message. Three consecutive `ndx work --loop` iterations failed this way and auto-cancelled the loop, despite each task's work being complete and committed.\n\nb5a3a3e0 fixed shell resolution (`buildShellInvocation` falls back to `cmd.exe /d /s /c`), which removes the trigger on this machine — but the gate's inference remains unguarded and will misreport any future spawn failure the same way. exec.ts:52-69 documents this exact hazard: \"a caller that infers pass/fail from exitCode alone reports 'your tests failed' for a suite that was never launched.\" The agent that shipped b5a3a3e0 explicitly flagged this as left undone.\n\nA gate that cannot start the suite must fail loudly and distinctly, naming the unresolvable shell — not silently claim the tests failed."
-lastModified: "2026-09-03T19:55:57.899Z"
+lastModified: "2026-09-03T21:28:09.733Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

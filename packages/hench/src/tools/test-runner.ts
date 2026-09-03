@@ -386,11 +386,28 @@ export async function runPostTaskTests(
   }
 
   const startMs = Date.now();
-  const { stdout, stderr, exitCode } = await execShellCmd(
+  const { stdout, stderr, exitCode, launched, error } = await execShellCmd(
     command,
     { cwd: projectDir, timeout, maxBuffer: 2 * 1024 * 1024 },
   );
   const durationMs = Date.now() - startMs;
+
+  // Same hazard as runTestGate: a command that could not be spawned comes back
+  // as exitCode 1 with empty output, so inferring from exitCode alone records a
+  // test failure for tests that never ran. Reported as `ran: false` instead.
+  if (!launched) {
+    return {
+      ran: false,
+      passed: false,
+      command,
+      output: "",
+      durationMs,
+      targetedFiles,
+      error:
+        `Tests could not be executed — the command was never launched ` +
+        `(${error?.message ?? "spawn failed"})`,
+    };
+  }
 
   const passed = exitCode === 0;
   const output = truncateOutput(stdout, stderr, 2000);
@@ -583,13 +600,38 @@ export async function runTestGate(
   const command = testCommand || "pnpm test --reporter=json";
   const startMs = Date.now();
 
-  const { stdout, stderr, exitCode } = await execShellCmd(command, {
+  const { stdout, stderr, exitCode, launched, error } = await execShellCmd(command, {
     cwd: projectDir,
     timeout,
     maxBuffer: 5 * 1024 * 1024, // 5MB for larger test output
   });
 
   const totalDurationMs = Date.now() - startMs;
+
+  // The suite never started: the shell or the command could not be spawned.
+  //
+  // `exec` reports a spawn failure as exitCode 1 with empty stdout/stderr, which
+  // is byte-for-byte indistinguishable from a real failing exit unless `launched`
+  // is consulted — see ExecResult.launched. Inferring from exitCode alone told the
+  // operator their tests had failed for a suite that never ran, and in autonomous
+  // mode that aborted the run, which suppressed the PRD completion write and the
+  // commit for work that was already finished. On Windows without a POSIX shell
+  // this fired on essentially every task until b5a3a3e0 fixed shell resolution.
+  //
+  // Reported as `ran: false` so callers treat it as INCONCLUSIVE. It is not a
+  // verdict on the code: nothing was tested, so nothing can be said to have failed.
+  if (!launched) {
+    return {
+      ran: false,
+      passed: false,
+      packages: [],
+      command,
+      totalDurationMs,
+      error:
+        `Test gate could not be executed — the command was never launched ` +
+        `(${error?.message ?? "spawn failed"})`,
+    };
+  }
 
   // Handle timeout
   if (exitCode === null) {
@@ -792,6 +834,15 @@ export async function runDependencyAudit(
   const perPackageMetrics = new Map<string, DependencyAuditPackageResult>();
 
   // Step 1: Run pnpm audit
+  //
+  // AUDITED for the `launched` gap (task 02351b92) and deliberately NOT fixed
+  // here — exitCode alone is not sufficient, and the shortfall is worse than the
+  // one that task addresses. Both this step and step 2 fail OPEN: a command that
+  // never launched leaves `vulnerabilities` at all-zero, the parse is skipped
+  // because stdout is empty, and the function returns "no issues found" for an
+  // audit that never ran. Deciding what an unrunnable audit should report is a
+  // design call about a security gate, not a mechanical `launched` check, so it
+  // is tracked separately rather than guessed at inside this change.
   let auditCommand = "pnpm audit --json";
   let auditExitCode: number | null = 1;
 
@@ -826,7 +877,7 @@ export async function runDependencyAudit(
     // pnpm audit failed, continue with outdated check
   }
 
-  // Step 2: Run pnpm outdated
+  // Step 2: Run pnpm outdated — same fail-open `launched` gap as step 1 above.
   let outdatedCommand = "pnpm outdated --json";
   let outdatedExitCode: number | null = 1;
 

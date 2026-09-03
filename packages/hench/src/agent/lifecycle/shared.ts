@@ -2062,15 +2062,44 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             stream("Test Gate", "Skipped by user");
             gateComplete = true;
           } else {
-            // "abort" — mark run as failed and proceed to rollback
+            // "abort" — mark run as failed and proceed to rollback.
+            //
+            // Never emit a bare trailing colon: parseVitestOutput can return an
+            // empty package list for a runner whose output it cannot parse, and
+            // `Test gate failed: ` with nothing after it told the operator
+            // precisely nothing about why their run died.
             run.status = "failed";
-            run.error = `Test gate failed: ${failedPackages.join(", ")}`;
+            run.error =
+              failedPackages.length > 0
+                ? `Test gate failed: ${failedPackages.join(", ")}`
+                : `Test gate failed: ${testGate.error ?? "no package results were reported"}`;
             gateComplete = true;
           }
         }
       } else if (testGate.skipReason) {
         detail(`Skipped: ${testGate.skipReason}`);
         gateComplete = true;
+      } else {
+        // INCONCLUSIVE — `ran: false` with no skipReason means the gate could not
+        // be executed. The suite never started, so this is not a verdict on the
+        // code and must not be treated as one.
+        //
+        // Deliberately does NOT set run.status = "failed". Doing so skipped
+        // updateCompletedTaskStatus below and short-circuited the commit prompt,
+        // so finished, committed work went unrecorded in the PRD and the loop
+        // re-selected the same task until the 3-strike auto-cancel fired.
+        //
+        // Also sets gateComplete: without it the loop body did nothing on this
+        // branch and spun to the 5-attempt cap, re-running a command that cannot
+        // launch and then failing the run for exhausting its retries.
+        //
+        // The outcome stays on `run.testGate` (ran: false + error), so the run
+        // record and dashboard can tell this apart from a pass without a
+        // separate flag.
+        gateComplete = true;
+        stream("Test Gate", `⚠ Could not run — ${testGate.error ?? "reason unknown"}`);
+        detail("Inconclusive, not a failure: the suite never started, so nothing was tested.");
+        detail("The run continues; verify the suite yourself before trusting this commit.");
       }
     }
 

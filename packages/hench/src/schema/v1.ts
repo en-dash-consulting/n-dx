@@ -640,20 +640,33 @@ export interface TestPackageResult {
   durationMs?: number;
 }
 
+/**
+ * Outcome of the mandatory pre-commit test gate.
+ *
+ * Three outcomes, and `ran` is what distinguishes them — check it before
+ * `passed`:
+ *
+ * - `ran: true`  — the suite executed. `passed` is a real verdict on the code.
+ * - `ran: false` + `skipReason` — deliberately not run (e.g. no files changed).
+ * - `ran: false` + `error` — INCONCLUSIVE. The gate could not be executed at
+ *   all (the command could not be spawned). `passed` is meaningless here and is
+ *   set false only because the field is required; treating it as a verdict
+ *   reports "your tests failed" for a suite that never started.
+ */
 export interface TestGateResult {
-  /** Whether the test gate ran at all */
+  /** Whether the test gate ran at all. See the interface docblock — check this before `passed`. */
   ran: boolean;
-  /** Overall pass/fail (all packages must pass) */
+  /** Overall pass/fail (all packages must pass). Only meaningful when `ran` is true. */
   passed: boolean;
   /** Per-package results */
   packages: TestPackageResult[];
-  /** Reason gate was skipped if applicable */
+  /** Reason gate was deliberately skipped, if applicable */
   skipReason?: string;
   /** The full pnpm test command executed */
   command?: string;
   /** Total elapsed time (ms) */
   totalDurationMs?: number;
-  /** Error if test gate itself failed (e.g., timeout) */
+  /** Why the gate could not produce a verdict (never launched, or timed out) */
   error?: string;
 }
 
