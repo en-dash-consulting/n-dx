@@ -1122,6 +1122,49 @@ export interface ReviewPassContext {
   taskTitle: string;
 }
 
+/**
+ * Charge the reviewer's token spend to the run it reviewed.
+ *
+ * Both halves are required, and the per-turn half is the one that actually
+ * reaches `ndx usage`. Rex's `extractHenchTokenEvents` builds its events from
+ * `turnTokenUsage` whenever that array is non-empty and then moves on to the
+ * next run — it never falls back to the aggregate. So a run carrying only the
+ * executor's turns reports only the executor's spend, no matter how large
+ * `tokenUsage` grew. Charging the aggregate alone produced an 89%
+ * under-report on run 5c1e9bee, priced entirely at the executor's rate.
+ *
+ * The reviewer's turn numbers restart at 1, so they are offset past the
+ * executor's highest turn: `turn` stays monotonic within a run and stays
+ * usable as a label. An aggregate-only reviewer contributes no per-turn
+ * entries rather than one synthetic entry — fabricated per-turn data is
+ * indistinguishable from measured data once written.
+ *
+ * @internal Exported for testing.
+ */
+export function chargeReviewToRun(
+  run: RunRecord,
+  result: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage">,
+  reviewModel: string,
+): void {
+  run.tokenUsage = addTokenUsage(run.tokenUsage ?? { input: 0, output: 0 }, result.tokenUsage);
+
+  if (result.turnTokenUsage.length === 0) return;
+
+  const executorTurns = run.turnTokenUsage ?? [];
+  const turnOffset = executorTurns.reduce((max, t) => Math.max(max, t.turn ?? 0), 0);
+
+  run.turnTokenUsage = executorTurns.concat(
+    result.turnTokenUsage.map((turn, index) => ({
+      ...turn,
+      turn: turnOffset + Math.max(1, turn.turn ?? index + 1),
+      // The spawn tags these from `tokenMetadata`, but the local vendor sends
+      // no model flag and leaves an empty string behind. Normalize it away so
+      // the `turn.model ?? run.model` fallback downstream still engages.
+      model: turn.model || reviewModel || undefined,
+    })),
+  );
+}
+
 /** Per-invocation inputs that only exist once the task has actually run. */
 interface ReviewPassInvocation {
   run: RunRecord;
@@ -1228,7 +1271,7 @@ async function runAdversarialReviewPass(
   // Charge the review to the run it reviewed. It is part of the cost of
   // completing this task, and leaving it out would make `--review` look free
   // in `ndx usage`.
-  inv.run.tokenUsage = addTokenUsage(inv.run.tokenUsage ?? { input: 0, output: 0 }, result.tokenUsage);
+  chargeReviewToRun(inv.run, result, ctx.reviewModel);
 
   if (result.error) {
     const outcome: ReviewPassOutcome = {
