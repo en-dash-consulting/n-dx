@@ -4,11 +4,11 @@ level: "epic"
 title: "Rex"
 status: "completed"
 startedAt: "2026-03-24T20:09:27.774Z"
-completedAt: "2026-09-01T15:23:09.552Z"
-endedAt: "2026-09-01T15:23:09.552Z"
+completedAt: "2026-09-03T14:48:25.394Z"
+endedAt: "2026-09-03T14:48:25.394Z"
 description: "PRD management: hierarchical epics/features/tasks/subtasks, smart add from natural language, LLM-powered analysis and recommendations, validation, pruning, reshaping. Stores state in .rex/prd.json."
-lastModified: "2026-09-01T15:23:09.557Z"
-lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+lastModified: "2026-09-03T14:48:25.417Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
