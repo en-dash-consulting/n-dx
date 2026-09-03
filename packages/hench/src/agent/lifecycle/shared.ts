@@ -28,6 +28,7 @@ import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
 import type { PromptEnvelope } from "../../prd/llm-gateway.js";
+import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { saveRun } from "../../store/runs.js";
 import { persistRunLog } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
@@ -857,9 +858,15 @@ export interface FinalizeRunOptions {
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
 
 /**
- * Return the list of entries reported by `git status --porcelain`.
+ * Return the operator-authored entries reported by `git status --porcelain`.
  * Each non-blank line represents a modified, staged, or untracked path.
  * Returns an empty array when the working tree is clean or git is unavailable.
+ *
+ * Hench's own runtime artifacts are discounted (see
+ * {@link excludeHenchRuntimeArtifacts}). `.hench/locks/` is created at process
+ * startup, before the pre-run gate fires, so counting it made an autonomous
+ * run on a project without those `.gitignore` entries refuse to start against
+ * a lock it had just created itself.
  */
 async function listDirtyPaths(projectDir: string): Promise<string[]> {
   try {
@@ -867,7 +874,7 @@ async function listDirtyPaths(projectDir: string): Promise<string[]> {
       cwd: projectDir,
       timeout: 15_000,
     });
-    return output.trim().split("\n").filter(Boolean);
+    return excludeHenchRuntimeArtifacts(output.trim().split("\n").filter(Boolean));
   } catch {
     return [];
   }
