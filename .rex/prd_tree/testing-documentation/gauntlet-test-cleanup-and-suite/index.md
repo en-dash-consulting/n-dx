@@ -14,5 +14,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Apply recommended changes to the cross-OS pipeline validation stage](./apply-recommended-changes-to-the-cross.md) | pending |
+| [Apply recommended changes to the cross-OS pipeline validation stage](./apply-recommended-changes-to-the-cross.md) | completed |
 | [Remove stale gauntlet tests and repurpose niche tests into broader assertions](./remove-stale-gauntlet-tests-and.md) | pending |

@@ -47,6 +47,28 @@ It is opt-in per case via `shapeParity: true`, and only correct for cases whose 
 
 If a message in a `shapeParity` case ever legitimately gains a path, drop that case's flag in the same change rather than loosening the check. `shapeParity` is recorded in the `sequence` metadata, so two platforms disagreeing about which cases are shape-compared fails `compareSequence` rather than silently skipping the check.
 
+## What may be stripped as noise — and what may not
+
+`stripKnownRuntimeNoise` runs before both `normalizeText` and `describeShape`. The boundary it enforces is narrow and deliberate:
+
+> Strip what the Node **runtime** writes to our streams. Never strip what n-dx writes.
+
+Anything n-dx prints is the contract under test. Stripping it does not "normalize" the comparison — it deletes the assertion.
+
+The stage learned this concretely. `stripKnownRuntimeNoise` used to also remove:
+
+```
+[child-lifecycle] process group cleanup is not supported on this platform; falling back to direct child kill
+```
+
+That line was **n-dx's own output**, and it appeared on *every* win32 invocation — `ndx version`, `ndx --help`, `ndx status`, commands that spawn no child at all — because `cli.js` constructed its child-process tracker with `processGroups: true` at module load while `PLATFORM_SUPPORTS_PROCESS_GROUPS` is always false on win32. It was a genuine Windows-only regression in user-facing output, fixed in [`b0efffdd`](https://github.com/en-dash-consulting/n-dx/pull/329) by gating the notice behind `NDX_DEBUG_LIFECYCLE` / `NDX_DEBUG`. The strip had been added as a workaround while the bug was live.
+
+Keeping the strip after the fix inverted its purpose: it left `version-text`'s `stderrExact: ""` baseline structurally incapable of catching the one regression class in this stage's subject matter for which there is concrete historical evidence. Removing it is what makes that assertion load-bearing — and it is the assertion-level answer to "has anything here ever caught a real regression", since the eight smoke cases themselves have never fired on a product defect (see §2 of [the cost/value review](./cross-os-pipeline-review-2026-09.md)).
+
+Verified 2026-09-03: two replay cases in `tests/unit/cli-smoke-parity.test.js` assert that the notice now fails `version-text`'s baseline, and the live collector was re-run on Windows 11 / Node 22 with all eight cases green and the notice absent.
+
+Before adding an entry here, check which side of the boundary the line is on. If n-dx emits it, fix the emitter or assert it.
+
 ## Canonical Sequence
 
 1. `ndx version`

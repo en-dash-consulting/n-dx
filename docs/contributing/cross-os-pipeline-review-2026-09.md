@@ -9,6 +9,35 @@
 > records the broken output, which is the whole diagnostic value. Verified on
 > Windows: exit 1, error names `win32`, all 8 cases still recorded.
 >
+> **T4, added 2026-09-03.** Applying T2 exposed a defect this review missed. §3's T2 adds
+> `stderrExact: ""` to `version-text` so that "prints nothing to stderr" is a per-OS
+> assertion — but `stripKnownRuntimeNoise` was deleting n-dx's own
+> `[child-lifecycle] process group cleanup is not supported on this platform` line before
+> that assertion ever saw it. That line was a real Windows-only regression (it printed on
+> every win32 invocation, including commands that spawn nothing; fixed in `b0efffdd` / #329
+> by gating it behind `NDX_DEBUG_LIFECYCLE`), and the strip had been added as a workaround
+> while the bug was live. So T2 as specified would have shipped an assertion that could not
+> catch the single documented regression in its own subject matter. The strip is now removed
+> and the noise boundary is explicit: strip what the Node runtime writes, never what n-dx
+> writes. This is also the concrete answer to §2's open question — see "What may be stripped
+> as noise" in [cli-smoke-parity.md](./cli-smoke-parity.md).
+>
+> **Verification, 2026-09-03.** Full suite run on Windows 11 / Node 22 to satisfy the
+> "passes on a historically-failing platform" criterion: 6/6 suites green, and the live
+> `collect` run recorded all 8 cases with the baseline passing and the `[child-lifecycle]`
+> notice absent. That run surfaced one further Windows defect, now fixed:
+> `packages/web/tests/unit/server/routes-hench-execute.test.ts` asserted a terminal
+> broadcast state after a fixed 200ms sleep, which held in isolation but not under
+> full-suite parallel load — the last recorded state was still `starting`. It is now a
+> `vi.waitFor` poll, and that describe block gained the `shutdownActiveExecutions`
+> teardown its sibling block already had. This matters to the pipeline, not just to the
+> suite: `smoke-windows` runs `run-all-tests.mjs packages`, so the flake was a source of
+> intermittent red on the one platform this stage exists to watch.
+>
+> Not verified here: the Linux leg of that criterion. It needs the branch pushed —
+> `validate` and `smoke-parity` both run on `ubuntu-latest` and cannot be exercised
+> locally.
+>
 > This document is retained as the rationale record. It describes the pipeline as it
 > was before the change; do not read §1's assertion table as current.
 

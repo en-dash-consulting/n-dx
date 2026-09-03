@@ -42,17 +42,41 @@ function stableValue(value) {
   return value;
 }
 
+/**
+ * Strip noise the Node RUNTIME writes to our streams, and nothing else.
+ *
+ * That boundary is load-bearing. Anything n-dx itself prints is the contract
+ * under test, so stripping it here silently disables the assertion that would
+ * have caught it.
+ *
+ * Concretely: this function used to also strip
+ *   [child-lifecycle] process group cleanup is not supported on this platform;
+ *   falling back to direct child kill
+ * which n-dx printed on EVERY win32 invocation — `version`, `--help`, `status`,
+ * commands that spawn nothing — because cli.js built its tracker with
+ * `processGroups: true` at module load and `PLATFORM_SUPPORTS_PROCESS_GROUPS`
+ * is always false there. That is a real Windows-only regression in user-facing
+ * output, fixed in b0efffdd (#329) by gating the notice behind
+ * NDX_DEBUG_LIFECYCLE / NDX_DEBUG. The strip was the workaround this collector
+ * "had resorted to" (b0efffdd's own commit message) while the bug was live.
+ *
+ * Keeping the strip after the fix inverted its purpose: it made the
+ * `stderrExact: ""` baseline on `version-text` structurally incapable of
+ * catching the one regression class we have concrete historical evidence for.
+ * Removing it is what makes that assertion load-bearing. Verified on Windows 11
+ * / Node 22 (2026-09-03): all eight cases collect with the notice absent and the
+ * baseline green, so this is not trading a real failure for a theoretical one.
+ *
+ * Before adding an entry here, check which side of the boundary the line is on.
+ * If n-dx emits it, fix the emitter or assert it — do not strip it.
+ */
 function stripKnownRuntimeNoise(text) {
   return text
     .replace(
       /^\(node:\d+\) \[DEP0040\] DeprecationWarning: The `punycode` module is deprecated\. Please use a userland alternative instead\.\n?/gm,
       "",
     )
-    .replace(/^\(Use `node --trace-deprecation \.\.\.` to show where the warning was created\)\n?/gm, "")
-    .replace(
-      /^\[child-lifecycle\] process group cleanup is not supported on this platform; falling back to direct child kill\n?/gm,
-      "",
-    );
+    .replace(/^\(Use `node --trace-deprecation \.\.\.` to show where the warning was created\)\n?/gm, "");
 }
 
 class SmokeCollectionError extends Error {

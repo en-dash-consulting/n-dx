@@ -37,12 +37,18 @@ function parseDocumentedCliErrorCodes() {
   );
 }
 
-function createDeterministicSmokeRunner({ incompleteVersionJson = false, statusTitle = "Test Project" } = {}) {
+function createDeterministicSmokeRunner({
+  incompleteVersionJson = false,
+  statusTitle = "Test Project",
+  // Lets a test replay a CLI that leaks to stderr on `ndx version`. Empty is the
+  // contract; see the child-lifecycle regression-replay cases.
+  versionStderr = "",
+} = {}) {
   return async function executeCli(args) {
     const key = JSON.stringify(args);
     switch (key) {
       case JSON.stringify(["version"]):
-        return { exitCode: 0, stdout: `${CORE_VERSION}\n`, stderr: "" };
+        return { exitCode: 0, stdout: `${CORE_VERSION}\n`, stderr: versionStderr };
       case JSON.stringify(["version", "--json"]):
         return {
           exitCode: 0,
@@ -167,9 +173,48 @@ describe("cli smoke parity helpers", () => {
     );
   });
 
-  it("strips known child lifecycle platform warnings before comparing output", () => {
+  // REGRESSION REPLAY — the one historical defect in this stage's own subject
+  // matter that we have concrete evidence for, replayed against the tightened
+  // assertions.
+  //
+  // Before b0efffdd (#329), n-dx printed
+  //   [child-lifecycle] process group cleanup is not supported on this platform; ...
+  // to stderr on EVERY win32 invocation, including `ndx version`, which spawns
+  // nothing. cli.js constructed its tracker with `processGroups: true` at module
+  // load and PLATFORM_SUPPORTS_PROCESS_GROUPS is always false on win32. The fix
+  // gated the notice behind NDX_DEBUG_LIFECYCLE / NDX_DEBUG.
+  //
+  // This collector had a hardcoded strip for that exact line, added while the bug
+  // was live. That strip is why `stderrExact: ""` could not have caught it, and
+  // why these two tests exist: the first proves the noise is no longer erased, the
+  // second proves the baseline fails on the platform that emits it.
+  it("no longer erases n-dx's own output as runtime noise", () => {
     const text = [
       "[child-lifecycle] process group cleanup is not supported on this platform; falling back to direct child kill",
+      CORE_VERSION,
+      "",
+    ].join("\n");
+
+    expect(normalizeText(text)).not.toBe(CORE_VERSION);
+    expect(normalizeText(text)).toContain("[child-lifecycle]");
+  });
+
+  it("fails version-text's baseline on the child-lifecycle notice regression (b0efffdd)", async () => {
+    const notice = "[child-lifecycle] process group cleanup is not supported on this platform; falling back to direct child kill";
+    const artifact = await collectSmokeArtifact({
+      executeCli: createDeterministicSmokeRunner({ versionStderr: `${notice}\n` }),
+    });
+
+    expect(
+      validateBaseline(artifact, "win32").some((issue) =>
+        issue.includes("version-text stderr did not match expected static text")),
+    ).toBe(true);
+  });
+
+  it("still strips genuine Node runtime warnings, which are not n-dx output", () => {
+    const text = [
+      "(node:12345) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+      "(Use `node --trace-deprecation ...` to show where the warning was created)",
       CORE_VERSION,
       "",
     ].join("\n");
