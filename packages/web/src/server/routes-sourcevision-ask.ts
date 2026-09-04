@@ -3,7 +3,7 @@
  * project, answered from the existing `.sourcevision/` analysis.
  *
  * POST /api/sourcevision/ask
- *   body     { prompt: string, seed?: { kind?, id?, text? } }
+ *   body     { prompt: string, seed?: { kind?, id?, text?, zone?, files?, labels? } }
  *   200      { answer, vendor, model, tokens, contextSources }
  *   4xx/5xx  { error, kind, suggestion?, retryAfterMs? }
  *
@@ -93,6 +93,14 @@ const DEFAULT_ASK_TIMEOUT_MS = 120_000;
 const MAX_PROMPT_CHARS = 4_000;
 const MAX_SEED_TEXT_CHARS = 8_000;
 
+/**
+ * Files accepted on a seed — a request-size guard, deliberately looser than
+ * the assembler's rendering cap. The assembler decides how many fit the
+ * context budget and says how many it dropped; this only refuses a body large
+ * enough to be a mistake.
+ */
+const MAX_SEED_FILES = 100;
+
 const NDX_CONFIG = ".n-dx.json";
 const NDX_LOCAL_CONFIG = ".n-dx.local.json";
 
@@ -119,6 +127,9 @@ const AskRequestSchema = z
         kind: z.string().trim().max(64).optional(),
         id: z.string().trim().max(1_024).optional(),
         text: z.string().trim().max(MAX_SEED_TEXT_CHARS).optional(),
+        zone: z.string().trim().max(256).optional(),
+        files: z.array(z.string().trim().max(1_024)).max(MAX_SEED_FILES).optional(),
+        labels: z.record(z.string().trim().max(256)).optional(),
       })
       .strict()
       .optional(),
@@ -215,14 +226,37 @@ export function resolveAskTimeoutMs(projectDir: string): number {
 // ---------------------------------------------------------------------------
 
 /**
+ * Extra rules that apply when the question is about one specific item.
+ *
+ * A seeded question ("explain this finding") has a failure mode a free-form
+ * one does not: an answer that describes the *category* — what a god file is,
+ * why coupling is bad — reads as competent and could have been written without
+ * the analysis. These rules make the seeded item's own zone and files the
+ * subject, and require the answer to say where a fix would land, which is the
+ * part a reader cannot get from the finding row they already saw.
+ */
+const SEEDED_RULES = [
+  "- The user is asking about the specific item under 'What the user is looking at'.",
+  "  Make that item the subject: name its zone and its files explicitly, and",
+  "  explain what it means for THIS repository rather than for its category.",
+  "- Say what a fix would touch — which files and zones a change would land in,",
+  "  and what else imports them. If the analysis does not show that, say so.",
+  "- A generic explanation of the finding type is not an answer to this question.",
+];
+
+/**
  * Build the full prompt.
  *
  * The instruction block is emphatic about the analysis being the only source
  * because that is the endpoint's whole contract: the model has no file access
  * here, so an answer it invents from the project's name would be
  * indistinguishable from one the analysis supports.
+ *
+ * `seeded` adds {@link SEEDED_RULES}. It is a flag rather than the seed itself
+ * because the seed's content is already in `context`; what changes here is
+ * only what the model is asked to do with it.
  */
-export function buildAskPrompt(question: string, context: string): string {
+export function buildAskPrompt(question: string, context: string, seeded = false): string {
   return [
     "You are answering a question about a software project on behalf of the",
     "SourceVision dashboard. A static analysis of the project is provided below.",
@@ -234,6 +268,7 @@ export function buildAskPrompt(question: string, context: string): string {
     "- Cite the zone IDs, file paths, and findings you relied on.",
     "- Do not speculate about code you cannot see, and do not invent file paths.",
     "- Reply in markdown. Be concise.",
+    ...(seeded ? SEEDED_RULES : []),
     "",
     "----- BEGIN ANALYSIS -----",
     context,
@@ -457,7 +492,7 @@ async function handleAsk(
   try {
     const result = await completeWithTimeout(
       client,
-      { prompt: buildAskPrompt(parsed.prompt, context.text), model },
+      { prompt: buildAskPrompt(parsed.prompt, context.text, context.seeded), model },
       timeoutMs,
       (late) => record(late.tokenUsage, "timeout", 0),
     );

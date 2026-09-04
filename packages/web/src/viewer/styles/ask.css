@@ -17,10 +17,62 @@
 .sv-ask-idle,
 .sv-ask-answer,
 .sv-ask-error,
+.sv-ask-seed,
 .sv-ask-unavailable {
   display: flex;
   flex-direction: column;
   gap: var(--space-2-5);
+}
+
+/* The seeded finding, shown above the question it grounds. Tinted on its
+   leading edge rather than boxed in an accent colour: it is context for the
+   question, not a result or a warning. */
+.sv-ask-seed {
+  border-left: 3px solid var(--brand-teal);
+  gap: var(--space-2);
+}
+
+.sv-ask-seed-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.sv-ask-seed-clear-btn {
+  flex: none;
+  font-size: var(--font-sm);
+}
+
+.sv-ask-seed-text {
+  margin: 0;
+  font-size: var(--font-base);
+  line-height: 1.55;
+}
+
+/* Two columns: label, value. The labels come from the seed's own classification
+   map, so the grid sizes to whatever the surface supplied rather than to a
+   fixed set of fields. */
+.sv-ask-seed-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  font-size: var(--font-sm);
+}
+
+.sv-ask-seed-facts dt {
+  color: var(--text-dim);
+}
+
+.sv-ask-seed-facts dd {
+  margin: 0;
+}
+
+.sv-ask-seed-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
 }
 
 .sv-ask-label {

@@ -328,6 +328,63 @@ describe("POST /api/sourcevision/ask", () => {
     expect(prompt).toContain("Identifier: `checkout-core`");
   });
 
+  it("carries a finding seed's zone and files through to the model intact", async () => {
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
+
+    const res = await ask({
+      prompt: "Explain this finding in plain language.",
+      seed: {
+        kind: "finding",
+        id: "anti-pattern:checkout-core:God file",
+        text: "God file: src/checkout/pipeline.ts owns routing, validation, and persistence.",
+        zone: "checkout-core",
+        files: ["src/checkout/pipeline.ts", "src/checkout/validate.ts"],
+        labels: { type: "anti-pattern", severity: "critical" },
+      },
+    });
+    expect(res.status).toBe(200);
+
+    const prompt = stub.requests[0].prompt;
+    // The fields the row showed, reaching the model as fields — this is the
+    // difference between an explanation of THIS finding and an explanation of
+    // its category.
+    expect(prompt).toContain("Zone: `checkout-core`");
+    expect(prompt).toContain("`src/checkout/pipeline.ts`");
+    expect(prompt).toContain("`src/checkout/validate.ts`");
+    expect(prompt).toContain("type: anti-pattern");
+    expect(prompt).toContain("severity: critical");
+    // And the instructions that make the answer use them.
+    expect(prompt).toContain("name its zone and its files explicitly");
+    expect(prompt).toContain("Say what a fix would touch");
+  });
+
+  it("does not add the seeded rules to an unseeded question", async () => {
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
+
+    await ask({ prompt: "Which zones are most coupled?" });
+
+    const prompt = stub.requests[0].prompt;
+    expect(prompt).not.toContain("What the user is looking at");
+    expect(prompt).not.toContain("Say what a fix would touch");
+  });
+
+  it("refuses a seed field it does not honor rather than dropping it", async () => {
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
+
+    const res = await ask({
+      prompt: "Explain this.",
+      seed: { kind: "finding", severity: "critical" },
+    });
+
+    // `severity` belongs inside `labels`. A client that guessed the shape must
+    // be told, not silently answered without the field it thought it sent.
+    expect(res.status).toBe(400);
+    expect(stub.requests).toHaveLength(0);
+  });
+
   // ── Vendor / model resolution ─────────────────────────────────────────────
 
   it("resolves vendor and model from project config, not from a hardcoded pair", async () => {

@@ -132,4 +132,68 @@ describe("assembleAskContext", () => {
     expect(text).toContain("excerpt truncated");
     expect(text.length).toBeLessThan(7_000);
   });
+
+  // ── Seeded focus section ──────────────────────────────────────────────────
+  //
+  // The Explain action on a finding row is only worth having if the finding's
+  // own zone and files survive into the bundle. An answer that could have been
+  // written without them is the failure this feature exists to avoid, so these
+  // assert the specific values rather than that a section exists.
+
+  describe("seed", () => {
+    beforeEach(async () => {
+      await writeFile(join(svDir, "manifest.json"), JSON.stringify({ targetPath: "/repo/seeded" }));
+    });
+
+    it("carries the finding's zone, files, and labels through verbatim", () => {
+      const { text, seeded } = assembleAskContext(ctx, {
+        kind: "finding",
+        id: "anti-pattern:web-viewer:God file",
+        text: "God file: src/viewer/main.ts owns routing, loading, and layout.",
+        zone: "web-viewer",
+        files: ["src/viewer/main.ts", "src/viewer/route-state.ts"],
+        labels: { type: "anti-pattern", severity: "critical" },
+      });
+
+      expect(seeded).toBe(true);
+      expect(text).toContain("What the user is looking at");
+      expect(text).toContain("Surface: finding");
+      expect(text).toContain("Zone: `web-viewer`");
+      expect(text).toContain("`src/viewer/main.ts`");
+      expect(text).toContain("`src/viewer/route-state.ts`");
+      expect(text).toContain("type: anti-pattern");
+      expect(text).toContain("severity: critical");
+    });
+
+    it("omits the fields a finding did not set rather than inventing them", () => {
+      // A finding with no severity and no related files is the shape the
+      // acceptance criteria call out; blank labels must not reach the model as
+      // "severity: " with nothing after it.
+      const { text } = assembleAskContext(ctx, {
+        kind: "finding",
+        text: "Zones are evenly sized.",
+        labels: { type: "pattern", severity: "" },
+      });
+
+      expect(text).toContain("Classified as: type: pattern");
+      expect(text).not.toContain("severity");
+      expect(text).not.toContain("Zone:");
+      expect(text).not.toContain("Files involved");
+    });
+
+    it("reports no focus section for a seed with nothing in it", () => {
+      const { text, seeded } = assembleAskContext(ctx, { labels: {}, files: [] });
+      expect(seeded).toBe(false);
+      expect(text).not.toContain("What the user is looking at");
+    });
+
+    it("caps the file list and says how many it dropped", () => {
+      const files = Array.from({ length: 30 }, (_, i) => `src/f${i}.ts`);
+      const { text } = assembleAskContext(ctx, { kind: "finding", files });
+
+      expect(text).toContain("`src/f24.ts`");
+      expect(text).not.toContain("`src/f25.ts`");
+      expect(text).toContain("5 further files omitted");
+    });
+  });
 });

@@ -10,6 +10,17 @@ interface FindingsListProps {
   groupBy?: "severity" | "scope" | "type";
   searchable?: boolean;
   threshold?: number;
+  /**
+   * Offer an "Explain" action on every finding row, calling back with the
+   * finding itself.
+   *
+   * Opt-in rather than always-on, and handed the `Finding` rather than
+   * anything Ask-shaped: this component renders findings for the Problems,
+   * Suggestions, and Architecture views, and only the first two have somewhere
+   * to send one. Mapping a finding onto an Ask seed is the caller's job, so a
+   * display component does not acquire a dependency on a feature.
+   */
+  onExplain?: (finding: Finding) => void;
 }
 
 const SEVERITY_ICON: Record<string, string> = {
@@ -25,10 +36,25 @@ const TYPE_ICON: Record<string, string> = {
   suggestion: "✨",    // sparkles
 };
 
+/**
+ * Identify a finding by its content.
+ *
+ * Findings carry no ID of their own — `zones.json` writes them as a flat list
+ * — so identity has to come from the fields that do not change between runs
+ * for the same finding: what kind it is, where it is, and what it says. The
+ * text is clipped because a re-run may reword a tail while describing the same
+ * problem.
+ *
+ * Exported because the seed sent to the Ask panel names the finding with the
+ * same string the row is keyed by; two derivations would drift.
+ */
+export function findingKey(f: Finding): string {
+  return `${f.type}:${f.scope ?? "global"}:${f.text.slice(0, 40)}`;
+}
+
 /** Derive a stable DOM-safe ID from a finding's content. */
 function findingDetailId(f: Finding): string {
-  const raw = `${f.type}-${f.scope ?? "global"}-${f.text.slice(0, 40)}`;
-  return "fd-" + raw.replace(/[^a-zA-Z0-9]/g, "-").replace(/-{2,}/g, "-").slice(0, 64);
+  return "fd-" + findingKey(f).replace(/[^a-zA-Z0-9]/g, "-").replace(/-{2,}/g, "-").slice(0, 64);
 }
 
 export function FindingsList({
@@ -37,6 +63,7 @@ export function FindingsList({
   groupBy = "severity",
   searchable = true,
   threshold = 8,
+  onExplain,
 }: FindingsListProps) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -190,6 +217,23 @@ export function FindingsList({
         : h("div", { class: "finding-header" }, ...headerContent),
       // Main text — always visible
       h("p", { class: "finding-text" }, f.text),
+      // Explain sits outside the header, not inside it: the header is itself a
+      // button whenever the finding has related files, and a button nested in a
+      // button is invalid markup that browsers resolve unpredictably.
+      onExplain
+        ? h("div", { class: "finding-actions" },
+            h("button", {
+              type: "button",
+              class: "btn finding-explain-btn",
+              // The row already shows type, severity, and zone; what the label
+              // cannot show is which row this button belongs to, which is what
+              // a screen reader hears out of context.
+              "aria-label": `Explain this ${sev} ${f.type}: ${f.text}`,
+              title: "Explain this finding in plain language",
+              onClick: () => onExplain(f),
+            }, "Explain"),
+          )
+        : null,
       // Expandable detail (related files)
       hasDetail
         ? h("div", {

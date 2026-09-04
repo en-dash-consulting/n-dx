@@ -61,6 +61,15 @@ const MAX_CIRCULARS = 5;
 const MAX_CONTEXT_MD_CHARS = 6_000;
 /** Characters of a single zone description or finding kept. */
 const MAX_PROSE_CHARS = 400;
+/**
+ * Files listed for the seeded item.
+ *
+ * Higher than a display cap would be: these are the paths the answer is asked
+ * to name, so cutting them costs specificity — which is the whole point of
+ * seeding. A finding naming more than this is describing a zone, and the zone
+ * section already covers it.
+ */
+const MAX_SEED_FILES = 25;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -84,6 +93,23 @@ export interface AskSeed {
   id?: string;
   /** Verbatim text of the thing being asked about. */
   text?: string;
+  /** Zone the thing belongs to. `"global"` when it is project-wide. */
+  zone?: string;
+  /**
+   * Files (or zones) the thing names.
+   *
+   * Carried as a list rather than folded into `text` because the answer is
+   * required to name them: a model given `related: [a, b]` as prose has to
+   * re-extract the paths before it can talk about them, and re-extraction is
+   * where invented paths come from.
+   */
+  files?: string[];
+  /**
+   * Classification labels the surface applies — for a finding, its type and
+   * severity. A map rather than named fields because each surface classifies
+   * differently, and a zone seed's labels are not a finding's.
+   */
+  labels?: Record<string, string>;
 }
 
 /** The assembled grounding bundle. */
@@ -98,6 +124,15 @@ export interface AskContext {
   sources: string[];
   /** The rendered context block, ready to embed in a prompt. */
   text: string;
+  /**
+   * True when a seed produced a focus section.
+   *
+   * The caller adds instructions that refer to that section by name, so this
+   * is reported rather than re-derived from the seed: a seed carrying only
+   * blank fields renders nothing, and rules pointing at an absent section
+   * would be the model's problem to reconcile.
+   */
+  seeded: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -320,13 +355,28 @@ function renderContextMd(contextMd: string | null): string[] {
 
 function renderSeed(seed: AskSeed | undefined): string[] {
   if (!seed) return [];
+  const labels = Object.entries(seed.labels ?? {})
+    .filter(([, value]) => typeof value === "string" && value.trim().length > 0)
+    .map(([key, value]) => `${key}: ${value}`);
+  // Paths are fenced individually rather than joined into one span, so a file
+  // list stays copy-pasteable in whatever the model quotes back.
+  const files = (seed.files ?? [])
+    .filter((entry) => typeof entry === "string" && entry.trim().length > 0)
+    .slice(0, MAX_SEED_FILES)
+    .map((entry) => `\`${entry.trim()}\``);
+
   const facts = [
     seed.kind ? `- Surface: ${seed.kind}` : null,
     seed.id ? `- Identifier: \`${seed.id}\`` : null,
+    labels.length > 0 ? `- Classified as: ${labels.join(", ")}` : null,
+    seed.zone ? `- Zone: \`${seed.zone}\`` : null,
+    files.length > 0 ? `- Files involved: ${files.join(", ")}` : null,
     seed.text ? `- Text: ${truncate(seed.text, MAX_PROSE_CHARS * 4)}` : null,
   ].filter(Boolean) as string[];
   if (facts.length === 0) return [];
-  return ["## What the user is looking at", ...facts];
+
+  const omitted = omissionNote((seed.files ?? []).length, files.length, "files");
+  return ["## What the user is looking at", ...facts, ...(omitted ? [omitted] : [])];
 }
 
 // ---------------------------------------------------------------------------
@@ -355,6 +405,7 @@ export function assembleAskContext(ctx: ServerContext, seed?: AskSeed): AskConte
   if (components) sources.push(DATA_FILES.components);
   if (contextMd) sources.push("CONTEXT.md");
 
+  const seedSection = renderSeed(seed);
   const sections: string[][] = [
     renderProject(manifest),
     renderInventory(inventory),
@@ -364,7 +415,7 @@ export function assembleAskContext(ctx: ServerContext, seed?: AskSeed): AskConte
     renderImports(imports),
     renderComponents(components),
     renderContextMd(contextMd),
-    renderSeed(seed),
+    seedSection,
   ];
 
   const body = sections
@@ -376,5 +427,6 @@ export function assembleAskContext(ctx: ServerContext, seed?: AskSeed): AskConte
     available: sources.length > 0,
     sources,
     text: body,
+    seeded: seedSection.length > 0,
   };
 }

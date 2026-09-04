@@ -68,12 +68,26 @@
  *    "Capture failed:" prefix because the reason itself comes from the server
  *    and may not read as a failure on its own.
  *
+ * ## Seeded questions
+ *
+ * The panel can be entered from a finding row on the Problems or Suggestions
+ * view. That hands over an {@link AskSeed} — the finding's own type, severity,
+ * zone, message, and files — which rides beside the prompt rather than inside
+ * it, so the endpoint can render it as a focus section and require the answer
+ * to name those files. The prompt is pre-filled with a short, editable
+ * question; rewording it does not cost the grounding, because the grounding
+ * was never in the text.
+ *
+ * The seed is shown as well as sent, and can be detached. An answer that names
+ * files the user was never shown reads as a guess, and a seed that could not be
+ * removed would silently ground every later question in the finding the user
+ * happened to arrive from.
+ *
  * ## Deliberately not here yet
  *
- * Per-failure-mode wording beyond what the endpoint supplies, and seeding the
- * prompt from a finding, are separate PRD tasks under the same feature. The
- * shell is shaped so each lands in one place: a message map over
- * `AskErrorKind`, and an initial-prompt prop respectively.
+ * Per-failure-mode wording beyond what the endpoint supplies is a separate PRD
+ * task under the same feature. The shell is shaped so it lands in one place: a
+ * message map over `AskErrorKind`.
  *
  * Markdown in the answer is currently shown as-is in a pre-wrapped block. The
  * renderer that would format it lives in `pr-markdown.ts` behind
@@ -91,6 +105,8 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
+import type { AskSeed } from "../types.js";
+import { EXPLAIN_PROMPT } from "./finding-seed.js";
 import {
   clipboardFailureMessage,
   clipboardSuccessMessage,
@@ -288,11 +304,42 @@ async function readErrorPayload(res: Response): Promise<{ message: string; kind:
 // View
 // ---------------------------------------------------------------------------
 
-export function AskView() {
+export interface AskViewProps {
+  /**
+   * The item the user arrived from, if they arrived from one.
+   *
+   * Supplied by `navigateTo("ask", { askSeed })` and threaded through the view
+   * registry, so a surface that can explain something does not need a
+   * reference to this component.
+   */
+  seed?: AskSeed | null;
+}
+
+/**
+ * A value that changes exactly when the seed identifies a different thing.
+ *
+ * Route state hands back a fresh object on every render, so an effect keyed on
+ * the seed itself would re-run forever and keep resetting the prompt out from
+ * under whoever was typing.
+ */
+function seedIdentity(seed: AskSeed | null | undefined): string | null {
+  if (!seed) return null;
+  return `${seed.kind ?? ""}:${seed.id ?? ""}:${seed.text ?? ""}`;
+}
+
+export function AskView({ seed = null }: AskViewProps = {}) {
   const deployed = isDeployedMode();
   const cliName = useCliName();
 
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(() => (seed ? EXPLAIN_PROMPT : ""));
+  /**
+   * The seed actually attached to the next request.
+   *
+   * Held in state rather than read from the prop so the user can detach it:
+   * a seed that could not be removed would silently ground every later
+   * question in the finding they first arrived from.
+   */
+  const [activeSeed, setActiveSeed] = useState<AskSeed | null>(seed);
   const [state, setState] = useState<AskState>({ status: "idle" });
   const [copy, setCopy] = useState<CopyState>({ status: "idle" });
   const [capture, setCapture] = useState<CaptureState>({ status: "idle" });
@@ -361,6 +408,29 @@ export function AskView() {
     if (captureTimerRef.current !== null) window.clearTimeout(captureTimerRef.current);
   }, []);
 
+  /**
+   * Identity of the seed already applied.
+   *
+   * Seeded on the first render rather than left null, so arriving *with* a
+   * seed does not immediately re-apply it and overwrite the initial prompt.
+   */
+  const appliedSeedRef = useRef<string | null>(seedIdentity(seed));
+
+  // Explaining a second finding without leaving the panel has to replace the
+  // exchange, not append to it: the previous answer is about the previous
+  // finding, and leaving it on screen under a new seed misattributes it.
+  const seedKey = seedIdentity(seed);
+  useEffect(() => {
+    if (seedKey === appliedSeedRef.current) return;
+    appliedSeedRef.current = seedKey;
+    setActiveSeed(seed);
+    if (seed) {
+      setPrompt(EXPLAIN_PROMPT);
+      setState({ status: "idle" });
+      resetActions();
+    }
+  }, [seedKey, seed, resetActions]);
+
   const submit = useCallback(async () => {
     if (inFlightRef.current) return;
     // The no-op case: an empty or whitespace-only prompt issues no request.
@@ -375,7 +445,11 @@ export function AskView() {
       const res = await fetch(ASK_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: question }),
+        // The seed goes as a sibling of the prompt, not folded into it. The
+        // endpoint renders it as its own focus section and adds the rules that
+        // make the answer name this finding's zone and files, which it cannot
+        // do for facts buried in the question text.
+        body: JSON.stringify(activeSeed ? { prompt: question, seed: activeSeed } : { prompt: question }),
       });
 
       if (!res.ok) {
@@ -418,7 +492,7 @@ export function AskView() {
     } finally {
       inFlightRef.current = false;
     }
-  }, [prompt, resetActions]);
+  }, [prompt, activeSeed, resetActions]);
 
   const answerText = state.status === "answered" ? state.answer : null;
 
@@ -511,6 +585,45 @@ export function AskView() {
       "aria-live": "polite",
       "aria-atomic": "true",
     }, askAnnouncement(state)),
+
+    // What the seed carries is shown, not just sent. A grounded answer that
+    // names files the user never saw offered looks like the model guessed;
+    // showing the facts first makes the answer's specificity legible, and the
+    // detach control keeps the panel usable for an unrelated question without
+    // a round trip through the Problems view.
+    activeSeed
+      ? h("div", { class: "card sv-ask-seed" },
+          h("div", { class: "sv-ask-seed-head" },
+            h("h3", { class: "section-header-sm" }, "About this finding"),
+            h("button", {
+              type: "button",
+              class: "btn sv-ask-seed-clear-btn",
+              title: "Ask without this finding attached",
+              onClick: () => { setActiveSeed(null); },
+            }, "Detach"),
+          ),
+          activeSeed.text
+            ? h("p", { class: "sv-ask-seed-text" }, activeSeed.text)
+            : null,
+          h("dl", { class: "sv-ask-seed-facts" },
+            ...Object.entries(activeSeed.labels ?? {}).flatMap(([label, value]) => [
+              h("dt", { key: `dt-${label}` }, label),
+              h("dd", { key: `dd-${label}` }, value),
+            ]),
+            ...(activeSeed.zone
+              ? [h("dt", { key: "dt-zone" }, "zone"), h("dd", { key: "dd-zone" }, h("code", null, activeSeed.zone))]
+              : []),
+            ...(activeSeed.files?.length
+              ? [
+                  h("dt", { key: "dt-files" }, activeSeed.files.length === 1 ? "file" : "files"),
+                  h("dd", { key: "dd-files", class: "sv-ask-seed-files" },
+                    ...activeSeed.files.map((file, i) => h("code", { key: i }, file)),
+                  ),
+                ]
+              : []),
+          ),
+        )
+      : null,
 
     h("form", {
       class: "card sv-ask-form",
