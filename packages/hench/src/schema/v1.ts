@@ -699,8 +699,68 @@ export interface DependencyAuditPackageResult {
   outdatedCount: number;
 }
 
+/**
+ * One `pnpm` invocation made by the dependency audit.
+ *
+ * `ran` is what separates "this step found nothing" from "this step could not
+ * look". The two are otherwise identical: a step that never launched leaves
+ * every count it feeds at zero, exactly like a step that ran and found nothing.
+ */
+export interface DependencyAuditCommandRecord {
+  /** The command string executed. */
+  command: string;
+  /** Exit code, or null when the command was killed (timeout) or never spawned. */
+  exitCode: number | null;
+  /**
+   * Whether this step produced counts that can be trusted.
+   *
+   * false means its contribution to the aggregate counts is zeros that carry no
+   * information — not an absence of findings. `error` says why.
+   *
+   * Required rather than optional so every construction site has to state it.
+   */
+  ran: boolean;
+  /** Why the step produced no counts. Present iff `ran` is false. */
+  error?: string;
+}
+
+/**
+ * Outcome of the pre-loop dependency audit (self-heal mode).
+ *
+ * Check `ran` before reading any count. Three outcomes:
+ *
+ * - `ran: true`, no `error` — both steps executed; the counts are real.
+ * - `ran: true` + `error` — PARTIAL. One step executed, the other could not.
+ *   The failed half contributed zeros that mean nothing; `commands` says which
+ *   half and why.
+ * - `ran: false` + `error` — INCONCLUSIVE. Neither step produced counts. Every
+ *   count is zero and none of them means "clean".
+ *
+ * WHAT AN INCONCLUSIVE AUDIT MEANS FOR THE CALLER: warn and proceed. It does
+ * not block the run. Three reasons, recorded because this is a security-adjacent
+ * gate and the default instinct is to fail closed:
+ *
+ * 1. The audit is advisory. No code path gates on its findings — a run with ten
+ *    critical vulnerabilities proceeds today. A step that could not launch must
+ *    not be treated more harshly than one that launched and found those ten.
+ * 2. The defect this shape exists to prevent is the opposite one: reporting "no
+ *    vulnerabilities found" for an audit that never ran. That is fixed by never
+ *    claiming a clean result, not by stopping the run.
+ * 3. Blocking would turn a local tooling gap (`pnpm` absent from PATH, no
+ *    lockfile) into a total work stoppage, on exactly the platforms where spawn
+ *    failures are common.
+ *
+ * If the audit is ever promoted to a gate that can fail a run, revisit the
+ * decision THERE, not here: the inconclusive state is already distinguishable,
+ * so such a gate can fail closed without a schema change.
+ */
 export interface DependencyAuditResult {
-  /** Whether the audit ran at all */
+  /**
+   * Whether the audit produced any trustworthy counts at all.
+   *
+   * See the interface docblock — check this, and `error`, before reading a
+   * count. false with all-zero counts is "could not look", not "nothing found".
+   */
   ran: boolean;
   /** Whether the audit was skipped */
   skipped: boolean;
@@ -728,12 +788,16 @@ export interface DependencyAuditResult {
   };
   /** Per-workspace-package results */
   perPackage: DependencyAuditPackageResult[];
-  /** Commands executed during audit */
+  /** Per-step records — which command ran, and why one did not. */
   commands?: {
-    audit?: { command: string; exitCode: number };
-    outdated?: { command: string; exitCode: number };
+    audit?: DependencyAuditCommandRecord;
+    outdated?: DependencyAuditCommandRecord;
   };
-  /** Error if audit itself failed */
+  /**
+   * Why the audit is inconclusive or partial. Present iff at least one step
+   * failed to produce counts; see the interface docblock for how to read it
+   * together with `ran`.
+   */
   error?: string;
 }
 

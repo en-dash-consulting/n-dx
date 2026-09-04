@@ -35,7 +35,6 @@ The same `launched` gap is fixed in `runTestsForFiles`, `runTypecheck` (cleanup
 transformations — still fails closed, since it guards a mutation, but no longer
 reports a spawn failure as type errors), and completion validation. The rex
 requirements executor folds the spawn error into stderr, since its contract has
-no field for it. `runDependencyAudit` is annotated but deliberately unfixed: it
-fails OPEN, reporting a clean audit for one that never ran, which is a design
-decision about a security gate rather than a mechanical check — tracked
-separately.
+no field for it. `runDependencyAudit` was left annotated and tracked separately,
+because its fail-open behaviour was a design decision about a security-adjacent
+check rather than a mechanical one; it is fixed in its own changeset.
