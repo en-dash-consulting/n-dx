@@ -8,8 +8,8 @@ import {
 } from "../../../src/viewer/views/index.js";
 
 describe("SOURCEVISION_TABS", () => {
-  it("defines exactly 10 tabs", () => {
-    expect(SOURCEVISION_TABS).toHaveLength(10);
+  it("defines exactly 11 tabs", () => {
+    expect(SOURCEVISION_TABS).toHaveLength(11);
   });
 
   it("every tab has required fields", () => {
@@ -40,6 +40,7 @@ describe("SOURCEVISION_TABS", () => {
     expect(ids).toContain("problems");
     expect(ids).toContain("suggestions");
     expect(ids).toContain("pr-markdown");
+    expect(ids).toContain("ask");
   });
 
   it("enrichment-gated tabs reference correct thresholds", () => {
@@ -67,6 +68,14 @@ describe("SOURCEVISION_TABS", () => {
 
   it("gates PR Markdown behind a default-off feature flag", () => {
     expect(SOURCEVISION_TABS.find((t) => t.id === "pr-markdown")?.featureGate).toBe("sourcevision.prMarkdown");
+  });
+
+  it("gates Ask behind a default-off feature flag and marks it server-rendered", () => {
+    const ask = SOURCEVISION_TABS.find((t) => t.id === "ask")!;
+    expect(ask.featureGate).toBe("sourcevision.ask");
+    // The answer is an on-demand LLM call, so a static export cannot serve it.
+    expect(ask.requiresServer).toBe(true);
+    expect(ask.label).toBe("Ask");
   });
 });
 

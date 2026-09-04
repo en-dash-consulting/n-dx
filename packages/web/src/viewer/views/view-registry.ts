@@ -30,6 +30,7 @@ import {
   SuggestionsView,
   PRMarkdownView,
   RoutesView,
+  AskView,
 } from "./domain-sourcevision.js";
 
 import {
@@ -114,6 +115,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "pr-markdown": () =>
     h(PRMarkdownView, null),
+
+  "ask": () =>
+    h(AskView, null),
 
   "rex-dashboard": ({ navigateTo }) =>
     h(RexDashboard, { navigateTo }),

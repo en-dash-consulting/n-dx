@@ -37,11 +37,12 @@ export const SOURCEVISION_TABS: readonly SourceVisionTab[] = [
   { id: "problems", icon: "\u26A0", label: "Problems", minPass: ENRICHMENT_THRESHOLDS.problems },
   { id: "suggestions", icon: "\u2728", label: "Suggestions", minPass: ENRICHMENT_THRESHOLDS.suggestions },
   { id: "pr-markdown", icon: "\u270D", label: "PR Markdown", minPass: 0, featureGate: "sourcevision.prMarkdown" },
-  // TODO(ask-panel): the gated "Ask" tab lands here -- a prompt/response text
-  // exchange over the analysed project (explain a finding, refine the PRD).
-  // Tracked by PRD feature d339458a "SourceVision Ask Panel".
-  //
-  // Once it works here, the same panel is wanted on the Rex and Hench surfaces.
+  // `requiresServer`: the answer comes from an LLM call the n-dx server makes
+  // on demand (POST /api/sourcevision/ask). A static export has no such route
+  // -- deployed mode's fetch adapter answers every non-GET with a 405 -- so the
+  // tab is hidden there and the view renders the explanatory card instead.
+  { id: "ask", icon: "?", label: "Ask", minPass: 0, featureGate: "sourcevision.ask", requiresServer: true },
+  // Once Ask works here, the same panel is wanted on the Rex and Hench surfaces.
   // That is deliberately not tracked in the PRD yet: generalise this one first,
   // then lift the shared piece out. Adoption markers for the other two domains
   // are in domain-rex.ts and domain-hench.ts.

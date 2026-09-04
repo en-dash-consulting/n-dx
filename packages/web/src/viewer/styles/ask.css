@@ -1,0 +1,100 @@
+/* SourceVision Ask panel.
+ *
+ * Uses the tokens defined in tokens.css (--bg-surface, --border, --red,
+ * --brand-teal, --space-*, --radius-*). Note for anyone copying from
+ * pr-markdown.css or commands.css: those files reference --panel2, --line and
+ * --mono, none of which tokens.css defines, so those declarations are dropped
+ * by the browser. Do not propagate them here.
+ */
+
+.sv-ask-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sv-ask-form,
+.sv-ask-idle,
+.sv-ask-answer,
+.sv-ask-error,
+.sv-ask-unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2-5);
+}
+
+.sv-ask-label {
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+}
+
+.sv-ask-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--font-base);
+  line-height: var(--leading-normal);
+  resize: vertical;
+}
+
+.sv-ask-textarea:disabled {
+  opacity: 0.6;
+}
+
+.sv-ask-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.sv-ask-hint {
+  margin: 0;
+}
+
+/* The submitting state is the one the user waits through, so it gets a marker
+   of its own rather than only a disabled button. Reserving the line height
+   keeps the answer card from jumping when the marker appears and clears. */
+.sv-ask-status {
+  min-height: 1.25em;
+}
+
+.sv-ask-error {
+  border-left: 3px solid var(--red);
+}
+
+.sv-ask-error-message {
+  margin: 0;
+}
+
+.sv-ask-answer {
+  border-left: 3px solid var(--brand-teal);
+}
+
+.sv-ask-question {
+  margin: 0;
+  font-style: italic;
+}
+
+.sv-ask-answer-body {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: var(--leading-relaxed);
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.sv-ask-answer-meta {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--font-xs);
+}
