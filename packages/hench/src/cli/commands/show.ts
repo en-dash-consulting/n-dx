@@ -49,10 +49,10 @@ export async function cmdShow(
   info(`Started: ${run.startedAt}`);
   if (run.finishedAt) info(`Finished: ${run.finishedAt}`);
   info(`Turns: ${run.turns}`);
+  // formatTokenReport carries the cache halves itself — `show` used to print
+  // its own Cache line here, which is where `ndx work`'s run summary diverged
+  // from it and lost them.
   info(formatTokenReport(run.tokenUsage));
-  if (run.tokenUsage.cacheCreationInput || run.tokenUsage.cacheReadInput) {
-    info(`  Cache: ${run.tokenUsage.cacheCreationInput ?? 0} created / ${run.tokenUsage.cacheReadInput ?? 0} read`);
-  }
 
   // Whether this run was reviewed, next to the status it qualifies. The run
   // record is the only copy that outlives the terminal, so a run that was
