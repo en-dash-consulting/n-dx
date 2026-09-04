@@ -1,5 +1,235 @@
 # @n-dx/rex
 
+## 0.5.2
+
+### Patch Changes
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop `rex add` hanging forever when stdin is an open pipe.
+  
+  `dispatchAdd` awaited `readStdin()` before deciding which mode it was in, so
+  every invocation paid for the piped-description form. `readStdin` guards on
+  `isTTY`, and a `/dev/null` redirect reaches EOF at once — so the bug was
+  invisible interactively and in most scripts, and bit the caller that matters
+  most: anything spawning the CLI with `stdio: "pipe"` and no intention of
+  writing. The pipe never closes, `end` never fires, and the command waits
+  forever with no output. Manual mode is identified entirely by argv, so it now
+  runs without touching stdin: 147ms instead of unbounded.
+  
+  Two related faults surfaced while testing:
+  
+  - An unrecognised `--level` fell through to smart mode, which then waited on
+    stdin for a description that was never coming — a typo presented as a hang.
+    It is now an error naming the valid levels.
+  - The remaining legitimate waits were silent. They now announce themselves on
+    stderr after two seconds. The read itself is deliberately *not* bounded: a
+    first attempt cut it off after a deadline and silently discarded a payload
+    whose first byte arrived at three seconds. Losing piped input is worse than
+    waiting for it, so the fix bounds the silence rather than the read.
+  
+  The piped smart-add form (`echo "desc" | rex add`) is unchanged.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Count and price cache tokens in every usage rollup.
+  
+  Run records carry four token fields — input, output, cacheCreationInput,
+  cacheReadInput — but the rollups summed only the first two, and neither cost
+  estimator priced the cache at all. On this repo `ndx usage` reported 1,212,931
+  tokens and $18.00 across 1,024 runs; the same runs actually hold 668,969,084
+  tokens and cost roughly $237.74. Cache reads alone were 662M of that, 99% of
+  all tokens and completely invisible.
+  
+  Cache tokens are billed, not free: a write costs about 1.25x the input rate and
+  a read about 0.1x. Dropping them did not make the estimate approximate, it made
+  it wrong by more than an order of magnitude — and it hid the one number the
+  cost work moves, since batching and warm-parent forking trade fresh input for
+  cache reads.
+  
+  `PackageTokenUsage`, `AggregateTokenUsage`, and `TokenEvent` now carry
+  `cacheCreationTokens` and `cacheReadTokens` through extraction, grouping, and
+  aggregation. `ModelPricing` gains cache rates and `CostEstimate` reports the
+  two new cost components. CLI output breaks the four kinds out rather than
+  collapsing them, since they bill at four different rates — cache segments are
+  omitted when zero, so a project that never caches keeps the old two-part line.
+  
+  The dashboard already counted cache tokens but never priced them; its
+  `estimateCost` now matches. Because the dashboard keeps a second copy of the
+  aggregation, a new parity test pins the two pricing tables and both cost
+  formulas to each other so they cannot drift into quoting different dollar
+  figures for the same runs.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Replace identical-prompt retries with an escalation ladder.
+  
+  The retry path resent a byte-identical prompt up to three times and told the
+  model nothing about why the previous answer was rejected. A model that emits
+  unparseable JSON once will usually do it again given the same input, so those
+  were three calls billed for one answer.
+  
+  Retries now carry the validation error verbatim, and run on the standard tier.
+  That is two independent wins for different classes: the error feedback helps
+  every class — it is the actual complaint behind the audit finding — while model
+  escalation only changes anything for light-routed classes, where it is what
+  makes cheap-first routing safe. A light model that cannot satisfy the contract
+  hands off instead of failing the command. The attempt number is included in the
+  feedback, so consecutive prompts differ even when the error repeats, which is
+  the property the old loop violated.
+  
+  The retry count is unchanged at three attempts: this changes how retries
+  behave, not how many there are. Only validation failures escalate — transport
+  and auth errors propagate immediately, since escalating them neither diagnoses
+  nor fixes anything. Sourcevision's prompt-degradation ladder is untouched: it
+  shortens the prompt on the same model, which is right for a context-overflow
+  failure, while this escalates the model on the same prompt, which is right for
+  a capability failure. The failure class decides which applies.
+  
+  Applied to `prd.modify` (the audit's named site), `prd.rename`, and
+  `prd.merge`. Along the way, rename's title-collision check moved *inside* the
+  output contract: it used to run after every retry, so a light model returning
+  two identical titles failed the rename outright — now the standard tier gets a
+  chance at it.
+  
+  Escalation rates are tracked per task class, so a class escalating on more than
+  a fifth of its calls — the signal that its light routing is not paying for
+  itself — is visible rather than inferred.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Hold the folder-tree lock across `syncFolderTree`, and give both stores one
+  lock name for the tree.
+  
+  `syncFolderTree` — run after every PRD mutation, from the CLI and from every
+  MCP write handler — did an unlocked `loadDocument()` followed by an unlocked
+  full re-serialize of `.rex/prd_tree/`. Serialization deletes every on-disk
+  entry absent from the snapshot, so the sync was a read-modify-write racing
+  whatever writer came next, with two failure modes:
+  
+  - **Crash.** The read could observe a half-created item directory (an item
+    gaining its first child converts a bare `<slug>.md` into a `<slug>/`
+    directory), `parseFolderTree` threw ENOENT, and the handler returned
+    `isError`. This is the flake behind
+    `concurrent-write-lost-update.test.ts > an item inserted while
+    update_task_status deletes another survives`, which failed only under CI
+    load because the overlap window is timing-dependent.
+  - **Silent lost update.** The sync passed no `loadedAt`, which disables the
+    serializer's stale-save guard, so it would delete a concurrent writer's
+    items with no error — the exact hole the surrounding suite exists to pin.
+  
+  The sync now runs its load and its serialize inside one lock acquisition. That
+  closes both: it sees the committed tree rather than a transient one, and its
+  snapshot cannot go stale while it holds the lock (so no `loadedAt` proof is
+  needed).
+  
+  Separately, `FileStore` guarded the tree with `tree.lock` while
+  `FolderTreeStore` used `prd.lock`. Two names for one resource meant a writer
+  on each store could rewrite `.rex/prd_tree/` simultaneously with neither
+  seeing the other. Both now derive the path from `prdLockPath()` in
+  `store/paths.ts`, alongside `PRD_TREE_DIRNAME`.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Complete light-tier routing: move classification to the light tier, and give
+  the two unguarded light calls real output contracts.
+  
+  `sourcevision`'s classification batches now resolve through the `code.classify`
+  task class. This is the last of the audit's routing-map flips and the safest of
+  them: a fixed-size batch goes in, an enum-constrained list comes out, unknown
+  paths and unknown archetype ids are already dropped per item, and a prompt
+  degradation ladder already handles parse failures — so a wrong answer costs one
+  dropped classification.
+  
+  Routing a call to the cheapest adequate model is only a safe trade while bad
+  output stays detectable, and two light-routed calls had nothing checking them.
+  
+  The commit-subject call feeds `git commit -m` directly, and previously took the
+  first non-empty line and sliced it to 100 characters — so a fenced block, a
+  "Sure! Here's a subject:" preamble, or a markdown bullet would have been
+  committed into the repository's history. It now goes through a contract that
+  strips those tics and enforces one line within the documented 72-character
+  bound, falling back to the generic message when nothing usable survives:
+  refusing to commit would be worse than committing under a generic subject.
+  
+  The body-merge call was worse — whatever the model returned was written verbatim
+  as the surviving PRD item's description, so an empty answer or a JSON blob would
+  have been persisted as the item's body. It now validates, and *throws* on
+  failure rather than repairing: `reshape` already treats body merge as
+  best-effort and keeps the existing description, which beats persisting a
+  preamble or a sentence cut in half by a length cap.
+  
+  The other six light-routed sites were audited and already had contracts — zod
+  schemas for renames, clarify rounds and the assessment pass, and proposal
+  parsing with count checks for the consolidation guard. A new integration test
+  pins the resolved model for every class in the routing map, in both directions:
+  the light routes must be light, and the agent loop, proposal generation, and
+  deep enrichment must not be.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Compact the JSON that rex prompts send and ask for.
+  
+  Six prompt builders embedded their payload with `JSON.stringify(x, null, 2)` —
+  guard, breakdown, consolidate, assess, modify, decompose. Indentation is billed
+  as input on every analyze call and buys nothing: the model reads the shape from
+  the keys, not the whitespace. On a five-proposal payload the embedded JSON drops
+  37% (9,297 → 5,896 characters).
+  
+  The two few-shot examples were hand-written pretty JSON, so they carried the
+  same cost and, once the prompts started asking for minified output, contradicted
+  their own instruction. Both are now minified.
+  
+  Output is where the real saving is — output tokens cost roughly 5x input on
+  every tier — so the shared `OUTPUT_INSTRUCTION` and the bespoke instructions in
+  the assessment, decompose, and reshape prompts now ask for minified JSON
+  explicitly ("no whitespace between tokens, no indentation, no line breaks") and
+  tell the model not to restate the input.
+  
+  Response parsers are unchanged and still pass: they already tolerated fences and
+  surrounding prose, and compact JSON parses identically.
+  
+  The new `prompt-json-discipline.test.ts` builds each prompt and asserts the
+  result carries no indented JSON and does ask for minified output. It checks
+  behaviour rather than grepping for `null, 2`, because grep cannot tell a prompt
+  from the many legitimate pretty-printers in the tree — `--format=json` CLI
+  output and on-disk config files are supposed to stay readable, and were left
+  alone.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Report PRD tree paths written in a foreign slug convention, and pin write-path
+  parity.
+  
+  A rex build older than the id-qualified slug rule (landed 2026-08-26)
+  re-serializes the whole tree to the suffix-less form on its first write —
+  observed 2026-09-01 as 823 of 1398 files renamed by a single status update.
+  Nothing caught it: every rename was lossless, item content was untouched, and
+  `rex validate` inspects item fields without ever looking at the paths those
+  items live in. So an 800-file rewrite read as a clean tree.
+  
+  `findNonConformingSlugs` compares each item's on-disk entry against what
+  `slugify` would produce, and `rex validate` reports mismatches as warnings
+  naming `rex migrate-slugs` as the repair. An item whose file is merely missing
+  is not reported — that is a separate fault, and folding it in would make this
+  finding noisy enough to ignore.
+  
+  Also adds `write-path-parity.test.ts`, which disproves the assumption that
+  prompted this work: the MCP handler and the CLI's update sequence produce
+  byte-identical trees, and a status update rewrites at most three files at
+  steady state. The suspected divergence was not in either code path.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Thread task classes through every package's LLM choke point, and pass the
+  routing config surfaces through the `.n-dx.json` loader.
+  
+  rex's `spawnClaude`/`resolveConfiguredModel` accept `{ taskClass }` alongside
+  the legacy bare weight (the class wins; an explicit model still beats both),
+  and the analyze call sites now declare their classes — renames, merges,
+  consolidation checks, assessment, and clarify rounds route light by registry
+  default exactly as before, while proposals, modify, spec synthesis, smart-add,
+  and restructuring declare their standard-tier classes. `prd.decompose` is
+  deliberately not declared yet: its registry default is light, and that flip is
+  gated on the escalation ladder. sourcevision's `callClaude` gains the same
+  option, `resolveLightModel` now resolves through `zone.enrich-scan`, and the
+  enrichment passes and meta-evaluation declare their classes. hench resolves
+  the agent loop via `agent.execute` (standard by default — but
+  `llm.routes["agent.execute"] = "heavy"` now reroutes a run with no code
+  change), the pre-run commit message via `git.commit-message`, and CLI-path
+  run records carry the resolved tier in `weight` instead of always "standard".
+  `loadLLMConfig` passes `llm.tiers`, `llm.routes`, `llm.effort`, and
+  `llm.escalation` through its whitelist so the new config actually reaches
+  runtime. A repo-level contract test walks declared task classes and fails on
+  any class missing from `DEFAULT_ROUTES` or any choke point that stops
+  declaring its classes.
+- Updated dependencies [[`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`f0cf5d3`](https://github.com/en-dash-consulting/n-dx/commit/f0cf5d3bab556b80251a47206ad5fdc0ee587e93), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec)]:
+  - @n-dx/llm-client@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes

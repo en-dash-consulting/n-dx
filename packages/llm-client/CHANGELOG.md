@@ -1,5 +1,111 @@
 # @n-dx/llm-client
 
+## 0.5.2
+
+### Patch Changes
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop emitting `--full-auto`, which `codex exec` no longer accepts.
+  
+  `compileCodexPolicyFlags` returned `["--full-auto"]` for `workspace-write` +
+  `never` — the autonomous default. codex-cli 0.147.0 removed that flag from
+  `codex exec`, so every unattended codex spawn died on argument parsing before
+  reaching the model: `error: unexpected argument '--full-auto' found`. The whole
+  codex agent path was broken.
+  
+  Both halves of the policy are now stated explicitly — `--sandbox <mode>` plus
+  `-c approval_policy=<value>`, since `codex exec` has no approval flag. That is
+  also more robust than a preset: a preset is a name codex can retire, while
+  `--sandbox` and `approval_policy` are the settings it was composed from. The
+  one preset kept is `danger-full-access` + `never` →
+  `--dangerously-bypass-approvals-and-sandbox`, still on the exec surface and the
+  only way to express "no sandbox at all".
+  
+  `mapApprovalToCodexFlag` returned `"default"` and `"full-auto"` — names of exec
+  flags, not `approval_policy` values, and both gone. It now returns the config
+  values codex accepts (`on-request`, `never`), read off the CLI's own rejection
+  message, and the compiler uses it so the mapping is single-sourced.
+  
+  The gap that let this ship was that every test asserted our flags against our
+  own expectations. A new integration test scrapes `--help` from the *installed*
+  codex and asserts each flag we emit is one that binary accepts, for both `exec`
+  and `exec resume` — so the next arg-surface drift fails a test instead of
+  silently breaking every run. It skips when codex is absent, and says so.
+  
+  Verified end to end against codex-cli 0.147.0: a real autonomous spawn now
+  exits 0 with `turn.completed`, and resuming that thread answers from the prior
+  turn with 85% of input tokens served from cache — the batch session strategy
+  working on codex for the first time.
+
+- [#347](https://github.com/en-dash-consulting/n-dx/pull/347) [`f0cf5d3`](https://github.com/en-dash-consulting/n-dx/commit/f0cf5d3bab556b80251a47206ad5fdc0ee587e93) Thanks [@jeremylumanbailey](https://github.com/jeremylumanbailey)! - Fix Codex provider spawning codex exec --full-auto, which the Codex CLI removed entirely. compileCodexPolicyFlags now emits --sandbox workspace-write for the default execution policy instead of the removed flag.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `resolveTaskModel` — the class→tier→model resolution layer over
+  `resolveVendorModel`.
+  
+  Call sites declare what kind of work a call is (a task class such as
+  `prd.rename` or `git.commit-message`), config maps classes to tiers, and the
+  vendor catalog maps tiers to models. Ships the built-in `DEFAULT_ROUTES`
+  registry (mechanical single-shot classes → light; judgment work → standard;
+  `agent.execute` stays standard until telemetry justifies heavy), new
+  `LLMConfig` surfaces (`tiers` per-vendor tier→model overrides including the
+  `free` tier, `routes` with exact-then-longest-glob-prefix matching, `effort`
+  per class, `escalation` policy shape), and never-throw semantics: unknown
+  classes route to standard, unknown tier names degrade to standard, a `free`
+  route without a configured model falls through to light, and vendors that
+  cannot distinguish tiers resolve to the nearest available model. This makes
+  the previously unreachable heavy tier reachable via
+  `llm.routes["agent.execute"] = "heavy"` with no code change.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Thread task classes through every package's LLM choke point, and pass the
+  routing config surfaces through the `.n-dx.json` loader.
+  
+  rex's `spawnClaude`/`resolveConfiguredModel` accept `{ taskClass }` alongside
+  the legacy bare weight (the class wins; an explicit model still beats both),
+  and the analyze call sites now declare their classes — renames, merges,
+  consolidation checks, assessment, and clarify rounds route light by registry
+  default exactly as before, while proposals, modify, spec synthesis, smart-add,
+  and restructuring declare their standard-tier classes. `prd.decompose` is
+  deliberately not declared yet: its registry default is light, and that flip is
+  gated on the escalation ladder. sourcevision's `callClaude` gains the same
+  option, `resolveLightModel` now resolves through `zone.enrich-scan`, and the
+  enrichment passes and meta-evaluation declare their classes. hench resolves
+  the agent loop via `agent.execute` (standard by default — but
+  `llm.routes["agent.execute"] = "heavy"` now reroutes a run with no code
+  change), the pre-run commit message via `git.commit-message`, and CLI-path
+  run records carry the resolved tier in `weight` instead of always "standard".
+  `loadLLMConfig` passes `llm.tiers`, `llm.routes`, `llm.effort`, and
+  `llm.escalation` through its whitelist so the new config actually reaches
+  runtime. A repo-level contract test walks declared task classes and fails on
+  any class missing from `DEFAULT_ROUTES` or any choke point that stops
+  declaring its classes.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Guard the tier catalog against drifting out of the cost and context-window
+  tables.
+  
+  Bumping a tier constant to a newer model is an edit this repository has already
+  made twice — `claude-opus-4-7` → `claude-opus-5`, and `gpt-5.5` →
+  `gpt-5.6-terra`. Nothing required the matching `MODEL_COSTS` and
+  `MODEL_CONTEXT_WINDOWS` entries to be added alongside, and nothing failed when
+  they were missing.
+  
+  The consequence would have been quiet. `budgetPreflight` falls back to a 128K
+  window for an unlisted model, so a 200K-token prompt bound for a 1M-context
+  model is reported as not fitting and rejected as too large, while
+  `estimatedCostUsd` becomes undefined and cost estimation stops without saying
+  so — all with a green suite.
+  
+  A new test iterates every tier the catalog can resolve to and asserts both
+  tables cover it, skipping the local vendor's deliberately empty entries.
+  `GOOGLE_MODELS` is folded into the same rule: the previous coverage assertion
+  reached the google tiers and nothing else, which is exactly the asymmetry that
+  let claude and codex drift unguarded. The two tables are also checked against
+  each other, since a model priced but unsized breaks a different half of
+  preflight.
+  
+  No production behaviour changes. The runtime fallbacks are deliberately left
+  alone: `llm.tiers.<vendor>.<tier>` lets a project point a tier at any model id,
+  including one this catalog has never heard of, so those must keep working. It
+  is the built-in catalog that needs enforcing, and only a test can enforce that.
+
 ## 0.5.1
 
 ### Patch Changes
