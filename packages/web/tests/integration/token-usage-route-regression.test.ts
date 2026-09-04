@@ -31,27 +31,43 @@ function createMockApi(options: MockApiOptions = {}): typeof fetch {
     if (url === "/data") return jsonResponse({}, 404);
 
     if (url.startsWith("/api/token/utilization?")) {
+      // Mirrors the live shape of GET /api/token/utilization, cache token
+      // fields and the `web` (dashboard) bucket included. The route's own
+      // contract is asserted in tests/unit/server/routes-token-usage.test.ts;
+      // what this file cares about is that the view renders at all from a
+      // realistic payload, which it cannot do from a shape the server stopped
+      // serving.
       return jsonResponse({
         configured: { vendor: "openai", model: "gpt-5" },
-        source: { rex: "ok", hench: "ok", sourcevision: "ok" },
+        source: { rex: "ok", hench: "ok", sourcevision: "ok", dashboard: "ok" },
         period: "day",
         window: { since: null, until: null },
         usage: {
           packages: {
-            rex: { inputTokens: 2000, outputTokens: 500, calls: 3 },
-            hench: { inputTokens: 1000, outputTokens: 250, calls: 2 },
-            sv: { inputTokens: 500, outputTokens: 100, calls: 1 },
+            rex: { inputTokens: 2000, outputTokens: 500, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 3 },
+            hench: { inputTokens: 1000, outputTokens: 250, cacheCreationTokens: 120, cacheReadTokens: 4000, calls: 2 },
+            sv: { inputTokens: 500, outputTokens: 100, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 1 },
+            web: { inputTokens: 900, outputTokens: 60, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 1 },
           },
-          totalInputTokens: 3500,
-          totalOutputTokens: 850,
-          totalCalls: 6,
+          totalInputTokens: 4400,
+          totalOutputTokens: 910,
+          totalCacheCreationTokens: 120,
+          totalCacheReadTokens: 4000,
+          totalCalls: 7,
         },
-        cost: { total: "$0.25", totalRaw: 0.25, inputCost: 0.18, outputCost: 0.07 },
+        cost: {
+          total: "$0.25",
+          totalRaw: 0.25,
+          inputCost: 0.18,
+          outputCost: 0.07,
+          cacheWriteCost: 0.0005,
+          cacheReadCost: 0.0012,
+        },
         byVendorModel: [],
         trend: [],
         commands: [],
         budget: { severity: "ok", warnings: [] },
-        eventCount: 6,
+        eventCount: 7,
       });
     }
 

@@ -32,8 +32,18 @@
  * timer wins even though the provider may still be finishing in the
  * background.
  *
+ * ## Accounting
+ *
+ * Every attempted call is written to the dashboard spend ledger, including the
+ * ones that fail: a rate-limited or timed-out ask still cost something, and a
+ * ledger that only records answers would report the dashboard as cheaper than
+ * it is. A provider that finishes after the timer already answered the request
+ * appends its counts as a second, call-free record — see
+ * {@link recordDashboardUsage}.
+ *
  * @module web/server/routes-sourcevision-ask
  * @see sourcevision-ask-context.ts — bundle assembly (all sourcevision reads)
+ * @see dashboard-usage.ts — the ledger the utilization view aggregates
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -61,6 +71,8 @@ import type { ServerContext } from "./types.js";
 import { jsonResponse, readBody } from "./response-utils.js";
 import { readCliName } from "./cli-name.js";
 import { assembleAskContext } from "./sourcevision-ask-context.js";
+import { ASK_COMMAND, recordDashboardUsage, tokenFields } from "./dashboard-usage.js";
+import type { DashboardUsageOutcome } from "./dashboard-usage.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -243,20 +255,39 @@ export function buildAskPrompt(question: string, context: string): string {
  * arriving after the timer already won is still handled and cannot surface as
  * an unhandled rejection. `timeoutMs` is also passed to the provider so a
  * CLI-mode child bounds itself rather than outliving the response.
+ *
+ * `onLateResult` is called when the provider finishes *after* the timer already
+ * rejected. Those tokens were genuinely spent, so the ledger wants them even
+ * though no one is left to read the answer. The extra `then` needs its own
+ * rejection handler: `Promise.race` handles the original promise, but this
+ * derived one would otherwise report a post-timeout rejection as unhandled.
  */
 async function completeWithTimeout(
   client: LLMClient,
   request: CompletionRequest,
   timeoutMs: number,
+  onLateResult?: (result: CompletionResult) => void,
 ): Promise<CompletionResult> {
   if (timeoutMs <= 0) return await client.complete(request);
 
+  let timedOut = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const inFlight = client.complete({ ...request, timeoutMs });
+  inFlight.then(
+    (result) => {
+      if (timedOut) onLateResult?.(result);
+    },
+    () => {
+      // Already surfaced through the race; nothing to account for.
+    },
+  );
+
   try {
     return await Promise.race([
-      client.complete({ ...request, timeoutMs }),
+      inFlight,
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => {
+          timedOut = true;
           reject(
             new ClaudeClientError(
               `Ask request timed out after ${Math.round(timeoutMs / 1000)}s.`,
@@ -391,10 +422,34 @@ async function handleAsk(
   const { model } = resolveTaskModel("sourcevision.ask", llmConfig, { vendor });
   const timeoutMs = resolveAskTimeoutMs(ctx.projectDir);
 
+  /**
+   * Append one ledger record for this ask.
+   *
+   * `calls` is a parameter rather than always 1 because a provider that
+   * finishes after the timeout adds a second record for the same call.
+   */
+  const record = (
+    tokens: TokenUsage | undefined,
+    outcome: DashboardUsageOutcome,
+    calls: number,
+  ): void => {
+    recordDashboardUsage(ctx.projectDir, {
+      timestamp: new Date().toISOString(),
+      command: ASK_COMMAND,
+      vendor,
+      model,
+      ...tokenFields(tokens),
+      calls,
+      outcome,
+    });
+  };
+
   let client: LLMClient;
   try {
     client = (opts.createClient ?? createLLMClient)({ vendor, llmConfig });
   } catch (err) {
+    // Deliberately unrecorded: no call was made, so there is no spend. The
+    // ledger counts calls, not intentions.
     sendError(res, classifyAskFailure(err, vendor, model));
     return;
   }
@@ -404,17 +459,26 @@ async function handleAsk(
       client,
       { prompt: buildAskPrompt(parsed.prompt, context.text), model },
       timeoutMs,
+      (late) => record(late.tokenUsage, "timeout", 0),
     );
+    const tokens: TokenUsage = result.tokenUsage ?? { input: 0, output: 0 };
+    record(tokens, "success", 1);
     const payload: AskSuccessResponse = {
       answer: result.text,
       vendor,
       model,
-      tokens: result.tokenUsage ?? { input: 0, output: 0 },
+      tokens,
       contextSources: context.sources,
     };
     jsonResponse(res, 200, payload);
   } catch (err) {
-    sendError(res, classifyAskFailure(err, vendor, model));
+    const failure = classifyAskFailure(err, vendor, model);
+    // A failed call is still a call. Providers surface failures as untyped
+    // errors carrying no usage, so the counts are zero here — the record exists
+    // so the failure is visible in the utilization view rather than absent from
+    // it, and any counts the provider does report late are appended separately.
+    record(undefined, failure.kind === "timeout" ? "timeout" : "error", 1);
+    sendError(res, failure);
   }
 }
 
