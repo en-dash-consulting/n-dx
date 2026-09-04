@@ -16,5 +16,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Prompt caching in the API agent loop (cache_control breakpoints)](./prompt-caching-in-the-api-agent-loop.md) | completed |
-| [Summarizing prune that preserves the cache prefix](./summarizing-prune-that-preserves-the.md) | pending |
+| [Summarizing prune that preserves the cache prefix](./summarizing-prune-that-preserves-the.md) | completed |
 | [Wire the sourcevision PRIMER.md into ndx work and hench orientation](./wire-the-sourcevision-primer-md-into.md) | pending |

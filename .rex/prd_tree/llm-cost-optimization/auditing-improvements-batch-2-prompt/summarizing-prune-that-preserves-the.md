@@ -2,9 +2,11 @@
 id: "c3788fba-8bf0-45f2-a3c9-859b61b6236d"
 level: "task"
 title: "Summarizing prune that preserves the cache prefix"
-status: "pending"
+status: "completed"
 priority: "high"
 startedAt: "2026-09-04T18:38:56.654Z"
+completedAt: "2026-09-04T19:34:20.064Z"
+endedAt: "2026-09-04T19:34:20.064Z"
 acceptanceCriteria:
   - "Pruning no longer splices the front of the message array; the cached prefix is byte-identical across turns"
   - "The dropped span is replaced by a single retained summary message rather than discarded silently"
@@ -13,6 +15,6 @@ acceptanceCriteria:
   - "The local-provider inline prune (loop.ts:1006-1012) uses the same path as pruneMessages"
   - "A unit test asserts known information from a pruned turn survives in the summary"
 description: "pruneMessages (loop.ts:194) and the local-provider inline prune (loop.ts:1006-1012) both splice from the front of the message array, discarding the oldest turns with no record and invalidating any cached prefix. Replace with a prune that summarizes the dropped span into a single retained message via the context.summarize light-tier task class, and that never mutates the cached prefix."
-lastModified: "2026-09-04T18:50:08.886Z"
+lastModified: "2026-09-04T19:34:20.072Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

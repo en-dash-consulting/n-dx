@@ -108,7 +108,7 @@ describe("task-class registry contract", () => {
 
   it("hench declares its routed classes", () => {
     const classes = byPackage.get("hench");
-    for (const cls of ["agent.execute", "git.commit-message"]) {
+    for (const cls of ["agent.execute", "git.commit-message", "context.summarize"]) {
       expect(classes.has(cls), `hench no longer declares ${cls}`).toBe(true);
     }
   });
