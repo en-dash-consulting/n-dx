@@ -22,12 +22,70 @@ import { spawn, execFileSync } from "node:child_process";
 import { execFileSyncCli, spawnCli } from "./win-spawn.js";
 import { terminateTree, treeKillSpawnOptions } from "./child-lifecycle.js";
 import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
+import { createHash } from "node:crypto";
 import { join } from "path";
 import { tmpdir } from "os";
 
 // ---------------------------------------------------------------------------
 // NDX context assembly
 // ---------------------------------------------------------------------------
+
+/** Marker line sourcevision stamps a primer with, carrying its fingerprint. */
+const PRIMER_FINGERPRINT_PREFIX = "<!-- sourcevision-primer fingerprint:";
+
+/**
+ * Recompute the fingerprint a current primer would carry.
+ *
+ * Derived from `manifest.json`'s `analyzedAt` and `gitSha` — the two fields
+ * that change on exactly the events invalidating a primer (a re-analysis, or an
+ * analysis of a different commit).
+ *
+ * The formula is duplicated rather than imported: this is orchestration tier,
+ * which spawns package CLIs and does not import from them. Keep it in sync with
+ * `primerFingerprint()` in `packages/sourcevision/src/analyzers/primer.ts` (the
+ * writer) and `sourcevisionFingerprint()` in
+ * `packages/hench/src/agent/lifecycle/session-cache.ts` (the other reader);
+ * `tests/e2e/primer-fingerprint-contract.test.js` holds the three together.
+ *
+ * @param {string} dir  Project root directory.
+ * @returns {string}  Fingerprint, or a sentinel when no manifest is readable.
+ */
+export function currentPrimerFingerprint(dir) {
+  try {
+    const raw = readFileSync(join(dir, ".sourcevision", "manifest.json"), "utf-8");
+    const manifest = JSON.parse(raw);
+    const analyzedAt = typeof manifest?.analyzedAt === "string" ? manifest.analyzedAt : "";
+    const gitSha = typeof manifest?.gitSha === "string" ? manifest.gitSha : "";
+    if (!analyzedAt && !gitSha) return "unknown";
+    return createHash("sha256").update(`${analyzedAt} ${gitSha}`).digest("hex").slice(0, 16);
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * False only when a primer is *provably* stale.
+ *
+ * Staleness is knowable when the primer carries a stamp and the manifest yields
+ * a fingerprint to compare it against; a mismatch then means the analysis moved
+ * on and the primer describes a repo that no longer exists. Every other case —
+ * an unstamped primer, an absent or unreadable manifest — is unknowable, not
+ * stale, and discarding context on a hunch would cost a run the orientation it
+ * could have had for nothing gained.
+ *
+ * @param {string} dir      Project root directory.
+ * @param {string} primer   Primer file contents.
+ * @returns {boolean}
+ */
+export function isPrimerCurrent(dir, primer) {
+  const firstLine = primer.split("\n", 1)[0] ?? "";
+  if (!firstLine.startsWith(PRIMER_FINGERPRINT_PREFIX)) return true;
+  const stamped = firstLine.match(/fingerprint:\s*([0-9a-z]+)/i)?.[1];
+  if (!stamped) return true;
+  const current = currentPrimerFingerprint(dir);
+  if (current === "unknown") return true;
+  return stamped === current;
+}
 
 /**
  * Read the codebase context to inject into an agent run.
@@ -38,9 +96,11 @@ import { tmpdir } from "os";
  * retry, and CONTEXT.md is written for breadth (zone metrics, findings, route
  * tables) rather than for the question a task starting work actually has.
  *
- * Falls back to CONTEXT.md whenever no primer exists: `sourcevision analyze`
- * writes one best-effort, so its absence is an ordinary state (an LLM-free
- * `--lite` analysis, or a distillation that was skipped) and not an error.
+ * Falls back to CONTEXT.md whenever no *current* primer exists: `sourcevision
+ * analyze` writes one best-effort, so its absence is an ordinary state (an
+ * LLM-free `--lite` analysis, or a distillation that was skipped) and not an
+ * error. A primer stamped against an older analysis is treated the same way —
+ * see {@link isPrimerCurrent}.
  *
  * @param {string} dir  Project root directory.
  * @returns {{ content: string | null; warning?: string; source?: "primer" | "context" }}
@@ -50,7 +110,12 @@ export function readContextMd(dir) {
   if (existsSync(primerPath)) {
     try {
       const content = readFileSync(primerPath, "utf-8");
-      if (content.trim()) return { content, source: "primer" };
+      if (content.trim()) {
+        if (isPrimerCurrent(dir, content)) return { content, source: "primer" };
+        // A primer built from a demonstrably older analysis describes a repo
+        // that has since moved. Every task in the run inherits this payload, so
+        // a confidently wrong layout costs more than the untrimmed CONTEXT.md.
+      }
       // An empty primer is treated as absent rather than as empty context.
     } catch {
       // Fall through to CONTEXT.md — a partially written primer must not

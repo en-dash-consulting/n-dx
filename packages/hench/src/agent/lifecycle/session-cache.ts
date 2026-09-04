@@ -355,7 +355,19 @@ export function isParentUsable(
  *
  * A missing or unreadable manifest returns a stable sentinel rather than
  * throwing: projects without sourcevision output still get forking, they just
- * do not get analysis-driven invalidation.
+ * do not get analysis-driven invalidation. The sentinels are deliberately not
+ * valid hashes, so a reader comparing against one sees "cannot compare" rather
+ * than a spurious mismatch.
+ *
+ * The hash must equal what sourcevision stamps a primer with, because
+ * `readFreshPrimer` compares the two. The formula is duplicated rather than
+ * imported — hench and sourcevision sit in tiers that do not import each other
+ * — so keep it in sync with `primerFingerprint()` in
+ * `packages/sourcevision/src/analyzers/primer.ts` and
+ * `currentPrimerFingerprint()` in `packages/core/pair-programming.js`.
+ * `tests/e2e/primer-fingerprint-contract.test.js` holds the three together. The
+ * separator is a plain space — it was once an invisible NUL byte here and a
+ * space in the other two, which no reader could have seen in a diff.
  */
 export async function sourcevisionFingerprint(projectDir: string): Promise<string> {
   try {
@@ -364,7 +376,7 @@ export async function sourcevisionFingerprint(projectDir: string): Promise<strin
     const analyzedAt = typeof manifest.analyzedAt === "string" ? manifest.analyzedAt : "";
     const gitSha = typeof manifest.gitSha === "string" ? manifest.gitSha : "";
     if (!analyzedAt && !gitSha) return "sv-unknown";
-    return createHash("sha256").update(`${analyzedAt} ${gitSha}`).digest("hex").slice(0, 16);
+    return createHash("sha256").update(`${analyzedAt} ${gitSha}`).digest("hex").slice(0, 16);
   } catch {
     return "sv-absent";
   }

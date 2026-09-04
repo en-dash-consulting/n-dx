@@ -28,6 +28,8 @@
  * @module hench/agent/lifecycle/orientation
  */
 
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { createPromptEnvelope } from "../../prd/llm-gateway.js";
 import type {
   PromptSection,
@@ -91,14 +93,78 @@ export function buildOrientationSystemPrompt(): string {
   ].join("\n");
 }
 
+/** Filename of the distilled startup context sourcevision writes. */
+const PRIMER_FILENAME = "PRIMER.md";
+
+/** Marker line sourcevision stamps a primer with, carrying its fingerprint. */
+const PRIMER_FINGERPRINT_PREFIX = "<!-- sourcevision-primer fingerprint:";
+
+/**
+ * Read `.sourcevision/PRIMER.md` unless it is provably stale.
+ *
+ * The primer already answers most of what orientation goes looking for, so
+ * handing it over turns an exploration into a much shorter confirmation.
+ *
+ * That holds only while it describes the current repo. The stamp is compared
+ * against {@link sourcevisionFingerprint}, which derives the same
+ * `analyzedAt`/`gitSha` hash sourcevision stamps with, so a primer and the
+ * orientation built from it invalidate on exactly the same event. A mismatch
+ * means the analysis moved on, and a confidently wrong layout inherited by
+ * every fork is worse than no primer at all.
+ *
+ * Where staleness is *unknowable* — an unstamped primer, or a fingerprint
+ * sentinel standing in for an unreadable manifest — the primer is used. The
+ * check exists to catch drift it can see, not to withhold context on a hunch.
+ *
+ * Returns undefined for absent, unreadable, empty, or provably stale primers.
+ */
+export async function readFreshPrimer(
+  projectDir: string,
+  fingerprint: string,
+): Promise<string | undefined> {
+  try {
+    const text = await readFile(join(projectDir, ".sourcevision", PRIMER_FILENAME), "utf-8");
+    const firstLine = text.split("\n", 1)[0] ?? "";
+    const hasStamp = firstLine.startsWith(PRIMER_FINGERPRINT_PREFIX);
+    const stamped = hasStamp
+      ? firstLine.match(/fingerprint:\s*([0-9a-z]+)/i)?.[1]
+      : undefined;
+    // "sv-absent" / "sv-unknown" mean the manifest could not be read — there is
+    // nothing to compare against, so they are not treated as a mismatch.
+    const comparable = fingerprint !== "sv-absent" && fingerprint !== "sv-unknown";
+    if (stamped && comparable && stamped !== fingerprint) return undefined;
+    const body = (hasStamp ? text.slice(firstLine.length) : text).trim();
+    return body || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Task prompt for the orientation session.
  *
  * Must stay free of task-specific content — see the module note on why the
- * prefix has to be byte-identical across forks.
+ * prefix has to be byte-identical across forks. The primer is repo-scoped, not
+ * task-scoped, and is fingerprinted by the same key that invalidates a cached
+ * parent, so including it keeps the prefix stable across the forks that share
+ * a parent.
  */
-export function buildOrientationPrompt(): string {
+export function buildOrientationPrompt(primer?: string): string {
+  const preamble = primer
+    ? [
+      "A previous analysis of this repository produced the summary below. Treat it as a",
+      "starting point, not as verified fact: confirm the parts you will rely on, correct",
+      "anything that no longer holds, and fill the gaps it leaves. Do not re-derive what",
+      "it already states correctly.",
+      "",
+      "--- prior analysis ---",
+      primer,
+      "--- end prior analysis ---",
+      "",
+    ]
+    : [];
   return [
+    ...preamble,
     "Orient yourself in this repository. Do not modify anything.",
     "",
     "Establish and summarize:",
@@ -156,9 +222,15 @@ export async function ensureWarmParent(
   if (cached) await clearSessionCache(opts.henchDir);
   detail(`Warm session: orienting (${REJECTION_DETAIL[verdict.usable ? "no-entry" : verdict.reason]})`);
 
+  // Hand orientation the distilled primer when it matches this analysis, so it
+  // confirms and extends what sourcevision already established rather than
+  // rediscovering it turn by turn.
+  const primer = await readFreshPrimer(opts.projectDir, svFingerprint);
+  if (primer) detail("Warm session: seeding orientation with the sourcevision primer");
+
   const envelope = createPromptEnvelope([
     { name: "system" as PromptSectionName, content: buildOrientationSystemPrompt() } as PromptSection,
-    { name: "brief" as PromptSectionName, content: buildOrientationPrompt() } as PromptSection,
+    { name: "brief" as PromptSectionName, content: buildOrientationPrompt(primer) } as PromptSection,
   ]);
 
   const spawnConfig = opts.adapter.buildSpawnConfig(envelope, opts.policy, {

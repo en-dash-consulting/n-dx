@@ -29,11 +29,11 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Accessibility and regression coverage for the Ask panel](./accessibility-and-regression-2c57fe.md) | pending |
-| [Add gated Ask tab and prompt/response view shell](./add-gated-ask-tab-and-prompt-514d0d.md) | pending |
-| [Add POST /api/sourcevision/ask backed by analysis context and llm-client](./add-post-api-sourcevision-ask-74c3fe.md) | pending |
-| [Attribute Ask token spend in the usage rollup](./attribute-ask-token-spend-in-8b9c7d.md) | pending |
-| [Explain a finding in plain language from the Problems and Suggestions surfaces](./explain-a-finding-in-plain-a31d22.md) | pending |
-| [Give each degraded mode a specific, actionable message](./give-each-degraded-mode-a-811a8f.md) | pending |
-| [Propose and apply PRD refinements from the exchange, diff-reviewed and under the store lock](./propose-and-apply-prd-971901.md) | pending |
-| [Wire Copy and Capture-to-PRD actions on the answer](./wire-copy-and-capture-to-prd-900c51.md) | pending |
+| [Accessibility and regression coverage for the Ask panel](./accessibility-and-regression-coverage.md) | pending |
+| [Add gated Ask tab and prompt/response view shell](./add-gated-ask-tab-and-prompt-response.md) | pending |
+| [Add POST /api/sourcevision/ask backed by analysis context and llm-client](./add-post-api-sourcevision-ask-backed.md) | pending |
+| [Attribute Ask token spend in the usage rollup](./attribute-ask-token-spend-in-the-usage.md) | pending |
+| [Explain a finding in plain language from the Problems and Suggestions surfaces](./explain-a-finding-in-plain-language.md) | pending |
+| [Give each degraded mode a specific, actionable message](./give-each-degraded-mode-a-specific.md) | pending |
+| [Propose and apply PRD refinements from the exchange, diff-reviewed and under the store lock](./propose-and-apply-prd-refinements-from.md) | pending |
+| [Wire Copy and Capture-to-PRD actions on the answer](./wire-copy-and-capture-to-prd-actions.md) | pending |

@@ -24,6 +24,8 @@ import type {
 import type { TokenUsage } from "../../schema/index.js";
 import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage } from "./token-usage.js";
+import { pruneWithSummary } from "./context-prune.js";
+import { applyMessageCacheBreakpoints, buildCachedSystem } from "./prompt-cache.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD } from "../analysis/spin.js";
 import {
@@ -191,16 +193,51 @@ async function callWithFailover(
   }
 }
 
-function pruneMessages(messages: Anthropic.MessageParam[]): void {
-  // Keep first message (the task brief) and last MAX_CONTEXT_PAIRS turn-pairs.
-  // Turn-pairs are (assistant, user) so each pair = 2 messages.
-  const maxKeep = 1 + MAX_CONTEXT_PAIRS * 2;
+/** Characters of any single tool input or result kept when rendering for a prune summary. */
+const PRUNE_BLOCK_CHAR_LIMIT = 2_000;
 
-  if (messages.length <= maxKeep) return;
+function clip(text: string): string {
+  return text.length > PRUNE_BLOCK_CHAR_LIMIT
+    ? `${text.slice(0, PRUNE_BLOCK_CHAR_LIMIT)}…`
+    : text;
+}
 
-  const removed = messages.length - maxKeep;
-  messages.splice(1, removed);
-  detail(`Pruned ${removed} messages to stay within token budget`);
+/** Render one Anthropic message as plain text for the prune summarizer. */
+function renderAnthropicMessage(message: Anthropic.MessageParam): string {
+  if (typeof message.content === "string") return `${message.role}: ${clip(message.content)}`;
+  const parts: string[] = [];
+  for (const block of message.content) {
+    if (block.type === "text") parts.push(clip(block.text));
+    else if (block.type === "tool_use") {
+      parts.push(`[tool ${block.name}] ${clip(JSON.stringify(block.input ?? {}))}`);
+    } else if (block.type === "tool_result") {
+      const body = typeof block.content === "string"
+        ? block.content
+        : JSON.stringify(block.content ?? "");
+      parts.push(`[result${block.is_error ? " error" : ""}] ${clip(body)}`);
+    } else {
+      parts.push(`[${block.type}]`);
+    }
+  }
+  return `${message.role}: ${parts.join("\n")}`;
+}
+
+/**
+ * Prune the Anthropic history, summarizing what it drops.
+ *
+ * Keeps the first message (the task brief) and the last MAX_CONTEXT_PAIRS
+ * turn-pairs; a turn-pair is (assistant, user), so each pair is 2 messages.
+ */
+async function pruneMessages(
+  messages: Anthropic.MessageParam[],
+  henchDir: string,
+): Promise<void> {
+  await pruneWithSummary(messages, {
+    maxKeep: 1 + MAX_CONTEXT_PAIRS * 2,
+    henchDir,
+    render: renderAnthropicMessage,
+    makeSummaryMessage: (summary): Anthropic.MessageParam => ({ role: "user", content: summary }),
+  });
 }
 
 /** Resolved API resources needed for the agent turn loop. */
@@ -503,14 +540,33 @@ async function executeGeminiFunctionCalls(
   return responses;
 }
 
-/** Prune Gemini conversation history (keep brief + last MAX_CONTEXT_PAIRS pairs). */
-function pruneGeminiContents(contents: GeminiContent[]): void {
-  const maxKeep = 1 + MAX_CONTEXT_PAIRS * 2;
-  if (contents.length <= maxKeep) return;
+/** Render one Gemini turn as plain text for the prune summarizer. */
+function renderGeminiContent(content: GeminiContent): string {
+  const parts = content.parts.map((part) => {
+    if ("text" in part) return clip(part.text);
+    if ("functionCall" in part) {
+      return `[tool ${part.functionCall.name}] ${clip(JSON.stringify(part.functionCall.args ?? {}))}`;
+    }
+    return `[result ${part.functionResponse.name}] ${clip(JSON.stringify(part.functionResponse.response ?? {}))}`;
+  });
+  return `${content.role}: ${parts.join("\n")}`;
+}
 
-  const removed = contents.length - maxKeep;
-  contents.splice(1, removed);
-  detail(`Pruned ${removed} turns to stay within token budget`);
+/**
+ * Prune Gemini conversation history (keep brief + last MAX_CONTEXT_PAIRS pairs),
+ * summarizing what it drops. `"model"` is Gemini's name for the assistant role.
+ */
+async function pruneGeminiContents(
+  contents: GeminiContent[],
+  henchDir: string,
+): Promise<void> {
+  await pruneWithSummary(contents, {
+    maxKeep: 1 + MAX_CONTEXT_PAIRS * 2,
+    henchDir,
+    assistantRole: "model",
+    render: renderGeminiContent,
+    makeSummaryMessage: (summary): GeminiContent => ({ role: "user", parts: [{ text: summary }] }),
+  });
 }
 
 /** Parameters for the Gemini agentic tool-use loop. */
@@ -623,7 +679,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
         run.turns = turn + 1;
         subsection(`Turn ${turn + 1}/${maxTurns}`);
 
-        pruneGeminiContents(contents);
+        await pruneGeminiContents(contents, henchDir);
 
         const result = await withHeartbeat(
           `waiting on google/${model} response`,
@@ -734,6 +790,16 @@ interface OpenAiMessage {
     type: "function";
     function: { name: string; arguments: string };
   }>;
+}
+
+/** Render one OpenAI-format message as plain text for the prune summarizer. */
+function renderOpenAiMessage(message: OpenAiMessage): string {
+  const parts: string[] = [];
+  if (message.content) parts.push(clip(message.content));
+  for (const call of message.tool_calls ?? []) {
+    parts.push(`[tool ${call.function.name}] ${clip(call.function.arguments)}`);
+  }
+  return `${message.role}: ${parts.join("\n")}`;
 }
 
 /** Single tool call extracted from an OpenAI chat response. */
@@ -1003,13 +1069,18 @@ async function runLocalToolLoop(params: {
       run.turns = turn + 1;
       subsection(`Turn ${turn + 1}/${maxTurns}`);
 
-      // Prune history to stay within context limits
-      const maxKeep = 1 + MAX_CONTEXT_PAIRS * 2;
-      if (messages.length > maxKeep + 1) {
-        const toRemove = messages.length - maxKeep - 1;
-        const systemEnd = messages[0].role === "system" ? 1 : 0;
-        messages.splice(systemEnd, toRemove);
-        detail(`Pruned ${toRemove} messages to stay within context limit`);
+      // Prune history to stay within context limits. The system message, when
+      // present, sits at index 0 ahead of the brief — both are held back from
+      // the prune so the summary replaces only real turns.
+      {
+        const systemEnd = messages[0]?.role === "system" ? 1 : 0;
+        await pruneWithSummary(messages, {
+          maxKeep: 1 + systemEnd + MAX_CONTEXT_PAIRS * 2,
+          keepPrefix: systemEnd + 1,
+          henchDir,
+          render: renderOpenAiMessage,
+          makeSummaryMessage: (summary): OpenAiMessage => ({ role: "user", content: summary }),
+        });
       }
 
       const reqBody: Record<string, unknown> = {
@@ -1317,6 +1388,11 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // tool calls don't make the run appear stale to the web dashboard.
   const heartbeat = startHeartbeat(henchDir, run);
 
+  // Built once and reused verbatim on every turn. `tools` and `system` render
+  // ahead of `messages`, so this one breakpoint caches the tool schemas and the
+  // system prompt together — the largest fixed cost in a long run.
+  const cachedSystem = buildCachedSystem(systemPrompt);
+
   // API-specific: turn-based execution loop
   let consecutiveEmptyTurns = 0;
   let planOnlyRetryCount = 0;
@@ -1346,7 +1422,12 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       subsection(`Turn ${turn + 1}/${maxTurns}`);
 
-      pruneMessages(messages);
+      await pruneMessages(messages, henchDir);
+
+      // Cache breakpoints go on immediately before the request so the rolling
+      // one lands on the turn just appended, and so a prune cannot leave a
+      // marker behind on a message it removed.
+      applyMessageCacheBreakpoints(messages);
 
       const _t0 = Date.now();
       const response = await withHeartbeat(
@@ -1356,7 +1437,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
           {
             model,
             max_tokens: config.maxTokens,
-            system: systemPrompt,
+            system: cachedSystem,
             tools: TOOL_DEFINITIONS,
             messages,
           },
