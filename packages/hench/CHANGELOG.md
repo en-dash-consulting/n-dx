@@ -1,5 +1,348 @@
 # @n-dx/hench
 
+## 0.5.2
+
+### Patch Changes
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Implement the batch session strategy, so `hench.sessionStrategy: "batch"` does
+  what it already claimed to.
+  
+  That value was documented, accepted by config, and returned by strategy
+  resolution — but the run loop only acted on `"fork"`, so setting it silently
+  produced cold spawns.
+  
+  Batching resumes the *previous task's* session rather than forking a fixed
+  orientation, so the transcript accumulates. That is not a lesser fallback: it
+  is the correct shape for a CLI whose resume appends rather than branches, which
+  is exactly what `codex exec resume` does — it has no `--fork-session`
+  equivalent. It also makes `hench.tasksPerSession` load-bearing rather than
+  cosmetic, since an unbounded shared transcript costs more on every later turn
+  and lets one task's framing bleed into the next.
+  
+  The chain lives in the session cache beside the orientation parent, because
+  the run loop executes once per task and the chain has to survive between
+  calls. Writes merge rather than replace, so neither strategy discards the
+  other's state, and `--fresh` no longer clears a batch chain — re-orienting is
+  not the same as forgetting everything. A chain advances only after a
+  *completed* task: a failed task's transcript now contains the failure, and
+  resuming it would start the next task inside it.
+  
+  Briefs after the first are prefixed with an emphatic task-boundary divider —
+  naming the previous task finished, forbidding its plan from being resumed,
+  demoting earlier turns to background, and telling the model to re-read files
+  because the working tree has moved. Cross-task pollution is batching's known
+  cost, and a subtle marker would not have addressed it.
+  
+  Verified against the live Claude CLI: three chained tasks all reported the same
+  session id (appended, not branched), the second recalled a fact planted in the
+  first, and the third could count the earlier tasks. The codex leg is captured
+  as a follow-up rather than shipped unverified — that adapter has no session
+  handling yet, and its session-id event shape could not be confirmed here.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Wire the batch session strategy to the Codex CLI.
+  
+  Codex is the vendor batching most benefits: it has no `--fork-session`
+  equivalent, so resuming the previous task's thread is its only route out of
+  per-task cold starts. The strategy resolution and the chain bookkeeping were
+  already vendor-neutral; two pieces were missing.
+  
+  The adapter now emits `codex exec resume <id>` when given a `resumeSessionId`,
+  instead of always opening a fresh `exec`. That branch deliberately passes no
+  policy flags: `codex exec resume` accepts neither `-s/--sandbox` nor
+  `--approve-for-me`, and passing either aborts the spawn on argument parsing —
+  sandbox and approval policy belong to the thread being resumed. It never uses
+  `--last`, which resolves to the newest recorded session *globally* and would
+  let any other codex run on the machine capture the chain.
+  
+  Session-id extraction moved onto the adapter as `extractSessionId`, replacing a
+  hardcoded `session_id` lookup in the run loop. The key differs per vendor, and
+  codex's was verified against codex-cli 0.147.0 rather than assumed — it arrives
+  as `thread_id` on a single `thread.started` event. `session_id` appears only in
+  the on-disk rollout file, which is a different format from the `--json` stream;
+  a reasonable guess would have been wrong. Resuming re-emits the same id, so the
+  chain keeps counting one thread instead of restarting every task.
+  
+  Adapters that declare no `extractSessionId` fall back to the previous
+  `session_id` behaviour.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop emitting `--full-auto`, which `codex exec` no longer accepts.
+  
+  `compileCodexPolicyFlags` returned `["--full-auto"]` for `workspace-write` +
+  `never` — the autonomous default. codex-cli 0.147.0 removed that flag from
+  `codex exec`, so every unattended codex spawn died on argument parsing before
+  reaching the model: `error: unexpected argument '--full-auto' found`. The whole
+  codex agent path was broken.
+  
+  Both halves of the policy are now stated explicitly — `--sandbox <mode>` plus
+  `-c approval_policy=<value>`, since `codex exec` has no approval flag. That is
+  also more robust than a preset: a preset is a name codex can retire, while
+  `--sandbox` and `approval_policy` are the settings it was composed from. The
+  one preset kept is `danger-full-access` + `never` →
+  `--dangerously-bypass-approvals-and-sandbox`, still on the exec surface and the
+  only way to express "no sandbox at all".
+  
+  `mapApprovalToCodexFlag` returned `"default"` and `"full-auto"` — names of exec
+  flags, not `approval_policy` values, and both gone. It now returns the config
+  values codex accepts (`on-request`, `never`), read off the CLI's own rejection
+  message, and the compiler uses it so the mapping is single-sourced.
+  
+  The gap that let this ship was that every test asserted our flags against our
+  own expectations. A new integration test scrapes `--help` from the *installed*
+  codex and asserts each flag we emit is one that binary accepts, for both `exec`
+  and `exec resume` — so the next arg-surface drift fails a test instead of
+  silently breaking every run. It skips when codex is absent, and says so.
+  
+  Verified end to end against codex-cli 0.147.0: a real autonomous spawn now
+  exits 0 with `turn.completed`, and resuming that thread answers from the prior
+  turn with 85% of input tokens served from cache — the batch session strategy
+  working on codex for the first time.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix the full-suite gate skipping runs that changed files — including every run
+  the adversarial review pass had just repaired.
+  
+  The gate read `filesChanged` from the model's own summary of what it had done,
+  with a git fallback that only fired when the loop recorded no tool calls at
+  all. The Claude CLI always records tool calls, so on the default path the
+  fallback never ran and an empty summary meant the gate skipped, reporting "no
+  files modified" for runs that had modified files. Review-pass repairs could
+  not be seen either way: they happen in a separate spawn, after the summary is
+  parsed.
+  
+  Changed files are now derived from git, against the commit the run started
+  from rather than HEAD. That baseline matters: on the autoCommit path the
+  executor commits its own work before the gate runs, so a HEAD-relative diff
+  reports nothing and the gate would skip the very run it should test. The
+  pre-run baseline sees committed work and still-uncommitted reviewer repairs
+  alike, plus newly untracked files, excluding untracked paths that were already
+  present when the run started (those are the user's, not the run's).
+  
+  Discovery returns "git could not answer" distinctly from "nothing changed", so
+  a repo without git leaves the previous model-reported list in place instead of
+  being overridden by a guess. Untracked files are enumerated with
+  `--untracked-files=all` so a new directory yields its individual files: the
+  gate aggregates per file path, and a bare `src/` names no file and maps to no
+  package.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Bound the context handed to a task: `--context-file`, sibling lists, inherited
+  requirements, and `workflow.md`.
+  
+  A brief is rebuilt and re-sent for every task and every retry, so anything
+  unbounded in it is a cost multiplied by the whole loop — and three of its
+  sections grew with the *project* rather than with the task. Sibling lists are
+  now capped at 20 and inherited requirements at 25, `workflow.md` is trimmed at
+  4,000 characters, and `--context-file` — read straight off disk with no bound,
+  while `ndx work` pipes the entire CONTEXT.md plus PRD tree through it — is
+  trimmed at 24,000 characters with a warning naming the file.
+  
+  Inherited requirements are also deduplicated. `collectRequirements` walks the
+  whole parent chain, so a constraint restated at several levels arrived once per
+  level; the nearest-parent copy is kept, since its attribution is the more
+  specific one.
+  
+  Every cap reports what it dropped, with the omitted count and the total. That
+  matters more here than the numbers: an agent that cannot tell an absent
+  constraint from an unmentioned one will confidently act as though it does not
+  exist. `workflow.md` is trimmed at a line boundary for the same reason — a
+  mid-line cut would turn "do not delete X" into a complete-looking different
+  rule.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Complete light-tier routing: move classification to the light tier, and give
+  the two unguarded light calls real output contracts.
+  
+  `sourcevision`'s classification batches now resolve through the `code.classify`
+  task class. This is the last of the audit's routing-map flips and the safest of
+  them: a fixed-size batch goes in, an enum-constrained list comes out, unknown
+  paths and unknown archetype ids are already dropped per item, and a prompt
+  degradation ladder already handles parse failures — so a wrong answer costs one
+  dropped classification.
+  
+  Routing a call to the cheapest adequate model is only a safe trade while bad
+  output stays detectable, and two light-routed calls had nothing checking them.
+  
+  The commit-subject call feeds `git commit -m` directly, and previously took the
+  first non-empty line and sliced it to 100 characters — so a fenced block, a
+  "Sure! Here's a subject:" preamble, or a markdown bullet would have been
+  committed into the repository's history. It now goes through a contract that
+  strips those tics and enforces one line within the documented 72-character
+  bound, falling back to the generic message when nothing usable survives:
+  refusing to commit would be worse than committing under a generic subject.
+  
+  The body-merge call was worse — whatever the model returned was written verbatim
+  as the surviving PRD item's description, so an empty answer or a JSON blob would
+  have been persisted as the item's body. It now validates, and *throws* on
+  failure rather than repairing: `reshape` already treats body merge as
+  best-effort and keeps the existing description, which beats persisting a
+  preamble or a sentence cut in half by a length cap.
+  
+  The other six light-routed sites were audited and already had contracts — zod
+  schemas for renames, clarify rounds and the assessment pass, and proposal
+  parsing with count checks for the consolidation guard. A new integration test
+  pins the resolved model for every class in the routing map, in both directions:
+  the light routes must be light, and the agent loop, proposal generation, and
+  deep enrichment must not be.
+
+- [#347](https://github.com/en-dash-consulting/n-dx/pull/347) [`f0cf5d3`](https://github.com/en-dash-consulting/n-dx/commit/f0cf5d3bab556b80251a47206ad5fdc0ee587e93) Thanks [@jeremylumanbailey](https://github.com/jeremylumanbailey)! - Fix Codex provider spawning codex exec --full-auto, which the Codex CLI removed entirely. compileCodexPolicyFlags now emits --sandbox workspace-write for the default execution policy instead of the removed flag.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Commit adversarial-review repairs on the autoCommit path instead of orphaning
+  them in the working tree.
+  
+  On `--yes`/auto runs the executor commits its own work before the review pass
+  runs, the reviewer is barred from committing, and the completion-metadata
+  commit stages only `.rex/prd_tree` — so a must-fix repair the reviewer applied
+  in-session was owned by nobody and got swept into whatever commit happened
+  next (observed end-to-end in the review-pass verification).
+  
+  The reviewer spawn is now bracketed by working-tree snapshots (dirty paths →
+  content hash), and the diff — exactly what the reviewer changed, never
+  pre-existing dirt — is recorded on the run as `review.repairedFiles` and
+  committed on the autoCommit path as a dedicated pathspec commit referencing
+  the run and task (`review.repairCommit`). Interactive runs are unchanged: the
+  commit prompt already sweeps repairs into the task's commit. A repair commit
+  that cannot be made is reported with the leftover paths, never thrown — an
+  uncommitted repair is an inspection burden, not a broken task.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Add the warm-parent session foundation: `--fork-session` support, the
+  orientation session cache, and the session-strategy config keys.
+  
+  The Claude CLI adapter gains `forkSession`, emitting `--fork-session` after
+  `--resume` so a spawn can inherit a parent transcript under a new session id
+  without mutating the parent. Forking without a session to fork from is
+  suppressed rather than passed through — it would claim a fork that never
+  happened.
+  
+  A new `agent/lifecycle/session-cache.ts` owns which orientation session
+  exists and whether it is still safe to fork. Finding a parent is permissive
+  (absent, unreadable, or corrupt cache files are all simply a miss, costing one
+  orientation spawn); *using* one is strict, because a stale hit would have
+  every task in a loop inherit an orientation describing a repo that has since
+  changed. A parent is rejected, with a named reason, when the sourcevision
+  analysis fingerprint changes, when it ages past `hench.parentMaxAgeHours`,
+  when the vendor or model differs from the one it was built under, or when
+  `--fresh` is requested.
+  
+  New config: `hench.sessionStrategy` (`fork` | `batch` | `cold`),
+  `hench.tasksPerSession` (default 4), and `hench.parentMaxAgeHours` (default
+  24), documented in `ndx config --help`. Strategy resolution degrades rather
+  than errors: forking needs a CLI that resumes by session id, so other vendors
+  and `provider=api` resolve to `cold`.
+  
+  No spawn behavior changes yet — the orientation pass and fork wiring that
+  consume this land next.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Bound the spawns one task can make, and retry by resuming the failed session
+  rather than cold-restarting it.
+  
+  **Breaking-ish behaviour change:** plan-mode re-spawns now consume the retry
+  budget. Previously they were a separate per-attempt allowance, so four retries
+  against up to three plan re-spawns each could reach twelve cold spawns for a
+  single task — every one re-paying the harness prompt, the project
+  instructions, and the repo re-exploration. Making them additive means a task
+  that spends its budget entering plan mode gets correspondingly fewer failure
+  retries than it did before.
+  
+  A hard ceiling sits on top of the retry budget, defaulting to 8 and
+  configurable via `hench.maxSpawnsPerTask`. The two layers are not redundant:
+  some re-spawn paths deliberately *avoid* charging the retry budget, because
+  nothing was learned about the task — a plan-mode interception, the
+  stale-parent fork fallback. The ceiling counts every spawn regardless of why
+  it happened, so no future re-spawn path can reintroduce unbounded
+  multiplication by simply not asking. It is checked before spawning, so it
+  refuses to spend rather than reporting that the spending already happened, and
+  hitting it fails the task with the full breakdown.
+  
+  Transient failures on the Claude CLI now retry by resuming the failed session
+  — a plain resume, not a fork, since branching off the failure would leave the
+  retry without the transcript it exists to continue. The cold-restart retry
+  notice is suppressed on those retries: a resumed session *was* the previous
+  attempt, so telling it that files from a prior attempt still exist and to check
+  the current state before redoing work restates what it just did, and grows the
+  prompt on every retry. Vendors with no resume on this path keep cold retries
+  and keep the notice.
+  
+  Runs now record `spawnCount` and `spawnBreakdown`, so `ndx usage` can report
+  retry overhead — a task that took four spawns to succeed reads differently
+  from one that took one, and six plan re-spawns call for a different fix than
+  six failure retries.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Thread task classes through every package's LLM choke point, and pass the
+  routing config surfaces through the `.n-dx.json` loader.
+  
+  rex's `spawnClaude`/`resolveConfiguredModel` accept `{ taskClass }` alongside
+  the legacy bare weight (the class wins; an explicit model still beats both),
+  and the analyze call sites now declare their classes — renames, merges,
+  consolidation checks, assessment, and clarify rounds route light by registry
+  default exactly as before, while proposals, modify, spec synthesis, smart-add,
+  and restructuring declare their standard-tier classes. `prd.decompose` is
+  deliberately not declared yet: its registry default is light, and that flip is
+  gated on the escalation ladder. sourcevision's `callClaude` gains the same
+  option, `resolveLightModel` now resolves through `zone.enrich-scan`, and the
+  enrichment passes and meta-evaluation declare their classes. hench resolves
+  the agent loop via `agent.execute` (standard by default — but
+  `llm.routes["agent.execute"] = "heavy"` now reroutes a run with no code
+  change), the pre-run commit message via `git.commit-message`, and CLI-path
+  run records carry the resolved tier in `weight` instead of always "standard".
+  `loadLLMConfig` passes `llm.tiers`, `llm.routes`, `llm.effort`, and
+  `llm.escalation` through its whitelist so the new config actually reaches
+  runtime. A repo-level contract test walks declared task classes and fails on
+  any class missing from `DEFAULT_ROUTES` or any choke point that stops
+  declaring its classes.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop calling a failed non-must-fix capture an unrepaired must-fix.
+  
+  `unresolvedFindings` returns two different things: must-fix findings the pass
+  could not repair, and findings of any verdict whose action failed. The review
+  warning reported the combined count as "N must-fix finding(s) were not
+  repaired", so run 4b4526c5 — whose single unresolved finding was a low/should-fix
+  whose PRD capture failed — warned of an unrepaired must-fix. Counting failures
+  toward alarm is deliberate; labelling them all must-fix overstates the severity,
+  and a warning that cries wolf stops being read.
+  
+  `classifyUnresolved` now partitions the two, and a failed must-fix lands in the
+  must-fix bucket only, so the buckets never double-count. `formatUnresolvedWarning`
+  emits one line per reason, and is a pure function beside `formatReviewSummary`
+  rather than an inline string in the run loop — the wording was previously
+  untested, which is how the mislabel shipped.
+  
+  `run.review` gains `unrepairedMustFixCount` and `failedActionCount`.
+  `unresolvedCount` keeps its meaning as the combined headline, with its doc
+  comment corrected: it had claimed to be a must-fix count.
+
+- [#346](https://github.com/en-dash-consulting/n-dx/pull/346) [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Fork task spawns from a warm orientation session instead of cold-starting
+  every task.
+  
+  A cold task spawn spends its first turns rediscovering the repo — layout,
+  build and test commands, conventions — and pays that again on every retry and
+  every task in a `--loop`. Hench now runs that once, in a read-only orientation
+  session, and spawns each task as a fork of it (`--resume <parent>
+  --fork-session`), so tasks arrive already oriented and every fork presents the
+  same prefix.
+  
+  The orientation prompt is deliberately task-free: mention one task in it and
+  every fork gets a different prefix, and the first task's framing leaks into
+  the rest of the loop. Orientation is also read-only three times over — stated
+  in the system prompt, restated in the task prompt, and spawned in `plan` mode
+  — because that transcript is inherited by everything downstream.
+  
+  `cliLoop` runs once per task, so the cache, not loop plumbing, is what makes
+  orientation happen once per loop; it also persists across separate `ndx work`
+  invocations within the TTL. `ndx work --fresh` discards it, applied once at
+  the start of a run rather than per task, so a loop re-orients exactly once.
+  
+  Two failure modes are handled deliberately. Orientation never fails a run: a
+  spawn that errors, throws, or reports no session id simply yields no parent
+  and tasks spawn cold. And because a cached parent is validated against its own
+  metadata rather than the vendor's session store, a parent the CLI has since
+  forgotten would otherwise fail every task in the loop — so the first failed
+  fork drops the cache, disables forking for the rest of the run, and re-spawns
+  cold without consuming retry budget.
+  
+  Runs record `parentSessionId` when they forked, making the saving auditable.
+  Forking requires a CLI that resumes by session id, so other vendors and
+  `provider=api` continue to spawn cold.
+- Updated dependencies [[`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`f0cf5d3`](https://github.com/en-dash-consulting/n-dx/commit/f0cf5d3bab556b80251a47206ad5fdc0ee587e93), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec), [`4e0ca1c`](https://github.com/en-dash-consulting/n-dx/commit/4e0ca1c4c220f58855ade454e72c9500391dd0ec)]:
+  - @n-dx/rex@0.5.2
+  - @n-dx/llm-client@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes
