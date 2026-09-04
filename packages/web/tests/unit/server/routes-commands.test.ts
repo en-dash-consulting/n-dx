@@ -485,12 +485,19 @@ describe("commands route — ndx binary resolution ladder", () => {
   let server: Server;
   let port: number;
   let savedCliPath: string | undefined;
+  let savedLegacyCliPath: string | undefined;
 
   beforeEach(async () => {
     execMock.mockReset();
     spawnManagedMock.mockReset();
     savedCliPath = process.env["N_DX_CLI_PATH"];
     delete process.env["N_DX_CLI_PATH"];
+    // `resolveNdxBin` checks NDX_CLI_PATH ahead of every other rung, and any
+    // process launched by the ndx CLI inherits it — including a test run
+    // started from `ndx work`. Left set, it short-circuits the whole ladder and
+    // these assertions fail locally while passing in CI.
+    savedLegacyCliPath = process.env["NDX_CLI_PATH"];
+    delete process.env["NDX_CLI_PATH"];
     tmpDir = await mkdtemp(join(tmpdir(), "commands-ndxbin-"));
     await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
     ctx = {
@@ -509,6 +516,8 @@ describe("commands route — ndx binary resolution ladder", () => {
   afterEach(async () => {
     if (savedCliPath === undefined) delete process.env["N_DX_CLI_PATH"];
     else process.env["N_DX_CLI_PATH"] = savedCliPath;
+    if (savedLegacyCliPath === undefined) delete process.env["NDX_CLI_PATH"];
+    else process.env["NDX_CLI_PATH"] = savedLegacyCliPath;
     await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });

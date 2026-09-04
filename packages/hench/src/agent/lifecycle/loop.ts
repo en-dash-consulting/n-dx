@@ -23,6 +23,7 @@ import type {
 } from "../../prd/llm-gateway.js";
 import type { TokenUsage } from "../../schema/index.js";
 import { checkTokenBudget } from "./token-budget.js";
+import { buildCachedMessageRequest } from "./prompt-cache.js";
 import { parseTokenUsage } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD } from "../analysis/spin.js";
@@ -1353,13 +1354,13 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
         `waiting on ${vendor}/${model} response`,
         callWithFailover(
           client,
-          {
+          buildCachedMessageRequest({
             model,
-            max_tokens: config.maxTokens,
-            system: systemPrompt,
+            maxTokens: config.maxTokens,
+            systemPrompt,
             tools: TOOL_DEFINITIONS,
             messages,
-          },
+          }),
           config,
           vendor,
           model,
