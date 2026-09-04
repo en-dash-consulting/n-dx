@@ -1017,8 +1017,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/web/src/server/domain-gateway.ts",
-    maxExports: 15,
-    description: "web→sourcevision gateway (MCP server factory, domain types)",
+    maxExports: 16,
+    description: "web→sourcevision gateway (MCP server factory, domain types, iso-map builder, analysis-output schema types). Raised from 15 to carry the five artifact schema types (Manifest, Inventory, Imports, Zones, Components) that the Ask endpoint's context assembler parses .sourcevision/*.json against — sourcevision exposes no loader, so the types are the only thing keeping those disk reads honest about the schema, and importing them from @n-dx/sourcevision at the read site would bypass the gateway.",
   },
   {
     file: "packages/hench/src/prd/rex-gateway.ts",
