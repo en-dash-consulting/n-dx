@@ -231,6 +231,21 @@
   color: var(--text);
 }
 
+/* Row-level actions (Explain). Outside the header on purpose — the header is
+   itself a button whenever the finding has related files, and nesting one
+   button in another is invalid markup. */
+.finding-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.finding-explain-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+}
+
 .finding-meta {
   display: flex;
   align-items: center;

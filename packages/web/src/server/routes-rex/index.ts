@@ -10,6 +10,7 @@
  *   items.ts        — Item CRUD (add, get, patch, bulk, merge, delete)
  *   requirements.ts — Requirements CRUD, coverage, traceability
  *   prune.ts        — Prune preview and execution
+ *   refinements.ts  — Apply Ask-panel PRD refinements under the store lock
  *   restore.ts      — List and restore PRD tree snapshots (undo for reorganize/prune/reshape/fix)
  *   ../routes-rex-analysis.ts — Analysis, proposals, smart-add, batch-import
  *   execution.ts    — Epic-by-epic execution, pause/resume, shutdown
@@ -25,6 +26,7 @@ import { routePrdReads } from "./reads.js";
 import { routeItems } from "./items.js";
 import { routeItemRequirements, routeRequirementsAnalytics } from "./requirements.js";
 import { routePrune } from "./prune.js";
+import { routeRefinements } from "./refinements.js";
 import { routeRestore } from "./restore.js";
 import { routeProposals } from "../routes-rex-analysis.js";
 import { routeExecution } from "./execution.js";
@@ -40,6 +42,7 @@ const REX_PREFIX = "/api/rex/";
  * - Item CRUD (add, get, patch, bulk, merge)
  * - Requirements (item requirements CRUD, coverage, traceability)
  * - Prune (preview, execute)
+ * - Refinements (apply accepted Ask-panel PRD refinements)
  * - Restore (list snapshots, restore from one)
  * - Proposals (analyze, proposals, smart-add, batch-import)
  * - Execution (epic-by-epic, status, pause, resume)
@@ -72,6 +75,9 @@ export function handleRexRoute(
 
   const pruneResult = routePrune(path, method, req, res, ctx, broadcast);
   if (pruneResult !== false) return pruneResult;
+
+  const refinementResult = routeRefinements(path, method, req, res, ctx, broadcast);
+  if (refinementResult !== false) return refinementResult;
 
   const restoreResult = routeRestore(path, method, req, res, ctx, broadcast);
   if (restoreResult !== false) return restoreResult;

@@ -40,6 +40,7 @@ function makeCtx(): ViewRenderContext {
     selectedZone: null,
     selectedRunId: null,
     selectedTaskId: null,
+    askSeed: null,
     navigateTo: () => {},
     isFeatureDisabled: () => false,
   };

@@ -1,0 +1,257 @@
+/* SourceVision Ask panel.
+ *
+ * Uses the tokens defined in tokens.css (--bg-surface, --border, --red,
+ * --brand-teal, --space-*, --radius-*). Note for anyone copying from
+ * pr-markdown.css or commands.css: those files reference --panel2, --line and
+ * --mono, none of which tokens.css defines, so those declarations are dropped
+ * by the browser. Do not propagate them here.
+ */
+
+.sv-ask-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sv-ask-form,
+.sv-ask-idle,
+.sv-ask-answer,
+.sv-ask-error,
+.sv-ask-seed,
+.sv-ask-unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2-5);
+}
+
+/* The seeded finding, shown above the question it grounds. Tinted on its
+   leading edge rather than boxed in an accent colour: it is context for the
+   question, not a result or a warning. */
+.sv-ask-seed {
+  border-left: 3px solid var(--brand-teal);
+  gap: var(--space-2);
+}
+
+.sv-ask-seed-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.sv-ask-seed-clear-btn {
+  flex: none;
+  font-size: var(--font-sm);
+}
+
+.sv-ask-seed-text {
+  margin: 0;
+  font-size: var(--font-base);
+  line-height: 1.55;
+}
+
+/* Two columns: label, value. The labels come from the seed's own classification
+   map, so the grid sizes to whatever the surface supplied rather than to a
+   fixed set of fields. */
+.sv-ask-seed-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  font-size: var(--font-sm);
+}
+
+.sv-ask-seed-facts dt {
+  color: var(--text-dim);
+}
+
+.sv-ask-seed-facts dd {
+  margin: 0;
+}
+
+.sv-ask-seed-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.sv-ask-label {
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
+}
+
+.sv-ask-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--font-base);
+  line-height: var(--leading-normal);
+  resize: vertical;
+}
+
+.sv-ask-textarea:disabled {
+  opacity: 0.6;
+}
+
+/* Refine-mode toggle. Two columns so the hint aligns under the label rather
+   than under the checkbox, which would read as describing the checkbox's
+   state instead of what the mode does. */
+.sv-ask-mode {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+}
+
+.sv-ask-mode-label {
+  font-size: var(--font-base);
+}
+
+.sv-ask-mode-hint {
+  grid-column: 2;
+  margin: 0;
+}
+
+.sv-ask-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.sv-ask-hint {
+  margin: 0;
+}
+
+/* The submitting state is the one the user waits through, so it gets a marker
+   of its own rather than only a disabled button. Reserving the line height
+   keeps the answer card from jumping when the marker appears and clears. */
+.sv-ask-status {
+  min-height: 1.25em;
+}
+
+.sv-ask-error {
+  border-left: 3px solid var(--red);
+}
+
+.sv-ask-error-message,
+.sv-ask-error-suggestion {
+  margin: 0;
+}
+
+/* What to do about this particular mode. A list rather than a paragraph: the
+   steps are ordered and each is independently actionable, and the canonical
+   vendor remediation arrives as separate lines already. */
+.sv-ask-error-steps {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sv-ask-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The analyze affordance sits inside the error card, so it needs the separation
+   from the steps above it that a card boundary would otherwise give it. */
+.sv-ask-error-analyze {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.sv-ask-answer {
+  border-left: 3px solid var(--brand-teal);
+}
+
+.sv-ask-question {
+  margin: 0;
+  font-style: italic;
+}
+
+.sv-ask-answer-body {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: var(--leading-relaxed);
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.sv-ask-answer-meta {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--font-xs);
+}
+
+/* Answer actions: Copy and the confirm-guarded Capture to PRD. */
+.sv-ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sv-ask-capture-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sv-ask-capture-confirm-prompt {
+  font-size: var(--font-sm);
+}
+
+.sv-ask-capture-busy {
+  font-size: var(--font-sm);
+  opacity: 0.8;
+}
+
+/* Both feedback lines stay mounted so their live regions pre-exist the text.
+   Reserving the height keeps the card from resizing as messages come and go. */
+.sv-ask-feedback {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1-5);
+  margin: 0;
+  min-height: 1.25em;
+}
+
+.sv-ask-copy-feedback,
+.sv-ask-capture-feedback,
+.sv-ask-capture-error {
+  margin: 0;
+}
+
+/* The outcome marker. Success and failure differ in glyph as well as in hue,
+   so the state survives a reader who cannot separate the two colours. */
+.sv-ask-feedback-mark {
+  flex: none;
+  font-size: var(--font-sm);
+  line-height: 1.25em;
+}
+
+/* Success tints only the marker, leaving the message in body colour: the line
+   is a confirmation, not a warning, and recolouring its text would give it
+   more weight than the answer it sits under. A failure tints the whole line,
+   which is what the capture error already did. */
+.sv-ask-feedback-success .sv-ask-feedback-mark {
+  color: var(--green);
+}
+
+.sv-ask-feedback-error {
+  color: var(--red);
+}

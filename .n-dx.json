@@ -262,7 +262,7 @@
       "injectionSeams": [
         {
           "from": "packages/web/src/server/start.ts",
-          "to": "packages/web/src/server/register-scheduler.ts",
+          "to": "packages/web/src/server/task-usage.ts",
           "callbacks": [
             "broadcast",
             "collectAllIds",

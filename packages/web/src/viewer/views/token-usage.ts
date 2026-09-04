@@ -1,9 +1,27 @@
 /**
  * LLM Utilization dashboard view.
  *
- * Shows token consumption across packages (rex, hench, sourcevision),
- * grouped by command and time period, with budget status indicators
- * and trend visualization.
+ * Shows token consumption across packages (rex, hench, sourcevision) and the
+ * dashboard's own spend, grouped by command and time period, with budget status
+ * indicators and trend visualization.
+ *
+ * ## Dashboard spend
+ *
+ * The `web` package is the dashboard itself — today the SourceVision Ask panel.
+ * It is rendered as its own colour, its own donut slice, and its own filter
+ * option rather than being folded into Sourcevision, because "what did the
+ * dashboard cost me?" is the question this view exists to answer about itself.
+ * The server-side ledger is `src/server/dashboard-usage.ts`.
+ *
+ * ## Cache tokens
+ *
+ * Cache-creation and cache-read counts are shown, not folded away. The server
+ * has always reported and priced them (`estimateCost` charges cache writes at
+ * 1.25x input and reads at 0.1x), but this view used to type its rows without
+ * the fields and total only input + output — so the headline "Total Tokens"
+ * disagreed with the "Est. Cost" beside it, and on a cache-heavy run most of
+ * the bill had no visible line. Consistent with the hench/rex decision to
+ * report cache tokens rather than hide them.
  */
 
 import { h, Fragment } from "preact";
@@ -17,20 +35,36 @@ import { TOKEN_USAGE_POLL_KEY, USAGE_POLL_INTERVAL_MS } from "../usage/constants
 // Types (mirroring API response shapes)
 // ---------------------------------------------------------------------------
 
+/** Package keys the server aggregates by; `web` is the dashboard itself. */
+type TokenPackage = "hench" | "rex" | "sv" | "web";
+
+/** Render order, shared by the chart stack, the donut, and the legend. */
+const TOKEN_PACKAGES: readonly TokenPackage[] = ["hench", "rex", "sv", "web"];
+
+/**
+ * Wire shapes below are `as`-cast from `res.json()`, so they describe what the
+ * server sends rather than anything the runtime enforces. Fields added after
+ * the first release are therefore **optional**: the viewer is built and
+ * deployed as a static artifact, so it can be paired with an older server or
+ * with captured JSON, and one absent number must not blank the whole page.
+ * Absent always means "this source reported nothing", which reads as zero.
+ */
 interface PackageTokenUsage {
   inputTokens: number;
   outputTokens: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
   calls: number;
 }
 
+type ToolBreakdown = Partial<Record<TokenPackage, PackageTokenUsage>>;
+
 interface AggregateTokenUsage {
-  packages: {
-    rex: PackageTokenUsage;
-    hench: PackageTokenUsage;
-    sv: PackageTokenUsage;
-  };
+  packages: ToolBreakdown;
   totalInputTokens: number;
   totalOutputTokens: number;
+  totalCacheCreationTokens?: number;
+  totalCacheReadTokens?: number;
   totalCalls: number;
 }
 
@@ -39,6 +73,8 @@ interface CostEstimate {
   totalRaw: number;
   inputCost: number;
   outputCost: number;
+  cacheWriteCost?: number;
+  cacheReadCost?: number;
 }
 
 interface CommandTokenUsage extends PackageTokenUsage {
@@ -55,16 +91,12 @@ interface PeriodBucket {
 interface VendorModelUsage extends PackageTokenUsage {
   vendor: string;
   model: string;
-  toolBreakdown: {
-    rex: PackageTokenUsage;
-    hench: PackageTokenUsage;
-    sv: PackageTokenUsage;
-  };
+  toolBreakdown: ToolBreakdown;
 }
 
 interface UtilizationResponse {
   configured: { vendor: string; model: string };
-  source: { rex: string; hench: string; sourcevision: string };
+  source: { rex: string; hench: string; sourcevision: string; dashboard?: string };
   period: TimePeriod;
   window: { since: string | null; until: string | null };
   usage: AggregateTokenUsage;
@@ -74,11 +106,7 @@ interface UtilizationResponse {
     period: string;
     totalTokens: number;
     byVendorModel: VendorModelUsage[];
-    toolBreakdown: {
-      rex: PackageTokenUsage;
-      hench: PackageTokenUsage;
-      sv: PackageTokenUsage;
-    };
+    toolBreakdown: ToolBreakdown;
     estimatedCost: CostEstimate;
   }>;
   commands: CommandTokenUsage[];
@@ -169,13 +197,48 @@ const PKG_COLORS: Record<string, string> = {
   hench: "var(--brand-teal)",
   rex: "var(--brand-purple)",
   sv: "var(--brand-orange)",
+  web: "var(--brand-green)",
 };
 
 const PKG_LABELS: Record<string, string> = {
   hench: "Hench",
   rex: "Rex",
   sv: "Sourcevision",
+  web: "Dashboard",
 };
+
+/**
+ * Every token a package consumed, cache included.
+ *
+ * Summing only input + output would leave the largest component of a
+ * cache-heavy bill out of the chart while `estimateCost` still charged for it.
+ */
+function pkgTotal(usage: PackageTokenUsage | undefined): number {
+  if (!usage) return 0;
+  return (
+    usage.inputTokens
+    + usage.outputTokens
+    + (usage.cacheCreationTokens ?? 0)
+    + (usage.cacheReadTokens ?? 0)
+  );
+}
+
+/** Same sum over the whole-project aggregate. */
+function aggregateTotal(usage: AggregateTokenUsage): number {
+  return (
+    usage.totalInputTokens
+    + usage.totalOutputTokens
+    + (usage.totalCacheCreationTokens ?? 0)
+    + (usage.totalCacheReadTokens ?? 0)
+  );
+}
+
+/** Sum one field across every package in a breakdown. */
+function sumBreakdown(breakdown: ToolBreakdown, field: keyof PackageTokenUsage): number {
+  let total = 0;
+  for (const pkg of TOKEN_PACKAGES) total += breakdown[pkg]?.[field] ?? 0;
+  return total;
+}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -218,10 +281,7 @@ function PeriodChart({ buckets }: { buckets: PeriodBucket[] }) {
     return h("div", { class: "token-empty" }, "No data for the selected period");
   }
 
-  const maxTokens = Math.max(
-    ...buckets.map((b) => b.usage.totalInputTokens + b.usage.totalOutputTokens),
-    1,
-  );
+  const maxTokens = Math.max(...buckets.map((b) => aggregateTotal(b.usage)), 1);
 
   const barWidth = Math.max(20, Math.min(60, 600 / buckets.length));
   const chartWidth = Math.max(600, buckets.length * (barWidth + 8) + 80);
@@ -258,19 +318,15 @@ function PeriodChart({ buckets }: { buckets: PeriodBucket[] }) {
           }, val),
         );
       }),
-      // Bars (stacked: hench, rex, sv)
+      // Bars, stacked bottom-up in TOKEN_PACKAGES order. Driven by the array
+      // rather than one hand-placed rect per package: the offset arithmetic
+      // (`baseY - a - b - c`) is where a fourth package silently overlaps a
+      // third if a stack is extended by copy-paste.
       buckets.map((bucket, i) => {
         const x = 60 + i * (barWidth + 8);
-        const total = bucket.usage.totalInputTokens + bucket.usage.totalOutputTokens;
-        const henchTotal = bucket.usage.packages.hench.inputTokens + bucket.usage.packages.hench.outputTokens;
-        const rexTotal = bucket.usage.packages.rex.inputTokens + bucket.usage.packages.rex.outputTokens;
-        const svTotal = bucket.usage.packages.sv.inputTokens + bucket.usage.packages.sv.outputTokens;
-
-        const henchH = (henchTotal / maxTokens) * barArea;
-        const rexH = (rexTotal / maxTokens) * barArea;
-        const svH = (svTotal / maxTokens) * barArea;
-
+        const total = aggregateTotal(bucket.usage);
         const baseY = paddingTop + barArea;
+        let stacked = 0;
 
         // Label
         const periodLabel = bucket.period.length > 7
@@ -278,48 +334,25 @@ function PeriodChart({ buckets }: { buckets: PeriodBucket[] }) {
           : bucket.period;
 
         return h("g", { key: bucket.period },
-          // Hench bar (bottom)
-          henchH > 0
-            ? h("rect", {
-                x,
-                y: baseY - henchH,
-                width: barWidth,
-                height: henchH,
-                rx: 2,
-                fill: PKG_COLORS.hench,
-                opacity: 0.85,
-              },
-                h("title", null, `Hench: ${fmtTokens(henchTotal)} tokens`),
-              )
-            : null,
-          // Rex bar (middle)
-          rexH > 0
-            ? h("rect", {
-                x,
-                y: baseY - henchH - rexH,
-                width: barWidth,
-                height: rexH,
-                rx: 2,
-                fill: PKG_COLORS.rex,
-                opacity: 0.85,
-              },
-                h("title", null, `Rex: ${fmtTokens(rexTotal)} tokens`),
-              )
-            : null,
-          // SV bar (top)
-          svH > 0
-            ? h("rect", {
-                x,
-                y: baseY - henchH - rexH - svH,
-                width: barWidth,
-                height: svH,
-                rx: 2,
-                fill: PKG_COLORS.sv,
-                opacity: 0.85,
-              },
-                h("title", null, `SV: ${fmtTokens(svTotal)} tokens`),
-              )
-            : null,
+          TOKEN_PACKAGES.map((pkg) => {
+            const pkgTokens = pkgTotal(bucket.usage.packages[pkg]);
+            const height = (pkgTokens / maxTokens) * barArea;
+            if (height <= 0) return null;
+            const y = baseY - stacked - height;
+            stacked += height;
+            return h("rect", {
+              key: pkg,
+              x,
+              y,
+              width: barWidth,
+              height,
+              rx: 2,
+              fill: PKG_COLORS[pkg],
+              opacity: 0.85,
+            },
+              h("title", null, `${PKG_LABELS[pkg]}: ${fmtTokens(pkgTokens)} tokens`),
+            );
+          }),
           // X-axis label
           h("text", {
             x: x + barWidth / 2,
@@ -337,7 +370,7 @@ function PeriodChart({ buckets }: { buckets: PeriodBucket[] }) {
     ),
     // Legend
     h("div", { class: "chart-legend" },
-      (["hench", "rex", "sv"] as const).map((pkg) =>
+      TOKEN_PACKAGES.map((pkg) =>
         h("span", { key: pkg, class: "legend-item" },
           h("span", { class: "legend-dot", style: `background: ${PKG_COLORS[pkg]}` }),
           PKG_LABELS[pkg],
@@ -349,14 +382,12 @@ function PeriodChart({ buckets }: { buckets: PeriodBucket[] }) {
 
 /** Package breakdown donut. */
 function PackageBreakdown({ usage }: { usage: AggregateTokenUsage }) {
-  const total = usage.totalInputTokens + usage.totalOutputTokens;
+  const total = aggregateTotal(usage);
   if (total === 0) return h("div", { class: "token-empty" }, "No token usage recorded");
 
-  const pkgs = [
-    { key: "hench" as const, total: usage.packages.hench.inputTokens + usage.packages.hench.outputTokens },
-    { key: "rex" as const, total: usage.packages.rex.inputTokens + usage.packages.rex.outputTokens },
-    { key: "sv" as const, total: usage.packages.sv.inputTokens + usage.packages.sv.outputTokens },
-  ].filter((p) => p.total > 0);
+  const pkgs = TOKEN_PACKAGES
+    .map((key) => ({ key, total: pkgTotal(usage.packages[key]) }))
+    .filter((p) => p.total > 0);
 
   const size = 160;
   const cx = size / 2;
@@ -504,18 +535,11 @@ export function TokenUsageView() {
         (data.trend ?? []).map((bucket) => {
           const usage: AggregateTokenUsage = {
             packages: bucket.toolBreakdown,
-            totalInputTokens:
-              bucket.toolBreakdown.rex.inputTokens +
-              bucket.toolBreakdown.hench.inputTokens +
-              bucket.toolBreakdown.sv.inputTokens,
-            totalOutputTokens:
-              bucket.toolBreakdown.rex.outputTokens +
-              bucket.toolBreakdown.hench.outputTokens +
-              bucket.toolBreakdown.sv.outputTokens,
-            totalCalls:
-              bucket.toolBreakdown.rex.calls +
-              bucket.toolBreakdown.hench.calls +
-              bucket.toolBreakdown.sv.calls,
+            totalInputTokens: sumBreakdown(bucket.toolBreakdown, "inputTokens"),
+            totalOutputTokens: sumBreakdown(bucket.toolBreakdown, "outputTokens"),
+            totalCacheCreationTokens: sumBreakdown(bucket.toolBreakdown, "cacheCreationTokens"),
+            totalCacheReadTokens: sumBreakdown(bucket.toolBreakdown, "cacheReadTokens"),
+            totalCalls: sumBreakdown(bucket.toolBreakdown, "calls"),
           };
           return {
             period: bucket.period,
@@ -550,7 +574,7 @@ export function TokenUsageView() {
   const commandChartData = useMemo(() => {
     return filteredCommands.slice(0, 10).map((c) => ({
       label: `${PKG_LABELS[c.package] ?? c.package}: ${c.command}`,
-      value: c.inputTokens + c.outputTokens,
+      value: pkgTotal(c),
       color: PKG_COLORS[c.package] ?? "var(--accent)",
     }));
   }, [filteredCommands]);
@@ -601,9 +625,9 @@ export function TokenUsageView() {
             onChange: (e: Event) => setPkgFilter((e.target as HTMLSelectElement).value),
           },
             h("option", { value: "all" }, "All"),
-            h("option", { value: "hench" }, "Hench"),
-            h("option", { value: "rex" }, "Rex"),
-            h("option", { value: "sv" }, "Sourcevision"),
+            ...TOKEN_PACKAGES.map((pkg) =>
+              h("option", { key: pkg, value: pkg }, PKG_LABELS[pkg]),
+            ),
           ),
         ),
         since || until
@@ -640,6 +664,14 @@ export function TokenUsageView() {
               h("span", { class: "cost-label" }, "Sourcevision source"),
               h("code", null, utilization.source.sourcevision),
             ),
+            // Omitted rather than blank when the server predates the ledger:
+            // an empty <code> reads as "no source", which is a different claim.
+            utilization.source.dashboard
+              ? h("div", { class: "token-source-item" },
+                  h("span", { class: "cost-label" }, "Dashboard source"),
+                  h("code", null, utilization.source.dashboard),
+                )
+              : null,
           ),
         )
       : null,
@@ -656,7 +688,7 @@ export function TokenUsageView() {
     usage
       ? h("div", { class: "overview-metrics token-metrics" },
           h(MetricCard, {
-            value: fmtTokens(usage.totalInputTokens + usage.totalOutputTokens),
+            value: fmtTokens(aggregateTotal(usage)),
             label: "Total Tokens",
           }),
           h(MetricCard, {
@@ -676,6 +708,14 @@ export function TokenUsageView() {
           h(MetricCard, {
             value: fmtTokens(usage.totalOutputTokens),
             label: "Output Tokens",
+          }),
+          h(MetricCard, {
+            value: fmtTokens(usage.totalCacheCreationTokens ?? 0),
+            label: "Cache Write Tokens",
+          }),
+          h(MetricCard, {
+            value: fmtTokens(usage.totalCacheReadTokens ?? 0),
+            label: "Cache Read Tokens",
           }),
         )
       : null,
@@ -707,6 +747,8 @@ export function TokenUsageView() {
                   h("th", null, "Model"),
                   h("th", { class: "num" }, "Input Tokens"),
                   h("th", { class: "num" }, "Output Tokens"),
+                  h("th", { class: "num" }, "Cache Write"),
+                  h("th", { class: "num" }, "Cache Read"),
                   h("th", { class: "num" }, "Total"),
                   h("th", { class: "num" }, "Calls"),
                 ),
@@ -718,7 +760,9 @@ export function TokenUsageView() {
                     h("td", null, row.model),
                     h("td", { class: "num" }, fmtNumber(row.inputTokens)),
                     h("td", { class: "num" }, fmtNumber(row.outputTokens)),
-                    h("td", { class: "num" }, fmtNumber(row.inputTokens + row.outputTokens)),
+                    h("td", { class: "num" }, fmtNumber(row.cacheCreationTokens ?? 0)),
+                    h("td", { class: "num" }, fmtNumber(row.cacheReadTokens ?? 0)),
+                    h("td", { class: "num" }, fmtNumber(pkgTotal(row))),
                     h("td", { class: "num" }, fmtNumber(row.calls)),
                   ),
                 ),
@@ -779,14 +823,15 @@ export function TokenUsageView() {
                   h("th", null, "Command"),
                   h("th", { class: "num" }, "Input Tokens"),
                   h("th", { class: "num" }, "Output Tokens"),
+                  h("th", { class: "num" }, "Cache Write"),
+                  h("th", { class: "num" }, "Cache Read"),
                   h("th", { class: "num" }, "Total"),
                   h("th", { class: "num" }, "Calls"),
                 ),
               ),
               h("tbody", null,
-                filteredCommands.map((c) => {
-                  const total = c.inputTokens + c.outputTokens;
-                  return h("tr", { key: `${c.package}:${c.command}` },
+                filteredCommands.map((c) =>
+                  h("tr", { key: `${c.package}:${c.command}` },
                     h("td", null,
                       h("span", { class: "pkg-badge", style: `background: ${PKG_COLORS[c.package] ?? "var(--accent)"}` },
                         PKG_LABELS[c.package] ?? c.package,
@@ -795,10 +840,12 @@ export function TokenUsageView() {
                     h("td", null, c.command),
                     h("td", { class: "num" }, fmtNumber(c.inputTokens)),
                     h("td", { class: "num" }, fmtNumber(c.outputTokens)),
-                    h("td", { class: "num" }, fmtNumber(total)),
+                    h("td", { class: "num" }, fmtNumber(c.cacheCreationTokens ?? 0)),
+                    h("td", { class: "num" }, fmtNumber(c.cacheReadTokens ?? 0)),
+                    h("td", { class: "num" }, fmtNumber(pkgTotal(c))),
                     h("td", { class: "num" }, fmtNumber(c.calls)),
-                  );
-                }),
+                  ),
+                ),
               ),
             ),
           ),
@@ -867,6 +914,18 @@ export function TokenUsageView() {
               h("span", { class: "cost-label" }, "Output tokens"),
               h("span", { class: "cost-value" }, `$${cost.outputCost.toFixed(4)}`),
               h("span", { class: "cost-detail" }, `${fmtNumber(usage.totalOutputTokens)} tokens @ $15/M`),
+            ),
+            // Priced by the server all along; the breakdown simply never named
+            // them, so the line items did not add up to the total beneath them.
+            h("div", { class: "cost-item" },
+              h("span", { class: "cost-label" }, "Cache writes"),
+              h("span", { class: "cost-value" }, `$${(cost.cacheWriteCost ?? 0).toFixed(4)}`),
+              h("span", { class: "cost-detail" }, `${fmtNumber(usage.totalCacheCreationTokens ?? 0)} tokens @ $3.75/M`),
+            ),
+            h("div", { class: "cost-item" },
+              h("span", { class: "cost-label" }, "Cache reads"),
+              h("span", { class: "cost-value" }, `$${(cost.cacheReadCost ?? 0).toFixed(4)}`),
+              h("span", { class: "cost-detail" }, `${fmtNumber(usage.totalCacheReadTokens ?? 0)} tokens @ $0.30/M`),
             ),
             h("div", { class: "cost-item cost-total" },
               h("span", { class: "cost-label" }, "Total estimated"),

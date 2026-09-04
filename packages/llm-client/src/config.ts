@@ -392,6 +392,8 @@ export const DEFAULT_ROUTES: Record<string, TaskTier> = {
   "zone.enrich-scan": "light",
   "zone.enrich-deep": "standard",
   "zone.meta-eval": "standard",
+  // web
+  "sourcevision.ask": "standard",
 };
 
 /** What `resolveTaskModel` decided for one call. */

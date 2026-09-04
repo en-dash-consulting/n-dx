@@ -8,7 +8,7 @@
 
 import { h } from "preact";
 import type { ComponentChild, VNode } from "preact";
-import type { ViewId, NavigateTo, DetailItem, LoadedData } from "../types.js";
+import type { ViewId, NavigateTo, DetailItem, LoadedData, AskSeed } from "../types.js";
 import type { DegradableFeature } from "../performance/index.js";
 
 // ── View component imports (via domain barrels) ────────────────
@@ -30,6 +30,7 @@ import {
   SuggestionsView,
   PRMarkdownView,
   RoutesView,
+  AskView,
 } from "./domain-sourcevision.js";
 
 import {
@@ -76,6 +77,8 @@ export interface ViewRenderContext {
   selectedZone: string | null;
   selectedRunId: string | null;
   selectedTaskId: string | null;
+  /** Finding the Ask panel was entered with, when it was entered from one. */
+  askSeed: AskSeed | null;
   navigateTo: NavigateTo;
   isFeatureDisabled: (feature: DegradableFeature) => boolean;
 }
@@ -106,14 +109,17 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "architecture": ({ data, setDetail, navigateTo }) =>
     h(ArchitectureView, { data, onSelect: setDetail, navigateTo }),
 
-  "problems": ({ data }) =>
-    h(ProblemsView, { data }),
+  "problems": ({ data, navigateTo }) =>
+    h(ProblemsView, { data, navigateTo }),
 
-  "suggestions": ({ data }) =>
-    h(SuggestionsView, { data }),
+  "suggestions": ({ data, navigateTo }) =>
+    h(SuggestionsView, { data, navigateTo }),
 
   "pr-markdown": () =>
     h(PRMarkdownView, null),
+
+  "ask": ({ askSeed }) =>
+    h(AskView, { seed: askSeed }),
 
   "rex-dashboard": ({ navigateTo }) =>
     h(RexDashboard, { navigateTo }),

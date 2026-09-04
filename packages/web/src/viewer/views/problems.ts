@@ -1,16 +1,18 @@
 import { h, Fragment } from "preact";
 import { useMemo } from "preact/hooks";
-import type { LoadedData } from "../types.js";
+import type { LoadedData, NavigateTo } from "../types.js";
 import type { Finding } from "../external.js";
 import { FindingsList, BarChart } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
+import { findingAskSeed } from "./finding-seed.js";
 
 interface ProblemsProps {
   data: LoadedData;
+  navigateTo?: NavigateTo;
 }
 
-export function ProblemsView({ data }: ProblemsProps) {
+export function ProblemsView({ data, navigateTo }: ProblemsProps) {
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
@@ -94,6 +96,14 @@ export function ProblemsView({ data }: ProblemsProps) {
       legacyInsights,
       groupBy: "severity",
       searchable: true,
+      // No navigation target, no Explain action: the view renders standalone in
+      // tests and in the exported dashboard, and a button that goes nowhere is
+      // worse than an absent one. Not wrapped in useCallback because the
+      // enrichment gate returns before this component's hooks run, so adding
+      // another hook below it would widen an existing conditional-hook hazard.
+      ...(navigateTo
+        ? { onExplain: (f: Finding) => navigateTo("ask", { askSeed: findingAskSeed(f) }) }
+        : {}),
     })
   );
 }

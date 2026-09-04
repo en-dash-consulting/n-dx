@@ -44,6 +44,7 @@ export type {
   DependencyVulnerability,
   DependencyOutdated,
   DependencyAuditPackageResult,
+  DependencyAuditCommandRecord,
   DependencyAuditResult,
   CleanupTransformationRecord,
   CleanupBatchRecord,

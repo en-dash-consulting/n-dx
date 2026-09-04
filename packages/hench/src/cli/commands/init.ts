@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { access, readFile, readdir, writeFile } from "node:fs/promises";
 import {configExists, initConfig} from "../../store/config.js";
+import { HENCH_RUNTIME_GITIGNORE_ENTRIES } from "../../store/artifacts.js";
 import { HENCH_DIR } from "./constants.js";
 import { info } from "../output.js";
 import type { ProjectLanguage } from "../../schema/index.js";
@@ -29,7 +30,7 @@ async function fileExists(path: string): Promise<boolean> {
  * helpers (see detectProjectLanguage's own "mirrors sourcevision's logic
  * without importing it" comment above).
  */
-async function ensureGitignoreEntries(dir: string, entries: string[]): Promise<void> {
+async function ensureGitignoreEntries(dir: string, entries: readonly string[]): Promise<void> {
   const gitignorePath = join(dir, ".gitignore");
   let content = "";
   try {
@@ -86,6 +87,18 @@ export async function cmdInit(
 ): Promise<void> {
   const henchDir = join(dir, HENCH_DIR);
 
+  // Ensure .gitignore covers hench's own runtime artifacts. `.hench/locks/`
+  // is created the instant a run starts, before any real work happens, so
+  // without these entries it shows up as an untracked path on the very first
+  // `hench run`/`ndx work` — see store/artifacts.ts for the full story.
+  //
+  // Deliberately ahead of the already-initialized early return: a project
+  // initialized before these entries existed would otherwise never receive
+  // them, since init is a no-op on every subsequent invocation. The write is
+  // itself a no-op when the entries are already present, so re-running init
+  // still leaves .gitignore byte-identical.
+  await ensureGitignoreEntries(dir, HENCH_RUNTIME_GITIGNORE_ENTRIES);
+
   if (await configExists(henchDir)) {
     info(".hench/ already initialized, skipping");
     return;
@@ -93,22 +106,6 @@ export async function cmdInit(
 
   const language = await detectProjectLanguage(dir);
   const config = await initConfig(henchDir, language);
-
-  // Ensure .gitignore covers hench's own runtime artifacts. Without this,
-  // `.hench/locks/` (created the instant a run starts, before any real
-  // work happens) shows up as an untracked path on the very first
-  // `hench run`/`ndx work` on a freshly-initialized project — and hench's
-  // own git-dirty guard (agent/lifecycle/shared.ts) then refuses to start,
-  // self-blocking on an artifact it just created. `.hench/runs/` and
-  // `.hench/usage-cursors/` are the same kind of per-run/per-session output;
-  // `.hench-commit-msg.txt` is the scratch file the agent writes its
-  // proposed commit message to (see the agent system prompt).
-  await ensureGitignoreEntries(dir, [
-    ".hench/runs/",
-    ".hench/locks/",
-    ".hench/usage-cursors/",
-    ".hench-commit-msg.txt",
-  ]);
 
   info("Created .hench/config.json");
   info("Created .hench/runs/");

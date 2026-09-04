@@ -2,7 +2,7 @@
 id: "74c3fee8-3281-4b30-8157-8794ea68aea5"
 level: "task"
 title: "Add POST /api/sourcevision/ask backed by analysis context and llm-client"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "web"
@@ -10,6 +10,11 @@ tags:
   - "llm"
   - "sourcevision"
 source: "ndx-capture"
+startedAt: "2026-09-04T13:35:00.220Z"
+completedAt: "2026-09-04T13:51:20.403Z"
+endedAt: "2026-09-04T13:51:20.403Z"
+resolutionType: "code-change"
+resolutionDetail: "Added POST /api/sourcevision/ask (routes-sourcevision-ask.ts) plus the context assembler (sourcevision-ask-context.ts), 29 unit tests, and the sourcevision.ask task class. All 6 suites green."
 acceptanceCriteria:
   - "POST /api/sourcevision/ask accepts { prompt, seed? } and returns { answer, vendor, model, tokens } with a validated request schema"
   - "All sourcevision reads pass through domain-gateway.ts; the route file contains no direct @n-dx/sourcevision import (domain-isolation.test.js still passes)"
@@ -18,6 +23,6 @@ acceptanceCriteria:
   - "The answer is grounded in .sourcevision/ data: a unit test with fixture analysis data asserts the assembled context reaches the LLM call"
   - "A unit test covers the route's success path and each error path"
 description: "Add the server endpoint that answers a question about the analyzed project. Request carries the prompt plus optional seed context (see the explain-a-finding task); response carries the answer text, the vendor/model actually used, and token counts.\n\nContext assembly reads the already-written .sourcevision/ artifacts through packages/web/src/server/domain-gateway.ts -- adding re-exports there rather than importing @n-dx/sourcevision in the route file. The LLM call goes through @n-dx/llm-client (createLLMClient / provider factories), with vendor and model resolved from existing config the same way routes-llm.ts and routes-config.ts already do.\n\nOpen design decision left to implementation: either a small in-process tool-use loop that queries sourcevision lookups on demand, or a single non-agentic call over a pre-assembled context bundle. The bundle approach is cheaper and more predictable; the loop answers a wider range of questions. Whichever is chosen, the endpoint must stay within the sourcevision analysis as its ground truth."
-lastModified: "2026-09-01T14:04:44.087Z"
+lastModified: "2026-09-04T13:51:20.427Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

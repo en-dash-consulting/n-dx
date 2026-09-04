@@ -1017,8 +1017,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/web/src/server/domain-gateway.ts",
-    maxExports: 15,
-    description: "web→sourcevision gateway (MCP server factory, domain types)",
+    maxExports: 16,
+    description: "web→sourcevision gateway (MCP server factory, domain types, iso-map builder, analysis-output schema types). Raised from 15 to carry the five artifact schema types (Manifest, Inventory, Imports, Zones, Components) that the Ask endpoint's context assembler parses .sourcevision/*.json against — sourcevision exposes no loader, so the types are the only thing keeping those disk reads honest about the schema, and importing them from @n-dx/sourcevision at the read site would bypass the gateway.",
   },
   {
     file: "packages/hench/src/prd/rex-gateway.ts",
@@ -1926,6 +1926,110 @@ describe("architecture policy: shell-string and DEP0190 spawn guard", () => {
           "",
           "If this is a new intentional shell:true with empty args (like runShellTestCommand),",
           "update shellTrueIsEmptyArgsPattern() in architecture-policy.test.js.",
+        ].join("\n"),
+      );
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Direct POSIX-shell spawns
+  // -------------------------------------------------------------------------
+
+  /**
+   * Spawning a POSIX shell by name — `exec("sh", ["-c", command])` — is the
+   * shell-STRING twin of the DEP0190 argv problem, and the guards above did
+   * not cover it: nothing in them looks at WHICH binary is being spawned.
+   *
+   * On Windows `sh` resolves only inside a POSIX environment (Git for Windows,
+   * MSYS2, Cygwin). From PowerShell or cmd.exe — the default shells — the
+   * spawn fails with ENOENT, which `exec` reports as exitCode 1 with empty
+   * stdout/stderr: indistinguishable from a command that ran and failed. Three
+   * sites had drifted into this independently (llm-client execShellCmd, hench
+   * exec-shell.ts, rex verify.ts), so the fix is one shell resolver that every
+   * caller routes through, and this guard is what keeps a fourth from
+   * appearing.
+   */
+  const POSIX_SHELL_SPAWN_EXEMPT = new Map([
+    [
+      "packages/llm-client/src/exec.ts",
+      "Defines the sanctioned path: buildShellInvocation returns `sh -c` on " +
+        "POSIX and falls back to cmd.exe on a Windows box with no `sh`. This is " +
+        "the one file allowed to name a shell binary.",
+    ],
+  ]);
+
+  /**
+   * A POSIX shell name paired with a `-c` argv.
+   *
+   * Covers both shapes the pattern takes: the positional call
+   * `exec("sh", ["-c", cmd])` and the object literal
+   * `{ cmd: "sh", args: ["-c", cmd] }` that buildShellInvocation returns. The
+   * first version of this regex handled only the positional form, and the
+   * staleness assertion below immediately reported the exec.ts exemption as
+   * dead — which is what a staleness check is for.
+   */
+  const POSIX_SHELL_SPAWN_RE =
+    /["'](?:\/(?:usr\/)?bin\/)?(?:sh|bash|dash|zsh)["']\s*,\s*(?:\w+\s*:\s*)?\[\s*["']-c["']/;
+
+  it("POSIX_SHELL_SPAWN_EXEMPT entries exist and still spawn a POSIX shell", () => {
+    const stale = [];
+    for (const rel of POSIX_SHELL_SPAWN_EXEMPT.keys()) {
+      const full = join(ROOT, rel);
+      if (!existsSync(full)) {
+        stale.push(`${rel} — file no longer exists`);
+        continue;
+      }
+      if (!POSIX_SHELL_SPAWN_RE.test(readFileSync(full, "utf-8"))) {
+        stale.push(`${rel} — no longer spawns a POSIX shell; exemption is dead`);
+      }
+    }
+
+    if (stale.length > 0) {
+      expect.fail(
+        [
+          "POSIX_SHELL_SPAWN_EXEMPT has stale entries — an allowlist that outlives",
+          "the code it excuses silently widens the guard:",
+          "",
+          ...stale.map((s) => `  - ${s}`),
+        ].join("\n"),
+      );
+    }
+  });
+
+  it("no production file spawns a POSIX shell directly (use execShellCmd)", () => {
+    const violations = [];
+
+    for (const rel of collectShellScanFiles()) {
+      if (POSIX_SHELL_SPAWN_EXEMPT.has(rel)) continue;
+      const lines = readFileSync(join(ROOT, rel), "utf-8").split("\n");
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!isCodeLine(line)) continue;
+        const commentIdx = line.indexOf("//");
+        const codeOnlyLine = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
+        if (POSIX_SHELL_SPAWN_RE.test(codeOnlyLine)) {
+          violations.push(`${rel}:${i + 1} — ${codeOnlyLine.trim()}`);
+        }
+      }
+    }
+
+    if (violations.length > 0) {
+      expect.fail(
+        [
+          "Production files spawn a POSIX shell by name.",
+          "`sh` does not resolve on Windows outside a POSIX environment, and the",
+          "resulting ENOENT is reported as exitCode 1 with empty output — a command",
+          "that never ran looks exactly like one that ran and failed.",
+          "",
+          "Use execShellCmd from @n-dx/llm-client, which resolves a shell that exists",
+          "on the platform and sets `launched: false` when none could be spawned.",
+          "",
+          "Violations:",
+          ...violations.map((v) => `  - ${v}`),
+          "",
+          "If a case is genuinely unavoidable, add it to POSIX_SHELL_SPAWN_EXEMPT",
+          "with a reason.",
         ].join("\n"),
       );
     }

@@ -10,10 +10,15 @@
  */
 
 import { execStdout } from "../../process/exec.js";
+import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 
 /** Size of the uncommitted changes in the working tree. */
 export interface ChangeMagnitude {
-  /** Dirty paths reported by `git status --porcelain` (includes untracked). */
+  /**
+   * Operator-authored dirty paths reported by `git status --porcelain`
+   * (includes untracked). Hench's own runtime artifacts are discounted so
+   * this agrees with the gate's own count — see `store/artifacts.ts`.
+   */
   files: number;
   /**
    * Total insertions + deletions vs HEAD from `git diff HEAD --numstat`
@@ -64,7 +69,7 @@ export async function measureChangeMagnitude(
       cwd: projectDir,
       timeout: 15_000,
     });
-    files = status.trim().split("\n").filter(Boolean).length;
+    files = excludeHenchRuntimeArtifacts(status.trim().split("\n").filter(Boolean)).length;
   } catch {
     // Not a git repo or git unavailable — report zero files.
   }

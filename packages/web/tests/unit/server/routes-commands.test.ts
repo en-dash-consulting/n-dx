@@ -484,12 +484,24 @@ describe("commands route — ndx binary resolution ladder", () => {
   let ctx: ServerContext;
   let server: Server;
   let port: number;
-  let savedCliPath: string | undefined;
+  // BOTH vars, not just N_DX_CLI_PATH. resolveNdxBin checks NDX_CLI_PATH on the
+  // FIRST rung, before the project-local bin, so leaving it ambient makes every
+  // test in this block resolve to the launching CLI and assert nothing about the
+  // ladder. `ndx start` sets both for every child it spawns (see resolveNdxBin's
+  // doc comment), so anyone running this suite from a server or agent session
+  // launched by ndx saw two red tests here; CI stayed green only because it sets
+  // neither. Same save/delete/restore shape as
+  // routes-hench-execute-binary-resolution.test.ts.
+  let savedCliPaths: Record<string, string | undefined>;
 
   beforeEach(async () => {
     execMock.mockReset();
     spawnManagedMock.mockReset();
-    savedCliPath = process.env["N_DX_CLI_PATH"];
+    savedCliPaths = {
+      NDX_CLI_PATH: process.env["NDX_CLI_PATH"],
+      N_DX_CLI_PATH: process.env["N_DX_CLI_PATH"],
+    };
+    delete process.env["NDX_CLI_PATH"];
     delete process.env["N_DX_CLI_PATH"];
     tmpDir = await mkdtemp(join(tmpdir(), "commands-ndxbin-"));
     await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
@@ -507,8 +519,10 @@ describe("commands route — ndx binary resolution ladder", () => {
   });
 
   afterEach(async () => {
-    if (savedCliPath === undefined) delete process.env["N_DX_CLI_PATH"];
-    else process.env["N_DX_CLI_PATH"] = savedCliPath;
+    for (const [key, value] of Object.entries(savedCliPaths)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
     await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });

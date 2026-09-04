@@ -660,6 +660,62 @@ describe.skipIf(!axeRun)("[a11y] PRMarkdownView — axe audit", () => {
   });
 });
 
+// ── [a11y] AskView ───────────────────────────────────────────────────────────
+
+describe.skipIf(!axeRun)("[a11y] AskView — axe audit", () => {
+  let root: HTMLElement;
+  let cleanup: () => void;
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    // No vendor call: the panel issues nothing until a question is submitted,
+    // and the project-metadata fetch is left pending.
+    globalThis.fetch = vi.fn().mockReturnValue(new Promise(() => { /* never resolves */ }));
+  });
+
+  afterEach(() => {
+    act(() => {
+      render(null, root);
+    });
+    root.remove();
+    cleanup?.();
+    globalThis.fetch = originalFetch;
+  });
+
+  it("has zero critical/serious violations (light theme, idle state)", async () => {
+    cleanup = setTheme("light");
+    const { AskView } = await import("../../../src/viewer/views/ask.js");
+    root = renderToDiv(h(AskView, {}));
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+
+  it("has zero critical/serious violations (dark theme, idle state)", async () => {
+    cleanup = setTheme("dark");
+    const { AskView } = await import("../../../src/viewer/views/ask.js");
+    root = renderToDiv(h(AskView, {}));
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+
+  it("has zero violations in the deployed-mode unavailable state", async () => {
+    cleanup = setTheme("light");
+    window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "2026-01-01T00:00:00.000Z" };
+    try {
+      const { AskView } = await import("../../../src/viewer/views/ask.js");
+      root = renderToDiv(h(AskView, {}));
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      const violations = await runAxe(root);
+      expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+    } finally {
+      delete window.__NDX_DEPLOYED__;
+    }
+  });
+});
+
 // ── [a11y] ProjectSettings (loading state) ───────────────────────────────────
 
 describe.skipIf(!axeRun)("[a11y] ProjectSettings — axe audit", () => {

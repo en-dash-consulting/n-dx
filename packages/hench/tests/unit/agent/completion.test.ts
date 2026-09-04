@@ -315,11 +315,15 @@ describe("validateCompletion", () => {
     expect(gitArgs).toContain("def456");
     expect(gitArgs).not.toContain("HEAD");
 
-    // Test command should have run via sh -c
-    const testArgs = mockSpawn.mock.calls[1];
-    expect(testArgs[0]).toBe("sh");
-    expect(testArgs[1]).toContain("-c");
-    expect(testArgs[1]).toContain("pnpm test");
+    // Test command should have run through a shell, carrying the command
+    // string. WHICH shell is a platform decision (`sh -c` where a POSIX shell
+    // exists, cmd.exe on a Windows box without one — see buildShellInvocation),
+    // so asserting the binary by name made this pass from Git Bash and fail
+    // from PowerShell. The invariant worth pinning is that the command reached
+    // a shell at all.
+    const [testCmd, testArgv] = mockSpawn.mock.calls[1] as [string, string[]];
+    expect(["sh", "cmd.exe"]).toContain(testCmd);
+    expect(testArgv.join(" ")).toContain("pnpm test");
 
     expect(result.valid).toBe(true);
     expect(result.hasChanges).toBe(true);

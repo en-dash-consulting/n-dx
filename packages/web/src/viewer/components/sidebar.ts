@@ -135,13 +135,15 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
   const notionSyncEnabled = useFeatureToggle("rex.notionSync", false);
   const integrationsEnabled = useFeatureToggle("rex.integrations", false);
   const prMarkdownEnabled = useFeatureToggle("sourcevision.prMarkdown", false);
+  const askEnabled = useFeatureToggle("sourcevision.ask", false);
   const enabledGates = useMemo(() => {
     const m = new Map<string, boolean>();
     m.set("rex.notionSync", notionSyncEnabled);
     m.set("rex.integrations", integrationsEnabled);
     m.set("sourcevision.prMarkdown", prMarkdownEnabled);
+    m.set("sourcevision.ask", askEnabled);
     return m;
-  }, [notionSyncEnabled, integrationsEnabled, prMarkdownEnabled]);
+  }, [notionSyncEnabled, integrationsEnabled, prMarkdownEnabled, askEnabled]);
 
   /** Sections filtered by scope and feature gates. */
   const visibleSections = useMemo(() => {

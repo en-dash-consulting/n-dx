@@ -22,11 +22,19 @@ production path (`execShell`).
 tree is worth testing. A missing shell is a test-environment problem, and the
 test skips.
 
-**Under test.** hench's tools run `exec("sh", ["-c", cmd])` on *every* platform,
-so a POSIX shell is a genuine runtime requirement of the product on Windows too.
-A missing shell means `run_command` and the post-task test runner would not work
-on that machine either. Those tests also skip, but the skip message says which
-product capability went unverified — the limitation is real, not an artifact.
+**Under test.** hench's tools used to run `exec("sh", ["-c", cmd])` on *every*
+platform, which made a POSIX shell a genuine runtime requirement of the product
+on Windows: without it, `run_command` and the post-task test runner did not work
+on that machine either.
+
+That is no longer true. `execShellCmd` now resolves the shell per platform —
+`sh -c` where a POSIX shell exists, `cmd.exe /d /s /c` on a Windows box without
+one (`buildShellInvocation`, `packages/llm-client/src/exec.ts`) — so the product
+runs shell commands from PowerShell and cmd.exe. The tests in this category
+still skip without `sh`, because what they assert IS POSIX shell behaviour
+(pipes, single quotes, `2>/dev/null`); the skip now means "POSIX semantics went
+unverified on this host", not "the product does not work here". Un-skipping them
+would mean writing cmd.exe-semantics twins, which is a separate piece of work.
 
 ## Inventory
 
@@ -68,7 +76,9 @@ exercised.
 | `still skips when the run genuinely changed nothing` in `gate-changed-files.test.ts` | An empty changed set makes `runTestGate` return before spawning, so the case never reaches `sh` |
 | 4 cases in `packages/hench/tests/unit/tools/git.test.ts` (`runs git branch`, `properly handles quoted args…`, `handles args with special characters…`, `records git operations in policy audit log`) | Assert shape (`typeof result === "string"`) or guard bookkeeping that happens before the spawn — verified passing from PowerShell without `sh` |
 | Files writing `#!/bin/sh` shims (`cli-auth`, `cli-config`, `cli-stale-check`, `codex-integration`, `assistant-parity-smoke`, `llm-client/tests/helpers/fake-cli.ts`) | Write a script; execution is either POSIX-only (where `/bin/sh` exists by definition) or routed through cmd.exe on Windows |
-| Unit tests asserting `cmd === "sh"` (`llm-client/tests/unit/exec.test.ts:270`, `hench/tests/unit/process/exec.test.ts:124`, `hench/tests/unit/agent/completion.test.ts:320`) | Inspect a fake spawn's arguments; no process is created |
+| Unit tests asserting the resolved shell (`llm-client/tests/unit/exec.test.ts`, `hench/tests/unit/process/exec.test.ts`, `hench/tests/unit/agent/completion.test.ts`) | Inspect a fake spawn's arguments; no process is created. All three now pass `_platform`/`_posixShellAvailable` explicitly, or accept either shell — the earlier unconditional `cmd === "sh"` assertions passed from Git Bash and failed from PowerShell once `execShellCmd` became platform-aware |
+| `packages/llm-client/tests/integration/exec-shell-windows.test.ts` | Runs real commands, but only through `cmd.exe`, and the whole suite is `describe.skip` off win32. It is the inverse of every other row here: it needs the *absence* of a POSIX shell, which it arranges by forcing the cmd.exe branch and scrubbing Git/MSYS/Cygwin directories from the child's PATH. Nothing to guard — a host with `sh` still runs it |
+| `tests/e2e/architecture-policy.test.js` | Spawns nothing. The flagged `"sh", ["-c"` text is the POSIX_SHELL_SPAWN_RE detector and its exemption prose — the guard that keeps production code from spawning a shell by name |
 
 ## Helpers
 

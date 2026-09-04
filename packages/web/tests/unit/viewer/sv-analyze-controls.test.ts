@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { AnalyzeControls } from "../../../src/viewer/views/overview.js";
+import { AnalyzeControls } from "../../../src/viewer/components/analyze-controls.js";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {

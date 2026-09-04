@@ -10,6 +10,9 @@ Which rules are enforced, where, and how. Prevents duplicate or conflicting enfo
 | Domain isolation (rex ↔ sourcevision) | `tests/e2e/domain-isolation.test.js` | Verifies domain packages have no cross-imports | Test failure |
 | Orchestration tier boundary (spawn-only) | `tests/e2e/domain-isolation.test.js` | Checks orchestration files have no runtime library imports | Test failure |
 | Direct `node:child_process` imports | `tests/e2e/architecture-policy.test.js` | Allowlist-based scan of all packages | Test failure |
+| Hand-built shell command lines / DEP0190 | `tests/e2e/architecture-policy.test.js` | Tree scan for `exec`/`execSync` imports and `shell: true`+args, with a reasoned `SHELL_STRING_EXEMPT` allowlist | Test failure |
+| Direct POSIX-shell spawns (`sh -c`) | `tests/e2e/architecture-policy.test.js` | Tree scan for a shell name paired with a `-c` argv; only `execShellCmd`'s definition site is exempt, and the exemption is staleness-checked | Test failure |
+| Shell-spawning tests are inventoried | `tests/e2e/shell-spawn-inventory-policy.test.js` | Every test file that spawns a shell must have a row in `tests/shell-spawn-inventory.md` | Test failure |
 | Intra-package layering (domain → CLI) | `tests/e2e/architecture-policy.test.js` | Ensures `src/core/` never imports from `src/cli/` | Test failure |
 | Gateway contract (hench → rex) | `packages/hench/tests/unit/prd/rex-gateway.test.ts` | EXPECTED_EXPORTS list vs actual re-exports | Test failure |
 | Gateway contract (web → sourcevision) | `packages/web/tests/unit/server/domain-gateway.test.ts` | Verifies re-export matches canonical export | Test failure |

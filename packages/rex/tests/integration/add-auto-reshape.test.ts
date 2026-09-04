@@ -5,11 +5,12 @@
  *  - Hash-suffix duplicate siblings are merged after add
  *  - --no-reshape suppresses the pass
  *  - A live reshape.lock causes the pass to be skipped
- *  - Scoped pass cost grows sub-quadratically with sibling count (a complexity
- *    gate, not a wall-clock budget — see that test for why)
+ *  - Scoped consolidation compares siblings a linear number of times (a
+ *    complexity gate that counts comparisons — see that test for why it does
+ *    not time them)
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -21,19 +22,37 @@ import { REX_DIR } from "../../src/cli/commands/constants.js";
 import {
   stripHashSuffix,
   detectHashSuffixDuplicates,
+  detectNonDuplicateTitleCollisions,
   isReshapeInProgress,
-  runScopedConsolidationPass,
   RESHAPE_LOCK_FILENAME,
   encodeReshapeLock,
 } from "../../src/cli/commands/add-reshape.js";
 import { loadArchive, ARCHIVE_FILE } from "../../src/core/archive.js";
 import type { PRDItem } from "../../src/schema/index.js";
 
-// No BUDGET_MULTIPLIER here. The perf assertion below guards complexity, and it
-// now says so directly by comparing growth between two sibling counts rather than
-// scaling an absolute wall-clock budget. See that test for the reasoning, and
+// No BUDGET_MULTIPLIER here, and no clock at all. The complexity gate below
+// counts pairwise comparisons instead of timing them, so there is no budget to
+// scale. See that test for why timing could not be made reliable here, and
 // TESTING.md "Flake Resistance" for where scaled absolute budgets are still the
 // right tool (genuine latency budgets, not complexity claims).
+
+// Counts calls to the pairwise content-comparison primitive. Hoisted because
+// vi.mock factories run before module-level initialisers, so a plain `let` here
+// would be in its TDZ when the factory closes over it.
+const counters = vi.hoisted(() => ({ similarityCalls: 0 }));
+
+// Delegates to the real implementation and only counts — behaviour is unchanged
+// for every other test in this file, which reach `similarity` through cmdAdd.
+vi.mock("../../src/analyze/dedupe.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/analyze/dedupe.js")>();
+  return {
+    ...actual,
+    similarity: (a: string, b: string): number => {
+      counters.similarityCalls++;
+      return actual.similarity(a, b);
+    },
+  };
+});
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -259,23 +278,14 @@ describe("cmdAdd scoped consolidation pass", () => {
   let tmpDir: string;
   let rexDir: string;
 
-  /**
-   * Extra project dirs created inside a single test, cleaned up alongside tmpDir.
-   * The scaling test needs one store PER sibling count — see it for why sharing a
-   * store invalidates the measurement.
-   */
-  let extraDirs: string[] = [];
-
   beforeEach(async () => {
     const setup = await setupDir();
     tmpDir = setup.tmpDir;
     rexDir = setup.rexDir;
-    extraDirs = [];
   });
 
   afterEach(async () => {
     await cleanup(tmpDir);
-    await Promise.all(extraDirs.map((d) => cleanup(d)));
   });
 
   it("consolidates hash-suffix duplicate siblings after add", async () => {
@@ -457,145 +467,113 @@ describe("cmdAdd scoped consolidation pass", () => {
   });
 
   /**
-   * This replaced an absolute `expect(elapsed).toBeLessThan(500)`.
+   * COMPLEXITY GATE — counts work rather than timing it.
    *
-   * That budget measured the machine rather than the code: it passed in isolation
-   * and, under full-suite load, was observed timing out at the 30s test limit —
-   * 60x over — with runScopedConsolidationPass unchanged. A gate that is red for
-   * reasons unrelated to its subject stops being read.
+   * Three earlier versions of this assertion compared wall-clock readings: an
+   * absolute `expect(elapsed).toBeLessThan(500)`, then a growth ratio between two
+   * sibling counts, then that ratio taken as the min of 7 passes against
+   * per-size stores. The last of those still failed on an IDLE machine at 8.6x
+   * against an 8x bound, and failed reliably under the CPU load of an `ndx work`
+   * run — taking the hench pre-commit test gate red with it, on every task, for
+   * reasons unrelated to the code under test.
    *
-   * What it was guarding is that the pass stays SCOPED: cost should track the
-   * sibling set it examines, not blow up super-linearly as that set grows. So
-   * measure two sibling counts back-to-back in the same process and assert the
-   * growth. Ambient load scales both readings, so the ratio holds on a busy
-   * machine while a real complexity regression still trips it.
+   * It could not be fixed by tuning the bound. Its own SENSITIVITY LIMIT note
+   * recorded why: the readings were dominated by loading the tree (26 vs 101
+   * items), not by the cohort scan the test claimed to guard, so the signal it
+   * wanted was a minority of what it measured and the noise floor sat right at
+   * the threshold.
+   *
+   * What actually defines the complexity is how many pairwise content
+   * comparisons the detector performs. `similarity` is that primitive: grouping
+   * by normalized title calls it once per colliding pair — linear in cohort size
+   * — while comparing every sibling against every other calls it O(n²) times.
+   * Counting it is exact, needs no clock, and survives refactors that a
+   * title-read counter would not, because copying the cohort into a local
+   * structure changes neither the count nor the complexity.
+   *
+   * Deterministic: both counts are integers fixed by the fixture, identical on an
+   * idle machine and a saturated one. No raised timeout — this builds no store
+   * and does no I/O, so it runs in milliseconds where the timing version needed
+   * ~35s of setup.
    */
-  // 60s, not the 30s default: comparing two sizes means building 125 items via
-  // addItem, and each add re-serializes the tree, so SETUP dominates — measured
-  // ~14s locally while the two timed passes together are ~190ms of it. The old
-  // single-size version fit in 30s, so raising this is a direct cost of the
-  // two-point measurement. Note this is a timeout, not the assertion: it guards
-  // against a hang, and the pass/fail decision is the ratio below.
-  it("scoped pass cost grows sub-quadratically with sibling count", { timeout: 60_000 }, async () => {
+  it("scoped consolidation compares siblings a linear number of times", () => {
     /**
-     * Build an epic with `siblings` features in ITS OWN store, then time the
-     * consolidation pass triggered by one more. Returns the fastest of `runs`.
+     * Build `siblings` items as `siblings / 2` same-title pairs, each side
+     * carrying content that shares no vocabulary with the other.
      *
-     * OWN STORE, NOT A SHARED ONE. Both sizes used to be built in the same store,
-     * so the 100-sibling pass ran against a tree that already held the 25-sibling
-     * epic while the 25-sibling pass did not. Any part of the pass's cost that
-     * tracks TOTAL tree size rather than sibling count then landed on the large
-     * reading only, inflating the ratio — biased toward false failure, and the
-     * sibling-count claim was never cleanly isolated. One store per size makes
-     * sibling count the only variable.
+     * That shape is deliberate: `detectNonDuplicateTitleCollisions` only compares
+     * groups of EXACTLY 2, and only when both sides have content, so every pair
+     * here reaches the `similarity` call and nothing else does. Titles differ
+     * across pairs, so no group ever exceeds two members.
      *
-     * FASTEST OF N, NOT ONE SHOT. A single timing per size left this gate as
-     * load-sensitive as the absolute budget it replaced: three runs on an idle
-     * machine produced small readings of 204.7ms, 68.3ms and 59.9ms — a 3.4x
-     * spread — and the cold first reading is the one that flatters the ratio, which
-     * is backwards. The minimum treats load as the noise it is, and it also makes
-     * the first pass double as the warm-up: that pass is reliably the slowest, so
-     * the minimum discards it without needing a separate throwaway.
-     *
-     * The tree is built ONCE and only the pass is repeated. Rebuilding per run
-     * would triple the expensive half: setup is ~14s of addItem calls against
-     * ~190ms of timed work, which is also why this test carries a raised timeout.
+     * The two sides must be genuinely DISSIMILAR, not merely different strings.
+     * A first attempt used "…side a of pair 3" / "…side b of pair 3", which
+     * scored ABOVE the distinctness threshold, so the detector classified each
+     * pair as a true duplicate and routed it to the merge path — comparisons
+     * still happened, but the fixture guard below correctly reported that the
+     * cohort had stopped exercising the collision path.
      */
-    async function timeScopedPass(siblings: number, runs = 7): Promise<number> {
-      const own = await setupDir();
-      extraDirs.push(own.tmpDir);
-      const store = await resolveStore(own.rexDir);
+    const SIDE_CONTENT = [
+      "Streams ingested records through a bounded queue with backpressure.",
+      "Adds keyboard navigation and focus outlines to the settings dialog.",
+    ];
 
-      const epicId = randomUUID();
-      await store.addItem({ id: epicId, title: "Scaling Epic", level: "epic", status: "pending" });
-      for (let i = 0; i < siblings; i++) {
-        await store.addItem(
-          { id: randomUUID(), title: `Scaling Feature ${i}`, level: "feature", status: "pending" },
-          epicId,
-        );
+    function makeCohort(siblings: number): PRDItem[] {
+      const items: PRDItem[] = [];
+      for (let pair = 0; pair < siblings / 2; pair++) {
+        for (const content of SIDE_CONTENT) {
+          items.push(
+            makeItem({ title: `Collision ${pair}`, level: "feature", description: content }),
+          );
+        }
       }
-
-      // Added directly, bypassing cmdAdd overhead, so only the pass is timed.
-      const newId = randomUUID();
-      await store.addItem(
-        { id: newId, title: "Scaling Feature unique", level: "feature", status: "pending" },
-        epicId,
-      );
-
-      let best = Infinity;
-      for (let i = 0; i < runs; i++) {
-        const start = performance.now();
-        await runScopedConsolidationPass(own.rexDir, store, newId, {});
-        best = Math.min(best, performance.now() - start);
-      }
-
-      // Repeating the pass is only sound because it is a no-op on this fixture:
-      // every sibling title is distinct, so nothing is consolidated and each run
-      // measures the same tree. Asserted rather than assumed — if the pass ever
-      // began merging here, runs 2 and 3 would silently measure a shrinking tree
-      // and the minimum would be meaningless.
-      const doc = await store.loadDocument();
-      const epic = doc.items.find((i) => i.id === epicId);
-      expect(
-        epic?.children?.length,
-        "the timed pass mutated the fixture, so repeated runs did not measure the same work",
-      ).toBe(siblings + 1);
-
-      return best;
+      return items;
     }
 
-    const smallSiblings = 25;
-    const largeSiblings = 100;
+    function countComparisons(siblings: number): number {
+      const cohort = makeCohort(siblings);
+      counters.similarityCalls = 0;
+      const collisions = detectNonDuplicateTitleCollisions(cohort);
+
+      // Guard the fixture, do not assume it. If the cohort ever stopped producing
+      // pairwise collisions the comparison count would fall to zero, and the
+      // growth assertion below would pass while measuring nothing at all.
+      expect(
+        collisions.length,
+        "fixture stopped producing pairwise title collisions, so nothing was compared",
+      ).toBe(siblings / 2);
+
+      return counters.similarityCalls;
+    }
+
+    const smallSiblings = 24;
+    const largeSiblings = 96;
     const sizeRatio = largeSiblings / smallSiblings;
 
-    const smallMs = await timeScopedPass(smallSiblings);
-    const largeMs = await timeScopedPass(largeSiblings);
+    const smallCount = countComparisons(smallSiblings);
+    const largeCount = countComparisons(largeSiblings);
 
-    // MEASURED 2026-08-19 (Windows 11, Node v22). Three runs of this test, each
-    // reading already the min of 7 passes against an isolated store:
-    //
-    //   run   25 siblings   100 siblings   ratio
-    //     1        61.4ms        192.0ms    3.13x
-    //     2        64.4ms        199.7ms    3.10x
-    //     3        80.5ms        227.9ms    2.83x
-    //
-    // Sub-linear for a 4x sibling step, because the pass's cost is dominated by
-    // loading the tree (26 vs 101 items) rather than by scanning the cohort.
-    //
-    // MIN-OF-7, NOT 3, AND THAT NUMBER IS MEASURED TOO. With 3 the ratios were
-    // 4.91x / 7.15x / 3.23x — a 2.2x spread that left only 1.68x below the old 12x
-    // bound, barely better than the single-shot version this replaced. At 7 the
-    // spread collapses to 1.11x. It is affordable because the expensive half is
-    // setup, not the passes: going 3 → 7 cost ~1-2s of a ~35s test.
-    //
-    // BOUND TIGHTENED 12x → 8x (2x the size ratio), not raised. It sits 2.6x above
-    // the worst clean reading, and is verified in the other direction as
-    // TESTING.md "Flake Resistance" requires: an artificial term scaling as
-    // (cohort size)² added to runScopedConsolidationPass drove the ratio to 9.4x
-    // (25: 127.8ms, 100: 1200.5ms) and failed this gate. The old 12x bound would
-    // have let that same regression through.
-    //
-    // SENSITIVITY LIMIT, worth knowing before tightening further: because tree
-    // loading dominates, a quadratic term has to be large in absolute terms at 100
-    // siblings (~1s) before it moves this ratio. A smaller one is real but invisible
-    // here — it would need a bigger sibling step to surface, which costs setup time.
-    const timeRatio = largeMs / Math.max(smallMs, 0.1);
+    // Exact, not bounded: one comparison per pair is what linear MEANS here, and
+    // pinning it catches a detector that starts comparing more than it needs
+    // without yet being quadratic.
+    expect(smallCount).toBe(smallSiblings / 2);
+    expect(largeCount).toBe(largeSiblings / 2);
 
-    // Printed on pass as well as failure: re-deriving this bound after a
-    // deliberate change means reading these off a few runs, and a bound nobody can
-    // see the inputs to is a bound nobody will re-derive.
-    // eslint-disable-next-line no-console
-    console.log(
-      `\n  [scoped pass] ${smallSiblings} siblings ${smallMs.toFixed(1)}ms · ` +
-      `${largeSiblings} siblings ${largeMs.toFixed(1)}ms · ` +
-      `ratio ${timeRatio.toFixed(2)}x for a ${sizeRatio}x size step (bound ${sizeRatio * 2}x)`,
-    );
+    // The complexity claim stated as growth. Linear is sizeRatio (4x); comparing
+    // every sibling against every other would be sizeRatio² (16x).
+    //
+    // VERIFIED IN THE FAILING DIRECTION, as TESTING.md "Flake Resistance"
+    // requires. Adding a nested pairwise scan over the cohort to
+    // detectNonDuplicateTitleCollisions took the 24-sibling count from 12 to 288
+    // (276 pairs + the 12 the grouping path still did) and the growth to 16x.
+    // The exact-count assertions above fire first and name the number, which is
+    // why they are pinned rather than bounded.
+    const growth = largeCount / smallCount;
     expect(
-      timeRatio,
-      `scoped pass scaled ${timeRatio.toFixed(1)}x for a ${sizeRatio}x sibling increase ` +
-      `(${smallSiblings}: ${smallMs.toFixed(1)}ms, ${largeSiblings}: ${largeMs.toFixed(1)}ms). ` +
-      `It was linear (~${sizeRatio}x) when this test was written; a quadratic ` +
-      `regression would show ~${(sizeRatio * sizeRatio).toFixed(0)}x.`,
-    ).toBeLessThan(sizeRatio * 2);
+      growth,
+      `pairwise comparisons grew ${growth}x for a ${sizeRatio}x sibling increase ` +
+      `(${smallSiblings}: ${smallCount}, ${largeSiblings}: ${largeCount}). ` +
+      `Linear is ${sizeRatio}x; a quadratic regression would be ${sizeRatio ** 2}x.`,
+    ).toBeLessThanOrEqual(sizeRatio);
   });
 });

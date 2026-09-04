@@ -14,7 +14,9 @@ Swap between using the local development build of n-dx and the published npm ver
 
 ## Switch to local dev build
 
-1. Ensure the local build is current: `pnpm build` (`@n-dx/core` is plain JS, but it spawns the other packages' `dist/`, so they must be built)
+1. Ensure the local build is current: `pnpm --filter "@n-dx/core..." build`
+
+   The filter must come **before** the script name. The root `build` script is `pnpm -r run build`, so `pnpm build --filter @n-dx/core` passes `--filter` through to `tsc` and dies with `error TS5023: Unknown compiler option '--filter'`. The trailing `...` builds core's dependencies too — core itself is plain JS with no build step, so an un-suffixed filter compiles nothing.
 2. Remove the npm-installed version if present: `pnpm remove -g @n-dx/core`
 3. Link from the core package directory: `cd packages/core && pnpm link --global`
 4. Verify: `pnpm ls -g --depth=0` should show `@n-dx/core link:...packages/core`
@@ -45,7 +47,7 @@ The `pnpm` commands above are cross-platform and identical on Windows. Only two 
 Switch to local dev build:
 
 ```powershell
-pnpm build
+pnpm --filter "@n-dx/core..." build   # filter BEFORE the script — see step 1 above
 pnpm remove -g @n-dx/core          # ignore error if not installed
 cd packages\core
 pnpm link --global
@@ -74,6 +76,6 @@ Notes for Windows:
 
 - Always use `pnpm` (not `npm`) for global link/install — this repo uses pnpm and binaries resolve through pnpm's global bin directory
 - The global package name must be `@n-dx/core` (from `packages/core/package.json`) — never link from the monorepo root (which has name `n-dx` and no bin entries)
-- After switching to local, remember to `pnpm build` after code changes for them to take effect via the global link. `packages/core` itself needs no rebuild — it is plain JS — but it spawns `rex`, `hench` and `sourcevision` from their `dist/`, so a change in any of those does need one.
-- Note the flag order if you filter: `pnpm --filter @n-dx/core build`, not `pnpm build --filter @n-dx/core`. The latter forwards `--filter` to the package's own build script and fails with `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`
+- After switching to local, remember to `pnpm --filter "@n-dx/core..." build` after code changes for them to take effect via the global link
 - The link registers these binaries: `ndx`, `n-dx`, `rex`, `hench`, `sourcevision`, `sv`
+- **Never invoke via `npx` while testing a local build.** `npx ndx` ignores the global pnpm link — there is no `node_modules/.bin/ndx` in this repo, so npx resolves a registry copy and caches it. That copy silently goes stale: with 0.5.1 linked, `npx ndx --version` still reported `0.4.6`, and behavior differed enough to produce a wrong bug report (a "token usage is not captured" message that no longer exists in current source). Call the bare `ndx` / `rex` / `hench` binaries so the link is what runs. If a version or a message looks wrong, check `ndx --version` against `packages/core/package.json` before believing it.

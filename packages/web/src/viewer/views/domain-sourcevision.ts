@@ -7,7 +7,7 @@
  * entire SourceVision view surface without touching individual files.
  *
  * Domain scope: codebase analysis, import graphs, zones, files, routes,
- * architecture findings, and PR markdown.
+ * architecture findings, PR markdown, and the Ask exchange.
  */
 
 export { Overview } from "./overview.js";
@@ -20,3 +20,4 @@ export { ProblemsView } from "./problems.js";
 export { SuggestionsView } from "./suggestions.js";
 export { PRMarkdownView } from "./pr-markdown.js";
 export { RoutesView } from "./routes.js";
+export { AskView } from "./ask.js";

@@ -5,7 +5,7 @@ export type ViewerScope = "sourcevision" | "rex" | "hench";
 
 export type SourcevisionScopeViewId = Extract<
   ViewId,
-  "overview" | "graph" | "iso-map" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "pr-markdown"
+  "overview" | "graph" | "iso-map" | "zones" | "files" | "routes" | "architecture" | "problems" | "suggestions" | "pr-markdown" | "ask"
 >;
 
 export const SOURCEVISION_SCOPE_VIEWS: readonly SourcevisionScopeViewId[] = [
@@ -19,6 +19,7 @@ export const SOURCEVISION_SCOPE_VIEWS: readonly SourcevisionScopeViewId[] = [
   "problems",
   "suggestions",
   "pr-markdown",
+  "ask",
 ];
 
 export const REX_SCOPE_VIEWS: readonly ViewId[] = [

@@ -2,7 +2,14 @@
  * Token usage analytics API routes.
  *
  * Aggregates token consumption data from all n-dx packages
- * (rex, hench, sourcevision) and serves it for the dashboard.
+ * (rex, hench, sourcevision) plus the dashboard's own LLM spend
+ * (`web` — the SourceVision Ask panel) and serves it for the dashboard.
+ *
+ * The `web` bucket is deliberately its own package rather than being folded
+ * into `sv`: the tokens are spent interactively by a person at the dashboard,
+ * not by an analyze run, and every breakdown here has to keep the two
+ * separable. See `dashboard-usage.ts` for why the spend is not attributed to a
+ * PRD item.
  *
  * All endpoints are under /api/token/.
  *
@@ -19,6 +26,11 @@ import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./response-utils.js";
 import { AggregationResultCache } from "./aggregation-cache.js";
+import {
+  DASHBOARD_USAGE_FILE,
+  dashboardUsagePath,
+  readDashboardUsage,
+} from "./dashboard-usage.js";
 import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor } from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
@@ -33,12 +45,19 @@ interface PackageTokenUsage {
   calls: number;
 }
 
+/**
+ * Which n-dx surface spent the tokens.
+ *
+ * `web` is the dashboard itself (the Ask panel), and it is a peer of the three
+ * CLI packages rather than a sub-case of any of them.
+ */
+type TokenPackage = "rex" | "hench" | "sv" | "web";
+
+/** Every package key, in the order the dashboard renders them. */
+const TOKEN_PACKAGES: readonly TokenPackage[] = ["hench", "rex", "sv", "web"];
+
 interface AggregateTokenUsage {
-  packages: {
-    rex: PackageTokenUsage;
-    hench: PackageTokenUsage;
-    sv: PackageTokenUsage;
-  };
+  packages: ToolBreakdown;
   totalInputTokens: number;
   totalOutputTokens: number;
   totalCacheCreationTokens: number;
@@ -49,7 +68,7 @@ interface AggregateTokenUsage {
 interface TokenEvent {
   timestamp: string;
   command: string;
-  package: "rex" | "hench" | "sv";
+  package: TokenPackage;
   inputTokens: number;
   outputTokens: number;
   cacheCreationTokens: number;
@@ -59,11 +78,7 @@ interface TokenEvent {
   model?: string;
 }
 
-interface ToolBreakdown {
-  rex: PackageTokenUsage;
-  hench: PackageTokenUsage;
-  sv: PackageTokenUsage;
-}
+type ToolBreakdown = Record<TokenPackage, PackageTokenUsage>;
 
 interface VendorModelUsage extends PackageTokenUsage {
   vendor: string;
@@ -83,6 +98,7 @@ interface UtilizationSourceMeta {
   rex: string;
   hench: string;
   sourcevision: string;
+  dashboard: string;
 }
 
 interface ConfiguredModel {
@@ -158,7 +174,27 @@ function emptyToolBreakdown(): ToolBreakdown {
     rex: emptyPackageUsage(),
     hench: emptyPackageUsage(),
     sv: emptyPackageUsage(),
+    web: emptyPackageUsage(),
   };
+}
+
+/** Fold one event's counts into a package bucket. */
+function addEvent(target: PackageTokenUsage, ev: TokenEvent): void {
+  target.inputTokens += ev.inputTokens;
+  target.outputTokens += ev.outputTokens;
+  target.cacheCreationTokens += ev.cacheCreationTokens;
+  target.cacheReadTokens += ev.cacheReadTokens;
+  target.calls += ev.calls;
+}
+
+/** Sum one field across every package bucket. */
+function sumPackages(
+  breakdown: ToolBreakdown,
+  field: keyof PackageTokenUsage,
+): number {
+  let total = 0;
+  for (const pkg of TOKEN_PACKAGES) total += breakdown[pkg][field];
+  return total;
 }
 
 function isInRange(timestamp: string, since?: string, until?: string): boolean {
@@ -496,12 +532,45 @@ function extractSvEvents(projectDir: string, since?: string, until?: string): To
   return events;
 }
 
+/**
+ * Project the dashboard spend ledger into token events.
+ *
+ * One record is one LLM call the dashboard made, so `calls` is carried through
+ * as written rather than assumed to be 1 — a provider that reported its counts
+ * after an ask had already timed out contributes a record with `calls: 0`, and
+ * inflating that to 1 would double-count the call.
+ */
+function extractDashboardEvents(
+  projectDir: string,
+  since?: string,
+  until?: string,
+): TokenEvent[] {
+  const events: TokenEvent[] = [];
+  for (const record of readDashboardUsage(projectDir)) {
+    if (!isInRange(record.timestamp, since, until)) continue;
+    events.push({
+      timestamp: record.timestamp,
+      command: record.command,
+      package: "web",
+      inputTokens: record.inputTokens,
+      outputTokens: record.outputTokens,
+      cacheCreationTokens: record.cacheCreationTokens,
+      cacheReadTokens: record.cacheReadTokens,
+      calls: record.calls,
+      vendor: normalizeEventMetadata(record.vendor),
+      model: normalizeEventMetadata(record.model),
+    });
+  }
+  return events;
+}
+
 function collectAllEvents(ctx: ServerContext, since?: string, until?: string): TokenEvent[] {
   const logEntries = readLogEntries(ctx.rexDir);
   const rexEvents = extractRexEvents(logEntries, since, until);
   const henchEvents = extractHenchEvents(ctx.projectDir, since, until);
   const svEvents = extractSvEvents(ctx.projectDir, since, until);
-  return [...rexEvents, ...henchEvents, ...svEvents].sort(
+  const dashboardEvents = extractDashboardEvents(ctx.projectDir, since, until);
+  return [...rexEvents, ...henchEvents, ...svEvents, ...dashboardEvents].sort(
     (a, b) => a.timestamp.localeCompare(b.timestamp),
   );
 }
@@ -510,10 +579,14 @@ function resolveSourceMeta(ctx: ServerContext): UtilizationSourceMeta {
   const rexPath = join(ctx.rexDir, "execution-log.jsonl");
   const henchPath = join(ctx.projectDir, ".hench", "runs");
   const svPath = join(ctx.projectDir, ".sourcevision", "manifest.json");
+  const dashboardPath = dashboardUsagePath(ctx.projectDir);
   return {
     rex: existsSync(rexPath) ? ".rex/execution-log.jsonl" : "missing (.rex/execution-log.jsonl)",
     hench: existsSync(henchPath) ? ".hench/runs/*.json" : "missing (.hench/runs/*.json)",
     sourcevision: existsSync(svPath) ? ".sourcevision/manifest.json" : "missing (.sourcevision/manifest.json)",
+    dashboard: existsSync(dashboardPath)
+      ? DASHBOARD_USAGE_FILE
+      : `missing (${DASHBOARD_USAGE_FILE})`,
   };
 }
 
@@ -522,32 +595,25 @@ function resolveSourceMeta(ctx: ServerContext): UtilizationSourceMeta {
 // ---------------------------------------------------------------------------
 
 function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
-  const rex = emptyPackageUsage();
-  const hench = emptyPackageUsage();
-  const sv = emptyPackageUsage();
+  const packages = emptyToolBreakdown();
 
   for (const ev of events) {
-    const pkg = ev.package === "rex" ? rex : ev.package === "hench" ? hench : sv;
-    pkg.inputTokens += ev.inputTokens;
-    pkg.outputTokens += ev.outputTokens;
-    pkg.cacheCreationTokens += ev.cacheCreationTokens;
-    pkg.cacheReadTokens += ev.cacheReadTokens;
-    pkg.calls += ev.calls;
+    addEvent(packages[ev.package], ev);
   }
 
   return {
-    packages: { rex, hench, sv },
-    totalInputTokens: rex.inputTokens + hench.inputTokens + sv.inputTokens,
-    totalOutputTokens: rex.outputTokens + hench.outputTokens + sv.outputTokens,
-    totalCacheCreationTokens: rex.cacheCreationTokens + hench.cacheCreationTokens + sv.cacheCreationTokens,
-    totalCacheReadTokens: rex.cacheReadTokens + hench.cacheReadTokens + sv.cacheReadTokens,
-    totalCalls: rex.calls + hench.calls + sv.calls,
+    packages,
+    totalInputTokens: sumPackages(packages, "inputTokens"),
+    totalOutputTokens: sumPackages(packages, "outputTokens"),
+    totalCacheCreationTokens: sumPackages(packages, "cacheCreationTokens"),
+    totalCacheReadTokens: sumPackages(packages, "cacheReadTokens"),
+    totalCalls: sumPackages(packages, "calls"),
   };
 }
 
 interface CommandTokenUsage extends PackageTokenUsage {
   command: string;
-  package: "rex" | "hench" | "sv";
+  package: TokenPackage;
 }
 
 function groupByCommand(events: TokenEvent[]): CommandTokenUsage[] {
@@ -593,17 +659,8 @@ function aggregateByVendorModel(events: TokenEvent[]): VendorModelUsage[] {
       map.set(key, entry);
     }
 
-    const tool = ev.package === "rex" ? entry.toolBreakdown.rex : ev.package === "hench" ? entry.toolBreakdown.hench : entry.toolBreakdown.sv;
-    tool.inputTokens += ev.inputTokens;
-    tool.outputTokens += ev.outputTokens;
-    tool.cacheCreationTokens += ev.cacheCreationTokens;
-    tool.cacheReadTokens += ev.cacheReadTokens;
-    tool.calls += ev.calls;
-    entry.inputTokens += ev.inputTokens;
-    entry.outputTokens += ev.outputTokens;
-    entry.cacheCreationTokens += ev.cacheCreationTokens;
-    entry.cacheReadTokens += ev.cacheReadTokens;
-    entry.calls += ev.calls;
+    addEvent(entry.toolBreakdown[ev.package], ev);
+    addEvent(entry, ev);
   }
 
   return Array.from(map.values()).sort((a, b) => {

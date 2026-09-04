@@ -38,6 +38,8 @@
 # Server runtime
 .n-dx-web.pid
 .n-dx-web.port
+# Dashboard LLM spend ledger, one line per Ask call (`ndx start`)
+.n-dx-web-usage.jsonl
 
 # Run logs
 .run-logs/
