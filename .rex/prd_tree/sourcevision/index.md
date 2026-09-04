@@ -2,10 +2,12 @@
 id: "ebe4c082-7e93-44ee-a286-cf01c05dd907"
 level: "epic"
 title: "SourceVision"
-status: "pending"
+status: "completed"
 startedAt: "2026-04-13T18:35:49.604Z"
+completedAt: "2026-09-04T20:07:26.116Z"
+endedAt: "2026-09-04T20:07:26.116Z"
 description: "Static analysis engine: file inventory, import graph, zone detection (Louvain community detection), React component catalog, PR markdown generation. Produces .sourcevision/CONTEXT.md and llms.txt for AI consumption.\n\n---\n\nBuild an evaluation harness in tests/gauntlet/ that captures sourcevision's current LLM-driven analysis output (zone enrichment, file classification) as golden fixtures and scores future runs against them. Once the harness exists, optimization PRs (Haiku swap, heuristic-first classifier, payload reduction, raised concurrency, skip-trivial-zones short-circuit, --full pass signature dedup, cached LLM replay, semantic zone-name scoring) become measured changes with eval-score deltas rather than vibes-based judgment. Motivation: sourcevision analyze burns substantial tokens and wall-clock time; multiple optimization paths exist but each carries silent quality regression risk."
-lastModified: "2026-09-01T14:04:12.821Z"
+lastModified: "2026-09-04T20:07:26.138Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -36,7 +38,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [PR Markdown View Toggle and Copy UX](./pr-markdown-view-toggle-and-copy-ux/index.md) | completed |
 | [Recursive zone architecture](./recursive-zone-architecture/index.md) | completed |
 | [Resolve critical SourceVision architectural findings](./resolve-critical-sourcevision/index.md) | completed |
-| [SourceVision Ask Panel (text exchange: explain findings, refine the PRD)](./sourcevision-ask-panel-text-exchange/index.md) | pending |
+| [SourceVision Ask Panel (text exchange: explain findings, refine the PRD)](./sourcevision-ask-panel-text-exchange/index.md) | completed |
 | [SourceVision Findings Remediation](./sourcevision-findings-remediation/index.md) | completed |
 | [SourceVision Import Graph Visualization Enhancement](./sourcevision-import-graph/index.md) | completed |
 | [SourceVision PR Markdown Artifact-Based Fallback Mode](./sourcevision-pr-markdown-artifact/index.md) | completed |

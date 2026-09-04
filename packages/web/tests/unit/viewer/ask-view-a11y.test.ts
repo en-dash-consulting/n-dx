@@ -274,6 +274,7 @@ describe("AskView a11y", () => {
   it("reports the answer's length so the reader can decide when to go to it", () => {
     const answered = (answer: string): AskState => ({
       status: "answered", question: "q", answer, vendor: null, model: null, contextSources: [],
+      proposals: [], refinementNotes: [],
     });
 
     expect(askAnnouncement(answered("one two three"))).toContain("3 words");
@@ -287,6 +288,7 @@ describe("AskView a11y", () => {
     expect(askAnnouncement({
       status: "error",
       question: "q",
+      refine: false,
       failure: {
         kind: "rate_limit",
         message: "Vendor refused.",

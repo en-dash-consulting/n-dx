@@ -83,6 +83,25 @@
  * removed would silently ground every later question in the finding the user
  * happened to arrive from.
  *
+ * ## Refine mode
+ *
+ * An opt-in toggle sends the question with `mode: "refine"`, which puts the PRD
+ * in the model's context and lets the answer carry proposed mutations to
+ * existing items alongside its prose. The proposals render below the answer as
+ * before/after diffs and are accepted or rejected one at a time — see
+ * {@link RefinementList}.
+ *
+ * Two things about that flow live here rather than there:
+ *
+ * - **Accept posts one proposal, not the list.** Approving one change can never
+ *   apply another the user has not looked at.
+ * - **Reject issues no request.** It filters the proposal out of the answered
+ *   state and stops. Nothing on the reject path can reach the PRD.
+ *
+ * The toggle is off by default: refine mode costs tokens rendering the whole
+ * PRD into the prompt, and returns a surface whose buttons mutate it. Neither
+ * belongs in the path of someone who only wanted to ask about a zone.
+ *
  * ## Degraded modes
  *
  * The panel has several distinct ways to be unusable and they do not share a
@@ -104,6 +123,7 @@
  * @module web/viewer/views/ask
  * @see ../../server/routes-sourcevision-ask.ts -- the endpoint this consumes
  * @see ../../server/routes-rex-analysis.ts -- POST /api/rex/capture-ask
+ * @see ./ask-refinements.ts -- the proposal cards and their diffs
  */
 
 import { h } from "preact";
@@ -125,6 +145,14 @@ import {
   copyTextToClipboard,
   type ClipboardFailureReason,
 } from "../utils/clipboard.js";
+import {
+  REFINEMENT_APPLY_ENDPOINT,
+  RefinementList,
+  outcomeStates,
+  type RefinementCardState,
+  type RefinementOutcome,
+  type RefinementProposal,
+} from "./ask-refinements.js";
 
 // ---------------------------------------------------------------------------
 // Endpoint contract
@@ -144,6 +172,10 @@ export const ASK_CAPTURE_ENDPOINT = "/api/rex/capture-ask";
 export const ASK_MAX_PROMPT_CHARS = 4_000;
 
 const PROMPT_FIELD_ID = "sv-ask-prompt";
+
+/** Ids for the refine-mode toggle and the hint that describes what it does. */
+const REFINE_FIELD_ID = "sv-ask-refine-mode";
+const REFINE_HINT_ID = "sv-ask-refine-hint";
 
 /** Labels the answer region, so a reader can find it by name. */
 const ANSWER_HEADING_ID = "sv-ask-answer-heading";
@@ -175,6 +207,16 @@ interface AskSuccessPayload {
   vendor?: string;
   model?: string;
   contextSources?: string[];
+  /** Refine mode only: proposed mutations to existing PRD items. */
+  proposals?: RefinementProposal[];
+  /** Refine mode only: why entries in the model's block were dropped. */
+  refinementNotes?: string[];
+}
+
+/** Payload of `POST /api/rex/apply-refinements`, success or failure. */
+interface RefinementApplyPayload {
+  outcomes?: RefinementOutcome[];
+  error?: string;
 }
 
 /** Failure payload of `POST /api/sourcevision/ask`. */
@@ -202,8 +244,28 @@ interface AskCapturePayload {
 export type AskState =
   | { status: "idle" }
   | { status: "submitting"; question: string }
-  | { status: "answered"; question: string; answer: string; vendor: string | null; model: string | null; contextSources: string[] }
-  | { status: "error"; question: string; failure: AskFailure };
+  | {
+      status: "answered";
+      question: string;
+      answer: string;
+      vendor: string | null;
+      model: string | null;
+      contextSources: string[];
+      /**
+       * Proposals still awaiting a decision. A rejected proposal is dropped
+       * from this list, which is the whole of the reject path: there is no
+       * request it could make.
+       */
+      proposals: RefinementProposal[];
+      refinementNotes: string[];
+    }
+  | {
+      status: "error";
+      question: string;
+      failure: AskFailure;
+      /** The mode the failed question was asked in, so Retry re-sends it. */
+      refine: boolean;
+    };
 
 /**
  * True when `prompt` is worth sending.
@@ -237,8 +299,15 @@ export function askAnnouncement(state: AskState): string {
       return "Reading the analysis and composing an answer.";
     case "answered": {
       const words = state.answer.trim().split(/\s+/).filter((word) => word.length > 0).length;
+      const proposals = state.proposals.length;
       return `Answer ready, ${words} ${words === 1 ? "word" : "words"}.`
-        + " It is in the Answer region below the question.";
+        + " It is in the Answer region below the question."
+        // Announced with the arrival rather than left to be discovered: a
+        // proposal list that writes to the PRD is not something a reader
+        // should meet only by scrolling into it.
+        + (proposals > 0
+          ? ` ${proposals} proposed PRD ${proposals === 1 ? "change is" : "changes are"} waiting for review.`
+          : "");
     }
     default:
       return "";
@@ -366,6 +435,20 @@ export function AskView({ seed = null }: AskViewProps = {}) {
   const [capture, setCapture] = useState<CaptureState>({ status: "idle" });
 
   /**
+   * Whether the next question asks the model to act on the PRD.
+   *
+   * Opt-in, and off by default. Refine mode spends tokens rendering the whole
+   * PRD into the prompt and returns a surface whose buttons mutate it; neither
+   * belongs in the path of someone who only wanted to ask about a zone.
+   */
+  const [refineMode, setRefineMode] = useState(false);
+
+  /** Per-proposal card state, keyed by proposal id. */
+  const [proposalStates, setProposalStates] = useState<Map<string, RefinementCardState>>(
+    () => new Map(),
+  );
+
+  /**
    * Guards a second submit while one is in flight. `state.status` cannot do
    * this job on its own: the setState that moves the panel to `submitting`
    * has not been applied yet when a double click's second handler runs.
@@ -374,6 +457,15 @@ export function AskView({ seed = null }: AskViewProps = {}) {
 
   /** The same guard for capture — a double-pressed Confirm must write once. */
   const capturingRef = useRef(false);
+
+  /**
+   * Proposal ids with an apply in flight.
+   *
+   * A set rather than a boolean: two cards can be accepted in quick
+   * succession, and each must be refused a *second* press without blocking the
+   * other's first.
+   */
+  const applyingRef = useRef<Set<string>>(new Set());
 
   const copyTimerRef = useRef<number | null>(null);
   const captureTimerRef = useRef<number | null>(null);
@@ -421,6 +513,10 @@ export function AskView({ seed = null }: AskViewProps = {}) {
   const resetActions = useCallback(() => {
     showCopyFeedback({ status: "idle" });
     setCaptureStage({ status: "idle" });
+    // Card states belong to the previous answer's proposals. Carrying them
+    // over would mark a fresh proposal "applied" because the one it replaced
+    // happened to share an id — ids are only unique within one answer.
+    setProposalStates(new Map());
   }, [showCopyFeedback, setCaptureStage]);
 
   // A timer that outlives the panel would set state on an unmounted component.
@@ -460,8 +556,12 @@ export function AskView({ seed = null }: AskViewProps = {}) {
    * textarea by then. The prompt is never cleared, so a user who edited it
    * while an error was on screen keeps their edit and still gets a retry of
    * the exchange the error belongs to.
+   *
+   * `refine` is a parameter for the same reason: a retry must re-send the mode
+   * the question was asked in, which is not necessarily the toggle's position
+   * by the time the user presses Retry.
    */
-  const runAsk = useCallback(async (question: string) => {
+  const runAsk = useCallback(async (question: string, refine: boolean) => {
     if (inFlightRef.current) return;
     // The no-op case: an empty or whitespace-only prompt issues no request.
     if (!isSubmittablePrompt(question)) return;
@@ -477,12 +577,17 @@ export function AskView({ seed = null }: AskViewProps = {}) {
         // The seed goes as a sibling of the prompt, not folded into it. The
         // endpoint renders it as its own focus section and adds the rules that
         // make the answer name this finding's zone and files, which it cannot
-        // do for facts buried in the question text.
-        body: JSON.stringify(activeSeed ? { prompt: question, seed: activeSeed } : { prompt: question }),
+        // do for facts buried in the question text. `mode` rides beside them
+        // for the same reason: it selects prompt rules and context, not text.
+        body: JSON.stringify({
+          prompt: question,
+          ...(activeSeed ? { seed: activeSeed } : {}),
+          ...(refine ? { mode: "refine" } : {}),
+        }),
       });
 
       if (!res.ok) {
-        setState({ status: "error", question, failure: await readErrorPayload(res) });
+        setState({ status: "error", question, refine, failure: await readErrorPayload(res) });
         return;
       }
 
@@ -496,6 +601,7 @@ export function AskView({ seed = null }: AskViewProps = {}) {
         setState({
           status: "error",
           question,
+          refine,
           failure: {
             kind: "llm_error",
             message: "The model returned an empty answer.",
@@ -514,6 +620,8 @@ export function AskView({ seed = null }: AskViewProps = {}) {
         vendor: typeof payload.vendor === "string" ? payload.vendor : null,
         model: typeof payload.model === "string" ? payload.model : null,
         contextSources: Array.isArray(payload.contextSources) ? payload.contextSources : [],
+        proposals: Array.isArray(payload.proposals) ? payload.proposals : [],
+        refinementNotes: Array.isArray(payload.refinementNotes) ? payload.refinementNotes : [],
       });
     } catch (err) {
       // `fetch` rejects only for transport faults, so this is never a provider
@@ -522,6 +630,7 @@ export function AskView({ seed = null }: AskViewProps = {}) {
       setState({
         status: "error",
         question,
+        refine,
         failure: {
           kind: "network",
           message: err instanceof Error ? err.message : null,
@@ -535,8 +644,8 @@ export function AskView({ seed = null }: AskViewProps = {}) {
     }
   }, [activeSeed, resetActions]);
 
-  /** Submit whatever is in the textarea. */
-  const submit = useCallback(() => runAsk(prompt.trim()), [runAsk, prompt]);
+  /** Submit whatever is in the textarea, in whichever mode is selected. */
+  const submit = useCallback(() => runAsk(prompt.trim(), refineMode), [runAsk, prompt, refineMode]);
 
   const answerText = state.status === "answered" ? state.answer : null;
 
@@ -583,6 +692,77 @@ export function AskView({ seed = null }: AskViewProps = {}) {
       capturingRef.current = false;
     }
   }, [state, setCaptureStage]);
+
+  /**
+   * Reject one proposal.
+   *
+   * Drops the card and nothing else. There is deliberately no request here and
+   * no server-side "rejected" record: the acceptance criterion is that
+   * rejecting leaves the PRD tree byte-identical, and the strongest way to
+   * guarantee that is for the reject path to have no code that could write.
+   */
+  const handleRejectProposal = useCallback((proposal: RefinementProposal) => {
+    setState((current) => current.status === "answered"
+      ? { ...current, proposals: current.proposals.filter((p) => p.id !== proposal.id) }
+      : current);
+  }, []);
+
+  /**
+   * Accept one proposal.
+   *
+   * Posts that proposal alone — not the pending list — so accepting one change
+   * can never apply another the user has not looked at yet. The proposal goes
+   * back exactly as it arrived: its `baseline` fingerprints are what the apply
+   * route re-checks under the lock, and editing them here would turn the
+   * staleness guard into a formality.
+   */
+  const handleAcceptProposal = useCallback(async (proposal: RefinementProposal) => {
+    if (applyingRef.current.has(proposal.id)) return;
+    applyingRef.current.add(proposal.id);
+    setProposalStates((current) => new Map(current).set(proposal.id, { status: "applying" }));
+
+    const settle = (next: RefinementCardState) => {
+      setProposalStates((current) => new Map(current).set(proposal.id, next));
+    };
+
+    try {
+      const res = await fetch(REFINEMENT_APPLY_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposals: [proposal] }),
+      });
+      let payload: RefinementApplyPayload = {};
+      try {
+        payload = await res.json() as RefinementApplyPayload;
+      } catch {
+        payload = {};
+      }
+      if (!res.ok) {
+        // The endpoint's wording when it gave any — for a held lock that is
+        // the sentence naming the holder's PID, which is the whole value of
+        // the failure. Only a response our server did not write falls back.
+        settle({
+          status: "refused",
+          reason: typeof payload.error === "string" && payload.error.trim().length > 0
+            ? payload.error
+            : `The change could not be applied (${res.status}).`,
+        });
+        return;
+      }
+      const states = outcomeStates([proposal], Array.isArray(payload.outcomes) ? payload.outcomes : []);
+      settle(states.get(proposal.id) ?? {
+        status: "refused",
+        reason: "The server did not report what happened to this change.",
+      });
+    } catch (err) {
+      settle({
+        status: "refused",
+        reason: err instanceof Error ? err.message : "The change could not be applied.",
+      });
+    } finally {
+      applyingRef.current.delete(proposal.id);
+    }
+  }, []);
 
   const header = h("div", { class: "view-header" },
     h(BrandedHeader, { product: "sourcevision", title: "SourceVision", class: "branded-header-sv" }),
@@ -692,6 +872,27 @@ export function AskView({ seed = null }: AskViewProps = {}) {
         "aria-describedby": "sv-ask-prompt-hint",
         onInput: (e: Event) => setPrompt((e.target as HTMLTextAreaElement).value),
       }),
+      // A checkbox rather than a second submit button: the mode belongs to the
+      // question being composed, and a "Refine the PRD" button beside "Ask"
+      // would read as an action that writes something.
+      h("div", { class: "sv-ask-mode" },
+        h("input", {
+          type: "checkbox",
+          id: REFINE_FIELD_ID,
+          class: "sv-ask-mode-toggle",
+          checked: refineMode,
+          "aria-describedby": REFINE_HINT_ID,
+          onChange: (e: Event) => setRefineMode((e.target as HTMLInputElement).checked),
+        }),
+        h("label", { class: "sv-ask-mode-label", for: REFINE_FIELD_ID },
+          "Propose changes to the PRD",
+        ),
+        h("p", { class: "section-sub sv-ask-mode-hint", id: REFINE_HINT_ID },
+          "Sends the PRD with the question and offers edits to existing items. "
+          + "Each edit is reviewed as a diff; nothing is written until you accept it.",
+        ),
+      ),
+
       h("div", { class: "sv-ask-form-footer" },
         h("p", { class: "section-sub sv-ask-hint", id: "sv-ask-prompt-hint" },
           tooLong
@@ -761,7 +962,7 @@ export function AskView({ seed = null }: AskViewProps = {}) {
                     type: "button",
                     class: "btn sv-ask-retry-btn",
                     title: "Send the same question again",
-                    onClick: () => { void runAsk(state.question); },
+                    onClick: () => { void runAsk(state.question, state.refine); },
                   }, "Retry"),
                 )
               : null,
@@ -889,6 +1090,19 @@ export function AskView({ seed = null }: AskViewProps = {}) {
               )
             : null,
         )
+      : null,
+
+    // Outside the answer region, not inside it. The region is labelled "Answer"
+    // and is where a reader goes to read prose; a list of controls that mutate
+    // the PRD is a different thing and gets its own place in the document.
+    state.status === "answered"
+      ? h(RefinementList, {
+          proposals: state.proposals,
+          states: proposalStates,
+          notes: state.refinementNotes,
+          onAccept: (proposal: RefinementProposal) => { void handleAcceptProposal(proposal); },
+          onReject: handleRejectProposal,
+        })
       : null,
   );
 }

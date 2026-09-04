@@ -42,6 +42,7 @@
 export type AskFailureKind =
   | "invalid_request"
   | "no_analysis"
+  | "no_prd"
   | "timeout"
   | "rate_limit"
   | "auth"
@@ -83,6 +84,7 @@ export interface AskFailurePresentation {
 export const ASK_FAILURE_KINDS: readonly AskFailureKind[] = [
   "invalid_request",
   "no_analysis",
+  "no_prd",
   "timeout",
   "rate_limit",
   "auth",
@@ -116,6 +118,18 @@ const PRESENTATION: Record<AskFailureKind, KindPresentation> = {
     steps: ["Run the analysis below, then ask the question again."],
     canRetry: false,
     needsAnalysis: true,
+  },
+  no_prd: {
+    title: "There is no PRD to refine",
+    message: "Refine mode proposes changes to existing PRD items, and this project has none yet.",
+    // Not `needsAnalysis`: running an analysis would not create PRD items
+    // either. The fix is to build a PRD, which happens on the Rex surface.
+    steps: [
+      "Build a PRD first — capture an answer with Capture to PRD, or run a plan from the Rex views.",
+      "Ask without refine mode to get an answer about the code alone.",
+    ],
+    canRetry: false,
+    needsAnalysis: false,
   },
   auth: {
     title: "The provider rejected the credentials",
@@ -179,6 +193,12 @@ const PRESENTATION: Record<AskFailureKind, KindPresentation> = {
  * 502, a dev server's own 404. Mirrors `KIND_TO_STATUS` in the route, so a
  * response that our own server did send is recovered exactly; anything else at
  * least lands on the closest true statement rather than on a bare status code.
+ *
+ * The one place the mirror cannot be injective is 404, which the route uses for
+ * both `no_analysis` and `no_prd`. That costs nothing in practice: a 404 our
+ * own server sent carries its `kind` in the body and never reaches this
+ * function, and a 404 from anything else is far likelier to mean the endpoint
+ * is missing than that the PRD is empty.
  */
 export function askFailureKindFromStatus(status: number): AskFailureKind {
   switch (status) {

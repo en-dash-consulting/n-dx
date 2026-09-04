@@ -3,8 +3,10 @@
  * project, answered from the existing `.sourcevision/` analysis.
  *
  * POST /api/sourcevision/ask
- *   body     { prompt: string, seed?: { kind?, id?, text?, zone?, files?, labels? } }
- *   200      { answer, vendor, model, tokens, contextSources }
+ *   body     { prompt: string, mode?: "ask" | "refine",
+ *              seed?: { kind?, id?, text?, zone?, files?, labels? } }
+ *   200      { answer, vendor, model, tokens, contextSources,
+ *              proposals?, refinementNotes? }
  *   4xx/5xx  { error, kind, suggestion?, retryAfterMs? }
  *
  * The endpoint is deliberately **not** on the `/api/sv/` prefix that serves the
@@ -36,6 +38,24 @@
  * `auth` additionally carries `remediation`: the canonical, vendor-aware fix
  * steps from `authFailureGuidance`, so the dashboard states the same cause and
  * the same fix as every CLI entry point.
+ *
+ * ## Refine mode
+ *
+ * `mode: "refine"` asks the model to act on the PRD rather than only describe
+ * the code. The PRD is added to the grounding bundle and the answer may carry a
+ * set of proposed mutations to existing items, returned as `proposals`.
+ *
+ * Nothing here writes. The proposals are a *review surface*: each one arrives
+ * with the before/after of exactly the fields it changes and the fingerprint of
+ * the item it was generated against, and only the ones the user accepts are
+ * posted to `POST /api/rex/apply-refinements`, which is where the store lock is
+ * taken. Keeping generation and application on separate endpoints is what makes
+ * "nothing is written until a proposal is explicitly accepted" a property of the
+ * architecture rather than of the client's good behaviour.
+ *
+ * The PRD is read through `rex-gateway`'s `resolveStore` — the same store the
+ * apply route writes through — so a refinement is always generated against the
+ * document that a later accept will be checked against.
  *
  * ## Accounting
  *
@@ -79,6 +99,14 @@ import { readCliName } from "./cli-name.js";
 import { assembleAskContext } from "./sourcevision-ask-context.js";
 import { ASK_COMMAND, recordDashboardUsage, tokenFields } from "./dashboard-usage.js";
 import type { DashboardUsageOutcome } from "./dashboard-usage.js";
+import { resolveStore } from "./rex-gateway.js";
+import type { PRDDocument } from "./rex-gateway.js";
+import {
+  REFINE_RULES,
+  parseAnswerRefinements,
+  renderPrdContext,
+} from "./prd-refinement.js";
+import type { RefinementProposal } from "./prd-refinement.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -110,6 +138,15 @@ const MAX_SEED_FILES = 100;
 const NDX_CONFIG = ".n-dx.json";
 const NDX_LOCAL_CONFIG = ".n-dx.local.json";
 
+/**
+ * How the PRD is named in `contextSources`.
+ *
+ * Every other entry is a filename under `.sourcevision/`; this one is not a
+ * file at all — the folder tree is read through the store, not off a path — so
+ * it is named for what it is rather than given a filename it does not have.
+ */
+const PRD_CONTEXT_SOURCE = "the PRD";
+
 // ---------------------------------------------------------------------------
 // Request schema
 // ---------------------------------------------------------------------------
@@ -128,6 +165,11 @@ const AskRequestSchema = z
       MAX_PROMPT_CHARS,
       `prompt must be at most ${MAX_PROMPT_CHARS} characters`,
     ),
+    /**
+     * What the answer is for. `refine` adds the PRD to the context and asks
+     * for proposed mutations alongside the prose; omitted means `ask`.
+     */
+    mode: z.enum(["ask", "refine"]).optional(),
     seed: z
       .object({
         kind: z.string().trim().max(64).optional(),
@@ -152,6 +194,7 @@ export type AskRequest = z.infer<typeof AskRequestSchema>;
 export type AskErrorKind =
   | "invalid_request"
   | "no_analysis"
+  | "no_prd"
   | "timeout"
   | "rate_limit"
   | "auth"
@@ -173,6 +216,21 @@ export interface AskSuccessResponse {
   tokens: TokenUsage;
   /** Analysis artifacts the answer was grounded in, relative to `.sourcevision/`. */
   contextSources: string[];
+  /**
+   * Proposed mutations to existing PRD items. Present only in refine mode, and
+   * empty when the model proposed none.
+   *
+   * These are proposals, not writes: each carries the before/after of the
+   * fields it changes and is applied only if the user accepts it.
+   */
+  proposals?: RefinementProposal[];
+  /**
+   * Why entries in the model's proposal block were dropped.
+   *
+   * Reported rather than swallowed — a model that proposed five changes and had
+   * two discarded would otherwise look as though it only found three.
+   */
+  refinementNotes?: string[];
 }
 
 export interface AskErrorResponse {
@@ -270,9 +328,16 @@ const SEEDED_RULES = [
  *
  * `seeded` adds {@link SEEDED_RULES}. It is a flag rather than the seed itself
  * because the seed's content is already in `context`; what changes here is
- * only what the model is asked to do with it.
+ * only what the model is asked to do with it. `refine` adds `REFINE_RULES` on
+ * the same terms — the PRD is already in `context`, and what changes is that
+ * the model is asked to propose mutations to it.
  */
-export function buildAskPrompt(question: string, context: string, seeded = false): string {
+export function buildAskPrompt(
+  question: string,
+  context: string,
+  seeded = false,
+  refine = false,
+): string {
   return [
     "You are answering a question about a software project on behalf of the",
     "SourceVision dashboard. A static analysis of the project is provided below.",
@@ -285,6 +350,7 @@ export function buildAskPrompt(question: string, context: string, seeded = false
     "- Do not speculate about code you cannot see, and do not invent file paths.",
     "- Reply in markdown. Be concise.",
     ...(seeded ? SEEDED_RULES : []),
+    ...(refine ? REFINE_RULES : []),
     "",
     "----- BEGIN ANALYSIS -----",
     context,
@@ -365,6 +431,10 @@ const CATEGORY_TO_KIND: Record<string, AskErrorKind> = {
 const KIND_TO_STATUS: Record<AskErrorKind, number> = {
   invalid_request: 400,
   no_analysis: 404,
+  // Same status as `no_analysis`, and for the same reason: the thing the mode
+  // needs to read does not exist. The kind in the body is what distinguishes
+  // them, which is why the panel prefers it over the status.
+  no_prd: 404,
   timeout: 504,
   rate_limit: 429,
   auth: 401,
@@ -394,6 +464,10 @@ const KIND_FALLBACK_WORDING: Record<Exclude<AskErrorKind, "auth">, { error: stri
   no_analysis: {
     error: "No analysis data to answer from.",
     suggestion: "Run an analysis first, then ask again.",
+  },
+  no_prd: {
+    error: "There are no PRD items to refine.",
+    suggestion: "Build a PRD first, or ask without refine mode.",
   },
   timeout: {
     error: "The model did not answer within the Ask time budget.",
@@ -482,6 +556,27 @@ function sendError(res: ServerResponse, payload: AskErrorResponse): void {
   jsonResponse(res, KIND_TO_STATUS[payload.kind], payload);
 }
 
+/**
+ * The prose to show for a refine-mode answer.
+ *
+ * A model that replies with nothing but the proposal block leaves the prose
+ * empty once the block is lifted out, and the panel treats an empty answer as a
+ * provider failure — which would throw away proposals that are perfectly good.
+ * The substitute states only what actually came back; it never stands in for an
+ * answer that genuinely was empty, because that case has no proposals either
+ * and falls through to the raw text.
+ */
+function refinementAnswer(
+  refinements: { prose: string; proposals: RefinementProposal[] },
+  raw: string,
+): string {
+  if (refinements.prose.trim().length > 0) return refinements.prose;
+  const count = refinements.proposals.length;
+  if (count === 0) return raw;
+  return `The model replied with ${count} proposed PRD change${count === 1 ? "" : "s"} and no explanation. `
+    + "Review each diff below on its own terms.";
+}
+
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
@@ -533,6 +628,34 @@ async function handleAsk(
     return;
   }
 
+  // Refine mode reads the PRD through the same store the apply route writes
+  // through, so the document the proposals are generated against is the one
+  // their fingerprints will be checked against.
+  const refine = parsed.mode === "refine";
+  let prdDoc: PRDDocument | null = null;
+  let contextText = context.text;
+  const contextSources = [...context.sources];
+  if (refine) {
+    try {
+      prdDoc = await (await resolveStore(ctx.rexDir)).loadDocument();
+    } catch {
+      // An unreadable PRD is indistinguishable from an absent one here, and
+      // both mean the same thing to the user: there is nothing to refine.
+      prdDoc = null;
+    }
+    if (!prdDoc || prdDoc.items.length === 0) {
+      sendError(res, {
+        error: "There are no PRD items to refine.",
+        kind: "no_prd",
+        suggestion: "Build a PRD first, or ask without refine mode.",
+      });
+      return;
+    }
+    const prdSection = renderPrdContext(prdDoc).join("\n");
+    contextText = `${context.text}\n\n${prdSection}`;
+    contextSources.push(PRD_CONTEXT_SOURCE);
+  }
+
   const llmConfig = await loadLLMConfig(ctx.projectDir);
   const vendor: LLMVendor = llmConfig.vendor ?? DEFAULT_LLM_VENDOR;
   // The class name is written as a literal, not via a constant: the registry
@@ -581,18 +704,27 @@ async function handleAsk(
   try {
     const result = await completeWithTimeout(
       client,
-      { prompt: buildAskPrompt(parsed.prompt, context.text, context.seeded), model },
+      { prompt: buildAskPrompt(parsed.prompt, contextText, context.seeded, refine), model },
       timeoutMs,
       (late) => record(late.tokenUsage, "timeout", 0),
     );
     const tokens: TokenUsage = result.tokenUsage ?? { input: 0, output: 0 };
     record(tokens, "success", 1);
+    // In refine mode the proposal block is lifted out of the answer: it is
+    // rendered as diffs below the prose, and leaving the JSON in place would
+    // show every change twice, once in a form nobody reviews.
+    const refinements = refine && prdDoc
+      ? parseAnswerRefinements(result.text, prdDoc)
+      : null;
     const payload: AskSuccessResponse = {
-      answer: result.text,
+      answer: refinements ? refinementAnswer(refinements, result.text) : result.text,
       vendor,
       model,
       tokens,
-      contextSources: context.sources,
+      contextSources,
+      ...(refinements
+        ? { proposals: refinements.proposals, refinementNotes: refinements.notes }
+        : {}),
     };
     jsonResponse(res, 200, payload);
   } catch (err) {

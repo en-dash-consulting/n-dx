@@ -98,6 +98,25 @@
   opacity: 0.6;
 }
 
+/* Refine-mode toggle. Two columns so the hint aligns under the label rather
+   than under the checkbox, which would read as describing the checkbox's
+   state instead of what the mode does. */
+.sv-ask-mode {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+}
+
+.sv-ask-mode-label {
+  font-size: var(--font-base);
+}
+
+.sv-ask-mode-hint {
+  grid-column: 2;
+  margin: 0;
+}
+
 .sv-ask-form-footer {
   display: flex;
   align-items: center;

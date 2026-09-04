@@ -129,7 +129,11 @@ describe("POST /api/rex/capture-ask", () => {
       question: "Which zones are most coupled?",
       answer: "`web-viewer` is the hub; split the composition layer.",
     });
-    expect(res.status).toBe(200);
+    // The route funnels every internal failure into a 400 carrying the error
+    // text, so a bare status assertion reports "expected 400 to be 200" and
+    // nothing else. Carrying the body into the message is the difference
+    // between a diagnosable failure and a rerun.
+    expect(res.status, await res.clone().text()).toBe(200);
 
     const epic = await captureEpic();
     expect(epic?.level).toBe("epic");

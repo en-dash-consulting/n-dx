@@ -15,6 +15,8 @@ import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import { ClaudeClientError, VERIFY_CREDENTIALS_STEP, authFailureGuidance } from "@n-dx/llm-client";
 import type { CompletionRequest, CompletionResult, LLMClient } from "@n-dx/llm-client";
+import { resolveStore } from "@n-dx/rex";
+import { REFINEMENT_FENCE_TAG } from "../../../src/server/prd-refinement.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import {
   handleSourcevisionAskRoute,
@@ -653,5 +655,145 @@ describe("POST /api/sourcevision/ask", () => {
       body: JSON.stringify({ prompt: "Cache-buster attached." }),
     });
     expect(res.status).toBe(200);
+  });
+
+  // ── Refine mode ───────────────────────────────────────────────────────────
+
+  describe("mode: refine", () => {
+    /** Seed a PRD through the store, so the tree on disk is the real shape. */
+    async function seedPRD(): Promise<void> {
+      await mkdir(ctx.rexDir, { recursive: true });
+      await (await resolveStore(ctx.rexDir)).saveDocument({
+        schema: "rex/v1",
+        title: "Ask Fixture PRD",
+        items: [{
+          id: "epic-1",
+          title: "Checkout hardening",
+          level: "epic",
+          status: "pending",
+          children: [{
+            id: "task-1",
+            title: "Split the god file",
+            level: "task",
+            status: "pending",
+            priority: "medium",
+            description: "Original description.",
+            acceptanceCriteria: ["It is smaller"],
+          }],
+        }],
+      } as never);
+    }
+
+    /** A model answer carrying one proposal block. */
+    function withProposals(prose: string, raw: unknown[]): string {
+      return `${prose}\n\n\`\`\`${REFINEMENT_FENCE_TAG}\n${JSON.stringify(raw)}\n\`\`\``;
+    }
+
+    it("puts the PRD in the prompt and asks for proposals", async () => {
+      await seedPRD();
+      const stub = stubClient(answering("The criteria are vague."));
+      routeOptions = stub.options;
+
+      const res = await ask({ prompt: "Is this epic well specified?", mode: "refine" });
+      expect(res.status).toBe(200);
+
+      const prompt = stub.requests[0].prompt;
+      expect(prompt).toContain("## Current PRD");
+      expect(prompt).toContain("`task-1`");
+      expect(prompt).toContain("Original description.");
+      expect(prompt).toContain(REFINEMENT_FENCE_TAG);
+      // The analysis is still there — refine mode adds the PRD, it does not
+      // replace the grounding the panel exists to provide.
+      expect(prompt).toContain("checkout-core");
+      expect((await res.json()).contextSources).toContain("the PRD");
+    });
+
+    it("does not send the PRD or the refine rules for a plain ask", async () => {
+      await seedPRD();
+      const stub = stubClient(answering("Checkout Core is the weak point."));
+      routeOptions = stub.options;
+
+      const res = await ask({ prompt: "Where is the risk?" });
+      expect(res.status).toBe(200);
+
+      expect(stub.requests[0].prompt).not.toContain("## Current PRD");
+      expect(stub.requests[0].prompt).not.toContain(REFINEMENT_FENCE_TAG);
+      const body = await res.json();
+      // Absent, not empty: a plain ask has no opinion about the PRD, and an
+      // empty list would read as "the model proposed nothing".
+      expect(body.proposals).toBeUndefined();
+      expect(body.contextSources).not.toContain("the PRD");
+    });
+
+    it("returns proposals built against the PRD, and strips the block from the prose", async () => {
+      await seedPRD();
+      routeOptions = stubClient(answering(withProposals(
+        "The criteria do not say what done looks like.",
+        [{
+          op: "edit",
+          itemId: "task-1",
+          acceptanceCriteria: ["No file over 400 lines", "Each split module has one owner"],
+          rationale: "\"It is smaller\" is not checkable.",
+        }],
+      ))).options;
+
+      const body = await (await ask({ prompt: "Improve this task.", mode: "refine" })).json();
+
+      expect(body.answer).toBe("The criteria do not say what done looks like.");
+      // The JSON is not shown twice: it renders as diffs, and leaving it in the
+      // prose would put every change on screen in a form nobody reviews.
+      expect(body.answer).not.toContain("acceptanceCriteria");
+      expect(body.proposals).toHaveLength(1);
+      expect(body.proposals[0].itemId).toBe("task-1");
+      // The before side is the server's reading of the item, not the model's.
+      expect(body.proposals[0].diffs[0].before).toEqual(["It is smaller"]);
+      expect(body.proposals[0].baseline[0].fingerprint).toEqual(expect.any(String));
+    });
+
+    it("reports proposals it had to drop rather than silently shrinking the list", async () => {
+      await seedPRD();
+      routeOptions = stubClient(answering(withProposals("Two ideas.", [
+        { op: "edit", itemId: "task-1", priority: "high" },
+        { op: "edit", itemId: "does-not-exist", priority: "high" },
+      ]))).options;
+
+      const body = await (await ask({ prompt: "Improve this.", mode: "refine" })).json();
+      expect(body.proposals).toHaveLength(1);
+      expect(body.refinementNotes.join(" ")).toContain("unknown item");
+    });
+
+    it("stands in for prose when the model replied with the block alone", async () => {
+      await seedPRD();
+      routeOptions = stubClient(answering(withProposals("", [
+        { op: "edit", itemId: "task-1", priority: "high" },
+      ]))).options;
+
+      const res = await ask({ prompt: "Just do it.", mode: "refine" });
+      // Not an empty answer — the panel treats one as a provider failure and
+      // would throw away proposals that are perfectly good.
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.answer).toContain("1 proposed PRD change");
+      expect(body.proposals).toHaveLength(1);
+    });
+
+    it("names an empty PRD as its own degraded mode, without calling a model", async () => {
+      const stub = stubClient(answering("never reached"));
+      routeOptions = stub.options;
+
+      const res = await ask({ prompt: "Refine what?", mode: "refine" });
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.kind).toBe("no_prd");
+      expect(body.error).toContain("no PRD items to refine");
+      // No tokens are spent asking a model to refine nothing.
+      expect(stub.requests).toHaveLength(0);
+    });
+
+    it("rejects a mode it does not implement", async () => {
+      const res = await ask({ prompt: "Do something else.", mode: "rewrite" });
+      expect(res.status).toBe(400);
+      expect((await res.json()).kind).toBe("invalid_request");
+    });
   });
 });

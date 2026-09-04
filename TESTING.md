@@ -40,7 +40,7 @@ tests that exercise in-process contract scenarios.
 | rex | Store mutation correctness, tree traversal pipeline, task selection with real PRDStore, legacy PRD migration into the folder tree (`prd.md`, branch-scoped files, and JSON-only sources via `ensureLegacyPrdMigrated`), folder-tree serializer/parser round-trips, cross-vendor authoring regression (smart-add / recommend / reshape / reorganize / prune across Claude and Codex) |
 | sourcevision | Analyzer pipeline phases in-process, zone detection with real file inventory |
 | hench | Gateway re-export validation, agent loop with mocked LLM responses, self-heal test gate (`runTestGate` succeeds on green, fails fast on red), Codex-batch self-heal fallback |
-| web | Cross-zone boundary checks, gateway re-export validation, messaging pipeline integration, cross-vendor pair-programming review (primary→reviewer direction, test-command pass/fail, reviewer-unavailable fallback) |
+| web | Cross-zone boundary checks, gateway re-export validation, messaging pipeline integration, cross-vendor pair-programming review (primary→reviewer direction, test-command pass/fail, reviewer-unavailable fallback), PRD refinement apply through `resolveStore` + `withTransaction` (accept writes under the lock, concurrent writer refused rather than overwritten, reject writes nothing) |
 | llm-client | Adapter resolution, config loading with real filesystem |
 
 Test-file pointers for the scenarios added above:
@@ -54,6 +54,7 @@ Test-file pointers for the scenarios added above:
 | Self-heal test gate | `packages/hench/tests/integration/test-gate.test.ts` |
 | Self-heal Codex-batch fallback | `packages/hench/tests/integration/self-heal-codex-batch.test.ts` |
 | Pair-programming cross-vendor review | `tests/integration/pair-programming.test.js` |
+| PRD refinement apply under the store lock | `packages/web/tests/integration/prd-refinement-apply.test.ts` |
 
 ### Gateway Admission Criterion
 
