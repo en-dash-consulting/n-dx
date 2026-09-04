@@ -31,7 +31,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Landing page for n-dx](./landing-page-for-n-dx/index.md) | completed |
 | [Live PR Markdown in SourceVision UI](./live-pr-markdown-in-sourcevision-ui/index.md) | completed |
 | [ndx work Model Resolution, Display, and Vendor-Change Reset](./ndx-work-model-resolution-display-and/index.md) | completed |
-| [Optional 3D isometric architecture map generator](./optional-3d-isometric-architecture-map.md) | completed |
 | [Phase 1: Language Registry & Inventory Foundation](./phase-1-language-registry-inventory/index.md) | completed |
 | [PR Markdown Reviewer Context Enrichment](./pr-markdown-reviewer-context-enrichment/index.md) | completed |
 | [PR Markdown View Toggle and Copy UX](./pr-markdown-view-toggle-and-copy-ux/index.md) | completed |
@@ -51,3 +50,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Web Server Port Management](./web-server-port-management/index.md) | completed |
 | [Web UI Memory Management and Crash Resolution](./web-ui-memory-management-and-crash/index.md) | completed |
 | [Zone Detection Validation for Go Projects](./zone-detection-validation-for-go/index.md) | completed |
+| [Optional 3D isometric architecture map generator](./optional-3d-isometric-architecture-map.md) | completed |
