@@ -285,7 +285,15 @@ describe("AskView a11y", () => {
   it("stays silent for idle and for error, which the alert already carries", async () => {
     expect(askAnnouncement({ status: "idle" })).toBe("");
     expect(askAnnouncement({
-      status: "error", question: "q", message: "Vendor refused.", kind: "rate_limit", suggestion: null,
+      status: "error",
+      question: "q",
+      failure: {
+        kind: "rate_limit",
+        message: "Vendor refused.",
+        suggestion: null,
+        remediation: [],
+        retryAfterMs: null,
+      },
     })).toBe("");
 
     // And in the rendered panel: the failure is announced exactly once, by the
@@ -507,7 +515,11 @@ describe("AskView a11y", () => {
     await type("A doomed question?");
     await submitForm();
 
-    expect(root.querySelector(".sv-ask-error .section-header-sm")?.textContent)
-      .toBe("Could not answer that question");
+    // The heading names the mode rather than repeating one generic line, so a
+    // reader who lands on it by heading navigation already knows which failure
+    // this is and whether it is theirs to fix.
+    const heading = root.querySelector(".sv-ask-error .section-header-sm")?.textContent ?? "";
+    expect(heading).toMatch(/rate limit/i);
+    expect(heading).not.toBe("Answer");
   });
 });

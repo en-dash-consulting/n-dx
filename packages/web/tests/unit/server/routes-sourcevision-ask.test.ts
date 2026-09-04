@@ -13,7 +13,7 @@ import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
-import { ClaudeClientError } from "@n-dx/llm-client";
+import { ClaudeClientError, VERIFY_CREDENTIALS_STEP, authFailureGuidance } from "@n-dx/llm-client";
 import type { CompletionRequest, CompletionResult, LLMClient } from "@n-dx/llm-client";
 import type { ServerContext } from "../../../src/server/types.js";
 import {
@@ -564,6 +564,51 @@ describe("POST /api/sourcevision/ask", () => {
     const body = await res.json();
     expect(body.kind).toBe("auth");
     expect(body.suggestion.length).toBeGreaterThan(0);
+  });
+
+  // The dashboard must state the same cause and the same fix as every CLI
+  // surface, so the steps are asserted to BE llm-client's array rather than to
+  // merely resemble it — a paraphrase would satisfy a reader and still leave a
+  // second copy free to drift from the canonical one.
+  it("sends llm-client's canonical remediation for a credential failure", async () => {
+    routeOptions = stubClient(
+      failing(new ClaudeClientError("401 invalid api key", "auth", false)),
+    ).options;
+
+    const body = await (await ask({ prompt: "Who am I?" })).json();
+    const guidance = authFailureGuidance("claude");
+    expect(body.remediation).toEqual(guidance.remediation);
+    expect(body.remediation.at(-1)).toBe(VERIFY_CREDENTIALS_STEP);
+    expect(body.error).toContain(guidance.headline);
+  });
+
+  it("still sends canonical remediation when the message carries no auth signal", async () => {
+    // The provider knew this was auth; the message says nothing a text
+    // classifier can match. Without deriving from the resolved kind, the reply
+    // was "Failed to ask SourceVision: the door is shut" under an auth code.
+    routeOptions = stubClient(
+      failing(new ClaudeClientError("the door is shut", "auth", false)),
+    ).options;
+
+    const body = await (await ask({ prompt: "Who am I?" })).json();
+    expect(body.kind).toBe("auth");
+    expect(body.error).toBe(authFailureGuidance("claude").headline);
+    expect(body.error).not.toContain("the door is shut");
+    expect(body.remediation.at(-1)).toBe(VERIFY_CREDENTIALS_STEP);
+  });
+
+  it("describes the mode it named when the classifier could not read the message", async () => {
+    // Same defect as above for a non-auth mode: the code said rate_limit while
+    // the wording fell through to the generic "Failed to ..." branch.
+    routeOptions = stubClient(
+      failing(new ClaudeClientError("", "rate-limit", true)),
+    ).options;
+
+    const body = await (await ask({ prompt: "Again?" })).json();
+    expect(body.kind).toBe("rate_limit");
+    expect(body.error).toMatch(/rate limit/i);
+    expect(body.error).not.toMatch(/^Failed to ask SourceVision/);
+    expect(body.suggestion.trim().length).toBeGreaterThan(0);
   });
 
   it("reports an unclassifiable provider failure as a named llm_error, not a bare 500", async () => {

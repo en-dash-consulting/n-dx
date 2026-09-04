@@ -34,6 +34,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Add POST /api/sourcevision/ask backed by analysis context and llm-client](./add-post-api-sourcevision-ask-backed.md) | completed |
 | [Attribute Ask token spend in the usage rollup](./attribute-ask-token-spend-in-the-usage.md) | completed |
 | [Explain a finding in plain language from the Problems and Suggestions surfaces](./explain-a-finding-in-plain-language.md) | completed |
-| [Give each degraded mode a specific, actionable message](./give-each-degraded-mode-a-specific.md) | pending |
+| [Give each degraded mode a specific, actionable message](./give-each-degraded-mode-a-specific.md) | completed |
 | [Propose and apply PRD refinements from the exchange, diff-reviewed and under the store lock](./propose-and-apply-prd-refinements-from.md) | pending |
 | [Wire Copy and Capture-to-PRD actions on the answer](./wire-copy-and-capture-to-prd-actions.md) | completed |

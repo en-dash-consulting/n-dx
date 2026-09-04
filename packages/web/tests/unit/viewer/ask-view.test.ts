@@ -296,7 +296,12 @@ describe("AskView", () => {
     await type("Anything?");
     await submitForm();
 
-    expect(root.querySelector(".sv-ask-error-message")?.textContent).toContain("502");
+    // The status is mapped onto a mode rather than shown as one — see the
+    // degraded-mode section below for what the card says instead.
+    expect(root.querySelector(".sv-ask-error-message")?.textContent?.trim().length)
+      .toBeGreaterThan(0);
+    expect(root.querySelector(".sv-ask-error h3")?.textContent?.trim().length)
+      .toBeGreaterThan(0);
   });
 
   it("replaces a previous answer when a new question is asked", async () => {
@@ -312,6 +317,176 @@ describe("AskView", () => {
     await type("Second question?");
     await submitForm();
     expect(root.querySelector(".sv-ask-answer-body")?.textContent).toBe("Second answer.");
+  });
+
+  // ── Degraded modes ───────────────────────────────────────────────
+  //
+  // Three distinct ways to be unusable, three distinct cards. The assertions
+  // below are about what the user is told and what they can do next, not about
+  // which HTTP status arrived — that mapping is covered in ask-failure.test.ts.
+
+  /** Text of every guidance step in the error card. */
+  function errorSteps(): string[] {
+    return Array.from(root.querySelectorAll(".sv-ask-error-steps li"))
+      .map((li) => li.textContent ?? "");
+  }
+
+  function errorKind(): string | null {
+    return root.querySelector(".sv-ask-error")?.getAttribute("data-ask-error-kind") ?? null;
+  }
+
+  function retryButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>("button.sv-ask-retry-btn");
+  }
+
+  /** Drive one failed exchange and leave the error card on screen. */
+  async function failWith(response: () => Promise<Response>, question = "Which zones are most coupled?"): Promise<void> {
+    mount();
+    await settle();
+    askResponse = response;
+    await type(question);
+    await submitForm();
+  }
+
+  it("offers the analysis run itself when there is nothing to answer from", async () => {
+    await failWith(async () => jsonResponse({
+      error: "No analysis data to answer from.",
+      kind: "no_analysis",
+      suggestion: "Run 'n-dx analyze .' first, then ask again.",
+    }, 404));
+
+    expect(errorKind()).toBe("no_analysis");
+    // The affordance, not just the command name: the same control the Overview
+    // uses, so the user can start the run without leaving the panel.
+    const analyze = root.querySelector(".sv-ask-error-analyze .overview-reanalyze");
+    expect(analyze).not.toBeNull();
+    expect(analyze?.textContent).toContain("Re-analyze");
+    expect(analyze?.textContent).toContain("Full analysis");
+    // Retrying the question would hit the same absent data.
+    expect(retryButton()).toBeNull();
+  });
+
+  it("shows the endpoint's canonical credential steps for an auth failure", async () => {
+    // Exactly what the route sends: authFailureGuidance(vendor).remediation,
+    // ending in VERIFY_CREDENTIALS_STEP. The panel renders them; it does not
+    // author credential wording of its own.
+    await failWith(async () => jsonResponse({
+      error: "Authentication failed for Claude — Invalid or expired credentials.",
+      kind: "auth",
+      suggestion: "Re-authenticate: claude logout && claude login  Verify credentials: ndx auth",
+      remediation: [
+        "Re-authenticate: claude logout && claude login",
+        "Verify credentials: ndx auth",
+      ],
+    }, 401));
+
+    expect(errorKind()).toBe("auth");
+    expect(errorSteps()).toContain("Re-authenticate: claude logout && claude login");
+    expect(errorSteps()).toContain("Verify credentials: ndx auth");
+    // Neither an analysis nor a retry fixes a rejected credential.
+    expect(retryButton()).toBeNull();
+    expect(root.querySelector(".sv-ask-error-analyze")).toBeNull();
+  });
+
+  it("names a timeout as itself and offers a retry", async () => {
+    await failWith(async () => jsonResponse({
+      error: "Ask request timed out after 120s.",
+      kind: "timeout",
+    }, 504));
+
+    expect(errorKind()).toBe("timeout");
+    expect(root.querySelector(".sv-ask-error h3")?.textContent).toMatch(/time/i);
+    expect(retryButton()).not.toBeNull();
+  });
+
+  it("names a rate limit as itself and states the delay the vendor asked for", async () => {
+    await failWith(async () => jsonResponse({
+      error: "Rate limit exceeded — the API is temporarily throttling requests.",
+      kind: "rate_limit",
+      retryAfterMs: 30_000,
+    }, 429));
+
+    expect(errorKind()).toBe("rate_limit");
+    expect(root.querySelector(".sv-ask-error h3")?.textContent).toMatch(/rate limit/i);
+    expect(errorSteps().join(" ")).toContain("30-second");
+    expect(retryButton()).not.toBeNull();
+  });
+
+  it("names a provider error as itself without offering a retry", async () => {
+    await failWith(async () => jsonResponse({
+      error: "The API is temporarily overloaded or experiencing errors.",
+      kind: "llm_error",
+    }, 502));
+
+    expect(errorKind()).toBe("llm_error");
+    expect(root.querySelector(".sv-ask-error h3")?.textContent).toMatch(/provider/i);
+    expect(retryButton()).toBeNull();
+    // Still not a dead end: the card says what to do instead.
+    expect(errorSteps().length).toBeGreaterThan(0);
+  });
+
+  it("re-sends the question that failed when Retry is pressed", async () => {
+    await failWith(async () => jsonResponse({ error: "timed out", kind: "timeout" }, 504), "Why is checkout coupled?");
+
+    askResponse = async () => jsonResponse({ answer: "Because of the pipeline file.", vendor: "claude", model: "m" });
+    await act(async () => {
+      retryButton()!.click();
+      await settle();
+    });
+
+    const bodies = fetchSpy.mock.calls
+      .filter(([u]) => String(u) === ASK_ENDPOINT)
+      .map(([, init]) => JSON.parse((init as RequestInit).body as string));
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1].prompt).toBe("Why is checkout coupled?");
+    expect(root.querySelector(".sv-ask-answer-body")?.textContent).toBe("Because of the pipeline file.");
+  });
+
+  it("keeps the question in the textarea through every degraded mode", async () => {
+    const question = "Which zones are most coupled, and what is driving it?";
+    const failures: Array<() => Promise<Response>> = [
+      async () => jsonResponse({ error: "no analysis", kind: "no_analysis" }, 404),
+      async () => jsonResponse({ error: "auth", kind: "auth", remediation: ["Verify credentials: ndx auth"] }, 401),
+      async () => jsonResponse({ error: "timed out", kind: "timeout" }, 504),
+      async () => jsonResponse({ error: "throttled", kind: "rate_limit" }, 429),
+      async () => { throw new TypeError("Failed to fetch"); },
+      async () => new Response("<html>502</html>", { status: 502, headers: { "Content-Type": "text/html" } }),
+    ];
+
+    mount();
+    await settle();
+    await type(question);
+    for (const response of failures) {
+      askResponse = response;
+      await submitForm();
+      expect(root.querySelector(".sv-ask-error")).not.toBeNull();
+      // The whole point: a failure never costs the user their question.
+      expect(textarea().value).toBe(question);
+      expect(submitButton().disabled).toBe(false);
+    }
+  });
+
+  it("names a mode rather than a status code when the body is not ours", async () => {
+    // A proxy's HTML 502 used to render as "The Ask request failed (502)".
+    await failWith(async () => new Response("<html>502 Bad Gateway</html>", {
+      status: 502,
+      headers: { "Content-Type": "text/html" },
+    }));
+
+    expect(errorKind()).toBe("llm_error");
+    const message = root.querySelector(".sv-ask-error-message")?.textContent ?? "";
+    expect(message).not.toMatch(/^The Ask request failed/);
+    expect(message.trim().length).toBeGreaterThan(0);
+    expect(errorSteps().length).toBeGreaterThan(0);
+  });
+
+  it("reports a transport failure as unreachable, not as the raw fetch text alone", async () => {
+    await failWith(async () => { throw new TypeError("Failed to fetch"); });
+
+    expect(errorKind()).toBe("network");
+    // The thrown text is kept as detail, but the heading is what names the fault.
+    expect(root.querySelector(".sv-ask-error h3")?.textContent).toMatch(/reach/i);
+    expect(retryButton()).not.toBeNull();
   });
 
   // ── The empty-prompt no-op ───────────────────────────────────────

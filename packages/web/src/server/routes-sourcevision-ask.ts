@@ -24,13 +24,18 @@
  *
  * ## Failure modes
  *
- * Every failure returns a named `kind` rather than a bare 500. The two that
- * matter operationally are distinguished from each other and from everything
- * else: `timeout` (the call outlived the configured budget) and `rate_limit`
- * (the vendor refused, with the retry delay when it supplied one). A request
- * cannot hang — the LLM call races a timer, and the response is sent when the
- * timer wins even though the provider may still be finishing in the
- * background.
+ * Every failure returns a named `kind` rather than a bare 500, and wording
+ * that matches that kind rather than whatever a text classifier made of the
+ * provider's message — see {@link classifyAskFailure}. The two that matter
+ * operationally are distinguished from each other and from everything else:
+ * `timeout` (the call outlived the configured budget) and `rate_limit` (the
+ * vendor refused, with the retry delay when it supplied one). A request cannot
+ * hang — the LLM call races a timer, and the response is sent when the timer
+ * wins even though the provider may still be finishing in the background.
+ *
+ * `auth` additionally carries `remediation`: the canonical, vendor-aware fix
+ * steps from `authFailureGuidance`, so the dashboard states the same cause and
+ * the same fix as every CLI entry point.
  *
  * ## Accounting
  *
@@ -53,6 +58,7 @@ import { z } from "zod";
 import {
   ClaudeClientError,
   DEFAULT_LLM_VENDOR,
+  authFailureGuidance,
   classifyLLMError,
   createLLMClient,
   deepMerge,
@@ -173,6 +179,16 @@ export interface AskErrorResponse {
   error: string;
   kind: AskErrorKind;
   suggestion?: string;
+  /**
+   * Ordered remediation steps for the panel to render as a list.
+   *
+   * Sent for `auth`, where the steps are `authFailureGuidance(vendor).remediation`
+   * verbatim — the same lines every CLI surface prints, ending in
+   * `VERIFY_CREDENTIALS_STEP`. The viewer is a browser bundle and cannot import
+   * the foundation tier, so shipping the canonical wording in the payload is
+   * what keeps the dashboard from growing a second copy free to drift.
+   */
+  remediation?: string[];
   /** Vendor-supplied retry delay, when a rate limit named one. */
   retryAfterMs?: number;
 }
@@ -357,12 +373,65 @@ const KIND_TO_STATUS: Record<AskErrorKind, number> = {
 };
 
 /**
+ * Wording of last resort, keyed by the kind that was actually resolved.
+ *
+ * Reached only when the shared classifier's category disagrees with that kind.
+ * That happens whenever a provider throws a typed {@link ClaudeClientError}
+ * whose *message* carries nothing a text classifier can match — a bare
+ * `ClaudeClientError("", "rate-limit")` classifies as `unknown` and would
+ * otherwise be reported as "Failed to ask SourceVision: " under a `rate_limit`
+ * code. Trusting the typed reason for the code but not for the wording is how
+ * the panel ends up naming one fault and describing another.
+ *
+ * `auth` is absent by construction: credential wording is never authored here,
+ * it comes from `authFailureGuidance`.
+ */
+const KIND_FALLBACK_WORDING: Record<Exclude<AskErrorKind, "auth">, { error: string; suggestion: string }> = {
+  invalid_request: {
+    error: "The request was rejected before it reached a model.",
+    suggestion: "Check the question and send it again.",
+  },
+  no_analysis: {
+    error: "No analysis data to answer from.",
+    suggestion: "Run an analysis first, then ask again.",
+  },
+  timeout: {
+    error: "The model did not answer within the Ask time budget.",
+    suggestion: "Retry, or raise sourcevision.ask.timeoutMs in .n-dx.json.",
+  },
+  rate_limit: {
+    error: "The vendor is rate limiting this project.",
+    suggestion: "Wait for the vendor's retry window, then ask again.",
+  },
+  network: {
+    error: "The request could not reach the vendor.",
+    suggestion: "Check network connectivity, then retry.",
+  },
+  llm_error: {
+    error: "The vendor returned an error instead of an answer.",
+    suggestion: "Retry, or check the configured vendor and model.",
+  },
+};
+
+/**
  * Classify a failed Ask call into a named kind plus user-facing wording.
  *
  * Providers that already threw a typed {@link ClaudeClientError} are trusted
  * over re-classification from the message: the provider knew it was a 429 or a
  * deadline, whereas the classifier can only pattern-match the text and would
  * downgrade a reason it cannot see to `unknown`.
+ *
+ * The wording follows the same rule. When the classifier reached the same
+ * conclusion its message is used, because it carries the provider's own detail
+ * (a quota metric, a model that does not exist). When it did not, the message
+ * would describe a different failure than the code names, so the fallback for
+ * the resolved kind is used instead.
+ *
+ * Credentials are the one mode with a single source of truth outside this file:
+ * `authFailureGuidance(vendor)` is what `ndx init`, `ndx work`, and the domain
+ * analyzers all print, and its `remediation` — ending in
+ * `VERIFY_CREDENTIALS_STEP` — is sent verbatim so the dashboard says exactly
+ * what the CLI says.
  */
 export function classifyAskFailure(
   err: unknown,
@@ -372,17 +441,37 @@ export function classifyAskFailure(
   const error = err instanceof Error ? err : new Error(String(err));
   const classification = classifyLLMError(error, vendor, { label: "ask SourceVision", model });
 
-  let kind: AskErrorKind = CATEGORY_TO_KIND[classification.category] ?? "llm_error";
+  const classifiedKind: AskErrorKind = CATEGORY_TO_KIND[classification.category] ?? "llm_error";
+  let kind = classifiedKind;
   if (error instanceof ClaudeClientError) {
     const fromReason = CATEGORY_TO_KIND[error.reason];
     if (fromReason) kind = fromReason;
   }
+  const classifierAgrees = classifiedKind === kind;
 
-  const response: AskErrorResponse = {
-    error: classification.message,
-    kind,
-    suggestion: classification.suggestion,
-  };
+  let response: AskErrorResponse;
+  if (kind === "auth") {
+    const guidance = authFailureGuidance(vendor);
+    response = {
+      // The classifier's auth branch is this same headline plus the
+      // command/vendor/model suffix, which is worth keeping when it applies.
+      error: classifierAgrees ? classification.message : guidance.headline,
+      kind,
+      suggestion: guidance.remediation.join("  "),
+      remediation: [...guidance.remediation],
+    };
+  } else {
+    const fallback = KIND_FALLBACK_WORDING[kind];
+    const usable = classifierAgrees && classification.message.trim().length > 0;
+    response = {
+      error: usable ? classification.message : fallback.error,
+      kind,
+      suggestion: usable && classification.suggestion.trim().length > 0
+        ? classification.suggestion
+        : fallback.suggestion,
+    };
+  }
+
   if (error instanceof ClaudeClientError && error.retryAfterMs != null) {
     response.retryAfterMs = error.retryAfterMs;
   }

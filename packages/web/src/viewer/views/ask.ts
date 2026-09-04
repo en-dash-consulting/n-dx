@@ -83,11 +83,17 @@
  * removed would silently ground every later question in the finding the user
  * happened to arrive from.
  *
- * ## Deliberately not here yet
+ * ## Degraded modes
  *
- * Per-failure-mode wording beyond what the endpoint supplies is a separate PRD
- * task under the same feature. The shell is shaped so it lands in one place: a
- * message map over `AskErrorKind`.
+ * The panel has several distinct ways to be unusable and they do not share a
+ * fix, so they do not share a card. {@link describeAskFailure} decides the
+ * naming, the guidance, and which affordance to offer for each; this module
+ * only renders that decision and owns the two actions it can take — a Retry
+ * that re-sends *the question that failed*, and the analysis run offered when
+ * there is nothing to answer from. The prompt is never cleared on failure, so
+ * no degraded path costs the user their question.
+ *
+ * ## Deliberately not here yet
  *
  * Markdown in the answer is currently shown as-is in a pre-wrapped block. The
  * renderer that would format it lives in `pr-markdown.ts` behind
@@ -102,11 +108,17 @@
 
 import { h } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { BrandedHeader } from "../components/index.js";
+import { AnalyzeControls, BrandedHeader } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import type { AskSeed } from "../types.js";
 import { EXPLAIN_PROMPT } from "./finding-seed.js";
+import {
+  askFailureKindFromStatus,
+  describeAskFailure,
+  isAskFailureKind,
+  type AskFailure,
+} from "./ask-failure.js";
 import {
   clipboardFailureMessage,
   clipboardSuccessMessage,
@@ -170,6 +182,9 @@ interface AskErrorPayload {
   error?: string;
   kind?: string;
   suggestion?: string;
+  /** Canonical vendor remediation, sent for credential failures. */
+  remediation?: string[];
+  retryAfterMs?: number;
 }
 
 /** Payload of `POST /api/rex/capture-ask`, success or failure. */
@@ -188,7 +203,7 @@ export type AskState =
   | { status: "idle" }
   | { status: "submitting"; question: string }
   | { status: "answered"; question: string; answer: string; vendor: string | null; model: string | null; contextSources: string[] }
-  | { status: "error"; question: string; message: string; kind: string | null; suggestion: string | null };
+  | { status: "error"; question: string; failure: AskFailure };
 
 /**
  * True when `prompt` is worth sending.
@@ -275,15 +290,17 @@ export function describeCapture(payload: AskCapturePayload): string {
 }
 
 /**
- * Read a failed response into user-facing wording.
+ * Read a failed response into the named mode it belongs to.
  *
- * The endpoint names every failure it can (`kind`, `error`, `suggestion`), so
- * the shell reports what it was told rather than re-deriving it from the
- * status code. A body that is not the documented shape still yields a
- * message, because a proxy returning HTML on a 502 must not surface as an
- * empty error card.
+ * The endpoint names every failure it can (`kind`, `error`, `suggestion`,
+ * `remediation`), so the shell reports what it was told rather than
+ * re-deriving it. What it must not do is fall back to the status code when the
+ * body is not the documented shape: a proxy returning HTML on a 502, or a dev
+ * server answering 404, used to surface as "The Ask request failed (502)" —
+ * the bare generic this panel exists to avoid. The status is mapped onto a
+ * mode instead, and {@link describeAskFailure} names it.
  */
-async function readErrorPayload(res: Response): Promise<{ message: string; kind: string | null; suggestion: string | null }> {
+async function readErrorPayload(res: Response): Promise<AskFailure> {
   let payload: AskErrorPayload | null = null;
   try {
     payload = await res.json() as AskErrorPayload;
@@ -292,11 +309,15 @@ async function readErrorPayload(res: Response): Promise<{ message: string; kind:
   }
   const message = typeof payload?.error === "string" && payload.error.trim().length > 0
     ? payload.error
-    : `The Ask request failed (${res.status}).`;
+    : null;
   return {
+    kind: isAskFailureKind(payload?.kind) ? payload.kind : askFailureKindFromStatus(res.status),
     message,
-    kind: typeof payload?.kind === "string" ? payload.kind : null,
     suggestion: typeof payload?.suggestion === "string" ? payload.suggestion : null,
+    remediation: Array.isArray(payload?.remediation)
+      ? payload.remediation.filter((step): step is string => typeof step === "string")
+      : [],
+    retryAfterMs: typeof payload?.retryAfterMs === "number" ? payload.retryAfterMs : null,
   };
 }
 
@@ -431,12 +452,20 @@ export function AskView({ seed = null }: AskViewProps = {}) {
     }
   }, [seedKey, seed, resetActions]);
 
-  const submit = useCallback(async () => {
+  /**
+   * Send one question.
+   *
+   * Takes the question rather than reading `prompt`, because Retry re-sends
+   * the question that failed — which is not necessarily what is in the
+   * textarea by then. The prompt is never cleared, so a user who edited it
+   * while an error was on screen keeps their edit and still gets a retry of
+   * the exchange the error belongs to.
+   */
+  const runAsk = useCallback(async (question: string) => {
     if (inFlightRef.current) return;
     // The no-op case: an empty or whitespace-only prompt issues no request.
-    if (!isSubmittablePrompt(prompt)) return;
+    if (!isSubmittablePrompt(question)) return;
 
-    const question = prompt.trim();
     inFlightRef.current = true;
     resetActions();
     setState({ status: "submitting", question });
@@ -453,8 +482,7 @@ export function AskView({ seed = null }: AskViewProps = {}) {
       });
 
       if (!res.ok) {
-        const failure = await readErrorPayload(res);
-        setState({ status: "error", question, ...failure });
+        setState({ status: "error", question, failure: await readErrorPayload(res) });
         return;
       }
 
@@ -462,13 +490,19 @@ export function AskView({ seed = null }: AskViewProps = {}) {
       const answer = typeof payload.answer === "string" ? payload.answer : "";
       if (answer.trim().length === 0) {
         // A 200 with nothing in it is a failure the user can act on (ask
-        // again, or check the vendor), not an answer to display as blank.
+        // again, or check the vendor), not an answer to display as blank. It
+        // is the provider's fault, not the transport's, so it is reported as
+        // one rather than as a generic failure.
         setState({
           status: "error",
           question,
-          message: "The model returned an empty answer.",
-          kind: "llm_error",
-          suggestion: "Try asking again, or rephrase the question.",
+          failure: {
+            kind: "llm_error",
+            message: "The model returned an empty answer.",
+            suggestion: null,
+            remediation: [],
+            retryAfterMs: null,
+          },
         });
         return;
       }
@@ -482,17 +516,27 @@ export function AskView({ seed = null }: AskViewProps = {}) {
         contextSources: Array.isArray(payload.contextSources) ? payload.contextSources : [],
       });
     } catch (err) {
+      // `fetch` rejects only for transport faults, so this is never a provider
+      // verdict. The thrown text ("Failed to fetch") is kept as detail rather
+      // than as the whole card: on its own it names nothing the user can act on.
       setState({
         status: "error",
         question,
-        message: err instanceof Error ? err.message : "The Ask request failed.",
-        kind: "network",
-        suggestion: null,
+        failure: {
+          kind: "network",
+          message: err instanceof Error ? err.message : null,
+          suggestion: null,
+          remediation: [],
+          retryAfterMs: null,
+        },
       });
     } finally {
       inFlightRef.current = false;
     }
-  }, [prompt, activeSeed, resetActions]);
+  }, [activeSeed, resetActions]);
+
+  /** Submit whatever is in the textarea. */
+  const submit = useCallback(() => runAsk(prompt.trim()), [runAsk, prompt]);
 
   const answerText = state.status === "answered" ? state.answer : null;
 
@@ -690,12 +734,46 @@ export function AskView({ seed = null }: AskViewProps = {}) {
         )
       : null,
 
+    // Every degraded mode is named as itself and carries what to do about it.
+    // The heading states the fault, the steps are doable from here, and the
+    // affordance that actually fixes the mode sits under them: the analysis run
+    // when there is nothing to answer from, a retry when the fault is transient.
+    // Nothing here can render as a bare status code — see ask-failure.ts.
     state.status === "error"
-      ? h("div", { class: "card sv-ask-error", role: "alert" },
-          h("h3", { class: "section-header-sm" }, "Could not answer that question"),
-          h("p", { class: "sv-ask-error-message" }, state.message),
-          state.suggestion ? h("p", { class: "section-sub" }, state.suggestion) : null,
-        )
+      ? (() => {
+          const failure = describeAskFailure(state.failure);
+          return h("div", {
+            class: `card sv-ask-error sv-ask-error-${failure.kind}`,
+            role: "alert",
+            "data-ask-error-kind": failure.kind,
+          },
+            h("h3", { class: "section-header-sm" }, failure.title),
+            h("p", { class: "sv-ask-error-message" }, failure.message),
+            state.failure.suggestion
+              ? h("p", { class: "section-sub sv-ask-error-suggestion" }, state.failure.suggestion)
+              : null,
+            h("ul", { class: "sv-ask-error-steps" },
+              ...failure.steps.map((step, i) => h("li", { key: i, class: "section-sub" }, step)),
+            ),
+            failure.canRetry
+              ? h("div", { class: "sv-ask-error-actions" },
+                  h("button", {
+                    type: "button",
+                    class: "btn sv-ask-retry-btn",
+                    title: "Send the same question again",
+                    onClick: () => { void runAsk(state.question); },
+                  }, "Retry"),
+                )
+              : null,
+            // The affordance the acceptance criterion asks for: the run itself,
+            // not the name of the command that would do it.
+            failure.needsAnalysis
+              ? h("div", { class: "sv-ask-error-analyze" },
+                  h(AnalyzeControls, null),
+                )
+              : null,
+          );
+        })()
       : null,
 
     state.status === "answered"

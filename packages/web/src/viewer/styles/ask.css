@@ -120,8 +120,34 @@
   border-left: 3px solid var(--red);
 }
 
-.sv-ask-error-message {
+.sv-ask-error-message,
+.sv-ask-error-suggestion {
   margin: 0;
+}
+
+/* What to do about this particular mode. A list rather than a paragraph: the
+   steps are ordered and each is independently actionable, and the canonical
+   vendor remediation arrives as separate lines already. */
+.sv-ask-error-steps {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sv-ask-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The analyze affordance sits inside the error card, so it needs the separation
+   from the steps above it that a card boundary would otherwise give it. */
+.sv-ask-error-analyze {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
 }
 
 .sv-ask-answer {
