@@ -22,7 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Artifact diet — cap sourcevision artifacts and startup context](./artifact-diet-cap-sourcevision/index.md) | completed |
-| [Auditing improvements batch 2 — prompt caching, prune quality, primer wiring](./auditing-improvements-batch-2-prompt/index.md) | pending |
+| [Auditing improvements batch 2 — prompt caching, prune quality, primer wiring](./auditing-improvements-batch-2-prompt/index.md) | completed |
 | [Eliminate per-task cold spawns (warm-parent fork + session batching)](./eliminate-per-task-cold-spawns-warm/index.md) | completed |
 | [Wire tiered model resolution (task class → tier → model)](./wire-tiered-model-resolution-task/index.md) | completed |
 | [Cap total spawns per task and retry via --resume](./cap-total-spawns-per-task-and-retry.md) | completed |

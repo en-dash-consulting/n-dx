@@ -43,6 +43,7 @@ import {
   sourcevisionFingerprint,
   type ParentRejection,
 } from "./session-cache.js";
+import { readFreshPrimer } from "./primer.js";
 import { detail } from "../../types/output.js";
 
 /** Minimal shape of a spawn result this module needs. */
@@ -95,13 +96,17 @@ export function buildOrientationSystemPrompt(): string {
  * Task prompt for the orientation session.
  *
  * Must stay free of task-specific content — see the module note on why the
- * prefix has to be byte-identical across forks.
+ * prefix has to be byte-identical across forks. The primer is repo-scoped, not
+ * task-scoped, so seeding it keeps that property: it is the same bytes for
+ * every fork of a given analysis, and a new analysis invalidates the parent
+ * anyway.
+ *
+ * @param primer  Current `.sourcevision/PRIMER.md` body, when one exists and
+ *                was built from the current analysis. Given one, orientation
+ *                confirms and fills gaps instead of rediscovering from zero.
  */
-export function buildOrientationPrompt(): string {
-  return [
-    "Orient yourself in this repository. Do not modify anything.",
-    "",
-    "Establish and summarize:",
+export function buildOrientationPrompt(primer?: string): string {
+  const questions = [
     "1. Layout — the top-level structure, which directories hold production code versus",
     "   tests, and where the main entry points are.",
     "2. Build and test commands — the actual commands this project uses, verified from",
@@ -109,10 +114,47 @@ export function buildOrientationPrompt(): string {
     "3. Conventions — language and module style, test framework and file naming, and any",
     "   contributor rules the repository documents for itself.",
     "4. Anything a newcomer would otherwise waste time rediscovering.",
+  ];
+
+  if (!primer) {
+    return [
+      "Orient yourself in this repository. Do not modify anything.",
+      "",
+      "Establish and summarize:",
+      ...questions,
+      "",
+      "Keep the exploration proportionate: skim broadly, read deeply only where it is needed",
+      "to answer the four points above. Do not attempt an exhaustive audit, and do not",
+      "propose changes.",
+    ].join("\n");
+  }
+
+  return [
+    "Orient yourself in this repository. Do not modify anything.",
     "",
-    "Keep the exploration proportionate: skim broadly, read deeply only where it is needed",
-    "to answer the four points above. Do not attempt an exhaustive audit, and do not",
-    "propose changes.",
+    "An automated analysis of this repository already produced the primer below. Treat it",
+    "as a starting point, not as gospel: it was distilled from a static analysis and may be",
+    "incomplete or wrong in places.",
+    "",
+    "## Existing primer",
+    "",
+    // Fenced so the primer's own headings cannot be read as instructions to
+    // this session — sourcevision strips fences from the body, so the delimiter
+    // cannot be closed early from inside.
+    "```markdown",
+    primer,
+    "```",
+    "",
+    "## Your task",
+    "",
+    "Confirm and correct the primer, then fill its gaps, so that the summary you leave",
+    "behind answers:",
+    ...questions,
+    "",
+    "Spot-check the primer's specific claims — especially the build and test commands —",
+    "against the actual manifest or config, and say plainly where it was wrong. Explore only",
+    "what the primer does not already settle. Do not re-derive what it states correctly, do",
+    "not attempt an exhaustive audit, and do not propose changes.",
   ].join("\n");
 }
 
@@ -156,9 +198,14 @@ export async function ensureWarmParent(
   if (cached) await clearSessionCache(opts.henchDir);
   detail(`Warm session: orienting (${REJECTION_DETAIL[verdict.usable ? "no-entry" : verdict.reason]})`);
 
+  // Seeded from the same fingerprint the parent is keyed on, so the primer a
+  // fork inherits always describes the analysis that fork was cached against.
+  const primer = await readFreshPrimer(opts.projectDir, svFingerprint);
+  if (primer) detail("Warm session: seeding orientation with the sourcevision primer");
+
   const envelope = createPromptEnvelope([
     { name: "system" as PromptSectionName, content: buildOrientationSystemPrompt() } as PromptSection,
-    { name: "brief" as PromptSectionName, content: buildOrientationPrompt() } as PromptSection,
+    { name: "brief" as PromptSectionName, content: buildOrientationPrompt(primer) } as PromptSection,
   ]);
 
   const spawnConfig = opts.adapter.buildSpawnConfig(envelope, opts.policy, {
