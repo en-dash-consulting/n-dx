@@ -105,10 +105,16 @@ export function readDeclaredConfig(root: string): {
 // ── Infrastructure-as-code discovery ────────────────────────────────────────
 
 /**
- * Terraform resource type → coarse kind.
+ * Resource type → coarse kind, for every IaC dialect.
  *
  * Matched as substrings against the resource type so this stays useful across
  * AWS, GCP and Azure without enumerating every provider's naming.
+ *
+ * One table, not one per parser: the patterns are written in Terraform's
+ * underscore form and `classifyResource` normalizes the other dialects into it
+ * (`AWS::SQS::Queue` → `aws_sqs_queue`). Two tables would disagree within a
+ * release — which is how the skill script and the package came to disagree
+ * about zone colours.
  */
 const IAC_KINDS: Array<[RegExp, string]> = [
   [/bucket|blob_container|storage_account/, "bucket"],
@@ -117,15 +123,24 @@ const IAC_KINDS: Array<[RegExp, string]> = [
   [/dynamodb|rds|_sql|spanner|firestore|bigtable|cosmosdb|documentdb|database/, "database"],
   [/elasticache|redis|memcache/, "cache"],
   [/kinesis|kafka|msk|firehose/, "stream"],
-  [/cloudwatch_event_rule|scheduler|cron|eventbridge_rule/, "scheduler"],
+  [/cloudwatch_event_rule|events_rule|scheduler|cron|eventbridge_rule/, "scheduler"],
   [/secret|kms|vault|parameter/, "secrets"],
-  [/lambda_function|cloud_run|cloudfunctions|container_app/, "compute"],
+  [
+    /lambda_function|serverless_function|cloud_run|cloudfunctions|container_app/,
+    "compute",
+  ],
 ];
 
+/**
+ * Classify a resource type from any dialect.
+ *
+ * CloudFormation's `AWS::SQS::Queue` and Terraform's `aws_sqs_queue` describe
+ * the same thing, so the separator is normalized and the one table decides.
+ */
 function classifyResource(type: string): string | null {
-  const lower = type.toLowerCase();
+  const normalized = type.toLowerCase().replace(/::/g, "_").replace(/-/g, "_");
   for (const [pattern, kind] of IAC_KINDS) {
-    if (pattern.test(lower)) return kind;
+    if (pattern.test(normalized)) return kind;
   }
   return null;
 }
@@ -134,11 +149,18 @@ const IAC_SKIP = new Set([
   "node_modules", ".git", ".terraform", "dist", "build", "vendor", "coverage",
 ]);
 
-/** Find Terraform files without walking the whole tree twice. */
-function findTerraform(root: string, limit = 400): string[] {
-  const found: string[] = [];
+/**
+ * Find IaC candidate files in one pass over the tree.
+ *
+ * Terraform and YAML get separate budgets. A repository holds far more YAML
+ * than Terraform — CI workflows, k8s manifests, lockfiles — and a shared budget
+ * would let that noise crowd out the `.tf` files before they were reached.
+ */
+function findIaCFiles(root: string, limit = 400): { terraform: string[]; yaml: string[] } {
+  const terraform: string[] = [];
+  const yaml: string[] = [];
   function walk(dir: string, depth: number): void {
-    if (depth > 8 || found.length >= limit) return;
+    if (depth > 8 || (terraform.length >= limit && yaml.length >= limit)) return;
     let entries;
     try {
       entries = readdirSync(dir, { withFileTypes: true });
@@ -147,44 +169,148 @@ function findTerraform(root: string, limit = 400): string[] {
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
-      if (found.length >= limit) return;
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
         if (IAC_SKIP.has(entry.name) || entry.name.startsWith(".")) continue;
         walk(full, depth + 1);
-      } else if (extname(entry.name) === ".tf") {
-        found.push(relative(root, full).split(sep).join("/"));
+        continue;
       }
+      const ext = extname(entry.name);
+      const path = relative(root, full).split(sep).join("/");
+      if (ext === ".tf" && terraform.length < limit) terraform.push(path);
+      else if ((ext === ".yaml" || ext === ".yml") && yaml.length < limit) yaml.push(path);
     }
   }
   walk(root, 0);
-  return found;
+  return { terraform, yaml };
 }
 
 const TF_RESOURCE = /resource\s+"([^"]+)"\s+"([^"]+)"\s*\{/g;
 /** A `name`-ish attribute inside a resource block, used to match code literals. */
 const TF_NAME_ATTR = /^\s*(?:name|bucket|queue_name|topic_name|function_name|identifier|table_name)\s*=\s*"([^"]+)"/gm;
 
+/** The top-level `Resources:` key that opens a template's resource block. */
+const CFN_RESOURCES = /^Resources:\s*$/m;
+/** `LogicalName:` at the indent resources sit on. */
+const CFN_LOGICAL = /^(\s+)([A-Za-z0-9]+):\s*$/;
+/** `Type: AWS::SQS::Queue`, quoted or not. */
+const CFN_TYPE = /^\s*Type:\s*['"]?([A-Za-z0-9]+::[A-Za-z0-9:-]+)['"]?\s*$/;
+/** A `name`-ish property, used to match code literals. */
+const CFN_NAME_PROP =
+  /^\s*(?:Name|BucketName|QueueName|TopicName|FunctionName|TableName|DBInstanceIdentifier|StreamName|ClusterName)\s*:\s*['"]?([^'"\n]+?)['"]?\s*$/;
+
 /**
- * Discover infrastructure from Terraform.
+ * Is this YAML a CloudFormation template?
  *
- * Deliberately shallow: it reads resource blocks, not state or modules, so it
- * finds what a reader would see scanning the `.tf` files themselves.
+ * A repository is mostly YAML that is not infrastructure — CI workflows, k8s
+ * manifests, lockfiles — and treating one as a template would invent
+ * infrastructure and flip the "this project has IaC" flag that decides which
+ * caveat the page shows. Requiring both a top-level `Resources:` block and a
+ * namespaced `Type:` is cheap and, in practice, conclusive.
+ */
+function isCloudFormation(content: string): boolean {
+  return CFN_RESOURCES.test(content) && /^\s*Type:\s*['"]?[A-Za-z0-9]+::/m.test(content);
+}
+
+/**
+ * Read resources out of a CloudFormation template.
+ *
+ * A line scan rather than a YAML parse, for the same reason the Terraform side
+ * reads resource blocks rather than state: no dependency, and it finds what a
+ * reader would see scanning the file. Anchors, nested stacks and `Fn::`
+ * indirection are out of reach, and that is the documented limit.
+ */
+function parseCloudFormation(content: string, file: string): DeclaredInfra[] {
+  const lines = content.split(/\r?\n/);
+  const start = lines.findIndex((l) => CFN_RESOURCES.test(l));
+  if (start === -1) return [];
+
+  const found: DeclaredInfra[] = [];
+  let baseIndent: number | null = null;
+  let current: { name: string; literals: Set<string>; type?: string } | null = null;
+
+  const flush = (): void => {
+    if (!current?.type) return;
+    const kind = classifyResource(current.type);
+    if (!kind) return; // nothing the map has anything useful to say about
+    found.push({
+      id: `infra:${current.type}.${current.name}`,
+      name: current.name,
+      kind,
+      usedBy: [],
+      note: `${current.type} declared in ${file}`,
+      origin: file,
+      literals: [...current.literals].sort(),
+    });
+  };
+
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent === 0) break; // a new top-level key ends the Resources block
+
+    const logical = CFN_LOGICAL.exec(line);
+    if (logical && (baseIndent === null || logical[1].length === baseIndent)) {
+      baseIndent = logical[1].length;
+      flush();
+      current = { name: logical[2], literals: new Set([logical[2]]) };
+      continue;
+    }
+    if (!current) continue;
+
+    const type = CFN_TYPE.exec(line);
+    if (type) {
+      current.type = type[1];
+      continue;
+    }
+    const prop = CFN_NAME_PROP.exec(line);
+    // An intrinsic function is not a name: matching source against
+    // "!Sub '${AWS::StackName}-docs'" would attribute the resource to nothing.
+    if (prop && !prop[1].startsWith("!") && !prop[1].includes("Fn::")) {
+      current.literals.add(prop[1].trim());
+    }
+  }
+  flush();
+
+  return found;
+}
+
+/**
+ * Discover infrastructure from infrastructure-as-code.
+ *
+ * Deliberately shallow: it reads resource declarations, not state, modules or
+ * deployed stacks, so it finds what a reader would see scanning the files
+ * themselves. Terraform and CloudFormation both feed the same classification
+ * table, so a resource means the same thing whichever dialect declared it.
  */
 export function discoverFromIaC(root: string): { infrastructure: DeclaredInfra[]; sawIaC: boolean } {
-  const files = findTerraform(root);
-  if (files.length === 0) return { infrastructure: [], sawIaC: false };
+  const { terraform, yaml } = findIaCFiles(root);
+  if (terraform.length === 0 && yaml.length === 0) {
+    return { infrastructure: [], sawIaC: false };
+  }
 
   const infrastructure: DeclaredInfra[] = [];
   const seen = new Set<string>();
+  const add = (entry: DeclaredInfra): void => {
+    if (seen.has(entry.id)) return;
+    seen.add(entry.id);
+    infrastructure.push(entry);
+  };
 
-  for (const file of files) {
-    let content: string;
+  const read = (file: string): string | null => {
     try {
-      content = readFileSync(join(root, file), "utf-8");
+      const full = join(root, file);
+      // A multi-megabyte YAML is a lockfile or a fixture, not a template.
+      if (statSync(full).size > 1_000_000) return null;
+      return readFileSync(full, "utf-8");
     } catch {
-      continue;
+      return null;
     }
+  };
+
+  for (const file of terraform) {
+    const content = read(file);
+    if (content === null) continue;
 
     TF_RESOURCE.lastIndex = 0;
     let match;
@@ -193,10 +319,6 @@ export function discoverFromIaC(root: string): { infrastructure: DeclaredInfra[]
       const kind = classifyResource(type);
       if (!kind) continue; // not a resource the map has anything useful to say about
 
-      const id = `infra:${type}.${localName}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-
       // Literal names inside the block give us something to match in code.
       const block = content.slice(match.index, match.index + 800);
       TF_NAME_ATTR.lastIndex = 0;
@@ -204,8 +326,8 @@ export function discoverFromIaC(root: string): { infrastructure: DeclaredInfra[]
       let attr;
       while ((attr = TF_NAME_ATTR.exec(block)) !== null) literals.add(attr[1]);
 
-      infrastructure.push({
-        id,
+      add({
+        id: `infra:${type}.${localName}`,
         name: localName,
         kind,
         usedBy: [],
@@ -216,8 +338,16 @@ export function discoverFromIaC(root: string): { infrastructure: DeclaredInfra[]
     }
   }
 
+  let sawTemplate = false;
+  for (const file of yaml) {
+    const content = read(file);
+    if (content === null || !isCloudFormation(content)) continue;
+    sawTemplate = true;
+    for (const entry of parseCloudFormation(content, file)) add(entry);
+  }
+
   infrastructure.sort((a, b) => a.id.localeCompare(b.id));
-  return { infrastructure, sawIaC: true };
+  return { infrastructure, sawIaC: terraform.length > 0 || sawTemplate };
 }
 
 // ── Linking infrastructure to code ──────────────────────────────────────────
