@@ -9,7 +9,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { AskView, ASK_ENDPOINT, isSubmittablePrompt } from "../../../src/viewer/views/ask.js";
+import {
+  AskView,
+  ASK_ENDPOINT,
+  ASK_CAPTURE_ENDPOINT,
+  describeCapture,
+  isSubmittablePrompt,
+} from "../../../src/viewer/views/ask.js";
 import { Sidebar } from "../../../src/viewer/components/sidebar.js";
 import { SOURCEVISION_TABS } from "../../../src/viewer/views/index.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
@@ -38,11 +44,38 @@ async function settle(): Promise<void> {
   });
 }
 
+/**
+ * Install (or remove) `navigator.clipboard`.
+ *
+ * `configurable: true` matters: the modern-API and no-API cases both run in
+ * the same worker, so the property has to be replaceable between tests.
+ */
+function setClipboard(writeText: ReturnType<typeof vi.fn> | null): void {
+  Object.defineProperty(navigator, "clipboard", {
+    value: writeText === null ? undefined : { writeText },
+    configurable: true,
+    writable: true,
+  });
+}
+
 describe("AskView", () => {
   let root: HTMLDivElement;
   /** Response served to the next POST /api/sourcevision/ask. */
   let askResponse: () => Promise<Response>;
+  /** Response served to the next POST /api/rex/capture-ask. */
+  let captureResponse: () => Promise<Response>;
   let fetchSpy: ReturnType<typeof vi.fn>;
+  let clipboardWriteText: ReturnType<typeof vi.fn>;
+  /** Set when a test installs a fake execCommand, so afterEach can remove it. */
+  let stubbedExecCommand = false;
+
+  /** Stub `document.execCommand("copy")`, which jsdom does not implement. */
+  function stubExecCommand(result: boolean): ReturnType<typeof vi.fn> {
+    const spy = vi.fn(() => result);
+    (document as unknown as { execCommand: unknown }).execCommand = spy;
+    stubbedExecCommand = true;
+    return spy;
+  }
 
   function mount() {
     root = document.createElement("div");
@@ -92,15 +125,23 @@ describe("AskView", () => {
     clearProjectMetadataCache();
     delete window.__NDX_DEPLOYED__;
     askResponse = async () => jsonResponse({ answer: "unset", vendor: "claude", model: "test-model" });
+    captureResponse = async () => jsonResponse({
+      ok: true,
+      item: { id: "task-1", title: "Which zones are most coupled?", level: "task" },
+      parent: { id: "epic-1", title: "SourceVision Ask", level: "epic", created: true },
+    });
     fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === ASK_ENDPOINT) return askResponse();
+      if (url === ASK_CAPTURE_ENDPOINT) return captureResponse();
       if (url === "/api/project") {
         return jsonResponse({ name: "n-dx", description: null, version: null, git: null, nameSource: "directory", cliName: "n-dx" });
       }
       return jsonResponse({}, 404);
     });
     vi.stubGlobal("fetch", fetchSpy);
+    clipboardWriteText = vi.fn(async () => {});
+    setClipboard(clipboardWriteText);
   });
 
   afterEach(() => {
@@ -111,6 +152,17 @@ describe("AskView", () => {
     // flag left on `window` would silently hide every `requiresServer` tab in
     // whatever ran next — which is how the gate-on case below first failed.
     delete window.__NDX_DEPLOYED__;
+    // jsdom ships no execCommand; leaving a fake behind would make the
+    // permission-denied case in another file silently succeed via the fallback.
+    if (stubbedExecCommand) {
+      delete (document as unknown as { execCommand?: unknown }).execCommand;
+      stubbedExecCommand = false;
+    }
+    setClipboard(null);
+    // Restored here as well as in the tests that install them: a fake clock
+    // abandoned by a timed-out test deadlocks every later `settle()`, which
+    // presents as a dozen unrelated failures rather than as one.
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -332,6 +384,314 @@ describe("AskView", () => {
     expect(isSubmittablePrompt("ok")).toBe(true);
     expect(isSubmittablePrompt("x".repeat(4_000))).toBe(true);
     expect(isSubmittablePrompt("x".repeat(4_001))).toBe(false);
+  });
+
+  // ── Answer actions: Copy ─────────────────────────────────────────
+
+  /** Get to an answered panel with `answer` on screen. */
+  async function askAndAnswer(answer = "web-viewer is the hub zone."): Promise<void> {
+    mount();
+    await settle();
+    askResponse = async () => jsonResponse({ answer, vendor: "claude", model: "m" });
+    await type("Which zones are most coupled?");
+    await submitForm();
+  }
+
+  function copyButton(): HTMLButtonElement {
+    const el = root.querySelector<HTMLButtonElement>("button.sv-ask-copy-btn");
+    if (!el) throw new Error("copy control not rendered");
+    return el;
+  }
+
+  function captureButton(): HTMLButtonElement {
+    const el = root.querySelector<HTMLButtonElement>("button.sv-ask-capture-btn");
+    if (!el) throw new Error("capture control not rendered");
+    return el;
+  }
+
+  async function click(el: HTMLButtonElement): Promise<void> {
+    await act(async () => { el.click(); });
+    await settle();
+  }
+
+  function copyFeedback(): string {
+    return root.querySelector(".sv-ask-copy-feedback")?.textContent ?? "";
+  }
+
+  function captureFeedback(): string {
+    return root.querySelector(".sv-ask-capture-feedback")?.textContent ?? "";
+  }
+
+  it("offers no actions until there is an answer to act on", async () => {
+    mount();
+    await settle();
+    expect(root.querySelector(".sv-ask-actions")).toBeNull();
+    expect(root.querySelector("button.sv-ask-copy-btn")).toBeNull();
+    expect(root.querySelector("button.sv-ask-capture-btn")).toBeNull();
+  });
+
+  it("copies the raw answer text through the clipboard API", async () => {
+    await askAndAnswer("## Coupling\n\n`web-viewer` is the hub.");
+    await click(copyButton());
+
+    // The raw text, not the rendered node text — a markdown answer must round
+    // trip through the clipboard unchanged.
+    expect(clipboardWriteText).toHaveBeenCalledWith("## Coupling\n\n`web-viewer` is the hub.");
+    expect(copyFeedback()).toBe("Copied answer to clipboard.");
+    expect(copyButton().textContent).toBe("Copied");
+  });
+
+  it("falls back to execCommand when the clipboard API is unavailable", async () => {
+    setClipboard(null);
+    const execCommand = stubExecCommand(true);
+
+    await askAndAnswer("Fallback body.");
+    await click(copyButton());
+
+    expect(execCommand).toHaveBeenCalledWith("copy");
+    expect(copyFeedback()).toBe("Copied answer to clipboard.");
+  });
+
+  it("falls back to execCommand when the clipboard API rejects", async () => {
+    clipboardWriteText.mockRejectedValueOnce(new Error("write failed"));
+    const execCommand = stubExecCommand(true);
+
+    await askAndAnswer("Fallback body.");
+    await click(copyButton());
+
+    expect(clipboardWriteText).toHaveBeenCalled();
+    expect(execCommand).toHaveBeenCalledWith("copy");
+    // A fallback that worked is a successful copy, whatever the API said.
+    expect(copyFeedback()).toBe("Copied answer to clipboard.");
+  });
+
+  it("reports a permission denial distinctly from a generic failure", async () => {
+    const denied = new Error("Permission denied");
+    denied.name = "NotAllowedError";
+    clipboardWriteText.mockRejectedValueOnce(denied);
+    // No execCommand stub: the fallback must fail too, or the denial never
+    // reaches the message.
+
+    await askAndAnswer("Denied body.");
+    await click(copyButton());
+
+    expect(copyFeedback()).toBe(
+      "Clipboard access was blocked by browser permissions. "
+      + "Copy manually: select the answer and press Cmd+C (macOS) or Ctrl+C (Windows/Linux).",
+    );
+    // Same wording as the PR Markdown view, which is the point of sharing the
+    // helper — and distinct from the generic case asserted next.
+    expect(copyFeedback()).not.toContain("Failed to copy answer");
+  });
+
+  it("reports a non-permission failure with generic wording", async () => {
+    clipboardWriteText.mockRejectedValueOnce(new Error("clipboard is on fire"));
+    stubExecCommand(false);
+
+    await askAndAnswer("Broken body.");
+    await click(copyButton());
+
+    expect(copyFeedback()).toBe(
+      "Failed to copy answer to clipboard. "
+      + "Copy manually: select the answer and press Cmd+C (macOS) or Ctrl+C (Windows/Linux).",
+    );
+    expect(copyFeedback()).not.toContain("browser permissions");
+  });
+
+  it("clears copy feedback on its own", async () => {
+    // `shouldAdvanceTime` keeps the real clock driving the zero-delay timers
+    // that `settle()` awaits. Without it the harness deadlocks and the test
+    // times out before it can assert anything — and the abandoned fake clock
+    // then deadlocks every test after it in the file.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await askAndAnswer("Body.");
+      await click(copyButton());
+      expect(copyFeedback()).toContain("Copied answer");
+
+      await act(async () => { vi.advanceTimersByTime(2_000); });
+      expect(copyFeedback()).toBe("");
+      expect(copyButton().textContent).toBe("Copy answer");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // ── Answer actions: Capture to PRD ───────────────────────────────
+
+  it("writes nothing until the capture is confirmed", async () => {
+    await askAndAnswer();
+
+    const captureCalls = () => fetchSpy.mock.calls.filter(([u]) => String(u) === ASK_CAPTURE_ENDPOINT).length;
+    expect(captureCalls()).toBe(0);
+
+    // Arming the action is not the action.
+    await click(captureButton());
+    expect(captureCalls()).toBe(0);
+    expect(root.querySelector(".sv-ask-capture-confirm")).not.toBeNull();
+    expect(root.textContent).toContain("File this answer as a PRD task?");
+    // The arming button is replaced while armed, so it cannot be pressed twice.
+    expect(root.querySelector("button.sv-ask-capture-btn")).toBeNull();
+
+    const confirm = root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!;
+    await click(confirm);
+    expect(captureCalls()).toBe(1);
+  });
+
+  it("cancels without writing and can be armed again", async () => {
+    await askAndAnswer();
+
+    await click(captureButton());
+    const cancel = root.querySelector<HTMLButtonElement>("button.sv-ask-capture-cancel-btn")!;
+    await click(cancel);
+
+    expect(fetchSpy.mock.calls.filter(([u]) => String(u) === ASK_CAPTURE_ENDPOINT)).toHaveLength(0);
+    expect(root.querySelector(".sv-ask-capture-confirm")).toBeNull();
+    expect(captureFeedback()).toBe("");
+    // Cancelling returns the action to its resting state rather than consuming it.
+    expect(root.querySelector("button.sv-ask-capture-btn")).not.toBeNull();
+  });
+
+  it("sends the question and answer, and reports the item and its parent", async () => {
+    await askAndAnswer("Split the hub zone.");
+
+    await click(captureButton());
+    await click(root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!);
+
+    const call = fetchSpy.mock.calls.find(([u]) => String(u) === ASK_CAPTURE_ENDPOINT)!;
+    const init = call[1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({
+      question: "Which zones are most coupled?",
+      answer: "Split the hub zone.",
+    });
+
+    expect(captureFeedback()).toBe(
+      'Captured "Which zones are most coupled?" under "SourceVision Ask" (new epic).',
+    );
+  });
+
+  it("surfaces a capture failure and leaves the answer re-copyable", async () => {
+    captureResponse = async () => jsonResponse({ error: "PRD is locked by pid 4212" }, 409);
+
+    await askAndAnswer("Answer worth keeping.");
+    await click(captureButton());
+    await click(root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!);
+
+    const alert = root.querySelector(".sv-ask-capture-error");
+    expect(alert?.textContent).toBe("PRD is locked by pid 4212");
+    expect(alert?.getAttribute("role")).toBe("alert");
+
+    // The answer survived the failed write, and Copy still works on it.
+    expect(root.querySelector(".sv-ask-answer-body")?.textContent).toBe("Answer worth keeping.");
+    await click(copyButton());
+    expect(clipboardWriteText).toHaveBeenCalledWith("Answer worth keeping.");
+    expect(copyFeedback()).toContain("Copied answer");
+  });
+
+  it("names the status code when a capture failure carries no message", async () => {
+    captureResponse = async () => new Response("<html>502</html>", {
+      status: 502,
+      headers: { "Content-Type": "text/html" },
+    });
+
+    await askAndAnswer();
+    await click(captureButton());
+    await click(root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!);
+
+    expect(root.querySelector(".sv-ask-capture-error")?.textContent).toContain("502");
+  });
+
+  it("does not write twice when Confirm is pressed twice", async () => {
+    let release: (r: Response) => void = () => {};
+    captureResponse = () => new Promise<Response>((resolve) => { release = resolve; });
+
+    await askAndAnswer();
+    await click(captureButton());
+
+    const confirm = root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!;
+    await act(async () => {
+      confirm.click();
+      confirm.click();
+    });
+
+    expect(fetchSpy.mock.calls.filter(([u]) => String(u) === ASK_CAPTURE_ENDPOINT)).toHaveLength(1);
+    expect(root.querySelector(".sv-ask-capture-busy")).not.toBeNull();
+
+    await act(async () => {
+      release(jsonResponse({ item: { title: "T" }, parent: { title: "SourceVision Ask" } }));
+      await settle();
+    });
+  });
+
+  it("clears capture feedback on its own", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await askAndAnswer();
+      await click(captureButton());
+      await click(root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!);
+      expect(captureFeedback()).toContain("Captured");
+
+      await act(async () => { vi.advanceTimersByTime(10_000); });
+      expect(captureFeedback()).toBe("");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // ── Feedback does not outlive its answer ─────────────────────────
+
+  it("drops both kinds of feedback when a new question is asked", async () => {
+    await askAndAnswer("First answer.");
+
+    await click(copyButton());
+    await click(captureButton());
+    await click(root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!);
+    expect(copyFeedback()).toContain("Copied answer");
+    expect(captureFeedback()).toContain("Captured");
+
+    askResponse = async () => jsonResponse({ answer: "Second answer.", vendor: "claude", model: "m" });
+    await type("A different question?");
+    await submitForm();
+
+    expect(root.querySelector(".sv-ask-answer-body")?.textContent).toBe("Second answer.");
+    expect(copyFeedback()).toBe("");
+    expect(captureFeedback()).toBe("");
+    expect(copyButton().textContent).toBe("Copy answer");
+  });
+
+  it("drops feedback even when the new question fails", async () => {
+    await askAndAnswer("First answer.");
+    await click(copyButton());
+    expect(copyFeedback()).toContain("Copied answer");
+
+    askResponse = async () => jsonResponse({ error: "Vendor refused.", kind: "rate_limit" }, 429);
+    await type("A doomed question?");
+    await submitForm();
+
+    // The answer card is gone, so the feedback lines are gone with it — the
+    // assertion that matters is that neither reappears attached to the error.
+    expect(root.querySelector(".sv-ask-answer")).toBeNull();
+    expect(root.textContent).not.toContain("Copied answer to clipboard.");
+  });
+
+  // ── Capture result wording ───────────────────────────────────────
+
+  it("describes a capture from whatever the endpoint returned", () => {
+    expect(describeCapture({
+      item: { title: "Split the hub" },
+      parent: { title: "SourceVision Ask", created: false },
+    })).toBe('Captured "Split the hub" under "SourceVision Ask".');
+
+    expect(describeCapture({
+      item: { title: "Split the hub" },
+      parent: { title: "SourceVision Ask", created: true },
+    })).toBe('Captured "Split the hub" under "SourceVision Ask" (new epic).');
+
+    // A 200 that names nothing still reports that something was written,
+    // rather than rendering `Captured "undefined" under "undefined"`.
+    expect(describeCapture({})).toBe('Captured "the answer" to the PRD.');
+    expect(describeCapture({ item: { title: "   " } })).toBe('Captured "the answer" to the PRD.');
   });
 
   // ── Deployed mode ────────────────────────────────────────────────

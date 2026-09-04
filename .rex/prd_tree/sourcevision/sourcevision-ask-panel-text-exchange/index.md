@@ -36,4 +36,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Explain a finding in plain language from the Problems and Suggestions surfaces](./explain-a-finding-in-plain-language.md) | pending |
 | [Give each degraded mode a specific, actionable message](./give-each-degraded-mode-a-specific.md) | pending |
 | [Propose and apply PRD refinements from the exchange, diff-reviewed and under the store lock](./propose-and-apply-prd-refinements-from.md) | pending |
-| [Wire Copy and Capture-to-PRD actions on the answer](./wire-copy-and-capture-to-prd-actions.md) | pending |
+| [Wire Copy and Capture-to-PRD actions on the answer](./wire-copy-and-capture-to-prd-actions.md) | completed |

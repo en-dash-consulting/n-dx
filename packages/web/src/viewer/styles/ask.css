@@ -98,3 +98,40 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--font-xs);
 }
+
+/* Answer actions: Copy and the confirm-guarded Capture to PRD. */
+.sv-ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sv-ask-capture-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sv-ask-capture-confirm-prompt {
+  font-size: var(--font-sm);
+}
+
+.sv-ask-capture-busy {
+  font-size: var(--font-sm);
+  opacity: 0.8;
+}
+
+/* Both feedback lines stay mounted so their live regions pre-exist the text.
+   Reserving the height keeps the card from resizing as messages come and go. */
+.sv-ask-copy-feedback,
+.sv-ask-capture-feedback {
+  margin: 0;
+  min-height: 1.25em;
+}
+
+.sv-ask-capture-error {
+  margin: 0;
+  color: var(--red);
+}

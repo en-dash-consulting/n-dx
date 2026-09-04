@@ -22,28 +22,52 @@
  * not made; a single exchange is what the acceptance criteria describe, and
  * growing it into a list later is additive.
  *
+ * ## Answer actions
+ *
+ * Two actions sit under an answer. **Copy** goes through
+ * {@link copyTextToClipboard}, the copy path lifted out of `pr-markdown.ts`, so
+ * both surfaces fall back to `execCommand` identically and word a permission
+ * denial identically. **Capture to PRD** is confirm-guarded: the first press
+ * only arms it, and nothing is written until Confirm — the same shape as the
+ * Overview Next Steps panel, and for the same reason, since the action mutates
+ * the PRD.
+ *
+ * Both kinds of feedback are transient and both are cleared when a new question
+ * is submitted, so a "Copied" or "Captured" line can never be read as applying
+ * to an answer it did not come from. Capture's window is much longer than
+ * Copy's because its message names where the item landed, which the user needs
+ * time to read; Copy's only confirms an action whose result is already on the
+ * clipboard.
+ *
  * ## Deliberately not here yet
  *
- * Copy and Capture-to-PRD actions on the answer, per-failure-mode wording
- * beyond what the endpoint supplies, and seeding the prompt from a finding
- * are separate PRD tasks under the same feature. The shell is shaped so each
- * lands in one place: an action row under the answer, a message map over
+ * Per-failure-mode wording beyond what the endpoint supplies, and seeding the
+ * prompt from a finding, are separate PRD tasks under the same feature. The
+ * shell is shaped so each lands in one place: a message map over
  * `AskErrorKind`, and an initial-prompt prop respectively.
  *
- * Markdown in the answer is currently shown as-is in a pre-wrapped block.
- * The renderer that would format it lives in `pr-markdown.ts` behind
- * `pr-markdown-*` class names; lifting it out is a shared-module change that
- * belongs with the answer-actions task rather than with the shell.
+ * Markdown in the answer is currently shown as-is in a pre-wrapped block. The
+ * renderer that would format it lives in `pr-markdown.ts` behind
+ * `pr-markdown-*` class names; lifting it out is a separate shared-module
+ * change, and unlike the clipboard path it has only one would-be second
+ * consumer, so it stays where it is for now.
  *
  * @module web/viewer/views/ask
  * @see ../../server/routes-sourcevision-ask.ts -- the endpoint this consumes
+ * @see ../../server/routes-rex-analysis.ts -- POST /api/rex/capture-ask
  */
 
 import { h } from "preact";
-import { useCallback, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
+import {
+  clipboardFailureMessage,
+  clipboardSuccessMessage,
+  copyTextToClipboard,
+  type ClipboardFailureReason,
+} from "../utils/clipboard.js";
 
 // ---------------------------------------------------------------------------
 // Endpoint contract
@@ -52,10 +76,32 @@ import { isDeployedMode } from "../deployed-mode.js";
 /** Path of the Ask endpoint. Exported so tests assert on the real string. */
 export const ASK_ENDPOINT = "/api/sourcevision/ask";
 
+/**
+ * Path of the capture endpoint. On the rex prefix, not the sourcevision one:
+ * the request writes a PRD item, and the route that does that lives with the
+ * other PRD writers so it shares their store resolution and cache refresh.
+ */
+export const ASK_CAPTURE_ENDPOINT = "/api/rex/capture-ask";
+
 /** Mirrors the server's `MAX_PROMPT_CHARS` so the textarea refuses first. */
 export const ASK_MAX_PROMPT_CHARS = 4_000;
 
 const PROMPT_FIELD_ID = "sv-ask-prompt";
+
+/** What the copy action's manual-copy guidance tells the user to select. */
+const COPY_SUBJECT = "answer";
+
+/** How long a "Copied" confirmation stays up. Matches the PR Markdown view. */
+const COPY_FEEDBACK_MS = 2_000;
+
+/**
+ * How long a capture result stays up.
+ *
+ * Five times the copy window: this message names the item and the epic it
+ * landed under, and a confirmation that disappears before it can be read is
+ * indistinguishable from one that never appeared.
+ */
+const CAPTURE_FEEDBACK_MS = 10_000;
 
 /** Success payload of `POST /api/sourcevision/ask`. */
 interface AskSuccessPayload {
@@ -70,6 +116,13 @@ interface AskErrorPayload {
   error?: string;
   kind?: string;
   suggestion?: string;
+}
+
+/** Payload of `POST /api/rex/capture-ask`, success or failure. */
+interface AskCapturePayload {
+  item?: { id?: string; title?: string };
+  parent?: { title?: string; created?: boolean };
+  error?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +146,50 @@ export type AskState =
 export function isSubmittablePrompt(prompt: string): boolean {
   const trimmed = prompt.trim();
   return trimmed.length > 0 && trimmed.length <= ASK_MAX_PROMPT_CHARS;
+}
+
+/**
+ * Where the copy action stands. `error` carries a reason so the message can
+ * distinguish a blocked clipboard from a copy that simply did not work.
+ */
+type CopyState =
+  | { status: "idle" }
+  | { status: "success" }
+  | { status: "error"; reason: ClipboardFailureReason };
+
+/**
+ * Where the capture action stands.
+ *
+ * `confirm` is the whole point of the type: the button that starts a capture
+ * only moves the action into `confirm`, and no request is issued until the
+ * separate Confirm control is pressed. A boolean "capturing" flag could not
+ * express the armed-but-not-yet-written state that the acceptance criterion
+ * requires.
+ */
+type CaptureState =
+  | { status: "idle" }
+  | { status: "confirm" }
+  | { status: "capturing" }
+  | { status: "done"; message: string }
+  | { status: "error"; message: string };
+
+/**
+ * Describe a completed capture in terms of what was created and where.
+ *
+ * The parent is named because "Captured to PRD" leaves the user hunting for
+ * the item; naming the epic tells them which branch of the tree to open, and
+ * whether that epic is new tells them why they have not seen it before.
+ */
+export function describeCapture(payload: AskCapturePayload): string {
+  const title = typeof payload.item?.title === "string" && payload.item.title.trim().length > 0
+    ? payload.item.title.trim()
+    : "the answer";
+  const parent = typeof payload.parent?.title === "string" && payload.parent.title.trim().length > 0
+    ? payload.parent.title.trim()
+    : null;
+  if (!parent) return `Captured "${title}" to the PRD.`;
+  const suffix = payload.parent?.created === true ? " (new epic)" : "";
+  return `Captured "${title}" under "${parent}"${suffix}.`;
 }
 
 /**
@@ -131,6 +228,8 @@ export function AskView() {
 
   const [prompt, setPrompt] = useState("");
   const [state, setState] = useState<AskState>({ status: "idle" });
+  const [copy, setCopy] = useState<CopyState>({ status: "idle" });
+  const [capture, setCapture] = useState<CaptureState>({ status: "idle" });
 
   /**
    * Guards a second submit while one is in flight. `state.status` cannot do
@@ -139,6 +238,63 @@ export function AskView() {
    */
   const inFlightRef = useRef(false);
 
+  /** The same guard for capture — a double-pressed Confirm must write once. */
+  const capturingRef = useRef(false);
+
+  const copyTimerRef = useRef<number | null>(null);
+  const captureTimerRef = useRef<number | null>(null);
+
+  /** Show `next` and schedule it away, replacing any pending clear. */
+  const showCopyFeedback = useCallback((next: CopyState) => {
+    setCopy(next);
+    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = null;
+    if (next.status !== "idle") {
+      copyTimerRef.current = window.setTimeout(() => {
+        setCopy({ status: "idle" });
+        copyTimerRef.current = null;
+      }, COPY_FEEDBACK_MS);
+    }
+  }, []);
+
+  /**
+   * Move the capture action to `next`, auto-clearing only its terminal stages.
+   *
+   * `confirm` and `capturing` are stages the user is inside and must not time
+   * out from underneath them; `done` and `error` are results, and those do
+   * clear themselves.
+   */
+  const setCaptureStage = useCallback((next: CaptureState) => {
+    setCapture(next);
+    if (captureTimerRef.current !== null) window.clearTimeout(captureTimerRef.current);
+    captureTimerRef.current = null;
+    if (next.status === "done" || next.status === "error") {
+      captureTimerRef.current = window.setTimeout(() => {
+        setCapture({ status: "idle" });
+        captureTimerRef.current = null;
+      }, CAPTURE_FEEDBACK_MS);
+    }
+  }, []);
+
+  /**
+   * Drop both actions back to idle and cancel their pending clears.
+   *
+   * Called when a question is submitted rather than from an effect keyed on
+   * the answer: the reset must happen even when the request fails, and it must
+   * be observable in the same render as the `submitting` state, so that no
+   * intermediate frame can show the previous answer's "Copied" line.
+   */
+  const resetActions = useCallback(() => {
+    showCopyFeedback({ status: "idle" });
+    setCaptureStage({ status: "idle" });
+  }, [showCopyFeedback, setCaptureStage]);
+
+  // A timer that outlives the panel would set state on an unmounted component.
+  useEffect(() => () => {
+    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    if (captureTimerRef.current !== null) window.clearTimeout(captureTimerRef.current);
+  }, []);
+
   const submit = useCallback(async () => {
     if (inFlightRef.current) return;
     // The no-op case: an empty or whitespace-only prompt issues no request.
@@ -146,6 +302,7 @@ export function AskView() {
 
     const question = prompt.trim();
     inFlightRef.current = true;
+    resetActions();
     setState({ status: "submitting", question });
 
     try {
@@ -195,7 +352,53 @@ export function AskView() {
     } finally {
       inFlightRef.current = false;
     }
-  }, [prompt]);
+  }, [prompt, resetActions]);
+
+  const answerText = state.status === "answered" ? state.answer : null;
+
+  const handleCopy = useCallback(async () => {
+    if (answerText === null) return;
+    const result = await copyTextToClipboard(answerText);
+    showCopyFeedback(result.ok ? { status: "success" } : { status: "error", reason: result.reason });
+  }, [answerText, showCopyFeedback]);
+
+  const handleCapture = useCallback(async () => {
+    if (state.status !== "answered") return;
+    if (capturingRef.current) return;
+    capturingRef.current = true;
+    setCapture({ status: "capturing" });
+
+    try {
+      const res = await fetch(ASK_CAPTURE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: state.question, answer: state.answer }),
+      });
+      let payload: AskCapturePayload = {};
+      try {
+        payload = await res.json() as AskCapturePayload;
+      } catch {
+        payload = {};
+      }
+      if (!res.ok) {
+        // The endpoint's own wording when it supplied any, the status code
+        // otherwise -- a proxy returning HTML must still name what went wrong.
+        const reason = typeof payload.error === "string" && payload.error.trim().length > 0
+          ? payload.error
+          : `The capture request failed (${res.status}).`;
+        setCaptureStage({ status: "error", message: reason });
+        return;
+      }
+      setCaptureStage({ status: "done", message: describeCapture(payload) });
+    } catch (err) {
+      setCaptureStage({
+        status: "error",
+        message: err instanceof Error ? err.message : "The capture request failed.",
+      });
+    } finally {
+      capturingRef.current = false;
+    }
+  }, [state, setCaptureStage]);
 
   const header = h("div", { class: "view-header" },
     h(BrandedHeader, { product: "sourcevision", title: "SourceVision", class: "branded-header-sv" }),
@@ -299,6 +502,72 @@ export function AskView() {
                   ? ` · grounded in ${state.contextSources.join(", ")}`
                   : "",
               )
+            : null,
+
+          h("div", { class: "sv-ask-actions" },
+            h("button", {
+              type: "button",
+              class: "btn sv-ask-copy-btn",
+              onClick: () => { void handleCopy(); },
+            }, copy.status === "success" ? "Copied" : "Copy answer"),
+
+            capture.status === "idle" || capture.status === "done" || capture.status === "error"
+              ? h("button", {
+                  type: "button",
+                  class: "btn sv-ask-capture-btn",
+                  title: "File this answer as a PRD task so it can be worked on",
+                  onClick: () => { setCaptureStage({ status: "confirm" }); },
+                }, "Capture to PRD")
+              : null,
+
+            capture.status === "confirm"
+              ? h("span", { class: "sv-ask-capture-confirm" },
+                  h("span", { class: "sv-ask-capture-confirm-prompt" },
+                    "File this answer as a PRD task?",
+                  ),
+                  h("button", {
+                    type: "button",
+                    class: "btn sv-ask-capture-confirm-btn",
+                    onClick: () => { void handleCapture(); },
+                  }, "Confirm"),
+                  h("button", {
+                    type: "button",
+                    class: "btn sv-ask-capture-cancel-btn",
+                    onClick: () => { setCaptureStage({ status: "idle" }); },
+                  }, "Cancel"),
+                )
+              : null,
+
+            capture.status === "capturing"
+              ? h("span", { class: "sv-ask-capture-busy", "aria-busy": "true" }, "Capturing...")
+              : null,
+          ),
+
+          // Both feedback lines are always mounted so their live regions exist
+          // before the text arrives -- a region created in the same render as
+          // its content is not reliably announced.
+          h("p", {
+            class: "section-sub sv-ask-copy-feedback",
+            role: "status",
+            "aria-live": "polite",
+          },
+            copy.status === "success"
+              ? clipboardSuccessMessage(COPY_SUBJECT)
+              : copy.status === "error"
+                ? clipboardFailureMessage(copy.reason, COPY_SUBJECT)
+                : "",
+          ),
+          h("p", {
+            class: "section-sub sv-ask-capture-feedback",
+            role: "status",
+            "aria-live": "polite",
+          },
+            capture.status === "done" ? capture.message : "",
+          ),
+          // A failed write is an alert, not a status: it needs the interruption
+          // that a polite live region deliberately does not give it.
+          capture.status === "error"
+            ? h("p", { class: "section-sub sv-ask-capture-error", role: "alert" }, capture.message)
             : null,
         )
       : null,
