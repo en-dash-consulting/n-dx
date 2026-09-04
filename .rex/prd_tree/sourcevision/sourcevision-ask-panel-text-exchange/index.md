@@ -29,7 +29,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Accessibility and regression coverage for the Ask panel](./accessibility-and-regression-coverage.md) | pending |
+| [Accessibility and regression coverage for the Ask panel](./accessibility-and-regression-coverage.md) | completed |
 | [Add gated Ask tab and prompt/response view shell](./add-gated-ask-tab-and-prompt-response.md) | completed |
 | [Add POST /api/sourcevision/ask backed by analysis context and llm-client](./add-post-api-sourcevision-ask-backed.md) | completed |
 | [Attribute Ask token spend in the usage rollup](./attribute-ask-token-spend-in-the-usage.md) | pending |

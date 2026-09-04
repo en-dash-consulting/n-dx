@@ -39,6 +39,35 @@
  * time to read; Copy's only confirms an action whose result is already on the
  * clipboard.
  *
+ * ## Accessibility
+ *
+ * An async text exchange has one requirement the other SourceVision subviews
+ * do not: the answer arrives after an indeterminate delay, so its arrival has
+ * to be *announced* rather than merely rendered.
+ *
+ * Four decisions follow from that, and each is load-bearing:
+ *
+ * 1. **One persistent polite live region** ({@link askAnnouncement}), mounted
+ *    on every render with empty text while idle. A region created in the same
+ *    render as its content is not reliably announced, which is why the answer
+ *    card cannot be the live region itself.
+ * 2. **Arrival is announced, not content.** The region says an answer is
+ *    ready and how long it is; the answer itself is a `role="region"` labelled
+ *    by its heading, so the reader navigates to it when they choose. Piping
+ *    hundreds of words through a live region buries the one fact the waiting
+ *    user needs and talks over whatever they were reading.
+ * 3. **Nothing is disabled while a request is in flight.** Disabling the
+ *    element the user just activated moves focus to `<body>`, dropping a
+ *    keyboard user back at the top of the document mid-wait. The textarea goes
+ *    `readOnly` and the submit button carries `aria-disabled`; the real
+ *    `disabled` attribute is reserved for the unsubmittable-prompt case, which
+ *    can only be reached while focus is in the textarea.
+ * 4. **State is never signalled by colour alone.** Every feedback line carries
+ *    a shape marker ({@link FEEDBACK_MARK_OK} / {@link FEEDBACK_MARK_FAIL})
+ *    alongside its colour, and a capture failure adds a screen-reader-only
+ *    "Capture failed:" prefix because the reason itself comes from the server
+ *    and may not read as a failure on its own.
+ *
  * ## Deliberately not here yet
  *
  * Per-failure-mode wording beyond what the endpoint supplies, and seeding the
@@ -87,6 +116,15 @@ export const ASK_CAPTURE_ENDPOINT = "/api/rex/capture-ask";
 export const ASK_MAX_PROMPT_CHARS = 4_000;
 
 const PROMPT_FIELD_ID = "sv-ask-prompt";
+
+/** Labels the answer region, so a reader can find it by name. */
+const ANSWER_HEADING_ID = "sv-ask-answer-heading";
+
+/** Success marker. A shape, so colour is never the only success cue. */
+export const FEEDBACK_MARK_OK = "✓";
+
+/** Failure marker. A shape, so colour is never the only failure cue. */
+export const FEEDBACK_MARK_FAIL = "⚠";
 
 /** What the copy action's manual-copy guidance tells the user to select. */
 const COPY_SUBJECT = "answer";
@@ -146,6 +184,34 @@ export type AskState =
 export function isSubmittablePrompt(prompt: string): boolean {
   const trimmed = prompt.trim();
   return trimmed.length > 0 && trimmed.length <= ASK_MAX_PROMPT_CHARS;
+}
+
+/**
+ * What the panel's polite live region says for a given state.
+ *
+ * `answered` reports arrival and length rather than the answer, because a
+ * live region reads its entire text: a 400-word answer announced in full
+ * buries "it is here now" and talks over whatever the reader was on. The
+ * length is what tells them whether to jump to the region straight away or
+ * finish the sentence they were reading first.
+ *
+ * `idle` and `error` are deliberately silent. Idle is the state the panel
+ * renders in, so there is no transition to announce; the error card is a
+ * `role="alert"`, which announces itself, and repeating it here would read
+ * the same failure twice.
+ */
+export function askAnnouncement(state: AskState): string {
+  switch (state.status) {
+    case "submitting":
+      return "Reading the analysis and composing an answer.";
+    case "answered": {
+      const words = state.answer.trim().split(/\s+/).filter((word) => word.length > 0).length;
+      return `Answer ready, ${words} ${words === 1 ? "word" : "words"}.`
+        + " It is in the Answer region below the question.";
+    }
+    default:
+      return "";
+  }
 }
 
 /**
@@ -422,7 +488,6 @@ export function AskView() {
   }
 
   const submitting = state.status === "submitting";
-  const canSubmit = isSubmittablePrompt(prompt) && !submitting;
   const tooLong = prompt.trim().length > ASK_MAX_PROMPT_CHARS;
 
   // The state modifier is namespaced `sv-ask-state-*` rather than `sv-ask-*`:
@@ -437,8 +502,19 @@ export function AskView() {
       " analysis. Run an analysis first for anything it does not yet cover.",
     ),
 
+    // The panel's one live region, mounted on every render with empty text
+    // while there is nothing to say. A region inserted alongside its content
+    // is not reliably announced, so it cannot be created when the answer is.
+    h("p", {
+      class: "sr-only sv-ask-announcer",
+      role: "status",
+      "aria-live": "polite",
+      "aria-atomic": "true",
+    }, askAnnouncement(state)),
+
     h("form", {
       class: "card sv-ask-form",
+      "aria-busy": submitting ? "true" : "false",
       onSubmit: (e: Event) => {
         e.preventDefault();
         void submit();
@@ -451,7 +527,11 @@ export function AskView() {
         rows: 4,
         value: prompt,
         placeholder: "Which zones are most coupled, and what is driving it?",
-        disabled: submitting,
+        // `readOnly`, not `disabled`: disabling the field the user is typing
+        // in moves focus to <body>, so pressing Enter to submit would cost a
+        // keyboard user their place and their way back to the prompt. Read-only
+        // still refuses edits while the answer is in flight.
+        readOnly: submitting,
         "aria-describedby": "sv-ask-prompt-hint",
         onInput: (e: Event) => setPrompt((e.target as HTMLTextAreaElement).value),
       }),
@@ -464,20 +544,35 @@ export function AskView() {
         h("button", {
           type: "submit",
           class: "btn sv-ask-submit",
-          disabled: !canSubmit,
+          // The real `disabled` attribute is reserved for a prompt that cannot
+          // be sent — a state only reachable while focus is in the textarea,
+          // so it can never take focus away from this button. While a request
+          // is in flight the control stays focusable and merely reports itself
+          // unavailable, because disabling the button a keyboard user just
+          // pressed drops their focus to <body>. `submit()` refuses the second
+          // request either way.
+          //
+          // Set only while submitting, never as a standing `"false"`: paired
+          // with the native `disabled` above that would be a control claiming
+          // to be both unavailable and available at once.
+          disabled: !isSubmittablePrompt(prompt),
+          "aria-disabled": submitting ? "true" : undefined,
         }, submitting ? "Asking..." : "Ask"),
       ),
     ),
 
+    // No live semantics on either of the next two: the announcer above owns
+    // every state transition. Marking these as regions too would announce the
+    // same transition a second time.
     state.status === "idle"
-      ? h("div", { class: "card sv-ask-idle", role: "status", "aria-live": "polite" },
+      ? h("div", { class: "card sv-ask-idle" },
           h("h3", { class: "section-header-sm" }, "No question asked yet"),
           h("p", null, "Type a question above to get an answer grounded in the analysis."),
         )
       : null,
 
     submitting
-      ? h("div", { class: "sv-ask-status", role: "status", "aria-live": "polite" },
+      ? h("div", { class: "sv-ask-status" },
           h("p", { class: "loading" }, "Reading the analysis and composing an answer..."),
         )
       : null,
@@ -491,8 +586,17 @@ export function AskView() {
       : null,
 
     state.status === "answered"
-      ? h("div", { class: "card sv-ask-answer", role: "status", "aria-live": "polite" },
-          h("h3", { class: "section-header-sm" }, "Answer"),
+      // A labelled region rather than a live one: the announcer has already
+      // said the answer arrived, and this is where the reader goes to read it
+      // at their own pace. Making the card itself live would read the whole
+      // answer -- plus its metadata, its buttons, and every later "Copied"
+      // line, since a live ancestor claims all of its descendants' updates.
+      ? h("div", {
+          class: "card sv-ask-answer",
+          role: "region",
+          "aria-labelledby": ANSWER_HEADING_ID,
+        },
+          h("h3", { class: "section-header-sm", id: ANSWER_HEADING_ID }, "Answer"),
           h("p", { class: "section-sub sv-ask-question" }, state.question),
           h("div", { class: "sv-ask-answer-body" }, state.answer),
           state.model
@@ -545,29 +649,53 @@ export function AskView() {
 
           // Both feedback lines are always mounted so their live regions exist
           // before the text arrives -- a region created in the same render as
-          // its content is not reliably announced.
+          // its content is not reliably announced. The marker span carries the
+          // outcome as a shape so colour is not the only signal; it is
+          // aria-hidden because the message beside it already says which
+          // outcome this is.
           h("p", {
-            class: "section-sub sv-ask-copy-feedback",
+            class: `sv-ask-feedback sv-ask-feedback-${copy.status}`,
             role: "status",
             "aria-live": "polite",
           },
-            copy.status === "success"
-              ? clipboardSuccessMessage(COPY_SUBJECT)
-              : copy.status === "error"
-                ? clipboardFailureMessage(copy.reason, COPY_SUBJECT)
-                : "",
+            h("span", { class: "sv-ask-feedback-mark", "aria-hidden": "true" },
+              copy.status === "success"
+                ? FEEDBACK_MARK_OK
+                : copy.status === "error" ? FEEDBACK_MARK_FAIL : "",
+            ),
+            h("span", { class: "section-sub sv-ask-copy-feedback" },
+              copy.status === "success"
+                ? clipboardSuccessMessage(COPY_SUBJECT)
+                : copy.status === "error"
+                  ? clipboardFailureMessage(copy.reason, COPY_SUBJECT)
+                  : "",
+            ),
           ),
           h("p", {
-            class: "section-sub sv-ask-capture-feedback",
+            class: `sv-ask-feedback sv-ask-feedback-${capture.status === "done" ? "success" : "idle"}`,
             role: "status",
             "aria-live": "polite",
           },
-            capture.status === "done" ? capture.message : "",
+            h("span", { class: "sv-ask-feedback-mark", "aria-hidden": "true" },
+              capture.status === "done" ? FEEDBACK_MARK_OK : "",
+            ),
+            h("span", { class: "section-sub sv-ask-capture-feedback" },
+              capture.status === "done" ? capture.message : "",
+            ),
           ),
           // A failed write is an alert, not a status: it needs the interruption
           // that a polite live region deliberately does not give it.
+          //
+          // The message is the server's, so it may not read as a failure on its
+          // own -- "PRD is locked by pid 4212" states a fact. The marker says
+          // so by shape and the screen-reader prefix says so in words, which is
+          // what keeps the red from being the only thing carrying the outcome.
           capture.status === "error"
-            ? h("p", { class: "section-sub sv-ask-capture-error", role: "alert" }, capture.message)
+            ? h("p", { class: "sv-ask-feedback sv-ask-feedback-error", role: "alert" },
+                h("span", { class: "sv-ask-feedback-mark", "aria-hidden": "true" }, FEEDBACK_MARK_FAIL),
+                h("span", { class: "sr-only" }, "Capture failed: "),
+                h("span", { class: "section-sub sv-ask-capture-error" }, capture.message),
+              )
             : null,
         )
       : null,

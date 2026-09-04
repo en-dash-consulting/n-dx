@@ -125,13 +125,36 @@
 
 /* Both feedback lines stay mounted so their live regions pre-exist the text.
    Reserving the height keeps the card from resizing as messages come and go. */
-.sv-ask-copy-feedback,
-.sv-ask-capture-feedback {
+.sv-ask-feedback {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1-5);
   margin: 0;
   min-height: 1.25em;
 }
 
+.sv-ask-copy-feedback,
+.sv-ask-capture-feedback,
 .sv-ask-capture-error {
   margin: 0;
+}
+
+/* The outcome marker. Success and failure differ in glyph as well as in hue,
+   so the state survives a reader who cannot separate the two colours. */
+.sv-ask-feedback-mark {
+  flex: none;
+  font-size: var(--font-sm);
+  line-height: 1.25em;
+}
+
+/* Success tints only the marker, leaving the message in body colour: the line
+   is a confirmation, not a warning, and recolouring its text would give it
+   more weight than the answer it sits under. A failure tints the whole line,
+   which is what the capture error already did. */
+.sv-ask-feedback-success .sv-ask-feedback-mark {
+  color: var(--green);
+}
+
+.sv-ask-feedback-error {
   color: var(--red);
 }

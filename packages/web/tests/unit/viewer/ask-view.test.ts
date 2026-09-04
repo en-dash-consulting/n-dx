@@ -206,9 +206,11 @@ describe("AskView", () => {
     // submitting
     expect(root.querySelector(".sv-ask-status")).not.toBeNull();
     expect(root.querySelector(".sv-ask-idle")).toBeNull();
-    expect(submitButton().disabled).toBe(true);
     expect(submitButton().textContent).toBe("Asking...");
-    expect(textarea().disabled).toBe(true);
+    // Neither control is hard-disabled while the request is in flight — see
+    // the focus-retention test below for why. They report unavailable instead.
+    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
+    expect(textarea().readOnly).toBe(true);
 
     await act(async () => {
       release(jsonResponse({
@@ -253,7 +255,8 @@ describe("AskView", () => {
     expect(root.querySelector(".sv-ask-status")).toBeNull();
     // The panel is usable again rather than stuck in the failed submit.
     expect(submitButton().disabled).toBe(false);
-    expect(textarea().disabled).toBe(false);
+    expect(submitButton().getAttribute("aria-disabled")).toBeNull();
+    expect(textarea().readOnly).toBe(false);
   });
 
   it("reports a transport failure as an error rather than throwing", async () => {
@@ -578,9 +581,12 @@ describe("AskView", () => {
     await click(captureButton());
     await click(root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!);
 
-    const alert = root.querySelector(".sv-ask-capture-error");
-    expect(alert?.textContent).toBe("PRD is locked by pid 4212");
-    expect(alert?.getAttribute("role")).toBe("alert");
+    expect(root.querySelector(".sv-ask-capture-error")?.textContent).toBe("PRD is locked by pid 4212");
+    // The alert is the line, not the message span, so the marker and the
+    // screen-reader prefix are announced with the reason rather than after it.
+    const alert = root.querySelector("p[role='alert'].sv-ask-feedback-error");
+    expect(alert).not.toBeNull();
+    expect(alert?.querySelector(".sv-ask-capture-error")).not.toBeNull();
 
     // The answer survived the failed write, and Copy still works on it.
     expect(root.querySelector(".sv-ask-answer-body")?.textContent).toBe("Answer worth keeping.");
