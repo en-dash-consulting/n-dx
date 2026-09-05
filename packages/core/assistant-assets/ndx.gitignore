@@ -23,6 +23,8 @@
 .hench/reviews/
 # Per-session token-usage watermarks written by `hench record`
 .hench/usage-cursors/
+# Warm-parent CLI session ids for fork-based cold-start elimination — machine-local
+.hench/session-cache.json
 .hench-commit-msg.txt
 
 # Rex ephemeral state

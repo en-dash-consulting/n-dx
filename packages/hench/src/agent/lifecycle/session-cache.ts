@@ -353,9 +353,22 @@ export function isParentUsable(
  * different commit), and reading one small file keeps this cheap enough to
  * run before every task.
  *
- * A missing or unreadable manifest returns a stable sentinel rather than
- * throwing: projects without sourcevision output still get forking, they just
- * do not get analysis-driven invalidation.
+ * A missing, unreadable, or empty manifest returns a stable sentinel rather
+ * than throwing: projects without sourcevision output still get forking, they
+ * just do not get analysis-driven invalidation.
+ *
+ * ## Cross-tier contract
+ *
+ * This must produce byte-identical output to sourcevision's `primerFingerprint`
+ * and core's `sourcevisionAnalysisFingerprint`. The three tiers cannot share one
+ * implementation — sourcevision stamps the primer, core reads it from the
+ * orchestration tier (spawn-only, no library imports), and hench reads it
+ * without a sourcevision gateway — so the agreement is enforced by
+ * `tests/integration/primer-fingerprint-contract.test.js` instead. Divergence is
+ * silent rather than loud: the hashes simply never match, every primer looks
+ * stale, and the optimization quietly stops paying. The separator and the
+ * `unknown` sentinel are therefore load-bearing and must not be changed on one
+ * side alone.
  */
 export async function sourcevisionFingerprint(projectDir: string): Promise<string> {
   try {
@@ -363,10 +376,10 @@ export async function sourcevisionFingerprint(projectDir: string): Promise<strin
     const manifest = JSON.parse(raw) as { analyzedAt?: unknown; gitSha?: unknown };
     const analyzedAt = typeof manifest.analyzedAt === "string" ? manifest.analyzedAt : "";
     const gitSha = typeof manifest.gitSha === "string" ? manifest.gitSha : "";
-    if (!analyzedAt && !gitSha) return "sv-unknown";
-    return createHash("sha256").update(`${analyzedAt} ${gitSha}`).digest("hex").slice(0, 16);
+    if (!analyzedAt && !gitSha) return "unknown";
+    return createHash("sha256").update(`${analyzedAt} ${gitSha}`).digest("hex").slice(0, 16);
   } catch {
-    return "sv-absent";
+    return "unknown";
   }
 }
 

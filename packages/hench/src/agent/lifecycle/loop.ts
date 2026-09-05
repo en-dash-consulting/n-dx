@@ -23,6 +23,13 @@ import type {
 } from "../../prd/llm-gateway.js";
 import type { TokenUsage } from "../../schema/index.js";
 import { checkTokenBudget } from "./token-budget.js";
+import { buildCachedMessageRequest } from "./prompt-cache.js";
+import {
+  ConversationPruner,
+  anthropicPruneShape,
+  createContextSummarizer,
+} from "./context-prune.js";
+import type { PruneShape } from "./context-prune.js";
 import { parseTokenUsage } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD } from "../analysis/spin.js";
@@ -58,7 +65,6 @@ export interface AgentLoopResult {
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503, 529]);
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
-const MAX_CONTEXT_PAIRS = 20;
 const MAX_SUMMARY_LENGTH = 500;
 const MAX_TOOL_OUTPUT_STORED = 2000;
 
@@ -189,18 +195,6 @@ async function callWithFailover(
       }
     }
   }
-}
-
-function pruneMessages(messages: Anthropic.MessageParam[]): void {
-  // Keep first message (the task brief) and last MAX_CONTEXT_PAIRS turn-pairs.
-  // Turn-pairs are (assistant, user) so each pair = 2 messages.
-  const maxKeep = 1 + MAX_CONTEXT_PAIRS * 2;
-
-  if (messages.length <= maxKeep) return;
-
-  const removed = messages.length - maxKeep;
-  messages.splice(1, removed);
-  detail(`Pruned ${removed} messages to stay within token budget`);
 }
 
 /** Resolved API resources needed for the agent turn loop. */
@@ -503,14 +497,41 @@ async function executeGeminiFunctionCalls(
   return responses;
 }
 
-/** Prune Gemini conversation history (keep brief + last MAX_CONTEXT_PAIRS pairs). */
-function pruneGeminiContents(contents: GeminiContent[]): void {
-  const maxKeep = 1 + MAX_CONTEXT_PAIRS * 2;
-  if (contents.length <= maxKeep) return;
+/** Flatten one Gemini turn to text for the prune summarizer. */
+function renderGeminiContent(content: GeminiContent): string {
+  const parts: string[] = [];
+  for (const part of content.parts) {
+    if ("text" in part) {
+      if (part.text) parts.push(part.text);
+    } else if ("functionCall" in part) {
+      parts.push(`→ ${part.functionCall.name}(${JSON.stringify(part.functionCall.args)})`);
+    } else {
+      parts.push(`← ${JSON.stringify(part.functionResponse.response)}`);
+    }
+  }
+  if (parts.length === 0) return "";
+  return `${content.role}: ${parts.join("\n")}`;
+}
 
-  const removed = contents.length - maxKeep;
-  contents.splice(1, removed);
-  detail(`Pruned ${removed} turns to stay within token budget`);
+/**
+ * Prune shape for the Gemini loop. Gemini names the assistant role "model";
+ * a `functionResponse` turn is only valid after the `functionCall` turn it
+ * answers, so the tail must start on a model turn.
+ */
+function geminiPruneShape(): PruneShape<GeminiContent> {
+  return {
+    headCount: 1,
+    isTailStart: (content) => content.role === "model",
+    render: renderGeminiContent,
+    toSummaryMessage: (summary) => ({
+      role: "user",
+      parts: [{
+        text:
+          "[context] Earlier turns of this run were compacted to fit the " +
+          `context window. What happened in them:\n\n${summary}`,
+      }],
+    }),
+  };
 }
 
 /** Parameters for the Gemini agentic tool-use loop. */
@@ -531,6 +552,8 @@ interface GeminiToolLoopParams {
   startingHead: string | undefined;
   /** Untracked files present before the run, for scoped rollback (#303). */
   baselineUntracked: string[];
+  /** Resolved LLM config — routes the prune summary to its own tier. */
+  llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>;
   opts: AgentLoopOptions;
 }
 
@@ -556,7 +579,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   const {
     provider, config, model, systemPrompt, briefText, taskTitle, testCommand,
     taskId, henchDir, projectDir, store, maxTurns, tokenBudget, startingHead,
-    baselineUntracked, opts,
+    baselineUntracked, llmConfig, opts,
   } = params;
 
   const hasToolCalling =
@@ -612,6 +635,15 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       const contents: GeminiContent[] = [
         { role: "user", parts: [{ text: briefText }] },
       ];
+      const pruner = new ConversationPruner(
+        geminiPruneShape(),
+        createContextSummarizer({
+          provider,
+          llmConfig,
+          vendor: LLM_VENDOR.GOOGLE,
+          taskTitle,
+        }),
+      );
 
       for (let turn = 0; turn < maxTurns; turn++) {
         if (cancelled) {
@@ -623,7 +655,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
         run.turns = turn + 1;
         subsection(`Turn ${turn + 1}/${maxTurns}`);
 
-        pruneGeminiContents(contents);
+        await pruner.prune(contents);
 
         const result = await withHeartbeat(
           `waiting on google/${model} response`,
@@ -734,6 +766,39 @@ interface OpenAiMessage {
     type: "function";
     function: { name: string; arguments: string };
   }>;
+}
+
+/** Flatten one OpenAI-format message to text for the prune summarizer. */
+function renderOpenAiMessage(message: OpenAiMessage): string {
+  const parts: string[] = [];
+  if (message.content) parts.push(message.content);
+  for (const call of message.tool_calls ?? []) {
+    parts.push(`→ ${call.function.name}(${call.function.arguments})`);
+  }
+  if (parts.length === 0) return "";
+  return `${message.role}: ${parts.join("\n")}`;
+}
+
+/**
+ * Prune shape for the OpenAI-compatible (LM Studio) loop.
+ *
+ * The head is the optional system message plus the brief. A `tool` message is
+ * only valid immediately after the assistant message whose `tool_calls` it
+ * answers — the reason the tail must start on an assistant message, and a
+ * pairing the old inline `splice(systemEnd, n)` could break outright.
+ */
+function openAiPruneShape(hasSystemPrompt: boolean): PruneShape<OpenAiMessage> {
+  return {
+    headCount: hasSystemPrompt ? 2 : 1,
+    isTailStart: (message) => message.role === "assistant",
+    render: renderOpenAiMessage,
+    toSummaryMessage: (summary) => ({
+      role: "user",
+      content:
+        "[context] Earlier turns of this run were compacted to fit the context " +
+        `window. What happened in them:\n\n${summary}`,
+    }),
+  };
 }
 
 /** Single tool call extracted from an OpenAI chat response. */
@@ -973,6 +1038,16 @@ async function runLocalToolLoop(params: {
   }
   messages.push({ role: "user", content: briefText });
 
+  const pruner = new ConversationPruner(
+    openAiPruneShape(Boolean(systemPrompt)),
+    createContextSummarizer({
+      provider,
+      llmConfig,
+      vendor: LLM_VENDOR.LOCAL,
+      taskTitle,
+    }),
+  );
+
   // Pre-send token check: if maxContextTokens is configured, estimate whether the initial
   // brief fits before the first request. A rough heuristic (1 token ≈ 3.5 chars) is used
   // — exact tokenization requires the model's tokenizer. Fails fast with actionable guidance.
@@ -1004,13 +1079,7 @@ async function runLocalToolLoop(params: {
       subsection(`Turn ${turn + 1}/${maxTurns}`);
 
       // Prune history to stay within context limits
-      const maxKeep = 1 + MAX_CONTEXT_PAIRS * 2;
-      if (messages.length > maxKeep + 1) {
-        const toRemove = messages.length - maxKeep - 1;
-        const systemEnd = messages[0].role === "system" ? 1 : 0;
-        messages.splice(systemEnd, toRemove);
-        detail(`Pruned ${toRemove} messages to stay within context limit`);
-      }
+      await pruner.prune(messages);
 
       const reqBody: Record<string, unknown> = {
         model: model || undefined,
@@ -1257,6 +1326,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       tokenBudget,
       startingHead,
       baselineUntracked,
+      llmConfig,
       opts,
     });
   }
@@ -1307,6 +1377,19 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     { role: "user", content: briefText },
   ];
 
+  // Batched, summarizing prune. Cutting the oldest turns every turn — the old
+  // behavior — changed the prompt prefix on every request and made the cache
+  // breakpoints below unreadable.
+  const pruner = new ConversationPruner(
+    anthropicPruneShape(),
+    createContextSummarizer({
+      provider,
+      llmConfig,
+      vendor,
+      taskTitle: brief.task.title,
+    }),
+  );
+
   section(
     opts.runNumber !== undefined
       ? `Agent Run #${opts.runNumber} (${model}) start`
@@ -1346,20 +1429,20 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       subsection(`Turn ${turn + 1}/${maxTurns}`);
 
-      pruneMessages(messages);
+      await pruner.prune(messages);
 
       const _t0 = Date.now();
       const response = await withHeartbeat(
         `waiting on ${vendor}/${model} response`,
         callWithFailover(
           client,
-          {
+          buildCachedMessageRequest({
             model,
-            max_tokens: config.maxTokens,
-            system: systemPrompt,
+            maxTokens: config.maxTokens,
+            systemPrompt,
             tools: TOOL_DEFINITIONS,
             messages,
-          },
+          }),
           config,
           vendor,
           model,
