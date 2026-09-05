@@ -2,10 +2,11 @@
 id: "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6"
 level: "epic"
 title: "CLI & Developer Tools"
-status: "completed"
+status: "pending"
 startedAt: "2026-04-02T17:55:36.327Z"
-completedAt: "2026-04-10T18:34:32.028Z"
 description: "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline."
+lastModified: "2026-09-05T01:25:41.467Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -55,6 +56,7 @@ description: "Command-line interface: error handling, validation, formatting, he
 | [hench init must gitignore .hench/locks/ or the first autonomous run self-blocks](./hench-init-must-gitignore-hench-locks.md) | pending |
 | [`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record](./hench-record-no-tokens-leaves-the.md) | completed |
 | [`hench record` with no usage window silently claims the entire session transcript](./hench-record-with-no-usage-window.md) | completed |
+| [ndx ci architecture-policy gate fails on a clean main — four allowlist paths can never match](./ndx-ci-architecture-policy-gate-fails.md) | pending |
 | [Not every commit n-dx creates carries the Co-Authored-By trailer](./not-every-commit-n-dx-creates-carries.md) | completed |
 | [Pre-dispatch project-dir resolution still lets a directory shadow a config key](./pre-dispatch-project-dir-resolution.md) | completed |
 | [resolveDir treats a tool subcommand as the project directory, so `ndx hench record` checks the wrong path](./resolvedir-treats-a-tool-subcommand-as.md) | completed |
