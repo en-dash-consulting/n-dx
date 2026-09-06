@@ -23,6 +23,8 @@
 .hench/reviews/
 # Per-session token-usage watermarks written by `hench record`
 .hench/usage-cursors/
+# Warm-parent session cache, rewritten on every orientation. Machine-local.
+.hench/session-cache.json
 .hench-commit-msg.txt
 
 # Rex ephemeral state

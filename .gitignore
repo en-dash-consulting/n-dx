@@ -6,6 +6,7 @@ package-lock.json
 .hench/locks/
 .hench/usage-cursors/
 .hench/reviews/
+.hench/session-cache.json
 .hench-commit-msg.txt
 .run-logs/
 .n-dx.json

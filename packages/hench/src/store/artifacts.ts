@@ -21,7 +21,13 @@
  *
  * Deliberately narrow. `.hench/config.json` is operator-authored and is
  * expected to be tracked, so `.hench/` as a whole is *not* discounted — only
- * the per-run and per-session output directories below.
+ * the per-run and per-session output paths below.
+ *
+ * `.hench/session-cache.json` earns its place the hard way: it was committed
+ * on this branch by the very `git add -A` described above, and then rewritten
+ * by the next orientation, so an autonomous run would refuse to start against
+ * a file it had just written itself. An ignore line alone does not fix that
+ * once the file is tracked — the untrack and the discount are both required.
  *
  * @module hench/store/artifacts
  */
@@ -37,6 +43,7 @@ export const HENCH_RUNTIME_GITIGNORE_ENTRIES: readonly string[] = [
   ".hench/runs/",
   ".hench/locks/",
   ".hench/usage-cursors/",
+  ".hench/session-cache.json",
   ".hench-commit-msg.txt",
 ];
 
