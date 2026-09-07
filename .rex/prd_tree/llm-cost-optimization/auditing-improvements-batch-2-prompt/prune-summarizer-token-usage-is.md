@@ -1,0 +1,23 @@
+---
+id: "9d0cd27b-21f6-4485-b77e-9fe126b6e548"
+level: "task"
+title: "Prune summarizer token usage is discarded, so compaction spend never reaches run records or usage rollups"
+status: "pending"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "hench"
+  - "context-prune"
+  - "token-usage"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "After a prune whose completion returns tokenUsage, `run.tokenUsage.input` and `run.tokenUsage.output` include the summarizer's tokens"
+  - "`run.turnTokenUsage` gains an entry whose `model` is the light-tier model resolved for `context.summarize`, not the run's primary model"
+  - "A summarizer that returns no tokenUsage leaves the totals unchanged and does not throw"
+  - "A unit test asserts `PruneOutcome` carries the summarizer usage; a loop-level test asserts the run record includes it"
+  - "The cache-token fields on the run record are unaffected by summarizer usage"
+description: "Severity: medium. Verdict: should-fix. Found by the adversarial review of PR #353.\n\n## Failure scenario\n`createContextSummarizer` (packages/hench/src/agent/lifecycle/context-prune.ts:312) destructures only `text` from `provider.complete()` and drops `tokenUsage`. Each prune sends up to 20,000 characters to the light-tier model; none of that input or output is added to `run.tokenUsage` or `run.turnTokenUsage`, so `hench show`, the run summary, `rex usage`, the dashboard and `get_token_usage` all under-report the run. For `llm.vendor=local` the same loaded model does the extra work with no accounting at all. This is the same defect class as the PR's own commit 8d94fea9 (\"run summary omits cache tokens\").\n\n## Reachability\nEvery prune whose summary succeeds, on all three API loops.\n\n## Solution options\n1. (Recommended) Change `PruneSummarizer` to return `{ text: string; tokenUsage?: TokenUsage }`. Return the usage from `ConversationPruner.prune` in `PruneOutcome` (e.g. `summaryUsage`), and have each loop fold it into the run via the existing `recordTurnTokenUsageNormalized`, attributed to the light-tier `resolution.model` and the run's vendor, at the current turn number. Cost: small. Risk: none beyond the per-turn breakdown gaining an extra entry per prune.\n2. Record the usage inside `createContextSummarizer` via an injected callback. Same effect, but couples the summarizer to the run record.\n\nOption 1 keeps the pruner vendor-neutral and testable."
+lastModified: "2026-09-07T20:28:41.331Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

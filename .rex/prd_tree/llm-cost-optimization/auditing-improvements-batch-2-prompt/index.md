@@ -17,8 +17,16 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [append_log is MCP-only — no CLI equivalent, so ndx work runs cannot write execution-log entries](./append-log-is-mcp-only-no-cli.md) | pending |
+| [Keep-tail prune replays thinking blocks created before the cut, which Claude Fable 5.1's preserved-thinking check rejects](./keep-tail-prune-replays-thinking.md) | pending |
+| [No way to disable cache_control breakpoints for a Claude api_endpoint that rejects them](./no-way-to-disable-cache-control.md) | pending |
 | [PACKAGE_GUIDELINES .rex/ write-access protocol documented a PRD layout that no longer exists](./package-guidelines-rex-write-access.md) | completed |
+| [Primer freshness check rejects a still-valid primer after any analysis that made no LLM call](./primer-freshness-check-rejects-a-still.md) | pending |
+| [Prompt cache TTL is fixed at 5 minutes, so tool calls longer than about 4 minutes rewrite the whole conversation at the cache-write price](./prompt-cache-ttl-is-fixed-at-5-minutes.md) | pending |
 | [Prompt caching in the API agent loop (cache_control breakpoints)](./prompt-caching-in-the-api-agent-loop.md) | completed |
+| [Prune retention and transcript truncation are hard-coded, halving the verbatim window and summarizing from 800-char excerpts](./prune-retention-and-transcript.md) | pending |
+| [Prune summarizer token usage is discarded, so compaction spend never reaches run records or usage rollups](./prune-summarizer-token-usage-is.md) | pending |
 | [Run summary omits cache tokens, understating input ~65,000x](./run-summary-omits-cache-tokens.md) | completed |
+| [Summarizing prune emits two consecutive user turns on the local and Gemini loops, which strict chat templates reject](./summarizing-prune-emits-two.md) | pending |
 | [Summarizing prune that preserves the cache prefix](./summarizing-prune-that-preserves-the.md) | completed |
+| [tokenBudget counts uncached input only, so prompt caching silently disables the budget on API runs](./tokenbudget-counts-uncached-input-only.md) | pending |
 | [Wire the sourcevision PRIMER.md into ndx work and hench orientation](./wire-the-sourcevision-primer-md-into.md) | completed |
