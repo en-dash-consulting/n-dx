@@ -1,0 +1,23 @@
+---
+id: "c4a7d0c9-7de3-4069-bdb7-5bc41daaf2ea"
+level: "task"
+title: "Full test gate timeout is hard-coded at 5 minutes, so a passing suite that runs long under load fails the run"
+status: "pending"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "hench"
+  - "test-gate"
+  - "config"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "hench config schema accepts `fullTestTimeoutMs` (positive integer), validated with an actionable error, and `ndx config hench.fullTestTimeoutMs 900000` persists it"
+  - "`runTestGate` receives the configured value as its `timeout`; with no value configured the default is 900000"
+  - "The gate prints the command and the timeout in seconds when it starts"
+  - "A unit test proves a configured timeout reaches `runTestGate` and that the default changed; it fails on the current code"
+  - "Config documentation lists `fullTestTimeoutMs` beside `fullTestCommand` with the default and the reason to raise it"
+description: "Severity: medium. Verdict: should-fix. Observed while monitoring the first `ndx work --review` run on this branch (run 80c716ff, 2026-09-07).\n\n## Failure scenario\n`TEST_GATE_TIMEOUT = 300_000` (`packages/hench/src/tools/test-runner.ts:439`) is the only timeout the Full Test Suite Gate uses, and no config key or flag changes it. This repo's full suite takes about 198s uncontended. During the observed run a second `ndx work` in another worktree was running its own suite at the same time, plus the opus reviewer session; the gate ran 5m20s, was killed at the timeout, and the run was marked failed with the work already committed and the reviewer's repair left uncommitted. The agent had already run the same suite green in-session as workflow step 5, so the gate failed a task whose tests passed twice.\n\nThe 100s of headroom on a quiet machine is thin for a monorepo suite, and any contention removes it. The only remedies today are `--skip-test-gate` or a narrower `hench.fullTestCommand`, which is what the operator had to do (`pnpm --filter @n-dx/hench run validate`).\n\n## Reachability\nAny project whose full suite approaches five minutes, and any machine running more than one suite at once.\n\n## Solution options\n1. (Recommended) Add `hench.fullTestTimeoutMs` (config schema, `.hench/config.json`, `.n-dx.json` `hench` block, `ndx config`), default raised to 900_000 (15 minutes), passed through `runTestGate` as `timeout`. Log `Running <command> (timeout <n>s)` when the gate starts so the limit is visible before it bites. Cost: small. Risk: a genuinely hung suite holds the run three times longer before failing; the heartbeat keeps the dashboard from marking it stale.\n2. Derive the timeout from the agent's own in-session test run duration when available. Clever but opaque; not recommended.\n\nOption 1 is a one-key knob and matches how `fullTestCommand` is already configured."
+lastModified: "2026-09-07T23:03:01.514Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
