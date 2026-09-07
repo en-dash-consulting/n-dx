@@ -2,7 +2,7 @@
 id: "7f29fa1a-a88d-4234-96a0-1d888855af75"
 level: "task"
 title: "Summarizing prune emits two consecutive user turns on the local and Gemini loops, which strict chat templates reject"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "ndx-adversarial-review"
@@ -12,6 +12,9 @@ tags:
   - "local"
   - "gemini"
 source: "ndx-adversarial-review"
+startedAt: "2026-09-07T22:30:04.455Z"
+completedAt: "2026-09-07T22:38:44.325Z"
+endedAt: "2026-09-07T22:38:44.325Z"
 acceptanceCriteria:
   - "After a summarizing prune on the OpenAI-compatible shape, no two adjacent messages share a role, and every `tool` message is immediately preceded by an assistant message carrying `tool_calls` or by another `tool` message"
   - "After a summarizing prune on the Gemini shape, the contents array alternates user/model strictly from the brief onward"
@@ -20,6 +23,6 @@ acceptanceCriteria:
   - "Unit tests in packages/hench/tests/unit/agent/lifecycle/context-prune.test.ts cover the local and Gemini shapes after both a successful summary and a degraded drop; the tests fail on the current code"
   - "`triggerLength` accounts for a two-message summary so the next prune fires at the same cadence as a one-message summary"
 description: "Severity: high. Verdict: must-fix. Found by the adversarial review of PR #353.\n\n## Failure scenario\nAfter the first prune whose summary succeeds, `openAiPruneShape` (packages/hench/src/agent/lifecycle/loop.ts:791) and `geminiPruneShape` (loop.ts:519) insert the summary as a `user` message directly after the `user` brief, so the array reads: system, user brief, user summary, assistant, ... The Anthropic Messages API documents that consecutive same-role turns are merged, so the Anthropic shape is fine. LM Studio applies the loaded model's Jinja chat template, and several common templates (Mistral-Instruct, Gemma, Llama-2-chat) raise `Conversation roles must alternate` on non-alternating roles. The local loop turns any non-2xx response into a thrown error at loop.ts:1112, so the run fails on turn 22 and on every retry, because the message array has already been mutated. Gemini's `generateContent` has historically enforced user/model alternation for some models; not verified against the live API during the review.\n\n## Reachability\n`llm.vendor=local` (or `google`) plus a run that passes 21 turns. Default `maxTurns` is 50 and the templates go up to 80, so real runs get there. No test exercises the pruner inside the local or Gemini loop; the only alternation test covers the Anthropic shape.\n\n## Solution options\n1. (Recommended) Let `PruneShape.toSummaryMessage` return `M | M[]`, and have the local and Gemini shapes return a two-message pair: the user summary followed by a minimal assistant acknowledgement that claims no work (e.g. \"Acknowledged. Continuing from the compacted context.\"). The Anthropic shape keeps returning a single user message. `ConversationPruner.prune` splices in all returned messages and increments `summaryCount` by their length so `triggerLength` and `dropStart` stay correct. Cost: small, one new test file section. Risk: a few extra tokens per prune.\n2. Fold the summary text into the brief message for the two affected shapes. Keeps alternation with no extra message, but rewrites head bytes on every prune and mixes summary prose into the task brief.\n\nOption 1 keeps the head byte-stable and is easiest to test."
-lastModified: "2026-09-07T20:28:39.400Z"
+lastModified: "2026-09-07T22:38:44.345Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

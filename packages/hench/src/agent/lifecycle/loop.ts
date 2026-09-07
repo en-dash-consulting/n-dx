@@ -26,6 +26,7 @@ import { checkTokenBudget } from "./token-budget.js";
 import { buildCachedMessageRequest } from "./prompt-cache.js";
 import {
   ConversationPruner,
+  PRUNE_BRIDGE_TEXT,
   anthropicPruneShape,
   createContextSummarizer,
 } from "./context-prune.js";
@@ -517,20 +518,29 @@ function renderGeminiContent(content: GeminiContent): string {
  * Prune shape for the Gemini loop. Gemini names the assistant role "model";
  * a `functionResponse` turn is only valid after the `functionCall` turn it
  * answers, so the tail must start on a model turn.
+ *
+ * The summary is two turns, not one. `generateContent` expects `contents` to
+ * alternate user/model, and the tail already opens on a model turn, so a lone
+ * user summary would sit between the user brief and that model turn and break
+ * the alternation on the user side. A model bridge turn ahead of the summary
+ * restores it: user brief → model bridge → user summary → model tail.
  */
-function geminiPruneShape(): PruneShape<GeminiContent> {
+export function geminiPruneShape(): PruneShape<GeminiContent> {
   return {
     headCount: 1,
     isTailStart: (content) => content.role === "model",
     render: renderGeminiContent,
-    toSummaryMessage: (summary) => ({
-      role: "user",
-      parts: [{
-        text:
-          "[context] Earlier turns of this run were compacted to fit the " +
-          `context window. What happened in them:\n\n${summary}`,
-      }],
-    }),
+    toSummaryMessage: (summary) => [
+      { role: "model", parts: [{ text: PRUNE_BRIDGE_TEXT }] },
+      {
+        role: "user",
+        parts: [{
+          text:
+            "[context] Earlier turns of this run were compacted to fit the " +
+            `context window. What happened in them:\n\n${summary}`,
+        }],
+      },
+    ],
   };
 }
 
@@ -757,7 +767,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
 // ---------------------------------------------------------------------------
 
 /** OpenAI-format message in the conversation history. */
-interface OpenAiMessage {
+export interface OpenAiMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string | null;
   tool_call_id?: string;
@@ -786,18 +796,30 @@ function renderOpenAiMessage(message: OpenAiMessage): string {
  * only valid immediately after the assistant message whose `tool_calls` it
  * answers — the reason the tail must start on an assistant message, and a
  * pairing the old inline `splice(systemEnd, n)` could break outright.
+ *
+ * The summary is two messages, not one. Unlike the Anthropic endpoint, an
+ * OpenAI-compatible server hands the array to the loaded model's Jinja chat
+ * template, and Mistral-Instruct, Gemma and Llama-2-chat all raise
+ * "Conversation roles must alternate" on two user turns in a row. A lone user
+ * summary lands directly after the user brief and does exactly that, and the
+ * local loop turns the resulting non-2xx into a thrown error, so the run dies
+ * on the first prune and on every retry after it. An assistant bridge turn
+ * ahead of the summary keeps the array alternating from the brief onward.
  */
-function openAiPruneShape(hasSystemPrompt: boolean): PruneShape<OpenAiMessage> {
+export function openAiPruneShape(hasSystemPrompt: boolean): PruneShape<OpenAiMessage> {
   return {
     headCount: hasSystemPrompt ? 2 : 1,
     isTailStart: (message) => message.role === "assistant",
     render: renderOpenAiMessage,
-    toSummaryMessage: (summary) => ({
-      role: "user",
-      content:
-        "[context] Earlier turns of this run were compacted to fit the context " +
-        `window. What happened in them:\n\n${summary}`,
-    }),
+    toSummaryMessage: (summary) => [
+      { role: "assistant", content: PRUNE_BRIDGE_TEXT },
+      {
+        role: "user",
+        content:
+          "[context] Earlier turns of this run were compacted to fit the context " +
+          `window. What happened in them:\n\n${summary}`,
+      },
+    ],
   };
 }
 

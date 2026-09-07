@@ -26,7 +26,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Prune retention and transcript truncation are hard-coded, halving the verbatim window and summarizing from 800-char excerpts](./prune-retention-and-transcript.md) | pending |
 | [Prune summarizer token usage is discarded, so compaction spend never reaches run records or usage rollups](./prune-summarizer-token-usage-is.md) | pending |
 | [Run summary omits cache tokens, understating input ~65,000x](./run-summary-omits-cache-tokens.md) | completed |
-| [Summarizing prune emits two consecutive user turns on the local and Gemini loops, which strict chat templates reject](./summarizing-prune-emits-two.md) | pending |
+| [Summarizing prune emits two consecutive user turns on the local and Gemini loops, which strict chat templates reject](./summarizing-prune-emits-two.md) | completed |
 | [Summarizing prune that preserves the cache prefix](./summarizing-prune-that-preserves-the.md) | completed |
 | [tokenBudget counts uncached input only, so prompt caching silently disables the budget on API runs](./tokenbudget-counts-uncached-input-only.md) | pending |
 | [Wire the sourcevision PRIMER.md into ndx work and hench orientation](./wire-the-sourcevision-primer-md-into.md) | completed |
