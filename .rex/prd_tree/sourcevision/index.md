@@ -51,4 +51,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Web UI Memory Management and Crash Resolution](./web-ui-memory-management-and-crash/index.md) | completed |
 | [Zone Detection Validation for Go Projects](./zone-detection-validation-for-go/index.md) | completed |
 | [Optional 3D isometric architecture map generator](./optional-3d-isometric-architecture-map.md) | completed |
-| [sv analyze: skip git worktree checkouts in sub-analysis discovery](./sv-analyze-skip-git-worktree-checkouts.md) | pending |
+| [sv analyze: skip git worktree checkouts in sub-analysis discovery](./sv-analyze-skip-git-worktree-checkouts.md) | completed |

@@ -6,8 +6,9 @@
  * with prefixed IDs instead of re-running Louvain on its files.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import {join, relative} from "node:path";import type {
+import { execFileSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import {join, relative, resolve, sep} from "node:path";import type {
   Manifest,
   Inventory,
   Imports,
@@ -43,28 +44,101 @@ export interface SubAnalysis {
 // ── Detection ────────────────────────────────────────────────────────────────
 
 /**
+ * Directory names never descended into when looking for sub-analyses.
+ *
+ * `.claude` is present because agent sessions create git worktrees under
+ * `.claude/worktrees/<name>/`. Each is a full checkout carrying its own
+ * `.sourcevision/`, so without this the parent analysis absorbs a duplicate
+ * copy of its own zones for every live worktree.
+ */
+const SKIP_DIRS: ReadonlySet<string> = new Set([
+  "node_modules",
+  ".git",
+  ".claude",
+  "dist",
+  "build",
+  "fixtures",
+  "__fixtures__",
+  "testdata",
+  "__pycache__",
+  ".next",
+  ".nuxt",
+  ".svelte-kit",
+  ".turbo",
+  ".cache",
+  "coverage",
+  ".output",
+]);
+
+/**
+ * Resolve a path through symlinks, falling back to a plain absolute resolve
+ * when the path cannot be stat'd. Keeps comparisons total — an unresolvable
+ * path is still compared, just literally.
+ */
+function realpathOrResolve(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return resolve(p);
+  }
+}
+
+/**
+ * Registered git worktrees nested strictly inside `rootDir`.
+ *
+ * These are separate checkouts of the same repository (agent session
+ * worktrees under `.claude/`, the `.ndx-deploy-tmp` worktree created by
+ * `packages/core/export.js`). Each carries a full copy of the tree including
+ * `.sourcevision/`, so promoting one duplicates the entire parent analysis.
+ *
+ * The root itself is never included: running `sv analyze` from inside a
+ * worktree must analyze that worktree normally.
+ *
+ * Best-effort. Git missing, not a repository, a failure, or a timeout all
+ * yield an empty set and the scan proceeds exactly as it would have.
+ */
+function listNestedWorktrees(rootDir: string): ReadonlySet<string> {
+  let stdout: unknown;
+  try {
+    stdout = execFileSync("git", ["worktree", "list", "--porcelain"], {
+      cwd: rootDir,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 5000,
+    });
+  } catch {
+    return new Set();
+  }
+
+  if (typeof stdout !== "string") return new Set();
+
+  const rootReal = realpathOrResolve(rootDir);
+  const nested = new Set<string>();
+
+  for (const line of stdout.split("\n")) {
+    if (!line.startsWith("worktree ")) continue;
+    const wt = line.slice("worktree ".length).trim();
+    if (!wt) continue;
+
+    const wtReal = realpathOrResolve(wt);
+    if (wtReal !== rootReal && wtReal.startsWith(rootReal + sep)) {
+      nested.add(wtReal);
+    }
+  }
+
+  return nested;
+}
+
+/**
  * Recursively scan for .sourcevision directories within the project tree.
  * Skips the root .sourcevision itself and common excluded directories.
  */
-function findSubSvDirs(rootDir: string, currentDir: string, results: string[]): void {
-  const SKIP_DIRS = new Set([
-    "node_modules",
-    ".git",
-    "dist",
-    "build",
-    "fixtures",
-    "__fixtures__",
-    "testdata",
-    "__pycache__",
-    ".next",
-    ".nuxt",
-    ".svelte-kit",
-    ".turbo",
-    ".cache",
-    "coverage",
-    ".output",
-  ]);
-
+function findSubSvDirs(
+  rootDir: string,
+  currentDir: string,
+  results: string[],
+  nestedWorktrees: ReadonlySet<string>,
+): void {
   let entries: string[];
   try {
     entries = readdirSync(currentDir);
@@ -85,6 +159,12 @@ function findSubSvDirs(rootDir: string, currentDir: string, results: string[]): 
 
     if (!stat.isDirectory()) continue;
 
+    // A registered worktree is a duplicate checkout of this same repository —
+    // never a sub-analysis. Only pay for the realpath when there are any.
+    if (nestedWorktrees.size > 0 && nestedWorktrees.has(realpathOrResolve(fullPath))) {
+      continue;
+    }
+
     // Check if this directory has a .sourcevision subdirectory
     if (entry === SV_DIR) {
       // Skip the root's own .sourcevision
@@ -104,7 +184,7 @@ function findSubSvDirs(rootDir: string, currentDir: string, results: string[]): 
     }
 
     // Recurse
-    findSubSvDirs(rootDir, fullPath, results);
+    findSubSvDirs(rootDir, fullPath, results, nestedWorktrees);
   }
 }
 
@@ -187,7 +267,8 @@ function loadSubAnalysis(rootDir: string, subDir: string): SubAnalysis | null {
  */
 export function detectSubAnalyses(rootDir: string): SubAnalysis[] {
   const subDirs: string[] = [];
-  findSubSvDirs(rootDir, rootDir, subDirs);
+  // Resolved once per scan, not per directory.
+  findSubSvDirs(rootDir, rootDir, subDirs, listNestedWorktrees(rootDir));
 
   const results: SubAnalysis[] = [];
   for (const subDir of subDirs) {
