@@ -26,12 +26,12 @@
  *   [ head ][ summaries ][ live tail ]
  *     ^        ^            ^
  *     |        |            recent turns, verbatim
- *     |        one message per prune, append-only
+ *     |        one or two messages per prune, append-only
  *     system prompt / task brief — never touched
  * ```
  *
  * A prune replaces the span between the summaries and the retained tail with
- * **one** summary message, appended to the summary region. Nothing already in
+ * the summary, appended to the summary region. Nothing already in
  * the head or the summary region is ever rewritten or moved, so the prefix the
  * provider cached stays byte-identical across turns — that is why summaries
  * accumulate rather than being re-summarized into a single rolling message: a
@@ -86,6 +86,17 @@ export const TRANSCRIPT_MESSAGE_CHAR_LIMIT = 800;
 /** Overall cap on the rendered span. */
 export const TRANSCRIPT_CHAR_LIMIT = 20_000;
 
+/**
+ * Assistant turn that bridges the brief and the summary on formats that
+ * require strictly alternating roles.
+ *
+ * Deliberately claims nothing. It exists to occupy an assistant slot, and a
+ * model reading its own transcript must not find a turn where it appears to
+ * have reported progress it never made. Kept short for the same reason it
+ * exists at all: it is protocol padding, not context.
+ */
+export const PRUNE_BRIDGE_TEXT = "Understood. Continuing from the compacted context that follows.";
+
 /** Generates a summary of a rendered transcript. Rejects to decline. */
 export type PruneSummarizer = (transcript: string) => Promise<string>;
 
@@ -106,8 +117,21 @@ export interface PruneShape<M> {
   isTailStart: (message: M) => boolean;
   /** Flatten one message to plain text for the summarizer prompt. */
   render: (message: M) => string;
-  /** Wrap summary text in a message this format accepts. */
-  toSummaryMessage: (summary: string) => M;
+  /**
+   * Wrap summary text in the message — or messages — this format accepts.
+   *
+   * A list rather than a single message because the summary lands between the
+   * brief (a user turn) and the retained tail (an assistant turn), and formats
+   * differ on whether that is legal. Anthropic documents consecutive same-role
+   * turns as merged, so one user message is enough. The OpenAI-compatible and
+   * Gemini paths are rendered by the served model's own chat template, and the
+   * common ones (Mistral-Instruct, Gemma, Llama-2-chat) raise
+   * "Conversation roles must alternate" instead — so those shapes return an
+   * assistant bridge turn followed by the user summary, keeping the array
+   * strictly alternating. Order matters: bridge first, because the tail opens
+   * on an assistant turn and a summary placed last would collide with it.
+   */
+  toSummaryMessage: (summary: string) => M | M[];
 }
 
 /** What one {@link ConversationPruner.prune} call did. */
@@ -216,7 +240,12 @@ export class ConversationPruner<M> {
     private readonly summarize: PruneSummarizer,
   ) {}
 
-  /** Summary messages inserted so far. Exposed for assertions and logging. */
+  /**
+   * Messages held in the append-only summary region. Counted in messages, not
+   * in prunes, because a shape may need more than one message per summary —
+   * both {@link triggerLength} and the drop offset are message indices.
+   * Exposed for assertions and logging.
+   */
   get summaries(): number {
     return this.summaryCount;
   }
@@ -229,8 +258,9 @@ export class ConversationPruner<M> {
   /**
    * Prune `messages` in place when it has outgrown the trigger.
    *
-   * Mutates only the droppable span and appends at most one message; the head
-   * and the existing summaries keep their bytes and their indices.
+   * Mutates only the droppable span and appends whatever the shape's
+   * {@link PruneShape.toSummaryMessage} returns; the head and the existing
+   * summaries keep their bytes and their indices.
    */
   async prune(messages: M[]): Promise<PruneOutcome> {
     if (messages.length <= this.triggerLength) return NO_PRUNE;
@@ -253,8 +283,10 @@ export class ConversationPruner<M> {
       return { dropped: dropped.length, summarized: false };
     }
 
-    messages.splice(dropStart, dropped.length, this.shape.toSummaryMessage(summary));
-    this.summaryCount++;
+    const inserted = this.shape.toSummaryMessage(summary);
+    const summaryMessages = Array.isArray(inserted) ? inserted : [inserted];
+    messages.splice(dropStart, dropped.length, ...summaryMessages);
+    this.summaryCount += summaryMessages.length;
     detail(`Pruned ${dropped.length} messages into a ${summary.length}-char summary`);
     return { dropped: dropped.length, summarized: true };
   }

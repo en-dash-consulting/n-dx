@@ -21,6 +21,7 @@ import { describe, it, expect } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import {
   ConversationPruner,
+  PRUNE_BRIDGE_TEXT,
   PRUNE_RETAIN_PAIRS,
   PRUNE_TRIGGER_PAIRS,
   SUMMARY_CHAR_LIMIT,
@@ -33,6 +34,9 @@ import {
   renderPruneTranscript,
 } from "../../../../src/agent/lifecycle/context-prune.js";
 import type { PruneShape } from "../../../../src/agent/lifecycle/context-prune.js";
+import { geminiPruneShape, openAiPruneShape } from "../../../../src/agent/lifecycle/loop.js";
+import type { OpenAiMessage } from "../../../../src/agent/lifecycle/loop.js";
+import type { GeminiContent } from "../../../../src/prd/llm-gateway.js";
 import { resolveTaskModel } from "../../../../src/prd/llm-gateway.js";
 
 /** The class the prune summary must route through. */
@@ -305,6 +309,197 @@ describe("ConversationPruner with an OpenAI-compatible shape", () => {
     // The first live message is an assistant turn, so every retained tool
     // result still has the call it answers.
     expect(messages[3].role).toBe("assistant");
+  });
+});
+
+/**
+ * Role alternation, as the strict chat templates enforce it.
+ *
+ * Anthropic merges consecutive same-role turns, so its shape can put the
+ * summary next to the brief. Nothing else does: an OpenAI-compatible server
+ * renders the array through the loaded model's Jinja template, and
+ * Mistral-Instruct / Gemma / Llama-2-chat raise "Conversation roles must
+ * alternate" instead. The one legal repeat is a run of `tool` messages, which
+ * those templates handle as a block rather than as turns.
+ */
+function expectAlternatingRoles(roles: readonly string[]): void {
+  for (let i = 1; i < roles.length; i++) {
+    if (roles[i] === "tool" && roles[i - 1] === "tool") continue;
+    // Reported as an index-tagged transition so a failure names the seam.
+    expect(`${i - 1}→${i}: ${roles[i - 1]}, ${roles[i]}`).not.toMatch(
+      new RegExp(`: ${roles[i - 1]}, ${roles[i - 1]}$`),
+    );
+  }
+}
+
+describe("openAiPruneShape", () => {
+  const SYSTEM = "You are an autonomous coding agent.";
+
+  /** Head plus `pairs` (assistant tool_call, tool result) turn-pairs. */
+  function chat(pairs: number): OpenAiMessage[] {
+    const messages: OpenAiMessage[] = [
+      { role: "system", content: SYSTEM },
+      { role: "user", content: BRIEF },
+    ];
+    for (let n = 1; n <= pairs; n++) {
+      messages.push({
+        role: "assistant",
+        content: null,
+        tool_calls: [{
+          id: `call_${n}`,
+          type: "function",
+          function: { name: "read_file", arguments: `{"path":"src/step-${n}.ts"}` },
+        }],
+      });
+      messages.push({ role: "tool", tool_call_id: `call_${n}`, content: `step ${n} ok` });
+    }
+    return messages;
+  }
+
+  it("keeps the array alternating after a summarizing prune", async () => {
+    const pruner = new ConversationPruner(openAiPruneShape(true), stubSummarizer);
+    const messages = chat(PRUNE_TRIGGER_PAIRS + 1);
+
+    expect((await pruner.prune(messages)).summarized).toBe(true);
+
+    expectAlternatingRoles(messages.map((m) => m.role));
+    // The head is untouched and the summary region follows it.
+    expect(messages[0]).toEqual({ role: "system", content: SYSTEM });
+    expect(messages[1]).toEqual({ role: "user", content: BRIEF });
+    expect(messages[2]).toEqual({ role: "assistant", content: PRUNE_BRIDGE_TEXT });
+    expect(messages[3].role).toBe("user");
+    expect(messages[3].content).toContain("earlier turns did some work");
+    expect(messages[4].role).toBe("assistant");
+  });
+
+  it("leaves every tool message anchored to the call it answers", async () => {
+    const pruner = new ConversationPruner(openAiPruneShape(true), stubSummarizer);
+    const messages = chat(PRUNE_TRIGGER_PAIRS + 1);
+
+    await pruner.prune(messages);
+
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].role !== "tool") continue;
+      const previous = messages[i - 1];
+      expect(previous).toBeDefined();
+      const anchored =
+        previous.role === "tool" ||
+        (previous.role === "assistant" && (previous.tool_calls?.length ?? 0) > 0);
+      expect(anchored).toBe(true);
+    }
+  });
+
+  it("stays alternating with no system prompt, where the head is the brief alone", async () => {
+    const pruner = new ConversationPruner(openAiPruneShape(false), stubSummarizer);
+    const messages = chat(PRUNE_TRIGGER_PAIRS + 1).slice(1);
+
+    expect((await pruner.prune(messages)).summarized).toBe(true);
+
+    expectAlternatingRoles(messages.map((m) => m.role));
+    expect(messages[0]).toEqual({ role: "user", content: BRIEF });
+    expect(messages[1].role).toBe("assistant");
+  });
+
+  it("stays alternating on the degraded drop, when no summary is available", async () => {
+    const pruner = new ConversationPruner(openAiPruneShape(true), async () => {
+      throw new Error("provider unavailable");
+    });
+    const messages = chat(PRUNE_TRIGGER_PAIRS + 1);
+
+    expect((await pruner.prune(messages)).summarized).toBe(false);
+
+    expectAlternatingRoles(messages.map((m) => m.role));
+    expect(messages[2].role).toBe("assistant");
+    expect(pruner.summaries).toBe(0);
+  });
+
+  it("prunes at the same cadence despite the two-message summary", async () => {
+    let prunes = 0;
+    const pruner = new ConversationPruner(openAiPruneShape(true), async () => {
+      prunes++;
+      return "compacted";
+    });
+    const messages = chat(PRUNE_TRIGGER_PAIRS + 1);
+
+    await pruner.prune(messages);
+    expect(prunes).toBe(1);
+    // The summary region is two messages wide, so the trigger has to move by
+    // two as well — otherwise the next prune fires early and never stops.
+    expect(pruner.summaries).toBe(2);
+    expect(pruner.triggerLength).toBe(2 + 2 + PRUNE_TRIGGER_PAIRS * 2);
+
+    // The gap between trigger and retain is how many turn-pairs of pure
+    // append follow a prune, and it must not shrink because the summary got
+    // wider. Same cadence as the one-message Anthropic shape.
+    const addPair = (n: number): void => {
+      messages.push({ role: "assistant", content: `step ${n}` });
+      messages.push({ role: "user", content: `next ${n}` });
+    };
+
+    for (let n = 0; n < PRUNE_TRIGGER_PAIRS - PRUNE_RETAIN_PAIRS; n++) {
+      addPair(n);
+      await pruner.prune(messages);
+    }
+    expect(prunes).toBe(1);
+
+    addPair(PRUNE_TRIGGER_PAIRS);
+    await pruner.prune(messages);
+    expect(prunes).toBe(2);
+    expect(pruner.summaries).toBe(4);
+  });
+});
+
+describe("geminiPruneShape", () => {
+  /** Brief plus `pairs` (model functionCall, user functionResponse) turn-pairs. */
+  function contents(pairs: number): GeminiContent[] {
+    const turns: GeminiContent[] = [{ role: "user", parts: [{ text: BRIEF }] }];
+    for (let n = 1; n <= pairs; n++) {
+      turns.push({
+        role: "model",
+        parts: [{ functionCall: { name: "read_file", args: { path: `src/step-${n}.ts` } } }],
+      });
+      turns.push({
+        role: "user",
+        parts: [{ functionResponse: { name: "read_file", response: { result: `step ${n} ok` } } }],
+      });
+    }
+    return turns;
+  }
+
+  it("alternates user/model strictly from the brief onward after a prune", async () => {
+    const pruner = new ConversationPruner(geminiPruneShape(), stubSummarizer);
+    const turns = contents(PRUNE_TRIGGER_PAIRS + 1);
+
+    expect((await pruner.prune(turns)).summarized).toBe(true);
+
+    expectAlternatingRoles(turns.map((t) => t.role));
+    expect(turns[0]).toEqual({ role: "user", parts: [{ text: BRIEF }] });
+    expect(turns[1]).toEqual({ role: "model", parts: [{ text: PRUNE_BRIDGE_TEXT }] });
+    expect(turns[2].role).toBe("user");
+    expect(JSON.stringify(turns[2])).toContain("earlier turns did some work");
+    expect(turns[3].role).toBe("model");
+  });
+
+  it("stays alternating on the degraded drop, when no summary is available", async () => {
+    const pruner = new ConversationPruner(geminiPruneShape(), async () => {
+      throw new Error("provider unavailable");
+    });
+    const turns = contents(PRUNE_TRIGGER_PAIRS + 1);
+
+    expect((await pruner.prune(turns)).summarized).toBe(false);
+
+    expectAlternatingRoles(turns.map((t) => t.role));
+    expect(turns[1].role).toBe("model");
+    expect(pruner.summaries).toBe(0);
+  });
+});
+
+describe("PRUNE_BRIDGE_TEXT", () => {
+  it("claims no work and stays short — it is protocol padding, not context", () => {
+    expect(PRUNE_BRIDGE_TEXT.length).toBeLessThan(120);
+    for (const claim of ["I ran", "I edited", "I fixed", "completed", "done"]) {
+      expect(PRUNE_BRIDGE_TEXT.toLowerCase()).not.toContain(claim.toLowerCase());
+    }
   });
 });
 
