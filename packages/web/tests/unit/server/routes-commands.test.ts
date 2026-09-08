@@ -546,6 +546,64 @@ describe("commands route — ndx binary resolution ladder", () => {
     throw new Error("refresh did not finish");
   }
 
+  // ── Rung 0: NDX_CLI_PATH ──────────────────────────────────────────────────
+  //
+  // The rung that made this suite fail on developer machines. `ndx start` sets
+  // NDX_CLI_PATH on every child it spawns, so a contributor running these tests
+  // from a server-launched shell inherited it, and it short-circuited the whole
+  // ladder — every assertion below exercised rung 0 while claiming to test the
+  // rung it named. The hooks now clear it; these tests cover it deliberately so
+  // it stops being the rung nobody looks at.
+
+  it("prefers NDX_CLI_PATH over the project-local .bin/ndx", async () => {
+    // The property that made the leak silent: rung 0 outranks rung 1, so an
+    // ambient value hides the local bin rather than conflicting with it.
+    const { writeFile: wf, mkdir: md } = await import("node:fs/promises");
+    const binDir = join(tmpDir, "node_modules", ".bin");
+    await md(binDir, { recursive: true });
+    await wf(join(binDir, "ndx"), "#!/bin/sh\n");
+
+    const override = join(tmpDir, "override-cli.js");
+    await wf(override, "// stand-in for the launching ndx cli.js\n");
+    process.env["NDX_CLI_PATH"] = override;
+
+    await runRefresh();
+    expect(spawnManagedMock.mock.calls[0][0]).toBe("node");
+    expect((spawnManagedMock.mock.calls[0][1] as string[])[0]).toBe(override);
+  });
+
+  it("prefers NDX_CLI_PATH over N_DX_CLI_PATH", async () => {
+    // Two env vars one underscore apart, and the shorter one wins. Worth
+    // pinning: reading the ladder top-down does not make the precedence
+    // obvious, and mistaking one for the other is what the original report
+    // came down to.
+    const { writeFile: wf } = await import("node:fs/promises");
+    const override = join(tmpDir, "override-cli.js");
+    const underscored = join(tmpDir, "installed-cli.js");
+    await wf(override, "// rung 0\n");
+    await wf(underscored, "// rung 2\n");
+    process.env["NDX_CLI_PATH"] = override;
+    process.env["N_DX_CLI_PATH"] = underscored;
+
+    await runRefresh();
+    expect((spawnManagedMock.mock.calls[0][1] as string[])[0]).toBe(override);
+  });
+
+  it("takes NDX_CLI_PATH as given, without checking the file exists", async () => {
+    // Deliberately asymmetric with the stale-N_DX_CLI_PATH test below, which
+    // falls through to the next rung. Rung 0 does not: it is an explicit
+    // override, so a wrong value fails the spawn loudly instead of quietly
+    // resolving to a different binary than the operator asked for. Pinned
+    // because the asymmetry is invisible in the resolver and easy to
+    // "tidy up" into a silent fallthrough.
+    const missing = join(tmpDir, "gone", "cli.js");
+    process.env["NDX_CLI_PATH"] = missing;
+
+    await runRefresh();
+    expect(spawnManagedMock.mock.calls[0][0]).toBe("node");
+    expect((spawnManagedMock.mock.calls[0][1] as string[])[0]).toBe(missing);
+  });
+
   it("prefers the project-local .bin/ndx when present", async () => {
     const { writeFile: wf, mkdir: md } = await import("node:fs/promises");
     const binDir = join(tmpDir, "node_modules", ".bin");
