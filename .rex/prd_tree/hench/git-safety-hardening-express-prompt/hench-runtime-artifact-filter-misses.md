@@ -1,0 +1,23 @@
+---
+id: "9dfac9fd-ef90-44c2-80ce-5d8b72535bca"
+level: "task"
+title: "Hench runtime-artifact filter misses porcelain paths when the project dir is below the git root"
+status: "pending"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "hench"
+  - "git-safety"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "A test creates a git repo, initialises hench in a SUBDIRECTORY of it, creates .hench/locks/, and asserts performPreRunCommitGateIfNeeded returns \"proceed\" — this test fails on the current code"
+  - "The same subdirectory layout is covered for performRollbackIfNeeded: hench's own runtime files alone do not make a rollback look necessary"
+  - "excludeHenchRuntimeArtifacts still excludes the artifacts when projectDir IS the repo root (existing unit and integration cases keep passing)"
+  - "An operator edit to .hench/config.json still stops an autonomous run in both the root and subdirectory layouts"
+  - "A path belonging to a different project's .hench/ inside the same repo is NOT excluded — the filter matches hench's own artifacts for this project only"
+  - "The porcelain-path-relativity assumption is stated in a comment or docstring at the matching site, so the next reader does not re-derive it"
+description: "Verdict: should-fix. Severity: medium.\n\nFAILURE SCENARIO\nRun `ndx work` / `hench run` with a project directory that is not the git repository root — a package inside a larger repo, e.g. `ndx work packages/web`, or any checkout where `.hench/` sits below the root. The autonomous pre-run gate refuses to start:\n\n  \"Refusing to start an autonomous run with 1 uncommitted file(s), 0 line(s) changed in the working tree\"\n\n...on `.hench/locks/`, which hench itself created moments earlier and removes on exit — so the tree reads clean to anyone who checks afterwards. This is exactly the bug b6c3c26f set out to fix; the fix simply does not apply outside the repo root.\n\nMECHANISM\n`git status --porcelain` emits paths relative to the REPOSITORY ROOT, not to the cwd. Verified:\n\n  $ cd sub && git status --porcelain --untracked-files=all\n  ?? sub/.hench/locks/a.lock\n\nisHenchRuntimeArtifact (packages/hench/src/agent/lifecycle/shared.ts:873-878) matches that path against the bare prefixes in HENCH_RUNTIME_ARTIFACTS:\n\n  path === artifact || path === artifact.replace(/\\/$/,\"\") || path.startsWith(artifact)\n\n`\"sub/.hench/locks/a.lock\".startsWith(\".hench/locks/\")` is false, so the line survives the filter. Both callers are affected:\n - performPreRunCommitGateIfNeeded (shared.ts:1457) — refuses the run\n - performRollbackIfNeeded (shared.ts:1096) — counts hench's own files as changes needing rollback\n\nWHY NO TEST CAUGHT IT\npackages/hench/tests/unit/agent/pre-run-gate-own-state.test.ts stubs listDirty with hand-written root-relative lines (\"?? .hench/locks/\"), and its integration half runs `git init` AT the project dir. projectDir == repo root in every case, so the relativity mismatch is unreachable from the suite. Full test run is green.\n\nSOLUTION OPTIONS\n(a) RECOMMENDED — resolve the repo root once (`git rev-parse --show-toplevel`, alongside the existing execStdout git calls) and make porcelain paths relative to projectDir before matching. Correct for every layout; costs one extra git invocation per gate check, on a path that already runs `git status`.\n(b) Match on a path-segment boundary instead: `path === a || path.endsWith(\"/\" + a) || path.includes(\"/\" + a)`. No extra git call, but it would also exclude an unrelated `vendor/.hench/runs/` belonging to a different project inside the same repo — a false exclusion rather than a false inclusion, which is the less safe direction for a gate whose job is to protect uncommitted work.\n(c) Pass the paths through `git status --porcelain -- <projectDir>` and strip the known prefix. Equivalent to (a) with more string handling.\n\nRecommend (a).\n\nDECISION FOR THE OWNER\nWhether this is must-fix or should-fix depends on whether a project directory below the repo root is a supported shape for `ndx work`. If it is, this is must-fix.\n\nFound by /ndx-adversarial-review on branch fix/coding-prompts-and-workflows (b6c3c26f)."
+lastModified: "2026-09-08T21:07:00.878Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---

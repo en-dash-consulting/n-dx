@@ -103,6 +103,16 @@ export async function cmdInit(
   // `.hench/usage-cursors/` are the same kind of per-run/per-session output;
   // `.hench-commit-msg.txt` is the scratch file the agent writes its
   // proposed commit message to (see the agent system prompt).
+  //
+  // TODO: this list has drifted from HENCH_RUNTIME_ARTIFACTS (schema/v1.ts),
+  // which is the same policy expressed for the git-dirty gate and now also
+  // names `.hench/reviews/` and `.hench/session-cache.json`. Both are missing
+  // here, so a freshly initialised project shows them as untracked forever and
+  // can commit them by accident. The gate is unaffected — it reads the constant
+  // directly — but the constant's docstring claims `hench init` is its second
+  // consumer, which is not true while this array is hardcoded. Pass
+  // HENCH_RUNTIME_ARTIFACTS instead and add a parity assertion so the two
+  // cannot diverge again. (/ndx-adversarial-review, severity: low)
   await ensureGitignoreEntries(dir, [
     ".hench/runs/",
     ".hench/locks/",

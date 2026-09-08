@@ -2,11 +2,12 @@
 id: "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7"
 level: "epic"
 title: "Web Dashboard"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-24T05:27:03.754Z"
-completedAt: "2026-08-20T14:46:29.188Z"
 endedAt: "2026-08-20T14:46:29.188Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
+lastModified: "2026-09-08T21:06:11.616Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -16,7 +17,7 @@ description: "Unified web dashboard and MCP HTTP server. Preact-based UI with So
 | [Checkbox multi-select and detail panel UX for PRD tree](./checkbox-multi-select-and-detail-panel/index.md) | completed |
 | [CLI Command Aliases and Shortcuts](./cli-command-aliases-and-shortcuts/index.md) | completed |
 | [CLI Command Coverage Audit and Dashboard Trigger Controls](./cli-command-coverage-audit-and/index.md) | completed |
-| [Dashboard Route Ownership Decoupling](./dashboard-route-ownership-decoupling/index.md) | completed |
+| [Dashboard Route Ownership Decoupling](./dashboard-route-ownership-decoupling/index.md) | pending |
 | [Dedicated Commands Reference Section in Web Dashboard](./dedicated-commands-reference-section/index.md) | completed |
 | [Fix verified code-review findings on dashboard command triggers](./fix-verified-code-review-findings-on/index.md) | completed |
 | [Folder-Tree-Style Context Graph Visualization](./folder-tree-style-context-graph/index.md) | completed |
