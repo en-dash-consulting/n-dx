@@ -34,6 +34,7 @@ import {
   OUT_OF_SCOPE,
   REPRESENTATIVE,
   extractStaticPromptText,
+  contentHash,
 } from "../../scripts/prompt-census.mjs";
 
 const ROOT = join(import.meta.dirname, "../..");
@@ -559,6 +560,38 @@ describe("prompt census: baseline", () => {
         `  current  skills:   ${fresh.totals?.skillTokens}`,
       ].join("\n"),
     ).toBe(recorded.contentHash);
+  });
+
+  it("the content hash moves when a prompt does, and not otherwise", () => {
+    // Without this, the staleness test above could pass forever on a hash that
+    // never changes — a guard that cannot fail is not a guard. Driven through
+    // the real function on doctored reports, so no prompt has to be edited.
+    const recorded = JSON.parse(readFileSync(BASELINE_JSON, "utf-8"));
+    const base = contentHash(recorded);
+
+    const promptChanged = structuredClone(recorded);
+    promptChanged.surfaces[0].fixedTokens += 1;
+    expect(
+      contentHash(promptChanged),
+      "a changed prompt must move the hash",
+    ).not.toBe(base);
+
+    const skillChanged = structuredClone(recorded);
+    skillChanged.skills[0].chars += 1;
+    expect(
+      contentHash(skillChanged),
+      "a changed skill body must move the hash",
+    ).not.toBe(base);
+
+    // Re-recording an unchanged repo must be idempotent, or the staleness
+    // check would demand a commit on every run.
+    const reRecorded = structuredClone(recorded);
+    reRecorded.recordedAt = new Date().toISOString();
+    reRecorded.commit = "0000000000ff";
+    expect(
+      contentHash(reRecorded),
+      "the hash must cover measured content only, not when it was recorded",
+    ).toBe(base);
   });
 
   it("--check exits non-zero when a registered builder disappears", () => {

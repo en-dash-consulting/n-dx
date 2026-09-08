@@ -5,22 +5,22 @@
     "perCallTokens": 21688,
     "uniqueTokens": 13201,
     "skills": 13,
-    "skillTokens": 16990
+    "skillTokens": 16840
   },
   "skills": [
     {
       "name": "ndx-adversarial-review",
       "file": "packages/core/assistant-assets/skills/ndx-adversarial-review.md",
       "shipped": true,
-      "chars": 20667,
-      "tokens": 5167
+      "chars": 20512,
+      "tokens": 5128
     },
     {
       "name": "triage",
       "file": ".claude/skills/triage/SKILL.md",
       "shipped": false,
-      "chars": 7538,
-      "tokens": 1885
+      "chars": 7421,
+      "tokens": 1856
     },
     {
       "name": "iso-map",
@@ -33,22 +33,15 @@
       "name": "ndx-reshape",
       "file": "packages/core/assistant-assets/skills/ndx-reshape.md",
       "shipped": true,
-      "chars": 5886,
-      "tokens": 1472
+      "chars": 5816,
+      "tokens": 1454
     },
     {
       "name": "ndx-plan",
       "file": "packages/core/assistant-assets/skills/ndx-plan.md",
       "shipped": true,
-      "chars": 4480,
-      "tokens": 1120
-    },
-    {
-      "name": "ndx-capture",
-      "file": "packages/core/assistant-assets/skills/ndx-capture.md",
-      "shipped": true,
-      "chars": 4452,
-      "tokens": 1113
+      "chars": 4437,
+      "tokens": 1110
     },
     {
       "name": "dev-link",
@@ -58,46 +51,53 @@
       "tokens": 1105
     },
     {
+      "name": "ndx-capture",
+      "file": "packages/core/assistant-assets/skills/ndx-capture.md",
+      "shipped": true,
+      "chars": 4407,
+      "tokens": 1102
+    },
+    {
       "name": "ndx-config",
       "file": "packages/core/assistant-assets/skills/ndx-config.md",
       "shipped": true,
-      "chars": 3368,
-      "tokens": 842
+      "chars": 3322,
+      "tokens": 831
     },
     {
       "name": "ndx-work",
       "file": "packages/core/assistant-assets/skills/ndx-work.md",
       "shipped": true,
-      "chars": 2970,
-      "tokens": 743
+      "chars": 2954,
+      "tokens": 739
     },
     {
       "name": "ndx-feedback",
       "file": "packages/core/assistant-assets/skills/ndx-feedback.md",
       "shipped": true,
-      "chars": 2620,
-      "tokens": 655
+      "chars": 2565,
+      "tokens": 642
     },
     {
       "name": "no-plan-mode",
       "file": "packages/core/assistant-assets/skills/no-plan-mode.md",
       "shipped": true,
-      "chars": 2517,
-      "tokens": 630
+      "chars": 2476,
+      "tokens": 619
     },
     {
       "name": "ndx-zone",
       "file": "packages/core/assistant-assets/skills/ndx-zone.md",
       "shipped": true,
-      "chars": 825,
-      "tokens": 207
+      "chars": 817,
+      "tokens": 205
     },
     {
       "name": "ndx-status",
       "file": "packages/core/assistant-assets/skills/ndx-status.md",
       "shipped": true,
-      "chars": 788,
-      "tokens": 197
+      "chars": 780,
+      "tokens": 195
     }
   ],
   "byPackage": {
@@ -985,6 +985,8 @@
       }
     ]
   },
-  "recordedAt": "2026-09-08T18:48:37.501Z",
-  "commit": "3dda8b5b3cc1"
+  "recordedAt": "2026-09-08T23:27:22.041Z",
+  "commit": "76b274e097b2",
+  "dirty": false,
+  "contentHash": "6456f53198d7b7ef"
 }

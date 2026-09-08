@@ -1775,6 +1775,12 @@ async function main(argv) {
   }
 
   const report = await measure(model);
+  // Attached to the report rather than only to a recording, so `--json` and
+  // `--compare` expose the same identity a baseline was stamped with. The
+  // staleness test compares a fresh `--json` hash against the recorded one, so
+  // computing this only inside `--write` would leave it permanently undefined
+  // on one side of that comparison.
+  report.contentHash = contentHash(report);
   const stale = report.surfaces.filter((s) => s.error);
 
   if (flag("check")) {
@@ -1839,7 +1845,6 @@ async function main(argv) {
       // something, and it cannot be mistaken for a clean recording.
       commit: dirty ? `${sha}-dirty` : sha,
       dirty,
-      contentHash: contentHash(report),
     };
 
     // --out redirects the write so tests can exercise recording without
@@ -1876,4 +1881,5 @@ export {
   OUT_OF_SCOPE,
   REPRESENTATIVE,
   extractStaticPromptText,
+  contentHash,
 };

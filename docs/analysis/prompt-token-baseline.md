@@ -10,8 +10,9 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-09-08T18:48:37.501Z
-- **Commit** — `3dda8b5b3cc1`
+- **Recorded at** — 2026-09-08T23:27:22.041Z
+- **Commit** — `76b274e097b2`
+- **Content hash** — `6456f53198d7b7ef` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 36
 - **Per-call total** — 21,688 tokens (what every surface costs, summed)
@@ -218,7 +219,7 @@ per section rather than as one literal. These are the same sections
 | `system` | 1,663 | 416 | 71.4% |
 | `brief` | 668 | 167 | 28.6% |
 
-## Workflow skills — 16,990 tokens, 13 skills
+## Workflow skills — 16,840 tokens, 13 skills
 
 A skill body enters the agent's context whole the moment the skill is invoked,
 so its size is a per-invocation bill in the same way a builder's fixed text is a
@@ -231,19 +232,19 @@ portability guards until this table gave them a number.
 
 | Skill | Shipped | Chars | Tokens |
 |---|:-:|---:|---:|
-| `ndx-adversarial-review` | yes | 20,667 | 5,167 |
-| `triage` | — | 7,538 | 1,885 |
+| `ndx-adversarial-review` | yes | 20,512 | 5,128 |
+| `triage` | — | 7,421 | 1,856 |
 | `iso-map` | — | 7,413 | 1,854 |
-| `ndx-reshape` | yes | 5,886 | 1,472 |
-| `ndx-plan` | yes | 4,480 | 1,120 |
-| `ndx-capture` | yes | 4,452 | 1,113 |
+| `ndx-reshape` | yes | 5,816 | 1,454 |
+| `ndx-plan` | yes | 4,437 | 1,110 |
 | `dev-link` | — | 4,419 | 1,105 |
-| `ndx-config` | yes | 3,368 | 842 |
-| `ndx-work` | yes | 2,970 | 743 |
-| `ndx-feedback` | yes | 2,620 | 655 |
-| `no-plan-mode` | yes | 2,517 | 630 |
-| `ndx-zone` | yes | 825 | 207 |
-| `ndx-status` | yes | 788 | 197 |
+| `ndx-capture` | yes | 4,407 | 1,102 |
+| `ndx-config` | yes | 3,322 | 831 |
+| `ndx-work` | yes | 2,954 | 739 |
+| `ndx-feedback` | yes | 2,565 | 642 |
+| `no-plan-mode` | yes | 2,476 | 619 |
+| `ndx-zone` | yes | 817 | 205 |
+| `ndx-status` | yes | 780 | 195 |
 
 ## Packages with no LLM prompt surfaces
 
