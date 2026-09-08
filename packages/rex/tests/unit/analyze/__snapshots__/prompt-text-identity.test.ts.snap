@@ -45,20 +45,15 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Deduplication:
-- Do NOT include items that duplicate anything already in the existing PRD below.
 - Do NOT create duplicate tasks within your own response — if two aspects of the description overlap, merge them into a single task with combined criteria.
 - Use the project context to understand terminology and architecture.
 
 Avoid these common mistakes:
-- Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
-- Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
 - Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
 - Do NOT duplicate tasks already in the existing PRD (check the summary below).
-- Do NOT wrap your response in markdown fences — return raw JSON only.
 
 Existing PRD:
 (empty PRD)
@@ -114,20 +109,15 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Deduplication:
-- Do NOT include items that duplicate anything already in the existing PRD below.
 - Do NOT create duplicate tasks within your own response — if two aspects of the description overlap, merge them into a single task with combined criteria.
 - Use the project context to understand terminology and architecture.
 
 Avoid these common mistakes:
-- Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
-- Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
 - Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
 - Do NOT duplicate tasks already in the existing PRD (check the summary below).
-- Do NOT wrap your response in markdown fences — return raw JSON only.
 
 IMPORTANT: Scope your response to fit under this existing parent item:
   ID: feat-1
@@ -199,29 +189,22 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Deduplication:
-- Do NOT include items that duplicate anything already in the existing PRD below.
 - Do NOT create duplicate tasks within your own response — if two aspects of the description overlap, merge them into a single task with combined criteria.
 - Use the project context to understand terminology and architecture.
 
 Avoid these common mistakes:
-- Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
-- Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
 - Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
 - Do NOT duplicate tasks already in the existing PRD (check the summary below).
-- Do NOT wrap your response in markdown fences — return raw JSON only.
 
 ## Placement
-The existing PRD includes item IDs for epics and features. When new items
-naturally belong under an existing epic or feature, set "existingId" on the
-epic/feature object to reference it by ID. Only create new epics/features
-when the items genuinely represent new work areas not covered by the existing tree.
+Only create new epics/features when the items genuinely represent new work
+areas not covered by the existing tree.
 
 If an existing parent's title needs to expand to accommodate the new scope,
-use "existingId" to reference it AND set the title to the updated version.
+keep its "existingId" and set the title to the updated version.
 
 Project context (from documentation):
 --- README.md ---
@@ -255,7 +238,7 @@ For EACH proposal (by proposalIndex), provide:
 3. "issues": specific problems found (empty array if "keep")
 
 Assessment criteria — a well-sized task is:
-- Completable in one focused session (1-4 hours)
+- Sized at roughly 0.5–4 engineer-weeks, consistent with its "loe"
 - Independently testable and deployable where possible
 - Specific enough that the implementer knows exactly what to do
 
@@ -338,19 +321,16 @@ Rules:
 - If a feature has many small tasks, consolidate them into 1–3 well-scoped tasks.
 - If multiple features overlap significantly, merge them into one feature.
 - Preserve the epic structure — do NOT change epic titles unless features are merged across epics.
-- Each resulting task MUST have a verb-first title AND both a description and acceptanceCriteria.
 - Preserve ALL original intent — consolidation must not drop functionality or acceptance criteria.
 - Keep the highest priority among merged tasks.
 - Preserve LoE fields: when merging tasks with "loe", sum the LoE values and update "loeRationale" to reflect the combined scope. Keep the lower confidence level.
 - Do NOT add new functionality — only consolidate what exists.
-- Do NOT produce tasks with only a title — every task needs both description and criteria.
 
 Task quality:
 - Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Each element must be an object with:
@@ -381,7 +361,6 @@ Rules:
 - Each child task MUST have an LoE at or below 1 engineer-week.
 - Each child task MUST include "loe" (number, in engineer-weeks), "loeRationale" (string explaining the estimate), and "loeConfidence" ("low"|"medium"|"high").
 - The sum of child LoE values should approximate the parent's LoE (2 weeks).
-- Each child MUST have a verb-first title, a description, and acceptanceCriteria.
 - Distribute the parent's acceptance criteria among children — do not lose any.
 - Keep priorities consistent with the parent (medium).
 - Preserve tags from the parent where relevant.
@@ -393,7 +372,6 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Respond with ONLY a valid, minified JSON array of task objects — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, and do not restate the input task — just the JSON."
@@ -419,7 +397,6 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Guidelines for disambiguation:
@@ -462,7 +439,6 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Guidelines for disambiguation:
@@ -562,28 +538,21 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Deduplication:
-- Do NOT include items that duplicate anything already in the existing PRD below.
 - Use the project context to understand terminology, architecture, and domain-specific jargon in the notes.
 
 Avoid these common mistakes:
-- Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
-- Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
 - Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
 - Do NOT duplicate tasks already in the existing PRD (check the summary below).
-- Do NOT wrap your response in markdown fences — return raw JSON only.
 
 ## Placement
-The existing PRD includes item IDs for epics and features. When new items
-naturally belong under an existing epic or feature, set "existingId" on the
-epic/feature object to reference it by ID. Only create new epics/features
-when the items genuinely represent new work areas not covered by the existing tree.
+Only create new epics/features when the items genuinely represent new work
+areas not covered by the existing tree.
 
 If an existing parent's title needs to expand to accommodate the new scope,
-use "existingId" to reference it AND set the title to the updated version.
+keep its "existingId" and set the title to the updated version.
 
 Project context (from documentation):
 --- README.md ---
@@ -644,15 +613,11 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Avoid these common mistakes:
-- Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
-- Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
 - Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
 - Do NOT duplicate tasks already in the existing PRD (check the summary below).
-- Do NOT wrap your response in markdown fences — return raw JSON only.
 
 Existing PRD (for deduplication — do NOT include these items):
 - [epic] Billing (in_progress)
@@ -705,15 +670,11 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Avoid these common mistakes:
-- Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
-- Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
 - Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
 - Do NOT duplicate tasks already in the existing PRD (check the summary below).
-- Do NOT wrap your response in markdown fences — return raw JSON only.
 
 Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
 `;
@@ -763,29 +724,22 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Deduplication:
-- Do NOT include items that duplicate anything already in the existing PRD below.
 - Do NOT create duplicate items across descriptions — if two descriptions overlap, merge them into a single task with combined criteria.
 - Use the project context to understand terminology and architecture.
 
 Avoid these common mistakes:
-- Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
-- Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
 - Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
 - Do NOT duplicate tasks already in the existing PRD (check the summary below).
-- Do NOT wrap your response in markdown fences — return raw JSON only.
 
 ## Placement
-The existing PRD includes item IDs for epics and features. When new items
-naturally belong under an existing epic or feature, set "existingId" on the
-epic/feature object to reference it by ID. Only create new epics/features
-when the items genuinely represent new work areas not covered by the existing tree.
+Only create new epics/features when the items genuinely represent new work
+areas not covered by the existing tree.
 
 If an existing parent's title needs to expand to accommodate the new scope,
-use "existingId" to reference it AND set the title to the updated version.
+keep its "existingId" and set the title to the updated version.
 
 Project context (from documentation):
 --- README.md ---
@@ -913,7 +867,6 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Project description:
@@ -1006,15 +959,11 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Avoid these common mistakes:
-- Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
-- Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
 - Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
 - Do NOT duplicate tasks already in the existing PRD (check the summary below).
-- Do NOT wrap your response in markdown fences — return raw JSON only.
 
 The document is in Markdown format. Pay attention to headings, bullet points, and structured sections.
 
@@ -1086,7 +1035,6 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Scan-specific rules:
@@ -1095,11 +1043,8 @@ Scan-specific rules:
 - Use the project context below to align epic/feature names with the project's domain terminology.
 
 Avoid these common mistakes:
-- Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
-- Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
 - Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
 - Do NOT duplicate tasks already in the existing PRD (check the summary below).
-- Do NOT wrap your response in markdown fences — return raw JSON only.
 
 Project context (from documentation):
 --- README.md ---
@@ -1168,7 +1113,6 @@ Task quality:
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.
 
 Scan-specific rules:
@@ -1177,11 +1121,8 @@ Scan-specific rules:
 - Use the project context below to align epic/feature names with the project's domain terminology.
 
 Avoid these common mistakes:
-- Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
-- Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
 - Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
 - Do NOT duplicate tasks already in the existing PRD (check the summary below).
-- Do NOT wrap your response in markdown fences — return raw JSON only.
 
 Project context (from documentation):
 --- README.md ---

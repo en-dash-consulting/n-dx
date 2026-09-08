@@ -88,12 +88,13 @@ export function buildConsolidationGuardEnvelope(
         "- If a feature has many small tasks, consolidate them into 1–3 well-scoped tasks.",
         "- If multiple features overlap significantly, merge them into one feature.",
         "- Preserve the epic structure — do NOT change epic titles unless features are merged across epics.",
-        "- Each resulting task MUST have a verb-first title AND both a description and acceptanceCriteria.",
+        // Verb-first titles and the description + acceptanceCriteria
+        // requirement are stated by TASK_QUALITY_RULES, which this prompt also
+        // includes. They were restated here twice over.
         "- Preserve ALL original intent — consolidation must not drop functionality or acceptance criteria.",
         "- Keep the highest priority among merged tasks.",
         '- Preserve LoE fields: when merging tasks with "loe", sum the LoE values and update "loeRationale" to reflect the combined scope. Keep the lower confidence level.',
         "- Do NOT add new functionality — only consolidate what exists.",
-        "- Do NOT produce tasks with only a title — every task needs both description and criteria.",
       ].join("\n"),
     ),
     section("quality", TASK_QUALITY_RULES),

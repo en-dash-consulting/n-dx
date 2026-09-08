@@ -2,14 +2,14 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 22670,
-    "uniqueTokens": 13630
+    "perCallTokens": 21766,
+    "uniqueTokens": 13352
   },
   "byPackage": {
     "rex": {
       "surfaces": 19,
-      "perCallTokens": 16121,
-      "uniqueTokens": 7473
+      "perCallTokens": 15217,
+      "uniqueTokens": 7195
     },
     "sourcevision": {
       "surfaces": 7,
@@ -60,8 +60,16 @@
     },
     {
       "pkg": "rex",
+      "name": "reshapeRoleContent",
+      "tokens": 1054,
+      "usedBy": [
+        "buildReshapeEnvelope"
+      ]
+    },
+    {
+      "pkg": "rex",
       "name": "TASK_QUALITY_RULES",
-      "tokens": 181,
+      "tokens": 156,
       "usedBy": [
         "buildFileImportEnvelope",
         "buildScanImportEnvelope",
@@ -69,14 +77,6 @@
         "buildMultiAddEnvelope",
         "buildIdeasEnvelope",
         "buildDisambiguationEnvelope"
-      ]
-    },
-    {
-      "pkg": "rex",
-      "name": "reshapeRoleContent",
-      "tokens": 1054,
-      "usedBy": [
-        "buildReshapeEnvelope"
       ]
     },
     {
@@ -91,19 +91,6 @@
       ]
     },
     {
-      "pkg": "rex",
-      "name": "ANTI_PATTERNS",
-      "tokens": 141,
-      "usedBy": [
-        "buildFileImportEnvelope",
-        "buildScanImportEnvelope",
-        "buildAddEnvelope",
-        "buildMultiAddEnvelope",
-        "buildIdeasEnvelope",
-        "buildModifyEnvelope"
-      ]
-    },
-    {
       "pkg": "sourcevision",
       "name": "formatProjectShape",
       "tokens": 393,
@@ -115,7 +102,7 @@
     {
       "pkg": "rex",
       "name": "placementContent",
-      "tokens": 206,
+      "tokens": 155,
       "usedBy": [
         "buildAddEnvelope",
         "buildMultiAddEnvelope",
@@ -135,6 +122,19 @@
         "buildConsolidateEnvelope",
         "buildIdeasEnvelope",
         "buildDisambiguationEnvelope"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "ANTI_PATTERNS",
+      "tokens": 61,
+      "usedBy": [
+        "buildFileImportEnvelope",
+        "buildScanImportEnvelope",
+        "buildAddEnvelope",
+        "buildMultiAddEnvelope",
+        "buildIdeasEnvelope",
+        "buildModifyEnvelope"
       ]
     },
     {
@@ -226,14 +226,14 @@
       "constants": {
         "PRD_SCHEMA": 333,
         "FEW_SHOT_EXAMPLE": 432,
-        "TASK_QUALITY_RULES": 181,
-        "ANTI_PATTERNS": 141,
+        "TASK_QUALITY_RULES": 156,
+        "ANTI_PATTERNS": 61,
         "summarizeExisting": 9,
         "OUTPUT_INSTRUCTION": 52
       },
       "ownTokens": 123,
-      "fixedChars": 5077,
-      "fixedTokens": 1270
+      "fixedChars": 4659,
+      "fixedTokens": 1165
     },
     {
       "pkg": "rex",
@@ -246,13 +246,13 @@
         "PRD_SCHEMA": 333,
         "FEW_SHOT_EXAMPLE": 432,
         "CONSOLIDATION_INSTRUCTION": 223,
-        "TASK_QUALITY_RULES": 181,
-        "ANTI_PATTERNS": 141,
+        "TASK_QUALITY_RULES": 156,
+        "ANTI_PATTERNS": 61,
         "OUTPUT_INSTRUCTION": 52
       },
       "ownTokens": 400,
-      "fixedChars": 7043,
-      "fixedTokens": 1761
+      "fixedChars": 6625,
+      "fixedTokens": 1657
     },
     {
       "pkg": "rex",
@@ -260,21 +260,21 @@
       "builder": "buildAddEnvelope",
       "purpose": "Propose new PRD items from a natural-language description.",
       "inline": false,
-      "literals": 26,
+      "literals": 25,
       "constants": {
         "PRD_SCHEMA": 333,
         "FEW_SHOT_EXAMPLE": 432,
         "CONSOLIDATION_INSTRUCTION": 223,
-        "TASK_QUALITY_RULES": 181,
-        "ANTI_PATTERNS": 141,
-        "placementContent": 206,
+        "TASK_QUALITY_RULES": 156,
+        "ANTI_PATTERNS": 61,
+        "placementContent": 155,
         "projectContextContent": 10,
         "summarizeExisting": 9,
         "OUTPUT_INSTRUCTION": 52
       },
-      "ownTokens": 230,
-      "fixedChars": 7263,
-      "fixedTokens": 1816
+      "ownTokens": 210,
+      "fixedChars": 6559,
+      "fixedTokens": 1640
     },
     {
       "pkg": "rex",
@@ -282,21 +282,21 @@
       "builder": "buildMultiAddEnvelope",
       "purpose": "Propose items for several scan targets in one call.",
       "inline": false,
-      "literals": 28,
+      "literals": 27,
       "constants": {
         "PRD_SCHEMA": 333,
         "FEW_SHOT_EXAMPLE": 432,
         "CONSOLIDATION_INSTRUCTION": 223,
-        "TASK_QUALITY_RULES": 181,
-        "ANTI_PATTERNS": 141,
-        "placementContent": 206,
+        "TASK_QUALITY_RULES": 156,
+        "ANTI_PATTERNS": 61,
+        "placementContent": 155,
         "projectContextContent": 10,
         "summarizeExisting": 9,
         "OUTPUT_INSTRUCTION": 52
       },
-      "ownTokens": 215,
-      "fixedChars": 7202,
-      "fixedTokens": 1801
+      "ownTokens": 195,
+      "fixedChars": 6498,
+      "fixedTokens": 1625
     },
     {
       "pkg": "rex",
@@ -336,9 +336,9 @@
       "inline": false,
       "literals": 40,
       "constants": {},
-      "ownTokens": 492,
-      "fixedChars": 1967,
-      "fixedTokens": 492
+      "ownTokens": 497,
+      "fixedChars": 1985,
+      "fixedTokens": 497
     },
     {
       "pkg": "rex",
@@ -346,21 +346,21 @@
       "builder": "buildIdeasEnvelope",
       "purpose": "Extract proposals from free-form notes that local parsing missed.",
       "inline": false,
-      "literals": 29,
+      "literals": 28,
       "constants": {
         "PRD_SCHEMA": 333,
         "FEW_SHOT_EXAMPLE": 432,
         "CONSOLIDATION_INSTRUCTION": 223,
-        "TASK_QUALITY_RULES": 181,
-        "ANTI_PATTERNS": 141,
-        "placementContent": 206,
+        "TASK_QUALITY_RULES": 156,
+        "ANTI_PATTERNS": 61,
+        "placementContent": 155,
         "projectContextContent": 10,
         "summarizeExisting": 9,
         "OUTPUT_INSTRUCTION": 52
       },
-      "ownTokens": 378,
-      "fixedChars": 7855,
-      "fixedTokens": 1964
+      "ownTokens": 358,
+      "fixedChars": 7151,
+      "fixedTokens": 1788
     },
     {
       "pkg": "rex",
@@ -368,13 +368,13 @@
       "builder": "buildConsolidationGuardEnvelope",
       "purpose": "Second-opinion check before a consolidation is applied.",
       "inline": false,
-      "literals": 23,
+      "literals": 21,
       "constants": {
         "FEW_SHOT_EXAMPLE": 432
       },
-      "ownTokens": 320,
-      "fixedChars": 3006,
-      "fixedTokens": 752
+      "ownTokens": 273,
+      "fixedChars": 2817,
+      "fixedTokens": 705
     },
     {
       "pkg": "rex",
@@ -382,11 +382,11 @@
       "builder": "buildDecompositionEnvelope",
       "purpose": "Decompose a task whose level-of-effort exceeds the threshold.",
       "inline": false,
-      "literals": 24,
+      "literals": 23,
       "constants": {},
-      "ownTokens": 290,
-      "fixedChars": 1159,
-      "fixedTokens": 290
+      "ownTokens": 270,
+      "fixedChars": 1077,
+      "fixedTokens": 270
     },
     {
       "pkg": "rex",
@@ -397,12 +397,12 @@
       "literals": 21,
       "constants": {
         "PRD_SCHEMA": 333,
-        "TASK_QUALITY_RULES": 181,
+        "TASK_QUALITY_RULES": 156,
         "OUTPUT_INSTRUCTION": 52
       },
       "ownTokens": 186,
-      "fixedChars": 3007,
-      "fixedTokens": 752
+      "fixedChars": 2908,
+      "fixedTokens": 727
     },
     {
       "pkg": "rex",
@@ -439,11 +439,11 @@
       "literals": 29,
       "constants": {
         "FEW_SHOT_EXAMPLE": 432,
-        "ANTI_PATTERNS": 141
+        "ANTI_PATTERNS": 61
       },
       "ownTokens": 295,
-      "fixedChars": 3465,
-      "fixedTokens": 867
+      "fixedChars": 3146,
+      "fixedTokens": 787
     },
     {
       "pkg": "rex",
@@ -731,8 +731,8 @@
     "rex": {
       "surface": "buildAssessmentEnvelope",
       "describe": "Granularity assessment over one two-task proposal.",
-      "chars": 2948,
-      "tokens": 737,
+      "chars": 2966,
+      "tokens": 742,
       "sections": [
         {
           "name": "role",
@@ -751,8 +751,8 @@
         },
         {
           "name": "quality",
-          "chars": 211,
-          "tokens": 53
+          "chars": 229,
+          "tokens": 58
         },
         {
           "name": "anti-patterns",
@@ -765,7 +765,7 @@
           "tokens": 159
         }
       ],
-      "fixedTokens": 492,
+      "fixedTokens": 497,
       "contextTokens": 245
     },
     "sourcevision": {
@@ -872,6 +872,6 @@
       }
     ]
   },
-  "recordedAt": "2026-09-08T16:17:25.001Z",
-  "commit": "2a64b185456d"
+  "recordedAt": "2026-09-08T17:10:41.772Z",
+  "commit": "3b52ad57891d"
 }

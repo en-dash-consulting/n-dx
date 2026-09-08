@@ -1206,12 +1206,21 @@ function renderMarkdown(report) {
     "Every prompt surface in the monorepo that reaches an LLM, with the token cost of",
   );
   lines.push(
-    "the fixed text it always emits. This is the baseline the",
+    "the fixed text it always emits. This file is re-recorded as the",
   );
   lines.push(
-    "*Agent Prompt & Workflow Efficiency* epic is measured against — recorded before any",
+    "*Agent Prompt & Workflow Efficiency* epic proceeds, so the figures below are current",
   );
-  lines.push("prompt was rewritten.");
+  lines.push(
+    "rather than original. The epic started from **22,670 per-call / 13,630 unique** at",
+  );
+  lines.push(
+    "`2a64b185` — the last recording before any prompt was rewritten, and the number the",
+  );
+  lines.push(
+    "epic's overall reduction should be measured against. Use `--compare` for the delta",
+  );
+  lines.push("since whatever is recorded here now.");
   lines.push("");
   lines.push(`- **Recorded at** — ${report.recordedAt}`);
   lines.push(`- **Commit** — \`${report.commit}\``);
@@ -1328,6 +1337,18 @@ function renderMarkdown(report) {
     "  *raised* the recorded totals by ~5% with no prompt growing — the earlier figures",
   );
   lines.push("  were an undercount.");
+  lines.push(
+    "- **rex redundancy pass** — the first entry here that is a real reduction rather than",
+  );
+  lines.push(
+    "  a measurement change: -904 per-call / -278 unique, by deleting instructions that the",
+  );
+  lines.push(
+    "  same prompt already gave elsewhere and resolving a task-size contradiction (hours vs",
+  );
+  lines.push(
+    "  engineer-weeks). No instruction was removed from a prompt that did not still state it.",
+  );
   lines.push("");
 
   for (const pkg of Object.keys(report.byPackage)) {

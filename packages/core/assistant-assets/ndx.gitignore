@@ -23,6 +23,8 @@
 .hench/reviews/
 # Per-session token-usage watermarks written by `hench record`
 .hench/usage-cursors/
+# Resolved session/vendor state for the current machine
+.hench/session-cache.json
 .hench-commit-msg.txt
 
 # Rex ephemeral state

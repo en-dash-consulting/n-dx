@@ -500,27 +500,40 @@ const FORMAT_HINTS: Record<FileFormat, string> = {
 
 // ANTI_PATTERNS is defined here (not in analyze-shared) because it is only
 // used by reason.ts prompts, not by extract.ts or file-validation.ts.
+//
+// Three rules were dropped from this block because every prompt that includes
+// it already states them:
+//
+//   "tasks need a description and criteria" → TASK_QUALITY_RULES
+//   "no vague titles"                       → TASK_QUALITY_RULES (verb-first)
+//   "no markdown fences"                    → OUTPUT_INSTRUCTION
+//
+// The duplicate-detection rule below stays even though the dedup section says
+// the same thing, because that section reaches only buildAddEnvelope and
+// buildIdeasEnvelope — for buildFileImportEnvelope, buildScanImportEnvelope
+// and buildModifyEnvelope this is the only copy. The dedup section dropped its
+// version instead.
 export const ANTI_PATTERNS = `Avoid these common mistakes:
-- Do NOT produce tasks with only a title and no description or criteria — every task needs substance.
-- Do NOT use vague titles like "Implement the feature", "Fix the bug", "Update code" — be specific about WHAT is being implemented/fixed/updated.
 - Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
-- Do NOT duplicate tasks already in the existing PRD (check the summary below).
-- Do NOT wrap your response in markdown fences — return raw JSON only.`;
+- Do NOT duplicate tasks already in the existing PRD (check the summary below).`;
 
 /**
  * Auto-placement instruction block. Included in prompts when no explicit
- * parentId is specified, telling the LLM it can reference existing PRD
- * items by ID to place new items under them.
+ * parentId is specified.
+ *
+ * Says only what {@link PRD_SCHEMA} does not. The schema already defines what
+ * `existingId` is and that it exists to avoid creating duplicate containers,
+ * so this block opened by restating that — in three prompts that carried both.
+ * What remains is the part the schema cannot express: the judgement call about
+ * when to reuse a container versus create one, and the title-expansion rule.
  */
 export const AUTO_PLACEMENT_INSTRUCTION = `
 ## Placement
-The existing PRD includes item IDs for epics and features. When new items
-naturally belong under an existing epic or feature, set "existingId" on the
-epic/feature object to reference it by ID. Only create new epics/features
-when the items genuinely represent new work areas not covered by the existing tree.
+Only create new epics/features when the items genuinely represent new work
+areas not covered by the existing tree.
 
 If an existing parent's title needs to expand to accommodate the new scope,
-use "existingId" to reference it AND set the title to the updated version.`;
+keep its "existingId" and set the title to the updated version.`;
 
 /**
  * Consolidation instruction block. Guides the LLM toward producing fewer,
@@ -1119,8 +1132,10 @@ export function buildAddEnvelope(
     section(
       "dedup",
       [
+        // No "do not duplicate the existing PRD" line here: ANTI_PATTERNS,
+        // which every prompt using this section also includes, already says
+        // it. The rule below is a different one — dedup *within* the response.
         "Deduplication:",
-        "- Do NOT include items that duplicate anything already in the existing PRD below.",
         "- Do NOT create duplicate tasks within your own response — if two aspects of the description overlap, merge them into a single task with combined criteria.",
         "- Use the project context to understand terminology and architecture.",
       ].join("\n"),
@@ -1218,8 +1233,10 @@ export function buildMultiAddEnvelope(
     section(
       "dedup",
       [
+        // The "do not duplicate the existing PRD" rule is in ANTI_PATTERNS,
+        // which this prompt also includes. Below is the distinct rule: dedup
+        // within the response itself.
         "Deduplication:",
-        "- Do NOT include items that duplicate anything already in the existing PRD below.",
         "- Do NOT create duplicate items across descriptions — if two descriptions overlap, merge them into a single task with combined criteria.",
         "- Use the project context to understand terminology and architecture.",
       ].join("\n"),
@@ -1436,7 +1453,12 @@ export function buildAssessmentEnvelope(proposals: Proposal[]): PromptEnvelope {
       "quality",
       [
         "Assessment criteria — a well-sized task is:",
-        "- Completable in one focused session (1-4 hours)",
+        // Weeks, not the "one focused session (1-4 hours)" this used to say.
+        // The proposals being assessed carry `loe` in engineer-weeks, the
+        // generators are asked for 0.5–4 week tasks, and decomposition splits
+        // anything over taskThresholdWeeks (2). Judging those against an
+        // hour-scale bar recommended break_down on correctly-sized work.
+        '- Sized at roughly 0.5–4 engineer-weeks, consistent with its "loe"',
         "- Independently testable and deployable where possible",
         "- Specific enough that the implementer knows exactly what to do",
       ].join("\n"),
@@ -1622,8 +1644,9 @@ export function buildIdeasEnvelope(
     section(
       "dedup",
       [
+        // "Do not duplicate the existing PRD" comes from ANTI_PATTERNS, which
+        // this prompt also includes.
         "Deduplication:",
-        "- Do NOT include items that duplicate anything already in the existing PRD below.",
         "- Use the project context to understand terminology, architecture, and domain-specific jargon in the notes.",
       ].join("\n"),
     ),

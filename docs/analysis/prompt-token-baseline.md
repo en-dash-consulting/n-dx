@@ -3,16 +3,19 @@
 # Prompt Token-Cost Baseline
 
 Every prompt surface in the monorepo that reaches an LLM, with the token cost of
-the fixed text it always emits. This is the baseline the
-*Agent Prompt & Workflow Efficiency* epic is measured against — recorded before any
-prompt was rewritten.
+the fixed text it always emits. This file is re-recorded as the
+*Agent Prompt & Workflow Efficiency* epic proceeds, so the figures below are current
+rather than original. The epic started from **22,670 per-call / 13,630 unique** at
+`2a64b185` — the last recording before any prompt was rewritten, and the number the
+epic's overall reduction should be measured against. Use `--compare` for the delta
+since whatever is recorded here now.
 
-- **Recorded at** — 2026-09-08T16:17:25.001Z
-- **Commit** — `2a64b185456d`
+- **Recorded at** — 2026-09-08T17:10:41.772Z
+- **Commit** — `3b52ad57891d`
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 36
-- **Per-call total** — 22,670 tokens (what every surface costs, summed)
-- **Unique fixed text** — 13,630 tokens (distinct text a rewrite has to edit)
+- **Per-call total** — 21,766 tokens (what every surface costs, summed)
+- **Unique fixed text** — 13,352 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -68,25 +71,29 @@ so a jump is never mistaken for a regression or a win.
   text into a helper had been dropping it from the count entirely. That correction
   *raised* the recorded totals by ~5% with no prompt growing — the earlier figures
   were an undercount.
+- **rex redundancy pass** — the first entry here that is a real reduction rather than
+  a measurement change: -904 per-call / -278 unique, by deleting instructions that the
+  same prompt already gave elsewhere and resolving a task-size contradiction (hours vs
+  engineer-weeks). No instruction was removed from a prompt that did not still state it.
 
-## rex — 16,121 per-call / 7,473 unique, 19 surfaces
+## rex — 15,217 per-call / 7,195 unique, 19 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
-| `buildFileImportEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a single source document. | 18 | 123 | 1,147 | 1,270 |
-| `buildScanImportEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a batch of scanner findings. | 40 | 400 | 1,361 | 1,761 |
-| `buildAddEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose new PRD items from a natural-language description. | 26 | 230 | 1,586 | 1,816 |
-| `buildMultiAddEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose items for several scan targets in one call. | 28 | 215 | 1,586 | 1,801 |
+| `buildFileImportEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a single source document. | 18 | 123 | 1,042 | 1,165 |
+| `buildScanImportEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a batch of scanner findings. | 40 | 400 | 1,257 | 1,657 |
+| `buildAddEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose new PRD items from a natural-language description. | 25 | 210 | 1,430 | 1,640 |
+| `buildMultiAddEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose items for several scan targets in one call. | 27 | 195 | 1,430 | 1,625 |
 | `buildBreakdownEnvelope` | `packages/rex/src/analyze/reason.ts` | Split proposals judged too large into child tasks. | 17 | 200 | 483 | 683 |
 | `buildConsolidateEnvelope` | `packages/rex/src/analyze/reason.ts` | Merge overlapping proposals before they enter the PRD. | 19 | 234 | 484 | 718 |
-| `buildAssessmentEnvelope` | `packages/rex/src/analyze/reason.ts` | Assess whether proposal tasks are at the right granularity. | 40 | 492 | — | 492 |
-| `buildIdeasEnvelope` | `packages/rex/src/analyze/reason.ts` | Extract proposals from free-form notes that local parsing missed. | 29 | 378 | 1,586 | 1,964 |
-| `buildConsolidationGuardEnvelope` | `packages/rex/src/analyze/consolidation-guard.ts` | Second-opinion check before a consolidation is applied. | 23 | 320 | 432 | 752 |
-| `buildDecompositionEnvelope` | `packages/rex/src/analyze/decompose.ts` | Decompose a task whose level-of-effort exceeds the threshold. | 24 | 290 | — | 290 |
-| `buildDisambiguationEnvelope` | `packages/rex/src/analyze/extract.ts` | Resolve an ambiguous extraction against existing PRD items. | 21 | 186 | 566 | 752 |
+| `buildAssessmentEnvelope` | `packages/rex/src/analyze/reason.ts` | Assess whether proposal tasks are at the right granularity. | 40 | 497 | — | 497 |
+| `buildIdeasEnvelope` | `packages/rex/src/analyze/reason.ts` | Extract proposals from free-form notes that local parsing missed. | 28 | 358 | 1,430 | 1,788 |
+| `buildConsolidationGuardEnvelope` | `packages/rex/src/analyze/consolidation-guard.ts` | Second-opinion check before a consolidation is applied. | 21 | 273 | 432 | 705 |
+| `buildDecompositionEnvelope` | `packages/rex/src/analyze/decompose.ts` | Decompose a task whose level-of-effort exceeds the threshold. | 23 | 270 | — | 270 |
+| `buildDisambiguationEnvelope` | `packages/rex/src/analyze/extract.ts` | Resolve an ambiguous extraction against existing PRD items. | 21 | 186 | 541 | 727 |
 | `buildClarifyEnvelope` | `packages/rex/src/analyze/guided.ts` | Ask clarifying questions during guided PRD authoring. | 33 | 309 | — | 309 |
 | `buildSpecEnvelope` | `packages/rex/src/analyze/guided.ts` | Turn guided answers into a structured spec. | 22 | 150 | 432 | 582 |
-| `buildModifyEnvelope` | `packages/rex/src/analyze/modify-reason.ts` | Apply a natural-language edit to an existing PRD item. | 29 | 295 | 572 | 867 |
+| `buildModifyEnvelope` | `packages/rex/src/analyze/modify-reason.ts` | Apply a natural-language edit to an existing PRD item. | 29 | 295 | 492 | 787 |
 | `buildGroupRenameEnvelope` | `packages/rex/src/analyze/propose-group-renames.ts` | Rename a group of sibling items to a consistent scheme. | 27 | 214 | 29 | 243 |
 | `buildRenameEnvelope` | `packages/rex/src/analyze/rename-resolve.ts` | Pick the better of two colliding item titles. | 23 | 204 | 29 | 233 |
 | `buildReshapeEnvelope` | `packages/rex/src/analyze/reshape-reason.ts` | Propose a restructure of the PRD hierarchy. | 7 | 18 | 1,402 | 1,420 |
@@ -134,13 +141,13 @@ it. This is the leverage ordering for a rewrite.
 |---|---|---:|---:|---:|
 | `FEW_SHOT_EXAMPLE` | rex | 432 | 10 | 4,320 |
 | `PRD_SCHEMA` | rex | 333 | 6 | 1,998 |
-| `TASK_QUALITY_RULES` | rex | 181 | 6 | 1,086 |
 | `reshapeRoleContent` | rex | 1,054 | 1 | 1,054 |
+| `TASK_QUALITY_RULES` | rex | 156 | 6 | 936 |
 | `CONSOLIDATION_INSTRUCTION` | rex | 223 | 4 | 892 |
-| `ANTI_PATTERNS` | rex | 141 | 6 | 846 |
 | `formatProjectShape` | sourcevision | 393 | 2 | 786 |
-| `placementContent` | rex | 206 | 3 | 618 |
+| `placementContent` | rex | 155 | 3 | 465 |
 | `OUTPUT_INSTRUCTION` | rex | 52 | 8 | 416 |
+| `ANTI_PATTERNS` | rex | 61 | 6 | 366 |
 | `RESHAPE_FEW_SHOT` | rex | 326 | 1 | 326 |
 | `formatFileHeaders` | sourcevision | 54 | 1 | 54 |
 | `summarizeExisting` | rex | 9 | 4 | 36 |
@@ -158,7 +165,7 @@ reproducible without a model call. Dump any of them with `--dump <package>`.
 
 | Package | Entry point | Input | Fixed | Context | Assembled |
 |---|---|---|---:|---:|---:|
-| rex | `buildAssessmentEnvelope` | Granularity assessment over one two-task proposal. | 492 | 245 | 737 |
+| rex | `buildAssessmentEnvelope` | Granularity assessment over one two-task proposal. | 497 | 245 | 742 |
 | sourcevision | `buildPrimerEnvelope` | Primer distillation over a fixed 3-zone CONTEXT.md excerpt. | 229 | 137 | 366 |
 | hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 995 | n/a — 342 of the fixed text is on another branch | 653 |
 | core | `buildReviewerPrompt` | Pair-programming reviewer prompt over three changed files. | 281 | 16 | 297 |
@@ -177,11 +184,11 @@ per section rather than as one literal. These are the same sections
 
 | Section | Chars | Tokens | Share |
 |---|---:|---:|---:|
-| `input` | 1,055 | 264 | 35.8% |
-| `output` | 634 | 159 | 21.6% |
-| `anti-patterns` | 498 | 125 | 17.0% |
-| `structure` | 406 | 102 | 13.8% |
-| `quality` | 211 | 53 | 7.2% |
+| `input` | 1,055 | 264 | 35.6% |
+| `output` | 634 | 159 | 21.4% |
+| `anti-patterns` | 498 | 125 | 16.8% |
+| `structure` | 406 | 102 | 13.7% |
+| `quality` | 229 | 58 | 7.8% |
 | `role` | 134 | 34 | 4.6% |
 
 ### sourcevision envelope sections

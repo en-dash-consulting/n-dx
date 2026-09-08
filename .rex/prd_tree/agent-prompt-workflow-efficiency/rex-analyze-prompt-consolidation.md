@@ -2,7 +2,7 @@
 id: "0cfdca9f-cfa1-4a2f-93fc-f94678d09f1e"
 level: "feature"
 title: "Rex Analyze Prompt Consolidation"
-status: "pending"
+status: "completed"
 priority: "critical"
 tags:
   - "prompts"
@@ -11,6 +11,11 @@ tags:
 blockedBy:
   - "6a4c8eac-7d3c-4535-a983-808cd9e04fbb"
 source: "ndx-capture"
+startedAt: "2026-09-08T16:52:30.560Z"
+completedAt: "2026-09-08T17:15:22.967Z"
+endedAt: "2026-09-08T17:15:22.967Z"
+resolutionType: "code-change"
+resolutionDetail: "Resolved a three-way task-size contradiction (hours vs engineer-weeks) affecting 9 builders including the split/consolidate assessment prompt, and deleted instructions each prompt already gave elsewhere. rex 16,121 → 15,217 per-call, 7,473 → 7,195 unique. New prompt-non-redundancy suite pins all six rules. Criterion 6 not mechanically verified — no rex eval harness exists; scope was chosen so no prompt lost information. Two findings left for separate decisions: the assessment prompt's \"more than 3 acceptance criteria\" red flag contradicts the 4-criteria few-shot exemplar, and cli/help.ts still describes prd.json creation."
 acceptanceCriteria:
   - "Instructions repeated across the rex prompt builders — PRD schema description, proposal output contract, level definitions, JSON response shape — are stated once in a shared section and referenced, not restated per builder."
   - "The two large literals in extract.ts are broken into sections and reduced, with the specific redundancy that made one prompt reach ~5,582 tokens identified in the commit message or a note."
@@ -20,6 +25,6 @@ acceptanceCriteria:
   - "Proposal quality is unchanged: rex analyze, reorganize, prune, and reshape produce equivalent proposals for the same input as before the rewrite, verified on a representative project."
   - "Existing rex tests pass, including the chunked-review and consolidation suites."
 description: "Rex is the largest LLM prompt surface in the repo: roughly 12,565 tokens of static prompt text across 31 literals in 12 files, dwarfing every other package. Around 16 prompt builders are spread across packages/rex/src/analyze/ and core/reorganize.ts, six of them exported from reason.ts alone (buildAddPrompt, buildMultiAddPrompt, buildBreakdownPrompt, buildConsolidatePrompt, buildAssessmentPrompt, buildIdeasPrompt), plus modify-reason, reshape-reason, decompose, guided (buildClarifyPrompt and buildSpecPrompt), consolidation-guard, rename-resolve, propose-group-renames, extract (buildDisambiguationPrompt), analyze-shared, and chunked-review-state. Two files dominate: extract.ts holds ~5,582 tokens in only two literals, meaning one prompt is enormous, and reason.ts holds ~3,543 across 15. Because these prompts all describe the same PRD schema and the same proposal output contract to the same model, the duplication between them is the primary reduction opportunity — a shared schema section stated once beats sixteen restatements that can drift apart."
-lastModified: "2026-09-08T13:40:55.957Z"
+lastModified: "2026-09-08T17:15:22.990Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

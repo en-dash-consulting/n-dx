@@ -91,7 +91,9 @@ export function buildDecompositionEnvelope(
         `- Each child task MUST have an LoE at or below ${weeks}.`,
         '- Each child task MUST include "loe" (number, in engineer-weeks), "loeRationale" (string explaining the estimate), and "loeConfidence" ("low"|"medium"|"high").',
         `- The sum of child LoE values should approximate the parent's LoE (${task.loe ?? "unknown"} weeks).`,
-        "- Each child MUST have a verb-first title, a description, and acceptanceCriteria.",
+        // Verb-first titles and the description + acceptanceCriteria
+        // requirement come from TASK_QUALITY_RULES, which this prompt includes;
+        // children are tasks like any other.
         "- Distribute the parent's acceptance criteria among children — do not lose any.",
         `- Keep priorities consistent with the parent (${task.priority ?? "medium"}).`,
         "- Preserve tags from the parent where relevant.",
