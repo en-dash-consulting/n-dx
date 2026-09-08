@@ -62,14 +62,67 @@ export interface LocalApiProviderOptions {
   /** Maximum response tokens (default: 8192). */
   maxTokens?: number;
   /**
-   * Request timeout in milliseconds for non-streaming completions (default: 300000 = 5 min).
-   * Local inference can be slow; set higher for very large models.
-   * Streaming completions are not affected — the connection stays open as chunks arrive.
+   * Request timeout in milliseconds for non-streaming completions.
+   *
+   * Defaults to `llm.local.timeoutMs` from `.n-dx.json`, then 300000 (5 min).
+   * `0` disables the timeout entirely. Local inference can be slow; set higher
+   * for very large models. Streaming completions only apply this to connection
+   * setup — the connection then stays open as chunks arrive.
    */
   timeoutMs?: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+
+/**
+ * Resolve the per-request timeout for local completions.
+ *
+ * Precedence: explicit `override` (a caller-supplied option) → `llm.local.timeoutMs`
+ * from `.n-dx.json` → {@link DEFAULT_TIMEOUT_MS} (5 min).
+ *
+ * A resolved value of `0` means **no timeout** — the request runs until the
+ * local server responds or the connection drops. This mirrors the `0 = unlimited`
+ * convention used by `cli.timeoutMs`, and is the setting to use for very slow
+ * local models. Note that the CLI-level `cli.timeoutMs` setting does *not* reach
+ * this layer: it bounds the whole command, not the individual HTTP request.
+ *
+ * Exported so that other local-vendor call sites (e.g. hench's local tool loop)
+ * resolve the same value instead of hardcoding their own.
+ */
+export function resolveLocalTimeoutMs(
+  localConfig?: LocalConfig,
+  override?: number,
+): number {
+  if (typeof override === "number" && Number.isFinite(override) && override >= 0) {
+    return override;
+  }
+  const configured = localConfig?.timeoutMs;
+  if (typeof configured === "number" && Number.isFinite(configured) && configured >= 0) {
+    return configured;
+  }
+  return DEFAULT_TIMEOUT_MS;
+}
+
+/**
+ * Create an abort controller wired to `timeoutMs`, or `null` when the timeout
+ * is disabled (`0`). Callers must invoke `clear()` in a `finally` block so a
+ * completed request does not leave a pending timer holding the event loop open.
+ */
+function createTimeoutAbort(timeoutMs: number): { signal: AbortSignal; clear: () => void } | null {
+  if (timeoutMs <= 0) return null;
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
+  return { signal: abort.signal, clear: () => clearTimeout(timer) };
+}
+
+/** Human-readable rendering of a timeout for error messages. */
+function describeTimeout(timeoutMs: number): string {
+  if (timeoutMs >= 60_000) {
+    const minutes = Math.round(timeoutMs / 60_000);
+    return `${minutes} min`;
+  }
+  return `${timeoutMs / 1000}s`;
+}
 
 /** Build the base URL from host and port config. */
 function resolveBaseUrl(localConfig?: LocalConfig): string {
@@ -165,7 +218,7 @@ export function createLocalApiProvider(
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = resolveLocalTimeoutMs(localConfig, options.timeoutMs);
   // Empty string is intentional: LM Studio uses whichever model is loaded.
   const defaultModel = localConfig?.model ?? "";
 
@@ -211,18 +264,18 @@ export function createLocalApiProvider(
           // and uses the currently loaded one.
           if (model) body.model = model;
 
-          const abort = new AbortController();
-          const timer = setTimeout(() => abort.abort(), timeoutMs);
+          // timeoutMs === 0 disables the abort entirely (llm.local.timeoutMs 0).
+          const abort = createTimeoutAbort(timeoutMs);
           let response: Response;
           try {
             response = await fetch(`${baseUrl}/chat/completions`, {
               method: "POST",
               headers,
               body: JSON.stringify(body),
-              signal: abort.signal,
+              ...(abort ? { signal: abort.signal } : {}),
             });
           } finally {
-            clearTimeout(timer);
+            abort?.clear();
           }
 
           if (!response.ok) {
@@ -269,7 +322,8 @@ export function createLocalApiProvider(
           // AbortError means the timeout fired
           if ((err as Error).name === "AbortError") {
             throw new ClaudeClientError(
-              `Local API request timed out after ${timeoutMs / 1000}s. The model may still be loading or generating — try a shorter prompt or increase the timeout.`,
+              `Local API request timed out after ${describeTimeout(timeoutMs)}. The model may still be loading or generating — ` +
+              `raise the limit with 'ndx config llm.local.timeoutMs <ms>' (e.g. 7200000 for 2 h, or 0 for no limit).`,
               "timeout",
               true,
             );
@@ -305,28 +359,29 @@ export function createLocalApiProvider(
 
       // Timeout only covers the connection setup; once headers arrive the
       // controller is cleared so the stream itself can run indefinitely.
-      const streamAbort = new AbortController();
-      const streamTimer = setTimeout(() => streamAbort.abort(), timeoutMs);
+      // timeoutMs === 0 disables even the connection-setup bound.
+      const streamAbort = createTimeoutAbort(timeoutMs);
       let response: Response;
       try {
         response = await fetch(`${baseUrl}/chat/completions`, {
           method: "POST",
           headers,
           body: JSON.stringify(body),
-          signal: streamAbort.signal,
+          ...(streamAbort ? { signal: streamAbort.signal } : {}),
         });
       } catch (err) {
-        clearTimeout(streamTimer);
+        streamAbort?.clear();
         if ((err as Error).name === "AbortError") {
           throw new ClaudeClientError(
-            `Local API stream connection timed out after ${timeoutMs / 1000}s — the server did not begin responding.`,
+            `Local API stream connection timed out after ${describeTimeout(timeoutMs)} — the server did not begin responding. ` +
+            `Raise the limit with 'ndx config llm.local.timeoutMs <ms>' (0 = no limit).`,
             "timeout",
             true,
           );
         }
         throw new ClaudeClientError((err as Error).message ?? "Unknown error", "unknown", false);
       }
-      clearTimeout(streamTimer);
+      streamAbort?.clear();
 
       if (!response.ok) {
         const rawBody = await response.text();

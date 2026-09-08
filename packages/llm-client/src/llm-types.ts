@@ -137,6 +137,18 @@ export interface LocalConfig {
    */
   maxContextTokens?: number;
   /**
+   * Request timeout in milliseconds for a single local completion.
+   *
+   * Local inference on a large model can take far longer than a cloud API
+   * call, so this is configurable per project. Defaults to 300 000 (5 min);
+   * raise it (e.g. 7 200 000 = 2 h) when the model is slow or still loading.
+   *
+   * Applies to the blocking completion path and to the connection setup of a
+   * streaming request — once a stream starts producing chunks it is no longer
+   * bounded by this value.
+   */
+  timeoutMs?: number;
+  /**
    * Second-model verifier. When set, hench sends the primary model's completed
    * solution to this endpoint for review before finalizing the run.
    *

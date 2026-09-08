@@ -14,7 +14,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -815,6 +815,12 @@ async function callVerifier(
   cfg: { host?: string; port?: number; model?: string },
   briefText: string,
   primaryFinalMessage: string,
+  /**
+   * Request timeout in ms; 0 disables it. Defaults to 60 s — the review is a
+   * single short completion, but a slow local model needs the caller's
+   * llm.local.timeoutMs instead.
+   */
+  timeoutMs: number = 60_000,
 ): Promise<{ verdict: "PASS" | "FAIL"; reasoning: string }> {
   const host = typeof cfg.host === "string" && cfg.host ? cfg.host : "localhost";
   const port = typeof cfg.port === "number" && cfg.port > 0 ? cfg.port : 1235;
@@ -848,7 +854,7 @@ async function callVerifier(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(reqBody),
-      signal: AbortSignal.timeout(60_000),
+      ...(timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
     });
 
     if (!resp.ok) {
@@ -922,6 +928,9 @@ async function runLocalToolLoop(params: {
   const maxContextTokens = typeof localCfg?.["maxContextTokens"] === "number"
     ? (localCfg["maxContextTokens"] as number)
     : undefined;
+  // Per-request timeout: llm.local.timeoutMs (0 = no timeout, default 5 min).
+  // Note this is independent of cli.timeoutMs, which bounds the whole command.
+  const requestTimeoutMs = resolveLocalTimeoutMs(localCfg as { timeoutMs?: number } | undefined);
 
   // Verifier config — second model that reviews the primary's completed solution.
   const verifierRaw = localCfg?.["verifier"];
@@ -1029,7 +1038,8 @@ async function runLocalToolLoop(params: {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(reqBody),
-          signal: AbortSignal.timeout(5 * 60 * 1000), // 5 min
+          // llm.local.timeoutMs; 0 means wait indefinitely for a slow local model.
+          ...(requestTimeoutMs > 0 ? { signal: AbortSignal.timeout(requestTimeoutMs) } : {}),
         });
       } catch (err) {
         throw new Error(
@@ -1096,6 +1106,9 @@ async function runLocalToolLoop(params: {
             verifierCfg as { host?: string; port?: number; model?: string },
             briefText,
             assistantContent ?? "(no summary provided)",
+            // Share the primary's llm.local.timeoutMs — a verifier on the same
+            // hardware is no faster, and a 60 s cap would silently skip review.
+            requestTimeoutMs,
           );
           verifierCycleCount++;
           stream("Verifier", reasoning);
