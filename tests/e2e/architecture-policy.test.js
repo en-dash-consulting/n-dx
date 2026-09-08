@@ -65,6 +65,11 @@ const ALLOWED = new Set([
   "packages/rex/src/cli/commands/backfill-commit-attribution.ts",
   "packages/sourcevision/src/analyzers/branch-work-collector.ts",
   "packages/sourcevision/src/analyzers/branch-work-filter.ts",
+  // detectSubAnalyses() is synchronous and must stay so — making it async would
+  // change a public analyzer signature and cascade to every caller. Its one
+  // best-effort `git worktree list --porcelain` call therefore needs
+  // execFileSync; llm-client's exec()/execStdout() helpers return Promises.
+  "packages/sourcevision/src/analyzers/workspace.ts",
   "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
   "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
   // Iso map — reads the HEAD commit time and origin remote so the rendered page
