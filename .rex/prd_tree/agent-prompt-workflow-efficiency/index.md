@@ -34,6 +34,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Hench Runtime Prompt Tightening](./hench-runtime-prompt-tightening.md) | completed |
 | [Prompt Token-Cost Baseline & Measurement](./prompt-token-cost-baseline-measurement.md) | completed |
 | [Rex Analyze Prompt Consolidation](./rex-analyze-prompt-consolidation.md) | completed |
-| [Shipped Assistant-Asset Prompt Parity & Portability](./shipped-assistant-asset-prompt-parity.md) | pending |
+| [Shipped Assistant-Asset Prompt Parity & Portability](./shipped-assistant-asset-prompt-parity.md) | completed |
 | [SourceVision Enrich & Core Reviewer Prompt Tightening](./sourcevision-enrich-core-reviewer.md) | pending |
 | [Workflow Skill Wording & Termination Clarity](./workflow-skill-wording-termination.md) | completed |

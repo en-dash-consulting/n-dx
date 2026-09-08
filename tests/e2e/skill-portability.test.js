@@ -23,7 +23,11 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { allSkills } from "../helpers/all-skills.js";
+
+const ROOT = join(import.meta.dirname, "../..");
 
 /**
  * Every skill, not just the ten in the manifest.
@@ -114,4 +118,48 @@ describe("commit-message construction is shell-neutral", () => {
       ).not.toMatch(/\$\(cat/);
     });
   }
+});
+
+// ── The authoring reference must teach the rule it is enforcing ──────────────
+
+describe("SKILLS.md prescribes the commit pattern the guard allows", () => {
+  /**
+   * The reference every new skill is written from.
+   *
+   * Checking the skills alone left a gap wide enough to reintroduce the bug on
+   * the next skill anyone wrote: `SKILLS.md` documented the required commit
+   * step as `git commit -m "$(cat <<'EOF' ... EOF)"` — exactly the construction
+   * the assertions above reject — so following the documentation produced a
+   * skill that failed CI, and the two disagreed with no test able to notice.
+   */
+  const REFERENCE = join(ROOT, "packages/core/assistant-assets/SKILLS.md");
+  const body = readFileSync(REFERENCE, "utf-8");
+
+  it("does not teach a heredoc commit step", () => {
+    expect(
+      body,
+      "SKILLS.md prescribes a heredoc for the commit message, which the rule " +
+        "above forbids in the skills themselves. A skill author following the " +
+        "reference writes a skill that fails this suite.",
+    ).not.toMatch(/cat <</);
+  });
+
+  it("does not teach command substitution in a commit step", () => {
+    expect(body).not.toMatch(/\$\(cat/);
+  });
+
+  it("teaches the file-based form the skills actually use", () => {
+    expect(
+      body,
+      "SKILLS.md should prescribe writing the message to a scratch file and " +
+        "committing with 'git commit -F <file>'.",
+    ).toMatch(/git commit -F/);
+  });
+
+  it("still requires both trailer lines", () => {
+    // The reason the commit step is prescribed at all: a commit missing
+    // Co-Authored-By lands fine and vanishes from the dashboard merge graph.
+    expect(body).toContain("N-DX:");
+    expect(body).toContain("Co-Authored-By:");
+  });
 });
