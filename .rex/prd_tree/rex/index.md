@@ -2,13 +2,12 @@
 id: "bf053fb2-509d-4acf-aa61-7243e66027e5"
 level: "epic"
 title: "Rex"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-24T20:09:27.774Z"
-completedAt: "2026-09-03T14:48:25.394Z"
 endedAt: "2026-09-03T14:48:25.394Z"
 description: "PRD management: hierarchical epics/features/tasks/subtasks, smart add from natural language, LLM-powered analysis and recommendations, validation, pruning, reshaping. Stores state in .rex/prd.json."
-lastModified: "2026-09-03T14:48:25.417Z"
-lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-09-08T18:51:31.948Z"
+lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -47,3 +46,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Fix --mode=fast being ignored when --accept is passed to reorganize](./fix-mode-fast-being-ignored-when.md) | completed |
 | [Investigate flaky store-roundtrip concurrency test (0 items after serialized mutations)](./investigate-flaky-store-roundtrip.md) | completed |
 | [rex add hangs indefinitely when stdin is an open pipe](./rex-add-hangs-indefinitely-when-stdin.md) | completed |
+| [Stamp lastModified on tree mutations made inside store.withTransaction](./stamp-lastmodified-on-tree-mutations.md) | pending |

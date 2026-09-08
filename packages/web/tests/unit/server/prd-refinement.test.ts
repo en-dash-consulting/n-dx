@@ -410,6 +410,48 @@ describe("applyRefinements", () => {
     expect(outcomes[0].detail).toContain("no longer in the PRD");
   });
 
+  it("writes only the three known fields, whatever else `updates` carries", () => {
+    const doc = makeDoc();
+    const epic = find(doc, "epic-1")!;
+
+    // Built by hand rather than parsed, because that is the only way to reach
+    // this: `parseAnswerRefinements` constructs `updates` field by field and
+    // zod strips unknown keys, so the model cannot produce this shape. A
+    // crafted local client posting straight to /api/rex/apply-refinements can
+    // — the route's shape check does not look at `updates` and the type is
+    // erased at runtime. The diffs declare a description change only, so
+    // without the whitelist the write and the reviewed diff disagree.
+    const crafted = {
+      op: "edit",
+      id: "r1",
+      itemId: "epic-1",
+      itemTitle: epic.title,
+      itemLevel: epic.level,
+      rationale: "",
+      updates: {
+        description: "A description the user reviewed.",
+        status: "completed",
+        children: [],
+        title: "Renamed behind the diff",
+      },
+      diffs: [{ field: "description", before: [], after: ["A description the user reviewed."] }],
+      baseline: [{ itemId: "epic-1", fingerprint: itemFingerprint(epic) }],
+    } as unknown as EditRefinement;
+
+    const outcomes = applyRefinements(doc, [crafted]);
+    expect(outcomes).toEqual([{ id: "r1", itemId: "epic-1", status: "applied" }]);
+
+    // The declared change lands...
+    expect(find(doc, "epic-1")?.description).toBe("A description the user reviewed.");
+    // ...and the undeclared ones do not. `children: []` is the destructive one:
+    // it would delete both child tasks, and a childless completed epic is
+    // schema-valid, so validateDocument inside the transaction would not
+    // catch it.
+    expect(find(doc, "epic-1")?.status).toBe("pending");
+    expect(find(doc, "epic-1")?.children?.map((c) => c.id)).toEqual(["task-a", "task-b"]);
+    expect(find(doc, "epic-1")?.title).toBe("Epic One");
+  });
+
   it("keeps applying the rest of a batch when one goes stale", () => {
     const generatedAgainst = makeDoc();
     const proposals = proposalsFor(generatedAgainst, [

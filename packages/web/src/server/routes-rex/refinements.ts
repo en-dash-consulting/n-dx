@@ -67,10 +67,16 @@ export function routeRefinements(
  * Shape check on the posted proposals.
  *
  * Deliberately structural rather than a full re-derivation: the proposals were
- * built by this server from a document it loaded, and the authority that
- * matters — do the fingerprints still hold, is the mutation still legal — is
- * re-established under the lock by `applyRefinements`. What this guards is a
- * malformed body reaching the transaction at all.
+ * built by this server from a document it loaded, and the staleness and
+ * legality questions — do the fingerprints still hold, is the mutation still
+ * permitted — are re-established under the lock by `applyRefinements`. What
+ * this guards is a malformed body reaching the transaction at all.
+ *
+ * It does *not* constrain which fields an `edit` carries; the posted `updates`
+ * object is unchecked here and its type is erased at runtime. That scope is
+ * enforced at the write instead, where `applyRefinements` picks the three
+ * known fields off `updates` rather than spreading it — see the comment on the
+ * `edit` branch in `../prd-refinement.ts`.
  */
 function isProposalShape(value: unknown): value is RefinementProposal {
   if (typeof value !== "object" || value === null) return false;

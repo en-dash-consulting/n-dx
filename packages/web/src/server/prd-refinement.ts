@@ -695,7 +695,21 @@ export function applyRefinements(
     }
 
     if (proposal.op === "edit") {
-      updateInTree(doc.items, proposal.itemId, { ...proposal.updates } as Partial<PRDItem>);
+      // Picked field by field rather than spread. `updates` arrives from the
+      // request body and its TypeScript type is erased at runtime, so a
+      // spread writes whatever the caller put there — `status`, `children`,
+      // anything `Object.assign` will take — while the diffs the user
+      // reviewed claim only a description change. Nothing downstream catches
+      // that: `validateDocument` accepts a childless completed epic. The
+      // whitelist lives here, at the write, so the next person adding a
+      // refinement field has to add it in the same place they add the diff.
+      const { description, acceptanceCriteria, priority } = proposal.updates;
+      updateInTree(doc.items, proposal.itemId, {
+        ...(description !== undefined && { description }),
+        ...(acceptanceCriteria !== undefined && { acceptanceCriteria }),
+        // Validity already checked by validateAgainst above.
+        ...(priority !== undefined && { priority: priority as PRDItem["priority"] }),
+      });
       outcomes.push({ id: proposal.id, itemId: proposal.itemId, status: "applied" });
       continue;
     }
