@@ -181,6 +181,19 @@ const AskRequestSchema = z
         text: z.string().trim().max(MAX_SEED_TEXT_CHARS).optional(),
         zone: z.string().trim().max(256).optional(),
         files: z.array(z.string().trim().max(1_024)).max(MAX_SEED_FILES).optional(),
+        // TODO(ask-seed-caps): `labels` is the only uncapped field on the seed.
+        // The value length is bounded but the key count is not, and renderSeed
+        // joins every entry onto one line with no slice and no omission note —
+        // unlike `files`, which is .max(MAX_SEED_FILES) here and sliced there.
+        // A POST carrying 5,000 labels of 200 chars produced a ~1,043,955-char
+        // context bundle (~260k tokens) on an endpoint that spends money per
+        // call. Fix is `.max(20)` here plus a `.slice()` in renderSeed with the
+        // omission note `files` already gets.
+        //
+        // Low, on reachability rather than impact: the UI never sends this and
+        // request-security.ts blocks cross-origin browser mutations, so the
+        // caller has to be a local process or a hand-crafted request. That
+        // makes it a defence-in-depth gap, not an exploit path.
         labels: z.record(z.string().trim().max(256)).optional(),
       })
       .strict()

@@ -355,6 +355,10 @@ function renderContextMd(contextMd: string | null): string[] {
 
 function renderSeed(seed: AskSeed | undefined): string[] {
   if (!seed) return [];
+  // TODO(ask-seed-caps): no slice and no omission note here, unlike `files`
+  // below — see the note on `labels` in routes-sourcevision-ask.ts's request
+  // schema. Both halves are needed: capping the schema without slicing here
+  // leaves the renderer trusting its input.
   const labels = Object.entries(seed.labels ?? {})
     .filter(([, value]) => typeof value === "string" && value.trim().length > 0)
     .map(([key, value]) => `${key}: ${value}`);
@@ -424,6 +428,22 @@ export function assembleAskContext(ctx: ServerContext, seed?: AskSeed): AskConte
     .join("\n\n");
 
   return {
+    // TODO(ask-available): this reports "a file parsed", not "the bundle has
+    // content", which is not the invariant `available`'s docblock claims. Every
+    // renderer returns [] when it finds no recognised fields (renderProject's
+    // lines.length > 1 guard, and its siblings), so a `.sourcevision/` holding
+    // only `manifest.json` containing `{}` yields available: true, sources:
+    // ["manifest.json"], text: "". handleAsk then clears its no_analysis
+    // branch, spends tokens, and sends "Answer ONLY from the analysis
+    // provided" wrapped around an empty ANALYSIS block — the ungrounded answer
+    // the field exists to refuse.
+    //
+    // Reachable from an interrupted analyze leaving a syntactically valid but
+    // field-poor artifact, or any `.sourcevision/` whose only readable file
+    // renders to nothing (components.json with {"components": []},
+    // imports.json with no summary).
+    //
+    // Fix: `sources.length > 0 && body.trim().length > 0`, plus a test.
     available: sources.length > 0,
     sources,
     text: body,
