@@ -10,12 +10,12 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-09-08T18:02:43.765Z
-- **Commit** — `d0d7aeb84570`
+- **Recorded at** — 2026-09-08T18:48:37.501Z
+- **Commit** — `3dda8b5b3cc1`
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 36
-- **Per-call total** — 21,753 tokens (what every surface costs, summed)
-- **Unique fixed text** — 13,339 tokens (distinct text a rewrite has to edit)
+- **Per-call total** — 21,688 tokens (what every surface costs, summed)
+- **Unique fixed text** — 13,201 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -100,15 +100,15 @@ so a jump is never mistaken for a regression or a win.
 | `buildBodyMergeEnvelope` | `packages/rex/src/analyze/reshape-reason.ts` | Merge two item descriptions into one during a reshape. | 12 | 106 | — | 106 |
 | `buildValidationFeedbackEnvelope` | `packages/rex/src/analyze/escalate.ts` | Retry feedback appended to a prompt whose response failed validation. | 12 | 62 | — | 62 |
 
-## sourcevision — 2,724 per-call / 2,332 unique, 7 surfaces
+## sourcevision — 2,659 per-call / 2,194 unique, 7 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
-| `buildFirstPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | First-pass zone enrichment for a batch of zones. | 59 | 357 | 447 | 804 |
-| `buildLaterPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | Later-pass zone enrichment, given the previous pass's output. | 53 | 330 | 393 | 723 |
+| `buildFirstPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | First-pass zone enrichment for a batch of zones. | 57 | 317 | 463 | 780 |
+| `buildLaterPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | Later-pass zone enrichment, given the previous pass's output. | 50 | 265 | 434 | 699 |
 | `buildMetaEnvelope` | `packages/sourcevision/src/analyzers/enrich-config.ts` | Meta-evaluation choosing the enrichment strategy for a repo. | 23 | 531 | 14 | 545 |
-| `buildSingleZoneFirstPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | Per-zone enrichment, first pass — names and describes one zone. | 27 | 166 | — | 166 |
-| `buildSingleZoneLaterPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | Per-zone enrichment, later pass — adds only what pass 1 missed. | 30 | 166 | — | 166 |
+| `buildSingleZoneFirstPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | Per-zone enrichment, first pass — names and describes one zone. | 25 | 138 | 16 | 154 |
+| `buildSingleZoneLaterPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | Per-zone enrichment, later pass — adds only what pass 1 missed. | 27 | 120 | 41 | 161 |
 | `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 19 | 91 | — | 91 |
 | `buildPrimerEnvelope` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 21 | 229 | — | 229 |
 
@@ -149,7 +149,9 @@ it. This is the leverage ordering for a rewrite.
 | `OUTPUT_INSTRUCTION` | rex | 52 | 8 | 416 |
 | `ANTI_PATTERNS` | rex | 61 | 6 | 366 |
 | `RESHAPE_FEW_SHOT` | rex | 326 | 1 | 326 |
+| `JSON_OBJECT_ONLY` | sourcevision | 16 | 4 | 64 |
 | `formatFileHeaders` | sourcevision | 54 | 1 | 54 |
+| `ONLY_NEW_INSIGHTS` | sourcevision | 25 | 2 | 50 |
 | `summarizeExisting` | rex | 9 | 4 | 36 |
 | `projectContextContent` | rex | 10 | 3 | 30 |
 | `formatMemberSection` | rex | 29 | 1 | 29 |

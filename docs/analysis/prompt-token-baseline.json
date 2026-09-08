@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 21753,
-    "uniqueTokens": 13339,
+    "perCallTokens": 21688,
+    "uniqueTokens": 13201,
     "skills": 13,
     "skillTokens": 16990
   },
@@ -108,8 +108,8 @@
     },
     "sourcevision": {
       "surfaces": 7,
-      "perCallTokens": 2724,
-      "uniqueTokens": 2332
+      "perCallTokens": 2659,
+      "uniqueTokens": 2194
     },
     "hench": {
       "surfaces": 9,
@@ -242,10 +242,30 @@
     },
     {
       "pkg": "sourcevision",
+      "name": "JSON_OBJECT_ONLY",
+      "tokens": 16,
+      "usedBy": [
+        "buildFirstPassEnvelope",
+        "buildLaterPassEnvelope",
+        "buildSingleZoneFirstPassEnvelope",
+        "buildSingleZoneLaterPassEnvelope"
+      ]
+    },
+    {
+      "pkg": "sourcevision",
       "name": "formatFileHeaders",
       "tokens": 54,
       "usedBy": [
         "buildFirstPassEnvelope"
+      ]
+    },
+    {
+      "pkg": "sourcevision",
+      "name": "ONLY_NEW_INSIGHTS",
+      "tokens": 25,
+      "usedBy": [
+        "buildLaterPassEnvelope",
+        "buildSingleZoneLaterPassEnvelope"
       ]
     },
     {
@@ -606,14 +626,15 @@
       "builder": "buildFirstPassEnvelope",
       "purpose": "First-pass zone enrichment for a batch of zones.",
       "inline": false,
-      "literals": 59,
+      "literals": 57,
       "constants": {
         "formatProjectShape": 393,
-        "formatFileHeaders": 54
+        "formatFileHeaders": 54,
+        "JSON_OBJECT_ONLY": 16
       },
-      "ownTokens": 357,
-      "fixedChars": 3215,
-      "fixedTokens": 804
+      "ownTokens": 317,
+      "fixedChars": 3117,
+      "fixedTokens": 780
     },
     {
       "pkg": "sourcevision",
@@ -621,13 +642,15 @@
       "builder": "buildLaterPassEnvelope",
       "purpose": "Later-pass zone enrichment, given the previous pass's output.",
       "inline": false,
-      "literals": 53,
+      "literals": 50,
       "constants": {
-        "formatProjectShape": 393
+        "formatProjectShape": 393,
+        "ONLY_NEW_INSIGHTS": 25,
+        "JSON_OBJECT_ONLY": 16
       },
-      "ownTokens": 330,
-      "fixedChars": 2892,
-      "fixedTokens": 723
+      "ownTokens": 265,
+      "fixedChars": 2794,
+      "fixedTokens": 699
     },
     {
       "pkg": "sourcevision",
@@ -649,11 +672,13 @@
       "builder": "buildSingleZoneFirstPassEnvelope",
       "purpose": "Per-zone enrichment, first pass — names and describes one zone.",
       "inline": false,
-      "literals": 27,
-      "constants": {},
-      "ownTokens": 166,
-      "fixedChars": 663,
-      "fixedTokens": 166
+      "literals": 25,
+      "constants": {
+        "JSON_OBJECT_ONLY": 16
+      },
+      "ownTokens": 138,
+      "fixedChars": 613,
+      "fixedTokens": 154
     },
     {
       "pkg": "sourcevision",
@@ -661,11 +686,14 @@
       "builder": "buildSingleZoneLaterPassEnvelope",
       "purpose": "Per-zone enrichment, later pass — adds only what pass 1 missed.",
       "inline": false,
-      "literals": 30,
-      "constants": {},
-      "ownTokens": 166,
-      "fixedChars": 662,
-      "fixedTokens": 166
+      "literals": 27,
+      "constants": {
+        "ONLY_NEW_INSIGHTS": 25,
+        "JSON_OBJECT_ONLY": 16
+      },
+      "ownTokens": 120,
+      "fixedChars": 642,
+      "fixedTokens": 161
     },
     {
       "pkg": "sourcevision",
@@ -957,6 +985,6 @@
       }
     ]
   },
-  "recordedAt": "2026-09-08T18:02:43.765Z",
-  "commit": "d0d7aeb84570"
+  "recordedAt": "2026-09-08T18:48:37.501Z",
+  "commit": "3dda8b5b3cc1"
 }

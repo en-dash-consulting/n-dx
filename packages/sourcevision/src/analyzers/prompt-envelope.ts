@@ -65,6 +65,43 @@ export const SV_PROMPT_SECTIONS = [
 /** A section name from {@link SV_PROMPT_SECTIONS}. */
 export type SvPromptSection = (typeof SV_PROMPT_SECTIONS)[number];
 
+// ── Shared output contract ──────────────────────────────────────────────────
+//
+// Four enrichment builders across two files each spelled the response contract
+// out for themselves, and they had already drifted: one asked for "ONLY a JSON
+// object" where the others asked for "ONLY a JSON object (no markdown, no
+// explanation)". `tryParseJSON` strips fences, so the divergence cost output
+// tokens rather than breaking anything — which is exactly why nothing caught
+// it. These prompts run per batch and per zone, so a contract written four ways
+// is also four places to edit when the response shape changes.
+
+/** Ask for a bare JSON object. Stated identically by every enrichment prompt. */
+export const JSON_OBJECT_ONLY =
+  "Respond with ONLY a JSON object (no markdown, no explanation):";
+
+/** Later-pass rule: do not restate what the previous pass already found. */
+export const ONLY_NEW_INSIGHTS =
+  "Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.";
+
+/**
+ * The finding-shape line, in its two intended forms.
+ *
+ * Batch prompts name the `category` enum; the per-zone prompts do not. That is
+ * a choice rather than an oversight — per-zone enrichment is the minimal
+ * fallback path, and `classifyFinding` in enrich-parsing.ts derives a category
+ * from the finding text whenever the model omits one, so asking for it there
+ * would add tokens to the smallest prompts for a field the pipeline already
+ * fills in.
+ *
+ * @param withCategory - include the category enum (batch prompts only)
+ */
+export function findingsContract(withCategory: boolean): string {
+  const severity = 'Findings: severity ("info"|"warning"|"critical")';
+  return withCategory
+    ? `${severity}, category ("structural"|"code"|"documentation").`
+    : `${severity}.`;
+}
+
 /**
  * Declare one prompt section.
  *

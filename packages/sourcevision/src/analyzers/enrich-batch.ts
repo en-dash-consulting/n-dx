@@ -30,6 +30,9 @@ import {
   svPromptEnvelope,
   svPrompt,
   logSvPromptSections,
+  JSON_OBJECT_ONLY,
+  ONLY_NEW_INSIGHTS,
+  findingsContract,
 } from "./prompt-envelope.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -570,9 +573,9 @@ export function buildFirstPassEnvelope(
       section(
         "output",
         [
-          'Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").',
+          findingsContract(true),
           "",
-          "Respond with ONLY a JSON object (no markdown, no explanation):",
+          JSON_OBJECT_ONLY,
           '{"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":["actionable insight"],"findings":[{"type":"observation","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["cross-zone observation"],"findings":[{"type":"observation","scope":"global","text":"finding text","severity":"info","category":"code"}]}',
           "",
           `Return exactly ${batchZones.length} zone entries. Use finding types: ${passConfig.expectedTypes.join(", ")}.`,
@@ -667,11 +670,11 @@ export function buildLaterPassEnvelope(
       section(
         "output",
         [
-          "Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.",
+          ONLY_NEW_INSIGHTS,
           "",
-          'Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").',
+          findingsContract(true),
           "",
-          "Respond with ONLY a JSON object (no markdown, no explanation):",
+          JSON_OBJECT_ONLY,
           `{"zones":[{"id":"existing-zone-id","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["new cross-zone observation"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"global","text":"finding text","severity":"info","category":"code"}]}`,
           "",
           `Return one entry per zone. Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine if nothing new to add.`,

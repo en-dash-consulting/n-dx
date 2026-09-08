@@ -35,6 +35,9 @@ import {
   svPromptEnvelope,
   svPrompt,
   logSvPromptSections,
+  JSON_OBJECT_ONLY,
+  ONLY_NEW_INSIGHTS,
+  findingsContract,
 } from "./prompt-envelope.js";
 
 // ── Per-zone structure hash ──────────────────────────────────────────────────
@@ -113,9 +116,9 @@ export function buildSingleZoneFirstPassEnvelope(
     section(
       "output",
       [
-        'Findings: severity ("info"|"warning"|"critical").',
+        findingsContract(false),
         "",
-        "Respond with ONLY a JSON object (no markdown, no explanation):",
+        JSON_OBJECT_ONLY,
         `{"id":"kebab-case-id","name":"Title Case Name","description":"One sentence describing the zone's purpose.","insights":["actionable insight about this zone"],"findings":[{"type":"observation","scope":"${zone.id}","text":"finding text","severity":"info"}]}`,
         "",
         `Use finding types: ${passConfig.expectedTypes.join(", ")}.`,
@@ -155,11 +158,13 @@ export function buildSingleZoneLaterPassEnvelope(
     section(
       "output",
       [
-        "Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.",
+        ONLY_NEW_INSIGHTS,
         "",
-        'Findings: severity ("info"|"warning"|"critical").',
+        findingsContract(false),
         "",
-        "Respond with ONLY a JSON object:",
+        // Was "Respond with ONLY a JSON object:" — the one builder of four that
+        // dropped the parenthetical, so this path alone did not forbid markdown.
+        JSON_OBJECT_ONLY,
         `{"id":"${zone.id}","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"${zone.id}","text":"finding text","severity":"info"}]}`,
         "",
         `Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine if nothing new to add.`,
