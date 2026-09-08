@@ -52,4 +52,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Web Server Port Management](./web-server-port-management/index.md) | completed |
 | [Web UI Memory Management and Crash Resolution](./web-ui-memory-management-and-crash/index.md) | completed |
 | [Zone Detection Validation for Go Projects](./zone-detection-validation-for-go/index.md) | completed |
+| [Allowlist workspace.ts in the child_process architecture policy (PR #354 CI fix)](./allowlist-workspace-ts-in-the-child.md) | completed |
 | [Optional 3D isometric architecture map generator](./optional-3d-isometric-architecture-map.md) | completed |
+| [sv analyze: skip git worktree checkouts in sub-analysis discovery](./sv-analyze-skip-git-worktree-checkouts.md) | completed |
