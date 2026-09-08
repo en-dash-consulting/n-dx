@@ -450,6 +450,117 @@ describe("prompt census: baseline", () => {
     }
   });
 
+  // ── Provenance ────────────────────────────────────────────────────────────
+  //
+  // The recorded baseline once named commit 3dda8b5b while containing
+  // JSON_OBJECT_ONLY, a constant that first exists in 0b57e2eb — a descendant.
+  // `--write` had run against a dirty tree and stamped `.git/HEAD` regardless,
+  // so the published artifact attributed its numbers to code that did not
+  // contain them, and `--compare` reported "(no surface changed)" across a
+  // range that demonstrably had.
+  //
+  // Note what would NOT have caught it: the token counts were correct. Only
+  // the attribution was wrong. So these tests check the stamp, and the
+  // staleness test below checks measured content — two different failures.
+
+  it("refuses to record a baseline from a dirty tree", () => {
+    // Made dirty with an untracked file so the assertion holds whatever state
+    // the developer's tree happens to be in when the suite runs.
+    const marker = join(ROOT, ".prompt-census-dirty-probe.tmp");
+    const before = readFileSync(BASELINE_JSON, "utf-8");
+    writeFileSync(marker, "dirty\n");
+
+    try {
+      let exitCode = 0;
+      let stderr = "";
+      try {
+        execFileSync(process.execPath, [CENSUS, "--write"], {
+          cwd: ROOT,
+          encoding: "utf-8",
+          stdio: "pipe",
+        });
+      } catch (err) {
+        exitCode = err.status;
+        stderr = err.stderr ?? "";
+      }
+
+      expect(exitCode, "--write should refuse a dirty tree").toBe(1);
+      expect(stderr).toMatch(/dirty|uncommitted/i);
+      expect(
+        readFileSync(BASELINE_JSON, "utf-8"),
+        "refusal must happen before anything is written",
+      ).toBe(before);
+    } finally {
+      rmSync(marker, { force: true });
+    }
+  });
+
+  it("marks the stamp when --allow-dirty overrides the refusal", () => {
+    // The override must not be able to produce a stamp indistinguishable from
+    // a clean recording — that is the whole defect. Writes to a temp output so
+    // the real baseline is never touched.
+    const dir = mkdtempSync(join(tmpdir(), "prompt-census-"));
+    const marker = join(ROOT, ".prompt-census-dirty-probe2.tmp");
+    const before = readFileSync(BASELINE_JSON, "utf-8");
+    writeFileSync(marker, "dirty\n");
+
+    try {
+      const out = join(dir, "baseline.json");
+      execFileSync(
+        process.execPath,
+        [CENSUS, "--write", "--allow-dirty", "--out", out],
+        { cwd: ROOT, encoding: "utf-8", stdio: "pipe" },
+      );
+
+      const recorded = JSON.parse(readFileSync(out, "utf-8"));
+      expect(recorded.dirty, "a dirty recording must say so").toBe(true);
+      expect(
+        recorded.commit,
+        "a dirty recording must not present a bare commit sha as its provenance",
+      ).toMatch(/-dirty$/);
+      expect(
+        readFileSync(BASELINE_JSON, "utf-8"),
+        "--out must redirect the write, not additionally rewrite the real baseline",
+      ).toBe(before);
+    } finally {
+      rmSync(marker, { force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("the checked-in baseline still describes what the repo measures now", () => {
+    // Staleness, checked on measured content rather than on the commit sha.
+    // A "stamp must equal HEAD" assertion cannot work: recording the baseline
+    // dirties the baseline files, so committing them puts HEAD one ahead of
+    // the stamp and the check would fail after every legitimate re-record.
+    // The content hash only moves when the measurements actually move.
+    const recorded = JSON.parse(readFileSync(BASELINE_JSON, "utf-8"));
+    const fresh = census();
+
+    expect(
+      recorded.contentHash,
+      "baseline predates content hashing — re-record it with " +
+        "`node scripts/prompt-census.mjs --write`",
+    ).toBeTruthy();
+
+    expect(
+      fresh.contentHash,
+      [
+        "The checked-in prompt-token baseline no longer describes this repo.",
+        "A prompt surface or skill body changed without the baseline being",
+        "re-recorded, so docs/analysis/prompt-token-baseline.md is stating",
+        "figures that are no longer true.",
+        "",
+        "Fix: node scripts/prompt-census.mjs --write",
+        "",
+        `  baseline per-call: ${recorded.totals?.perCallTokens}`,
+        `  current  per-call: ${fresh.totals?.perCallTokens}`,
+        `  baseline skills:   ${recorded.totals?.skillTokens}`,
+        `  current  skills:   ${fresh.totals?.skillTokens}`,
+      ].join("\n"),
+    ).toBe(recorded.contentHash);
+  });
+
   it("--check exits non-zero when a registered builder disappears", () => {
     // Proves the staleness guard is load-bearing rather than vacuous.
     const src = readFileSync(CENSUS, "utf-8");

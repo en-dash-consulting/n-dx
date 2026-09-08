@@ -60,6 +60,12 @@ import { readFileSync, writeFileSync, existsSync, realpathSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
+// Only `--write` shells out, and only to establish whether the tree is clean.
+// See treeState() for why reading .git/ was not enough. This script is listed
+// under "Development scripts" in the ALLOWED set of
+// tests/e2e/architecture-policy.test.js.
+import { execFileSync } from "node:child_process";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const BASELINE_JSON = join(ROOT, "docs/analysis/prompt-token-baseline.json");
@@ -1283,6 +1289,20 @@ function renderMarkdown(report) {
   lines.push("");
   lines.push(`- **Recorded at** — ${report.recordedAt}`);
   lines.push(`- **Commit** — \`${report.commit}\``);
+  if (report.dirty) {
+    lines.push(
+      "- **Working tree was dirty** — these figures were measured from " +
+        "uncommitted changes, so the commit above is where the tree was based, " +
+        "not what produced these numbers. Re-record from a clean tree.",
+    );
+  }
+  if (report.contentHash) {
+    lines.push(
+      `- **Content hash** — \`${report.contentHash}\` ` +
+        "(identifies the measurement itself; `tests/e2e/prompt-census.test.js` " +
+        "fails when the repo no longer matches it)",
+    );
+  }
   lines.push(`- **Model for cost/context figures** — \`${report.model}\``);
   lines.push(`- **Surfaces** — ${report.totals.surfaces}`);
   lines.push(
@@ -1583,14 +1603,96 @@ function renderMarkdown(report) {
   return lines.join("\n");
 }
 
+// ── Provenance ───────────────────────────────────────────────────────────────
+
+/**
+ * Whether the working tree matches HEAD.
+ *
+ * ## Why this exists
+ *
+ * A recorded baseline is only worth keeping if it says which code produced its
+ * numbers. `currentCommit()` reads `.git/HEAD`, which reports the commit the
+ * tree is *based on* — not whether the files actually measured still match it.
+ * So `--write` from a dirty tree measured the working tree and stamped HEAD,
+ * and the two disagreed with nothing to notice.
+ *
+ * That is not hypothetical. The checked-in baseline named `3dda8b5b` while
+ * containing `JSON_OBJECT_ONLY`, a constant introduced by `0b57e2eb` — a
+ * *descendant* of the commit it claimed. `--compare` consequently reported
+ * "(no surface changed)" across a range that had changed a prompt.
+ *
+ * ## Why a subprocess
+ *
+ * Answering "does the tree match HEAD?" from `.git/` alone means reading the
+ * index, inflating loose objects, and walking packfiles — reimplementing git.
+ * The mtime shortcut (compare each measured file against `.git/index`) is
+ * guesswork that reports clean after a `touch`. Since a false *clean* is the
+ * exact failure being fixed, neither is acceptable, so this script joins the
+ * "Development scripts" entries already in the ALLOWED set of
+ * tests/e2e/architecture-policy.test.js.
+ *
+ * ## Scope, and why it is deliberately broad
+ *
+ * Any dirty path counts, not only the measured ones. An unrelated edit will
+ * therefore block a recording, which `--allow-dirty` exists to escape. The
+ * trade is intentional: this can report dirty when the measurement would in
+ * fact have been faithful, but it can never report clean when it would not.
+ *
+ * @returns `{ dirty }` — `dirty: true` when the tree differs from HEAD or the
+ *   state could not be established at all. Never optimistic.
+ */
+function treeState() {
+  try {
+    const out = execFileSync("git", ["status", "--porcelain"], {
+      cwd: ROOT,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return { dirty: out.trim().length > 0 };
+  } catch {
+    // No git, not a repo, or git failed. "Unknown" is treated as dirty: a
+    // stamp that might be wrong must not be presented as though it is right.
+    return { dirty: true };
+  }
+}
+
+/**
+ * Hash the measurement itself, so provenance does not depend on git at all.
+ *
+ * Two jobs. It gives the recording an identity that cannot disagree with its
+ * own contents, and it is the staleness signal: when a prompt or skill body
+ * changes without the baseline being re-recorded, this moves and
+ * tests/e2e/prompt-census.test.js fails.
+ *
+ * Deliberately *not* a commit-equality check. Recording the baseline dirties
+ * the baseline files, so committing them puts HEAD one commit ahead of the
+ * stamp — a "stamp must equal HEAD" assertion would fail immediately after
+ * every legitimate re-record. Hashing content sidesteps that: it only moves
+ * when the numbers move.
+ *
+ * Only the fields a rewrite could change are hashed. `recordedAt` and the
+ * model id are excluded, so re-recording an unchanged repo is idempotent.
+ */
+function contentHash(report) {
+  const canonical = {
+    surfaces: report.surfaces
+      .map((s) => [s.file, s.builder, s.fixedChars ?? null, s.fixedTokens ?? null])
+      .sort((a, b) => `${a[0]}${a[1]}`.localeCompare(`${b[0]}${b[1]}`)),
+    skills: report.skills
+      .map((s) => [s.name, s.chars, s.tokens])
+      .sort((a, b) => a[0].localeCompare(b[0])),
+  };
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex").slice(0, 16);
+}
+
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 /**
  * Read the current commit from `.git` directly.
  *
- * Deliberately not `git rev-parse` — importing child_process here would mean
- * adding this script to the ALLOWED list in architecture-policy.test.js, which
- * is a real policy surface and not worth spending on a provenance stamp.
+ * Still not `git rev-parse` — reading the ref is exact and needs no subprocess.
+ * What a `.git/` read cannot tell you is whether the *working tree* matches
+ * that commit, which is the question {@link treeState} exists to answer.
  */
 function currentCommit() {
   const head = readGitFile(".git/HEAD");
@@ -1634,6 +1736,10 @@ async function main(argv) {
         "  --compare         diff HEAD against docs/analysis/prompt-token-baseline.json",
         "  --baseline <path> compare against a different recording instead",
         "  --write           rewrite the checked-in baseline (.md and .json)",
+        "                    refused on a dirty tree: the census measures the",
+        "                    tree but stamps HEAD, so they must agree",
+        "  --allow-dirty     record anyway; the stamp is marked `<sha>-dirty`",
+        "  --out <path>      write the recording to <path> instead (.md alongside)",
         "  --dump <pkg>      print the assembled representative prompt for a package",
         "  --check           exit 1 if any registry entry no longer resolves",
         "  --model <id>      model used for the token estimate (default: claude-sonnet-5)",
@@ -1703,20 +1809,54 @@ async function main(argv) {
       for (const s of stale) console.error(`  ${s.file} — ${s.error}`);
       return 1;
     }
+
+    // A recording measures the working tree but stamps a commit, so the two
+    // agree only when the tree is clean. Refuse rather than publish a stamp
+    // that names code the numbers did not come from.
+    const { dirty } = treeState();
+    if (dirty && !flag("allow-dirty")) {
+      console.error(
+        [
+          "Refusing to record a baseline from a dirty working tree.",
+          "",
+          "The census measures the tree but stamps HEAD, so a recording made",
+          "now would attribute its numbers to a commit that does not contain",
+          "them — which is how the previous baseline came to name a commit",
+          "predating the code it measured.",
+          "",
+          "Commit or stash first, or pass --allow-dirty to record anyway (the",
+          "stamp is then marked, not silently wrong).",
+        ].join("\n"),
+      );
+      return 1;
+    }
+
+    const sha = currentCommit();
     const stamped = {
       ...report,
       recordedAt: new Date().toISOString(),
-      commit: currentCommit(),
+      // Suffixed rather than omitted: a reader looking for provenance finds
+      // something, and it cannot be mistaken for a clean recording.
+      commit: dirty ? `${sha}-dirty` : sha,
+      dirty,
+      contentHash: contentHash(report),
     };
-    writeFileSync(BASELINE_JSON, `${JSON.stringify(stamped, null, 2)}\n`);
-    writeFileSync(BASELINE_MD, `${renderMarkdown(stamped)}\n`);
+
+    // --out redirects the write so tests can exercise recording without
+    // rewriting the published artifact.
+    const outJson = value("out") ?? BASELINE_JSON;
+    const outMd = outJson === BASELINE_JSON ? BASELINE_MD : outJson.replace(/\.json$/, ".md");
+
+    writeFileSync(outJson, `${JSON.stringify(stamped, null, 2)}\n`);
+    writeFileSync(outMd, `${renderMarkdown(stamped)}\n`);
     console.log(
       `Wrote ${report.totals.surfaces} surfaces — ` +
         `${report.totals.perCallTokens.toLocaleString("en-US")} per-call, ` +
-        `${report.totals.uniqueTokens.toLocaleString("en-US")} unique fixed tokens`,
+        `${report.totals.uniqueTokens.toLocaleString("en-US")} unique fixed tokens` +
+        (dirty ? " (DIRTY TREE — stamp marked)" : ""),
     );
-    console.log("  docs/analysis/prompt-token-baseline.md");
-    console.log("  docs/analysis/prompt-token-baseline.json");
+    console.log(`  ${outMd}`);
+    console.log(`  ${outJson}`);
     return 0;
   }
 

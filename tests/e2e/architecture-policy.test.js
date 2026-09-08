@@ -58,6 +58,11 @@ const ALLOWED = new Set([
   "packages/web/dev.js",
   "scripts/cli-smoke-parity.mjs",
   "scripts/run-vitest-bind-aware.mjs",
+  // Needs `git status --porcelain` to refuse recording a prompt-token baseline
+  // from a dirty tree. Establishing that from `.git/` alone would mean
+  // reimplementing git's index and object store, and the mtime shortcut can
+  // report clean after a `touch` — a false clean being the exact bug it fixes.
+  "scripts/prompt-census.mjs",
   // Process monitoring — needs raw execFile for system commands (vm_stat, sysctl)
   "packages/hench/src/process/memory-monitor.ts",
   // Git operations — need execFileSync/execFile for git CLI calls
