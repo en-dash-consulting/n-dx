@@ -195,4 +195,38 @@ describe("scoped route dispatch", () => {
     ).toBe(409);
     expect(result.exitCode).toBe(0);
   }, 90_000);
+
+  // ── The same guard, on routes that are not the ask route ──────────────────
+  //
+  // `handleScopedRoute` took an already-invoked handler, so the defect was
+  // never specific to the ask route — it was the shape of every scoped call
+  // site. These two are the routes an out-of-scope POST demonstrably reached:
+  // probing the pre-fix build showed `/api/notion/*` and `/api/merge-graph`
+  // writing (and killing the process), while the other scoped handlers return
+  // false without writing because they do not accept POST on those paths —
+  // verified both on a bare fixture and on one with `.rex/`, `.sourcevision/`
+  // and `.hench/` initialised.
+  //
+  // That is an accident of which methods those handlers accept, not a guard,
+  // which is why the fix is a signature that cannot be misused rather than a
+  // check bolted onto each site. These cases pin the two that were reachable.
+
+  it.each([
+    ["/api/notion/test", "rex"],
+    ["/api/merge-graph", "rex"],
+  ])(
+    "does not run %s when its package (%s) is out of scope",
+    async (routePath) => {
+      const result = await runDriver("sourcevision", routePath);
+
+      expect(
+        result.stderr,
+        `${routePath} ran despite being out of scope and wrote to a finished ` +
+          "response. The scope check must precede handler invocation.",
+      ).not.toMatch(/ERR_HTTP_HEADERS_SENT/);
+      expect(result.exitCode, `server died handling one POST to ${routePath}`).toBe(0);
+      expect(result.survived).toBe(true);
+    },
+    90_000,
+  );
 });

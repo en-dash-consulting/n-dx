@@ -301,9 +301,6 @@ export async function refreshPRDCache(rexDir: string): Promise<void> {
   }
 }
 
-function resolveRouteResult(result: RouteResult): Promise<boolean> | boolean {
-  return result instanceof Promise ? result : result;
-}
 
 function registerSourcevisionWatcher(
   scope: ViewerScope | undefined,
@@ -587,12 +584,31 @@ function handleReloadSignalEndpoint(
   return true;
 }
 
+/**
+ * Run a route handler only when its package is in scope.
+ *
+ * The handler arrives as a thunk, and that is the whole point of the
+ * signature. It used to take the handler's *result*, which meant every caller
+ * had already invoked it before this function read `enabled`: on a false guard
+ * the promise was neither awaited nor cancelled, so the handler ran on, wrote
+ * to a response the 404 fall-through in {@link handleApiRoutes} had already
+ * finished, and threw ERR_HTTP_HEADERS_SENT from an unawaited promise —
+ * terminating the process. `/api/notion/*` and `/api/merge-graph` were
+ * reachable that way; the rest escaped only by not accepting POST on the paths
+ * probed, which is luck rather than a guard.
+ *
+ * Passing an already-invoked handler is now a type error, so the mistake
+ * cannot be reintroduced one call site at a time.
+ *
+ * @param enabled - whether this route's package is in the viewer's scope
+ * @param run - invoked only when `enabled`; never called otherwise
+ */
 async function handleScopedRoute(
   enabled: boolean,
-  result: RouteResult,
+  run: () => RouteResult,
 ): Promise<boolean> {
   if (!enabled) return false;
-  return await resolveRouteResult(result);
+  return await run();
 }
 
 async function handleApiRoutes(
@@ -608,40 +624,33 @@ async function handleApiRoutes(
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;
   if (await handleProjectRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(true, handleGitRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleNotionRoute(req, res, ctx))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleIntegrationRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleIntegrationRoute(req, res, ctx))) return true;
   if (await handleFeaturesRoute(req, res, ctx)) return true;
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
   if (await handleLlmRoute(req, res, ctx)) return true;
   if (await handleProjectSettingsRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(true, handleCommandsRoute(req, res, ctx, ws.broadcast, {
+  if (await handleScopedRoute(true, () => handleCommandsRoute(req, res, ctx, ws.broadcast, {
     onProjectInitialized: () => {
       clearStatusCache();
       reregisterProjectWatchers(ctx, watcher, ws, watcherHandles);
     },
   }))) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
-  // Async, unlike its sibling above — it awaits a model call — but the scope
-  // check still comes first and is NOT delegated to handleScopedRoute, which
-  // takes an already-invoked handler. Routing this through there ran the
-  // handler regardless of scope: it reached the model call, then wrote to a
-  // response the 404 fall-through below had already finished, throwing
-  // ERR_HTTP_HEADERS_SENT from an unawaited promise and killing the process.
-  // See tests/integration/scoped-route-dispatch.test.ts.
-  if (isInScope(ctx.scope, "sourcevision")
-    && await handleSourcevisionAskRoute(req, res, ctx)) return true;
+  // Async, unlike its sibling above: it awaits a model call.
+  if (await handleScopedRoute(isInScope(ctx.scope, "sourcevision"), () => handleSourcevisionAskRoute(req, res, ctx))) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleRexRoute(req, res, ctx, ws.broadcast))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), handleHenchRoute(req, res, ctx, ws.broadcast, { onStatusInvalidate: clearStatusCache }))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), handleWorkflowRoute(req, res, ctx))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), handleAdaptiveRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, ws.broadcast))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, ws.broadcast, { onStatusInvalidate: clearStatusCache }))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleWorkflowRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleAdaptiveRoute(req, res, ctx))) return true;
   if (isInScope(ctx.scope, "rex") && handleValidationRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleTokenUsageRoute(req, res, ctx))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleMergeGraphRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleTokenUsageRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleMergeGraphRoute(req, res, ctx))) return true;
   if (handleDataRoute(req, res, ctx, watcher)) return true;
   if (assets && handleStaticRoute(req, res, ctx, assets)) return true;
   return false;
