@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, findItem, PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
-import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
+import { DEFAULT_CHECKPOINT_THRESHOLD, HENCH_RUNTIME_ARTIFACTS } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { getCurrentHead, execStdout } from "../../process/exec.js";
@@ -857,13 +857,66 @@ export interface FinalizeRunOptions {
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
 
 /**
+ * Strip the porcelain status prefix, leaving the path.
+ *
+ * `git status --porcelain` emits `XY <path>` — two status columns, a space,
+ * then the path. Renames arrive as `R  old -> new`; the new path is the one
+ * that matters for matching.
+ */
+function porcelainPath(line: string): string {
+  const path = line.slice(3).trim();
+  const arrow = path.lastIndexOf(" -> ");
+  return arrow === -1 ? path : path.slice(arrow + 4);
+}
+
+/** Whether a porcelain line names a path hench wrote for its own bookkeeping. */
+function isHenchRuntimeArtifact(line: string): boolean {
+  const path = porcelainPath(line).replace(/^"|"$/g, "").replaceAll("\\", "/");
+  return HENCH_RUNTIME_ARTIFACTS.some(
+    (artifact) =>
+      path === artifact || path === artifact.replace(/\/$/, "") || path.startsWith(artifact),
+  );
+}
+
+/**
+ * Drop hench's own runtime state from a porcelain listing.
+ *
+ * Applied by the callers rather than folded into {@link listDirtyPaths},
+ * because this is a policy about what counts as operator work, not a detail of
+ * how the paths were obtained — and `listDirtyPaths` is an injectable seam, so
+ * a filter hidden inside the default implementation would silently not apply
+ * wherever a caller supplied its own.
+ *
+ * The policy: a file hench wrote for itself is never something the operator
+ * must commit or stash. `.hench/locks/` is created the instant a run starts
+ * and removed on exit, so counting it made an autonomous run refuse to start
+ * on a file it had just written — then erase the evidence, leaving a
+ * "1 uncommitted file(s), 0 line(s) changed" message against a tree that read
+ * clean by the time anyone looked. `.gitignore` normally hides these and
+ * `hench init` writes those entries, but the gate must not depend on that: a
+ * project initialised before they existed still self-blocks.
+ *
+ * @see HENCH_RUNTIME_ARTIFACTS — the list, shared with `hench init`
+ */
+export function excludeHenchRuntimeArtifacts(lines: string[]): string[] {
+  return lines.filter((line) => !isHenchRuntimeArtifact(line));
+}
+
+/**
  * Return the list of entries reported by `git status --porcelain`.
  * Each non-blank line represents a modified, staged, or untracked path.
  * Returns an empty array when the working tree is clean or git is unavailable.
+ *
+ * `--untracked-files=all` matters twice over. By default git collapses a
+ * wholly-untracked directory to a single entry — a fresh project reports
+ * `?? .hench/`, never `?? .hench/locks/` — so
+ * {@link excludeHenchRuntimeArtifacts} could not see what was inside and the
+ * run blocked on its own lock file anyway. It also makes the count honest: a
+ * directory of forty new files was being reported as "1 uncommitted file(s)".
  */
 async function listDirtyPaths(projectDir: string): Promise<string[]> {
   try {
-    const output = await execStdout("git", ["status", "--porcelain"], {
+    const output = await execStdout("git", ["status", "--porcelain", "--untracked-files=all"], {
       cwd: projectDir,
       timeout: 15_000,
     });
@@ -1038,7 +1091,9 @@ async function performRollbackIfNeeded(
   projectDir: string,
   options: PerformRollbackOptions = {},
 ): Promise<void> {
-  const dirtyPaths = await listDirtyPaths(projectDir);
+  // Same exclusion as the pre-run gate: hench's own lock and run files are not
+  // the agent's work, so they must not make a rollback look necessary.
+  const dirtyPaths = excludeHenchRuntimeArtifacts(await listDirtyPaths(projectDir));
   if (dirtyPaths.length === 0) {
     return;
   }
@@ -1399,7 +1454,7 @@ export async function performPreRunCommitGateIfNeeded(
   // Dry runs never touch the working tree; skip the gate entirely.
   if (dryRun) return "proceed";
 
-  const dirty = await listDirty(projectDir);
+  const dirty = excludeHenchRuntimeArtifacts(await listDirty(projectDir));
   if (dirty.length === 0) return "proceed"; // Clean tree → start immediately, no prompt.
 
   const magnitude = await measureMagnitude(projectDir);

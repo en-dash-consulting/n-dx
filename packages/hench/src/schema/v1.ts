@@ -102,6 +102,39 @@ export interface GitSafetyConfig {
  */
 export const DEFAULT_CHECKPOINT_THRESHOLD = 200;
 
+/**
+ * Paths hench writes for its own bookkeeping, which are never operator work.
+ *
+ * Two consumers must agree on this list, which is why it lives here rather
+ * than in either of them:
+ *
+ * - `hench init` gitignores them, so a fresh project does not show them as
+ *   untracked.
+ * - The pre-run git-dirty gate excludes them, so a run does not block on a
+ *   file it created itself.
+ *
+ * The gate needs its own copy of the rule because gitignoring is not enough. A
+ * project initialised before that landed, or one whose `.gitignore` was edited,
+ * still has `.hench/locks/` appear as untracked the instant a run starts —
+ * hench creates it before any real work happens and removes it on exit, so the
+ * run refuses to start and then erases the evidence, leaving a "1 uncommitted
+ * file(s), 0 line(s) changed" message against a tree that reads clean.
+ *
+ * `.hench/config.json` is deliberately absent: it is meant to be committed, so
+ * an edit to it is genuine operator work and must still stop an autonomous run.
+ * For the same reason this list names specific paths rather than `.hench/`.
+ *
+ * Prefixes, not exact paths — `.hench/runs/` matches everything beneath it.
+ */
+export const HENCH_RUNTIME_ARTIFACTS: readonly string[] = [
+  ".hench/locks/",
+  ".hench/runs/",
+  ".hench/usage-cursors/",
+  ".hench/reviews/",
+  ".hench/session-cache.json",
+  ".hench-commit-msg.txt",
+];
+
 export type Provider = "cli" | "api";
 
 /**
