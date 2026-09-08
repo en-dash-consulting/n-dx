@@ -2,7 +2,7 @@
 id: "555604fb-68dc-454d-a857-712bf347f233"
 level: "feature"
 title: "Hench Runtime Prompt Tightening"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "prompts"
@@ -11,6 +11,11 @@ tags:
 blockedBy:
   - "76076f6a-c23c-4905-864b-5218a5a6ee69"
 source: "ndx-capture"
+startedAt: "2026-09-08T17:55:10.401Z"
+completedAt: "2026-09-08T18:07:42.595Z"
+endedAt: "2026-09-08T18:07:42.595Z"
+resolutionType: "code-change"
+resolutionDetail: "Removed duplication only visible in the assembled envelope: the project block was emitted by both the system prompt and the brief, and ## Rules had become a second rendering of ## Workflow. PREVIOUS FAILURE now directs a change of approach instead of dumping prior output. Assembled prompt 653 → 584 tokens (-10.6%), per-section reported. New prompt-non-redundancy suite asserts against the assembled envelope for both providers. Criterion 3 needed no change (no plan-mode contradiction exists); criteria 1, 4 and the behavioural half of 7 not done — they need live-run evidence or are separate model calls. buildReviewBrief (1,460 tokens, the largest hench surface) is now measured but untouched."
 acceptanceCriteria:
   - "Each brief section earns its place: any section that the agent demonstrably ignores or re-derives from the codebase anyway is cut or replaced with a pointer."
   - "The brief states the intended change and its scope boundary explicitly, so the agent does not widen or narrow the work on its own judgement."
@@ -20,6 +25,6 @@ acceptanceCriteria:
   - "Per-section token counts from the PromptEnvelope diagnostics are reported before and after, and the assembled total for the representative task drops measurably against the recorded baseline."
   - "Existing hench tests pass, including the prompt parity and envelope regression suites, and a run against a representative task produces the same file changes as before the rewrite."
 description: "Rewrite the prompts hench sends on every autonomous run. Six surfaces: packages/hench/src/agent/planning/brief.ts (the assembled task brief, ~397 lines, 33 push calls), planning/prompt.ts (buildSystemPrompt and buildPromptEnvelope, 84 push calls), lifecycle/plan-mode-prompt.ts, lifecycle/orientation.ts (buildOrientationSystemPrompt and buildOrientationPrompt), agent/analysis/adversarial-review.ts (buildReviewSystemPrompt), and lifecycle/prompt-diagnostics.ts. Because hench assembles prompts from short fragments rather than single literals, its volume must be read through the PromptEnvelope section diagnostics rather than by scanning template literals. The brief currently accretes sections — task, parent, siblings, previous failure, acceptance criteria, tags — and each is a candidate for either sharpening or removal. Target: the agent reads the brief once and knows exactly which change to make, without a discovery phase the brief could have short-circuited."
-lastModified: "2026-09-08T13:40:18.017Z"
+lastModified: "2026-09-08T18:07:42.622Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

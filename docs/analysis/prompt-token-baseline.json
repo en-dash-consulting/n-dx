@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 21766,
-    "uniqueTokens": 13352,
+    "perCallTokens": 21753,
+    "uniqueTokens": 13339,
     "skills": 13,
     "skillTokens": 16990
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 3544,
-      "uniqueTokens": 3544
+      "perCallTokens": 3531,
+      "uniqueTokens": 3531
     },
     "core": {
       "surfaces": 1,
@@ -299,14 +299,6 @@
       "tokens": 15,
       "usedBy": [
         "buildMetaEnvelope"
-      ]
-    },
-    {
-      "pkg": "hench",
-      "name": "DEFAULT_CLI_NAME",
-      "tokens": 1,
-      "usedBy": [
-        "formatTaskBrief"
       ]
     }
   ],
@@ -705,11 +697,11 @@
       "builder": "buildSystemPrompt",
       "purpose": "The agent's system prompt — role, rules, workflow, error handling.",
       "inline": false,
-      "literals": 65,
+      "literals": 62,
       "constants": {},
-      "ownTokens": 849,
-      "fixedChars": 3396,
-      "fixedTokens": 849
+      "ownTokens": 768,
+      "fixedChars": 3072,
+      "fixedTokens": 768
     },
     {
       "pkg": "hench",
@@ -730,12 +722,10 @@
       "purpose": "Render the task brief section — task, parent chain, requirements.",
       "inline": false,
       "literals": 42,
-      "constants": {
-        "DEFAULT_CLI_NAME": 1
-      },
-      "ownTokens": 145,
-      "fixedChars": 584,
-      "fixedTokens": 146
+      "constants": {},
+      "ownTokens": 214,
+      "fixedChars": 854,
+      "fixedTokens": 214
     },
     {
       "pkg": "hench",
@@ -896,23 +886,23 @@
     "hench": {
       "surface": "buildPromptEnvelope",
       "describe": "Full agent envelope (system + brief) for a CLI-provider run.",
-      "chars": 2612,
-      "tokens": 653,
+      "chars": 2333,
+      "tokens": 584,
       "sections": [
         {
           "name": "system",
-          "chars": 1862,
-          "tokens": 466
+          "chars": 1663,
+          "tokens": 416
         },
         {
           "name": "brief",
-          "chars": 748,
-          "tokens": 187
+          "chars": 668,
+          "tokens": 167
         }
       ],
-      "fixedTokens": 995,
+      "fixedTokens": 982,
       "branchConditional": true,
-      "unreachedTokens": 342
+      "unreachedTokens": 398
     },
     "core": {
       "surface": "buildReviewerPrompt",
@@ -967,6 +957,6 @@
       }
     ]
   },
-  "recordedAt": "2026-09-08T17:44:10.855Z",
-  "commit": "dd2da72cbacd"
+  "recordedAt": "2026-09-08T18:02:43.765Z",
+  "commit": "d0d7aeb84570"
 }

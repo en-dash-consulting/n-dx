@@ -141,15 +141,17 @@ describe("cross-vendor init-to-run smoke", () => {
         provider: "api" as const,
       });
 
-      // Core rules present in both
-      expect(cliPrompt).toContain("Read existing code");
-      expect(apiPrompt).toContain("Read existing code");
+      // Core guidance present in both. Read-first and run-tests live in
+      // `## Workflow` rather than `## Rules`: they are steps, and stating them
+      // in both sections meant every run carried each instruction twice.
+      expect(cliPrompt).toContain("read the code you are about to change");
+      expect(apiPrompt).toContain("read the code you are about to change");
       expect(cliPrompt).toContain("minimal, focused changes");
       expect(apiPrompt).toContain("minimal, focused changes");
       expect(cliPrompt).toContain("Follow existing code patterns");
       expect(apiPrompt).toContain("Follow existing code patterns");
-      expect(cliPrompt).toContain("Run tests after making changes");
-      expect(apiPrompt).toContain("Run tests after making changes");
+      expect(cliPrompt).toContain("Run validation/tests if configured");
+      expect(apiPrompt).toContain("Run validation/tests if configured");
       expect(cliPrompt).toContain("commit message");
       expect(apiPrompt).toContain("commit message");
     });
