@@ -8,8 +8,10 @@
  *
  * They also pin the three properties the baseline's credibility rests on:
  *
- * 1. Both construction styles are measured — single template literals (rex,
- *    sourcevision) and `lines.push(...)` fragment assembly (hench).
+ * 1. Every construction style is measured — `lines.push(...)` fragment assembly
+ *    (hench), template literals (core), and section envelopes (rex,
+ *    sourcevision). Each looks different to an AST scanner, and a census that
+ *    handled only one of them would undercount the others to near zero.
  * 2. Counts come from llm-client's estimator, not a second one invented here.
  * 3. Re-running after a change reports a before/after delta, not just a total.
  *
@@ -193,33 +195,53 @@ describe("prompt census: scope boundaries", () => {
 
 describe("prompt census: measurement", () => {
   it("counts fragment-assembled prompts as well as template literals", () => {
-    // hench pushes short fragments; rex writes one large template literal.
-    // A literal-scanning census undercounts the first, which is the whole
-    // reason this tool extracts per builder rather than per file.
-    const pushStyle = SURFACES.find((s) => s.builder === "buildSystemPrompt");
-    const templateStyle = SURFACES.find((s) => s.builder === "buildAssessmentPrompt");
-
-    const pushed = extract(pushStyle);
-    const templated = extract(templateStyle);
+    // hench pushes many short fragments; core writes a handful of large
+    // template literals. A literal-scanning census undercounts the first,
+    // which is the whole reason this tool extracts per builder rather than
+    // per file. Both must land in the same order of magnitude of text.
+    const pushed = extract(SURFACES.find((s) => s.builder === "buildSystemPrompt"));
+    const templated = extract(SURFACES.find((s) => s.builder === "buildReviewerPrompt"));
 
     // buildSystemPrompt is ~65 separate `lines.push("...")` calls.
     expect(pushed.literals).toBeGreaterThan(30);
     expect(pushed.ownText.length).toBeGreaterThan(2000);
 
-    // buildAssessmentPrompt is a single template literal of comparable size.
-    expect(templated.literals).toBe(1);
+    // buildReviewerPrompt is a few large template literals of comparable bulk.
+    expect(templated.literals).toBeLessThan(15);
     expect(templated.ownText.length).toBeGreaterThan(1000);
   });
 
+  it("counts section-envelope prompts, whose literals are per-section", () => {
+    // Since the envelope migration, rex and sourcevision build prompts as a
+    // list of named sections rather than one template literal. That turns one
+    // large literal into many medium ones — a shape neither of the styles
+    // above has — so it needs its own guard. Before helper-following landed,
+    // factoring shared text into a `placementContent()` helper dropped it from
+    // the count entirely and silently shrank the baseline.
+    const assessment = extract(SURFACES.find((s) => s.builder === "buildAssessmentEnvelope"));
+
+    expect(assessment.literals).toBeGreaterThan(10);
+    expect(assessment.ownText.length).toBeGreaterThan(1000);
+
+    // buildAddEnvelope reaches most of its text through helpers and constants,
+    // so own text alone would be a large undercount.
+    const add = extract(SURFACES.find((s) => s.builder === "buildAddEnvelope"));
+    expect([...add.constants.keys()]).toEqual(
+      expect.arrayContaining(["placementContent", "TASK_QUALITY_RULES"]),
+    );
+    expect([...add.constants.values()].join("").length).toBeGreaterThan(add.ownText.length);
+  });
+
   it("resolves prompt text held in module-level constants", () => {
-    // reasonForReshape's body holds ~15 tokens of scaffolding; its prompt is
-    // four `const PROMPT = \`…\`` declarations. Counting only the body was a
-    // 25x undercount before constant resolution landed.
-    const surface = SURFACES.find((s) => s.builder === "reasonForReshape");
-    const extracted = extract(surface);
+    // buildReshapeEnvelope's body holds ~15 tokens of scaffolding; its prompt
+    // is a few `const PROMPT = \`…\`` declarations plus a mode-switching
+    // helper. Counting only the body was a 25x undercount before constant
+    // resolution landed, and helper-following keeps it that way now that the
+    // three-way role switch lives in reshapeRoleContent().
+    const extracted = extract(SURFACES.find((s) => s.builder === "buildReshapeEnvelope"));
 
     expect([...extracted.constants.keys()]).toEqual(
-      expect.arrayContaining(["RESHAPE_SYSTEM_PROMPT", "RESHAPE_FEW_SHOT"]),
+      expect.arrayContaining(["reshapeRoleContent", "RESHAPE_FEW_SHOT"]),
     );
     expect(extracted.ownText.length).toBeLessThan(200);
     expect([...extracted.constants.values()].join("").length).toBeGreaterThan(4000);
@@ -228,7 +250,7 @@ describe("prompt census: measurement", () => {
   it("resolves prompt constants imported from a sibling module", () => {
     // rex keeps PRD_SCHEMA in analyze-shared.ts and interpolates it into
     // builders in reason.ts. Same-file resolution alone misses it.
-    const extracted = extract(SURFACES.find((s) => s.builder === "buildAddPrompt"));
+    const extracted = extract(SURFACES.find((s) => s.builder === "buildAddEnvelope"));
     expect([...extracted.constants.keys()]).toContain("PRD_SCHEMA");
   });
 
@@ -255,6 +277,56 @@ describe("prompt census: measurement", () => {
     // the two parts must reconstruct the assembled total.
     expect(rex.contextTokens).toBeGreaterThan(0);
     expect(rex.fixedTokens + rex.contextTokens).toBe(rex.tokens);
+  });
+
+  it("splits every dump fixture, so a renamed surface cannot drop one", () => {
+    // The split is computed by matching `REPRESENTATIVE[pkg].surface` against a
+    // registered builder name. A miss is not an error — the split is simply
+    // omitted — so the envelope rename took rex's and sourcevision's splits away
+    // and nothing said so. Asserting the field exists for every package is what
+    // makes that failure audible.
+    const report = census();
+
+    for (const pkg of Object.keys(REPRESENTATIVE)) {
+      const a = report.assembled[pkg];
+      expect(a.error, `${pkg} dump failed`).toBeUndefined();
+      expect(
+        a.fixedTokens,
+        `${pkg}: REPRESENTATIVE.surface \`${a.surface}\` does not resolve to a ` +
+          "registered builder, so its fixed/context split was silently dropped",
+      ).toBeGreaterThan(0);
+
+      // Either the assembled path carried context, or the builder is
+      // branch-conditional and the unreached text is reported instead.
+      const accounted = a.contextTokens !== undefined || a.unreachedTokens !== undefined;
+      expect(accounted, `${pkg}: neither context nor unreached text reported`).toBe(true);
+    }
+  });
+
+  it("reports a per-section split for every envelope-built package", () => {
+    // The whole point of moving rex and sourcevision onto PromptEnvelope: a
+    // rewrite needs to know which *section* carries a prompt's cost, not just
+    // which builder. Without this the migration is a refactor with nothing to
+    // show for it, so the artifact is pinned rather than left to drift.
+    const report = census();
+
+    for (const pkg of ["rex", "sourcevision", "hench"]) {
+      const a = report.assembled[pkg];
+      expect(a.sections, `${pkg} reports no section split`).toBeDefined();
+      expect(a.sections.length).toBeGreaterThan(1);
+
+      for (const s of a.sections) {
+        expect(s.name, `${pkg} has an unnamed section`).toBeTruthy();
+        expect(s.tokens).toBeGreaterThan(0);
+      }
+
+      // Sections must account for the assembled prompt, or the split is a
+      // partial view masquerading as a full one. Separators between sections
+      // mean the parts sum to slightly under the whole.
+      const summed = a.sections.reduce((n, s) => n + s.chars, 0);
+      expect(summed).toBeGreaterThan(a.chars * 0.9);
+      expect(summed).toBeLessThanOrEqual(a.chars);
+    }
   });
 
   it("reports every package's assembled prompt from a fixed input", () => {

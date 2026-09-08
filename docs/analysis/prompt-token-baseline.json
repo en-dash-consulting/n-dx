@@ -1,20 +1,20 @@
 {
   "model": "claude-sonnet-5",
   "totals": {
-    "surfaces": 35,
-    "perCallTokens": 21511,
-    "uniqueTokens": 13089
+    "surfaces": 36,
+    "perCallTokens": 22670,
+    "uniqueTokens": 13630
   },
   "byPackage": {
     "rex": {
       "surfaces": 19,
-      "perCallTokens": 15788,
-      "uniqueTokens": 7366
+      "perCallTokens": 16121,
+      "uniqueTokens": 7473
     },
     "sourcevision": {
-      "surfaces": 6,
-      "perCallTokens": 1898,
-      "uniqueTokens": 1898
+      "surfaces": 7,
+      "perCallTokens": 2724,
+      "uniqueTokens": 2332
     },
     "hench": {
       "surfaces": 9,
@@ -33,16 +33,16 @@
       "name": "FEW_SHOT_EXAMPLE",
       "tokens": 432,
       "usedBy": [
-        "reasonFromFile",
-        "reasonFromScanResults",
-        "buildAddPrompt",
-        "buildMultiAddPrompt",
-        "buildBreakdownPrompt",
-        "buildConsolidatePrompt",
-        "buildIdeasPrompt",
-        "buildConsolidationGuardPrompt",
-        "buildSpecPrompt",
-        "buildModifyPrompt"
+        "buildFileImportEnvelope",
+        "buildScanImportEnvelope",
+        "buildAddEnvelope",
+        "buildMultiAddEnvelope",
+        "buildBreakdownEnvelope",
+        "buildConsolidateEnvelope",
+        "buildIdeasEnvelope",
+        "buildConsolidationGuardEnvelope",
+        "buildSpecEnvelope",
+        "buildModifyEnvelope"
       ]
     },
     {
@@ -50,12 +50,12 @@
       "name": "PRD_SCHEMA",
       "tokens": 333,
       "usedBy": [
-        "reasonFromFile",
-        "reasonFromScanResults",
-        "buildAddPrompt",
-        "buildMultiAddPrompt",
-        "buildIdeasPrompt",
-        "buildDisambiguationPrompt"
+        "buildFileImportEnvelope",
+        "buildScanImportEnvelope",
+        "buildAddEnvelope",
+        "buildMultiAddEnvelope",
+        "buildIdeasEnvelope",
+        "buildDisambiguationEnvelope"
       ]
     },
     {
@@ -63,12 +63,20 @@
       "name": "TASK_QUALITY_RULES",
       "tokens": 181,
       "usedBy": [
-        "reasonFromFile",
-        "reasonFromScanResults",
-        "buildAddPrompt",
-        "buildMultiAddPrompt",
-        "buildIdeasPrompt",
-        "buildDisambiguationPrompt"
+        "buildFileImportEnvelope",
+        "buildScanImportEnvelope",
+        "buildAddEnvelope",
+        "buildMultiAddEnvelope",
+        "buildIdeasEnvelope",
+        "buildDisambiguationEnvelope"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "reshapeRoleContent",
+      "tokens": 1054,
+      "usedBy": [
+        "buildReshapeEnvelope"
       ]
     },
     {
@@ -76,10 +84,10 @@
       "name": "CONSOLIDATION_INSTRUCTION",
       "tokens": 223,
       "usedBy": [
-        "reasonFromScanResults",
-        "buildAddPrompt",
-        "buildMultiAddPrompt",
-        "buildIdeasPrompt"
+        "buildScanImportEnvelope",
+        "buildAddEnvelope",
+        "buildMultiAddEnvelope",
+        "buildIdeasEnvelope"
       ]
     },
     {
@@ -87,20 +95,31 @@
       "name": "ANTI_PATTERNS",
       "tokens": 141,
       "usedBy": [
-        "reasonFromFile",
-        "reasonFromScanResults",
-        "buildAddPrompt",
-        "buildMultiAddPrompt",
-        "buildIdeasPrompt",
-        "buildModifyPrompt"
+        "buildFileImportEnvelope",
+        "buildScanImportEnvelope",
+        "buildAddEnvelope",
+        "buildMultiAddEnvelope",
+        "buildIdeasEnvelope",
+        "buildModifyEnvelope"
+      ]
+    },
+    {
+      "pkg": "sourcevision",
+      "name": "formatProjectShape",
+      "tokens": 393,
+      "usedBy": [
+        "buildFirstPassEnvelope",
+        "buildLaterPassEnvelope"
       ]
     },
     {
       "pkg": "rex",
-      "name": "POST_PRUNE_CONSOLIDATION_PROMPT",
-      "tokens": 508,
+      "name": "placementContent",
+      "tokens": 206,
       "usedBy": [
-        "reasonForReshape"
+        "buildAddEnvelope",
+        "buildMultiAddEnvelope",
+        "buildIdeasEnvelope"
       ]
     },
     {
@@ -108,32 +127,14 @@
       "name": "OUTPUT_INSTRUCTION",
       "tokens": 52,
       "usedBy": [
-        "reasonFromFile",
-        "reasonFromScanResults",
-        "buildAddPrompt",
-        "buildMultiAddPrompt",
-        "buildBreakdownPrompt",
-        "buildConsolidatePrompt",
-        "buildIdeasPrompt",
-        "buildDisambiguationPrompt"
-      ]
-    },
-    {
-      "pkg": "rex",
-      "name": "RESHAPE_SYSTEM_PROMPT",
-      "tokens": 377,
-      "usedBy": [
-        "reasonForReshape"
-      ]
-    },
-    {
-      "pkg": "rex",
-      "name": "AUTO_PLACEMENT_INSTRUCTION",
-      "tokens": 119,
-      "usedBy": [
-        "buildAddPrompt",
-        "buildMultiAddPrompt",
-        "buildIdeasPrompt"
+        "buildFileImportEnvelope",
+        "buildScanImportEnvelope",
+        "buildAddEnvelope",
+        "buildMultiAddEnvelope",
+        "buildBreakdownEnvelope",
+        "buildConsolidateEnvelope",
+        "buildIdeasEnvelope",
+        "buildDisambiguationEnvelope"
       ]
     },
     {
@@ -141,15 +142,68 @@
       "name": "RESHAPE_FEW_SHOT",
       "tokens": 326,
       "usedBy": [
-        "reasonForReshape"
+        "buildReshapeEnvelope"
+      ]
+    },
+    {
+      "pkg": "sourcevision",
+      "name": "formatFileHeaders",
+      "tokens": 54,
+      "usedBy": [
+        "buildFirstPassEnvelope"
       ]
     },
     {
       "pkg": "rex",
-      "name": "SMART_PRUNE_PROMPT",
-      "tokens": 163,
+      "name": "summarizeExisting",
+      "tokens": 9,
       "usedBy": [
-        "reasonForReshape"
+        "buildFileImportEnvelope",
+        "buildAddEnvelope",
+        "buildMultiAddEnvelope",
+        "buildIdeasEnvelope"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "projectContextContent",
+      "tokens": 10,
+      "usedBy": [
+        "buildAddEnvelope",
+        "buildMultiAddEnvelope",
+        "buildIdeasEnvelope"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "formatMemberSection",
+      "tokens": 29,
+      "usedBy": [
+        "buildGroupRenameEnvelope"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "formatItemSection",
+      "tokens": 29,
+      "usedBy": [
+        "buildRenameEnvelope"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "summarizePRD",
+      "tokens": 22,
+      "usedBy": [
+        "buildReshapeEnvelope"
+      ]
+    },
+    {
+      "pkg": "sourcevision",
+      "name": "formatAnnotatedFinding",
+      "tokens": 15,
+      "usedBy": [
+        "buildMetaEnvelope"
       ]
     },
     {
@@ -165,28 +219,29 @@
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/reason.ts",
-      "builder": "reasonFromFile",
+      "builder": "buildFileImportEnvelope",
       "purpose": "Propose PRD items from a single source document.",
-      "inline": true,
-      "literals": 7,
+      "inline": false,
+      "literals": 18,
       "constants": {
         "PRD_SCHEMA": 333,
         "FEW_SHOT_EXAMPLE": 432,
         "TASK_QUALITY_RULES": 181,
         "ANTI_PATTERNS": 141,
+        "summarizeExisting": 9,
         "OUTPUT_INSTRUCTION": 52
       },
-      "ownTokens": 116,
-      "fixedChars": 5015,
-      "fixedTokens": 1254
+      "ownTokens": 123,
+      "fixedChars": 5077,
+      "fixedTokens": 1270
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/reason.ts",
-      "builder": "reasonFromScanResults",
+      "builder": "buildScanImportEnvelope",
       "purpose": "Propose PRD items from a batch of scanner findings.",
-      "inline": true,
-      "literals": 13,
+      "inline": false,
+      "literals": 40,
       "constants": {
         "PRD_SCHEMA": 333,
         "FEW_SHOT_EXAMPLE": 432,
@@ -195,331 +250,359 @@
         "ANTI_PATTERNS": 141,
         "OUTPUT_INSTRUCTION": 52
       },
-      "ownTokens": 415,
-      "fixedChars": 7103,
-      "fixedTokens": 1776
+      "ownTokens": 400,
+      "fixedChars": 7043,
+      "fixedTokens": 1761
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/reason.ts",
-      "builder": "buildAddPrompt",
+      "builder": "buildAddEnvelope",
       "purpose": "Propose new PRD items from a natural-language description.",
       "inline": false,
-      "literals": 6,
+      "literals": 26,
       "constants": {
-        "AUTO_PLACEMENT_INSTRUCTION": 119,
         "PRD_SCHEMA": 333,
         "FEW_SHOT_EXAMPLE": 432,
         "CONSOLIDATION_INSTRUCTION": 223,
         "TASK_QUALITY_RULES": 181,
         "ANTI_PATTERNS": 141,
+        "placementContent": 206,
+        "projectContextContent": 10,
+        "summarizeExisting": 9,
         "OUTPUT_INSTRUCTION": 52
       },
-      "ownTokens": 300,
-      "fixedChars": 7117,
-      "fixedTokens": 1780
+      "ownTokens": 230,
+      "fixedChars": 7263,
+      "fixedTokens": 1816
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/reason.ts",
-      "builder": "buildMultiAddPrompt",
+      "builder": "buildMultiAddEnvelope",
       "purpose": "Propose items for several scan targets in one call.",
       "inline": false,
-      "literals": 8,
+      "literals": 28,
       "constants": {
-        "AUTO_PLACEMENT_INSTRUCTION": 119,
         "PRD_SCHEMA": 333,
         "FEW_SHOT_EXAMPLE": 432,
         "CONSOLIDATION_INSTRUCTION": 223,
         "TASK_QUALITY_RULES": 181,
         "ANTI_PATTERNS": 141,
+        "placementContent": 206,
+        "projectContextContent": 10,
+        "summarizeExisting": 9,
         "OUTPUT_INSTRUCTION": 52
       },
-      "ownTokens": 285,
-      "fixedChars": 7056,
-      "fixedTokens": 1764
+      "ownTokens": 215,
+      "fixedChars": 7202,
+      "fixedTokens": 1801
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/reason.ts",
-      "builder": "buildBreakdownPrompt",
+      "builder": "buildBreakdownEnvelope",
       "purpose": "Split proposals judged too large into child tasks.",
       "inline": false,
-      "literals": 1,
+      "literals": 17,
       "constants": {
         "FEW_SHOT_EXAMPLE": 432,
         "OUTPUT_INSTRUCTION": 52
       },
-      "ownTokens": 191,
-      "fixedChars": 2698,
-      "fixedTokens": 675
+      "ownTokens": 200,
+      "fixedChars": 2732,
+      "fixedTokens": 683
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/reason.ts",
-      "builder": "buildConsolidatePrompt",
+      "builder": "buildConsolidateEnvelope",
       "purpose": "Merge overlapping proposals before they enter the PRD.",
       "inline": false,
-      "literals": 1,
+      "literals": 19,
       "constants": {
         "FEW_SHOT_EXAMPLE": 432,
         "OUTPUT_INSTRUCTION": 52
       },
-      "ownTokens": 226,
-      "fixedChars": 2836,
-      "fixedTokens": 709
+      "ownTokens": 234,
+      "fixedChars": 2870,
+      "fixedTokens": 718
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/reason.ts",
-      "builder": "buildAssessmentPrompt",
+      "builder": "buildAssessmentEnvelope",
       "purpose": "Assess whether proposal tasks are at the right granularity.",
       "inline": false,
-      "literals": 1,
+      "literals": 40,
       "constants": {},
-      "ownTokens": 479,
-      "fixedChars": 1914,
-      "fixedTokens": 479
+      "ownTokens": 492,
+      "fixedChars": 1967,
+      "fixedTokens": 492
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/reason.ts",
-      "builder": "buildIdeasPrompt",
+      "builder": "buildIdeasEnvelope",
       "purpose": "Extract proposals from free-form notes that local parsing missed.",
       "inline": false,
-      "literals": 6,
+      "literals": 29,
       "constants": {
-        "AUTO_PLACEMENT_INSTRUCTION": 119,
         "PRD_SCHEMA": 333,
         "FEW_SHOT_EXAMPLE": 432,
         "CONSOLIDATION_INSTRUCTION": 223,
         "TASK_QUALITY_RULES": 181,
         "ANTI_PATTERNS": 141,
+        "placementContent": 206,
+        "projectContextContent": 10,
+        "summarizeExisting": 9,
         "OUTPUT_INSTRUCTION": 52
       },
-      "ownTokens": 448,
-      "fixedChars": 7707,
-      "fixedTokens": 1927
+      "ownTokens": 378,
+      "fixedChars": 7855,
+      "fixedTokens": 1964
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/consolidation-guard.ts",
-      "builder": "buildConsolidationGuardPrompt",
+      "builder": "buildConsolidationGuardEnvelope",
       "purpose": "Second-opinion check before a consolidation is applied.",
       "inline": false,
-      "literals": 1,
+      "literals": 23,
       "constants": {
         "FEW_SHOT_EXAMPLE": 432
       },
-      "ownTokens": 306,
-      "fixedChars": 2948,
-      "fixedTokens": 737
+      "ownTokens": 320,
+      "fixedChars": 3006,
+      "fixedTokens": 752
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/decompose.ts",
-      "builder": "buildDecompositionPrompt",
+      "builder": "buildDecompositionEnvelope",
       "purpose": "Decompose a task whose level-of-effort exceeds the threshold.",
       "inline": false,
-      "literals": 7,
+      "literals": 24,
       "constants": {},
-      "ownTokens": 285,
-      "fixedChars": 1140,
-      "fixedTokens": 285
+      "ownTokens": 290,
+      "fixedChars": 1159,
+      "fixedTokens": 290
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/extract.ts",
-      "builder": "buildDisambiguationPrompt",
+      "builder": "buildDisambiguationEnvelope",
       "purpose": "Resolve an ambiguous extraction against existing PRD items.",
       "inline": false,
-      "literals": 5,
+      "literals": 21,
       "constants": {
         "PRD_SCHEMA": 333,
         "TASK_QUALITY_RULES": 181,
         "OUTPUT_INSTRUCTION": 52
       },
-      "ownTokens": 174,
-      "fixedChars": 2959,
-      "fixedTokens": 740
+      "ownTokens": 186,
+      "fixedChars": 3007,
+      "fixedTokens": 752
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/guided.ts",
-      "builder": "buildClarifyPrompt",
+      "builder": "buildClarifyEnvelope",
       "purpose": "Ask clarifying questions during guided PRD authoring.",
       "inline": false,
-      "literals": 5,
+      "literals": 33,
       "constants": {},
-      "ownTokens": 295,
-      "fixedChars": 1178,
-      "fixedTokens": 295
+      "ownTokens": 309,
+      "fixedChars": 1234,
+      "fixedTokens": 309
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/guided.ts",
-      "builder": "buildSpecPrompt",
+      "builder": "buildSpecEnvelope",
       "purpose": "Turn guided answers into a structured spec.",
       "inline": false,
-      "literals": 5,
+      "literals": 22,
       "constants": {
         "FEW_SHOT_EXAMPLE": 432
       },
-      "ownTokens": 133,
-      "fixedChars": 2256,
-      "fixedTokens": 564
+      "ownTokens": 150,
+      "fixedChars": 2325,
+      "fixedTokens": 582
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/modify-reason.ts",
-      "builder": "buildModifyPrompt",
+      "builder": "buildModifyEnvelope",
       "purpose": "Apply a natural-language edit to an existing PRD item.",
       "inline": false,
-      "literals": 5,
+      "literals": 29,
       "constants": {
         "FEW_SHOT_EXAMPLE": 432,
         "ANTI_PATTERNS": 141
       },
-      "ownTokens": 272,
-      "fixedChars": 3373,
-      "fixedTokens": 844
+      "ownTokens": 295,
+      "fixedChars": 3465,
+      "fixedTokens": 867
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/propose-group-renames.ts",
-      "builder": "buildGroupRenamePrompt",
+      "builder": "buildGroupRenameEnvelope",
       "purpose": "Rename a group of sibling items to a consistent scheme.",
       "inline": false,
-      "literals": 23,
-      "constants": {},
-      "ownTokens": 210,
-      "fixedChars": 839,
-      "fixedTokens": 210
+      "literals": 27,
+      "constants": {
+        "formatMemberSection": 29
+      },
+      "ownTokens": 214,
+      "fixedChars": 970,
+      "fixedTokens": 243
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/rename-resolve.ts",
-      "builder": "buildRenamePrompt",
+      "builder": "buildRenameEnvelope",
       "purpose": "Pick the better of two colliding item titles.",
       "inline": false,
-      "literals": 3,
-      "constants": {},
-      "ownTokens": 196,
-      "fixedChars": 783,
-      "fixedTokens": 196
+      "literals": 23,
+      "constants": {
+        "formatItemSection": 29
+      },
+      "ownTokens": 204,
+      "fixedChars": 930,
+      "fixedTokens": 233
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/reshape-reason.ts",
-      "builder": "reasonForReshape",
+      "builder": "buildReshapeEnvelope",
       "purpose": "Propose a restructure of the PRD hierarchy.",
-      "inline": true,
-      "literals": 8,
+      "inline": false,
+      "literals": 7,
       "constants": {
-        "POST_PRUNE_CONSOLIDATION_PROMPT": 508,
-        "SMART_PRUNE_PROMPT": 163,
-        "RESHAPE_SYSTEM_PROMPT": 377,
+        "reshapeRoleContent": 1054,
+        "summarizePRD": 22,
         "RESHAPE_FEW_SHOT": 326
       },
-      "ownTokens": 15,
-      "fixedChars": 5551,
-      "fixedTokens": 1388
+      "ownTokens": 18,
+      "fixedChars": 5680,
+      "fixedTokens": 1420
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/reshape-reason.ts",
-      "builder": "reasonForBodyMerge",
+      "builder": "buildBodyMergeEnvelope",
       "purpose": "Merge two item descriptions into one during a reshape.",
-      "inline": true,
+      "inline": false,
       "literals": 12,
       "constants": {},
       "ownTokens": 106,
-      "fixedChars": 421,
+      "fixedChars": 422,
       "fixedTokens": 106
     },
     {
       "pkg": "rex",
       "file": "packages/rex/src/analyze/escalate.ts",
-      "builder": "buildValidationFeedback",
+      "builder": "buildValidationFeedbackEnvelope",
       "purpose": "Retry feedback appended to a prompt whose response failed validation.",
       "inline": false,
-      "literals": 11,
+      "literals": 12,
       "constants": {},
-      "ownTokens": 59,
-      "fixedChars": 234,
-      "fixedTokens": 59
+      "ownTokens": 62,
+      "fixedChars": 245,
+      "fixedTokens": 62
     },
     {
       "pkg": "sourcevision",
       "file": "packages/sourcevision/src/analyzers/enrich-batch.ts",
-      "builder": "buildFirstPassPrompt",
+      "builder": "buildFirstPassEnvelope",
       "purpose": "First-pass zone enrichment for a batch of zones.",
       "inline": false,
-      "literals": 26,
-      "constants": {},
-      "ownTokens": 318,
-      "fixedChars": 1270,
-      "fixedTokens": 318
+      "literals": 59,
+      "constants": {
+        "formatProjectShape": 393,
+        "formatFileHeaders": 54
+      },
+      "ownTokens": 357,
+      "fixedChars": 3215,
+      "fixedTokens": 804
     },
     {
       "pkg": "sourcevision",
       "file": "packages/sourcevision/src/analyzers/enrich-batch.ts",
-      "builder": "buildLaterPassPrompt",
+      "builder": "buildLaterPassEnvelope",
       "purpose": "Later-pass zone enrichment, given the previous pass's output.",
       "inline": false,
-      "literals": 21,
-      "constants": {},
-      "ownTokens": 301,
-      "fixedChars": 1203,
-      "fixedTokens": 301
+      "literals": 53,
+      "constants": {
+        "formatProjectShape": 393
+      },
+      "ownTokens": 330,
+      "fixedChars": 2892,
+      "fixedTokens": 723
     },
     {
       "pkg": "sourcevision",
       "file": "packages/sourcevision/src/analyzers/enrich-config.ts",
-      "builder": "buildMetaPrompt",
+      "builder": "buildMetaEnvelope",
       "purpose": "Meta-evaluation choosing the enrichment strategy for a repo.",
       "inline": false,
-      "literals": 11,
-      "constants": {},
-      "ownTokens": 520,
-      "fixedChars": 2077,
-      "fixedTokens": 520
+      "literals": 23,
+      "constants": {
+        "formatAnnotatedFinding": 15
+      },
+      "ownTokens": 531,
+      "fixedChars": 2179,
+      "fixedTokens": 545
     },
     {
       "pkg": "sourcevision",
       "file": "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
-      "builder": "enrichSingleZone",
-      "purpose": "Per-zone enrichment fallback when batch enrichment is too coarse.",
-      "inline": true,
-      "literals": 50,
+      "builder": "buildSingleZoneFirstPassEnvelope",
+      "purpose": "Per-zone enrichment, first pass — names and describes one zone.",
+      "inline": false,
+      "literals": 27,
       "constants": {},
-      "ownTokens": 452,
-      "fixedChars": 1806,
-      "fixedTokens": 452
+      "ownTokens": 166,
+      "fixedChars": 663,
+      "fixedTokens": 166
+    },
+    {
+      "pkg": "sourcevision",
+      "file": "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
+      "builder": "buildSingleZoneLaterPassEnvelope",
+      "purpose": "Per-zone enrichment, later pass — adds only what pass 1 missed.",
+      "inline": false,
+      "literals": 30,
+      "constants": {},
+      "ownTokens": 166,
+      "fixedChars": 662,
+      "fixedTokens": 166
     },
     {
       "pkg": "sourcevision",
       "file": "packages/sourcevision/src/analyzers/classify.ts",
-      "builder": "buildLLMClassifyPrompt",
+      "builder": "buildLLMClassifyEnvelope",
       "purpose": "Classify file archetypes the heuristic classifier could not.",
       "inline": false,
-      "literals": 10,
+      "literals": 19,
       "constants": {},
-      "ownTokens": 84,
-      "fixedChars": 336,
-      "fixedTokens": 84
+      "ownTokens": 91,
+      "fixedChars": 361,
+      "fixedTokens": 91
     },
     {
       "pkg": "sourcevision",
       "file": "packages/sourcevision/src/analyzers/primer.ts",
-      "builder": "buildPrimerPrompt",
+      "builder": "buildPrimerEnvelope",
       "purpose": "Distil CONTEXT.md into the startup primer every agent run inherits.",
       "inline": false,
-      "literals": 18,
+      "literals": 21,
       "constants": {},
-      "ownTokens": 223,
-      "fixedChars": 889,
-      "fixedTokens": 223
+      "ownTokens": 229,
+      "fixedChars": 915,
+      "fixedTokens": 229
     },
     {
       "pkg": "hench",
@@ -646,20 +729,74 @@
   ],
   "assembled": {
     "rex": {
-      "surface": "buildAssessmentPrompt",
+      "surface": "buildAssessmentEnvelope",
       "describe": "Granularity assessment over one two-task proposal.",
       "chars": 2948,
       "tokens": 737,
-      "fixedTokens": 479,
-      "contextTokens": 258
+      "sections": [
+        {
+          "name": "role",
+          "chars": 134,
+          "tokens": 34
+        },
+        {
+          "name": "input",
+          "chars": 1055,
+          "tokens": 264
+        },
+        {
+          "name": "structure",
+          "chars": 406,
+          "tokens": 102
+        },
+        {
+          "name": "quality",
+          "chars": 211,
+          "tokens": 53
+        },
+        {
+          "name": "anti-patterns",
+          "chars": 498,
+          "tokens": 125
+        },
+        {
+          "name": "output",
+          "chars": 634,
+          "tokens": 159
+        }
+      ],
+      "fixedTokens": 492,
+      "contextTokens": 245
     },
     "sourcevision": {
-      "surface": "buildPrimerPrompt",
+      "surface": "buildPrimerEnvelope",
       "describe": "Primer distillation over a fixed 3-zone CONTEXT.md excerpt.",
       "chars": 1461,
       "tokens": 366,
-      "fixedTokens": 223,
-      "contextTokens": 143
+      "sections": [
+        {
+          "name": "role",
+          "chars": 156,
+          "tokens": 39
+        },
+        {
+          "name": "rules",
+          "chars": 402,
+          "tokens": 101
+        },
+        {
+          "name": "output",
+          "chars": 312,
+          "tokens": 78
+        },
+        {
+          "name": "input",
+          "chars": 585,
+          "tokens": 147
+        }
+      ],
+      "fixedTokens": 229,
+      "contextTokens": 137
     },
     "hench": {
       "surface": "buildPromptEnvelope",
@@ -735,6 +872,6 @@
       }
     ]
   },
-  "recordedAt": "2026-09-08T14:45:17.367Z",
-  "commit": "5a6978846bb2"
+  "recordedAt": "2026-09-08T16:17:25.001Z",
+  "commit": "2a64b185456d"
 }

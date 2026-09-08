@@ -25,11 +25,16 @@
  *   `assembled - fixed` is the per-run context, which a rewrite does *not*
  *   reduce and which must not be credited to one.
  *
- * Static extraction is what makes both construction styles comparable. rex and
- * sourcevision build prompts as single large template literals; hench pushes
- * dozens of short fragments onto an array. Counting *literals in the function
- * body* catches both — a literal-per-file scan undercounts hench badly, and
- * measuring only assembled output cannot separate fixed text from context.
+ * Static extraction is what makes the construction styles comparable. core
+ * writes a few large template literals; hench pushes dozens of short fragments
+ * onto an array; rex and sourcevision declare a list of named sections.
+ * Counting *literals in the function body* catches all three — a
+ * literal-per-file scan undercounts the latter two badly, and measuring only
+ * assembled output cannot separate fixed text from context.
+ *
+ * For the four `--dump` entry points the real builder is called, so those also
+ * report a per-section split. That is the table a rewrite reads first: it names
+ * which *part* of a prompt carries the bill, not just which builder.
  *
  * ## Token counting
  *
@@ -78,122 +83,127 @@ const require = createRequire(join(ROOT, "packages/web/package.json"));
  */
 const SURFACES = [
   // ── rex ────────────────────────────────────────────────────────────────
+  //
+  // Every rex surface names its `*Envelope` builder, which is where the prompt
+  // literals live since the envelope migration. The `*Prompt` function beside
+  // each one is a two-line `assemblePromptText(...)` wrapper and would measure
+  // at zero, so naming the wrapper here would silently zero out the surface.
+  //
+  // Per-section cost is not recorded per surface: sections exist at runtime,
+  // and this registry is measured statically. The section breakdown comes from
+  // the `--dump` fixtures below, which call the real builders.
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/reason.ts",
-    builder: "reasonFromFile",
-    inline: true,
+    builder: "buildFileImportEnvelope",
     purpose: "Propose PRD items from a single source document.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/reason.ts",
-    builder: "reasonFromScanResults",
-    inline: true,
+    builder: "buildScanImportEnvelope",
     purpose: "Propose PRD items from a batch of scanner findings.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/reason.ts",
-    builder: "buildAddPrompt",
+    builder: "buildAddEnvelope",
     purpose: "Propose new PRD items from a natural-language description.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/reason.ts",
-    builder: "buildMultiAddPrompt",
+    builder: "buildMultiAddEnvelope",
     purpose: "Propose items for several scan targets in one call.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/reason.ts",
-    builder: "buildBreakdownPrompt",
+    builder: "buildBreakdownEnvelope",
     purpose: "Split proposals judged too large into child tasks.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/reason.ts",
-    builder: "buildConsolidatePrompt",
+    builder: "buildConsolidateEnvelope",
     purpose: "Merge overlapping proposals before they enter the PRD.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/reason.ts",
-    builder: "buildAssessmentPrompt",
+    builder: "buildAssessmentEnvelope",
     purpose: "Assess whether proposal tasks are at the right granularity.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/reason.ts",
-    builder: "buildIdeasPrompt",
+    builder: "buildIdeasEnvelope",
     purpose: "Extract proposals from free-form notes that local parsing missed.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/consolidation-guard.ts",
-    builder: "buildConsolidationGuardPrompt",
+    builder: "buildConsolidationGuardEnvelope",
     purpose: "Second-opinion check before a consolidation is applied.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/decompose.ts",
-    builder: "buildDecompositionPrompt",
+    builder: "buildDecompositionEnvelope",
     purpose: "Decompose a task whose level-of-effort exceeds the threshold.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/extract.ts",
-    builder: "buildDisambiguationPrompt",
+    builder: "buildDisambiguationEnvelope",
     purpose: "Resolve an ambiguous extraction against existing PRD items.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/guided.ts",
-    builder: "buildClarifyPrompt",
+    builder: "buildClarifyEnvelope",
     purpose: "Ask clarifying questions during guided PRD authoring.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/guided.ts",
-    builder: "buildSpecPrompt",
+    builder: "buildSpecEnvelope",
     purpose: "Turn guided answers into a structured spec.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/modify-reason.ts",
-    builder: "buildModifyPrompt",
+    builder: "buildModifyEnvelope",
     purpose: "Apply a natural-language edit to an existing PRD item.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/propose-group-renames.ts",
-    builder: "buildGroupRenamePrompt",
+    builder: "buildGroupRenameEnvelope",
     purpose: "Rename a group of sibling items to a consistent scheme.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/rename-resolve.ts",
-    builder: "buildRenamePrompt",
+    builder: "buildRenameEnvelope",
     purpose: "Pick the better of two colliding item titles.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/reshape-reason.ts",
-    builder: "reasonForReshape",
-    inline: true,
+    builder: "buildReshapeEnvelope",
     purpose: "Propose a restructure of the PRD hierarchy.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/reshape-reason.ts",
-    builder: "reasonForBodyMerge",
-    inline: true,
+    builder: "buildBodyMergeEnvelope",
     purpose: "Merge two item descriptions into one during a reshape.",
   },
   {
     pkg: "rex",
     file: "packages/rex/src/analyze/escalate.ts",
-    builder: "buildValidationFeedback",
+    builder: "buildValidationFeedbackEnvelope",
     purpose: "Retry feedback appended to a prompt whose response failed validation.",
   },
 
@@ -201,38 +211,43 @@ const SURFACES = [
   {
     pkg: "sourcevision",
     file: "packages/sourcevision/src/analyzers/enrich-batch.ts",
-    builder: "buildFirstPassPrompt",
+    builder: "buildFirstPassEnvelope",
     purpose: "First-pass zone enrichment for a batch of zones.",
   },
   {
     pkg: "sourcevision",
     file: "packages/sourcevision/src/analyzers/enrich-batch.ts",
-    builder: "buildLaterPassPrompt",
+    builder: "buildLaterPassEnvelope",
     purpose: "Later-pass zone enrichment, given the previous pass's output.",
   },
   {
     pkg: "sourcevision",
     file: "packages/sourcevision/src/analyzers/enrich-config.ts",
-    builder: "buildMetaPrompt",
+    builder: "buildMetaEnvelope",
     purpose: "Meta-evaluation choosing the enrichment strategy for a repo.",
   },
   {
     pkg: "sourcevision",
     file: "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
-    builder: "enrichSingleZone",
-    inline: true,
-    purpose: "Per-zone enrichment fallback when batch enrichment is too coarse.",
+    builder: "buildSingleZoneFirstPassEnvelope",
+    purpose: "Per-zone enrichment, first pass — names and describes one zone.",
+  },
+  {
+    pkg: "sourcevision",
+    file: "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
+    builder: "buildSingleZoneLaterPassEnvelope",
+    purpose: "Per-zone enrichment, later pass — adds only what pass 1 missed.",
   },
   {
     pkg: "sourcevision",
     file: "packages/sourcevision/src/analyzers/classify.ts",
-    builder: "buildLLMClassifyPrompt",
+    builder: "buildLLMClassifyEnvelope",
     purpose: "Classify file archetypes the heuristic classifier could not.",
   },
   {
     pkg: "sourcevision",
     file: "packages/sourcevision/src/analyzers/primer.ts",
-    builder: "buildPrimerPrompt",
+    builder: "buildPrimerEnvelope",
     purpose: "Distil CONTEXT.md into the startup primer every agent run inherits.",
   },
 
@@ -388,6 +403,30 @@ const OUT_OF_SCOPE = [
  * of two or more modules is not resolved; none exist today, and `--check`
  * plus the totals in the baseline make a new one visible as a sudden drop.
  *
+ * Calls to module-local helpers are followed the same way, for the same
+ * reason. When the envelope migration factored rex's thrice-duplicated
+ * placement block into `placementContent()` and its three-way mode switch into
+ * `reshapeRoleContent()`, the text those helpers emit — including the
+ * `AUTO_PLACEMENT_INSTRUCTION` and three reshape-brief constants they
+ * reference — vanished from the measurement even though every prompt was
+ * byte-for-byte unchanged. That is the worst failure mode this tool has: a
+ * refactor that improves the code silently shrinks the baseline, and the next
+ * rewrite gets credited with a saving nobody made. Following local calls means
+ * moving prompt text into a helper does not change what it costs.
+ *
+ * Two rules keep that from double-counting:
+ *
+ * 1. A helper's text is recorded as *shared*, not own — the same treatment a
+ *    module constant gets. Each caller is charged the full cost per call, and
+ *    the package's unique total counts it once, because a rewrite edits the
+ *    helper once. `placementContent` is called by three builders.
+ * 2. A helper that is itself a registered surface is skipped, because it is
+ *    already measured under its own row. `buildSystemPrompt` calls
+ *    `buildGoLanguageContext`, which the registry lists separately.
+ *
+ * Helper following is one level deep and cycle-guarded. A helper that calls a
+ * second helper contributes only its own text; none do today.
+ *
  * All branches count. A builder with `isCli ? A : B` emits only one of them per
  * run, but both are fixed text a rewrite can shorten, so both belong in the
  * baseline. This is why a `fixed` total can exceed the `assembled` length of
@@ -396,7 +435,16 @@ const OUT_OF_SCOPE = [
  * @returns {{ text: string, literals: number, constants: string[] } | null}
  *   null when the builder is not found.
  */
-function extractStaticPromptText(ts, sourceText, fileName, builderName) {
+function extractStaticPromptText(
+  ts,
+  sourceText,
+  fileName,
+  builderName,
+  options = {},
+) {
+  /** Builders in this file that the registry measures in their own right. */
+  const registeredSurfaces = options.registeredSurfaces ?? new Set();
+
   const sf = ts.createSourceFile(
     fileName,
     sourceText,
@@ -419,6 +467,8 @@ function extractStaticPromptText(ts, sourceText, fileName, builderName) {
    *  when totalling a package. `PRD_SCHEMA` is interpolated into seven rex
    *  builders: each call pays for it, but a rewrite edits it once. */
   const pulledConstants = new Map();
+  /** Local helpers already inlined — guards against recursion and re-counting. */
+  const followedHelpers = new Set([builderName]);
 
   const visit = (node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
@@ -443,6 +493,34 @@ function extractStaticPromptText(ts, sourceText, fileName, builderName) {
     ) {
       pulledConstants.set(node.text, moduleConstants.get(node.text));
       return;
+    } else if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      !followedHelpers.has(node.expression.text) &&
+      !registeredSurfaces.has(node.expression.text) &&
+      !pulledConstants.has(node.expression.text)
+    ) {
+      // Inline a module-local helper's prompt text, so factoring a duplicated
+      // block out of three builders does not delete it from the measurement.
+      const name = node.expression.text;
+      const helper = findFunctionBody(ts, sf, name);
+      if (helper) {
+        followedHelpers.add(name);
+        const helperParts = [];
+        const helperConstants = new Map();
+        collectInto(ts, sf, helper, helperParts, helperConstants, moduleConstants);
+        // Recorded as shared, keyed by the helper's name: charged to every
+        // caller per call, edited once. Its own constant references are folded
+        // in so `placementContent` carries AUTO_PLACEMENT_INSTRUCTION with it.
+        const helperText = [
+          helperParts.join("\n"),
+          [...helperConstants.values()].join("\n"),
+        ].filter(Boolean).join("\n");
+        if (helperText.length > 0) pulledConstants.set(name, helperText);
+      }
+      // Arguments may carry literals of their own (`section("role", "…")`).
+      for (const arg of node.arguments) visit(arg);
+      return;
     }
     ts.forEachChild(node, visit);
   };
@@ -456,6 +534,38 @@ function extractStaticPromptText(ts, sourceText, fileName, builderName) {
     constants: pulledConstants,
     literals: parts.length,
   };
+}
+
+/**
+ * Collect literals and referenced constants from one function body.
+ *
+ * The leaf walk, without helper following — used for the bodies of helpers that
+ * a builder calls, so a helper contributes its own literals and the constants
+ * it interpolates, but does not recurse further. That bound is what keeps
+ * "one level deep" true for calls as well as imports.
+ */
+function collectInto(ts, sf, body, parts, constants, moduleConstants) {
+  const visit = (node) => {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      parts.push(node.text);
+    } else if (ts.isTemplateExpression(node)) {
+      let joined = node.head.text;
+      for (const span of node.templateSpans) joined += span.literal.text;
+      parts.push(joined);
+      for (const span of node.templateSpans) visit(span.expression);
+      return;
+    } else if (
+      ts.isIdentifier(node) &&
+      moduleConstants.has(node.text) &&
+      !constants.has(node.text) &&
+      !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
+    ) {
+      constants.set(node.text, moduleConstants.get(node.text));
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(body, visit);
 }
 
 /**
@@ -571,21 +681,52 @@ function findFunctionBody(ts, sf, name) {
  * the same token count out, on any machine, with no model call. They import
  * from `dist/`, which the package guidelines permit for repo tooling.
  */
+/**
+ * Render an envelope as a dump entry: the assembled text plus its per-section
+ * split.
+ *
+ * The package's own assembler is used rather than a join here, so the dumped
+ * text is exactly what the package sends — a separator mismatch would make the
+ * dump quietly disagree with production.
+ *
+ * @param {Record<string, Function>} mod - the package's prompt-envelope module
+ * @param {{envelope: {sections: {name: string, content: string}[]}, assemble: string}} args
+ */
+function envelopeDump(mod, { envelope, assemble }) {
+  return {
+    text: mod[assemble](envelope),
+    sections: envelope.sections.map((s) => ({
+      name: s.name,
+      chars: s.content.length,
+    })),
+  };
+}
+
 const REPRESENTATIVE = {
   rex: {
-    surface: "buildAssessmentPrompt",
+    // Names the registered *envelope* builder, not the `*Prompt` wrapper that
+    // build() calls. The two emit identical text, but only the registered name
+    // resolves against SURFACES below — and an unresolved name silently drops
+    // this package's fixed/context split rather than erroring.
+    surface: "buildAssessmentEnvelope",
     describe: "Granularity assessment over one two-task proposal.",
     async build() {
-      const { buildAssessmentPrompt } = await loadDist("rex/dist/analyze/reason.js");
-      return buildAssessmentPrompt(FIXTURE_PROPOSALS);
+      const { buildAssessmentEnvelope } = await loadDist("rex/dist/analyze/reason.js");
+      return envelopeDump(await loadDist("rex/dist/analyze/prompt-envelope.js"), {
+        envelope: buildAssessmentEnvelope(FIXTURE_PROPOSALS),
+        assemble: "rexPrompt",
+      });
     },
   },
   sourcevision: {
-    surface: "buildPrimerPrompt",
+    surface: "buildPrimerEnvelope",
     describe: "Primer distillation over a fixed 3-zone CONTEXT.md excerpt.",
     async build() {
-      const { buildPrimerPrompt } = await loadDist("sourcevision/dist/analyzers/primer.js");
-      return buildPrimerPrompt(FIXTURE_CONTEXT_MD);
+      const { buildPrimerEnvelope } = await loadDist("sourcevision/dist/analyzers/primer.js");
+      return envelopeDump(await loadDist("sourcevision/dist/analyzers/prompt-envelope.js"), {
+        envelope: buildPrimerEnvelope(FIXTURE_CONTEXT_MD),
+        assemble: "svPrompt",
+      });
     },
   },
   hench: {
@@ -740,6 +881,23 @@ async function measure(model) {
 
   const tokens = (text) => budgetPreflight(model, text.length).tokenEstimate;
 
+  /**
+   * Builders the registry measures in their own right, per file.
+   *
+   * Passed to the extractor so a call to one of them is not inlined into its
+   * caller — `buildSystemPrompt` calls `buildGoLanguageContext`, and following
+   * it would charge the Go context twice.
+   */
+  const registeredByFile = new Map();
+  for (const s of SURFACES) {
+    let set = registeredByFile.get(s.file);
+    if (!set) { set = new Set(); registeredByFile.set(s.file, set); }
+    set.add(s.builder);
+  }
+  const extractOptions = (file) => ({
+    registeredSurfaces: registeredByFile.get(file) ?? new Set(),
+  });
+
   const surfaces = SURFACES.map((s) => {
     const abs = join(ROOT, s.file);
     if (!existsSync(abs)) {
@@ -750,6 +908,7 @@ async function measure(model) {
       readFileSync(abs, "utf8"),
       abs,
       s.builder,
+      extractOptions(s.file),
     );
     if (!extracted) {
       return { ...s, error: `builder \`${s.builder}\` not found in ${s.file}` };
@@ -783,7 +942,13 @@ async function measure(model) {
   for (const s of SURFACES) {
     const abs = join(ROOT, s.file);
     if (!existsSync(abs)) continue;
-    const extracted = extractStaticPromptText(ts, readFileSync(abs, "utf8"), abs, s.builder);
+    const extracted = extractStaticPromptText(
+      ts,
+      readFileSync(abs, "utf8"),
+      abs,
+      s.builder,
+      extractOptions(s.file),
+    );
     if (!extracted) continue;
     for (const [name, text] of extracted.constants) {
       constantTexts.set(`${s.pkg}::${name}`, { pkg: s.pkg, name, text });
@@ -1086,15 +1251,18 @@ function renderMarkdown(report) {
   lines.push("credited to the wrong surface.");
   lines.push("");
   lines.push(
-    "Counting literals rather than output is also what makes the two construction",
+    "Counting literals rather than output is also what makes the three construction",
   );
   lines.push(
-    "styles comparable. rex and sourcevision build one large template literal per",
+    "styles comparable. core writes a few large template literals per prompt; hench",
   );
   lines.push(
-    "prompt; hench pushes dozens of short fragments onto an array. A literal-per-file",
+    "pushes dozens of short fragments onto an array; rex and sourcevision declare a",
   );
-  lines.push("scan undercounts hench; counting literals per *builder* does not.");
+  lines.push(
+    "list of named sections. A literal-per-file scan undercounts the last two badly;",
+  );
+  lines.push("counting literals per *builder* does not.");
   lines.push("");
   lines.push(
     "Token counts come from `budgetPreflight()` in `@n-dx/llm-client` — the same",
@@ -1124,6 +1292,42 @@ function renderMarkdown(report) {
     "ten times its own size. Reporting only the per-call sum would point a rewrite at the",
   );
   lines.push("largest builders rather than at the most-reused text.");
+  lines.push("");
+  lines.push("## Measurement revisions");
+  lines.push("");
+  lines.push(
+    "A total in this file can move because prompts changed or because the *measurement*",
+  );
+  lines.push(
+    "changed. Only the first is a result. Revisions of the second kind are recorded here",
+  );
+  lines.push("so a jump is never mistaken for a regression or a win.");
+  lines.push("");
+  lines.push(
+    "- **Envelope migration** — rex's and sourcevision's prompts moved onto",
+  );
+  lines.push(
+    "  `PromptEnvelope`, and every builder was renamed `*Prompt` → `*Envelope`, so a",
+  );
+  lines.push(
+    "  `--compare` across that change shows the whole registry as NEW/REMOVED. The",
+  );
+  lines.push(
+    "  assembled text is byte-identical apart from removed doubled blank lines, proved by",
+  );
+  lines.push(
+    "  the `prompt-text-identity` snapshot suites in both packages. In the same change the",
+  );
+  lines.push(
+    "  extractor learned to follow module-local helper calls: factoring duplicated prompt",
+  );
+  lines.push(
+    "  text into a helper had been dropping it from the count entirely. That correction",
+  );
+  lines.push(
+    "  *raised* the recorded totals by ~5% with no prompt growing — the earlier figures",
+  );
+  lines.push("  were an undercount.");
   lines.push("");
 
   for (const pkg of Object.keys(report.byPackage)) {
@@ -1196,22 +1400,31 @@ function renderMarkdown(report) {
   lines.push("still worth shortening — it just is not billed on this particular path.");
   lines.push("");
 
-  const hench = report.assembled.hench;
-  if (hench?.sections) {
-    lines.push("### hench envelope sections");
+  // Per-section cost for every envelope-built package. This is the table a
+  // rewrite reads first: it is the only place that says which *part* of a
+  // prompt carries the bill, so the largest section can be opened first
+  // instead of the largest builder.
+  for (const [pkg, a] of Object.entries(report.assembled)) {
+    if (!a?.sections) continue;
+    lines.push(`### ${pkg} envelope sections`);
     lines.push("");
     lines.push(
-      "hench assembles its prompt from fragments into a `PromptEnvelope`, so its cost is",
+      `\`${a.surface}\` assembles its prompt from named sections, so its cost is reported`,
     );
     lines.push(
-      "reported per section rather than as one literal. These are the same sections",
+      "per section rather than as one literal. These are the same sections",
     );
-    lines.push("`extractPromptSectionDiagnostics()` reports at runtime.");
+    lines.push(
+      "`extractPromptSectionDiagnostics()` reports at runtime, over the fixture in",
+    );
+    lines.push(`*${a.describe}*`);
     lines.push("");
-    lines.push("| Section | Chars | Tokens |");
-    lines.push("|---|---:|---:|");
-    for (const s of hench.sections) {
-      lines.push(`| \`${s.name}\` | ${n(s.chars)} | ${n(s.tokens)} |`);
+    lines.push("| Section | Chars | Tokens | Share |");
+    lines.push("|---|---:|---:|---:|");
+    const total = a.sections.reduce((sum, s) => sum + s.tokens, 0) || 1;
+    for (const s of [...a.sections].sort((x, y) => y.tokens - x.tokens)) {
+      const share = ((s.tokens / total) * 100).toFixed(1);
+      lines.push(`| \`${s.name}\` | ${n(s.chars)} | ${n(s.tokens)} | ${share}% |`);
     }
     lines.push("");
   }

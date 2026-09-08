@@ -161,11 +161,8 @@ Zones:
   files: "src/core/billing.ts", "src/core/period.ts"
   entryPoints: "src/core/billing.ts"
 
-
-
 Cross-zone imports:
   api→core: 4 imports
-
 
 Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
 
@@ -186,7 +183,6 @@ Zones:
   files: "src/core/billing.ts", "src/core/period.ts"
   known insights: (none)
 
-
 Cross-zone imports:
   api→core: 4 imports
 
@@ -198,7 +194,6 @@ This is enrichment pass 2. Focus on inter-zone relationships:
 - Clean boundaries and well-defined interfaces → "info"
 - Leaky abstractions or missing interfaces → "warning"
 - Circular dependencies → "critical"
-
 
 Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.
 

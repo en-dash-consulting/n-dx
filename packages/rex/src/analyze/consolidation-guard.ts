@@ -22,6 +22,8 @@ import {
   PRD_SCHEMA,
   TASK_QUALITY_RULES,
 } from "./reason.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import { section, rexPromptEnvelope, rexPrompt } from "./prompt-envelope.js";
 
 // ── Types ──
 
@@ -63,39 +65,52 @@ export function countProposalTasks(proposals: Proposal[]): number {
  * Build the re-consolidation prompt for over-granular proposals.
  * Pure function — no I/O.
  */
+export function buildConsolidationGuardEnvelope(
+  proposals: Proposal[],
+  ceiling: number,
+  currentTaskCount: number,
+): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      `You are a product requirements analyst. The following PRD proposals contain ${currentTaskCount} tasks, which exceeds the project's consolidation ceiling of ${ceiling} tasks. Consolidate them into fewer, larger work packages.`,
+    ),
+    section("input", `Current proposals:\n${JSON.stringify(proposals)}`),
+    section(
+      "consolidation",
+      `Target: Reduce to at most ${ceiling} tasks total while preserving all scope.`,
+    ),
+    section(
+      "input-rules",
+      [
+        "Rules:",
+        "- Merge closely related tasks within each feature into broader tasks with combined acceptance criteria.",
+        "- If a feature has many small tasks, consolidate them into 1–3 well-scoped tasks.",
+        "- If multiple features overlap significantly, merge them into one feature.",
+        "- Preserve the epic structure — do NOT change epic titles unless features are merged across epics.",
+        "- Each resulting task MUST have a verb-first title AND both a description and acceptanceCriteria.",
+        "- Preserve ALL original intent — consolidation must not drop functionality or acceptance criteria.",
+        "- Keep the highest priority among merged tasks.",
+        '- Preserve LoE fields: when merging tasks with "loe", sum the LoE values and update "loeRationale" to reflect the combined scope. Keep the lower confidence level.',
+        "- Do NOT add new functionality — only consolidate what exists.",
+        "- Do NOT produce tasks with only a title — every task needs both description and criteria.",
+      ].join("\n"),
+    ),
+    section("quality", TASK_QUALITY_RULES),
+    section("schema", PRD_SCHEMA),
+    section("example", FEW_SHOT_EXAMPLE),
+    section("output", OUTPUT_INSTRUCTION),
+  ]);
+}
+
 export function buildConsolidationGuardPrompt(
   proposals: Proposal[],
   ceiling: number,
   currentTaskCount: number,
 ): string {
-  const proposalJson = JSON.stringify(proposals);
-
-  return `You are a product requirements analyst. The following PRD proposals contain ${currentTaskCount} tasks, which exceeds the project's consolidation ceiling of ${ceiling} tasks. Consolidate them into fewer, larger work packages.
-
-Current proposals:
-${proposalJson}
-
-Target: Reduce to at most ${ceiling} tasks total while preserving all scope.
-
-Rules:
-- Merge closely related tasks within each feature into broader tasks with combined acceptance criteria.
-- If a feature has many small tasks, consolidate them into 1–3 well-scoped tasks.
-- If multiple features overlap significantly, merge them into one feature.
-- Preserve the epic structure — do NOT change epic titles unless features are merged across epics.
-- Each resulting task MUST have a verb-first title AND both a description and acceptanceCriteria.
-- Preserve ALL original intent — consolidation must not drop functionality or acceptance criteria.
-- Keep the highest priority among merged tasks.
-- Preserve LoE fields: when merging tasks with "loe", sum the LoE values and update "loeRationale" to reflect the combined scope. Keep the lower confidence level.
-- Do NOT add new functionality — only consolidate what exists.
-- Do NOT produce tasks with only a title — every task needs both description and criteria.
-
-${TASK_QUALITY_RULES}
-
-${PRD_SCHEMA}
-
-${FEW_SHOT_EXAMPLE}
-
-${OUTPUT_INSTRUCTION}`;
+  return rexPrompt(
+    buildConsolidationGuardEnvelope(proposals, ceiling, currentTaskCount),
+  );
 }
 
 // ── Guard logic ──

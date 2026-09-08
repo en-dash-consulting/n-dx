@@ -60,7 +60,6 @@ Avoid these common mistakes:
 - Do NOT duplicate tasks already in the existing PRD (check the summary below).
 - Do NOT wrap your response in markdown fences — return raw JSON only.
 
-
 Existing PRD:
 (empty PRD)
 
@@ -937,7 +936,6 @@ exports[`rex prompts built inline at the call site > reasonForBodyMerge 1`] = `
 Given the following items (with titles and descriptions), write a single combined description
 that covers the full scope of all items. The description should be concise, clear, and complete.
 Return only the plain-text description — no JSON, no markdown, no labels.
-
 ## Items to merge
 1. Title: Invoice generation
    Description: Render and deliver invoices.
@@ -976,7 +974,6 @@ Respond with ONLY a valid, minified JSON array of action objects — no whitespa
 # Widget Service
 
 A billing service for widget subscriptions. Node, TypeScript, Postgres.
-
 Example output (for reference — do NOT include this in your response):
 [{"action":"merge","survivorId":"abc-123","mergedIds":["def-456"],"title":"Implement user authentication with OAuth2","reason":"Both items describe OAuth2 authentication setup with overlapping acceptance criteria"},{"action":"update","itemId":"ghi-789","updates":{"description":"Handle rate limiting for external API calls with exponential backoff","acceptanceCriteria":["Returns 429 with retry-after header","Implements exponential backoff up to 60s"]},"reason":"Original description was too vague — added specific retry strategy and verifiable criteria"},{"action":"split","sourceId":"mno-345","children":[{"title":"Validate form inputs on submit","level":"task","acceptanceCriteria":["Required fields rejected with clear error","Email format validated against RFC 5322"]},{"title":"Show inline error messages on validation failure","level":"task"}],"reason":"Original task bundled validation logic and error UX — splitting clarifies scope and ownership"},{"action":"reparent","itemId":"pqr-678","newParentId":"stu-901","reason":"Belongs under the auth epic, not the dashboard epic"},{"action":"obsolete","itemId":"jkl-012","reason":"This migration task was for the old database schema which has been replaced by the v2 schema"}]"
 `;
@@ -1030,7 +1027,6 @@ Document to analyze:
 # Requirements
 
 - Trials must expire after 14 days.
-
 
 Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
 `;

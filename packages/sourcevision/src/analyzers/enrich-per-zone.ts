@@ -29,6 +29,13 @@ import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError } from "./claude-client.js";
 import { tryParseJSON, extractFindings, deduplicateZoneIds, formatFileLabel, extractZoneInsights, findPrevZone } from "./enrich-parsing.js";
 import {emptyAnalyzeTokenUsage} from "./token-usage.js";import { startSpinner } from "../cli/output.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import {
+  section,
+  svPromptEnvelope,
+  svPrompt,
+  logSvPromptSections,
+} from "./prompt-envelope.js";
 
 // ── Per-zone structure hash ──────────────────────────────────────────────────
 
@@ -53,6 +60,114 @@ interface SingleZoneResult {
  * Sends only this zone's files + entry points + boundary crossings.
  * Includes 1-line summaries of other zones for context.
  */
+/** Everything the two per-zone prompts read, already rendered. */
+interface SingleZonePromptContext {
+  zone: Zone;
+  config: { maxFiles: number; maxCrossings: number };
+  passConfig: PassConfig;
+  /** Rendered file list for this attempt's sampling budget. */
+  filesStr: string;
+  /** One-line summaries of the other zones. */
+  otherContext: string;
+  /** Rendered boundary-crossing table. */
+  crossingLines: string;
+  /** Operator hints from config. */
+  hints?: string;
+  /** Which enrichment pass this is (later-pass only). */
+  passNumber?: number;
+  /** What the previous pass concluded about this zone (later-pass only). */
+  previousZone?: Zone;
+}
+
+/**
+ * First-pass prompt for a single zone — name it and describe it.
+ *
+ * Extracted from {@link enrichSingleZone}, which built both prompts inline in
+ * its retry loop. Exported so their section costs appear in the same report as
+ * every other prompt surface: per-zone enrichment is the fallback path for
+ * repositories where batch enrichment is too coarse, so it runs once per zone
+ * and its cost scales with the repository.
+ */
+export function buildSingleZoneFirstPassEnvelope(
+  ctx: SingleZonePromptContext,
+): PromptEnvelope {
+  const { zone, config, passConfig } = ctx;
+  const entryLine = config.maxFiles >= 8
+    ? `\nEntry points: ${zone.entryPoints.map((f) => `"${f}"`).join(", ") || "none"}`
+    : "";
+
+  return svPromptEnvelope([
+    section(
+      "role",
+      "Analyze this code zone. It was discovered by import-graph community detection.",
+    ),
+    section("rules", passConfig.focus),
+    section(
+      "input",
+      `Zone: "${zone.id}" (cohesion: ${zone.cohesion}, coupling: ${zone.coupling}, ${zone.files.length} files)\n` +
+        `Files: ${ctx.filesStr}${entryLine}`,
+    ),
+    section("other-zones", ctx.otherContext),
+    section("hints", ctx.hints ? `Project context from the developer:\n${ctx.hints}` : ""),
+    section("crossings", `Boundary crossings:\n${ctx.crossingLines || "  (none)"}`),
+    section(
+      "output",
+      [
+        'Findings: severity ("info"|"warning"|"critical").',
+        "",
+        "Respond with ONLY a JSON object (no markdown, no explanation):",
+        `{"id":"kebab-case-id","name":"Title Case Name","description":"One sentence describing the zone's purpose.","insights":["actionable insight about this zone"],"findings":[{"type":"observation","scope":"${zone.id}","text":"finding text","severity":"info"}]}`,
+        "",
+        `Use finding types: ${passConfig.expectedTypes.join(", ")}.`,
+      ].join("\n"),
+    ),
+  ]);
+}
+
+/** Later-pass prompt for a single zone — add only what pass 1 missed. */
+export function buildSingleZoneLaterPassEnvelope(
+  ctx: SingleZonePromptContext,
+): PromptEnvelope {
+  const { zone, config, passConfig } = ctx;
+  const prevInsights = ctx.previousZone?.insights ?? [];
+  const maxInsights = config.maxFiles >= 8
+    ? prevInsights.length
+    : Math.min(prevInsights.length, 3);
+  const shown = prevInsights.slice(0, maxInsights);
+
+  return svPromptEnvelope([
+    section("role", "You previously analyzed this zone. Here is the current state:"),
+    section(
+      "input",
+      [
+        `Zone: "${zone.id}" (cohesion: ${zone.cohesion}, coupling: ${zone.coupling}, ${zone.files.length} files)`,
+        `Files: ${ctx.filesStr}`,
+        `Known insights: ${shown.length > 0 ? shown.map((i) => `"${i}"`).join("; ") : "(none)"}`,
+      ].join("\n"),
+    ),
+    section("other-zones", ctx.otherContext),
+    section("hints", ctx.hints ? `Project context from the developer:\n${ctx.hints}` : ""),
+    section("crossings", `Boundary crossings:\n${ctx.crossingLines || "  (none)"}`),
+    section(
+      "rules",
+      `This is enrichment pass ${ctx.passNumber}. ${passConfig.focus}`,
+    ),
+    section(
+      "output",
+      [
+        "Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.",
+        "",
+        'Findings: severity ("info"|"warning"|"critical").',
+        "",
+        "Respond with ONLY a JSON object:",
+        `{"id":"${zone.id}","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"${zone.id}","text":"finding text","severity":"info"}]}`,
+        "",
+        `Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine if nothing new to add.`,
+      ].join("\n"),
+    ),
+  ]);
+}
+
 async function enrichSingleZone(
   zone: Zone,
   allZones: Zone[],
@@ -104,55 +219,32 @@ async function enrichSingleZone(
       : zone.files;
     const filesStr = filesSample.map((f) => formatFileLabel(f, fileArchetypes)).join(", ");
 
-    let prompt: string;
-    if (isFirstPass) {
-      const entryLine = config.maxFiles >= 8
-        ? `\nEntry points: ${zone.entryPoints.map((f) => `"${f}"`).join(", ") || "none"}`
-        : "";
-      prompt = `Analyze this code zone. It was discovered by import-graph community detection.
-
-${passConfig.focus}
-
-Zone: "${zone.id}" (cohesion: ${zone.cohesion}, coupling: ${zone.coupling}, ${zone.files.length} files)
-Files: ${filesStr}${entryLine}
-${otherContext}
-${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
-Boundary crossings:
-${crossingLines || "  (none)"}
-
-Findings: severity ("info"|"warning"|"critical").
-
-Respond with ONLY a JSON object (no markdown, no explanation):
-{"id":"kebab-case-id","name":"Title Case Name","description":"One sentence describing the zone's purpose.","insights":["actionable insight about this zone"],"findings":[{"type":"observation","scope":"${zone.id}","text":"finding text","severity":"info"}]}
-
-Use finding types: ${passConfig.expectedTypes.join(", ")}.`;
-    } else {
-      const prevInsights = previousZone?.insights ?? [];
-      const maxInsights = config.maxFiles >= 8 ? prevInsights.length : Math.min(prevInsights.length, 3);
-      prompt = `You previously analyzed this zone. Here is the current state:
-
-Zone: "${zone.id}" (cohesion: ${zone.cohesion}, coupling: ${zone.coupling}, ${zone.files.length} files)
-Files: ${filesStr}
-Known insights: ${prevInsights.slice(0, maxInsights).length > 0 ? prevInsights.slice(0, maxInsights).map((i) => `"${i}"`).join("; ") : "(none)"}
-${otherContext}
-${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
-Boundary crossings:
-${crossingLines || "  (none)"}
-
-This is enrichment pass ${passNumber}. ${passConfig.focus}
-
-Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.
-
-Findings: severity ("info"|"warning"|"critical").
-
-Respond with ONLY a JSON object:
-{"id":"${zone.id}","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"${zone.id}","text":"finding text","severity":"info"}]}
-
-Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine if nothing new to add.`;
-    }
+    const envelope = isFirstPass
+      ? buildSingleZoneFirstPassEnvelope({
+        zone,
+        config,
+        passConfig,
+        filesStr,
+        otherContext,
+        crossingLines,
+        hints,
+      })
+      : buildSingleZoneLaterPassEnvelope({
+        zone,
+        config,
+        passConfig,
+        passNumber,
+        filesStr,
+        otherContext,
+        crossingLines,
+        previousZone,
+        hints,
+      });
+    const prompt = svPrompt(envelope);
 
     const promptLevel = config.maxFiles >= PER_ZONE_MAX_FILES ? "full" : config.maxFiles >= 8 ? "medium" : "minimal";
     console.log(`  [enrich] Zone "${zone.id}" (attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length}, ${promptLevel} prompt)...`);
+    logSvPromptSections(`enrichSingleZone "${zone.id}" pass ${passNumber} (${promptLevel})`, envelope);
 
     let callText: string;
     try {

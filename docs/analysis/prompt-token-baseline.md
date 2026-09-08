@@ -7,12 +7,12 @@ the fixed text it always emits. This is the baseline the
 *Agent Prompt & Workflow Efficiency* epic is measured against — recorded before any
 prompt was rewritten.
 
-- **Recorded at** — 2026-09-08T14:45:17.367Z
-- **Commit** — `5a6978846bb2`
+- **Recorded at** — 2026-09-08T16:17:25.001Z
+- **Commit** — `2a64b185456d`
 - **Model for cost/context figures** — `claude-sonnet-5`
-- **Surfaces** — 35
-- **Per-call total** — 21,511 tokens (what every surface costs, summed)
-- **Unique fixed text** — 13,089 tokens (distinct text a rewrite has to edit)
+- **Surfaces** — 36
+- **Per-call total** — 22,670 tokens (what every surface costs, summed)
+- **Unique fixed text** — 13,630 tokens (distinct text a rewrite has to edit)
 
 ## How to reproduce
 
@@ -32,10 +32,11 @@ supplies — file lists, PRD items, analysis output — and it does not shrink b
 someone tightened a sentence. Keeping them apart is what stops a reduction being
 credited to the wrong surface.
 
-Counting literals rather than output is also what makes the two construction
-styles comparable. rex and sourcevision build one large template literal per
-prompt; hench pushes dozens of short fragments onto an array. A literal-per-file
-scan undercounts hench; counting literals per *builder* does not.
+Counting literals rather than output is also what makes the three construction
+styles comparable. core writes a few large template literals per prompt; hench
+pushes dozens of short fragments onto an array; rex and sourcevision declare a
+list of named sections. A literal-per-file scan undercounts the last two badly;
+counting literals per *builder* does not.
 
 Token counts come from `budgetPreflight()` in `@n-dx/llm-client` — the same
 estimator the runtime uses for context-window preflight, so a number here is the
@@ -52,40 +53,57 @@ surface — a constant used by ten builders is written once, so shortening it is
 ten times its own size. Reporting only the per-call sum would point a rewrite at the
 largest builders rather than at the most-reused text.
 
-## rex — 15,788 per-call / 7,366 unique, 19 surfaces
+## Measurement revisions
+
+A total in this file can move because prompts changed or because the *measurement*
+changed. Only the first is a result. Revisions of the second kind are recorded here
+so a jump is never mistaken for a regression or a win.
+
+- **Envelope migration** — rex's and sourcevision's prompts moved onto
+  `PromptEnvelope`, and every builder was renamed `*Prompt` → `*Envelope`, so a
+  `--compare` across that change shows the whole registry as NEW/REMOVED. The
+  assembled text is byte-identical apart from removed doubled blank lines, proved by
+  the `prompt-text-identity` snapshot suites in both packages. In the same change the
+  extractor learned to follow module-local helper calls: factoring duplicated prompt
+  text into a helper had been dropping it from the count entirely. That correction
+  *raised* the recorded totals by ~5% with no prompt growing — the earlier figures
+  were an undercount.
+
+## rex — 16,121 per-call / 7,473 unique, 19 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
-| `reasonFromFile` *(inline)* | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a single source document. | 7 | 116 | 1,138 | 1,254 |
-| `reasonFromScanResults` *(inline)* | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a batch of scanner findings. | 13 | 415 | 1,361 | 1,776 |
-| `buildAddPrompt` | `packages/rex/src/analyze/reason.ts` | Propose new PRD items from a natural-language description. | 6 | 300 | 1,480 | 1,780 |
-| `buildMultiAddPrompt` | `packages/rex/src/analyze/reason.ts` | Propose items for several scan targets in one call. | 8 | 285 | 1,479 | 1,764 |
-| `buildBreakdownPrompt` | `packages/rex/src/analyze/reason.ts` | Split proposals judged too large into child tasks. | 1 | 191 | 484 | 675 |
-| `buildConsolidatePrompt` | `packages/rex/src/analyze/reason.ts` | Merge overlapping proposals before they enter the PRD. | 1 | 226 | 483 | 709 |
-| `buildAssessmentPrompt` | `packages/rex/src/analyze/reason.ts` | Assess whether proposal tasks are at the right granularity. | 1 | 479 | — | 479 |
-| `buildIdeasPrompt` | `packages/rex/src/analyze/reason.ts` | Extract proposals from free-form notes that local parsing missed. | 6 | 448 | 1,479 | 1,927 |
-| `buildConsolidationGuardPrompt` | `packages/rex/src/analyze/consolidation-guard.ts` | Second-opinion check before a consolidation is applied. | 1 | 306 | 431 | 737 |
-| `buildDecompositionPrompt` | `packages/rex/src/analyze/decompose.ts` | Decompose a task whose level-of-effort exceeds the threshold. | 7 | 285 | — | 285 |
-| `buildDisambiguationPrompt` | `packages/rex/src/analyze/extract.ts` | Resolve an ambiguous extraction against existing PRD items. | 5 | 174 | 566 | 740 |
-| `buildClarifyPrompt` | `packages/rex/src/analyze/guided.ts` | Ask clarifying questions during guided PRD authoring. | 5 | 295 | — | 295 |
-| `buildSpecPrompt` | `packages/rex/src/analyze/guided.ts` | Turn guided answers into a structured spec. | 5 | 133 | 431 | 564 |
-| `buildModifyPrompt` | `packages/rex/src/analyze/modify-reason.ts` | Apply a natural-language edit to an existing PRD item. | 5 | 272 | 572 | 844 |
-| `buildGroupRenamePrompt` | `packages/rex/src/analyze/propose-group-renames.ts` | Rename a group of sibling items to a consistent scheme. | 23 | 210 | — | 210 |
-| `buildRenamePrompt` | `packages/rex/src/analyze/rename-resolve.ts` | Pick the better of two colliding item titles. | 3 | 196 | — | 196 |
-| `reasonForReshape` *(inline)* | `packages/rex/src/analyze/reshape-reason.ts` | Propose a restructure of the PRD hierarchy. | 8 | 15 | 1,373 | 1,388 |
-| `reasonForBodyMerge` *(inline)* | `packages/rex/src/analyze/reshape-reason.ts` | Merge two item descriptions into one during a reshape. | 12 | 106 | — | 106 |
-| `buildValidationFeedback` | `packages/rex/src/analyze/escalate.ts` | Retry feedback appended to a prompt whose response failed validation. | 11 | 59 | — | 59 |
+| `buildFileImportEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a single source document. | 18 | 123 | 1,147 | 1,270 |
+| `buildScanImportEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose PRD items from a batch of scanner findings. | 40 | 400 | 1,361 | 1,761 |
+| `buildAddEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose new PRD items from a natural-language description. | 26 | 230 | 1,586 | 1,816 |
+| `buildMultiAddEnvelope` | `packages/rex/src/analyze/reason.ts` | Propose items for several scan targets in one call. | 28 | 215 | 1,586 | 1,801 |
+| `buildBreakdownEnvelope` | `packages/rex/src/analyze/reason.ts` | Split proposals judged too large into child tasks. | 17 | 200 | 483 | 683 |
+| `buildConsolidateEnvelope` | `packages/rex/src/analyze/reason.ts` | Merge overlapping proposals before they enter the PRD. | 19 | 234 | 484 | 718 |
+| `buildAssessmentEnvelope` | `packages/rex/src/analyze/reason.ts` | Assess whether proposal tasks are at the right granularity. | 40 | 492 | — | 492 |
+| `buildIdeasEnvelope` | `packages/rex/src/analyze/reason.ts` | Extract proposals from free-form notes that local parsing missed. | 29 | 378 | 1,586 | 1,964 |
+| `buildConsolidationGuardEnvelope` | `packages/rex/src/analyze/consolidation-guard.ts` | Second-opinion check before a consolidation is applied. | 23 | 320 | 432 | 752 |
+| `buildDecompositionEnvelope` | `packages/rex/src/analyze/decompose.ts` | Decompose a task whose level-of-effort exceeds the threshold. | 24 | 290 | — | 290 |
+| `buildDisambiguationEnvelope` | `packages/rex/src/analyze/extract.ts` | Resolve an ambiguous extraction against existing PRD items. | 21 | 186 | 566 | 752 |
+| `buildClarifyEnvelope` | `packages/rex/src/analyze/guided.ts` | Ask clarifying questions during guided PRD authoring. | 33 | 309 | — | 309 |
+| `buildSpecEnvelope` | `packages/rex/src/analyze/guided.ts` | Turn guided answers into a structured spec. | 22 | 150 | 432 | 582 |
+| `buildModifyEnvelope` | `packages/rex/src/analyze/modify-reason.ts` | Apply a natural-language edit to an existing PRD item. | 29 | 295 | 572 | 867 |
+| `buildGroupRenameEnvelope` | `packages/rex/src/analyze/propose-group-renames.ts` | Rename a group of sibling items to a consistent scheme. | 27 | 214 | 29 | 243 |
+| `buildRenameEnvelope` | `packages/rex/src/analyze/rename-resolve.ts` | Pick the better of two colliding item titles. | 23 | 204 | 29 | 233 |
+| `buildReshapeEnvelope` | `packages/rex/src/analyze/reshape-reason.ts` | Propose a restructure of the PRD hierarchy. | 7 | 18 | 1,402 | 1,420 |
+| `buildBodyMergeEnvelope` | `packages/rex/src/analyze/reshape-reason.ts` | Merge two item descriptions into one during a reshape. | 12 | 106 | — | 106 |
+| `buildValidationFeedbackEnvelope` | `packages/rex/src/analyze/escalate.ts` | Retry feedback appended to a prompt whose response failed validation. | 12 | 62 | — | 62 |
 
-## sourcevision — 1,898 per-call / 1,898 unique, 6 surfaces
+## sourcevision — 2,724 per-call / 2,332 unique, 7 surfaces
 
 | Builder | File | Purpose | Literals | Own | Shared | Per-call |
 |---|---|---|---:|---:|---:|---:|
-| `buildFirstPassPrompt` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | First-pass zone enrichment for a batch of zones. | 26 | 318 | — | 318 |
-| `buildLaterPassPrompt` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | Later-pass zone enrichment, given the previous pass's output. | 21 | 301 | — | 301 |
-| `buildMetaPrompt` | `packages/sourcevision/src/analyzers/enrich-config.ts` | Meta-evaluation choosing the enrichment strategy for a repo. | 11 | 520 | — | 520 |
-| `enrichSingleZone` *(inline)* | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | Per-zone enrichment fallback when batch enrichment is too coarse. | 50 | 452 | — | 452 |
-| `buildLLMClassifyPrompt` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 10 | 84 | — | 84 |
-| `buildPrimerPrompt` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 18 | 223 | — | 223 |
+| `buildFirstPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | First-pass zone enrichment for a batch of zones. | 59 | 357 | 447 | 804 |
+| `buildLaterPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-batch.ts` | Later-pass zone enrichment, given the previous pass's output. | 53 | 330 | 393 | 723 |
+| `buildMetaEnvelope` | `packages/sourcevision/src/analyzers/enrich-config.ts` | Meta-evaluation choosing the enrichment strategy for a repo. | 23 | 531 | 14 | 545 |
+| `buildSingleZoneFirstPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | Per-zone enrichment, first pass — names and describes one zone. | 27 | 166 | — | 166 |
+| `buildSingleZoneLaterPassEnvelope` | `packages/sourcevision/src/analyzers/enrich-per-zone.ts` | Per-zone enrichment, later pass — adds only what pass 1 missed. | 30 | 166 | — | 166 |
+| `buildLLMClassifyEnvelope` | `packages/sourcevision/src/analyzers/classify.ts` | Classify file archetypes the heuristic classifier could not. | 19 | 91 | — | 91 |
+| `buildPrimerEnvelope` | `packages/sourcevision/src/analyzers/primer.ts` | Distil CONTEXT.md into the startup primer every agent run inherits. | 21 | 229 | — | 229 |
 
 ## hench — 3,544 per-call / 3,544 unique, 9 surfaces
 
@@ -117,14 +135,20 @@ it. This is the leverage ordering for a rewrite.
 | `FEW_SHOT_EXAMPLE` | rex | 432 | 10 | 4,320 |
 | `PRD_SCHEMA` | rex | 333 | 6 | 1,998 |
 | `TASK_QUALITY_RULES` | rex | 181 | 6 | 1,086 |
+| `reshapeRoleContent` | rex | 1,054 | 1 | 1,054 |
 | `CONSOLIDATION_INSTRUCTION` | rex | 223 | 4 | 892 |
 | `ANTI_PATTERNS` | rex | 141 | 6 | 846 |
-| `POST_PRUNE_CONSOLIDATION_PROMPT` | rex | 508 | 1 | 508 |
+| `formatProjectShape` | sourcevision | 393 | 2 | 786 |
+| `placementContent` | rex | 206 | 3 | 618 |
 | `OUTPUT_INSTRUCTION` | rex | 52 | 8 | 416 |
-| `RESHAPE_SYSTEM_PROMPT` | rex | 377 | 1 | 377 |
-| `AUTO_PLACEMENT_INSTRUCTION` | rex | 119 | 3 | 357 |
 | `RESHAPE_FEW_SHOT` | rex | 326 | 1 | 326 |
-| `SMART_PRUNE_PROMPT` | rex | 163 | 1 | 163 |
+| `formatFileHeaders` | sourcevision | 54 | 1 | 54 |
+| `summarizeExisting` | rex | 9 | 4 | 36 |
+| `projectContextContent` | rex | 10 | 3 | 30 |
+| `formatMemberSection` | rex | 29 | 1 | 29 |
+| `formatItemSection` | rex | 29 | 1 | 29 |
+| `summarizePRD` | rex | 22 | 1 | 22 |
+| `formatAnnotatedFinding` | sourcevision | 15 | 1 | 15 |
 | `DEFAULT_CLI_NAME` | hench | 1 | 1 | 1 |
 
 ## Assembled prompts (fixed representative input)
@@ -134,8 +158,8 @@ reproducible without a model call. Dump any of them with `--dump <package>`.
 
 | Package | Entry point | Input | Fixed | Context | Assembled |
 |---|---|---|---:|---:|---:|
-| rex | `buildAssessmentPrompt` | Granularity assessment over one two-task proposal. | 479 | 258 | 737 |
-| sourcevision | `buildPrimerPrompt` | Primer distillation over a fixed 3-zone CONTEXT.md excerpt. | 223 | 143 | 366 |
+| rex | `buildAssessmentEnvelope` | Granularity assessment over one two-task proposal. | 492 | 245 | 737 |
+| sourcevision | `buildPrimerEnvelope` | Primer distillation over a fixed 3-zone CONTEXT.md excerpt. | 229 | 137 | 366 |
 | hench | `buildPromptEnvelope` | Full agent envelope (system + brief) for a CLI-provider run. | 995 | n/a — 342 of the fixed text is on another branch | 653 |
 | core | `buildReviewerPrompt` | Pair-programming reviewer prompt over three changed files. | 281 | 16 | 297 |
 
@@ -144,16 +168,47 @@ every branch in the builder, and one run takes one path. `buildSystemPrompt` alo
 carries separate CLI/API, auto-commit, and self-heal branches. The unreached text is
 still worth shortening — it just is not billed on this particular path.
 
+### rex envelope sections
+
+`buildAssessmentEnvelope` assembles its prompt from named sections, so its cost is reported
+per section rather than as one literal. These are the same sections
+`extractPromptSectionDiagnostics()` reports at runtime, over the fixture in
+*Granularity assessment over one two-task proposal.*
+
+| Section | Chars | Tokens | Share |
+|---|---:|---:|---:|
+| `input` | 1,055 | 264 | 35.8% |
+| `output` | 634 | 159 | 21.6% |
+| `anti-patterns` | 498 | 125 | 17.0% |
+| `structure` | 406 | 102 | 13.8% |
+| `quality` | 211 | 53 | 7.2% |
+| `role` | 134 | 34 | 4.6% |
+
+### sourcevision envelope sections
+
+`buildPrimerEnvelope` assembles its prompt from named sections, so its cost is reported
+per section rather than as one literal. These are the same sections
+`extractPromptSectionDiagnostics()` reports at runtime, over the fixture in
+*Primer distillation over a fixed 3-zone CONTEXT.md excerpt.*
+
+| Section | Chars | Tokens | Share |
+|---|---:|---:|---:|
+| `input` | 585 | 147 | 40.3% |
+| `rules` | 402 | 101 | 27.7% |
+| `output` | 312 | 78 | 21.4% |
+| `role` | 156 | 39 | 10.7% |
+
 ### hench envelope sections
 
-hench assembles its prompt from fragments into a `PromptEnvelope`, so its cost is
-reported per section rather than as one literal. These are the same sections
-`extractPromptSectionDiagnostics()` reports at runtime.
+`buildPromptEnvelope` assembles its prompt from named sections, so its cost is reported
+per section rather than as one literal. These are the same sections
+`extractPromptSectionDiagnostics()` reports at runtime, over the fixture in
+*Full agent envelope (system + brief) for a CLI-provider run.*
 
-| Section | Chars | Tokens |
-|---|---:|---:|
-| `system` | 1,862 | 466 |
-| `brief` | 748 | 187 |
+| Section | Chars | Tokens | Share |
+|---|---:|---:|---:|
+| `system` | 1,862 | 466 | 71.4% |
+| `brief` | 748 | 187 | 28.6% |
 
 ## Packages with no LLM prompt surfaces
 

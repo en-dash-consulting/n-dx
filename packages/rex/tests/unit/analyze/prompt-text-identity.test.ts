@@ -11,10 +11,27 @@
  * checker or a unit test on parsed output would catch, and would silently
  * change what every `rex analyze` run sends to a model.
  *
- * These snapshots were recorded from the pre-migration implementation and left
- * untouched by it. They are therefore evidence rather than description: a
- * passing run means the assembled envelope reproduces the original prompt
- * exactly, separators included.
+ * These snapshots were recorded from the pre-migration implementation. Twenty
+ * of the twenty-four came through the migration untouched, so they are
+ * evidence rather than description: a passing run means the assembled envelope
+ * reproduces the original prompt exactly, separators included.
+ *
+ * ## The four that were deliberately re-recorded
+ *
+ * Each lost exactly one blank line, and in each case the old text was wrong:
+ *
+ * | Surface | What changed |
+ * |---|---|
+ * | `buildAddPrompt` (empty PRD, no docs) | Two optional blocks were both absent, and the hand-rolled `\n${block}` padding left a doubled blank line behind them. |
+ * | `reasonFromFile` | The document being imported ended in a newline, which landed next to the template's own blank line before the output contract. |
+ * | `reasonForReshape` | The optional project-context block carried a trailing newline that doubled the separator before the few-shot example. |
+ * | `reasonForBodyMerge` | An explicit `""` array element added a blank line the other single-newline prompt does not have. |
+ *
+ * All four are consequences of blocks padding themselves, which is the idiom
+ * the envelope replaces: a section that is absent now costs nothing and a
+ * section that is present costs exactly one separator. Collapsing them removes
+ * a handful of tokens and changes no instruction. Nothing else about any
+ * prompt moved — no wording, no ordering, no punctuation.
  *
  * Each surface is driven through its real entry point with a fixed fixture. The
  * four surfaces that build their prompt inline and call the model in the same

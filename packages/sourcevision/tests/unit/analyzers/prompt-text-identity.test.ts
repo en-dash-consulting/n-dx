@@ -6,6 +6,21 @@
  * onto `PromptEnvelope`, so a passing run is evidence that the restructuring
  * changed no prompt text — not a restatement of whatever the code now emits.
  *
+ * ## The two that were deliberately re-recorded
+ *
+ * `buildFirstPassPrompt` lost three blank lines and `buildLaterPassPrompt` two.
+ * Both prompts interleave five optional blocks — file headers, other-zone
+ * summaries, prior batch names, developer hints, and the last-batch note — and
+ * each block used to carry its own leading and trailing newline. When a block
+ * was absent its padding stayed behind, so a run with no developer hints and a
+ * single batch emitted up to four consecutive newlines where one blank line was
+ * intended. This fixture exercises exactly that case, which is also the common
+ * one: most repositories configure no hints.
+ *
+ * The envelope makes an absent section cost nothing and a present one cost
+ * exactly one separator, which is what removed them. No wording, ordering, or
+ * punctuation moved in any of the eight surfaces.
+ *
  * The three exported builders are called directly. The three that build their
  * prompt inside the function that also calls the model are captured by mocking
  * `callClaude` and reading the prompt it was handed, which keeps the test shape

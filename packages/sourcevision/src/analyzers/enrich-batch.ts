@@ -24,6 +24,13 @@ import type { PassConfig } from "./enrich-config.js";
 import { callClaude, ClaudeClientError } from "./claude-client.js";
 import {tryParseJSON, extractFindings, formatFileLabel} from "./enrich-parsing.js";import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import {
+  section,
+  svPromptEnvelope,
+  svPrompt,
+  logSvPromptSections,
+} from "./prompt-envelope.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -197,11 +204,16 @@ export async function enrichBatch(
       .map(([pair, count]) => `  ${pair}: ${count} imports`)
       .join("\n");
 
-    const prompt = isFirstPass
-      ? buildFirstPassPrompt(batchZones, config, otherContext, priorNames, crossingLines, globalPromptNote, passConfig, fileArchetypes, hints, projectProfile)
-      : buildLaterPassPrompt(batchZones, config, otherContext, crossingLines, passNumber, passConfig, previousZones, globalPromptNote, fileArchetypes, hints, projectProfile);
+    const envelope = isFirstPass
+      ? buildFirstPassEnvelope(batchZones, config, otherContext, priorNames, crossingLines, globalPromptNote, passConfig, fileArchetypes, hints, projectProfile)
+      : buildLaterPassEnvelope(batchZones, config, otherContext, crossingLines, passNumber, passConfig, previousZones, globalPromptNote, fileArchetypes, hints, projectProfile);
+    const prompt = svPrompt(envelope);
 
     const promptLevel = config.maxFiles >= 8 ? "full" : config.maxFiles > 0 ? "compact" : "minimal";
+    logSvPromptSections(
+      `enrichBatch pass ${passNumber}${batchLabel} (${promptLevel})`,
+      envelope,
+    );
     const spinner = startSpinner(
       `  [enrich]${batchLabel} Calling LLM (attempt ${attempt + 1}/${ATTEMPT_CONFIGS.length}, ${promptLevel} prompt)...`,
     );
@@ -411,7 +423,10 @@ function formatFileHeaders(
     entries.push(block);
   }
   if (entries.length === 0) return "";
-  return `\nFile headers (leading doc comments — treat these as authoritative about each file's purpose; DO NOT call a documented file "undocumented"):\n${entries.join("\n")}\n`;
+  // No surrounding blank lines: this is a prompt section, and the envelope
+  // separator supplies the spacing. Padding it here is what used to leave a
+  // doubled blank line behind whenever the block was empty.
+  return `File headers (leading doc comments — treat these as authoritative about each file's purpose; DO NOT call a documented file "undocumented"):\n${entries.join("\n")}`;
 }
 
 /**
@@ -493,14 +508,15 @@ function formatProjectShape(p: ProjectProfile): string {
     "Either confirm the hypothesis from the file contents you can see and rewrite it as a fact, or omit it.",
   );
 
-  let block = `\nProject shape:\n${lines.map((l) => `  - ${l}`).join("\n")}`;
+  // Unpadded — see formatFileHeaders: the envelope separator owns the spacing.
+  let block = `Project shape:\n${lines.map((l) => `  - ${l}`).join("\n")}`;
   if (guards.length > 0) {
     block += `\n\nHard constraints derived from the project shape:\n${guards.map((g) => `  - ${g}`).join("\n")}`;
   }
-  return block + "\n";
+  return block;
 }
 
-function buildFirstPassPrompt(
+export function buildFirstPassEnvelope(
   batchZones: Zone[],
   config: AttemptConfig,
   otherContext: string,
@@ -511,7 +527,7 @@ function buildFirstPassPrompt(
   fileArchetypes?: Map<string, string | null>,
   hints?: string,
   projectProfile?: ProjectProfile,
-): string {
+): PromptEnvelope {
   const projectShape = projectProfile ? formatProjectShape(projectProfile) : "";
   if (config.maxFiles > 0) {
     const sampledFiles: string[] = [];
@@ -537,25 +553,32 @@ function buildFirstPassPrompt(
       ? formatFileHeaders(sampledFiles, projectProfile.projectDir)
       : "";
 
-    return `Analyze this codebase's zone structure. Each zone groups related files discovered by import-graph community detection.
-
-${passConfig.focus}
-${projectShape}
-Zones:
-${zoneList}
-${fileHeaders}
-${otherContext}
-${priorNames}${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
-Cross-zone imports:
-${crossingLines || "  (none)"}
-${globalPromptNote}
-
-Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
-
-Respond with ONLY a JSON object (no markdown, no explanation):
-{"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":["actionable insight"],"findings":[{"type":"observation","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["cross-zone observation"],"findings":[{"type":"observation","scope":"global","text":"finding text","severity":"info","category":"code"}]}
-
-Return exactly ${batchZones.length} zone entries. Use finding types: ${passConfig.expectedTypes.join(", ")}.`;
+    return svPromptEnvelope([
+      section(
+        "role",
+        "Analyze this codebase's zone structure. Each zone groups related files discovered by import-graph community detection.",
+      ),
+      section("rules", passConfig.focus),
+      section("project-profile", projectShape),
+      section("input", `Zones:\n${zoneList}`),
+      section("file-headers", fileHeaders),
+      section("other-zones", otherContext),
+      section("prior-pass", priorNames),
+      section("hints", hints ? `Project context from the developer:\n${hints}` : ""),
+      section("crossings", `Cross-zone imports:\n${crossingLines || "  (none)"}`),
+      section("global-note", globalPromptNote),
+      section(
+        "output",
+        [
+          'Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").',
+          "",
+          "Respond with ONLY a JSON object (no markdown, no explanation):",
+          '{"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":["actionable insight"],"findings":[{"type":"observation","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["cross-zone observation"],"findings":[{"type":"observation","scope":"global","text":"finding text","severity":"info","category":"code"}]}',
+          "",
+          `Return exactly ${batchZones.length} zone entries. Use finding types: ${passConfig.expectedTypes.join(", ")}.`,
+        ].join("\n"),
+      ),
+    ]);
   }
 
   // Minimal prompt (no files)
@@ -575,19 +598,26 @@ Return exactly ${batchZones.length} zone entries. Use finding types: ${passConfi
     })
     .join("\n");
 
-  return `Name these code zones. Each groups files by import structure.
-${projectShape}
-Zones:
-${zoneList}
-${otherContext}
-${priorNames}${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
-Return ONLY JSON:
-{"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":[]}],"insights":[]}
-
-Exactly ${batchZones.length} entries.`;
+  return svPromptEnvelope([
+    section("role", "Name these code zones. Each groups files by import structure."),
+    section("project-profile", projectShape),
+    section("input", `Zones:\n${zoneList}`),
+    section("other-zones", otherContext),
+    section("prior-pass", priorNames),
+    section("hints", hints ? `Project context from the developer:\n${hints}` : ""),
+    section(
+      "output",
+      [
+        "Return ONLY JSON:",
+        '{"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":[]}],"insights":[]}',
+        "",
+        `Exactly ${batchZones.length} entries.`,
+      ].join("\n"),
+    ),
+  ]);
 }
 
-function buildLaterPassPrompt(
+export function buildLaterPassEnvelope(
   batchZones: Zone[],
   config: AttemptConfig,
   otherContext: string,
@@ -599,7 +629,7 @@ function buildLaterPassPrompt(
   fileArchetypes?: Map<string, string | null>,
   hints?: string,
   projectProfile?: ProjectProfile,
-): string {
+): PromptEnvelope {
   const projectShape = projectProfile ? formatProjectShape(projectProfile) : "";
   const prevZones = previousZones?.zones ?? [];
   const prevGlobal = previousZones?.insights ?? [];
@@ -620,29 +650,34 @@ function buildLaterPassPrompt(
       })
       .join("\n");
 
-    return `You previously analyzed this codebase. Here is the current state:
-${projectShape}
-Zones:
-${zoneContext}
-${otherContext}
-${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
-Cross-zone imports:
-${crossingLines || "  (none)"}
-
-Previous architecture insights:
-${prevGlobal.length > 0 ? prevGlobal.map((i) => `- ${i}`).join("\n") : "(none yet)"}
-
-This is enrichment pass ${passNumber}. ${passConfig.focus}
-${globalPromptNote}
-
-Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.
-
-Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
-
-Respond with ONLY a JSON object (no markdown, no explanation):
-{"zones":[{"id":"existing-zone-id","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["new cross-zone observation"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"global","text":"finding text","severity":"info","category":"code"}]}
-
-Return one entry per zone. Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine if nothing new to add.`;
+    return svPromptEnvelope([
+      section("role", "You previously analyzed this codebase. Here is the current state:"),
+      section("project-profile", projectShape),
+      section("input", `Zones:\n${zoneContext}`),
+      section("other-zones", otherContext),
+      section("hints", hints ? `Project context from the developer:\n${hints}` : ""),
+      section("crossings", `Cross-zone imports:\n${crossingLines || "  (none)"}`),
+      section(
+        "prior-pass",
+        "Previous architecture insights:\n" +
+          (prevGlobal.length > 0 ? prevGlobal.map((i) => `- ${i}`).join("\n") : "(none yet)"),
+      ),
+      section("rules", `This is enrichment pass ${passNumber}. ${passConfig.focus}`),
+      section("global-note", globalPromptNote),
+      section(
+        "output",
+        [
+          "Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.",
+          "",
+          'Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").',
+          "",
+          "Respond with ONLY a JSON object (no markdown, no explanation):",
+          `{"zones":[{"id":"existing-zone-id","newInsights":["new insight"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["new cross-zone observation"],"findings":[{"type":"${passConfig.expectedTypes[0]}","scope":"global","text":"finding text","severity":"info","category":"code"}]}`,
+          "",
+          `Return one entry per zone. Use finding types: ${passConfig.expectedTypes.join(", ")}. Empty arrays are fine if nothing new to add.`,
+        ].join("\n"),
+      ),
+    ]);
   }
 
   // Minimal prompt
@@ -655,12 +690,17 @@ Return one entry per zone. Use finding types: ${passConfig.expectedTypes.join(",
     })
     .join("\n");
 
-  return `Enrichment pass ${passNumber} for code zones. ${passConfig.focus}
-
-Zones:
-${zoneContext}
-${otherContext}
-${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
-Return ONLY JSON:
-{"zones":[{"id":"zone-id","newInsights":[],"findings":[]}],"insights":[],"findings":[]}`;
+  return svPromptEnvelope([
+    section("role", `Enrichment pass ${passNumber} for code zones. ${passConfig.focus}`),
+    section("input", `Zones:\n${zoneContext}`),
+    section("other-zones", otherContext),
+    section("hints", hints ? `Project context from the developer:\n${hints}` : ""),
+    section(
+      "output",
+      [
+        "Return ONLY JSON:",
+        '{"zones":[{"id":"zone-id","newInsights":[],"findings":[]}],"insights":[],"findings":[]}',
+      ].join("\n"),
+    ),
+  ]);
 }

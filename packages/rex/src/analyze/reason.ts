@@ -52,6 +52,13 @@ import {
 } from "./analyze-shared.js";
 import type { ClaudeResult, FileFormat } from "./analyze-shared.js";
 import { spawnClaude } from "./llm-bridge.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import {
+  section,
+  rexPromptEnvelope,
+  rexPrompt,
+  logRexPromptSections,
+} from "./prompt-envelope.js";
 
 // ── Zod schemas for LLM response validation ──
 
@@ -711,6 +718,52 @@ export interface ReasonResult {
   tokenUsage: AnalyzeTokenUsage;
 }
 
+/**
+ * Prompt for importing a formal spec document into the PRD.
+ *
+ * Extracted from {@link reasonFromFile} so the prompt is measurable and
+ * testable on its own — it used to be built inline immediately before the
+ * model call, which meant neither.
+ */
+export function buildFileImportEnvelope(
+  content: string,
+  format: FileFormat,
+  existingItems: PRDItem[],
+): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "You are a product requirements analyst. Read the following document and extract a structured PRD (Product Requirements Document) as a JSON array.",
+    ),
+    section("schema", PRD_SCHEMA),
+    section("example", FEW_SHOT_EXAMPLE),
+    section(
+      "structure",
+      [
+        "Structuring guidelines:",
+        "- Group related items into epics and features logically.",
+        "- Derive tasks from actionable items in the document.",
+        "- If the document covers multiple distinct areas, create separate epics for each.",
+      ].join("\n"),
+    ),
+    section("quality", TASK_QUALITY_RULES),
+    section("anti-patterns", ANTI_PATTERNS),
+    section("format-hint", FORMAT_HINTS[format]),
+    section("existing-prd", `Existing PRD:\n${summarizeExisting(existingItems)}`),
+    section("input", `Document to analyze:\n${content}`),
+    section("output", OUTPUT_INSTRUCTION),
+  ]);
+}
+
+/** Assembled form of {@link buildFileImportEnvelope}. */
+export function buildFileImportPrompt(
+  content: string,
+  format: FileFormat,
+  existingItems: PRDItem[],
+): string {
+  return rexPrompt(buildFileImportEnvelope(content, format, existingItems));
+}
+
 export async function reasonFromFile(
   filePath: string,
   existingItems: PRDItem[],
@@ -738,32 +791,9 @@ export async function reasonFromFile(
   }
 
   // Fall back to LLM-based extraction
-  const existingSummary = summarizeExisting(existingItems);
-
-  const prompt = `You are a product requirements analyst. Read the following document and extract a structured PRD (Product Requirements Document) as a JSON array.
-
-${PRD_SCHEMA}
-
-${FEW_SHOT_EXAMPLE}
-
-Structuring guidelines:
-- Group related items into epics and features logically.
-- Derive tasks from actionable items in the document.
-- If the document covers multiple distinct areas, create separate epics for each.
-
-${TASK_QUALITY_RULES}
-
-${ANTI_PATTERNS}
-
-${FORMAT_HINTS[format]}
-
-Existing PRD:
-${existingSummary}
-
-Document to analyze:
-${content}
-
-${OUTPUT_INSTRUCTION}`;
+  const envelope = buildFileImportEnvelope(content, format, existingItems);
+  const prompt = rexPrompt(envelope);
+  logRexPromptSections("reasonFromFile", envelope);
 
   const result = await spawnClaude(prompt, model, undefined, { taskClass: "prd.propose" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
@@ -864,6 +894,89 @@ export async function reasonFromFiles(
   return { proposals: mergeProposals(allProposals), tokenUsage };
 }
 
+/** Inputs that vary per chunk of a split scan, and per PRD state. */
+export interface ScanImportContext {
+  /** Rendered scan results for this chunk. */
+  scanSummary: string;
+  /** Summary of the PRD as it stands. */
+  existingSummary: string;
+  /** Project documentation, already rendered; empty when there is none. */
+  projectContext?: string;
+  /** Which chunk of a split scan this is, and what earlier chunks produced. */
+  chunkNote?: string;
+  /** True on the first scan of an existing codebase, where the PRD is empty. */
+  isBaseline?: boolean;
+}
+
+/**
+ * Prompt for turning automated scan findings into a structured PRD.
+ *
+ * Extracted from {@link reasonFromScanResults}, which built it inline inside
+ * its per-chunk loop.
+ */
+export function buildScanImportEnvelope(ctx: ScanImportContext): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "You are a product requirements analyst. Given the following raw scan results from automated code analysis, organize them into a clean, well-structured PRD as a JSON array.",
+    ),
+    section("schema", PRD_SCHEMA),
+    section("example", FEW_SHOT_EXAMPLE),
+    section("consolidation", CONSOLIDATION_INSTRUCTION),
+    section(
+      "baseline",
+      ctx.isBaseline
+        ? [
+          "IMPORTANT — Baseline mode:",
+          "This is the first scan of an existing codebase. The PRD is empty, but the code already exists.",
+          'You MUST include a "status" field on every epic, feature, and task:',
+          '- "completed" — the code already implements this functionality (the scan found evidence it exists)',
+          '- "pending" — this is a gap, improvement, or missing feature that should be built',
+          "",
+          'Most items from an existing codebase scan should be "completed". Only mark items as "pending" if',
+          "they represent genuinely missing functionality, TODOs, or improvements identified in the scan results.",
+        ].join("\n")
+        : "",
+    ),
+    section(
+      "structure",
+      [
+        "Structuring guidelines:",
+        "- Near-duplicate items have already been merged. Focus on semantic grouping and structure.",
+        "- If any remaining items are clearly about the same thing, merge them into a single item.",
+        '- Create meaningful epic groupings that reflect the project\'s domain (not generic names like "Tests" or "Documentation").',
+        "- Group related work into features under appropriate epics.",
+      ].join("\n"),
+    ),
+    section("quality", TASK_QUALITY_RULES),
+    section(
+      "input-rules",
+      [
+        "Scan-specific rules:",
+        "- Preserve priority levels from the scan results where they exist.",
+        "- Rewrite vague scan-generated titles to be clear and actionable.",
+        "- Use the project context below to align epic/feature names with the project's domain terminology.",
+      ].join("\n"),
+    ),
+    section("anti-patterns", ANTI_PATTERNS),
+    section("chunk-note", ctx.chunkNote),
+    section(
+      "project-context",
+      ctx.projectContext
+        ? `Project context (from documentation):\n${ctx.projectContext}`
+        : "",
+    ),
+    section("existing-prd", `Existing PRD:\n${ctx.existingSummary}`),
+    section("input", `Scan results:\n${ctx.scanSummary}`),
+    section("output", OUTPUT_INSTRUCTION),
+  ]);
+}
+
+/** Assembled form of {@link buildScanImportEnvelope}. */
+export function buildScanImportPrompt(ctx: ScanImportContext): string {
+  return rexPrompt(buildScanImportEnvelope(ctx));
+}
+
 export async function reasonFromScanResults(
   results: ScanResult[],
   existingItems: PRDItem[],
@@ -880,10 +993,6 @@ export async function reasonFromScanResults(
   // Read project documentation for additional context
   const projectContext = options?.dir
     ? await readProjectContext(options.dir)
-    : "";
-
-  const contextBlock = projectContext
-    ? `\nProject context (from documentation):\n${projectContext}\n`
     : "";
 
   // Split large result sets into chunks to stay within token limits
@@ -903,54 +1012,22 @@ export async function reasonFromScanResults(
     // LLM can reuse existing groupings instead of creating duplicates
     let chunkNote = "";
     if (chunks.length > 1) {
-      chunkNote = `\nNote: This is chunk ${i + 1} of ${chunks.length}. Focus only on the scan results shown here.`;
+      chunkNote = `Note: This is chunk ${i + 1} of ${chunks.length}. Focus only on the scan results shown here.`;
       if (i > 0 && allProposals.length > 0) {
         const priorEpics = [...new Set(allProposals.map((p) => p.epic.title))];
         chunkNote += `\nEpics created from previous chunks (reuse these names where items belong to the same area):\n${priorEpics.map((e) => `  - ${e}`).join("\n")}`;
       }
-      chunkNote += "\n";
     }
 
-    const baselineInstruction = isBaseline ? `
-IMPORTANT — Baseline mode:
-This is the first scan of an existing codebase. The PRD is empty, but the code already exists.
-You MUST include a "status" field on every epic, feature, and task:
-- "completed" — the code already implements this functionality (the scan found evidence it exists)
-- "pending" — this is a gap, improvement, or missing feature that should be built
-
-Most items from an existing codebase scan should be "completed". Only mark items as "pending" if
-they represent genuinely missing functionality, TODOs, or improvements identified in the scan results.
-` : "";
-
-    const prompt = `You are a product requirements analyst. Given the following raw scan results from automated code analysis, organize them into a clean, well-structured PRD as a JSON array.
-
-${PRD_SCHEMA}
-
-${FEW_SHOT_EXAMPLE}
-${CONSOLIDATION_INSTRUCTION}
-${baselineInstruction}
-Structuring guidelines:
-- Near-duplicate items have already been merged. Focus on semantic grouping and structure.
-- If any remaining items are clearly about the same thing, merge them into a single item.
-- Create meaningful epic groupings that reflect the project's domain (not generic names like "Tests" or "Documentation").
-- Group related work into features under appropriate epics.
-
-${TASK_QUALITY_RULES}
-
-Scan-specific rules:
-- Preserve priority levels from the scan results where they exist.
-- Rewrite vague scan-generated titles to be clear and actionable.
-- Use the project context below to align epic/feature names with the project's domain terminology.
-
-${ANTI_PATTERNS}
-${chunkNote}${contextBlock}
-Existing PRD:
-${existingSummary}
-
-Scan results:
-${scanSummary}
-
-${OUTPUT_INSTRUCTION}`;
+    const envelope = buildScanImportEnvelope({
+      scanSummary,
+      existingSummary,
+      projectContext,
+      chunkNote,
+      isBaseline,
+    });
+    const prompt = rexPrompt(envelope);
+    logRexPromptSections(`reasonFromScanResults chunk ${i + 1}/${chunks.length}`, envelope);
 
     const claudeResult = await spawnClaude(prompt, model, undefined, { taskClass: "prd.propose" });
     accumulateTokenUsage(tokenUsage, claudeResult.tokenUsage);
@@ -972,68 +1049,102 @@ export interface AddPromptOptions {
  * Build the LLM prompt for a natural-language add command.
  * Exported separately so it can be tested without spawning claude.
  */
+/**
+ * Content for the `placement` section: where the model may put new items.
+ *
+ * Two mutually exclusive shapes. With an explicit parent the response is
+ * constrained to that subtree; without one — and only when there is an
+ * existing tree to place into — the model is told it may reference existing
+ * containers by ID. Shared by the three natural-language add builders, which
+ * each had a byte-identical copy of this block.
+ */
+function placementContent(
+  existingItems: PRDItem[],
+  options?: AddPromptOptions,
+): string {
+  if (options?.parentId) {
+    const parentEntry = findItemInTree(existingItems, options.parentId);
+    if (!parentEntry) return "";
+    return [
+      "IMPORTANT: Scope your response to fit under this existing parent item:",
+      `  ID: ${options.parentId}`,
+      `  Level: ${parentEntry.level}`,
+      `  Title: ${parentEntry.title}`,
+      "",
+      `Only create children appropriate for a ${parentEntry.level}. For example, if the parent is an epic, create features and tasks. If the parent is a feature, create only tasks.`,
+      "Do NOT create a new epic — instead use the parent's title as the epic title in your response.",
+    ].join("\n");
+  }
+  return existingItems.length > 0 ? AUTO_PLACEMENT_INSTRUCTION : "";
+}
+
+/** Content for the `project-context` section, or empty when there are no docs. */
+function projectContextContent(projectContext: string): string {
+  return projectContext
+    ? `Project context (from documentation):\n${projectContext}`
+    : "";
+}
+
+/**
+ * Prompt for turning one natural-language description into PRD items.
+ *
+ * The synchronous envelope builder is separated from the async
+ * {@link buildAddPrompt} so the prompt can be measured and snapshot without
+ * reading the project's documentation from disk.
+ */
+export function buildAddEnvelope(
+  description: string,
+  existingItems: PRDItem[],
+  projectContext: string,
+  options?: AddPromptOptions,
+): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "You are a product requirements analyst. Given the following natural-language description, create a structured PRD breakdown as a JSON array.",
+    ),
+    section("schema", PRD_SCHEMA),
+    section("example", FEW_SHOT_EXAMPLE),
+    section("consolidation", CONSOLIDATION_INSTRUCTION),
+    section(
+      "structure",
+      [
+        "Structuring guidelines:",
+        "- Break the description into a logical hierarchy of epics, features, and tasks.",
+        "- If the description is broad or covers multiple distinct areas, create multiple epics rather than forcing everything under one.",
+        "- Group related work into features under appropriate epics.",
+      ].join("\n"),
+    ),
+    section("quality", TASK_QUALITY_RULES),
+    section(
+      "dedup",
+      [
+        "Deduplication:",
+        "- Do NOT include items that duplicate anything already in the existing PRD below.",
+        "- Do NOT create duplicate tasks within your own response — if two aspects of the description overlap, merge them into a single task with combined criteria.",
+        "- Use the project context to understand terminology and architecture.",
+      ].join("\n"),
+    ),
+    section("anti-patterns", ANTI_PATTERNS),
+    section("placement", placementContent(existingItems, options)),
+    section("project-context", projectContextContent(projectContext)),
+    section(
+      "existing-prd",
+      `Existing PRD:\n${summarizeExisting(existingItems, { withIds: !options?.parentId })}`,
+    ),
+    section("input", `Description to add:\n${description}`),
+    section("output", OUTPUT_INSTRUCTION),
+  ]);
+}
+
 export async function buildAddPrompt(
   description: string,
   existingItems: PRDItem[],
   dir: string,
   options?: AddPromptOptions,
 ): Promise<string> {
-  const hasParent = !!options?.parentId;
-  const existingSummary = summarizeExisting(existingItems, { withIds: !hasParent });
   const projectContext = await readProjectContext(dir);
-
-  const contextBlock = projectContext
-    ? `\nProject context (from documentation):\n${projectContext}\n`
-    : "";
-
-  let parentConstraint = "";
-  let placementBlock = "";
-  if (hasParent) {
-    // Find the parent in the tree and describe it
-    const parentEntry = findItemInTree(existingItems, options!.parentId!);
-    if (parentEntry) {
-      parentConstraint = `
-IMPORTANT: Scope your response to fit under this existing parent item:
-  ID: ${options!.parentId}
-  Level: ${parentEntry.level}
-  Title: ${parentEntry.title}
-
-Only create children appropriate for a ${parentEntry.level}. For example, if the parent is an epic, create features and tasks. If the parent is a feature, create only tasks.
-Do NOT create a new epic — instead use the parent's title as the epic title in your response.`;
-    }
-  } else if (existingItems.length > 0) {
-    placementBlock = AUTO_PLACEMENT_INSTRUCTION;
-  }
-
-  return `You are a product requirements analyst. Given the following natural-language description, create a structured PRD breakdown as a JSON array.
-
-${PRD_SCHEMA}
-
-${FEW_SHOT_EXAMPLE}
-${CONSOLIDATION_INSTRUCTION}
-
-Structuring guidelines:
-- Break the description into a logical hierarchy of epics, features, and tasks.
-- If the description is broad or covers multiple distinct areas, create multiple epics rather than forcing everything under one.
-- Group related work into features under appropriate epics.
-
-${TASK_QUALITY_RULES}
-
-Deduplication:
-- Do NOT include items that duplicate anything already in the existing PRD below.
-- Do NOT create duplicate tasks within your own response — if two aspects of the description overlap, merge them into a single task with combined criteria.
-- Use the project context to understand terminology and architecture.
-
-${ANTI_PATTERNS}
-${parentConstraint}${placementBlock}
-${contextBlock}
-Existing PRD:
-${existingSummary}
-
-Description to add:
-${description}
-
-${OUTPUT_INSTRUCTION}`;
+  return rexPrompt(buildAddEnvelope(description, existingItems, projectContext, options));
 }
 
 function findItemInTree(
@@ -1077,71 +1188,64 @@ export async function reasonFromDescription(
  * instructed to produce a coherent, de-duplicated structure that covers them
  * all.
  */
+/** Prompt for turning several natural-language descriptions into one PRD. */
+export function buildMultiAddEnvelope(
+  descriptions: string[],
+  existingItems: PRDItem[],
+  projectContext: string,
+  options?: AddPromptOptions,
+): PromptEnvelope {
+  const numbered = descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n");
+
+  return rexPromptEnvelope([
+    section(
+      "role",
+      `You are a product requirements analyst. You have been given ${descriptions.length} feature descriptions at once. Analyze ALL of them and create a unified, coherent PRD breakdown as a JSON array.`,
+    ),
+    section("schema", PRD_SCHEMA),
+    section("example", FEW_SHOT_EXAMPLE),
+    section("consolidation", CONSOLIDATION_INSTRUCTION),
+    section(
+      "structure",
+      [
+        "Structuring guidelines:",
+        "- Treat each description as a distinct piece of work.",
+        "- Group related descriptions under the same epic when they naturally belong together.",
+        "- Keep unrelated descriptions in separate epics.",
+      ].join("\n"),
+    ),
+    section("quality", TASK_QUALITY_RULES),
+    section(
+      "dedup",
+      [
+        "Deduplication:",
+        "- Do NOT include items that duplicate anything already in the existing PRD below.",
+        "- Do NOT create duplicate items across descriptions — if two descriptions overlap, merge them into a single task with combined criteria.",
+        "- Use the project context to understand terminology and architecture.",
+      ].join("\n"),
+    ),
+    section("anti-patterns", ANTI_PATTERNS),
+    section("placement", placementContent(existingItems, options)),
+    section("project-context", projectContextContent(projectContext)),
+    section(
+      "existing-prd",
+      `Existing PRD:\n${summarizeExisting(existingItems, { withIds: !options?.parentId })}`,
+    ),
+    section("input", `Descriptions to add:\n${numbered}`),
+    section("output", OUTPUT_INSTRUCTION),
+  ]);
+}
+
 export async function buildMultiAddPrompt(
   descriptions: string[],
   existingItems: PRDItem[],
   dir: string,
   options?: AddPromptOptions,
 ): Promise<string> {
-  const hasParent = !!options?.parentId;
-  const existingSummary = summarizeExisting(existingItems, { withIds: !hasParent });
   const projectContext = await readProjectContext(dir);
-
-  const contextBlock = projectContext
-    ? `\nProject context (from documentation):\n${projectContext}\n`
-    : "";
-
-  let parentConstraint = "";
-  let placementBlock = "";
-  if (hasParent) {
-    const parentEntry = findItemInTree(existingItems, options!.parentId!);
-    if (parentEntry) {
-      parentConstraint = `
-IMPORTANT: Scope your response to fit under this existing parent item:
-  ID: ${options!.parentId}
-  Level: ${parentEntry.level}
-  Title: ${parentEntry.title}
-
-Only create children appropriate for a ${parentEntry.level}. For example, if the parent is an epic, create features and tasks. If the parent is a feature, create only tasks.
-Do NOT create a new epic — instead use the parent's title as the epic title in your response.`;
-    }
-  } else if (existingItems.length > 0) {
-    placementBlock = AUTO_PLACEMENT_INSTRUCTION;
-  }
-
-  const numbered = descriptions
-    .map((d, i) => `${i + 1}. ${d}`)
-    .join("\n");
-
-  return `You are a product requirements analyst. You have been given ${descriptions.length} feature descriptions at once. Analyze ALL of them and create a unified, coherent PRD breakdown as a JSON array.
-
-${PRD_SCHEMA}
-
-${FEW_SHOT_EXAMPLE}
-${CONSOLIDATION_INSTRUCTION}
-
-Structuring guidelines:
-- Treat each description as a distinct piece of work.
-- Group related descriptions under the same epic when they naturally belong together.
-- Keep unrelated descriptions in separate epics.
-
-${TASK_QUALITY_RULES}
-
-Deduplication:
-- Do NOT include items that duplicate anything already in the existing PRD below.
-- Do NOT create duplicate items across descriptions — if two descriptions overlap, merge them into a single task with combined criteria.
-- Use the project context to understand terminology and architecture.
-
-${ANTI_PATTERNS}
-${parentConstraint}${placementBlock}
-${contextBlock}
-Existing PRD:
-${existingSummary}
-
-Descriptions to add:
-${numbered}
-
-${OUTPUT_INSTRUCTION}`;
+  return rexPrompt(
+    buildMultiAddEnvelope(descriptions, existingItems, projectContext, options),
+  );
 }
 
 /**
@@ -1178,27 +1282,34 @@ export async function reasonFromDescriptions(
  * Each task is split into smaller subtasks; features may be expanded.
  * Pure function — no I/O.
  */
+export function buildBreakdownEnvelope(proposals: Proposal[]): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "You are a product requirements analyst. Break down the following PRD proposals into finer-grained, more detailed tasks.",
+    ),
+    section("input", `Current proposals:\n${JSON.stringify(proposals)}`),
+    section(
+      "input-rules",
+      [
+        "Rules:",
+        "- Split each task into 2-4 smaller, more specific subtasks.",
+        "- If a feature has only 1 task, expand it into 2-3 tasks covering distinct aspects.",
+        "- Preserve the epic and feature structure — do NOT change epic or feature titles.",
+        "- Each new task MUST have a verb-first title AND both a description and acceptanceCriteria.",
+        "- Distribute the original acceptance criteria among the subtasks — do not lose any.",
+        "- Keep priorities consistent with the originals.",
+        "- Do NOT add entirely new functionality — only decompose what exists.",
+        "- Do NOT produce tasks with only a title — every task needs both description and criteria.",
+      ].join("\n"),
+    ),
+    section("example", FEW_SHOT_EXAMPLE),
+    section("output", OUTPUT_INSTRUCTION),
+  ]);
+}
+
 export function buildBreakdownPrompt(proposals: Proposal[]): string {
-  const proposalJson = JSON.stringify(proposals);
-
-  return `You are a product requirements analyst. Break down the following PRD proposals into finer-grained, more detailed tasks.
-
-Current proposals:
-${proposalJson}
-
-Rules:
-- Split each task into 2-4 smaller, more specific subtasks.
-- If a feature has only 1 task, expand it into 2-3 tasks covering distinct aspects.
-- Preserve the epic and feature structure — do NOT change epic or feature titles.
-- Each new task MUST have a verb-first title AND both a description and acceptanceCriteria.
-- Distribute the original acceptance criteria among the subtasks — do not lose any.
-- Keep priorities consistent with the originals.
-- Do NOT add entirely new functionality — only decompose what exists.
-- Do NOT produce tasks with only a title — every task needs both description and criteria.
-
-${FEW_SHOT_EXAMPLE}
-
-${OUTPUT_INSTRUCTION}`;
+  return rexPrompt(buildBreakdownEnvelope(proposals));
 }
 
 /**
@@ -1206,29 +1317,36 @@ ${OUTPUT_INSTRUCTION}`;
  * Multiple fine-grained tasks are merged into broader ones.
  * Pure function — no I/O.
  */
+export function buildConsolidateEnvelope(proposals: Proposal[]): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "You are a product requirements analyst. Consolidate the following PRD proposals into coarser-grained, higher-level tasks.",
+    ),
+    section("input", `Current proposals:\n${JSON.stringify(proposals)}`),
+    section(
+      "input-rules",
+      [
+        "Rules:",
+        "- Merge related tasks within each feature into broader, higher-level tasks.",
+        "- Aim to reduce the total task count by roughly half.",
+        "- If a feature has many tasks, combine related ones with merged acceptance criteria.",
+        "- If multiple features are closely related, merge them into one feature.",
+        "- Preserve the epic structure — do NOT change epic titles.",
+        "- Each resulting task MUST have a verb-first title AND both a description and acceptanceCriteria.",
+        "- Preserve the original intent — the consolidated tasks should cover the same scope as the originals.",
+        "- Keep the highest priority among merged tasks.",
+        "- Do NOT remove functionality — only consolidate what exists.",
+        "- Do NOT produce tasks with only a title — every task needs both description and criteria.",
+      ].join("\n"),
+    ),
+    section("example", FEW_SHOT_EXAMPLE),
+    section("output", OUTPUT_INSTRUCTION),
+  ]);
+}
+
 export function buildConsolidatePrompt(proposals: Proposal[]): string {
-  const proposalJson = JSON.stringify(proposals);
-
-  return `You are a product requirements analyst. Consolidate the following PRD proposals into coarser-grained, higher-level tasks.
-
-Current proposals:
-${proposalJson}
-
-Rules:
-- Merge related tasks within each feature into broader, higher-level tasks.
-- Aim to reduce the total task count by roughly half.
-- If a feature has many tasks, combine related ones with merged acceptance criteria.
-- If multiple features are closely related, merge them into one feature.
-- Preserve the epic structure — do NOT change epic titles.
-- Each resulting task MUST have a verb-first title AND both a description and acceptanceCriteria.
-- Preserve the original intent — the consolidated tasks should cover the same scope as the originals.
-- Keep the highest priority among merged tasks.
-- Do NOT remove functionality — only consolidate what exists.
-- Do NOT produce tasks with only a title — every task needs both description and criteria.
-
-${FEW_SHOT_EXAMPLE}
-
-${OUTPUT_INSTRUCTION}`;
+  return rexPrompt(buildConsolidateEnvelope(proposals));
 }
 
 /**
@@ -1291,47 +1409,70 @@ const GranularityAssessmentArraySchema = z.array(GranularityAssessmentSchema);
  * when they should be broken down or consolidated.
  * Pure function — no I/O.
  */
-export function buildAssessmentPrompt(proposals: Proposal[]): string {
+export function buildAssessmentEnvelope(proposals: Proposal[]): PromptEnvelope {
   const proposalJson = JSON.stringify(
     proposals.map((p, i) => ({ proposalIndex: i, ...p })),
   );
 
-  return `You are a product requirements analyst specializing in task sizing. Assess whether each proposal's tasks are at the right granularity.
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "You are a product requirements analyst specializing in task sizing. Assess whether each proposal's tasks are at the right granularity.",
+    ),
+    section("input", `Proposals to assess:\n${proposalJson}`),
+    section(
+      "structure",
+      [
+        "For EACH proposal (by proposalIndex), provide:",
+        '1. "recommendation": "break_down" | "consolidate" | "keep"',
+        '   - "break_down": tasks are too large/broad — split into smaller units',
+        '   - "consolidate": tasks are too fine-grained — merge into larger units',
+        '   - "keep": tasks are appropriately sized',
+        '2. "reasoning": concise explanation (1-2 sentences)',
+        '3. "issues": specific problems found (empty array if "keep")',
+      ].join("\n"),
+    ),
+    section(
+      "quality",
+      [
+        "Assessment criteria — a well-sized task is:",
+        "- Completable in one focused session (1-4 hours)",
+        "- Independently testable and deployable where possible",
+        "- Specific enough that the implementer knows exactly what to do",
+      ].join("\n"),
+    ),
+    section(
+      "anti-patterns",
+      [
+        "Red flags for TOO BROAD:",
+        "- More than 3 acceptance criteria",
+        '- Vague titles like "implement the feature" or "add API endpoints"',
+        "- Covers multiple distinct components or concerns",
+        "",
+        "Red flags for TOO FINE-GRAINED:",
+        "- Single line change or trivial config tweak",
+        "- Feature has more than 6 tasks",
+        "- Multiple tasks that would naturally be done in the same edit session",
+        "",
+        "Red flags for MISSING SUBSTANCE:",
+        "- Feature has only 1 task (should be broken down or merged)",
+        "- Tasks lack description or acceptance criteria",
+      ].join("\n"),
+    ),
+    section(
+      "output",
+      [
+        "Respond with ONLY a valid, minified JSON array of assessment objects, one per proposal — no whitespace between tokens, no indentation, no line breaks:",
+        '[{"proposalIndex":0,"recommendation":"break_down","reasoning":"Several tasks cover broad functionality that spans multiple components.","issues":["Task \'Implement authentication system\' covers login, signup, password reset, and session management — should be separate tasks","Task \'Add API endpoints\' is vague and likely involves multiple distinct endpoints"]}]',
+        "",
+        "Key each object by proposalIndex; do not restate the proposal. No explanation, no markdown fences — ONLY the JSON array.",
+      ].join("\n"),
+    ),
+  ]);
+}
 
-Proposals to assess:
-${proposalJson}
-
-For EACH proposal (by proposalIndex), provide:
-1. "recommendation": "break_down" | "consolidate" | "keep"
-   - "break_down": tasks are too large/broad — split into smaller units
-   - "consolidate": tasks are too fine-grained — merge into larger units
-   - "keep": tasks are appropriately sized
-2. "reasoning": concise explanation (1-2 sentences)
-3. "issues": specific problems found (empty array if "keep")
-
-Assessment criteria — a well-sized task is:
-- Completable in one focused session (1-4 hours)
-- Independently testable and deployable where possible
-- Specific enough that the implementer knows exactly what to do
-
-Red flags for TOO BROAD:
-- More than 3 acceptance criteria
-- Vague titles like "implement the feature" or "add API endpoints"
-- Covers multiple distinct components or concerns
-
-Red flags for TOO FINE-GRAINED:
-- Single line change or trivial config tweak
-- Feature has more than 6 tasks
-- Multiple tasks that would naturally be done in the same edit session
-
-Red flags for MISSING SUBSTANCE:
-- Feature has only 1 task (should be broken down or merged)
-- Tasks lack description or acceptance criteria
-
-Respond with ONLY a valid, minified JSON array of assessment objects, one per proposal — no whitespace between tokens, no indentation, no line breaks:
-[{"proposalIndex":0,"recommendation":"break_down","reasoning":"Several tasks cover broad functionality that spans multiple components.","issues":["Task 'Implement authentication system' covers login, signup, password reset, and session management — should be separate tasks","Task 'Add API endpoints' is vague and likely involves multiple distinct endpoints"]}]
-
-Key each object by proposalIndex; do not restate the proposal. No explanation, no markdown fences — ONLY the JSON array.`;
+export function buildAssessmentPrompt(proposals: Proposal[]): string {
+  return rexPrompt(buildAssessmentEnvelope(proposals));
 }
 
 /**
@@ -1450,70 +1591,62 @@ export async function assessGranularity(
  * `reasonFromFile` (formal spec import via analyze): this prompt is tuned for
  * rough, unstructured idea dumps.
  */
+export function buildIdeasEnvelope(
+  content: string,
+  existingItems: PRDItem[],
+  projectContext: string,
+  options?: AddPromptOptions,
+): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "You are a product requirements analyst reading raw brainstorming notes. These are NOT formal specs — they are rough ideas, bullet points, half-formed thoughts, and informal shorthand. Distill every idea into a well-structured PRD as a JSON array.",
+    ),
+    section("schema", PRD_SCHEMA),
+    section("example", FEW_SHOT_EXAMPLE),
+    section("consolidation", CONSOLIDATION_INSTRUCTION),
+    section(
+      "input-rules",
+      [
+        "Interpreting rough notes:",
+        '- Capture EVERY idea, no matter how brief or fragmentary. A single word like "caching" is still an idea worth structuring.',
+        '- Questions ("what about dark mode?") are feature requests in disguise — treat them as such.',
+        '- Expand shorthand and abbreviations ("auth" → "authentication", "perf" → "performance") using the project context to infer meaning.',
+        "- When an idea is ambiguous, pick the most likely interpretation given the project context and note your assumption in the task description.",
+        '- Contradictory notes (e.g. "use Redis" and "keep it simple, no external deps") should both be captured as separate options with a note about the trade-off.',
+        '- Problems without solutions ("login is slow") become investigative tasks (e.g. "Profile and optimize login flow").',
+        '- Vague ideas ("make it better") should be fleshed out into concrete tasks based on the project context.',
+      ].join("\n"),
+    ),
+    section("quality", TASK_QUALITY_RULES),
+    section(
+      "dedup",
+      [
+        "Deduplication:",
+        "- Do NOT include items that duplicate anything already in the existing PRD below.",
+        "- Use the project context to understand terminology, architecture, and domain-specific jargon in the notes.",
+      ].join("\n"),
+    ),
+    section("anti-patterns", ANTI_PATTERNS),
+    section("placement", placementContent(existingItems, options)),
+    section("project-context", projectContextContent(projectContext)),
+    section(
+      "existing-prd",
+      `Existing PRD:\n${summarizeExisting(existingItems, { withIds: !options?.parentId })}`,
+    ),
+    section("input", `Brainstorming notes:\n${content}`),
+    section("output", OUTPUT_INSTRUCTION),
+  ]);
+}
+
 export async function buildIdeasPrompt(
   content: string,
   existingItems: PRDItem[],
   dir: string,
   options?: AddPromptOptions,
 ): Promise<string> {
-  const hasParent = !!options?.parentId;
-  const existingSummary = summarizeExisting(existingItems, { withIds: !hasParent });
   const projectContext = await readProjectContext(dir);
-
-  const contextBlock = projectContext
-    ? `\nProject context (from documentation):\n${projectContext}\n`
-    : "";
-
-  let parentConstraint = "";
-  let placementBlock = "";
-  if (hasParent) {
-    const parentEntry = findItemInTree(existingItems, options!.parentId!);
-    if (parentEntry) {
-      parentConstraint = `
-IMPORTANT: Scope your response to fit under this existing parent item:
-  ID: ${options!.parentId}
-  Level: ${parentEntry.level}
-  Title: ${parentEntry.title}
-
-Only create children appropriate for a ${parentEntry.level}. For example, if the parent is an epic, create features and tasks. If the parent is a feature, create only tasks.
-Do NOT create a new epic — instead use the parent's title as the epic title in your response.`;
-    }
-  } else if (existingItems.length > 0) {
-    placementBlock = AUTO_PLACEMENT_INSTRUCTION;
-  }
-
-  return `You are a product requirements analyst reading raw brainstorming notes. These are NOT formal specs — they are rough ideas, bullet points, half-formed thoughts, and informal shorthand. Distill every idea into a well-structured PRD as a JSON array.
-
-${PRD_SCHEMA}
-
-${FEW_SHOT_EXAMPLE}
-${CONSOLIDATION_INSTRUCTION}
-
-Interpreting rough notes:
-- Capture EVERY idea, no matter how brief or fragmentary. A single word like "caching" is still an idea worth structuring.
-- Questions ("what about dark mode?") are feature requests in disguise — treat them as such.
-- Expand shorthand and abbreviations ("auth" → "authentication", "perf" → "performance") using the project context to infer meaning.
-- When an idea is ambiguous, pick the most likely interpretation given the project context and note your assumption in the task description.
-- Contradictory notes (e.g. "use Redis" and "keep it simple, no external deps") should both be captured as separate options with a note about the trade-off.
-- Problems without solutions ("login is slow") become investigative tasks (e.g. "Profile and optimize login flow").
-- Vague ideas ("make it better") should be fleshed out into concrete tasks based on the project context.
-
-${TASK_QUALITY_RULES}
-
-Deduplication:
-- Do NOT include items that duplicate anything already in the existing PRD below.
-- Use the project context to understand terminology, architecture, and domain-specific jargon in the notes.
-
-${ANTI_PATTERNS}
-${parentConstraint}${placementBlock}
-${contextBlock}
-Existing PRD:
-${existingSummary}
-
-Brainstorming notes:
-${content}
-
-${OUTPUT_INSTRUCTION}`;
+  return rexPrompt(buildIdeasEnvelope(content, existingItems, projectContext, options));
 }
 
 /**
