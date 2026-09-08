@@ -12,16 +12,29 @@
  *      so naming it alone strands Windows users — and n-dx is developed on
  *      Windows.
  *
- * The skill list is derived from the manifest, so a NEW skill is covered the
- * moment it is added.
+ * The skill list covers both the manifest skills and the repo-local ones, and
+ * is derived rather than written down, so a NEW skill of either kind is covered
+ * the moment it is added. Repo-local skills matter here even though `ndx init`
+ * does not install them: the repo is developed on Windows, so a POSIX-only
+ * instruction strands its own authors.
  *
- * @see packages/core/assistant-assets/skills/ — the bodies under test
+ * @see packages/core/assistant-assets/skills/ — the shipped bodies under test
+ * @see tests/helpers/all-skills.js — how both kinds are enumerated
  */
 
 import { describe, it, expect } from "vitest";
-import { getSkillNames, getSkillBody } from "../../packages/core/assistant-assets.js";
+import { allSkills } from "../helpers/all-skills.js";
 
-const SKILLS = getSkillNames();
+/**
+ * Every skill, not just the ten in the manifest.
+ *
+ * This suite used to derive its list from `getSkillNames()`, which exempted the
+ * three repo-local skills (`iso-map`, `triage`, `dev-link`) from every guard
+ * below — silently, because the suite still passed. The rules here exist
+ * because bad assumptions shipped twice already; there is no reason a
+ * repo-local skill should be free to ship a third.
+ */
+const SKILLS = allSkills();
 
 // ── Default branch must be resolved, not named ───────────────────────────────
 
@@ -39,9 +52,8 @@ describe("skills resolve the default branch instead of hardcoding it", () => {
     expect(SKILLS.length).toBeGreaterThan(0);
   });
 
-  for (const name of SKILLS) {
+  for (const { name, body } of SKILLS) {
     it(`${name}: names no default branch inside a git command`, () => {
-      const body = getSkillBody(name);
       const match = body.match(HARDCODED_BRANCH_IN_GIT_CMD);
       expect(
         match?.[0] ?? null,
@@ -58,9 +70,8 @@ describe("skills resolve the default branch instead of hardcoding it", () => {
 // ── Timestamp instructions must not be POSIX-only ────────────────────────────
 
 describe("timestamp instructions are platform-neutral", () => {
-  for (const name of SKILLS) {
+  for (const { name, body } of SKILLS) {
     it(`${name}: does not prescribe a POSIX-only timestamp command`, () => {
-      const body = getSkillBody(name);
       if (!body.includes("date -Is")) return; // nothing to check
 
       // `date -Is` does not exist in PowerShell. Naming it is fine as one
@@ -78,9 +89,8 @@ describe("timestamp instructions are platform-neutral", () => {
 // ── Commit steps must not be POSIX-only ──────────────────────────────────────
 
 describe("commit-message construction is shell-neutral", () => {
-  for (const name of SKILLS) {
+  for (const { name, body } of SKILLS) {
     it(`${name}: builds no commit message with a heredoc or command substitution`, () => {
-      const body = getSkillBody(name);
 
       // `cat <<'EOF'` and `$(...)` do not exist in PowerShell or cmd.exe, and
       // Git Bash is not part of Windows — it arrives only with Git for

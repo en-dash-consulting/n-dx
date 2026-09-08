@@ -77,3 +77,11 @@ Notes for Windows:
 - After switching to local, remember to `pnpm build` after code changes for them to take effect via the global link. `packages/core` itself needs no rebuild — it is plain JS — but it spawns `rex`, `hench` and `sourcevision` from their `dist/`, so a change in any of those does need one.
 - Note the flag order if you filter: `pnpm --filter @n-dx/core build`, not `pnpm build --filter @n-dx/core`. The latter forwards `--filter` to the package's own build script and fails with `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`
 - The link registers these binaries: `ndx`, `n-dx`, `rex`, `hench`, `sourcevision`, `sv`
+
+## Done when
+
+The requested link state is in effect and verified — `ndx` resolves to the
+intended build, reported back to the user. Stop there. Do not build, test, or
+run n-dx commands beyond the one check that confirms resolution: this skill
+switches which binary is on `PATH`, and what the user does with it afterwards is
+a separate run.

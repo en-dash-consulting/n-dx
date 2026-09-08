@@ -10,8 +10,8 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-09-08T17:10:41.772Z
-- **Commit** — `3b52ad57891d`
+- **Recorded at** — 2026-09-08T17:44:10.855Z
+- **Commit** — `dd2da72cbacd`
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 36
 - **Per-call total** — 21,766 tokens (what every surface costs, summed)
@@ -216,6 +216,33 @@ per section rather than as one literal. These are the same sections
 |---|---:|---:|---:|
 | `system` | 1,862 | 466 | 71.4% |
 | `brief` | 748 | 187 | 28.6% |
+
+## Workflow skills — 16,990 tokens, 13 skills
+
+A skill body enters the agent's context whole the moment the skill is invoked,
+so its size is a per-invocation bill in the same way a builder's fixed text is a
+per-call one. The two totals are NOT added together: a skill run and an analyze
+call are different events.
+
+`shipped` marks the skills `ndx init` installs into other repositories. The rest
+exist only here, which makes them easy to forget — they were exempt from the
+portability guards until this table gave them a number.
+
+| Skill | Shipped | Chars | Tokens |
+|---|:-:|---:|---:|
+| `ndx-adversarial-review` | yes | 20,667 | 5,167 |
+| `triage` | — | 7,538 | 1,885 |
+| `iso-map` | — | 7,413 | 1,854 |
+| `ndx-reshape` | yes | 5,886 | 1,472 |
+| `ndx-plan` | yes | 4,480 | 1,120 |
+| `ndx-capture` | yes | 4,452 | 1,113 |
+| `dev-link` | — | 4,419 | 1,105 |
+| `ndx-config` | yes | 3,368 | 842 |
+| `ndx-work` | yes | 2,970 | 743 |
+| `ndx-feedback` | yes | 2,620 | 655 |
+| `no-plan-mode` | yes | 2,517 | 630 |
+| `ndx-zone` | yes | 825 | 207 |
+| `ndx-status` | yes | 788 | 197 |
 
 ## Packages with no LLM prompt surfaces
 

@@ -149,3 +149,11 @@ node scripts/build-iso-skill.mjs
 If you are reading this in a repository where the skill was installed on its
 own, there are no TypeScript sources alongside it — the script is standalone and
 self-contained by design, and editing it directly is fine there.
+
+## Done when
+
+The HTML file is written and its path reported to the user. This skill renders a
+view of the code; it does not change the code it renders, does not act on the
+coupling problems the map makes visible, and does not regenerate the project's
+analysis. Opening the file, or fixing what it reveals, is the user's next move —
+not this run's.

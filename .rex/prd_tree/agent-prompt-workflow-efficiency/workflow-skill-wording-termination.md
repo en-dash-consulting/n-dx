@@ -2,7 +2,7 @@
 id: "4aa01e0c-31d5-4db0-9386-214b01da32dd"
 level: "feature"
 title: "Workflow Skill Wording & Termination Clarity"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "prompts"
@@ -11,6 +11,11 @@ tags:
 blockedBy:
   - "76076f6a-c23c-4905-864b-5218a5a6ee69"
 source: "ndx-capture"
+startedAt: "2026-09-08T17:30:11.518Z"
+completedAt: "2026-09-08T17:49:48.346Z"
+endedAt: "2026-09-08T17:49:48.346Z"
+resolutionType: "code-change"
+resolutionDetail: "All 13 skills now declare an explicit terminating action, enforced by a new skill-termination suite. Portability guards extended to the three repo-local skills that were silently exempt. Census now measures skill bodies (16,990 tokens / 13, baseline recorded), giving criterion 6 a metric it lacked. Criteria 1, 3 and 5 were already satisfied — survey found no defect. Criterion 7 partial: /ndx-work exercised end to end, the other twelve verified structurally only. Long-skill compression declined as evidence-free; the length is earned safety detail."
 acceptanceCriteria:
   - "Every skill opens with its single intended outcome, so the agent knows what done looks like before reading the steps."
   - "Every skill names its terminating action explicitly, so a run stops on the intended change rather than continuing into optional follow-up work."
@@ -20,6 +25,6 @@ acceptanceCriteria:
   - "Skill invocation token cost drops measurably against the recorded baseline for the long skills, with the short ones left alone where they are already minimal."
   - "Each rewritten skill is exercised once end to end and reaches the same outcome as before the rewrite."
 description: "Rewrite the 13 project workflow skills under .claude/skills/ so each one drives the agent to its intended outcome by the shortest path. Sizes vary widely (iso-map 121 lines, ndx-adversarial-review 107, triage 86, down to ndx-zone at 12), and the long ones carry the most restated context and the most conditional branching. Each skill needs a stated goal, an explicit stopping condition, and no step that duplicates what the hench brief or the MCP tool descriptions already supply."
-lastModified: "2026-09-08T13:08:14.310Z"
+lastModified: "2026-09-08T17:49:48.370Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

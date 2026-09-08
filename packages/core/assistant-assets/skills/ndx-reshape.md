@@ -68,3 +68,10 @@ ndx hench record --task=<id> --status=completed --startedAt=<the time you noted>
 Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. Use `--task=skill:ndx-reshape`. Restructuring spans many items, so it is recorded against a synthetic id that `get_token_usage` reports in its `orphans` bucket rather than charging a single item.
 
 Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.
+
+## Done when
+
+The approved restructuring is applied, committed, and recorded. Reshaping moves
+and regroups items; it does not implement them, does not change their status,
+and does not capture new work discovered while reading the tree. Stop after the
+structure the user approved — not the further tidying it makes visible.

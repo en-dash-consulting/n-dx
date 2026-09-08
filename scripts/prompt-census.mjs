@@ -863,6 +863,40 @@ const FIXTURE_BRIEF = {
 };
 
 /** Import a built module by workspace-relative path. */
+/**
+ * Measure every workflow skill body.
+ *
+ * Skills are prompts too — a skill body is pasted into the agent's context the
+ * moment it is invoked, so a 20 KB skill is a 5,000-token bill on every run
+ * that touches it. They were outside this census entirely, which meant the one
+ * category of prompt text a contributor edits by hand most often was also the
+ * only one with no number attached.
+ *
+ * Measured whole rather than per section: unlike the code builders there is no
+ * conditional assembly to attribute: the body goes in as written.
+ *
+ * Both kinds are included. The ten in the manifest ship to other repositories
+ * via `ndx init`; `iso-map`, `triage` and `dev-link` exist only here. Both cost
+ * the same tokens when invoked, so both are counted, with `shipped` recording
+ * which is which.
+ */
+async function measureSkills(model) {
+  const { allSkills } = await import(
+    pathToFileURL(join(ROOT, "tests/helpers/all-skills.js")).href
+  );
+  const { budgetPreflight } = await loadDist("llm-client/dist/budget-preflight.js");
+
+  return allSkills()
+    .map((s) => ({
+      name: s.name,
+      file: s.file,
+      shipped: s.shipped,
+      chars: s.body.length,
+      tokens: budgetPreflight(model, s.body.length).tokenEstimate,
+    }))
+    .sort((a, b) => b.tokens - a.tokens);
+}
+
 async function loadDist(relative) {
   const abs = join(ROOT, "packages", relative);
   if (!existsSync(abs)) {
@@ -1029,6 +1063,8 @@ async function measure(model) {
     if (byPackage[c.pkg]) byPackage[c.pkg].uniqueTokens += c.tokens;
   }
 
+  const skills = await measureSkills(model);
+
   return {
     model,
     totals: {
@@ -1037,7 +1073,11 @@ async function measure(model) {
       perCallTokens: surfaces.reduce((n, s) => n + (s.fixedTokens ?? 0), 0),
       /** Distinct fixed prompt text in the repo. What a rewrite has to edit. */
       uniqueTokens: Object.values(byPackage).reduce((n, p) => n + p.uniqueTokens, 0),
+      /** Skill bodies, counted separately — one is billed per invocation, not per call. */
+      skills: skills.length,
+      skillTokens: skills.reduce((n, s) => n + s.tokens, 0),
     },
+    skills,
     byPackage,
     sharedConstants,
     surfaces,
@@ -1175,10 +1215,29 @@ function printComparison(before, after) {
 
   if (moved === 0) console.log("  (no surface changed)");
 
+  // Skills are listed separately because they are billed per invocation, not
+  // per model call — folding them into the surface table would imply a total
+  // that no single event ever costs.
+  const beforeSkills = new Map((before.skills ?? []).map((s) => [s.name, s]));
+  const skillRows = (after.skills ?? []).filter(
+    (s) => (beforeSkills.get(s.name)?.tokens ?? null) !== s.tokens,
+  );
+  if (skillRows.length) {
+    console.log("─".repeat(61));
+    console.log(`${pad("SKILL", 34)}${padL("BEFORE", 9)}${padL("AFTER", 9)}${padL("DELTA", 9)}`);
+    for (const s of skillRows) {
+      const prev = beforeSkills.get(s.name);
+      const b = prev?.tokens;
+      const d = b === undefined ? "NEW" : `${s.tokens - b > 0 ? "+" : ""}${s.tokens - b}`;
+      console.log(`${pad(s.name, 34)}${padL(b ?? "—", 9)}${padL(s.tokens, 9)}${padL(d, 9)}`);
+    }
+  }
+
   console.log("─".repeat(61));
   for (const [label, key] of [
     ["TOTAL per-call", "perCallTokens"],
     ["TOTAL unique fixed text", "uniqueTokens"],
+    ["TOTAL skill bodies", "skillTokens"],
   ]) {
     const b = before.totals[key] ?? 0;
     const a = after.totals[key] ?? 0;
@@ -1446,6 +1505,40 @@ function renderMarkdown(report) {
     for (const s of [...a.sections].sort((x, y) => y.tokens - x.tokens)) {
       const share = ((s.tokens / total) * 100).toFixed(1);
       lines.push(`| \`${s.name}\` | ${n(s.chars)} | ${n(s.tokens)} | ${share}% |`);
+    }
+    lines.push("");
+  }
+
+  if (report.skills?.length) {
+    lines.push(
+      `## Workflow skills — ${n(report.totals.skillTokens)} tokens, ${report.skills.length} skills`,
+    );
+    lines.push("");
+    lines.push(
+      "A skill body enters the agent's context whole the moment the skill is invoked,",
+    );
+    lines.push(
+      "so its size is a per-invocation bill in the same way a builder's fixed text is a",
+    );
+    lines.push(
+      "per-call one. The two totals are NOT added together: a skill run and an analyze",
+    );
+    lines.push("call are different events.");
+    lines.push("");
+    lines.push(
+      "`shipped` marks the skills `ndx init` installs into other repositories. The rest",
+    );
+    lines.push(
+      "exist only here, which makes them easy to forget — they were exempt from the",
+    );
+    lines.push("portability guards until this table gave them a number.");
+    lines.push("");
+    lines.push("| Skill | Shipped | Chars | Tokens |");
+    lines.push("|---|:-:|---:|---:|");
+    for (const s of report.skills) {
+      lines.push(
+        `| \`${s.name}\` | ${s.shipped ? "yes" : "—"} | ${n(s.chars)} | ${n(s.tokens)} |`,
+      );
     }
     lines.push("");
   }
