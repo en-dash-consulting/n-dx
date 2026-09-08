@@ -82,10 +82,27 @@ export async function validateCompletion(
 
   // Run tests if configured
   if (options?.testCommand) {
-    const { error: testError, stderr: testStderr } = await execShellCmd(
+    const { error: testError, stderr: testStderr, launched } = await execShellCmd(
       options.testCommand,
       { cwd: projectDir, timeout },
     );
+
+    // A command that never launched also arrives here with a non-null `error`,
+    // and reporting it as `testsRan: true` / "Tests failed" claimed a verdict on
+    // code that was never exercised. Still fails closed — completion cannot be
+    // validated without tests — but says which of the two happened.
+    if (!launched) {
+      return {
+        valid: false,
+        hasChanges: true,
+        diffSummary,
+        testsRan: false,
+        testsPassed: false,
+        reason:
+          `Tests could not be executed — the command was never launched ` +
+          `(${testError?.message ?? "spawn failed"})`,
+      };
+    }
 
     if (testError) {
       return {

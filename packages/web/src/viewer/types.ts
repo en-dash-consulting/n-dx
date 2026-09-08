@@ -13,7 +13,33 @@ export interface LoadedData {
   callGraph: CallGraph | null;
 }
 
-export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string; taskId?: string }) => void;
+/**
+ * Structured pointer to whatever the user was looking at when they asked.
+ *
+ * Mirrors the `seed` field of `POST /api/sourcevision/ask`. It is a set of
+ * facts, not a sentence: a surface that seeds the Ask panel hands over the
+ * item's own classification, zone, and files so the answer can name them,
+ * rather than flattening them into a pre-written prompt the user would then
+ * have to edit to ask anything else.
+ *
+ * @see ../server/sourcevision-ask-context.ts — the shape this crosses to
+ */
+export interface AskSeed {
+  /** Which surface the question came from, e.g. `"finding"`. */
+  kind?: string;
+  /** Identifier of the thing on that surface. */
+  id?: string;
+  /** Verbatim text of the thing being asked about. */
+  text?: string;
+  /** Zone the thing belongs to. `"global"` when it is project-wide. */
+  zone?: string;
+  /** Files (or zones) the thing names. */
+  files?: string[];
+  /** Classification labels — for a finding, its type and severity. */
+  labels?: Record<string, string>;
+}
+
+export type NavigateTo = (view: ViewId, opts?: { file?: string; zone?: string; runId?: string; taskId?: string; askSeed?: AskSeed }) => void;
 
 export interface FileDetail {
   type: "file";

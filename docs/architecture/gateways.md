@@ -34,7 +34,7 @@ Some cross-zone dependencies use callback injection rather than gateway imports.
 
 | Injection site | Target module | Injected callbacks | Interface type |
 |----------------|---------------|--------------------|----------------|
-| `web/src/server/start.ts` | `web/src/server/register-scheduler.ts` | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
+| `web/src/server/start.ts` | `web/src/server/task-usage.ts` (barrel facade over `task-usage/register-scheduler.ts`) | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
 
 **Rules:**
 - Prefer injection over import when the target would otherwise need to import from a higher-tier zone

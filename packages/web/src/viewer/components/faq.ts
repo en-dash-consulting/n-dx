@@ -138,6 +138,7 @@ const VIEW_TO_FAQ_SECTION: Record<string, string> = {
   problems: "SourceVision",
   suggestions: "SourceVision",
   "pr-markdown": "SourceVision",
+  ask: "SourceVision",
   // Rex views
   "rex-dashboard": "Rex (PRD Management)",
   prd: "Rex (PRD Management)",

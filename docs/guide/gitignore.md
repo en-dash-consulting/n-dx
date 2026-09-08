@@ -37,6 +37,7 @@ Add this block to your project's `.gitignore`:
 .hench/runs/
 .hench/locks/
 .hench/usage-cursors/
+.hench/session-cache.json
 .hench-commit-msg.txt
 
 # Rex ephemeral state
@@ -74,6 +75,7 @@ If you want to commit `.sourcevision/` as a shared analysis baseline, remove tha
 | `.hench/runs/` | LLM conversation transcripts, tool call logs | Per-run artifacts; large, not useful to teammates |
 | `.hench/locks/` | Concurrency lock files | Transient; leftover locks cause hench to stall |
 | `.hench/usage-cursors/` | Per-session watermarks marking how far through a Claude Code transcript `hench record` has attributed tokens | Machine- and session-local; committing one collides between machines and puts a session id in history. Deleting it costs accuracy on the next record, never the record |
+| `.hench/session-cache.json` | Cached warm-parent orientation session — vendor session id, TTL, and the analysis fingerprint it was built on | Rewritten on every orientation and only valid on the machine that created it; committing it churns a session id into history and can leave an autonomous run refusing to start against its own write |
 | `.hench-commit-msg.txt` | Proposed commit message from last agent run | Temporary scratch file |
 | `.rex/.backups/` | Timestamped snapshots of `prd_tree` before reshape/add | Safety net only; 10 most-recent retained automatically |
 | `.rex/.cache/` | `prd.json` derived from the folder tree (web server only) | Ephemeral; regenerated on `ndx start` |

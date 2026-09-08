@@ -15,6 +15,9 @@
  *
  * 1. **Fire-and-collect** (`exec`, `execStdout`, `execShellCmd`) — run a
  *    command, wait for it to finish, return structured output.
+ *    `execShellCmd` is the only sanctioned way to run a shell command STRING:
+ *    it resolves a shell that exists on the platform rather than assuming
+ *    `sh`, which does not resolve on Windows outside a POSIX environment.
  * 2. **Spawn-and-delegate** (`spawnTool`) — spawn a Node script with
  *    inherited stdio (or piped output), wait for its exit code.
  * 3. **Windows-safe CLI spawn** (`spawnCli`) — spawn a CLI binary via
@@ -46,6 +49,24 @@ export interface ExecResult {
   /** null when the process was killed (e.g. timeout). */
   exitCode: number | null;
   error: Error | null;
+  /**
+   * Whether the command actually started.
+   *
+   * `false` means it never ran — the binary or shell could not be spawned
+   * (ENOENT and friends), or `spawn` rejected the options synchronously. The
+   * accompanying `exitCode` is 1 and `stdout`/`stderr` are empty, which is
+   * indistinguishable from a real failing exit unless this flag is consulted:
+   * a caller that infers pass/fail from `exitCode` alone reports "your tests
+   * failed" for a suite that was never launched.
+   *
+   * `true` means the process ran and its outcome is in `exitCode` — including
+   * a non-zero exit, and including `null` for a kill or timeout. A shell that
+   * launched and then reported `command not found` is `launched: true`: the
+   * shell ran, and its non-zero exit is a real result.
+   *
+   * Required rather than optional so every construction site has to state it.
+   */
+  launched: boolean;
 }
 
 /** Options shared by all exec helpers. */
@@ -92,6 +113,20 @@ export interface ExecOptions {
    * Production callers must never pass this.
    */
   _platform?: NodeJS.Platform;
+  /**
+   * @internal Pass `windowsVerbatimArguments` through to `spawn`. Set by
+   * {@link execShellCmd} for the cmd.exe path, whose command line is
+   * self-quoted and must not be re-quoted by Node. Callers wanting a shell
+   * should use {@link execShellCmd} rather than setting this by hand.
+   */
+  _windowsVerbatimArguments?: boolean;
+  /**
+   * @internal Override the win32 POSIX-shell probe — for unit tests only.
+   * Skips the `where sh` lookup and forces {@link execShellCmd} down the
+   * POSIX (`true`) or cmd.exe (`false`) branch. Production callers must
+   * never pass this.
+   */
+  _posixShellAvailable?: boolean;
 }
 
 /**
@@ -159,6 +194,7 @@ export function exec(
     treeKill = true,
     freeze = isPosixFreezeKillEnabled(env ?? process.env),
     _platform = process.platform as NodeJS.Platform,
+    _windowsVerbatimArguments,
   } = opts;
 
   const display = [cmd, ...args].join(" ");
@@ -203,10 +239,15 @@ export function exec(
         // child died while its descendants kept running. Here the option actually
         // arrives.
         ...spawnOptions,
+        // Only meaningful on win32, and only set by execShellCmd's cmd.exe
+        // path. Undefined elsewhere, which is what spawn already assumes.
+        ...(_windowsVerbatimArguments === undefined
+          ? {}
+          : { windowsVerbatimArguments: _windowsVerbatimArguments }),
       });
     } catch (error) {
       // spawn throws synchronously for invalid arguments (bad cwd type, etc.).
-      finish({ stdout: "", stderr: "", exitCode: 1, error: error as Error });
+      finish({ stdout: "", stderr: "", exitCode: 1, error: error as Error, launched: false });
       return;
     }
 
@@ -253,8 +294,17 @@ export function exec(
 
     child.once("error", (error: Error) => {
       // Spawn failure (ENOENT and friends). execFile surfaced these as a non-null
-      // error with a non-numeric code, which mapped to exitCode 1.
-      finish({ stdout: text(stdoutChunks), stderr: text(stderrChunks), exitCode: 1, error });
+      // error with a non-numeric code, which mapped to exitCode 1 — kept, so
+      // exit-code branching is unchanged. `launched: false` is the field that
+      // tells a caller this exitCode describes a command that never started
+      // rather than one that ran and failed.
+      finish({
+        stdout: text(stdoutChunks),
+        stderr: text(stderrChunks),
+        exitCode: 1,
+        error,
+        launched: false,
+      });
     });
 
     child.once("close", (code: number | null, signal: NodeJS.Signals | null) => {
@@ -270,6 +320,7 @@ export function exec(
             code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
             killed: true,
           }),
+          launched: true,
         });
         return;
       }
@@ -289,7 +340,13 @@ export function exec(
       // it still reports immediately.
       if (timedOut) return;
       if (signal !== null) {
-        finish({ stdout, stderr, exitCode: null, error: killedError(display, timeout, false, signal) });
+        finish({
+          stdout,
+          stderr,
+          exitCode: null,
+          error: killedError(display, timeout, false, signal),
+          launched: true,
+        });
         return;
       }
 
@@ -302,6 +359,7 @@ export function exec(
           exitCode === 0
             ? null
             : Object.assign(new Error(`Command failed: ${display}\n${stderr}`), { code: exitCode }),
+        launched: true,
       });
     });
 
@@ -323,6 +381,7 @@ export function exec(
               stderr: text(stderrChunks),
               exitCode: null,
               error: killedError(display, timeout, true, null),
+              launched: true,
             });
           });
       }, timeout);
@@ -384,16 +443,121 @@ export function execStdout(
   });
 }
 
+// ---------------------------------------------------------------------------
+// Shell resolution (cross-OS)
+// ---------------------------------------------------------------------------
+
+/** The shell a command string will be handed to. See {@link buildShellInvocation}. */
+export interface ShellInvocation {
+  /** Executable to spawn. */
+  cmd: string;
+  /** Argv for the shell, with the command string already in place. */
+  args: string[];
+  /**
+   * Which shell semantics the command will be interpreted under. `"posix"`
+   * gives `sh` behaviour (single quotes, `2>/dev/null`, globs); `"cmd"` gives
+   * cmd.exe behaviour, where those do not hold. Callers that need to explain
+   * a failure to a human should surface this.
+   */
+  kind: "posix" | "cmd";
+}
+
+/** Memoized result of the win32 `sh` probe — one `where sh` per process. */
+let posixShellProbe: boolean | undefined;
+
 /**
- * Execute a shell command string (via `sh -c`).
+ * Whether a POSIX `sh` is resolvable on this machine.
  *
- * Wraps the command in a shell for glob expansion, pipes, etc.
+ * Always true off win32. On win32 `sh` exists only when a POSIX environment
+ * (Git for Windows, MSYS2, Cygwin) has put it on PATH — which PowerShell and
+ * cmd.exe, the default shells, do not. Probed at most once per process
+ * because the answer cannot change under us and `where` costs a subprocess.
+ */
+function hasPosixShell(platform: NodeJS.Platform): boolean {
+  if (platform !== "win32") return true;
+  posixShellProbe ??= isExecutableOnPath("sh");
+  return posixShellProbe;
+}
+
+/**
+ * Decide which shell runs a command string, and how to invoke it.
+ *
+ * ## Why this is not just `sh -c`
+ *
+ * `sh -c <command>` was used unconditionally on every platform. On Windows
+ * `sh` resolves only inside a POSIX environment, so from PowerShell or
+ * cmd.exe the spawn failed with ENOENT — and because {@link exec} reports a
+ * spawn failure as `exitCode: 1` with empty output, every caller read "the
+ * command ran and failed" for a command that never started. The hench test
+ * gate concluded the suite was broken after essentially every task.
+ *
+ * ## The choice on Windows
+ *
+ * A POSIX `sh` is PREFERRED when one is genuinely resolvable, and cmd.exe is
+ * the fallback. Both directions of that were considered:
+ *
+ * - Unconditional cmd.exe would be more uniform, but it silently changes the
+ *   meaning of every command string on the machines that work today. n-dx's
+ *   Windows users have Git for Windows (they need git), so `sh` is present far
+ *   more often than not, and callers pass POSIX-flavoured strings — hench's
+ *   `run_command` tool passes whatever the model wrote. Switching those to
+ *   cmd.exe semantics would trade a loud ENOENT for quiet misinterpretation.
+ * - Preferring `sh` keeps those machines byte-identical to POSIX, and gives
+ *   the machines that have no `sh` a shell that actually exists.
+ *
+ * The resulting difference is real and is therefore reported rather than
+ * hidden: `kind` names the semantics in force, so a caller can say which
+ * shell interpreted a command instead of guessing.
+ *
+ * cmd.exe is invoked as `cmd.exe /d /s /c "<command>"` with
+ * `windowsVerbatimArguments`, the same shape {@link spawnCli} uses: `/s` plus
+ * the wrapping quote pair means cmd strips exactly the outer pair and treats
+ * the rest verbatim, so quotes inside the caller's command survive. `/d`
+ * skips AutoRun registry commands.
+ *
+ * Pure function — safe to call on any platform, so its tests run everywhere.
+ *
+ * @param command           The shell command string.
+ * @param platform          Target platform.
+ * @param posixShellAvailable Whether `sh` is resolvable (see {@link hasPosixShell}).
+ */
+export function buildShellInvocation(
+  command: string,
+  platform: NodeJS.Platform,
+  posixShellAvailable: boolean,
+): ShellInvocation {
+  if (platform === "win32" && !posixShellAvailable) {
+    return { cmd: "cmd.exe", args: ["/d", "/s", "/c", `"${command}"`], kind: "cmd" };
+  }
+  return { cmd: "sh", args: ["-c", command], kind: "posix" };
+}
+
+/**
+ * Execute a shell command string, in a shell that exists on this platform.
+ *
+ * Wraps the command in a shell for glob expansion, pipes, `&&`, etc. Which
+ * shell, and why it is not unconditionally `sh -c`, is documented on
+ * {@link buildShellInvocation}.
+ *
+ * Check `launched` on the result before treating a non-zero `exitCode` as a
+ * failing command — see {@link ExecResult.launched}.
  */
 export function execShellCmd(
   command: string,
   opts: ExecOptions,
 ): Promise<ExecResult> {
-  return exec("sh", ["-c", command], opts);
+  const platform = opts._platform ?? (process.platform as NodeJS.Platform);
+  const shell = buildShellInvocation(
+    command,
+    platform,
+    opts._posixShellAvailable ?? hasPosixShell(platform),
+  );
+  return exec(shell.cmd, shell.args, {
+    ...opts,
+    // The cmd.exe command line is self-quoted above; Node re-quoting it would
+    // break the outer pair that /s depends on.
+    ...(shell.kind === "cmd" ? { _windowsVerbatimArguments: true } : {}),
+  });
 }
 
 /**

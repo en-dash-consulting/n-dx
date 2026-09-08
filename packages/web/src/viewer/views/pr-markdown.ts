@@ -1,6 +1,12 @@
 import { h, type ComponentChildren } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
+import {
+  clipboardFailureMessage,
+  clipboardSuccessMessage,
+  copyTextToClipboard,
+  type ClipboardFailureReason,
+} from "../utils/clipboard.js";
 
 interface PRMarkdownResponse {
   markdown: string | null;
@@ -34,7 +40,10 @@ const PR_MARKDOWN_MODE_STORAGE_KEY = "sv:pr-markdown:view-mode";
 type PRMarkdownViewMode = "preview" | "raw";
 
 type CopyState = "idle" | "success" | "error";
-type CopyErrorKind = "permission-denied" | "generic" | null;
+type CopyErrorKind = ClipboardFailureReason | null;
+
+/** What the manual-copy guidance tells the user to select. */
+const COPY_SUBJECT = "markdown";
 
 function parseStoredViewMode(value: string | null): PRMarkdownViewMode {
   return value === "raw" ? "raw" : "preview";
@@ -86,29 +95,6 @@ function formatStaleDuration(ms: number | null): string {
   if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
   const hours = Math.round(minutes / 60);
   return `${hours} hour${hours === 1 ? "" : "s"}`;
-}
-
-function fallbackCopyText(text: string): boolean {
-  try {
-    const input = document.createElement("textarea");
-    input.value = text;
-    input.style.position = "fixed";
-    input.style.opacity = "0";
-    document.body.appendChild(input);
-    input.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(input);
-    return ok;
-  } catch {
-    return false;
-  }
-}
-
-function isPermissionDeniedClipboardError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  return error.name === "NotAllowedError"
-    || /permission/i.test(error.message)
-    || /denied/i.test(error.message);
 }
 
 function renderMarkdownPreview(markdown: string) {
@@ -307,19 +293,14 @@ export function PRMarkdownView() {
 
   const handleCopyRawMarkdown = useCallback(async () => {
     if (!markdown) return;
-    try {
-      await navigator.clipboard.writeText(markdown);
+    const result = await copyTextToClipboard(markdown);
+    if (result.ok) {
       setCopyErrorKind(null);
       setCopyFeedback("success");
-    } catch (error) {
-      if (fallbackCopyText(markdown)) {
-        setCopyErrorKind(null);
-        setCopyFeedback("success");
-        return;
-      }
-      setCopyErrorKind(isPermissionDeniedClipboardError(error) ? "permission-denied" : "generic");
-      setCopyFeedback("error");
+      return;
     }
+    setCopyErrorKind(result.reason);
+    setCopyFeedback("error");
   }, [markdown, setCopyFeedback]);
 
   const handleModeChange = useCallback((mode: PRMarkdownViewMode) => {
@@ -342,11 +323,9 @@ export function PRMarkdownView() {
   }, [markdown]);
 
   const copyFeedbackMessage = copyState === "success"
-    ? "Copied markdown to clipboard."
+    ? clipboardSuccessMessage(COPY_SUBJECT)
     : copyState === "error"
-      ? copyErrorKind === "permission-denied"
-        ? "Clipboard access was blocked by browser permissions. Copy manually: select the markdown and press Cmd+C (macOS) or Ctrl+C (Windows/Linux)."
-        : "Failed to copy markdown to clipboard. Copy manually: select the markdown and press Cmd+C (macOS) or Ctrl+C (Windows/Linux)."
+      ? clipboardFailureMessage(copyErrorKind ?? "generic", COPY_SUBJECT)
       : "";
   const fallbackTitle = availability === "unsupported"
     ? "Git is unavailable"

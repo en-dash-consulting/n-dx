@@ -1340,7 +1340,17 @@ export async function cmdRun(
           audit.outdated.minor.length +
           audit.outdated.patch.length;
 
-        if (vulnCount === 0 && outdatedCount === 0) {
+        // `audit.error` alongside `ran: true` means one of the two steps could
+        // not report, so its half of these counts is zeros that mean nothing.
+        // Claiming "none found" off a partial audit is the fail-open failure
+        // this whole path guards against — say what was actually measured.
+        if (audit.error) {
+          info(`⚠ Audit incomplete — ${audit.error}`);
+          info(
+            `Measured so far: ${vulnCount} vulnerabilities, ${outdatedCount} outdated packages ` +
+            `(zeros from the step that failed carry no information)`,
+          );
+        } else if (vulnCount === 0 && outdatedCount === 0) {
           info("✓ No vulnerabilities or outdated packages found");
         } else {
           if (vulnCount > 0) {
@@ -1363,7 +1373,12 @@ export async function cmdRun(
       } else if (audit.skipped && audit.skipReason) {
         info(`Skipped: ${audit.skipReason}`);
       } else if (audit.error) {
-        info(`Audit error: ${audit.error}`);
+        // INCONCLUSIVE, not clean — neither step produced counts. Warn and
+        // proceed, per the decision recorded on DependencyAuditResult: the audit
+        // gates nothing today, so a `pnpm` that will not spawn must not be a
+        // harder stop than ten critical vulnerabilities are.
+        info(`⚠ Dependency audit inconclusive — ${audit.error}`);
+        info("Proceeding without dependency findings; nothing was verified.");
       }
     }
 

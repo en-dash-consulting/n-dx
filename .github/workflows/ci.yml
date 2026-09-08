@@ -148,10 +148,23 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # This step ASSERTS the per-OS baseline (expected exit code, stdout/stderr
+      # contract, JSON shape) as well as collecting. It used to be assertion-free,
+      # with the baseline checked in smoke-parity — which meant a macOS-only CLI
+      # regression left this job green and reddened an ubuntu job two steps
+      # downstream, and went unchecked entirely whenever either smoke job failed
+      # (smoke-parity `needs` both). The contract now fails the platform that
+      # broke it. See validateBaseline in scripts/cli-smoke-parity.mjs.
       - name: Collect normalized smoke artifact
         run: node scripts/cli-smoke-parity.mjs collect --output ndx-cli-smoke-macos.json
 
+      # `always()`: on a baseline failure the collector writes the artifact and
+      # then exits non-zero, so the artifact holds the exact output that broke the
+      # contract. Uploading it anyway is the difference between a diagnosable
+      # failure and a red job with nothing to inspect. Missing-file is a warning,
+      # not an error, so a collector that died before the write is still fine here.
       - name: Upload smoke artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ndx-cli-smoke-macos
@@ -182,7 +195,31 @@ jobs:
       # on this job. What this job uniquely provides is macOS specifically, and
       # only for the root suite: a macOS-only behavior exercised solely by a
       # per-package test never runs on macOS in CI.
+      #
+      # GATED TO main-BRANCH PUSHES. Measured on run 32286589689, this step is
+      # 2.53 of the job's 3.52 wall minutes — ~30 of its 40 billed, and macOS
+      # bills at 10x Linux. It ran green in 14 of 15 runs on the branch that
+      # added it. Its single catch (run 32283838405: a test assuming synchronous
+      # reaping, true for `taskkill /T /F` but not POSIX `SIGKILL`) was real, so
+      # the step stays — but PRs get macOS collection only, and the suite runs on
+      # every merge to main, which is upstream of every release since release.yml
+      # runs from main. Net effect ~71 -> ~41 billed minutes per PR.
+      #
+      # A POSIX-semantics defect can now merge before this step sees it. If that
+      # actually happens, the next escalation is a path filter on the spawn and
+      # lifecycle areas (packages/core, llm-client exec, hench process, tests/e2e)
+      # rather than reverting to unconditional — better coverage per minute, at
+      # the cost of `fetch-depth: 0` and a diff step to maintain.
+      #
+      # DELIBERATELY A STEP CONDITION, NOT A JOB CONDITION: smoke-parity `needs`
+      # this job and `needs` propagates skips, so gating the job would silently
+      # disable the parity comparison. Do not reach for workflow-level
+      # `paths-ignore` either — a required status check that never starts stays
+      # pending forever and blocks the PR, whereas a job skipped by a job-level
+      # `if:` is treated as successful. Job names are load-bearing for branch
+      # protection; keep them stable.
       - name: Run root e2e / integration tests
+        if: github.event_name == 'push'
         run: node scripts/run-vitest-bind-aware.mjs root
 
   smoke-windows:
@@ -216,10 +253,16 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Asserts the per-OS baseline as well as collecting — see the equivalent
+      # step in smoke-macos for why the contract lives here rather than in
+      # smoke-parity.
       - name: Collect normalized smoke artifact
         run: node scripts/cli-smoke-parity.mjs collect --output ndx-cli-smoke-windows.json
 
+      # `always()` for the same reason as smoke-macos: keep the artifact that
+      # records a baseline failure.
       - name: Upload smoke artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ndx-cli-smoke-windows
@@ -290,5 +333,10 @@ jobs:
           name: ndx-cli-smoke-windows
           path: smoke-windows
 
+      # Pure cross-OS comparison: canonical sequence metadata, the `comparable`
+      # projection, normalized failure codes, and the raw separator/line-ending
+      # fingerprint. The per-OS baseline is enforced in each smoke job's collect
+      # step, so this job no longer holds a contract that gets skipped whenever a
+      # platform is red.
       - name: Compare smoke artifacts
         run: node scripts/cli-smoke-parity.mjs compare --mac smoke-macos/ndx-cli-smoke-macos.json --windows smoke-windows/ndx-cli-smoke-windows.json

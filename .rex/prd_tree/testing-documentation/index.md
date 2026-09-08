@@ -2,14 +2,15 @@
 id: "738f6000-aa94-41a0-86da-1d505e2674dd"
 level: "epic"
 title: "Testing & Documentation"
-status: "pending"
+status: "completed"
 startedAt: "2026-05-06T13:27:57.504Z"
-endedAt: "2026-08-26T14:46:51.302Z"
+completedAt: "2026-09-08T19:04:31.905Z"
+endedAt: "2026-09-08T19:04:31.905Z"
 resolutionType: "acknowledgment"
 resolutionDetail: "Fixed final architecture policy test failure (PRD storage invariant violations). All child tasks completed. Test suite passes (1628 tests). Epic infrastructure and documentation goals met."
 description: "Local testing infrastructure (gauntlet config validation), platform/prerequisite documentation, and ongoing documentation refresh for PRD-related changes."
-lastModified: "2026-09-07T22:41:42.784Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-09-08T19:04:31.928Z"
+lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -31,6 +32,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Fix observation in web-server (1 finding)](./fix-observation-in-web-server-1-finding/index.md) | completed |
 | [Fix observation in web-unit (1 finding)](./fix-observation-in-web-unit-1-finding/index.md) | completed |
 | [Fix suggestion in web-server (1 finding)](./fix-suggestion-in-web-server-1-finding/index.md) | completed |
+| [Gauntlet Test Cleanup and Suite Consolidation](./gauntlet-test-cleanup-and-suite/index.md) | completed |
+| [Gauntlet Test Suite Audit and Cross-OS Validity Review](./gauntlet-test-suite-audit-and-cross-os/index.md) | completed |
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-in-main/index.md) | completed |
 | [macOS Local Docker Test Suite](./macos-local-docker-test-suite/index.md) | completed |
 | [Make test results independent of ambient environment and machine load](./make-test-results-independent-of/index.md) | completed |
@@ -47,5 +50,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Auto Re-Init Detection for Stale Projects](./auto-re-init-detection-for-stale.md) | completed |
 | [Auto-Update Detection from npm Registry](./auto-update-detection-from-npm-registry.md) | completed |
 | [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-the.md) | completed |
-| [routes-commands ndx-ladder tests leak the ambient NDX_CLI_PATH env var](./routes-commands-ndx-ladder-tests-leak.md) | pending |
+| [routes-commands ndx-ladder tests leak the ambient NDX_CLI_PATH env var](./routes-commands-ndx-ladder-tests-leak.md) | completed |
 | [Zone cohesion gate silently passes in CI instead of reporting it did not run](./zone-cohesion-gate-silently-passes-in.md) | completed |

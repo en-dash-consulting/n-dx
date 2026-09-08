@@ -149,6 +149,143 @@ resource "aws_iam_role" "irrelevant" {}
   });
 });
 
+// ── CloudFormation ──────────────────────────────────────────────────────────
+
+/** A template header that makes the file unambiguously CloudFormation. */
+const CFN_HEADER = "AWSTemplateFormatVersion: '2010-09-09'\n";
+
+describe("discoverFromIaC, CloudFormation", () => {
+  it("classifies CloudFormation types into the same kinds as Terraform", () => {
+    // The type is normalized (AWS::SQS::Queue → aws_sqs_queue) so one table
+    // serves both dialects; a second table would drift from the first.
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/template.yaml": `${CFN_HEADER}Resources:
+  Documents:
+    Type: AWS::S3::Bucket
+  Ingest:
+    Type: AWS::SQS::Queue
+  Ledger:
+    Type: AWS::DynamoDB::Table
+  Sessions:
+    Type: AWS::ElastiCache::CacheCluster
+  Fanout:
+    Type: AWS::SNS::Topic
+  Worker:
+    Type: AWS::Lambda::Function
+  Nightly:
+    Type: AWS::Events::Rule
+  ApiRole:
+    Type: AWS::IAM::Role
+`,
+    });
+    const { infrastructure, sawIaC } = discoverFromIaC(dir);
+    expect(sawIaC).toBe(true);
+    expect(Object.fromEntries(infrastructure.map((i) => [i.name, i.kind]))).toEqual({
+      Documents: "bucket",
+      Ingest: "queue",
+      Ledger: "database",
+      Sessions: "cache",
+      Fanout: "topic",
+      Worker: "compute",
+      Nightly: "scheduler",
+    });
+    // An IAM role is real infrastructure but says nothing about architecture.
+    expect(infrastructure.some((i) => i.name === "ApiRole")).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("recognises a SAM template", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "template.yml": `${CFN_HEADER}Transform: AWS::Serverless-2016-10-31
+Resources:
+  Api:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: acme-api-handler
+`,
+    });
+    const { infrastructure } = discoverFromIaC(dir);
+    expect(infrastructure).toHaveLength(1);
+    expect(infrastructure[0]).toMatchObject({ name: "Api", kind: "compute" });
+    expect(infrastructure[0].literals).toContain("acme-api-handler");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("takes name literals from properties but not from intrinsic functions", () => {
+    // `!Sub '${AWS::StackName}-docs'` is not a name, and matching source
+    // against it would attribute the bucket to nothing or to everything.
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/s.yaml": `${CFN_HEADER}Resources:
+  Documents:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: acme-documents-prod
+  Uploads:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '\${AWS::StackName}-uploads'
+`,
+    });
+    const byName = Object.fromEntries(
+      discoverFromIaC(dir).infrastructure.map((i) => [i.name, i.literals]),
+    );
+    expect(byName.Documents).toContain("acme-documents-prod");
+    expect(byName.Uploads).toEqual(["Uploads"]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("records which template declared each resource", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "deploy/stack.yaml": `${CFN_HEADER}Resources:\n  Ingest:\n    Type: AWS::SQS::Queue\n`,
+    });
+    const [infra] = discoverFromIaC(dir).infrastructure;
+    expect(infra.origin).toBe("deploy/stack.yaml");
+    expect(infra.note).toContain("AWS::SQS::Queue");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("ignores YAML that is not a CloudFormation template", () => {
+    // A repository is full of YAML. Treating a CI workflow or a k8s manifest as
+    // IaC would invent infrastructure, and flip the "this project has IaC" flag
+    // that decides which caveat the page shows.
+    const dir = makeProject({
+      ...BASE_FILES,
+      "ci.yaml": `name: build\njobs:\n  test:\n    steps:\n      - run: pnpm test\n`,
+      "k8s/deploy.yml": `apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: queue-worker\n`,
+    });
+    expect(discoverFromIaC(dir)).toEqual({ infrastructure: [], sawIaC: false });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("finds resources in both dialects at once, deterministically", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/main.tf": `resource "aws_s3_bucket" "from_tf" {}\n`,
+      "infra/stack.yaml": `${CFN_HEADER}Resources:\n  FromCfn:\n    Type: AWS::SQS::Queue\n`,
+    });
+    const names = discoverFromIaC(dir).infrastructure.map((i) => i.name);
+    expect(names).toContain("from_tf");
+    expect(names).toContain("FromCfn");
+    expect(JSON.stringify(discoverFromIaC(dir))).toBe(JSON.stringify(discoverFromIaC(dir)));
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("survives a template whose Resources block is empty or malformed", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "a.yaml": `${CFN_HEADER}Resources:\n`,
+      "b.yaml": `${CFN_HEADER}Resources:\n  Broken:\n`,
+      "c.yaml": `${CFN_HEADER}Resources:\n  Ok:\n    Type: AWS::SQS::Queue\n`,
+    });
+    expect(discoverFromIaC(dir).infrastructure.map((i) => i.name)).toEqual(["Ok"]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 // ── Linking ─────────────────────────────────────────────────────────────────
 
 describe("linkInfrastructure", () => {
@@ -273,6 +410,29 @@ describe("declared architecture in the model", () => {
     expect(node).toBeDefined();
     expect(node!.name).toBe("documents");
     expect(node!.body).toContain("infra/main.tf");
+    expect(node!.inbound.map((l) => l.id)).toContain("src/core");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("draws CloudFormation resources with nothing declared by hand", () => {
+    // The point of IaC discovery: a team on CloudFormation gets nodes without
+    // writing a .n-dx.json at all.
+    const dir = makeProject({
+      ...BASE_FILES,
+      "src/core/f.ts": `export const queue = "acme-ingest-queue";\n`,
+      "infra/stack.yaml": `AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  Ingest:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: acme-ingest-queue
+`,
+    });
+    const model = buildIsoModel(loadFromScan(dir, { useGit: false, analyzedAt: "t" }));
+    const node = model.nodes.find((n) => n.kind === "infra");
+    expect(node).toBeDefined();
+    expect(node!.name).toBe("Ingest");
+    expect(node!.body).toContain("infra/stack.yaml");
     expect(node!.inbound.map((l) => l.id)).toContain("src/core");
     rmSync(dir, { recursive: true, force: true });
   });

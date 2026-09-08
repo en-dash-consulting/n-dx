@@ -13,6 +13,7 @@ import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./
 import { createDataWatcher, handleDataRoute } from "./routes-data.js";
 import { handleRexRoute, shutdownRexExecution } from "./routes-rex/index.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
+import { handleSourcevisionAskRoute } from "./routes-sourcevision-ask.js";
 import { handleIsoMapRoute } from "./routes-iso-map.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
@@ -622,6 +623,10 @@ async function handleApiRoutes(
       reregisterProjectWatchers(ctx, watcher, ws, watcherHandles);
     },
   }))) return true;
+  // Scope is checked *before* the call, not via handleScopedRoute: that helper
+  // takes an already-invoked RouteResult, so an out-of-scope Ask request would
+  // still reach the LLM and write a response whose value is then discarded.
+  if (isInScope(ctx.scope, "sourcevision") && await handleSourcevisionAskRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;

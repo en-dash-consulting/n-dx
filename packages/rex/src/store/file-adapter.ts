@@ -5,7 +5,14 @@ import { validateDocument, validateConfig, validateLogEntry } from "../schema/va
 import { SCHEMA_VERSION } from "../schema/index.js";
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, walkTree, insertChild, updateInTree, removeFromTree } from "../core/tree.js";
-import { stampModified, stampModifiedFields, stampActor } from "../core/sync.js";
+import {
+  stampModified,
+  stampModifiedFields,
+  stampActor,
+  snapshotItemContent,
+  stampChangedItems,
+} from "../core/sync.js";
+import { resolveActor } from "../core/identity.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import { atomicWrite } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
@@ -508,9 +515,18 @@ export class FileStore implements PRDStore {
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
     const folderTreeLockPath = prdLockPath(this.rexDir);
+    // Resolved before the lock is taken: the first call in a process shells
+    // out to git, and that is not work to do while holding the PRD lock. The
+    // result is cached process-wide, so warming it here also keeps any
+    // `stampModified` inside `fn` off the locked span.
+    const actor = await resolveActor();
     return withLock(folderTreeLockPath, async () => {
       const doc = await this.loadDocument();
+      // Signatured before `fn` runs, so the stamp below covers whatever it
+      // mutated directly — callers that bypass updateItem still get one.
+      const before = snapshotItemContent(doc.items);
       const result = await fn(doc);
+      stampChangedItems(doc.items, before, await stampModifiedFields(undefined, actor));
       const valid = validateDocument(doc);
       if (!valid.ok) {
         throw new Error(`Invalid document after mutation: ${valid.errors.message}`);

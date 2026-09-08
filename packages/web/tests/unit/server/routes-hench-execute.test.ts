@@ -358,6 +358,10 @@ describe("broadcast on execute", () => {
     // Await the close before removing the directory: on Windows the still-open
     // server handle is what makes the removal fail, so the order matters.
     await closeRouteTestServer(server);
+    // Same reason as the sibling describe block above: a still-running spawned
+    // child holds a CWD lock on tmpDir and removal fails with EBUSY on Windows.
+    // This block spawns too, so it needs the same teardown.
+    await shutdownActiveExecutions(500).catch(() => {});
     await removeTestDir(tmpDir);
   });
 
@@ -376,8 +380,18 @@ describe("broadcast on execute", () => {
     });
     expect(res.status).toBe(202);
 
-    // Wait for process to spawn and complete/fail (no real hench binary in test env)
-    await new Promise((r) => setTimeout(r, 200));
+    // Wait for the spawn to REACH a terminal state rather than sleeping a fixed
+    // interval. There is no hench binary in the test environment so the run
+    // fails fast, but "fast" is not bounded: under full-suite parallel load on
+    // Windows the spawn, its failure, and the broadcast together exceeded the
+    // 200ms this used to sleep, and the last recorded state was still
+    // "starting" when the assertions ran. Poll for the work instead of guessing
+    // the wall clock (TESTING.md, flake family 3).
+    await vi.waitFor(() => {
+      expect(broadcastMessages.length).toBeGreaterThan(0);
+      const last = (broadcastMessages.at(-1) as Record<string, unknown>).state as Record<string, unknown>;
+      expect(["completed", "failed"]).toContain(last.status);
+    }, { timeout: 5_000 });
 
     expect(broadcastFn).toHaveBeenCalled();
 
