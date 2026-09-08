@@ -158,22 +158,40 @@ function resolveRexBin(ctx: ServerContext): { bin: string; args: string[] } {
 /**
  * Resolve the ndx orchestrator CLI. Ladder:
  *
- *  1. Project-local `node_modules/.bin/ndx` — the analyzed project's own
- *     install wins, matching {@link resolveNdxCli}.
- *  2. `N_DX_CLI_PATH` — set by the launching CLI (cli.js) for every child it
- *     spawns, so a server started by `ndx start` always knows the running
- *     install's cli.js, whatever the layout (global, npm, pnpm, monorepo).
- *  3. `@n-dx/core/cli.js` resolved from THIS server's module graph — covers
+ *  1. `NDX_CLI_PATH` — the launching CLI's own path.
+ *  2. Project-local `node_modules/.bin/ndx` — the analyzed project's own
+ *     install, matching {@link resolveNdxCli}.
+ *  3. `N_DX_CLI_PATH` — also the launching CLI's own path.
+ *  4. `@n-dx/core/cli.js` resolved from THIS server's module graph — covers
  *     servers not started via ndx on flat (npm-hoisted) installs. Unlike the
  *     domain CLIs, this step often fails by design: web cannot declare
  *     @n-dx/core as a dependency (core depends on web — a cycle), so strict
  *     pnpm layouts won't resolve it.
- *  4. The monorepo dogfood path — valid solely when the analyzed project is
+ *  5. The monorepo dogfood path — valid solely when the analyzed project is
  *     the n-dx repo itself.
+ *
+ * Rungs 1 and 3 are one mechanism under two names: `cli.js` assigns both to
+ * `fileURLToPath(import.meta.url)` on startup (packages/core/cli.js), so a
+ * server started by `ndx start` knows the running install's cli.js whatever
+ * the layout (global, npm, pnpm, monorepo). Rung 1 straddles the project-local
+ * bin and rung 3 sits below it, which means the launcher outranks the analyzed
+ * project's own install today — the two names were added at different times
+ * and only rung 3's placement was deliberate. Consolidating them is a
+ * behaviour change for anyone reading either name, so it is left alone; what
+ * matters here is that both are documented and both are covered by the ladder
+ * tests, because an ambient `NDX_CLI_PATH` answering silently from rung 1 is
+ * what made the rungs below it untested.
+ *
+ * Both env rungs are guarded on `existsSync`. The value is exported to every
+ * child of an `ndx` process, so it outlives the install that wrote it: a
+ * dev-link install that moved or was uninstalled leaves a path that no longer
+ * exists, and spawning it verbatim fails with MODULE_NOT_FOUND where the rungs
+ * below would have resolved.
  */
 export function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
-  if (process.env.NDX_CLI_PATH) {
-    return { bin: "node", args: [process.env.NDX_CLI_PATH] };
+  const launcherCli = process.env["NDX_CLI_PATH"];
+  if (launcherCli && existsSync(launcherCli)) {
+    return { bin: "node", args: [launcherCli] };
   }
   const bin = join(ctx.projectDir, "node_modules", ".bin", "ndx");
   if (existsSync(bin)) return { bin, args: [] };
