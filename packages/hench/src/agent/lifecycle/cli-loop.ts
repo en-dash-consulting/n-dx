@@ -1133,6 +1133,49 @@ interface ReviewPassInvocation {
 }
 
 /**
+ * Charge a review pass's token spend to the run it reviewed.
+ *
+ * Both halves of the run record matter, and they are read by different
+ * consumers. `tokenUsage` is the aggregate that headlines `ndx usage` and
+ * feeds the PRD rollup; `turnTokenUsage` is what the per-command and
+ * per-model breakdowns read — rex's `extractHenchTokenEvents` uses it
+ * whenever it is non-empty and never falls back to the aggregate. Merging
+ * only the aggregate therefore left the reviewer's entire spend out of the
+ * per-command line and priced the whole run at the executor's model, even
+ * when the reviewer ran on a stronger and more expensive one.
+ *
+ * Reviewer turns are renumbered to continue after the executor's last turn so
+ * `hench show` reads as one monotonic sequence rather than restarting at 1,
+ * and each entry carries the review model so per-model costing is right.
+ */
+export function mergeReviewTokenUsage(
+  run: {
+    tokenUsage?: SpawnResult["tokenUsage"];
+    turnTokenUsage?: TurnTokenUsage[];
+  },
+  spend: Pick<SpawnResult, "tokenUsage" | "turnTokenUsage">,
+  reviewModel: string,
+): void {
+  run.tokenUsage = addTokenUsage(run.tokenUsage ?? { input: 0, output: 0 }, spend.tokenUsage);
+
+  if (spend.turnTokenUsage.length === 0) return;
+
+  const executorTurns = run.turnTokenUsage ?? [];
+  const turnOffset = executorTurns.reduce((max, t) => Math.max(max, t.turn), 0);
+
+  // Concat rather than push: syncRunFromAccumulated aliases the retry
+  // accumulator's array straight onto the run, so pushing here would grow the
+  // accumulator too and double-count the reviewer on a later sync.
+  run.turnTokenUsage = executorTurns.concat(
+    spend.turnTokenUsage.map((turn) => ({
+      ...turn,
+      turn: turnOffset + turn.turn,
+      model: turn.model || reviewModel,
+    })),
+  );
+}
+
+/**
  * Run the adversarial review pass for a completed task.
  *
  * The pass never fails the task. By the time it runs, completion validation
@@ -1228,7 +1271,7 @@ async function runAdversarialReviewPass(
   // Charge the review to the run it reviewed. It is part of the cost of
   // completing this task, and leaving it out would make `--review` look free
   // in `ndx usage`.
-  inv.run.tokenUsage = addTokenUsage(inv.run.tokenUsage ?? { input: 0, output: 0 }, result.tokenUsage);
+  mergeReviewTokenUsage(inv.run, result, ctx.reviewModel);
 
   if (result.error) {
     const outcome: ReviewPassOutcome = {

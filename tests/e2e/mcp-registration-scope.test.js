@@ -51,6 +51,19 @@ afterEach(async () => {
   }
 });
 
+/**
+ * Final path segment, for either separator.
+ *
+ * `claude` resolves the project key through realpath and writes it
+ * forward-slash normalised, while `mkdtemp` hands back a native path — on
+ * Windows that is backslash-separated. Splitting on `/` alone left the
+ * Windows side unreduced, so every comparison against a config key failed
+ * while the product was registering correctly. Comparing on the final segment
+ * (rather than the whole path) is also what dodges macOS's /var vs
+ * /private/var symlink.
+ */
+const base = (p) => p.split(/[\\/]/).pop();
+
 /** Every mcpServers map in a claude config, keyed by the project it belongs to. */
 async function readRegistrations() {
   const path = join(configDir, ".claude.json");
@@ -80,9 +93,6 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope", () => {
     const byProject = await readRegistrations();
     const projects = Object.keys(byProject);
 
-    // `claude` resolves the project key through realpath, so compare on the
-    // suffix rather than the raw temp path (/var vs /private/var on macOS).
-    const base = (p) => p.split("/").pop();
     expect(
       projects.map(base),
       `MCP servers were registered under ${projects.join(", ")}, ` +
@@ -105,7 +115,6 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope", () => {
     });
 
     const byProject = await readRegistrations();
-    const base = (p) => p.split("/").pop();
     const offenders = [];
 
     for (const [project, servers] of Object.entries(byProject)) {
@@ -148,7 +157,6 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope", () => {
     });
 
     const byProject = await readRegistrations();
-    const base = (p) => p.split("/").pop();
     const callerEntry = Object.entries(byProject).find(([p]) => base(p) === base(cwdDir));
 
     expect(
