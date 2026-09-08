@@ -1,0 +1,740 @@
+{
+  "model": "claude-sonnet-5",
+  "totals": {
+    "surfaces": 35,
+    "perCallTokens": 21511,
+    "uniqueTokens": 13089
+  },
+  "byPackage": {
+    "rex": {
+      "surfaces": 19,
+      "perCallTokens": 15788,
+      "uniqueTokens": 7366
+    },
+    "sourcevision": {
+      "surfaces": 6,
+      "perCallTokens": 1898,
+      "uniqueTokens": 1898
+    },
+    "hench": {
+      "surfaces": 9,
+      "perCallTokens": 3544,
+      "uniqueTokens": 3544
+    },
+    "core": {
+      "surfaces": 1,
+      "perCallTokens": 281,
+      "uniqueTokens": 281
+    }
+  },
+  "sharedConstants": [
+    {
+      "pkg": "rex",
+      "name": "FEW_SHOT_EXAMPLE",
+      "tokens": 432,
+      "usedBy": [
+        "reasonFromFile",
+        "reasonFromScanResults",
+        "buildAddPrompt",
+        "buildMultiAddPrompt",
+        "buildBreakdownPrompt",
+        "buildConsolidatePrompt",
+        "buildIdeasPrompt",
+        "buildConsolidationGuardPrompt",
+        "buildSpecPrompt",
+        "buildModifyPrompt"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "PRD_SCHEMA",
+      "tokens": 333,
+      "usedBy": [
+        "reasonFromFile",
+        "reasonFromScanResults",
+        "buildAddPrompt",
+        "buildMultiAddPrompt",
+        "buildIdeasPrompt",
+        "buildDisambiguationPrompt"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "TASK_QUALITY_RULES",
+      "tokens": 181,
+      "usedBy": [
+        "reasonFromFile",
+        "reasonFromScanResults",
+        "buildAddPrompt",
+        "buildMultiAddPrompt",
+        "buildIdeasPrompt",
+        "buildDisambiguationPrompt"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "CONSOLIDATION_INSTRUCTION",
+      "tokens": 223,
+      "usedBy": [
+        "reasonFromScanResults",
+        "buildAddPrompt",
+        "buildMultiAddPrompt",
+        "buildIdeasPrompt"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "ANTI_PATTERNS",
+      "tokens": 141,
+      "usedBy": [
+        "reasonFromFile",
+        "reasonFromScanResults",
+        "buildAddPrompt",
+        "buildMultiAddPrompt",
+        "buildIdeasPrompt",
+        "buildModifyPrompt"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "POST_PRUNE_CONSOLIDATION_PROMPT",
+      "tokens": 508,
+      "usedBy": [
+        "reasonForReshape"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "OUTPUT_INSTRUCTION",
+      "tokens": 52,
+      "usedBy": [
+        "reasonFromFile",
+        "reasonFromScanResults",
+        "buildAddPrompt",
+        "buildMultiAddPrompt",
+        "buildBreakdownPrompt",
+        "buildConsolidatePrompt",
+        "buildIdeasPrompt",
+        "buildDisambiguationPrompt"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "RESHAPE_SYSTEM_PROMPT",
+      "tokens": 377,
+      "usedBy": [
+        "reasonForReshape"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "AUTO_PLACEMENT_INSTRUCTION",
+      "tokens": 119,
+      "usedBy": [
+        "buildAddPrompt",
+        "buildMultiAddPrompt",
+        "buildIdeasPrompt"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "RESHAPE_FEW_SHOT",
+      "tokens": 326,
+      "usedBy": [
+        "reasonForReshape"
+      ]
+    },
+    {
+      "pkg": "rex",
+      "name": "SMART_PRUNE_PROMPT",
+      "tokens": 163,
+      "usedBy": [
+        "reasonForReshape"
+      ]
+    },
+    {
+      "pkg": "hench",
+      "name": "DEFAULT_CLI_NAME",
+      "tokens": 1,
+      "usedBy": [
+        "formatTaskBrief"
+      ]
+    }
+  ],
+  "surfaces": [
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/reason.ts",
+      "builder": "reasonFromFile",
+      "purpose": "Propose PRD items from a single source document.",
+      "inline": true,
+      "literals": 7,
+      "constants": {
+        "PRD_SCHEMA": 333,
+        "FEW_SHOT_EXAMPLE": 432,
+        "TASK_QUALITY_RULES": 181,
+        "ANTI_PATTERNS": 141,
+        "OUTPUT_INSTRUCTION": 52
+      },
+      "ownTokens": 116,
+      "fixedChars": 5015,
+      "fixedTokens": 1254
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/reason.ts",
+      "builder": "reasonFromScanResults",
+      "purpose": "Propose PRD items from a batch of scanner findings.",
+      "inline": true,
+      "literals": 13,
+      "constants": {
+        "PRD_SCHEMA": 333,
+        "FEW_SHOT_EXAMPLE": 432,
+        "CONSOLIDATION_INSTRUCTION": 223,
+        "TASK_QUALITY_RULES": 181,
+        "ANTI_PATTERNS": 141,
+        "OUTPUT_INSTRUCTION": 52
+      },
+      "ownTokens": 415,
+      "fixedChars": 7103,
+      "fixedTokens": 1776
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/reason.ts",
+      "builder": "buildAddPrompt",
+      "purpose": "Propose new PRD items from a natural-language description.",
+      "inline": false,
+      "literals": 6,
+      "constants": {
+        "AUTO_PLACEMENT_INSTRUCTION": 119,
+        "PRD_SCHEMA": 333,
+        "FEW_SHOT_EXAMPLE": 432,
+        "CONSOLIDATION_INSTRUCTION": 223,
+        "TASK_QUALITY_RULES": 181,
+        "ANTI_PATTERNS": 141,
+        "OUTPUT_INSTRUCTION": 52
+      },
+      "ownTokens": 300,
+      "fixedChars": 7117,
+      "fixedTokens": 1780
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/reason.ts",
+      "builder": "buildMultiAddPrompt",
+      "purpose": "Propose items for several scan targets in one call.",
+      "inline": false,
+      "literals": 8,
+      "constants": {
+        "AUTO_PLACEMENT_INSTRUCTION": 119,
+        "PRD_SCHEMA": 333,
+        "FEW_SHOT_EXAMPLE": 432,
+        "CONSOLIDATION_INSTRUCTION": 223,
+        "TASK_QUALITY_RULES": 181,
+        "ANTI_PATTERNS": 141,
+        "OUTPUT_INSTRUCTION": 52
+      },
+      "ownTokens": 285,
+      "fixedChars": 7056,
+      "fixedTokens": 1764
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/reason.ts",
+      "builder": "buildBreakdownPrompt",
+      "purpose": "Split proposals judged too large into child tasks.",
+      "inline": false,
+      "literals": 1,
+      "constants": {
+        "FEW_SHOT_EXAMPLE": 432,
+        "OUTPUT_INSTRUCTION": 52
+      },
+      "ownTokens": 191,
+      "fixedChars": 2698,
+      "fixedTokens": 675
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/reason.ts",
+      "builder": "buildConsolidatePrompt",
+      "purpose": "Merge overlapping proposals before they enter the PRD.",
+      "inline": false,
+      "literals": 1,
+      "constants": {
+        "FEW_SHOT_EXAMPLE": 432,
+        "OUTPUT_INSTRUCTION": 52
+      },
+      "ownTokens": 226,
+      "fixedChars": 2836,
+      "fixedTokens": 709
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/reason.ts",
+      "builder": "buildAssessmentPrompt",
+      "purpose": "Assess whether proposal tasks are at the right granularity.",
+      "inline": false,
+      "literals": 1,
+      "constants": {},
+      "ownTokens": 479,
+      "fixedChars": 1914,
+      "fixedTokens": 479
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/reason.ts",
+      "builder": "buildIdeasPrompt",
+      "purpose": "Extract proposals from free-form notes that local parsing missed.",
+      "inline": false,
+      "literals": 6,
+      "constants": {
+        "AUTO_PLACEMENT_INSTRUCTION": 119,
+        "PRD_SCHEMA": 333,
+        "FEW_SHOT_EXAMPLE": 432,
+        "CONSOLIDATION_INSTRUCTION": 223,
+        "TASK_QUALITY_RULES": 181,
+        "ANTI_PATTERNS": 141,
+        "OUTPUT_INSTRUCTION": 52
+      },
+      "ownTokens": 448,
+      "fixedChars": 7707,
+      "fixedTokens": 1927
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/consolidation-guard.ts",
+      "builder": "buildConsolidationGuardPrompt",
+      "purpose": "Second-opinion check before a consolidation is applied.",
+      "inline": false,
+      "literals": 1,
+      "constants": {
+        "FEW_SHOT_EXAMPLE": 432
+      },
+      "ownTokens": 306,
+      "fixedChars": 2948,
+      "fixedTokens": 737
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/decompose.ts",
+      "builder": "buildDecompositionPrompt",
+      "purpose": "Decompose a task whose level-of-effort exceeds the threshold.",
+      "inline": false,
+      "literals": 7,
+      "constants": {},
+      "ownTokens": 285,
+      "fixedChars": 1140,
+      "fixedTokens": 285
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/extract.ts",
+      "builder": "buildDisambiguationPrompt",
+      "purpose": "Resolve an ambiguous extraction against existing PRD items.",
+      "inline": false,
+      "literals": 5,
+      "constants": {
+        "PRD_SCHEMA": 333,
+        "TASK_QUALITY_RULES": 181,
+        "OUTPUT_INSTRUCTION": 52
+      },
+      "ownTokens": 174,
+      "fixedChars": 2959,
+      "fixedTokens": 740
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/guided.ts",
+      "builder": "buildClarifyPrompt",
+      "purpose": "Ask clarifying questions during guided PRD authoring.",
+      "inline": false,
+      "literals": 5,
+      "constants": {},
+      "ownTokens": 295,
+      "fixedChars": 1178,
+      "fixedTokens": 295
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/guided.ts",
+      "builder": "buildSpecPrompt",
+      "purpose": "Turn guided answers into a structured spec.",
+      "inline": false,
+      "literals": 5,
+      "constants": {
+        "FEW_SHOT_EXAMPLE": 432
+      },
+      "ownTokens": 133,
+      "fixedChars": 2256,
+      "fixedTokens": 564
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/modify-reason.ts",
+      "builder": "buildModifyPrompt",
+      "purpose": "Apply a natural-language edit to an existing PRD item.",
+      "inline": false,
+      "literals": 5,
+      "constants": {
+        "FEW_SHOT_EXAMPLE": 432,
+        "ANTI_PATTERNS": 141
+      },
+      "ownTokens": 272,
+      "fixedChars": 3373,
+      "fixedTokens": 844
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/propose-group-renames.ts",
+      "builder": "buildGroupRenamePrompt",
+      "purpose": "Rename a group of sibling items to a consistent scheme.",
+      "inline": false,
+      "literals": 23,
+      "constants": {},
+      "ownTokens": 210,
+      "fixedChars": 839,
+      "fixedTokens": 210
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/rename-resolve.ts",
+      "builder": "buildRenamePrompt",
+      "purpose": "Pick the better of two colliding item titles.",
+      "inline": false,
+      "literals": 3,
+      "constants": {},
+      "ownTokens": 196,
+      "fixedChars": 783,
+      "fixedTokens": 196
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/reshape-reason.ts",
+      "builder": "reasonForReshape",
+      "purpose": "Propose a restructure of the PRD hierarchy.",
+      "inline": true,
+      "literals": 8,
+      "constants": {
+        "POST_PRUNE_CONSOLIDATION_PROMPT": 508,
+        "SMART_PRUNE_PROMPT": 163,
+        "RESHAPE_SYSTEM_PROMPT": 377,
+        "RESHAPE_FEW_SHOT": 326
+      },
+      "ownTokens": 15,
+      "fixedChars": 5551,
+      "fixedTokens": 1388
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/reshape-reason.ts",
+      "builder": "reasonForBodyMerge",
+      "purpose": "Merge two item descriptions into one during a reshape.",
+      "inline": true,
+      "literals": 12,
+      "constants": {},
+      "ownTokens": 106,
+      "fixedChars": 421,
+      "fixedTokens": 106
+    },
+    {
+      "pkg": "rex",
+      "file": "packages/rex/src/analyze/escalate.ts",
+      "builder": "buildValidationFeedback",
+      "purpose": "Retry feedback appended to a prompt whose response failed validation.",
+      "inline": false,
+      "literals": 11,
+      "constants": {},
+      "ownTokens": 59,
+      "fixedChars": 234,
+      "fixedTokens": 59
+    },
+    {
+      "pkg": "sourcevision",
+      "file": "packages/sourcevision/src/analyzers/enrich-batch.ts",
+      "builder": "buildFirstPassPrompt",
+      "purpose": "First-pass zone enrichment for a batch of zones.",
+      "inline": false,
+      "literals": 26,
+      "constants": {},
+      "ownTokens": 318,
+      "fixedChars": 1270,
+      "fixedTokens": 318
+    },
+    {
+      "pkg": "sourcevision",
+      "file": "packages/sourcevision/src/analyzers/enrich-batch.ts",
+      "builder": "buildLaterPassPrompt",
+      "purpose": "Later-pass zone enrichment, given the previous pass's output.",
+      "inline": false,
+      "literals": 21,
+      "constants": {},
+      "ownTokens": 301,
+      "fixedChars": 1203,
+      "fixedTokens": 301
+    },
+    {
+      "pkg": "sourcevision",
+      "file": "packages/sourcevision/src/analyzers/enrich-config.ts",
+      "builder": "buildMetaPrompt",
+      "purpose": "Meta-evaluation choosing the enrichment strategy for a repo.",
+      "inline": false,
+      "literals": 11,
+      "constants": {},
+      "ownTokens": 520,
+      "fixedChars": 2077,
+      "fixedTokens": 520
+    },
+    {
+      "pkg": "sourcevision",
+      "file": "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
+      "builder": "enrichSingleZone",
+      "purpose": "Per-zone enrichment fallback when batch enrichment is too coarse.",
+      "inline": true,
+      "literals": 50,
+      "constants": {},
+      "ownTokens": 452,
+      "fixedChars": 1806,
+      "fixedTokens": 452
+    },
+    {
+      "pkg": "sourcevision",
+      "file": "packages/sourcevision/src/analyzers/classify.ts",
+      "builder": "buildLLMClassifyPrompt",
+      "purpose": "Classify file archetypes the heuristic classifier could not.",
+      "inline": false,
+      "literals": 10,
+      "constants": {},
+      "ownTokens": 84,
+      "fixedChars": 336,
+      "fixedTokens": 84
+    },
+    {
+      "pkg": "sourcevision",
+      "file": "packages/sourcevision/src/analyzers/primer.ts",
+      "builder": "buildPrimerPrompt",
+      "purpose": "Distil CONTEXT.md into the startup primer every agent run inherits.",
+      "inline": false,
+      "literals": 18,
+      "constants": {},
+      "ownTokens": 223,
+      "fixedChars": 889,
+      "fixedTokens": 223
+    },
+    {
+      "pkg": "hench",
+      "file": "packages/hench/src/agent/planning/prompt.ts",
+      "builder": "buildSystemPrompt",
+      "purpose": "The agent's system prompt — role, rules, workflow, error handling.",
+      "inline": false,
+      "literals": 65,
+      "constants": {},
+      "ownTokens": 849,
+      "fixedChars": 3396,
+      "fixedTokens": 849
+    },
+    {
+      "pkg": "hench",
+      "file": "packages/hench/src/agent/planning/prompt.ts",
+      "builder": "buildGoLanguageContext",
+      "purpose": "Go toolchain and convention context, added when the project is Go.",
+      "inline": false,
+      "literals": 26,
+      "constants": {},
+      "ownTokens": 278,
+      "fixedChars": 1109,
+      "fixedTokens": 278
+    },
+    {
+      "pkg": "hench",
+      "file": "packages/hench/src/agent/planning/brief.ts",
+      "builder": "formatTaskBrief",
+      "purpose": "Render the task brief section — task, parent chain, requirements.",
+      "inline": false,
+      "literals": 42,
+      "constants": {
+        "DEFAULT_CLI_NAME": 1
+      },
+      "ownTokens": 145,
+      "fixedChars": 584,
+      "fixedTokens": 146
+    },
+    {
+      "pkg": "hench",
+      "file": "packages/hench/src/agent/analysis/adversarial-review.ts",
+      "builder": "buildReviewSystemPrompt",
+      "purpose": "System prompt for the adversarial review pass.",
+      "inline": false,
+      "literals": 27,
+      "constants": {},
+      "ownTokens": 331,
+      "fixedChars": 1321,
+      "fixedTokens": 331
+    },
+    {
+      "pkg": "hench",
+      "file": "packages/hench/src/agent/analysis/adversarial-review.ts",
+      "builder": "buildReviewBrief",
+      "purpose": "Brief handed to the reviewer — what to attack and where to report.",
+      "inline": false,
+      "literals": 129,
+      "constants": {},
+      "ownTokens": 1460,
+      "fixedChars": 5838,
+      "fixedTokens": 1460
+    },
+    {
+      "pkg": "hench",
+      "file": "packages/hench/src/agent/lifecycle/orientation.ts",
+      "builder": "buildOrientationSystemPrompt",
+      "purpose": "System prompt for the one-off repository orientation pass.",
+      "inline": false,
+      "literals": 9,
+      "constants": {},
+      "ownTokens": 114,
+      "fixedChars": 454,
+      "fixedTokens": 114
+    },
+    {
+      "pkg": "hench",
+      "file": "packages/hench/src/agent/lifecycle/orientation.ts",
+      "builder": "buildOrientationPrompt",
+      "purpose": "Orientation task prompt — what to establish about the repo.",
+      "inline": false,
+      "literals": 15,
+      "constants": {},
+      "ownTokens": 191,
+      "fixedChars": 761,
+      "fixedTokens": 191
+    },
+    {
+      "pkg": "hench",
+      "file": "packages/hench/src/agent/lifecycle/cli-loop.ts",
+      "builder": "buildRetryNotice",
+      "purpose": "Notice appended on retry telling a fresh session what is on disk.",
+      "inline": false,
+      "literals": 4,
+      "constants": {},
+      "ownTokens": 55,
+      "fixedChars": 217,
+      "fixedTokens": 55
+    },
+    {
+      "pkg": "hench",
+      "file": "packages/hench/src/agent/lifecycle/plan-mode-prompt.ts",
+      "builder": "formatPlanModeAppendix",
+      "purpose": "Appendix re-spawning a session that stalled in plan mode.",
+      "inline": false,
+      "literals": 12,
+      "constants": {},
+      "ownTokens": 120,
+      "fixedChars": 478,
+      "fixedTokens": 120
+    },
+    {
+      "pkg": "core",
+      "file": "packages/core/pair-programming.js",
+      "builder": "buildReviewerPrompt",
+      "purpose": "QA reviewer prompt for the pair-programming second opinion.",
+      "inline": false,
+      "literals": 6,
+      "constants": {},
+      "ownTokens": 281,
+      "fixedChars": 1124,
+      "fixedTokens": 281
+    }
+  ],
+  "assembled": {
+    "rex": {
+      "surface": "buildAssessmentPrompt",
+      "describe": "Granularity assessment over one two-task proposal.",
+      "chars": 2948,
+      "tokens": 737,
+      "fixedTokens": 479,
+      "contextTokens": 258
+    },
+    "sourcevision": {
+      "surface": "buildPrimerPrompt",
+      "describe": "Primer distillation over a fixed 3-zone CONTEXT.md excerpt.",
+      "chars": 1461,
+      "tokens": 366,
+      "fixedTokens": 223,
+      "contextTokens": 143
+    },
+    "hench": {
+      "surface": "buildPromptEnvelope",
+      "describe": "Full agent envelope (system + brief) for a CLI-provider run.",
+      "chars": 2612,
+      "tokens": 653,
+      "sections": [
+        {
+          "name": "system",
+          "chars": 1862,
+          "tokens": 466
+        },
+        {
+          "name": "brief",
+          "chars": 748,
+          "tokens": 187
+        }
+      ],
+      "fixedTokens": 995,
+      "branchConditional": true,
+      "unreachedTokens": 342
+    },
+    "core": {
+      "surface": "buildReviewerPrompt",
+      "describe": "Pair-programming reviewer prompt over three changed files.",
+      "chars": 1187,
+      "tokens": 297,
+      "fixedTokens": 281,
+      "contextTokens": 16
+    }
+  },
+  "noPromptPackages": {
+    "web": "Serves the dashboard and proxies MCP. Every LLM call it surfaces is made by rex, sourcevision, or hench behind a gateway; web composes no prompt text of its own.",
+    "llm-client": "Foundation tier. Carries the prompt envelope and token types that the other packages fill in, but composes no prompt text itself."
+  },
+  "outOfScope": {
+    "namePatterns": [
+      "^prompt[A-Z]",
+      "^confirmPrompt$",
+      "^defaultPrompt$",
+      "Prompt(Input|Choice|Confirm)$"
+    ],
+    "classified": [
+      {
+        "file": "packages/rex/src/cli/commands/chunked-review-state.ts",
+        "builder": "buildPrompt",
+        "reason": "Readline prompt string (`(3/8 accepted) > `) passed to promptLine. Named buildPrompt but never reaches a model."
+      },
+      {
+        "file": "packages/rex/src/cli/commands/smart-add.ts",
+        "builder": "parseDuplicatePromptInput",
+        "reason": "Parses a human's answer to a readline prompt."
+      },
+      {
+        "file": "packages/hench/src/agent/analysis/review.ts",
+        "builder": "promptReview",
+        "reason": "Interactive review gate — asks the operator, not a model."
+      },
+      {
+        "file": "packages/hench/src/agent/lifecycle/prompt-diagnostics.ts",
+        "builder": "extractPromptSectionDiagnostics",
+        "reason": "Measures a prompt envelope; emits no prompt text."
+      },
+      {
+        "file": "packages/hench/src/agent/lifecycle/prompt-diagnostics.ts",
+        "builder": "logPromptSections",
+        "reason": "Logs envelope section sizes to the CLI."
+      },
+      {
+        "file": "packages/hench/src/tools/test-command-resolver.ts",
+        "builder": "promptForTestCommand",
+        "reason": "Asks the operator for a test command."
+      }
+    ]
+  },
+  "recordedAt": "2026-09-08T14:45:17.367Z",
+  "commit": "5a6978846bb2"
+}

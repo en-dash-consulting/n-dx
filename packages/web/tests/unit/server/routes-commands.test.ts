@@ -484,13 +484,27 @@ describe("commands route — ndx binary resolution ladder", () => {
   let ctx: ServerContext;
   let server: Server;
   let port: number;
-  let savedCliPath: string | undefined;
+  /**
+   * Both env vars resolveNdxBin() reads, saved and cleared per test.
+   *
+   * `NDX_CLI_PATH` (no separator) short-circuits the whole ladder before the
+   * project-local bin is even checked, and `ndx start` sets it on every child
+   * it spawns — so a developer running this suite from a server-launched shell
+   * saw every assertion here fail while the resolver was working correctly.
+   * Clearing only `N_DX_CLI_PATH` left the test at the mercy of the ambient
+   * environment.
+   */
+  const CLI_PATH_VARS = ["NDX_CLI_PATH", "N_DX_CLI_PATH"] as const;
+  let savedCliPaths: Record<string, string | undefined>;
 
   beforeEach(async () => {
     execMock.mockReset();
     spawnManagedMock.mockReset();
-    savedCliPath = process.env["N_DX_CLI_PATH"];
-    delete process.env["N_DX_CLI_PATH"];
+    savedCliPaths = {};
+    for (const key of CLI_PATH_VARS) {
+      savedCliPaths[key] = process.env[key];
+      delete process.env[key];
+    }
     tmpDir = await mkdtemp(join(tmpdir(), "commands-ndxbin-"));
     await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
     ctx = {
@@ -507,8 +521,11 @@ describe("commands route — ndx binary resolution ladder", () => {
   });
 
   afterEach(async () => {
-    if (savedCliPath === undefined) delete process.env["N_DX_CLI_PATH"];
-    else process.env["N_DX_CLI_PATH"] = savedCliPath;
+    for (const key of CLI_PATH_VARS) {
+      const saved = savedCliPaths[key];
+      if (saved === undefined) delete process.env[key];
+      else process.env[key] = saved;
+    }
     await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });

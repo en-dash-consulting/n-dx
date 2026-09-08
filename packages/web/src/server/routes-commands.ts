@@ -158,6 +158,11 @@ function resolveRexBin(ctx: ServerContext): { bin: string; args: string[] } {
 /**
  * Resolve the ndx orchestrator CLI. Ladder:
  *
+ *  0. `NDX_CLI_PATH` — an explicit override that wins over everything below,
+ *     including the project-local bin. Set by `ndx start` on the children it
+ *     spawns. Because it short-circuits the whole ladder, any test exercising
+ *     the steps below must clear it as well as `N_DX_CLI_PATH` — leaving it
+ *     set makes every other rung unreachable.
  *  1. Project-local `node_modules/.bin/ndx` — the analyzed project's own
  *     install wins, matching {@link resolveNdxCli}.
  *  2. `N_DX_CLI_PATH` — set by the launching CLI (cli.js) for every child it

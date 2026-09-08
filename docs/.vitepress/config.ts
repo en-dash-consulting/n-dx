@@ -84,6 +84,7 @@ export default defineConfig({
           items: [
             { text: "Process Lifecycle", link: "/analysis/process-lifecycle-audit" },
             { text: "Signal Handling", link: "/analysis/signal-handling-audit" },
+            { text: "Prompt Token Baseline", link: "/analysis/prompt-token-baseline" },
             { text: "Memory OS Behavior", link: "/process/memory-os-behavior" },
             { text: "Install Path Validation", link: "/process/install-path-validation" },
           ],

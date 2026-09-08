@@ -2,13 +2,18 @@
 id: "76076f6a-c23c-4905-864b-5218a5a6ee69"
 level: "feature"
 title: "Prompt Token-Cost Baseline & Measurement"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "prompts"
   - "tokens"
   - "measurement"
 source: "ndx-capture"
+startedAt: "2026-09-08T14:28:59.413Z"
+completedAt: "2026-09-08T14:57:49.636Z"
+endedAt: "2026-09-08T14:57:49.636Z"
+resolutionType: "code-change"
+resolutionDetail: "Added scripts/prompt-census.mjs plus the checked-in baseline at docs/analysis/prompt-token-baseline.{md,json}: 35 LLM prompt surfaces across rex/sourcevision/hench/core, 21,511 per-call and 13,089 unique fixed tokens, counted via llm-client's budgetPreflight(). 21 enforcement tests in tests/e2e/prompt-census.test.js."
 acceptanceCriteria:
   - "A single checked-in inventory lists every LLM prompt surface across rex, sourcevision, hench, and core with its file path, builder function, purpose, and measured token cost at HEAD before any rewrite."
   - "The inventory records that web contains no LLM prompt surfaces, so the exclusion is deliberate rather than an oversight."
@@ -19,6 +24,6 @@ acceptanceCriteria:
   - "The baseline distinguishes fixed prompt text from context assembled per run, so later reductions are attributed to the right surface."
   - "Re-running the measurement after a rewrite emits a before-and-after comparison rather than only the current total."
 description: "Establish the measurement substrate the rest of this epic is judged against. Inventory every prompt surface that reaches an LLM and record its token cost before any rewriting, so \"we made it cheaper\" is a number rather than a claim. A census at capture time found the static prompt text concentrated in rex (~12,565 tokens across 31 literals in 12 files) and sourcevision (~1,997 across 12), with one surface in core (pair-programming.js buildReviewerPrompt) and none in web. Hench's own prompts are assembled from many short fragments rather than single literals, so a literal-scanning census undercounts them and they must be measured through the PromptEnvelope diagnostics instead. Reuse the existing token-parsing path in packages/hench/src/prd/llm-gateway.ts rather than adding a second counter. Interactive readline prompts (promptUser, confirmPrompt, promptLine and similar, roughly 20 functions) are questions to the human, not LLM prompts, and are explicitly out of scope."
-lastModified: "2026-09-08T13:40:02.996Z"
+lastModified: "2026-09-08T14:57:49.664Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

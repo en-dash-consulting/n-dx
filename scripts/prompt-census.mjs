@@ -1,0 +1,1412 @@
+#!/usr/bin/env node
+/**
+ * Prompt token-cost census — measure every LLM prompt surface in the monorepo.
+ *
+ * The point of this tool is to make "we made the prompts cheaper" a number
+ * instead of a claim. It records the token cost of every prompt surface that
+ * reaches an LLM, before and after a rewrite, from one declared registry.
+ *
+ *   node scripts/prompt-census.mjs                  # measure HEAD, print a table
+ *   node scripts/prompt-census.mjs --json           # same, machine-readable
+ *   node scripts/prompt-census.mjs --compare        # before/after vs the baseline
+ *   node scripts/prompt-census.mjs --compare --baseline <path>   # vs another one
+ *   node scripts/prompt-census.mjs --write          # rewrite the checked-in baseline
+ *   node scripts/prompt-census.mjs --dump <pkg>     # print one assembled prompt
+ *   node scripts/prompt-census.mjs --check          # fail if the registry is stale
+ *
+ * ## How a surface is measured
+ *
+ * Two numbers per surface, because they move for different reasons:
+ *
+ * - **fixed** — the prompt text the builder always emits, extracted statically
+ *   from the string literals in its body. This is the part a rewrite reduces.
+ * - **assembled** — the length of a real prompt built from a fixed
+ *   representative input. Only available for the four `--dump` entry points.
+ *   `assembled - fixed` is the per-run context, which a rewrite does *not*
+ *   reduce and which must not be credited to one.
+ *
+ * Static extraction is what makes both construction styles comparable. rex and
+ * sourcevision build prompts as single large template literals; hench pushes
+ * dozens of short fragments onto an array. Counting *literals in the function
+ * body* catches both — a literal-per-file scan undercounts hench badly, and
+ * measuring only assembled output cannot separate fixed text from context.
+ *
+ * ## Token counting
+ *
+ * Counts come from `budgetPreflight()` in @n-dx/llm-client, the same estimator
+ * the runtime uses to decide whether a prompt fits a context window. This tool
+ * deliberately does not add a second estimator: a number produced here has to
+ * be the number the runtime would produce for the same text.
+ *
+ * ## Scope
+ *
+ * In scope: prompt text sent to a model. Out of scope: interactive readline
+ * prompts (`promptUser`, `confirmPrompt`, `promptLine`, …) — those are
+ * questions to a human. They are listed explicitly in OUT_OF_SCOPE below so a
+ * later audit does not mistake one for an LLM prompt, and so that a
+ * confusingly-named one (rex's `buildPrompt`, which feeds `promptLine`) stays
+ * classified rather than rediscovered.
+ *
+ * @see docs/analysis/prompt-token-baseline.md — the generated inventory
+ * @see tests/e2e/prompt-census.test.js — registry staleness enforcement
+ */
+
+import { readFileSync, writeFileSync, existsSync, realpathSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const BASELINE_JSON = join(ROOT, "docs/analysis/prompt-token-baseline.json");
+const BASELINE_MD = join(ROOT, "docs/analysis/prompt-token-baseline.md");
+
+/**
+ * TypeScript resolves from the web package, the workspace member that depends
+ * on it most directly. Same resolution trick as scripts/build-iso-skill.mjs.
+ */
+const require = createRequire(join(ROOT, "packages/web/package.json"));
+
+// ── Registry: declared LLM prompt surfaces ───────────────────────────────────
+
+/**
+ * Every prompt surface that reaches a model, one entry per builder.
+ *
+ * `builder` names the enclosing function whose string literals form the prompt.
+ * For surfaces where the prompt is an inline template literal rather than an
+ * extracted builder, `builder` names the function that contains it and
+ * `inline: true` records that there is no dedicated builder to rewrite.
+ */
+const SURFACES = [
+  // ── rex ────────────────────────────────────────────────────────────────
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/reason.ts",
+    builder: "reasonFromFile",
+    inline: true,
+    purpose: "Propose PRD items from a single source document.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/reason.ts",
+    builder: "reasonFromScanResults",
+    inline: true,
+    purpose: "Propose PRD items from a batch of scanner findings.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/reason.ts",
+    builder: "buildAddPrompt",
+    purpose: "Propose new PRD items from a natural-language description.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/reason.ts",
+    builder: "buildMultiAddPrompt",
+    purpose: "Propose items for several scan targets in one call.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/reason.ts",
+    builder: "buildBreakdownPrompt",
+    purpose: "Split proposals judged too large into child tasks.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/reason.ts",
+    builder: "buildConsolidatePrompt",
+    purpose: "Merge overlapping proposals before they enter the PRD.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/reason.ts",
+    builder: "buildAssessmentPrompt",
+    purpose: "Assess whether proposal tasks are at the right granularity.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/reason.ts",
+    builder: "buildIdeasPrompt",
+    purpose: "Extract proposals from free-form notes that local parsing missed.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/consolidation-guard.ts",
+    builder: "buildConsolidationGuardPrompt",
+    purpose: "Second-opinion check before a consolidation is applied.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/decompose.ts",
+    builder: "buildDecompositionPrompt",
+    purpose: "Decompose a task whose level-of-effort exceeds the threshold.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/extract.ts",
+    builder: "buildDisambiguationPrompt",
+    purpose: "Resolve an ambiguous extraction against existing PRD items.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/guided.ts",
+    builder: "buildClarifyPrompt",
+    purpose: "Ask clarifying questions during guided PRD authoring.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/guided.ts",
+    builder: "buildSpecPrompt",
+    purpose: "Turn guided answers into a structured spec.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/modify-reason.ts",
+    builder: "buildModifyPrompt",
+    purpose: "Apply a natural-language edit to an existing PRD item.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/propose-group-renames.ts",
+    builder: "buildGroupRenamePrompt",
+    purpose: "Rename a group of sibling items to a consistent scheme.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/rename-resolve.ts",
+    builder: "buildRenamePrompt",
+    purpose: "Pick the better of two colliding item titles.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/reshape-reason.ts",
+    builder: "reasonForReshape",
+    inline: true,
+    purpose: "Propose a restructure of the PRD hierarchy.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/reshape-reason.ts",
+    builder: "reasonForBodyMerge",
+    inline: true,
+    purpose: "Merge two item descriptions into one during a reshape.",
+  },
+  {
+    pkg: "rex",
+    file: "packages/rex/src/analyze/escalate.ts",
+    builder: "buildValidationFeedback",
+    purpose: "Retry feedback appended to a prompt whose response failed validation.",
+  },
+
+  // ── sourcevision ───────────────────────────────────────────────────────
+  {
+    pkg: "sourcevision",
+    file: "packages/sourcevision/src/analyzers/enrich-batch.ts",
+    builder: "buildFirstPassPrompt",
+    purpose: "First-pass zone enrichment for a batch of zones.",
+  },
+  {
+    pkg: "sourcevision",
+    file: "packages/sourcevision/src/analyzers/enrich-batch.ts",
+    builder: "buildLaterPassPrompt",
+    purpose: "Later-pass zone enrichment, given the previous pass's output.",
+  },
+  {
+    pkg: "sourcevision",
+    file: "packages/sourcevision/src/analyzers/enrich-config.ts",
+    builder: "buildMetaPrompt",
+    purpose: "Meta-evaluation choosing the enrichment strategy for a repo.",
+  },
+  {
+    pkg: "sourcevision",
+    file: "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
+    builder: "enrichSingleZone",
+    inline: true,
+    purpose: "Per-zone enrichment fallback when batch enrichment is too coarse.",
+  },
+  {
+    pkg: "sourcevision",
+    file: "packages/sourcevision/src/analyzers/classify.ts",
+    builder: "buildLLMClassifyPrompt",
+    purpose: "Classify file archetypes the heuristic classifier could not.",
+  },
+  {
+    pkg: "sourcevision",
+    file: "packages/sourcevision/src/analyzers/primer.ts",
+    builder: "buildPrimerPrompt",
+    purpose: "Distil CONTEXT.md into the startup primer every agent run inherits.",
+  },
+
+  // ── hench ──────────────────────────────────────────────────────────────
+  {
+    pkg: "hench",
+    file: "packages/hench/src/agent/planning/prompt.ts",
+    builder: "buildSystemPrompt",
+    purpose: "The agent's system prompt — role, rules, workflow, error handling.",
+  },
+  {
+    pkg: "hench",
+    file: "packages/hench/src/agent/planning/prompt.ts",
+    builder: "buildGoLanguageContext",
+    purpose: "Go toolchain and convention context, added when the project is Go.",
+  },
+  {
+    pkg: "hench",
+    file: "packages/hench/src/agent/planning/brief.ts",
+    builder: "formatTaskBrief",
+    purpose: "Render the task brief section — task, parent chain, requirements.",
+  },
+  {
+    pkg: "hench",
+    file: "packages/hench/src/agent/analysis/adversarial-review.ts",
+    builder: "buildReviewSystemPrompt",
+    purpose: "System prompt for the adversarial review pass.",
+  },
+  {
+    pkg: "hench",
+    file: "packages/hench/src/agent/analysis/adversarial-review.ts",
+    builder: "buildReviewBrief",
+    purpose: "Brief handed to the reviewer — what to attack and where to report.",
+  },
+  {
+    pkg: "hench",
+    file: "packages/hench/src/agent/lifecycle/orientation.ts",
+    builder: "buildOrientationSystemPrompt",
+    purpose: "System prompt for the one-off repository orientation pass.",
+  },
+  {
+    pkg: "hench",
+    file: "packages/hench/src/agent/lifecycle/orientation.ts",
+    builder: "buildOrientationPrompt",
+    purpose: "Orientation task prompt — what to establish about the repo.",
+  },
+  {
+    pkg: "hench",
+    file: "packages/hench/src/agent/lifecycle/cli-loop.ts",
+    builder: "buildRetryNotice",
+    purpose: "Notice appended on retry telling a fresh session what is on disk.",
+  },
+  {
+    pkg: "hench",
+    file: "packages/hench/src/agent/lifecycle/plan-mode-prompt.ts",
+    builder: "formatPlanModeAppendix",
+    purpose: "Appendix re-spawning a session that stalled in plan mode.",
+  },
+
+  // ── core ───────────────────────────────────────────────────────────────
+  {
+    pkg: "core",
+    file: "packages/core/pair-programming.js",
+    builder: "buildReviewerPrompt",
+    purpose: "QA reviewer prompt for the pair-programming second opinion.",
+  },
+];
+
+/**
+ * Packages with no LLM prompt surfaces.
+ *
+ * Recorded so the absence is a finding rather than an oversight — a later
+ * audit should be able to tell "we looked and there were none" apart from
+ * "nobody looked". Enforced by tests/e2e/prompt-census.test.js.
+ */
+const NO_PROMPT_PACKAGES = {
+  web: "Serves the dashboard and proxies MCP. Every LLM call it surfaces is made by rex, sourcevision, or hench behind a gateway; web composes no prompt text of its own.",
+  "llm-client": "Foundation tier. Carries the prompt envelope and token types that the other packages fill in, but composes no prompt text itself.",
+};
+
+/**
+ * Name patterns for interactive readline prompts — questions to a human, not
+ * to a model. Explicitly out of scope for this epic.
+ */
+const INTERACTIVE_PROMPT_PATTERNS = [
+  /^prompt[A-Z]/, //  promptUser, promptLine, promptRollbackConfirm, promptCommitConfirm, …
+  /^confirmPrompt$/,
+  /^defaultPrompt$/,
+  /Prompt(Input|Choice|Confirm)$/,
+];
+
+/**
+ * Builders whose name matches a prompt pattern but which are not LLM prompts.
+ *
+ * These are the false positives a name-based audit produces. Each one is
+ * classified here once so it does not have to be re-investigated.
+ */
+const OUT_OF_SCOPE = [
+  {
+    file: "packages/rex/src/cli/commands/chunked-review-state.ts",
+    builder: "buildPrompt",
+    reason: "Readline prompt string (`(3/8 accepted) > `) passed to promptLine. Named buildPrompt but never reaches a model.",
+  },
+  {
+    file: "packages/rex/src/cli/commands/smart-add.ts",
+    builder: "parseDuplicatePromptInput",
+    reason: "Parses a human's answer to a readline prompt.",
+  },
+  {
+    file: "packages/hench/src/agent/analysis/review.ts",
+    builder: "promptReview",
+    reason: "Interactive review gate — asks the operator, not a model.",
+  },
+  {
+    file: "packages/hench/src/agent/lifecycle/prompt-diagnostics.ts",
+    builder: "extractPromptSectionDiagnostics",
+    reason: "Measures a prompt envelope; emits no prompt text.",
+  },
+  {
+    file: "packages/hench/src/agent/lifecycle/prompt-diagnostics.ts",
+    builder: "logPromptSections",
+    reason: "Logs envelope section sizes to the CLI.",
+  },
+  {
+    file: "packages/hench/src/tools/test-command-resolver.ts",
+    builder: "promptForTestCommand",
+    reason: "Asks the operator for a test command.",
+  },
+];
+
+// ── Static literal extraction ────────────────────────────────────────────────
+
+/**
+ * Extract the static prompt text a builder always emits.
+ *
+ * Walks the named function's body and collects every string literal. A
+ * template literal contributes its static spans with the interpolations
+ * removed (`${x}` costs nothing here — it is per-run context, counted under
+ * `assembled` instead). Separate literals are joined with a newline, which is
+ * how `lines.push(...)` assembly renders and close enough for template
+ * literals that it does not distort a comparison run against the same rule.
+ *
+ * Module-level string constants the body references are resolved and counted
+ * too, including ones imported from a sibling module (rex keeps `PRD_SCHEMA`
+ * and `TASK_QUALITY_RULES` in `analyze-shared.ts` and interpolates them into
+ * seven different builders). Without that step a builder like
+ * `reasonForReshape`, whose entire prompt lives in four `const PROMPT = \`…\``
+ * declarations and whose body only assembles them, measures at 57 characters —
+ * a 25x undercount. Each constant is counted once per surface no matter how
+ * many times it is referenced.
+ *
+ * Import following is one level deep. A constant re-exported through a chain
+ * of two or more modules is not resolved; none exist today, and `--check`
+ * plus the totals in the baseline make a new one visible as a sudden drop.
+ *
+ * All branches count. A builder with `isCli ? A : B` emits only one of them per
+ * run, but both are fixed text a rewrite can shorten, so both belong in the
+ * baseline. This is why a `fixed` total can exceed the `assembled` length of
+ * any single path — see `branchConditional` in the report.
+ *
+ * @returns {{ text: string, literals: number, constants: string[] } | null}
+ *   null when the builder is not found.
+ */
+function extractStaticPromptText(ts, sourceText, fileName, builderName) {
+  const sf = ts.createSourceFile(
+    fileName,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+  );
+
+  const target = findFunctionBody(ts, sf, builderName);
+  if (!target) return null;
+
+  const moduleConstants = new Map([
+    ...collectImportedStringConstants(ts, sf, fileName),
+    ...collectModuleStringConstants(ts, sf), // local wins on a name collision
+  ]);
+
+  /** @type {string[]} */
+  const parts = [];
+  /** Constants are kept apart from body literals so the report can both charge
+   *  each surface the full cost it pays per call AND deduplicate shared text
+   *  when totalling a package. `PRD_SCHEMA` is interpolated into seven rex
+   *  builders: each call pays for it, but a rewrite edits it once. */
+  const pulledConstants = new Map();
+
+  const visit = (node) => {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      parts.push(node.text);
+    } else if (ts.isTemplateExpression(node)) {
+      // Static spans only — interpolations are per-run context.
+      let joined = node.head.text;
+      for (const span of node.templateSpans) joined += span.literal.text;
+      parts.push(joined);
+      // Descend into each interpolation — `${PRD_SCHEMA}` is a bare identifier
+      // that must be visited itself, not just its children, and a ternary can
+      // pick between two fixed sentences. Calling visit() rather than
+      // forEachChild() is what makes `${CONST}` resolve.
+      for (const span of node.templateSpans) visit(span.expression);
+      return;
+    } else if (
+      ts.isIdentifier(node) &&
+      moduleConstants.has(node.text) &&
+      !pulledConstants.has(node.text) &&
+      // Skip `obj.NAME` — only a bare value reference pulls the constant in.
+      !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
+    ) {
+      pulledConstants.set(node.text, moduleConstants.get(node.text));
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  ts.forEachChild(target, visit);
+
+  return {
+    /** Literals written inside this builder — text only it can shorten. */
+    ownText: parts.join("\n"),
+    /** Shared constants it pulls in — name → text. */
+    constants: pulledConstants,
+    literals: parts.length,
+  };
+}
+
+/**
+ * Map every module-level `const NAME = <string literal>` in a file to its text.
+ *
+ * Only top-level declarations — a local `const` inside the builder is already
+ * reached by the body walk, and resolving it here would double-count it.
+ */
+function collectModuleStringConstants(ts, sf) {
+  const constants = new Map();
+
+  for (const stmt of sf.statements) {
+    if (!ts.isVariableStatement(stmt)) continue;
+    for (const decl of stmt.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
+      const init = decl.initializer;
+
+      if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) {
+        constants.set(decl.name.text, init.text);
+      } else if (ts.isTemplateExpression(init)) {
+        let joined = init.head.text;
+        for (const span of init.templateSpans) joined += span.literal.text;
+        constants.set(decl.name.text, joined);
+      }
+    }
+  }
+
+  return constants;
+}
+
+/**
+ * Resolve string constants this file imports by name from a sibling module.
+ *
+ * Only relative specifiers are followed, and only named imports — a prompt
+ * constant reached through a package boundary would be a layering problem
+ * worth failing on rather than quietly measuring. TS emits `./x.js` for
+ * `./x.ts`, so the specifier is mapped back to source.
+ */
+function collectImportedStringConstants(ts, sf, fileName) {
+  const resolved = new Map();
+
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+    const spec = stmt.moduleSpecifier.text;
+    if (!spec.startsWith(".")) continue;
+
+    const bindings = stmt.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+
+    const source = join(dirname(fileName), spec.replace(/\.js$/, ".ts"));
+    if (!existsSync(source)) continue;
+
+    const sibling = ts.createSourceFile(
+      source,
+      readFileSync(source, "utf8"),
+      ts.ScriptTarget.Latest,
+      /* setParentNodes */ true,
+    );
+    const exported = collectModuleStringConstants(ts, sibling);
+
+    for (const el of bindings.elements) {
+      // `import { A as B }` — look up A, bind under the local name B.
+      const original = (el.propertyName ?? el.name).text;
+      if (exported.has(original)) resolved.set(el.name.text, exported.get(original));
+    }
+  }
+
+  return resolved;
+}
+
+/** Find the body of a function declaration, arrow, or method by name. */
+function findFunctionBody(ts, sf, name) {
+  let found = null;
+
+  const visit = (node) => {
+    if (found) return;
+
+    if (
+      (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) &&
+      node.name &&
+      node.name.getText(sf) === name &&
+      node.body
+    ) {
+      found = node.body;
+      return;
+    }
+
+    if (
+      ts.isVariableDeclaration(node) &&
+      node.name &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === name &&
+      node.initializer &&
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+    ) {
+      found = node.initializer.body;
+      return;
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sf);
+  return found;
+}
+
+// ── Representative inputs (the `--dump` fixtures) ────────────────────────────
+
+/**
+ * One assembled prompt per package, from a fixed input.
+ *
+ * These exist so the assembled number is reproducible: the same fixture in,
+ * the same token count out, on any machine, with no model call. They import
+ * from `dist/`, which the package guidelines permit for repo tooling.
+ */
+const REPRESENTATIVE = {
+  rex: {
+    surface: "buildAssessmentPrompt",
+    describe: "Granularity assessment over one two-task proposal.",
+    async build() {
+      const { buildAssessmentPrompt } = await loadDist("rex/dist/analyze/reason.js");
+      return buildAssessmentPrompt(FIXTURE_PROPOSALS);
+    },
+  },
+  sourcevision: {
+    surface: "buildPrimerPrompt",
+    describe: "Primer distillation over a fixed 3-zone CONTEXT.md excerpt.",
+    async build() {
+      const { buildPrimerPrompt } = await loadDist("sourcevision/dist/analyzers/primer.js");
+      return buildPrimerPrompt(FIXTURE_CONTEXT_MD);
+    },
+  },
+  hench: {
+    surface: "buildPromptEnvelope",
+    describe: "Full agent envelope (system + brief) for a CLI-provider run.",
+    async build() {
+      const { buildPromptEnvelope } = await loadDist("hench/dist/agent/planning/prompt.js");
+      const { DEFAULT_HENCH_CONFIG } = await loadDist("hench/dist/schema/v1.js");
+      const envelope = buildPromptEnvelope(FIXTURE_BRIEF, {
+        ...DEFAULT_HENCH_CONFIG(),
+        provider: "cli",
+      });
+      // Report per-section so the fragment-assembled prompt is not collapsed
+      // into a single opaque number.
+      return {
+        text: envelope.sections.map((s) => s.content).join("\n\n"),
+        sections: envelope.sections.map((s) => ({
+          name: s.name,
+          chars: s.content.length,
+        })),
+      };
+    },
+  },
+  core: {
+    surface: "buildReviewerPrompt",
+    describe: "Pair-programming reviewer prompt over three changed files.",
+    async build() {
+      const { buildReviewerPrompt } = await loadDist("core/pair-programming.js");
+      return buildReviewerPrompt({
+        changedFiles: [
+          "packages/rex/src/analyze/reason.ts",
+          "packages/rex/tests/unit/analyze/reason.test.ts",
+          "docs/analysis/prompt-token-baseline.md",
+        ],
+        testCommand: "pnpm test",
+      });
+    },
+  },
+};
+
+const FIXTURE_PROPOSALS = [
+  {
+    epic: {
+      title: "Agent Prompt & Workflow Efficiency",
+      source: "sourcevision",
+      description: "Audit and tighten every prompt surface that drives an LLM.",
+    },
+    features: [
+      {
+        title: "Prompt Token-Cost Baseline & Measurement",
+        source: "sourcevision",
+        description: "Record the token cost of every prompt surface before any rewrite.",
+        tasks: [
+          {
+            title: "Inventory every LLM prompt surface",
+            source: "sourcevision",
+            sourceFile: "packages/rex/src/analyze/reason.ts",
+            description: "List each builder with its file, purpose, and measured cost.",
+            acceptanceCriteria: [
+              "Every surface across rex, sourcevision, hench, and core is listed.",
+              "Counts come from the existing llm-client token path.",
+            ],
+            priority: "high",
+            tags: ["prompts", "tokens"],
+          },
+          {
+            title: "Emit a before/after comparison",
+            source: "sourcevision",
+            sourceFile: "scripts/prompt-census.mjs",
+            description: "Re-running the census after a rewrite reports the delta.",
+            acceptanceCriteria: ["Comparison names the surfaces that moved."],
+            priority: "medium",
+            tags: ["prompts"],
+          },
+        ],
+      },
+    ],
+  },
+];
+
+const FIXTURE_CONTEXT_MD = [
+  "# Project Context",
+  "",
+  "## Overview",
+  "TypeScript monorepo, 6 packages, pnpm workspaces. 744 production files.",
+  "",
+  "## Zones",
+  "- `web-viewer` — 269 files, cohesion 0.92, coupling 0.08. Preact dashboard UI.",
+  "- `rex-cli` — 170 files, cohesion 0.99, coupling 0.01. PRD command handlers.",
+  "- `hench` — 108 files, cohesion 1.00, coupling 0.00. Agent loop and tool dispatch.",
+  "",
+  "## Entry points",
+  "- `packages/core/cli.js` — the `n-dx` orchestrator.",
+  "- `packages/web/src/server/start.ts` — dashboard server, port 3117.",
+  "",
+  "## Commands",
+  "- Build: `pnpm build`",
+  "- Test: `pnpm test`",
+  "- Typecheck: `pnpm typecheck`",
+].join("\n");
+
+const FIXTURE_BRIEF = {
+  project: {
+    name: "n-dx",
+    cliName: "n-dx",
+    validateCommand: "pnpm typecheck",
+    testCommand: "pnpm test",
+  },
+  task: {
+    id: "00000000-0000-4000-8000-000000000000",
+    title: "Prompt Token-Cost Baseline & Measurement",
+    level: "feature",
+    status: "pending",
+    priority: "high",
+    description:
+      "Inventory every prompt surface that reaches an LLM and record its token cost before any rewriting.",
+    acceptanceCriteria: [
+      "A single checked-in inventory lists every LLM prompt surface with its measured token cost.",
+      "Token counts come from the existing llm-client token path.",
+      "Re-running the measurement emits a before-and-after comparison.",
+    ],
+    tags: ["prompts", "tokens", "measurement"],
+  },
+  parentChain: [
+    {
+      title: "Agent Prompt & Workflow Efficiency",
+      level: "epic",
+      description: "Audit and tighten every prompt surface that drives an LLM.",
+    },
+  ],
+  requirements: [],
+  siblings: [],
+  recentLog: [],
+};
+
+/** Import a built module by workspace-relative path. */
+async function loadDist(relative) {
+  const abs = join(ROOT, "packages", relative);
+  if (!existsSync(abs)) {
+    throw new Error(
+      `Missing build output: packages/${relative}\nRun \`pnpm build\` first — the census imports built prompt builders.`,
+    );
+  }
+  return import(pathToFileURL(abs).href);
+}
+
+// ── Measurement ──────────────────────────────────────────────────────────────
+
+async function measure(model) {
+  const ts = require("typescript");
+  const { budgetPreflight } = await loadDist("llm-client/dist/budget-preflight.js");
+
+  const tokens = (text) => budgetPreflight(model, text.length).tokenEstimate;
+
+  const surfaces = SURFACES.map((s) => {
+    const abs = join(ROOT, s.file);
+    if (!existsSync(abs)) {
+      return { ...s, error: "file not found" };
+    }
+    const extracted = extractStaticPromptText(
+      ts,
+      readFileSync(abs, "utf8"),
+      abs,
+      s.builder,
+    );
+    if (!extracted) {
+      return { ...s, error: `builder \`${s.builder}\` not found in ${s.file}` };
+    }
+    const constantText = [...extracted.constants.values()].join("\n");
+    const fullText = [extracted.ownText, constantText].filter(Boolean).join("\n");
+
+    return {
+      pkg: s.pkg,
+      file: s.file,
+      builder: s.builder,
+      purpose: s.purpose,
+      inline: s.inline === true,
+      literals: extracted.literals,
+      /** Shared constants this builder interpolates, name → token cost. */
+      constants: Object.fromEntries(
+        [...extracted.constants].map(([name, text]) => [name, tokens(text)]),
+      ),
+      /** Text only this builder can shorten. */
+      ownTokens: tokens(extracted.ownText),
+      /** What one call to this builder pays, shared constants included. */
+      fixedChars: fullText.length,
+      fixedTokens: tokens(fullText),
+    };
+  });
+
+  // A constant interpolated into seven builders costs seven times per call but
+  // is edited once. Both numbers matter, and reporting only the first would
+  // point the rest of this epic at the wrong work.
+  const constantTexts = new Map();
+  for (const s of SURFACES) {
+    const abs = join(ROOT, s.file);
+    if (!existsSync(abs)) continue;
+    const extracted = extractStaticPromptText(ts, readFileSync(abs, "utf8"), abs, s.builder);
+    if (!extracted) continue;
+    for (const [name, text] of extracted.constants) {
+      constantTexts.set(`${s.pkg}::${name}`, { pkg: s.pkg, name, text });
+    }
+  }
+
+  const sharedConstants = [...constantTexts.values()]
+    .map((c) => ({
+      pkg: c.pkg,
+      name: c.name,
+      tokens: tokens(c.text),
+      usedBy: surfaces.filter((s) => !s.error && c.name in s.constants).map((s) => s.builder),
+    }))
+    .sort((a, b) => b.tokens * b.usedBy.length - a.tokens * a.usedBy.length);
+
+  const assembled = {};
+  for (const [pkg, rep] of Object.entries(REPRESENTATIVE)) {
+    try {
+      const built = await rep.build();
+      const text = typeof built === "string" ? built : built.text;
+      assembled[pkg] = {
+        surface: rep.surface,
+        describe: rep.describe,
+        chars: text.length,
+        tokens: tokens(text),
+        ...(typeof built === "object" && built.sections
+          ? {
+            sections: built.sections.map((sec) => ({
+              ...sec,
+              tokens: budgetPreflight(model, sec.chars).tokenEstimate,
+            })),
+          }
+          : {}),
+      };
+    } catch (err) {
+      assembled[pkg] = { surface: rep.surface, error: err.message };
+    }
+  }
+
+  // Fixed text is the part a rewrite reduces; context is what the run supplies.
+  // Attributing a reduction to the wrong one is the failure this split prevents.
+  for (const [pkg, a] of Object.entries(assembled)) {
+    if (a.error) continue;
+    const surface = surfaces.find((s) => s.pkg === pkg && s.builder === a.surface);
+    // hench's dump entry point composes other measured builders rather than
+    // holding literals of its own, so sum the surfaces it delivers.
+    const fixedTokens = surface
+      ? surface.fixedTokens
+      : pkg === "hench"
+        ? sumFixed(surfaces, ["buildSystemPrompt", "formatTaskBrief"])
+        : undefined;
+    if (fixedTokens === undefined) continue;
+    a.fixedTokens = fixedTokens;
+
+    // `fixed` counts every branch; the assembled prompt took one path. When
+    // fixed exceeds assembled the builder is branch-conditional and the
+    // difference is unreached text, NOT negative context. Reported rather
+    // than clamped to zero — clamping would quietly turn "half this builder
+    // never runs on this path" into "this prompt carries no context".
+    if (a.tokens >= fixedTokens) {
+      a.contextTokens = a.tokens - fixedTokens;
+    } else {
+      a.branchConditional = true;
+      a.unreachedTokens = fixedTokens - a.tokens;
+    }
+  }
+
+  const byPackage = {};
+  for (const s of surfaces) {
+    if (s.error) continue;
+    byPackage[s.pkg] ??= { surfaces: 0, perCallTokens: 0, uniqueTokens: 0 };
+    byPackage[s.pkg].surfaces++;
+    byPackage[s.pkg].perCallTokens += s.fixedTokens;
+    byPackage[s.pkg].uniqueTokens += s.ownTokens;
+  }
+  // Add each shared constant to its package once — the edit surface, not the bill.
+  for (const c of sharedConstants) {
+    if (byPackage[c.pkg]) byPackage[c.pkg].uniqueTokens += c.tokens;
+  }
+
+  return {
+    model,
+    totals: {
+      surfaces: surfaces.filter((s) => !s.error).length,
+      /** Sum of what every surface costs per call. Shared text counted per use. */
+      perCallTokens: surfaces.reduce((n, s) => n + (s.fixedTokens ?? 0), 0),
+      /** Distinct fixed prompt text in the repo. What a rewrite has to edit. */
+      uniqueTokens: Object.values(byPackage).reduce((n, p) => n + p.uniqueTokens, 0),
+    },
+    byPackage,
+    sharedConstants,
+    surfaces,
+    assembled,
+    noPromptPackages: NO_PROMPT_PACKAGES,
+    outOfScope: {
+      namePatterns: INTERACTIVE_PROMPT_PATTERNS.map((r) => r.source),
+      classified: OUT_OF_SCOPE,
+    },
+  };
+}
+
+function sumFixed(surfaces, builders) {
+  return surfaces
+    .filter((s) => builders.includes(s.builder) && !s.error)
+    .reduce((n, s) => n + s.fixedTokens, 0);
+}
+
+// ── Reporting ────────────────────────────────────────────────────────────────
+
+function pad(s, n) {
+  return String(s).padEnd(n);
+}
+function padL(s, n) {
+  return String(s).padStart(n);
+}
+
+function printTable(report) {
+  const errors = report.surfaces.filter((s) => s.error);
+
+  console.log(`\nPrompt token census — fixed prompt text at HEAD (model: ${report.model})\n`);
+  console.log(
+    `${pad("PACKAGE", 14)}${pad("BUILDER", 32)}${padL("LITERALS", 9)}${padL("OWN", 8)}${padL("SHARED", 8)}${padL("PER-CALL", 9)}`,
+  );
+  console.log("─".repeat(80));
+
+  for (const pkg of Object.keys(report.byPackage)) {
+    for (const s of report.surfaces.filter((x) => x.pkg === pkg && !x.error)) {
+      const name = s.builder + (s.inline ? " *" : "");
+      const shared = s.fixedTokens - s.ownTokens;
+      console.log(
+        `${pad(pkg, 14)}${pad(name, 32)}${padL(s.literals, 9)}${padL(s.ownTokens, 8)}${padL(shared || "—", 8)}${padL(s.fixedTokens, 9)}`,
+      );
+    }
+    const p = report.byPackage[pkg];
+    console.log(
+      `${pad("", 14)}${pad(`  └ ${p.surfaces} surfaces, ${p.uniqueTokens} unique`, 32)}${padL("", 9)}${padL("", 8)}${padL("", 8)}${padL(p.perCallTokens, 9)}`,
+    );
+  }
+
+  console.log("─".repeat(80));
+  console.log(
+    `${pad("TOTAL", 14)}${pad(`${report.totals.surfaces} surfaces`, 32)}${padL("", 9)}${padL("", 8)}${padL("", 8)}${padL(report.totals.perCallTokens, 9)}`,
+  );
+  console.log(
+    `${pad("", 14)}${pad("unique fixed prompt text", 32)}${padL("", 9)}${padL("", 8)}${padL("", 8)}${padL(report.totals.uniqueTokens, 9)}`,
+  );
+  console.log("\n  * prompt is an inline template literal, not an extracted builder");
+  console.log("  OWN = literals in this builder   SHARED = constants it interpolates");
+  console.log("  PER-CALL = what one call pays    unique = distinct text a rewrite edits");
+
+  if (report.sharedConstants.length > 0) {
+    console.log("\nShared prompt constants (edit once, saves everywhere it is used):\n");
+    for (const c of report.sharedConstants) {
+      console.log(
+        `  ${pad(c.name, 32)}${padL(c.tokens, 6)} tokens x ${c.usedBy.length} ` +
+          `= ${c.tokens * c.usedBy.length} per-call tokens`,
+      );
+    }
+  }
+
+  console.log("\nAssembled prompts from fixed representative input:\n");
+  for (const [pkg, a] of Object.entries(report.assembled)) {
+    if (a.error) {
+      console.log(`  ${pad(pkg, 14)} ${a.surface} — ERROR: ${a.error}`);
+      continue;
+    }
+    const split = a.branchConditional
+      ? `  (fixed ${a.fixedTokens} across all branches; ${a.unreachedTokens} not on this path)`
+      : a.contextTokens === undefined
+        ? ""
+        : `  (fixed ${a.fixedTokens} + context ${a.contextTokens})`;
+    console.log(`  ${pad(pkg, 14)} ${pad(a.surface, 24)} ${padL(a.tokens, 6)} tokens${split}`);
+    for (const sec of a.sections ?? []) {
+      console.log(`  ${pad("", 14)}   └ ${pad(sec.name, 22)} ${padL(sec.tokens, 6)} tokens`);
+    }
+  }
+
+  console.log("\nPackages with no LLM prompt surfaces:");
+  for (const [pkg, why] of Object.entries(report.noPromptPackages)) {
+    console.log(`  ${pad(pkg, 14)} ${why}`);
+  }
+
+  if (errors.length > 0) {
+    console.log("\nSTALE REGISTRY ENTRIES:");
+    for (const e of errors) console.log(`  ${e.file} — ${e.error}`);
+  }
+  console.log("");
+  return errors.length;
+}
+
+function printComparison(before, after) {
+  const key = (s) => `${s.file}::${s.builder}`;
+  const beforeMap = new Map(
+    before.surfaces.filter((s) => !s.error).map((s) => [key(s), s]),
+  );
+
+  console.log(`\nPrompt token census — baseline vs HEAD\n`);
+  console.log(`  baseline: ${before.recordedAt ?? "unknown"} @ ${before.commit ?? "unknown"}`);
+  console.log(`  current:  HEAD (model: ${after.model})\n`);
+  console.log(`${pad("BUILDER", 34)}${padL("BEFORE", 9)}${padL("AFTER", 9)}${padL("DELTA", 9)}`);
+  console.log("─".repeat(61));
+
+  let moved = 0;
+  for (const s of after.surfaces) {
+    if (s.error) continue;
+    const prev = beforeMap.get(key(s));
+    if (!prev) {
+      console.log(`${pad(s.builder, 34)}${padL("—", 9)}${padL(s.fixedTokens, 9)}${padL("NEW", 9)}`);
+      moved++;
+      continue;
+    }
+    beforeMap.delete(key(s));
+    const delta = s.fixedTokens - prev.fixedTokens;
+    if (delta === 0) continue;
+    moved++;
+    const sign = delta > 0 ? `+${delta}` : String(delta);
+    console.log(`${pad(s.builder, 34)}${padL(prev.fixedTokens, 9)}${padL(s.fixedTokens, 9)}${padL(sign, 9)}`);
+  }
+
+  for (const [, gone] of beforeMap) {
+    moved++;
+    console.log(`${pad(gone.builder, 34)}${padL(gone.fixedTokens, 9)}${padL("—", 9)}${padL("REMOVED", 9)}`);
+  }
+
+  if (moved === 0) console.log("  (no surface changed)");
+
+  console.log("─".repeat(61));
+  for (const [label, key] of [
+    ["TOTAL per-call", "perCallTokens"],
+    ["TOTAL unique fixed text", "uniqueTokens"],
+  ]) {
+    const b = before.totals[key] ?? 0;
+    const a = after.totals[key] ?? 0;
+    const d = a - b;
+    const pct = b ? `${((d / b) * 100).toFixed(1)}%` : "—";
+    console.log(
+      `${pad(label, 34)}${padL(b, 9)}${padL(a, 9)}${padL(`${d > 0 ? "+" : ""}${d}`, 9)}  ${pct}`,
+    );
+  }
+  console.log("");
+  return 0;
+}
+
+// ── Markdown inventory ───────────────────────────────────────────────────────
+
+function renderMarkdown(report) {
+  const lines = [];
+  const n = (x) => x.toLocaleString("en-US");
+
+  lines.push("<!-- GENERATED by `node scripts/prompt-census.mjs --write`. Do not edit by hand. -->");
+  lines.push("");
+  lines.push("# Prompt Token-Cost Baseline");
+  lines.push("");
+  lines.push(
+    "Every prompt surface in the monorepo that reaches an LLM, with the token cost of",
+  );
+  lines.push(
+    "the fixed text it always emits. This is the baseline the",
+  );
+  lines.push(
+    "*Agent Prompt & Workflow Efficiency* epic is measured against — recorded before any",
+  );
+  lines.push("prompt was rewritten.");
+  lines.push("");
+  lines.push(`- **Recorded at** — ${report.recordedAt}`);
+  lines.push(`- **Commit** — \`${report.commit}\``);
+  lines.push(`- **Model for cost/context figures** — \`${report.model}\``);
+  lines.push(`- **Surfaces** — ${report.totals.surfaces}`);
+  lines.push(
+    `- **Per-call total** — ${n(report.totals.perCallTokens)} tokens (what every surface costs, summed)`,
+  );
+  lines.push(
+    `- **Unique fixed text** — ${n(report.totals.uniqueTokens)} tokens (distinct text a rewrite has to edit)`,
+  );
+  lines.push("");
+  lines.push("## How to reproduce");
+  lines.push("");
+  lines.push("```sh");
+  lines.push("pnpm build                                    # the census imports built builders");
+  lines.push("node scripts/prompt-census.mjs                # measure HEAD");
+  lines.push("node scripts/prompt-census.mjs --compare      # before/after vs this file");
+  lines.push("node scripts/prompt-census.mjs --dump hench   # print one assembled prompt");
+  lines.push("node scripts/prompt-census.mjs --write        # re-record the baseline");
+  lines.push("```");
+  lines.push("");
+  lines.push("## What the two numbers mean");
+  lines.push("");
+  lines.push(
+    "**Fixed** is the prompt text a builder always emits, extracted from the string",
+  );
+  lines.push(
+    "literals in its body. It is what a rewrite reduces. **Context** is what the run",
+  );
+  lines.push(
+    "supplies — file lists, PRD items, analysis output — and it does not shrink because",
+  );
+  lines.push(
+    "someone tightened a sentence. Keeping them apart is what stops a reduction being",
+  );
+  lines.push("credited to the wrong surface.");
+  lines.push("");
+  lines.push(
+    "Counting literals rather than output is also what makes the two construction",
+  );
+  lines.push(
+    "styles comparable. rex and sourcevision build one large template literal per",
+  );
+  lines.push(
+    "prompt; hench pushes dozens of short fragments onto an array. A literal-per-file",
+  );
+  lines.push("scan undercounts hench; counting literals per *builder* does not.");
+  lines.push("");
+  lines.push(
+    "Token counts come from `budgetPreflight()` in `@n-dx/llm-client` — the same",
+  );
+  lines.push(
+    "estimator the runtime uses for context-window preflight, so a number here is the",
+  );
+  lines.push("number the runtime would produce for the same text.");
+  lines.push("");
+  lines.push("## Per-call vs unique");
+  lines.push("");
+  lines.push(
+    "**Own** is the text written inside a builder. **Shared** is the prompt constants it",
+  );
+  lines.push(
+    "interpolates — `PRD_SCHEMA`, `FEW_SHOT_EXAMPLE` and friends, which rex reuses across",
+  );
+  lines.push("many builders. **Per-call** is their sum: what one invocation actually sends.");
+  lines.push("");
+  lines.push(
+    "The two totals answer different questions. Per-call is the bill. Unique is the edit",
+  );
+  lines.push(
+    "surface — a constant used by ten builders is written once, so shortening it is worth",
+  );
+  lines.push(
+    "ten times its own size. Reporting only the per-call sum would point a rewrite at the",
+  );
+  lines.push("largest builders rather than at the most-reused text.");
+  lines.push("");
+
+  for (const pkg of Object.keys(report.byPackage)) {
+    const p = report.byPackage[pkg];
+    lines.push(
+      `## ${pkg} — ${n(p.perCallTokens)} per-call / ${n(p.uniqueTokens)} unique, ${p.surfaces} surfaces`,
+    );
+    lines.push("");
+    lines.push("| Builder | File | Purpose | Literals | Own | Shared | Per-call |");
+    lines.push("|---|---|---|---:|---:|---:|---:|");
+    for (const s of report.surfaces.filter((x) => x.pkg === pkg && !x.error)) {
+      const name = s.inline ? `\`${s.builder}\` *(inline)*` : `\`${s.builder}\``;
+      const shared = s.fixedTokens - s.ownTokens;
+      lines.push(
+        `| ${name} | \`${s.file}\` | ${s.purpose} | ${s.literals} | ${n(s.ownTokens)} | ${shared ? n(shared) : "—"} | ${n(s.fixedTokens)} |`,
+      );
+    }
+    lines.push("");
+  }
+
+  if (report.sharedConstants.length > 0) {
+    lines.push("## Shared prompt constants");
+    lines.push("");
+    lines.push(
+      "Ranked by total per-call cost — size times the number of builders that interpolate",
+    );
+    lines.push("it. This is the leverage ordering for a rewrite.");
+    lines.push("");
+    lines.push("| Constant | Package | Tokens | Used by | Per-call total |");
+    lines.push("|---|---|---:|---:|---:|");
+    for (const c of report.sharedConstants) {
+      lines.push(
+        `| \`${c.name}\` | ${c.pkg} | ${n(c.tokens)} | ${c.usedBy.length} | ${n(c.tokens * c.usedBy.length)} |`,
+      );
+    }
+    lines.push("");
+  }
+
+  lines.push("## Assembled prompts (fixed representative input)");
+  lines.push("");
+  lines.push(
+    "One entry point per package, invoked with a checked-in fixture so the number is",
+  );
+  lines.push("reproducible without a model call. Dump any of them with `--dump <package>`.");
+  lines.push("");
+  lines.push("| Package | Entry point | Input | Fixed | Context | Assembled |");
+  lines.push("|---|---|---|---:|---:|---:|");
+  for (const [pkg, a] of Object.entries(report.assembled)) {
+    if (a.error) {
+      lines.push(`| ${pkg} | \`${a.surface}\` | — | — | — | **error: ${a.error}** |`);
+      continue;
+    }
+    const context = a.branchConditional
+      ? `n/a — ${n(a.unreachedTokens)} of the fixed text is on another branch`
+      : n(a.contextTokens ?? 0);
+    lines.push(
+      `| ${pkg} | \`${a.surface}\` | ${a.describe} | ${n(a.fixedTokens ?? 0)} | ${context} | ${n(a.tokens)} |`,
+    );
+  }
+  lines.push("");
+  lines.push(
+    "A `fixed` figure above the assembled length is not an error: the fixed column counts",
+  );
+  lines.push(
+    "every branch in the builder, and one run takes one path. `buildSystemPrompt` alone",
+  );
+  lines.push(
+    "carries separate CLI/API, auto-commit, and self-heal branches. The unreached text is",
+  );
+  lines.push("still worth shortening — it just is not billed on this particular path.");
+  lines.push("");
+
+  const hench = report.assembled.hench;
+  if (hench?.sections) {
+    lines.push("### hench envelope sections");
+    lines.push("");
+    lines.push(
+      "hench assembles its prompt from fragments into a `PromptEnvelope`, so its cost is",
+    );
+    lines.push(
+      "reported per section rather than as one literal. These are the same sections",
+    );
+    lines.push("`extractPromptSectionDiagnostics()` reports at runtime.");
+    lines.push("");
+    lines.push("| Section | Chars | Tokens |");
+    lines.push("|---|---:|---:|");
+    for (const s of hench.sections) {
+      lines.push(`| \`${s.name}\` | ${n(s.chars)} | ${n(s.tokens)} |`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## Packages with no LLM prompt surfaces");
+  lines.push("");
+  lines.push(
+    "Recorded so the absence is a finding rather than an oversight — these were checked.",
+  );
+  lines.push("");
+  lines.push("| Package | Why |");
+  lines.push("|---|---|");
+  for (const [pkg, why] of Object.entries(report.noPromptPackages)) {
+    lines.push(`| ${pkg} | ${why} |`);
+  }
+  lines.push("");
+
+  lines.push("## Out of scope: interactive readline prompts");
+  lines.push("");
+  lines.push(
+    "These are questions to a human, not to a model. They are listed by name pattern so",
+  );
+  lines.push("a later audit does not mistake one for an LLM prompt surface.");
+  lines.push("");
+  lines.push("Name patterns:");
+  lines.push("");
+  for (const p of report.outOfScope.namePatterns) {
+    lines.push(`- \`/${p}/\``);
+  }
+  lines.push("");
+  lines.push(
+    "Specific builders whose names match a prompt pattern but which are not LLM prompts:",
+  );
+  lines.push("");
+  lines.push("| Builder | File | Why it is out of scope |");
+  lines.push("|---|---|---|");
+  for (const o of report.outOfScope.classified) {
+    lines.push(`| \`${o.builder}\` | \`${o.file}\` | ${o.reason} |`);
+  }
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+// ── Entry point ──────────────────────────────────────────────────────────────
+
+/**
+ * Read the current commit from `.git` directly.
+ *
+ * Deliberately not `git rev-parse` — importing child_process here would mean
+ * adding this script to the ALLOWED list in architecture-policy.test.js, which
+ * is a real policy surface and not worth spending on a provenance stamp.
+ */
+function currentCommit() {
+  const head = readGitFile(".git/HEAD");
+  if (!head) return "unknown";
+
+  const ref = /^ref:\s*(.+)$/.exec(head);
+  if (!ref) return head.slice(0, 12); // detached HEAD holds the sha directly
+
+  const loose = readGitFile(join(".git", ref[1]));
+  if (loose) return loose.slice(0, 12);
+
+  // Ref has been packed — scan packed-refs for it.
+  const packed = readGitFile(".git/packed-refs") ?? "";
+  for (const line of packed.split("\n")) {
+    const [sha, name] = line.trim().split(/\s+/);
+    if (name === ref[1]) return sha.slice(0, 12);
+  }
+  return "unknown";
+}
+
+/** Read a file under .git, or null when it is absent (e.g. a tarball checkout). */
+function readGitFile(relative) {
+  const abs = join(ROOT, relative);
+  return existsSync(abs) ? readFileSync(abs, "utf8").trim() : null;
+}
+
+async function main(argv) {
+  const flag = (name) => argv.includes(`--${name}`);
+  const value = (name) => {
+    const i = argv.indexOf(`--${name}`);
+    return i >= 0 ? argv[i + 1] : undefined;
+  };
+
+  if (flag("help") || flag("h")) {
+    console.log(
+      [
+        "Usage: node scripts/prompt-census.mjs [options]",
+        "",
+        "  (no options)      measure HEAD and print the table",
+        "  --json            emit the full report as JSON",
+        "  --compare         diff HEAD against docs/analysis/prompt-token-baseline.json",
+        "  --baseline <path> compare against a different recording instead",
+        "  --write           rewrite the checked-in baseline (.md and .json)",
+        "  --dump <pkg>      print the assembled representative prompt for a package",
+        "  --check           exit 1 if any registry entry no longer resolves",
+        "  --model <id>      model used for the token estimate (default: claude-sonnet-5)",
+        "",
+        `  packages with a --dump fixture: ${Object.keys(REPRESENTATIVE).join(", ")}`,
+      ].join("\n"),
+    );
+    return 0;
+  }
+
+  const model = value("model") ?? "claude-sonnet-5";
+
+  const dumpPkg = value("dump");
+  if (dumpPkg !== undefined) {
+    const rep = REPRESENTATIVE[dumpPkg];
+    if (!rep) {
+      console.error(
+        `Unknown package "${dumpPkg}". Available: ${Object.keys(REPRESENTATIVE).join(", ")}`,
+      );
+      return 1;
+    }
+    const { budgetPreflight } = await loadDist("llm-client/dist/budget-preflight.js");
+    const built = await rep.build();
+    const text = typeof built === "string" ? built : built.text;
+    console.error(
+      `── ${dumpPkg}/${rep.surface} — ${text.length} chars, ` +
+        `${budgetPreflight(model, text.length).tokenEstimate} tokens (${rep.describe})`,
+    );
+    console.error("─".repeat(78));
+    // Prompt body on stdout so it can be redirected or diffed on its own.
+    console.log(text);
+    return 0;
+  }
+
+  const report = await measure(model);
+  const stale = report.surfaces.filter((s) => s.error);
+
+  if (flag("check")) {
+    if (stale.length === 0) {
+      console.log(`prompt census: ${report.totals.surfaces} surfaces resolve.`);
+      return 0;
+    }
+    console.error("prompt census: stale registry entries in scripts/prompt-census.mjs\n");
+    for (const s of stale) console.error(`  ${s.file} — ${s.error}`);
+    return 1;
+  }
+
+  if (flag("json")) {
+    console.log(JSON.stringify(report, null, 2));
+    return stale.length > 0 ? 1 : 0;
+  }
+
+  if (flag("compare")) {
+    const baselinePath = value("baseline") ?? BASELINE_JSON;
+    if (!existsSync(baselinePath)) {
+      console.error(
+        `No baseline at ${baselinePath}.\nRun \`node scripts/prompt-census.mjs --write\` to record one first.`,
+      );
+      return 1;
+    }
+    return printComparison(JSON.parse(readFileSync(baselinePath, "utf8")), report);
+  }
+
+  if (flag("write")) {
+    if (stale.length > 0) {
+      console.error("Refusing to record a baseline with stale registry entries:\n");
+      for (const s of stale) console.error(`  ${s.file} — ${s.error}`);
+      return 1;
+    }
+    const stamped = {
+      ...report,
+      recordedAt: new Date().toISOString(),
+      commit: currentCommit(),
+    };
+    writeFileSync(BASELINE_JSON, `${JSON.stringify(stamped, null, 2)}\n`);
+    writeFileSync(BASELINE_MD, `${renderMarkdown(stamped)}\n`);
+    console.log(
+      `Wrote ${report.totals.surfaces} surfaces — ` +
+        `${report.totals.perCallTokens.toLocaleString("en-US")} per-call, ` +
+        `${report.totals.uniqueTokens.toLocaleString("en-US")} unique fixed tokens`,
+    );
+    console.log("  docs/analysis/prompt-token-baseline.md");
+    console.log("  docs/analysis/prompt-token-baseline.json");
+    return 0;
+  }
+
+  return printTable(report) > 0 ? 1 : 0;
+}
+
+// Run only when invoked as a command — tests/e2e/prompt-census.test.js imports
+// the registry from this module and must not trigger a measurement pass.
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+  process.exitCode = await main(process.argv.slice(2));
+}
+
+export {
+  SURFACES,
+  NO_PROMPT_PACKAGES,
+  INTERACTIVE_PROMPT_PATTERNS,
+  OUT_OF_SCOPE,
+  REPRESENTATIVE,
+  extractStaticPromptText,
+};
