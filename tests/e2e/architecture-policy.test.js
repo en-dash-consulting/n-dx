@@ -1283,6 +1283,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/index.ts", "CLI command dispatch — lazy-loads command handlers"],
   ["packages/rex/src/cli/commands/analyze.ts", "Chunked-review lazy import — loaded only during interactive proposal review"],
   ["packages/rex/src/cli/commands/migrate-to-folder-tree.ts", "Lazy-loads node:readline only for the interactive legacy-file cleanup prompt"],
+  ["packages/rex/src/cli/commands/import-bundle.ts", "Lazy-loads node:readline only for the interactive --replace confirmation prompt — skipped entirely with --yes or off a TTY"],
   ["packages/rex/src/cli/commands/prune.ts", "Lazy-loads LLM client for smart prune proposals"],
   ["packages/rex/src/cli/commands/remove.ts", "Lazy-loads LLM client for smart remove analysis"],
   ["packages/rex/src/cli/commands/reorganize.ts", "Lazy-loads LLM client for reorganization proposals"],

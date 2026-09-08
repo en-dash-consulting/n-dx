@@ -466,6 +466,62 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["add", "recommend"],
   },
+  export: {
+    tool: "rex",
+    command: "export",
+    summary: "write the PRD to a portable JSON bundle",
+    usage: "rex export --out=<path.json> [dir]",
+    description:
+      "Serializes the whole PRD to a single JSON file that can be carried to\n" +
+      "another machine and imported with 'rex import-bundle'. Item ids,\n" +
+      "hierarchy, status, acceptance criteria, tags, dependencies and\n" +
+      "attribution metadata are all preserved.\n" +
+      "\n" +
+      "The bundle is a transport artifact, not PRD storage: it must be written\n" +
+      "outside .rex/prd_tree/, and nothing in rex ever reads it as a backend.\n" +
+      "\n" +
+      "Not to be confused with 'ndx export', which publishes the static\n" +
+      "dashboard. This command is also available as 'ndx prd export'.",
+    options: [
+      { flag: "--out=<path>", description: "Bundle output path (required)" },
+      { flag: "--format=json", description: "Print a JSON summary instead of a human line" },
+    ],
+    examples: [
+      { command: "rex export --out=./prd-bundle.json", description: "Export the whole PRD" },
+      { command: "rex export --out=/tmp/prd.json --format=json .", description: "Export and report as JSON" },
+    ],
+    related: ["import-bundle", "sync"],
+  },
+  "import-bundle": {
+    tool: "rex",
+    command: "import-bundle",
+    summary: "rebuild the PRD tree from a portable JSON bundle",
+    usage: "rex import-bundle --in=<path.json> [options] [dir]",
+    description:
+      "Reconstructs .rex/prd_tree/ from a bundle written by 'rex export'. The\n" +
+      "bundle is validated and version-checked before anything is written, and\n" +
+      "the tree write runs under the PRD lock so it cannot interleave with\n" +
+      "another writer.\n" +
+      "\n" +
+      "--merge (the default) is additive: local items keep their content and\n" +
+      "placement, new bundle items are grafted on, and ids that already exist\n" +
+      "with different content are reported rather than overwritten. --replace\n" +
+      "discards the local tree and needs --yes when not on a terminal.\n" +
+      "\n" +
+      "Named 'import-bundle' because 'rex import' is an alias for 'rex analyze'.\n" +
+      "Also available as 'ndx prd import'.",
+    options: [
+      { flag: "--in=<path>", description: "Bundle input path (required)" },
+      { flag: "--replace", description: "Overwrite the tree with the bundle instead of merging" },
+      { flag: "--yes, -y", description: "Skip the --replace confirmation prompt" },
+      { flag: "--format=json", description: "Print a JSON summary instead of human output" },
+    ],
+    examples: [
+      { command: "rex import-bundle --in=./prd-bundle.json", description: "Merge a bundle into the local PRD" },
+      { command: "rex import-bundle --in=./prd-bundle.json --replace --yes", description: "Replace the local PRD outright" },
+    ],
+    related: ["export", "sync"],
+  },
   adapter: {
     tool: "rex",
     command: "adapter",

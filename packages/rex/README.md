@@ -192,6 +192,26 @@ rex analyze --format=json myproject
 
 **Flags:** `--lite`, `--accept`, `--format=json`
 
+### `rex export [dir]` / `rex import-bundle [dir]`
+
+Carry the PRD between machines as a single JSON bundle, without sharing the repo or configuring a remote adapter.
+
+```bash
+rex export --out=./prd-bundle.json myproject          # write the bundle
+rex import-bundle --in=./prd-bundle.json other        # merge it into another project
+rex import-bundle --in=./prd-bundle.json --replace --yes other
+```
+
+The bundle preserves item ids, hierarchy, level, status, priority, description, acceptance criteria, tags, `blockedBy` edges, source, and attribution metadata, and carries the PRD `SCHEMA_VERSION` so a bundle written by a newer rex is refused rather than imported partially.
+
+It is a transport artifact, not storage: it must be written outside `.rex/prd_tree/`, and nothing in rex reads it as a PRD backend. Import rebuilds the folder tree through the normal store write path inside `store.withTransaction`, so it holds the PRD lock and cannot interleave with another writer.
+
+`--merge` (the default) is additive — local items keep their content and placement, new bundle items are grafted on, and ids that already exist with differing content are reported rather than overwritten. `--replace` discards the local tree and requires confirmation, or `--yes` when not attached to a terminal.
+
+Named `import-bundle` because `rex import` is an alias for `rex analyze`. From the orchestrator these are `ndx prd export` and `ndx prd import` (`ndx export` is the unrelated static-dashboard exporter).
+
+**Flags:** `--out=<path>` (export), `--in=<path>` (import), `--replace`, `--yes`, `--format=json`
+
 ### `rex mcp [dir]`
 
 Start an MCP (Model Context Protocol) server on stdio. This is how AI agents interact with rex programmatically.

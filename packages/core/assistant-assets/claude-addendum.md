@@ -84,4 +84,6 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/prd_tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
 
+**Bundle carve-out.** `ndx prd export` (`rex export`) writes the PRD to a single JSON file, and this does not breach the invariant above: the bundle is a *transport artifact*, written only to an operator-chosen path outside `.rex/prd_tree/`, never read as a PRD backend and never a write target for a PRD mutation. `ndx prd import` (`rex import-bundle`) rebuilds the folder tree through the normal store write path, inside `store.withTransaction`. Refusing an output path inside the tree is enforced in code. Note that `ndx export` is a different command — it publishes the static dashboard.
+
 HTTP-request concurrency notes for the web server live in `packages/web/CLAUDE.md`.
