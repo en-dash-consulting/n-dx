@@ -26,5 +26,5 @@ prop omitted, plus the registry wiring that supplies it — dropping the prop
 there would have restored the old behaviour with every component-level
 assertion still passing.
 
-Gating remains viewer-side, matching `sourcevision.prMarkdown`:
-`POST /api/sourcevision/ask` is still reachable directly.
+The endpoint enforces the same toggle — see the separate changeset for
+`POST /api/sourcevision/ask`.

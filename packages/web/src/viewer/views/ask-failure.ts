@@ -41,6 +41,7 @@
 /** The named failure modes of `POST /api/sourcevision/ask`. */
 export type AskFailureKind =
   | "invalid_request"
+  | "disabled"
   | "no_analysis"
   | "no_prd"
   | "timeout"
@@ -83,6 +84,7 @@ export interface AskFailurePresentation {
 /** Every kind the endpoint can name. Exported so tests can enumerate them. */
 export const ASK_FAILURE_KINDS: readonly AskFailureKind[] = [
   "invalid_request",
+  "disabled",
   "no_analysis",
   "no_prd",
   "timeout",
@@ -184,6 +186,17 @@ const PRESENTATION: Record<AskFailureKind, KindPresentation> = {
     canRetry: false,
     needsAnalysis: false,
   },
+  disabled: {
+    title: "The Ask panel is turned off for this project",
+    message: "This project has the sourcevision.ask feature disabled, so the endpoint refused the question before it reached a model.",
+    // No retry: the same question will be refused until the toggle changes, and
+    // the fix is a setting rather than anything about the question. Reaching
+    // this card at all means a stale tab or a direct request — both entry
+    // points into the panel are hidden while the toggle is off.
+    steps: ["Enable the Ask Panel toggle in the Feature Toggles view, then reload this page."],
+    canRetry: false,
+    needsAnalysis: false,
+  },
 };
 
 /**
@@ -194,11 +207,13 @@ const PRESENTATION: Record<AskFailureKind, KindPresentation> = {
  * response that our own server did send is recovered exactly; anything else at
  * least lands on the closest true statement rather than on a bare status code.
  *
- * The one place the mirror cannot be injective is 404, which the route uses for
- * both `no_analysis` and `no_prd`. That costs nothing in practice: a 404 our
- * own server sent carries its `kind` in the body and never reaches this
- * function, and a 404 from anything else is far likelier to mean the endpoint
- * is missing than that the PRD is empty.
+ * The mirror is not injective at 404, which the route uses for both
+ * `no_analysis` and `no_prd`, and it deliberately does not mirror 403 at all.
+ * Both cost nothing in practice, for the same reason: a response our own server
+ * sent carries its `kind` in the body and never reaches this function. For
+ * anything else, the likelier reading wins — a foreign 404 means the endpoint
+ * is missing rather than that the PRD is empty, and a foreign 403 is an access
+ * denial rather than this project's feature toggle.
  */
 export function askFailureKindFromStatus(status: number): AskFailureKind {
   switch (status) {

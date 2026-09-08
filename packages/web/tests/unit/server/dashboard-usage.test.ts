@@ -205,6 +205,22 @@ describe("Ask spend in the utilization rollup", () => {
     return await res.json();
   }
 
+  /**
+   * Write `.n-dx.json` with the Ask toggle on.
+   *
+   * `sourcevision.ask` defaults to off and the endpoint now refuses when it is,
+   * so a fixture that writes this file for its `llm` block must carry the
+   * feature key too or the request never reaches a provider — and a ledger test
+   * whose call was refused would assert over an empty file for the wrong
+   * reason.
+   */
+  function writeNdxConfig(dir: string, extra: Record<string, unknown> = {}): Promise<void> {
+    return writeFile(
+      join(dir, ".n-dx.json"),
+      JSON.stringify({ ...extra, features: { sourcevision: { ask: true } } }),
+    );
+  }
+
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "dash-usage-rollup-"));
     svDir = join(tmpDir, ".sourcevision");
@@ -213,6 +229,7 @@ describe("Ask spend in the utilization rollup", () => {
     await mkdir(rexDir, { recursive: true });
     await writeFile(join(svDir, "manifest.json"), JSON.stringify(MANIFEST));
     await writeFile(join(svDir, "zones.json"), JSON.stringify(ZONES));
+    await writeNdxConfig(tmpDir);
 
     ctx = { projectDir: tmpDir, svDir, rexDir, dev: false };
     routeOptions = {};
@@ -241,10 +258,7 @@ describe("Ask spend in the utilization rollup", () => {
   // ── The acceptance criterion ──────────────────────────────────────────────
 
   it("records vendor, model, and every token class for an answered ask", async () => {
-    await writeFile(
-      join(tmpDir, ".n-dx.json"),
-      JSON.stringify({ llm: { vendor: "local", local: { model: "qwen-3-coder" } } }),
-    );
+    await writeNdxConfig(tmpDir, { llm: { vendor: "local", local: { model: "qwen-3-coder" } } });
     routeOptions = stub(() =>
       Promise.resolve({
         text: "Core is the only zone.",
@@ -270,10 +284,7 @@ describe("Ask spend in the utilization rollup", () => {
   });
 
   it("surfaces the ask in the rollup under its own vendor/model attribution", async () => {
-    await writeFile(
-      join(tmpDir, ".n-dx.json"),
-      JSON.stringify({ llm: { vendor: "local", local: { model: "qwen-3-coder" } } }),
-    );
+    await writeNdxConfig(tmpDir, { llm: { vendor: "local", local: { model: "qwen-3-coder" } } });
     routeOptions = stub(() =>
       Promise.resolve({
         text: "ok",
@@ -365,10 +376,7 @@ describe("Ask spend in the utilization rollup", () => {
   });
 
   it("records a timed-out ask, and its tokens if the provider reports them late", async () => {
-    await writeFile(
-      join(tmpDir, ".n-dx.json"),
-      JSON.stringify({ sourcevision: { ask: { timeoutMs: 30 } } }),
-    );
+    await writeNdxConfig(tmpDir, { sourcevision: { ask: { timeoutMs: 30 } } });
     let settle: (result: CompletionResult) => void = () => {};
     routeOptions = stub(() => new Promise<CompletionResult>((resolve) => { settle = resolve; }));
 
@@ -405,6 +413,7 @@ describe("Ask spend in the utilization rollup", () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "dash-usage-empty-"));
     const emptySvDir = join(emptyDir, ".sourcevision");
     await mkdir(emptySvDir, { recursive: true });
+    await writeNdxConfig(emptyDir);
     const emptyCtx: ServerContext = {
       projectDir: emptyDir,
       svDir: emptySvDir,

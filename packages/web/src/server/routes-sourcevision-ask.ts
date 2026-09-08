@@ -101,6 +101,7 @@ import { ASK_COMMAND, recordDashboardUsage, tokenFields } from "./dashboard-usag
 import type { DashboardUsageOutcome } from "./dashboard-usage.js";
 import { resolveStore } from "./rex-gateway.js";
 import type { PRDDocument } from "./rex-gateway.js";
+import { isFeatureEnabled } from "./routes-features.js";
 import {
   REFINE_RULES,
   parseAnswerRefinements,
@@ -113,6 +114,9 @@ import type { RefinementProposal } from "./prd-refinement.js";
 // ---------------------------------------------------------------------------
 
 const ASK_PATH = "/api/sourcevision/ask";
+
+/** Registry key of the toggle that governs this endpoint. */
+const ASK_FEATURE_KEY = "sourcevision.ask";
 
 /**
  * Default budget for one Ask call, overridable via
@@ -193,6 +197,7 @@ export type AskRequest = z.infer<typeof AskRequestSchema>;
 /** Named failure modes. Every non-200 response carries exactly one. */
 export type AskErrorKind =
   | "invalid_request"
+  | "disabled"
   | "no_analysis"
   | "no_prd"
   | "timeout"
@@ -430,6 +435,9 @@ const CATEGORY_TO_KIND: Record<string, AskErrorKind> = {
 
 const KIND_TO_STATUS: Record<AskErrorKind, number> = {
   invalid_request: 400,
+  // Refused by project policy, not by a credential — the request was
+  // well-formed and the caller is not being asked to authenticate.
+  disabled: 403,
   no_analysis: 404,
   // Same status as `no_analysis`, and for the same reason: the thing the mode
   // needs to read does not exist. The kind in the body is what distinguishes
@@ -460,6 +468,10 @@ const KIND_FALLBACK_WORDING: Record<Exclude<AskErrorKind, "auth">, { error: stri
   invalid_request: {
     error: "The request was rejected before it reached a model.",
     suggestion: "Check the question and send it again.",
+  },
+  disabled: {
+    error: "The SourceVision Ask panel is turned off for this project.",
+    suggestion: "Enable sourcevision.ask in the Feature Toggles view, or set features.sourcevision.ask to true in .n-dx.json.",
   },
   no_analysis: {
     error: "No analysis data to answer from.",
@@ -752,6 +764,23 @@ export async function handleSourcevisionAskRoute(
 
   if ((req.method || "GET") !== "POST") {
     jsonResponse(res, 405, { error: "Method not allowed. Use POST.", kind: "invalid_request" });
+    return true;
+  }
+
+  // Checked before the body is read and before the analysis is loaded: a
+  // feature that is off should refuse for that reason, not report whichever
+  // other precondition the project happens to also be missing.
+  //
+  // The viewer hides both entry points into this panel when the toggle is off,
+  // so this gate is not what a user meets — it is what makes the toggle a
+  // property of the endpoint rather than a property of one client. Ask spends
+  // tokens per call; a default-off, experimental feature should not be
+  // reachable by anything that can reach the port.
+  if (!isFeatureEnabled(ctx.projectDir, ASK_FEATURE_KEY)) {
+    sendError(res, {
+      ...KIND_FALLBACK_WORDING.disabled,
+      kind: "disabled",
+    });
     return true;
   }
 

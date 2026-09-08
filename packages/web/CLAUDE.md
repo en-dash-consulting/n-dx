@@ -46,6 +46,25 @@ The viewer's UI composition layer (sidebar, config-footer, faq, logos) is a comp
 3. The zone pins in `.n-dx.json` targeting `"web-server"` are no-ops when the zone is absent — they will re-activate if the zone re-appears in Louvain output
 4. The actual server/viewer boundary is enforced by `boundary-check.test.ts` regardless of zone detection — zone dissolution is a metrics artifact, not an architectural violation
 
+## Feature-toggle enforcement
+
+Toggles in `routes-features.ts`'s registry are enforced in the viewer by
+`useFeatureToggle` — the sidebar and the SourceVision tab list read them, and any
+*other* entry point into a gated surface must read the same toggle. The Explain
+button on Problems and Suggestions is the worked example: it is not in the sidebar,
+so gating the sidebar alone left a default-off feature reachable through a side door
+whose only off switch the toggle itself had hidden. Views that cannot call the hook
+(both of those return early from an enrichment gate before their hooks run) take the
+value as a prop from `main.ts` via `ViewRenderContext`, defaulting to `false`.
+
+**Server-side enforcement is per-toggle, not universal.** Use
+`isFeatureEnabled(projectDir, key)` from `routes-features.ts` when a route must not
+act with its feature off; it reads `.n-dx.json` per call (toggles change while the
+server runs) and fails closed. Today only `sourcevision.ask` is gated this way,
+because each call spends tokens. `sourcevision.prMarkdown` is viewer-gated only —
+it renders from analysis already on disk, so a direct request costs nothing. Decide
+new toggles on that basis rather than by copying whichever neighbour is closest.
+
 ## HTTP-request concurrency (web server)
 
 When `ndx start` is running, the web server holds in-process caches (aggregation cache, PRD tree snapshot) that are populated from disk on demand. External CLI commands that write to the same files can cause stale or partial reads:

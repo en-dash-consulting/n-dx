@@ -214,6 +214,22 @@ describe("POST /api/sourcevision/ask", () => {
     await writeFile(join(svDir, "CONTEXT.md"), CONTEXT_MD);
   }
 
+  /**
+   * Write `.n-dx.json` with the Ask toggle on.
+   *
+   * The endpoint refuses when `sourcevision.ask` is off, and off is the default
+   * — so a fixture project that writes no config, or writes one for some other
+   * reason and drops the feature key, gets a 403 instead of whatever the test
+   * meant to exercise. Every write of this file goes through here so that
+   * cannot happen by omission.
+   */
+  function writeNdxConfig(dir: string, extra: Record<string, unknown> = {}): Promise<void> {
+    return writeFile(
+      join(dir, ".n-dx.json"),
+      JSON.stringify({ ...extra, features: { sourcevision: { ask: true } } }),
+    );
+  }
+
   function ask(body: unknown): Promise<Response> {
     return fetch(`${baseUrl}/api/sourcevision/ask`, {
       method: "POST",
@@ -227,6 +243,7 @@ describe("POST /api/sourcevision/ask", () => {
     svDir = join(tmpDir, ".sourcevision");
     await mkdir(svDir, { recursive: true });
     await writeAnalysis();
+    await writeNdxConfig(tmpDir);
 
     ctx = { projectDir: tmpDir, svDir, rexDir: join(tmpDir, ".rex"), dev: false };
     routeOptions = {};
@@ -390,10 +407,7 @@ describe("POST /api/sourcevision/ask", () => {
   // ── Vendor / model resolution ─────────────────────────────────────────────
 
   it("resolves vendor and model from project config, not from a hardcoded pair", async () => {
-    await writeFile(
-      join(tmpDir, ".n-dx.json"),
-      JSON.stringify({ llm: { vendor: "local", local: { model: "qwen-3-coder" } } }),
-    );
+    await writeNdxConfig(tmpDir, { llm: { vendor: "local", local: { model: "qwen-3-coder" } } });
     const stub = stubClient(answering("ok"));
     routeOptions = stub.options;
 
@@ -407,17 +421,14 @@ describe("POST /api/sourcevision/ask", () => {
   });
 
   it("honors an llm.routes reroute of the sourcevision.ask task class", async () => {
-    await writeFile(
-      join(tmpDir, ".n-dx.json"),
-      JSON.stringify({
-        llm: {
-          vendor: "local",
-          local: { model: "qwen-3-coder" },
-          routes: { "sourcevision.ask": "light" },
-          tiers: { local: { light: "qwen-1.5b" } },
-        },
-      }),
-    );
+    await writeNdxConfig(tmpDir, {
+      llm: {
+        vendor: "local",
+        local: { model: "qwen-3-coder" },
+        routes: { "sourcevision.ask": "light" },
+        tiers: { local: { light: "qwen-1.5b" } },
+      },
+    });
     routeOptions = stubClient(answering("ok")).options;
 
     const body = await (await ask({ prompt: "Cheap question." })).json();
@@ -425,10 +436,7 @@ describe("POST /api/sourcevision/ask", () => {
   });
 
   it("lets .n-dx.local.json override the shared vendor choice", async () => {
-    await writeFile(
-      join(tmpDir, ".n-dx.json"),
-      JSON.stringify({ llm: { vendor: "claude" } }),
-    );
+    await writeNdxConfig(tmpDir, { llm: { vendor: "claude" } });
     await writeFile(
       join(tmpDir, ".n-dx.local.json"),
       JSON.stringify({ llm: { vendor: "local", local: { model: "on-this-machine" } } }),
@@ -481,12 +489,102 @@ describe("POST /api/sourcevision/ask", () => {
     expect(body.error).toContain("JSON");
   });
 
+  // ── Feature toggle ────────────────────────────────────────────────────────
+
+  /**
+   * `sourcevision.ask` is experimental and defaults to off, and its stated
+   * impact is that each question spends tokens. Gating only the viewer would
+   * make that a property of one client: anything else that can reach the port
+   * still spends the project's tokens. The assertion that matters in each case
+   * below is `stub.requests` — a refusal that still called the provider has
+   * refused nothing that costs money.
+   */
+  it("refuses when sourcevision.ask is off", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ features: { sourcevision: { ask: false } } }),
+    );
+    const stub = stubClient(answering("should not be called"));
+    routeOptions = stub.options;
+
+    const res = await ask({ prompt: "Where is the architectural risk?" });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.kind).toBe("disabled");
+    expect(body.suggestion).toContain("sourcevision.ask");
+    expect(stub.requests).toHaveLength(0);
+  });
+
+  it("refuses on a project with no config at all, because the toggle defaults to off", async () => {
+    await rm(join(tmpDir, ".n-dx.json"), { force: true });
+    const stub = stubClient(answering("should not be called"));
+    routeOptions = stub.options;
+
+    const res = await ask({ prompt: "Anything?" });
+
+    expect(res.status).toBe(403);
+    expect((await res.json()).kind).toBe("disabled");
+    expect(stub.requests).toHaveLength(0);
+  });
+
+  it("fails closed when .n-dx.json is unparseable rather than reading past it", async () => {
+    // The config reader swallows a parse error and returns {}. That must reach
+    // the registry default, not an assumed-on feature.
+    await writeFile(join(tmpDir, ".n-dx.json"), "{ not json");
+    const stub = stubClient(answering("should not be called"));
+    routeOptions = stub.options;
+
+    expect((await ask({ prompt: "Anything?" })).status).toBe(403);
+    expect(stub.requests).toHaveLength(0);
+  });
+
+  it("refuses before validating the request, so the reason given is the real one", async () => {
+    // An over-long prompt is also invalid. With the feature off, "the panel is
+    // off" is the fact worth reporting — fixing the prompt would change nothing.
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ features: { sourcevision: { ask: false } } }),
+    );
+    routeOptions = stubClient(answering("should not be called")).options;
+
+    const res = await ask({ prompt: "x".repeat(4_001) });
+    expect(res.status).toBe(403);
+    expect((await res.json()).kind).toBe("disabled");
+  });
+
+  it("picks the toggle up without a restart when it is switched on", async () => {
+    // The dashboard writes .n-dx.json while the server runs. A gate that read
+    // the value once at startup would keep refusing after the user enabled it.
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ features: { sourcevision: { ask: false } } }),
+    );
+    const stub = stubClient(answering("Now it answers."));
+    routeOptions = stub.options;
+
+    expect((await ask({ prompt: "First try." })).status).toBe(403);
+
+    await writeNdxConfig(tmpDir);
+
+    const res = await ask({ prompt: "Second try." });
+    expect(res.status).toBe(200);
+    expect((await res.json()).answer).toBe("Now it answers.");
+    expect(stub.requests).toHaveLength(1);
+  });
+
+  it("still rejects a non-POST method when the feature is on", async () => {
+    const res = await fetch(`${baseUrl}/api/sourcevision/ask`, { method: "GET" });
+    expect(res.status).toBe(405);
+  });
+
   // ── No analysis ───────────────────────────────────────────────────────────
 
   it("refuses to answer when there is no analysis to ground the answer in", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "sv-ask-empty-"));
     const emptySvDir = join(emptyDir, ".sourcevision");
     await mkdir(emptySvDir, { recursive: true });
+    await writeNdxConfig(emptyDir);
     const stub = stubClient(answering("should not be called"));
     const emptyCtx: ServerContext = {
       projectDir: emptyDir,
@@ -517,10 +615,7 @@ describe("POST /api/sourcevision/ask", () => {
   // ── LLM failure modes ─────────────────────────────────────────────────────
 
   it("names a timeout, rather than hanging, when the call outlives the configured budget", async () => {
-    await writeFile(
-      join(tmpDir, ".n-dx.json"),
-      JSON.stringify({ sourcevision: { ask: { timeoutMs: 50 } } }),
-    );
+    await writeNdxConfig(tmpDir, { sourcevision: { ask: { timeoutMs: 50 } } });
     // Never settles: without the timeout race this request would hang until the
     // client gave up or the test timed out.
     routeOptions = stubClient(() => new Promise<CompletionResult>(() => {})).options;
@@ -533,10 +628,7 @@ describe("POST /api/sourcevision/ask", () => {
   });
 
   it("passes the configured budget down to the provider as well as racing it", async () => {
-    await writeFile(
-      join(tmpDir, ".n-dx.json"),
-      JSON.stringify({ sourcevision: { ask: { timeoutMs: 4_000 } } }),
-    );
+    await writeNdxConfig(tmpDir, { sourcevision: { ask: { timeoutMs: 4_000 } } });
     const stub = stubClient(answering("ok"));
     routeOptions = stub.options;
 
