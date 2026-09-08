@@ -34,7 +34,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 |-------|--------|
 | [Extend PromptEnvelope Beyond Hench](./extend-promptenvelope-beyond-hench.md) | completed |
 | [Hench Runtime Prompt Tightening](./hench-runtime-prompt-tightening.md) | completed |
-| [prompt-census --write stamps a commit that does not match the measured tree](./prompt-census-write-stamps-a-commit.md) | in_progress |
+| [prompt-census --write stamps a commit that does not match the measured tree](./prompt-census-write-stamps-a-commit.md) | completed |
 | [Prompt Token-Cost Baseline & Measurement](./prompt-token-cost-baseline-measurement.md) | completed |
 | [Rex Analyze Prompt Consolidation](./rex-analyze-prompt-consolidation.md) | completed |
 | [Shipped Assistant-Asset Prompt Parity & Portability](./shipped-assistant-asset-prompt-parity.md) | completed |
