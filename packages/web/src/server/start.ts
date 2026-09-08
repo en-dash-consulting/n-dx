@@ -624,12 +624,15 @@ async function handleApiRoutes(
     },
   }))) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
-  // Async, unlike its sibling above: it awaits a model call, so it goes
-  // through handleScopedRoute rather than being invoked bare.
-  if (await handleScopedRoute(
-    isInScope(ctx.scope, "sourcevision"),
-    handleSourcevisionAskRoute(req, res, ctx),
-  )) return true;
+  // Async, unlike its sibling above — it awaits a model call — but the scope
+  // check still comes first and is NOT delegated to handleScopedRoute, which
+  // takes an already-invoked handler. Routing this through there ran the
+  // handler regardless of scope: it reached the model call, then wrote to a
+  // response the 404 fall-through below had already finished, throwing
+  // ERR_HTTP_HEADERS_SENT from an unawaited promise and killing the process.
+  // See tests/integration/scoped-route-dispatch.test.ts.
+  if (isInScope(ctx.scope, "sourcevision")
+    && await handleSourcevisionAskRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleRexRoute(req, res, ctx, ws.broadcast))) return true;

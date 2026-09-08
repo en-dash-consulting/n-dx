@@ -14,7 +14,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Ask route runs before its scope guard, crashing the server on an out-of-scope POST](./ask-route-runs-before-its-scope-guard.md) | pending |
+| [Ask route runs before its scope guard, crashing the server on an out-of-scope POST](./ask-route-runs-before-its-scope-guard.md) | completed |
 | [Globalize Token Usage Route Ownership](./globalize-token-usage-route-ownership.md) | completed |
 | [handleScopedRoute evaluates every scoped route handler before checking scope](./handlescopedroute-evaluates-every.md) | pending |
 | [Legacy URL Compatibility and Routing Regression Coverage](./legacy-url-compatibility-and-routing.md) | completed |
