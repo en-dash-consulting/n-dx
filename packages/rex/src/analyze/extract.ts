@@ -1536,7 +1536,7 @@ export function isAmbiguousStructure(
  * The prompt includes the raw content and asks the LLM to classify it
  * into the standard epic → feature → task hierarchy.
  */
-function buildDisambiguationPrompt(
+export function buildDisambiguationPrompt(
   content: string,
   existingTitles: Set<string>,
 ): string {

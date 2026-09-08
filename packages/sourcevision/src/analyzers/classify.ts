@@ -488,7 +488,7 @@ async function classifyBatchWithLLM(
 /**
  * Build the LLM prompt for file classification.
  */
-function buildLLMClassifyPrompt(
+export function buildLLMClassifyPrompt(
   files: FileClassification[],
   archetypes: { id: string; name: string; description: string }[],
   includeDescriptions: boolean,
