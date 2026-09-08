@@ -24,6 +24,7 @@ import { ProblemsView } from "../../../src/viewer/views/problems.js";
 import { SuggestionsView } from "../../../src/viewer/views/suggestions.js";
 import { AskView } from "../../../src/viewer/views/ask.js";
 import type { Finding } from "../../../src/viewer/external.js";
+import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import type { AskSeed, LoadedData, NavigateTo, ViewId } from "../../../src/viewer/types.js";
 
 // ---------------------------------------------------------------------------
@@ -240,7 +241,7 @@ describe("Explain from the Problems and Suggestions views", () => {
 
   it("Problems sends the clicked anti-pattern to the Ask view", async () => {
     const { calls, navigateTo } = captureNavigation();
-    root = mount(h(ProblemsView, { data: loadedData(FINDINGS), navigateTo }));
+    root = mount(h(ProblemsView, { data: loadedData(FINDINGS), navigateTo, askEnabled: true }));
 
     const target = explainButtons(root).find(
       (b) => b.getAttribute("aria-label")?.includes("God file"),
@@ -256,7 +257,7 @@ describe("Explain from the Problems and Suggestions views", () => {
 
   it("Suggestions sends the clicked suggestion to the Ask view", async () => {
     const { calls, navigateTo } = captureNavigation();
-    root = mount(h(SuggestionsView, { data: loadedData(FINDINGS), navigateTo }));
+    root = mount(h(SuggestionsView, { data: loadedData(FINDINGS), navigateTo, askEnabled: true }));
 
     const target = explainButtons(root).find(
       (b) => b.getAttribute("aria-label")?.includes("clipboard"),
@@ -273,7 +274,7 @@ describe("Explain from the Problems and Suggestions views", () => {
   it("offers Explain on every row each view shows", () => {
     const { navigateTo } = captureNavigation();
 
-    root = mount(h(ProblemsView, { data: loadedData(FINDINGS), navigateTo }));
+    root = mount(h(ProblemsView, { data: loadedData(FINDINGS), navigateTo, askEnabled: true }));
     const problemRows = root.querySelectorAll("li.finding-card").length;
     expect(problemRows).toBe(FINDINGS.filter((f) => f.type === "anti-pattern").length);
     expect(explainButtons(root)).toHaveLength(problemRows);
@@ -281,11 +282,92 @@ describe("Explain from the Problems and Suggestions views", () => {
     render(null, root);
     root.remove();
 
-    root = mount(h(SuggestionsView, { data: loadedData(FINDINGS), navigateTo }));
+    root = mount(h(SuggestionsView, { data: loadedData(FINDINGS), navigateTo, askEnabled: true }));
     const suggestionRows = root.querySelectorAll("li.finding-card").length;
     expect(suggestionRows).toBe(FINDINGS.filter((f) => f.type === "suggestion").length);
     expect(explainButtons(root)).toHaveLength(suggestionRows);
   });
+});
+
+// ---------------------------------------------------------------------------
+// 3b. Explain honours the sourcevision.ask toggle
+// ---------------------------------------------------------------------------
+
+/**
+ * Explain is the second entry point into Ask, and the one that is not in the
+ * sidebar. The sidebar and the tab list both read `sourcevision.ask`; if this
+ * button does not, then on a default install (the toggle is experimental and
+ * defaults to false) a finding row still reaches the panel and spends tokens,
+ * while the only control that could stop it is hidden by the very toggle that
+ * is off. Rows must still render — it is the action that goes away, not the
+ * finding.
+ */
+describe("Explain respects the sourcevision.ask toggle", () => {
+  let root: HTMLElement;
+
+  afterEach(() => {
+    render(null, root);
+    root.remove();
+  });
+
+  const views = [
+    { name: "Problems", View: ProblemsView, type: "anti-pattern" as const },
+    { name: "Suggestions", View: SuggestionsView, type: "suggestion" as const },
+  ];
+
+  for (const { name, View, type } of views) {
+    it(`${name} renders no Explain action when the toggle is off`, () => {
+      root = mount(h(View, {
+        data: loadedData(FINDINGS),
+        navigateTo: () => { throw new Error("Explain navigated with Ask disabled"); },
+        askEnabled: false,
+      }));
+
+      expect(root.querySelectorAll("li.finding-card").length)
+        .toBe(FINDINGS.filter((f) => f.type === type).length);
+      expect(explainButtons(root)).toHaveLength(0);
+    });
+
+    it(`${name} fails closed when the caller omits the toggle entirely`, () => {
+      // A new call site that forgets the prop must not re-open the side door.
+      root = mount(h(View, { data: loadedData(FINDINGS), navigateTo: () => {} }));
+      expect(explainButtons(root)).toHaveLength(0);
+    });
+  }
+
+  // Gating the components is only half the fix: the registry is what supplies
+  // the prop, and dropping it there would silently restore the old behaviour
+  // while every component-level test above still passed.
+  for (const view of ["problems", "suggestions"] as const) {
+    it(`the registry passes the toggle through to the ${view} view`, () => {
+      function ctx(askEnabled: boolean): ViewRenderContext {
+        return {
+          data: loadedData(FINDINGS),
+          setDetail: () => {},
+          setPrdDetailContent: () => {},
+          selectedFile: null,
+          setSelectedFile: () => {},
+          selectedZone: null,
+          selectedRunId: null,
+          selectedTaskId: null,
+          askSeed: null,
+          navigateTo: () => {},
+          isFeatureDisabled: () => false,
+          askEnabled,
+        };
+      }
+
+      root = mount(h(() => renderActiveView(view as ViewId, ctx(false)) as never, null));
+      expect(root.querySelectorAll("li.finding-card").length).toBeGreaterThan(0);
+      expect(explainButtons(root)).toHaveLength(0);
+
+      render(null, root);
+      root.remove();
+
+      root = mount(h(() => renderActiveView(view as ViewId, ctx(true)) as never, null));
+      expect(explainButtons(root).length).toBeGreaterThan(0);
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------

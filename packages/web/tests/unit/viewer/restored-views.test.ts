@@ -43,6 +43,7 @@ function makeCtx(): ViewRenderContext {
     askSeed: null,
     navigateTo: () => {},
     isFeatureDisabled: () => false,
+    askEnabled: false,
   };
 }
 

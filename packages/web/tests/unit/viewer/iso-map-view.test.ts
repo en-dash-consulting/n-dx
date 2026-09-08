@@ -317,6 +317,7 @@ describe("iso-map view registration", () => {
       askSeed: null,
       navigateTo: () => {},
       isFeatureDisabled: () => false,
+      askEnabled: false,
     };
   }
 

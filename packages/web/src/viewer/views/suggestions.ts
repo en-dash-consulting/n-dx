@@ -10,6 +10,8 @@ import { findingAskSeed } from "./finding-seed.js";
 interface SuggestionsProps {
   data: LoadedData;
   navigateTo?: NavigateTo;
+  /** State of the `sourcevision.ask` toggle — see the note in problems.ts. */
+  askEnabled?: boolean;
 }
 
 function RefreshRecommendationsButton() {
@@ -80,7 +82,7 @@ function RefreshRecommendationsButton() {
   );
 }
 
-export function SuggestionsView({ data, navigateTo }: SuggestionsProps) {
+export function SuggestionsView({ data, navigateTo, askEnabled = false }: SuggestionsProps) {
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
@@ -145,8 +147,9 @@ export function SuggestionsView({ data, navigateTo }: SuggestionsProps) {
       legacyInsights,
       groupBy: "severity",
       searchable: true,
-      // Omitted without a navigation target — see the note in problems.ts.
-      ...(navigateTo
+      // Omitted without a navigation target, or with Ask toggled off — see the
+      // note in problems.ts.
+      ...(navigateTo && askEnabled
         ? { onExplain: (f: Finding) => navigateTo("ask", { askSeed: findingAskSeed(f) }) }
         : {}),
     })

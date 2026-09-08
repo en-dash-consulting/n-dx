@@ -10,9 +10,17 @@ import { findingAskSeed } from "./finding-seed.js";
 interface ProblemsProps {
   data: LoadedData;
   navigateTo?: NavigateTo;
+  /**
+   * State of the `sourcevision.ask` toggle, supplied by the caller.
+   *
+   * Defaults to `false` so a caller that forgets it gets no Explain action
+   * rather than an ungated one — Ask is experimental, default-off, and spends
+   * tokens per question.
+   */
+  askEnabled?: boolean;
 }
 
-export function ProblemsView({ data, navigateTo }: ProblemsProps) {
+export function ProblemsView({ data, navigateTo, askEnabled = false }: ProblemsProps) {
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
@@ -98,10 +106,15 @@ export function ProblemsView({ data, navigateTo }: ProblemsProps) {
       searchable: true,
       // No navigation target, no Explain action: the view renders standalone in
       // tests and in the exported dashboard, and a button that goes nowhere is
-      // worse than an absent one. Not wrapped in useCallback because the
-      // enrichment gate returns before this component's hooks run, so adding
-      // another hook below it would widen an existing conditional-hook hazard.
-      ...(navigateTo
+      // worse than an absent one. The same applies when `sourcevision.ask` is
+      // off — Explain is a second entry point into Ask, and leaving it live
+      // would make a default-off feature reachable through a side door whose
+      // only off switch lives in the sidebar the toggle already hid.
+      //
+      // `askEnabled` arrives as a prop rather than from useFeatureToggle here
+      // because the enrichment gate above returns before this component's hooks
+      // run; another hook below it would widen that conditional-hook hazard.
+      ...(navigateTo && askEnabled
         ? { onExplain: (f: Finding) => navigateTo("ask", { askSeed: findingAskSeed(f) }) }
         : {}),
     })

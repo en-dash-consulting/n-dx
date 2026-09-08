@@ -81,6 +81,14 @@ export interface ViewRenderContext {
   askSeed: AskSeed | null;
   navigateTo: NavigateTo;
   isFeatureDisabled: (feature: DegradableFeature) => boolean;
+  /**
+   * State of the `sourcevision.ask` toggle, read by the caller.
+   *
+   * Views that offer a route into Ask must honour it: the toggle is the only
+   * control the user has over Ask, and the sidebar that hosts that control is
+   * itself hidden when the toggle is off.
+   */
+  askEnabled: boolean;
 }
 
 // ── Registry ───────────────────────────────────────────────────
@@ -109,11 +117,11 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "architecture": ({ data, setDetail, navigateTo }) =>
     h(ArchitectureView, { data, onSelect: setDetail, navigateTo }),
 
-  "problems": ({ data, navigateTo }) =>
-    h(ProblemsView, { data, navigateTo }),
+  "problems": ({ data, navigateTo, askEnabled }) =>
+    h(ProblemsView, { data, navigateTo, askEnabled }),
 
-  "suggestions": ({ data, navigateTo }) =>
-    h(SuggestionsView, { data, navigateTo }),
+  "suggestions": ({ data, navigateTo, askEnabled }) =>
+    h(SuggestionsView, { data, navigateTo, askEnabled }),
 
   "pr-markdown": () =>
     h(PRMarkdownView, null),
