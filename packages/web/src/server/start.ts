@@ -13,6 +13,7 @@ import { resolveStaticAssets, handleStaticRoute, isProjectInitialized } from "./
 import { createDataWatcher, handleDataRoute } from "./routes-data.js";
 import { handleRexRoute, shutdownRexExecution } from "./routes-rex/index.js";
 import { handleSourcevisionRoute } from "./routes-sourcevision.js";
+import { handleSourcevisionAskRoute } from "./routes-sourcevision-ask.js";
 import { handleIsoMapRoute } from "./routes-iso-map.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
@@ -623,6 +624,12 @@ async function handleApiRoutes(
     },
   }))) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
+  // Async, unlike its sibling above: it awaits a model call, so it goes
+  // through handleScopedRoute rather than being invoked bare.
+  if (await handleScopedRoute(
+    isInScope(ctx.scope, "sourcevision"),
+    handleSourcevisionAskRoute(req, res, ctx),
+  )) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), handleRexRoute(req, res, ctx, ws.broadcast))) return true;

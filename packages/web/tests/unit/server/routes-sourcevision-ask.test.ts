@@ -1,0 +1,237 @@
+/**
+ * Unit tests for POST /api/sourcevision/ask.
+ *
+ * The endpoint answers a question about the analyzed project, grounded in the
+ * `.sourcevision/` artifacts rather than the model's own recollection of the
+ * codebase. Three properties matter enough to pin:
+ *
+ * 1. **The context actually reaches the model.** An endpoint that reads
+ *    CONTEXT.md and then forgets to include it would still return plausible
+ *    prose — the failure is invisible from the response alone, so the test
+ *    asserts on the prompt handed to `complete()`.
+ * 2. **The vendor and model are resolved from config, not hardcoded**, and are
+ *    reported back. A caller cannot judge an answer without knowing what
+ *    produced it.
+ * 3. **Failures are named.** `ClaudeClientError` already classifies auth,
+ *    timeout, rate-limit and CLI failures; a route that collapses them into a
+ *    500 throws that away, and "it hung" and "you are rate limited" need
+ *    different responses from the operator.
+ *
+ * @see packages/web/src/server/routes-sourcevision-ask.ts
+ * @see packages/web/src/server/sourcevision-ask-context.ts
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import type { Server } from "node:http";
+
+const { completeMock, createLLMClientMock, loadLLMConfigMock } = vi.hoisted(() => ({
+  completeMock: vi.fn(),
+  createLLMClientMock: vi.fn(),
+  loadLLMConfigMock: vi.fn(),
+}));
+
+vi.mock("@n-dx/llm-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@n-dx/llm-client")>();
+  return {
+    ...actual,
+    createLLMClient: createLLMClientMock,
+    loadLLMConfig: loadLLMConfigMock,
+  };
+});
+
+import { ClaudeClientError } from "@n-dx/llm-client";
+import type { ServerContext } from "../../../src/server/types.js";
+import { handleSourcevisionAskRoute } from "../../../src/server/routes-sourcevision-ask.js";
+import {
+  startRouteTestServer,
+  closeRouteTestServer,
+} from "../../helpers/server-route-test-support.js";
+
+const CONTEXT_MD = [
+  "# Project Context",
+  "",
+  "## Zones",
+  "- `billing` — 12 files, cohesion 0.91. Invoice generation and dunning.",
+  "- `api` — 8 files, cohesion 0.88. HTTP handlers.",
+].join("\n");
+
+describe("POST /api/sourcevision/ask", () => {
+  let tmpDir: string;
+  let ctx: ServerContext;
+  let server: Server;
+  let port: number;
+
+  beforeEach(async () => {
+    completeMock.mockReset();
+    createLLMClientMock.mockReset();
+    loadLLMConfigMock.mockReset();
+
+    createLLMClientMock.mockReturnValue({ mode: "cli", complete: completeMock });
+    loadLLMConfigMock.mockResolvedValue({ vendor: "claude", claude: { model: "claude-sonnet-5" } });
+    completeMock.mockResolvedValue({
+      text: "The billing zone owns invoice generation.",
+      tokenUsage: { input: 1200, output: 42 },
+    });
+
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-ask-"));
+    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
+    await writeFile(join(tmpDir, ".sourcevision", "CONTEXT.md"), CONTEXT_MD, "utf-8");
+
+    ctx = {
+      projectDir: tmpDir,
+      svDir: join(tmpDir, ".sourcevision"),
+      rexDir: join(tmpDir, ".rex"),
+      dev: false,
+    } as ServerContext;
+
+    const started = await startRouteTestServer((req, res) =>
+      handleSourcevisionAskRoute(req, res, ctx),
+    );
+    server = started.server;
+    port = started.port;
+  });
+
+  afterEach(async () => {
+    await closeRouteTestServer(server);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  /** POST a body to the ask endpoint. */
+  async function ask(body: unknown): Promise<{ status: number; body: any }> {
+    const res = await fetch(`http://127.0.0.1:${port}/api/sourcevision/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return { status: res.status, body: await res.json() };
+  }
+
+  // ── Success path ──────────────────────────────────────────────────────────
+
+  it("answers, and reports the vendor and model that produced the answer", async () => {
+    const { status, body } = await ask({ prompt: "What does the billing zone do?" });
+
+    expect(status).toBe(200);
+    expect(body.answer).toBe("The billing zone owns invoice generation.");
+    expect(body.vendor).toBe("claude");
+    expect(body.model).toBe("claude-sonnet-5");
+    expect(body.tokens).toEqual({ input: 1200, output: 42 });
+  });
+
+  it("grounds the answer in .sourcevision/ data", async () => {
+    // The property the endpoint exists for. Asserted on the prompt rather than
+    // the response, because a route that dropped the context would still
+    // return fluent text.
+    await ask({ prompt: "What does the billing zone do?" });
+
+    const prompt = completeMock.mock.calls[0][0].prompt as string;
+    expect(prompt).toContain("Invoice generation and dunning");
+    expect(prompt).toContain("What does the billing zone do?");
+    expect(prompt).toContain("cohesion 0.91");
+  });
+
+  it("includes the caller's seed context when supplied", async () => {
+    await ask({ prompt: "Why does this matter?", seed: "Finding: api imports billing directly." });
+
+    const prompt = completeMock.mock.calls[0][0].prompt as string;
+    expect(prompt).toContain("api imports billing directly");
+  });
+
+  it("resolves the model from config rather than hardcoding it", async () => {
+    loadLLMConfigMock.mockResolvedValue({ vendor: "claude", claude: { model: "claude-opus-5" } });
+
+    const { body } = await ask({ prompt: "Anything." });
+
+    expect(completeMock.mock.calls[0][0].model).toBe("claude-opus-5");
+    expect(body.model).toBe("claude-opus-5");
+  });
+
+  // ── Request validation ────────────────────────────────────────────────────
+
+  it("rejects a missing prompt with 400", async () => {
+    const { status, body } = await ask({});
+    expect(status).toBe(400);
+    expect(body.error).toMatch(/prompt/i);
+    expect(completeMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a blank prompt with 400", async () => {
+    const { status } = await ask({ prompt: "   " });
+    expect(status).toBe(400);
+    expect(completeMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-string seed with 400", async () => {
+    const { status } = await ask({ prompt: "ok", seed: { not: "a string" } });
+    expect(status).toBe(400);
+    expect(completeMock).not.toHaveBeenCalled();
+  });
+
+  // ── Error paths ───────────────────────────────────────────────────────────
+
+  it("returns 504 and names the timeout", async () => {
+    completeMock.mockRejectedValue(new ClaudeClientError("took too long", "timeout", true));
+
+    const { status, body } = await ask({ prompt: "Anything." });
+
+    expect(status).toBe(504);
+    expect(body.reason).toBe("timeout");
+    expect(body.error).toMatch(/timed out/i);
+  });
+
+  it("returns 429 and names the rate limit", async () => {
+    completeMock.mockRejectedValue(new ClaudeClientError("slow down", "rate-limit", true));
+
+    const { status, body } = await ask({ prompt: "Anything." });
+
+    expect(status).toBe(429);
+    expect(body.reason).toBe("rate-limit");
+    expect(body.error).toMatch(/rate limit/i);
+  });
+
+  it("returns 401 and names the auth failure", async () => {
+    completeMock.mockRejectedValue(new ClaudeClientError("not logged in", "auth", false));
+
+    const { status, body } = await ask({ prompt: "Anything." });
+
+    expect(status).toBe(401);
+    expect(body.reason).toBe("auth");
+  });
+
+  it("names an unclassified failure rather than surfacing a bare 500", async () => {
+    completeMock.mockRejectedValue(new Error("socket hang up"));
+
+    const { status, body } = await ask({ prompt: "Anything." });
+
+    expect(status).toBe(502);
+    expect(body.reason).toBe("unknown");
+    expect(body.error).toMatch(/socket hang up/);
+  });
+
+  it("returns 409 when the project has not been analyzed", async () => {
+    // No CONTEXT.md means there is no ground truth to answer from. Saying so
+    // is more useful than letting the model answer from imagination.
+    await rm(join(tmpDir, ".sourcevision", "CONTEXT.md"));
+
+    const { status, body } = await ask({ prompt: "Anything." });
+
+    expect(status).toBe(409);
+    expect(body.error).toMatch(/analy/i);
+    expect(completeMock).not.toHaveBeenCalled();
+  });
+
+  // ── Routing ───────────────────────────────────────────────────────────────
+
+  it("ignores unrelated paths", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/other`, { method: "POST" });
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects GET on the ask path with 405", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/sourcevision/ask`);
+    expect(res.status).toBe(405);
+  });
+});
