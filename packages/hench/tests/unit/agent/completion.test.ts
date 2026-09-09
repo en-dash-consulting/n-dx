@@ -315,11 +315,17 @@ describe("validateCompletion", () => {
     expect(gitArgs).toContain("def456");
     expect(gitArgs).not.toContain("HEAD");
 
-    // Test command should have run via sh -c
-    const testArgs = mockSpawn.mock.calls[1];
-    expect(testArgs[0]).toBe("sh");
-    expect(testArgs[1]).toContain("-c");
-    expect(testArgs[1]).toContain("pnpm test");
+    // Test command should have run through a shell. Which shell is the host's
+    // to decide — `sh -c` where sh is on PATH, else `cmd.exe /d /s /c`, which
+    // is what Windows gets and needs its own quoting kept verbatim. Both shapes
+    // are asserted concretely rather than matched loosely.
+    const [shellCmd, shellArgs] = mockSpawn.mock.calls[1] as [string, string[]];
+    if (shellCmd === "sh") {
+      expect(shellArgs).toEqual(["-c", "pnpm test"]);
+    } else {
+      expect(shellCmd).toMatch(/cmd\.exe$/i);
+      expect(shellArgs).toEqual(["/d", "/s", "/c", '"pnpm test"']);
+    }
 
     expect(result.valid).toBe(true);
     expect(result.hasChanges).toBe(true);

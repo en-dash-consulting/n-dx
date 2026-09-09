@@ -212,12 +212,12 @@ export function detectRunner(testCommand: string): string | undefined {
  *
  * findRelevantTests correctly returns OS-native paths — it stat()s them, and
  * Windows accepts backslashes. But those values then become part of a COMMAND
- * STRING, and runPostTaskTests runs that through execShellCmd, which is
- * `exec("sh", ["-c", cmd])` on every platform. A POSIX shell reads each
- * backslash as an escape, so "src\agent\loop.test.ts" arrives as
- * "srcagentloop.test.ts", the runner's filter matches nothing, and vitest exits
- * 1 — making every scoped post-task run on Windows report failure regardless of
- * the code.
+ * STRING, and runPostTaskTests runs that through execShellCmd, which may reach
+ * a POSIX shell on any platform (it prefers `sh` wherever `sh` is on PATH). A
+ * POSIX shell reads each backslash as an escape, so "src\agent\loop.test.ts"
+ * arrives as "srcagentloop.test.ts", the runner's filter matches nothing, and
+ * vitest exits 1 — making every scoped post-task run on Windows report failure
+ * regardless of the code.
  *
  * Forward slashes survive sh untouched and are accepted as filters by vitest,
  * jest and mocha, and are the required form for Go package patterns.
@@ -555,6 +555,40 @@ function parseVitestOutput(stdout: string, stderr: string): TestPackageResult[] 
 }
 
 /**
+ * Describe a non-zero exit that produced nothing attributable to a package.
+ *
+ * The gate used to drop this on the floor: `execShellCmd` reports a shell that
+ * never launched as `exitCode: 1` with empty stdout/stderr and a populated
+ * `error`, `parseVitestOutput` had nothing to parse and returned `[]`, and the
+ * caller printed `✗ 0/0 package(s) failed` followed by `Test gate failed:` with
+ * an empty package list — a run aborted for reasons the operator could not see.
+ * Whatever the cause (missing shell, bad test command, a runner that crashed
+ * before reporting), say so and quote what the command actually emitted.
+ */
+function opaqueFailureDetail(
+  command: string,
+  exitCode: number,
+  error: Error | null,
+  stdout: string,
+  stderr: string,
+): string {
+  const parts = [`\`${command}\` exited ${exitCode} without reporting any test results.`];
+
+  if ((error as { code?: string } | null)?.code === "ENOENT") {
+    parts.push(
+      "The shell or command could not be launched — check that the configured " +
+        "test command exists on PATH (hench.testCommand).",
+    );
+  }
+
+  const output = truncateOutput(stdout, stderr, 800);
+  if (output) parts.push(output);
+  else if (error) parts.push(error.message);
+
+  return parts.join("\n");
+}
+
+/**
  * Run the full test suite as a mandatory gate in self-heal mode.
  *
  * Behavior:
@@ -563,6 +597,11 @@ function parseVitestOutput(stdout: string, stderr: string): TestPackageResult[] 
  * - Aggregates results by package (packages/xyz/...)
  * - Returns per-package pass/fail status and failure counts
  * - Never throws — always returns a structured result
+ *
+ * A non-zero exit is always attributable to at least one package in the result:
+ * when the output names none, a synthetic `workspace` entry carries the reason.
+ * Callers report the gate by counting failed packages, so an empty list read as
+ * "nothing failed" even though the run was aborted anyway.
  */
 export async function runTestGate(
   options: TestGateOptions,
@@ -583,7 +622,7 @@ export async function runTestGate(
   const command = testCommand || "pnpm test --reporter=json";
   const startMs = Date.now();
 
-  const { stdout, stderr, exitCode } = await execShellCmd(command, {
+  const { stdout, stderr, exitCode, error } = await execShellCmd(command, {
     cwd: projectDir,
     timeout,
     maxBuffer: 5 * 1024 * 1024, // 5MB for larger test output
@@ -606,6 +645,23 @@ export async function runTestGate(
   // Parse output to extract per-package results
   const packages = parseVitestOutput(stdout, stderr);
   const overallPassed = exitCode === 0;
+
+  // A non-zero exit that no package accounts for — a shell that never launched,
+  // a missing script, a runner that died before reporting. Name it, so the
+  // failure is legible instead of "0/0 package(s) failed".
+  if (!overallPassed && packages.every((p) => p.passed)) {
+    const failureOutput = opaqueFailureDetail(command, exitCode, error, stdout, stderr);
+    packages.push({ name: "workspace", passed: false, failureOutput });
+
+    return {
+      ran: true,
+      passed: false,
+      packages,
+      command,
+      totalDurationMs,
+      error: failureOutput,
+    };
+  }
 
   return {
     ran: true,

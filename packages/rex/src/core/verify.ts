@@ -10,7 +10,7 @@
 
 import { readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { PROJECT_DIRS, exec as foundationExec } from "@n-dx/llm-client";
+import { PROJECT_DIRS, execShellCmd as foundationExecShell } from "@n-dx/llm-client";
 import { walkTree } from "./tree.js";
 import { extractKeywords, scoreMatch } from "./keywords.js";
 import type {PRDItem} from "../schema/index.js";
@@ -192,13 +192,19 @@ export function collectVerifiableTasks(
 // Shell execution (delegates to foundation layer)
 // ---------------------------------------------------------------------------
 
-function exec(
-  cmd: string,
-  args: string[],
+/**
+ * Run a command string through a shell.
+ *
+ * Delegates shell choice to the foundation layer rather than spawning `sh`
+ * directly — `sh` is not on a stock Windows PATH, and a failed spawn is
+ * indistinguishable from a test suite that ran and failed.
+ */
+function execShell(
+  command: string,
   cwd: string,
   timeout: number,
 ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
-  return foundationExec(cmd, args, { cwd, timeout, maxBuffer: 2 * 1024 * 1024 });
+  return foundationExecShell(command, { cwd, timeout, maxBuffer: 2 * 1024 * 1024 });
 }
 
 // ---------------------------------------------------------------------------
@@ -283,9 +289,7 @@ export async function verify(options: VerifyOptions): Promise<VerifyResult> {
     const command = `${testCommand} ${files.join(" ")}`;
 
     const startMs = Date.now();
-    const { stdout, stderr, exitCode } = await exec(
-      "sh", ["-c", command], projectDir, timeout,
-    );
+    const { stdout, stderr, exitCode } = await execShell(command, projectDir, timeout);
     const durationMs = Date.now() - startMs;
 
     const output = (stdout.trim() || stderr.trim()).slice(-2000);

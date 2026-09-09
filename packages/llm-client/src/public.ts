@@ -269,6 +269,8 @@ export {
   exec,
   execStdout,
   execShellCmd,
+  resolveShellInvocation,
+  resetShellProbe,
   getCurrentHead,
   getCurrentBranch,
   sanitizeBranchName,
@@ -290,6 +292,7 @@ export {
 export type {
   ExecResult,
   ExecOptions,
+  ShellInvocation,
   SpawnToolOptions,
   SpawnToolResult,
   ManagedChild,

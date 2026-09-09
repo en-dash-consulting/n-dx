@@ -1,4 +1,4 @@
-import { exec } from "../process/exec.js";
+import { execShellCmd } from "../process/exec.js";
 import { isVerbose, verbose } from "../types/output.js";
 
 export interface ExecShellOptions {
@@ -62,7 +62,9 @@ export async function execShell(opts: ExecShellOptions): Promise<string> {
   } = opts;
 
   const liveTail = createLiveTail();
-  const result = await exec("sh", ["-c", command], { cwd, timeout, maxBuffer, env, onData: liveTail.onData });
+  // execShellCmd, not exec("sh", …): `sh` is absent from a stock Windows PATH,
+  // where it failed to spawn and reported as a command that ran and exited 1.
+  const result = await execShellCmd(command, { cwd, timeout, maxBuffer, env, onData: liveTail.onData });
   liveTail.flush();
 
   // Timeout — exitCode is null when the process was killed

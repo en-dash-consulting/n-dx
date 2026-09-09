@@ -119,7 +119,10 @@ describe("execShellCmd", () => {
     const spawned = fakeSpawn("ok");
     mockSpawn.mockImplementation(spawned.impl);
 
-    await execShellCmd("echo hello | head", { cwd: "/tmp", timeout: 5000 });
+    // Platform pinned: execShellCmd resolves the host's shell (cmd.exe where
+    // `sh` is absent, as on a stock Windows PATH), so the sh shape has to be
+    // asked for rather than assumed. See resolveShellInvocation.
+    await execShellCmd("echo hello | head", { cwd: "/tmp", timeout: 5000, _platform: "linux" });
 
     expect(spawned.calls[0]!.cmd).toBe("sh");
     expect(spawned.calls[0]!.args).toEqual(["-c", "echo hello | head"]);

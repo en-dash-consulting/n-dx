@@ -88,6 +88,12 @@ export interface ExecOptions {
    */
   freeze?: boolean;
   /**
+   * Windows only: hand the argument list to the child exactly as written,
+   * without Node's per-argument quoting. Set by {@link execShellCmd} when it
+   * falls back to `cmd.exe`, which must receive its own quoting intact.
+   */
+  windowsVerbatimArguments?: boolean;
+  /**
    * @internal Override platform detection — for unit tests only.
    * Production callers must never pass this.
    */
@@ -158,6 +164,7 @@ export function exec(
     onData,
     treeKill = true,
     freeze = isPosixFreezeKillEnabled(env ?? process.env),
+    windowsVerbatimArguments,
     _platform = process.platform as NodeJS.Platform,
   } = opts;
 
@@ -196,6 +203,8 @@ export function exec(
         cwd,
         env,
         stdio: ["pipe", "pipe", "pipe"],
+        // Only meaningful on win32; undefined elsewhere, and spawn ignores it.
+        ...(windowsVerbatimArguments ? { windowsVerbatimArguments: true } : {}),
         // This is the reason exec spawns rather than execFile'ing. execFile builds
         // its own options object for spawn and silently drops anything outside its
         // curated set, `detached` included — so on POSIX the child was never a
@@ -384,16 +393,96 @@ export function execStdout(
   });
 }
 
+/** How a shell command string is handed to a shell binary. */
+export interface ShellInvocation {
+  /** Shell binary to spawn. */
+  cmd: string;
+  /** Arguments carrying the command string. */
+  args: string[];
+  /** True when the args must reach the child unquoted (cmd.exe). */
+  windowsVerbatimArguments?: boolean;
+}
+
+/** Cached PATH probe for `sh` on win32 — see {@link resolveShellInvocation}. */
+let win32PosixShell: boolean | undefined;
+
+/** @internal Test seam — forget the cached win32 `sh` probe. */
+export function resetShellProbe(): void {
+  win32PosixShell = undefined;
+}
+
 /**
- * Execute a shell command string (via `sh -c`).
+ * Choose the shell that will run a command string.
  *
- * Wraps the command in a shell for glob expansion, pipes, etc.
+ * POSIX gets `sh -c`, as it always did. Windows is the case this exists for:
+ * `sh` is NOT a Windows program, and Git for Windows puts `sh.exe` in
+ * `Git\bin`/`Git\usr\bin` while placing only `Git\cmd` (git.exe alone) on PATH.
+ * So `spawn("sh", …)` failed with ENOENT ~2 ms in, and because a spawn failure
+ * surfaces as `exitCode: 1` with empty stdout/stderr, every caller read it as
+ * "the command ran and failed" — the hench test gate reported
+ * `0/0 package(s) failed` and aborted otherwise-good runs.
+ *
+ * `sh` is still preferred when it IS on PATH (e.g. `ndx` launched from a Git
+ * Bash shell), so POSIX-quoted test commands keep working where they worked
+ * before. Only when it is absent do we fall back to `cmd.exe /d /s /c`, which
+ * every Windows install has.
+ *
+ * The fallback quotes the command itself and asks for verbatim arguments:
+ * `/s` strips exactly the outer quote pair, so quotes INSIDE the command
+ * survive, whereas Node's own arg quoting would escape them as `\"` — which
+ * cmd.exe does not unescape.
+ *
+ * The PATH probe shells out (`where`), so it is cached for the process; pass
+ * `hasPosixShell` (or call {@link resetShellProbe}) in tests.
+ */
+export function resolveShellInvocation(
+  command: string,
+  opts: {
+    platform?: NodeJS.Platform;
+    hasPosixShell?: () => boolean;
+    env?: NodeJS.ProcessEnv;
+  } = {},
+): ShellInvocation {
+  const platform = opts.platform ?? (process.platform as NodeJS.Platform);
+  const posix: ShellInvocation = { cmd: "sh", args: ["-c", command] };
+
+  if (platform !== "win32") return posix;
+
+  if (opts.hasPosixShell) {
+    if (opts.hasPosixShell()) return posix;
+  } else {
+    win32PosixShell ??= isExecutableOnPath("sh");
+    if (win32PosixShell) return posix;
+  }
+
+  // ComSpec is honoured only when it needs no quoting: verbatim mode leaves the
+  // whole command line unquoted, so a spaced shell path would tokenize wrong.
+  // The bare name resolves through System32, which is always on PATH.
+  const comspec = (opts.env ?? process.env).ComSpec;
+  const shell = comspec && !/\s/.test(comspec) ? comspec : "cmd.exe";
+
+  return {
+    cmd: shell,
+    args: ["/d", "/s", "/c", `"${command}"`],
+    windowsVerbatimArguments: true,
+  };
+}
+
+/**
+ * Execute a shell command string.
+ *
+ * Wraps the command in a shell for pipes, `&&`, and the like. Which shell —
+ * and why that is not simply `sh` — is {@link resolveShellInvocation}.
  */
 export function execShellCmd(
   command: string,
   opts: ExecOptions,
 ): Promise<ExecResult> {
-  return exec("sh", ["-c", command], opts);
+  const { cmd, args, windowsVerbatimArguments } = resolveShellInvocation(command, {
+    platform: opts._platform,
+    env: opts.env,
+  });
+  return exec(cmd, args, windowsVerbatimArguments ? { ...opts, windowsVerbatimArguments } : opts);
 }
 
 /**

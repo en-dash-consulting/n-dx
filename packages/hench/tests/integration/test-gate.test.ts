@@ -91,4 +91,42 @@ describe("Test Suite Gate Integration", () => {
       }
     }
   });
+
+  // Regression: a gate failure that no package accounts for used to be reported
+  // as "0/0 package(s) failed" with an empty `Test gate failed: ` reason, which
+  // is how a Windows run whose shell never launched aborted a good task without
+  // saying why. A non-zero exit must always name something and explain itself.
+  describe("failure with no attributable test output", () => {
+    it("attributes the failure and records why", async () => {
+      const result = await runTestGate({
+        projectDir,
+        filesChanged: ["src/index.ts"],
+        // Exits non-zero, prints nothing — the shape of an unlaunchable shell,
+        // a missing script, or a runner that died before reporting.
+        testCommand: `node -e "process.exit(3)"`,
+        timeout: 20_000,
+      });
+
+      expect(result.ran).toBe(true);
+      expect(result.passed).toBe(false);
+      expect(result.packages.filter((p) => !p.passed)).toHaveLength(1);
+      expect(result.error).toContain("exited 3");
+      expect(result.error).toContain("without reporting any test results");
+      expect(result.packages[0]!.failureOutput).toBe(result.error);
+    });
+
+    // The gate runs a command STRING, so it needs a shell — and `sh` is not on
+    // a stock Windows PATH. Proves the platform's shell is actually reached.
+    it("runs the command through a shell that exists on this platform", async () => {
+      const result = await runTestGate({
+        projectDir,
+        filesChanged: ["src/index.ts"],
+        testCommand: `node -e "process.stdout.write('shell-ok')"`,
+        timeout: 20_000,
+      });
+
+      expect(result.ran).toBe(true);
+      expect(result.passed).toBe(true);
+    });
+  });
 });

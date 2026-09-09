@@ -589,7 +589,8 @@ async function promptTestGateFailure(
 
   info(`\n${failCount}/${packageCount} package(s) failed testing`);
   detail(`Command: ${testGate.command}`);
-  detail(`Failed packages: ${failedPackages}`);
+  if (failedPackages) detail(`Failed packages: ${failedPackages}`);
+  else if (testGate.error) detail(testGate.error);
 
   const question =
     "[r]erun tests, [a]bort (revert & skip commit), or [s]kip gate (continue to commit)? [a] ";
@@ -2167,6 +2168,11 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
           const firstFailure = testGate.packages.find((p) => p.failureOutput);
           if (firstFailure?.failureOutput) {
             detail(firstFailure.failureOutput);
+          } else if (testGate.error) {
+            // Gate-level failure with nothing per-package to print — a timeout,
+            // or a command that never produced test output. Printing nothing
+            // here is what made an aborted run look unexplained.
+            detail(testGate.error);
           }
 
           // Prompt for action
@@ -2181,9 +2187,14 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             stream("Test Gate", "Skipped by user");
             gateComplete = true;
           } else {
-            // "abort" — mark run as failed and proceed to rollback
+            // "abort" — mark run as failed and proceed to rollback.
+            // Never leave the reason blank: with no failing package named (a
+            // timeout, an unlaunchable command) the run record used to read
+            // "Test gate failed: " and the loop stopped without saying why.
             run.status = "failed";
-            run.error = `Test gate failed: ${failedPackages.join(", ")}`;
+            run.error = failedPackages.length > 0
+              ? `Test gate failed: ${failedPackages.join(", ")}`
+              : `Test gate failed: ${testGate.error ?? `\`${testGate.command}\` reported no results`}`;
             gateComplete = true;
           }
         }

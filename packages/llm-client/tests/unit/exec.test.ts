@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, resolveShellInvocation, resetShellProbe, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
 import { resolve } from "node:path";
 import { fakeSpawn } from "../helpers/fake-spawn.js";
 
@@ -265,7 +265,7 @@ describe("execShellCmd", () => {
     const spawned = fakeSpawn({ stdout: "ok" });
     mockSpawn.mockImplementation(spawned.impl);
 
-    await execShellCmd("echo hello | head", { cwd: "/tmp", timeout: 5000 });
+    await execShellCmd("echo hello | head", { cwd: "/tmp", timeout: 5000, _platform: "linux" });
 
     expect(spawned.calls[0]!.cmd).toBe("sh");
     expect(spawned.calls[0]!.args).toEqual(["-c", "echo hello | head"]);
@@ -279,10 +279,81 @@ describe("execShellCmd", () => {
   it("returns ExecResult from the shell invocation", async () => {
     mockSpawn.mockImplementation(fakeSpawn({ stdout: "hello\n" }).impl);
 
-    const result = await execShellCmd("echo hello", { cwd: "/tmp", timeout: 5000 });
+    const result = await execShellCmd("echo hello", { cwd: "/tmp", timeout: 5000, _platform: "linux" });
 
     expect(result.stdout).toBe("hello\n");
     expect(result.exitCode).toBe(0);
+  });
+
+  // Regression: `sh` is not on a stock Windows PATH (Git for Windows ships
+  // sh.exe in Git\bin, and puts only Git\cmd on PATH), so this spawned nothing
+  // and reported exitCode 1 with empty output — read downstream as a test suite
+  // that ran and failed.
+  it("falls back to cmd.exe on win32 when sh is not on PATH", async () => {
+    resetShellProbe();
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not found");
+    });
+    const spawned = fakeSpawn({ stdout: "ok" });
+    mockSpawn.mockImplementation(spawned.impl);
+
+    await execShellCmd("npm run test", { cwd: "C:\\proj", timeout: 5000, _platform: "win32" });
+
+    // Bare name, or whatever space-free path ComSpec names on the host.
+    expect(spawned.calls[0]!.cmd).toMatch(/cmd\.exe$/);
+    expect(spawned.calls[0]!.args).toEqual(["/d", "/s", "/c", '"npm run test"']);
+    expect(spawned.calls[0]!.opts.windowsVerbatimArguments).toBe(true);
+  });
+
+  it("still prefers sh on win32 when sh IS on PATH", async () => {
+    resetShellProbe();
+    mockExecFileSync.mockReturnValue("C:\\Program Files\\Git\\usr\\bin\\sh.exe\n");
+    const spawned = fakeSpawn({ stdout: "ok" });
+    mockSpawn.mockImplementation(spawned.impl);
+
+    await execShellCmd("npm run test", { cwd: "C:\\proj", timeout: 5000, _platform: "win32" });
+
+    expect(spawned.calls[0]!.cmd).toBe("sh");
+    expect(spawned.calls[0]!.args).toEqual(["-c", "npm run test"]);
+    expect(spawned.calls[0]!.opts).not.toHaveProperty("windowsVerbatimArguments");
+  });
+});
+
+describe("resolveShellInvocation", () => {
+  it("uses sh -c on POSIX without probing PATH", () => {
+    const probe = vi.fn(() => false);
+
+    expect(resolveShellInvocation("ls | wc -l", { platform: "linux", hasPosixShell: probe }))
+      .toEqual({ cmd: "sh", args: ["-c", "ls | wc -l"] });
+    expect(probe).not.toHaveBeenCalled();
+  });
+
+  it("quotes the whole command for cmd.exe so /s strips only the outer pair", () => {
+    const invocation = resolveShellInvocation('vitest run --exclude="**/e2e"', {
+      platform: "win32",
+      hasPosixShell: () => false,
+    });
+
+    // Node's own arg quoting would escape the inner quotes as \" — which
+    // cmd.exe does not unescape. Verbatim + our own wrapper keeps them intact.
+    expect(invocation.args).toEqual(["/d", "/s", "/c", '"vitest run --exclude="**/e2e""']);
+    expect(invocation.windowsVerbatimArguments).toBe(true);
+  });
+
+  it("honours ComSpec but ignores a spaced one, which verbatim args cannot quote", () => {
+    const spaced = resolveShellInvocation("dir", {
+      platform: "win32",
+      hasPosixShell: () => false,
+      env: { ComSpec: "C:\\Odd Path\\cmd.exe" },
+    });
+    const plain = resolveShellInvocation("dir", {
+      platform: "win32",
+      hasPosixShell: () => false,
+      env: { ComSpec: "D:\\Windows\\system32\\cmd.exe" },
+    });
+
+    expect(spaced.cmd).toBe("cmd.exe");
+    expect(plain.cmd).toBe("D:\\Windows\\system32\\cmd.exe");
   });
 });
 
