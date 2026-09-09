@@ -11,6 +11,8 @@ import {
   extractRexTokenEvents,
   extractHenchTokenEvents,
   extractSvTokenEvents,
+  extractAskTokenUsage,
+  extractAskTokenEvents,
   collectTokenEvents,
   groupByCommand,
   groupByTimePeriod,
@@ -1102,6 +1104,191 @@ describe("extractSvTokenEvents", () => {
 
     const events = await extractSvTokenEvents(tmp, { since: "2026-01-15T00:00:00.000Z" });
     expect(events).toEqual([]);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// extractAskTokenUsage / extractAskTokenEvents
+// ---------------------------------------------------------------------------
+
+/**
+ * Dashboard Ask spend.
+ *
+ * `ndx usage` must agree with the dashboard, which books asks to the `sv`
+ * package under `command: "ask"`. The ledger is written by the web server's
+ * ask endpoint and read here straight off disk — the same arrangement by
+ * which rex reads hench's run files.
+ */
+describe("ask spend", () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "rex-token-ask-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true });
+  });
+
+  function writeLedger(...entries: Array<Record<string, unknown>>): void {
+    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    writeFileSync(
+      join(tmp, ".sourcevision", "ask-usage.jsonl"),
+      entries.map((e) => JSON.stringify({
+        timestamp: "2026-01-15T10:00:00.000Z",
+        vendor: "claude",
+        model: "claude-opus-5",
+        tier: "standard",
+        outcome: "answered",
+        durationMs: 2400,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
+        ...e,
+      })).join("\n") + "\n",
+    );
+  }
+
+  it("returns empty usage when no ledger exists", async () => {
+    const usage = await extractAskTokenUsage(tmp);
+    expect(usage).toEqual({
+      inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0,
+    });
+    expect(await extractAskTokenEvents(tmp)).toEqual([]);
+  });
+
+  it("sums every ask, counting each as one call", async () => {
+    writeLedger(
+      { inputTokens: 1200, outputTokens: 90, cacheReadTokens: 400 },
+      { inputTokens: 800, outputTokens: 60, cacheCreationTokens: 50 },
+    );
+
+    const usage = await extractAskTokenUsage(tmp);
+    expect(usage).toEqual({
+      inputTokens: 2000,
+      outputTokens: 150,
+      cacheCreationTokens: 50,
+      cacheReadTokens: 400,
+      calls: 2,
+    });
+  });
+
+  it("emits one sv/ask event per ask, carrying its own vendor and model", async () => {
+    writeLedger({ inputTokens: 1200, outputTokens: 90, vendor: "claude", model: "claude-opus-5" });
+
+    const events = await extractAskTokenEvents(tmp);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({
+      timestamp: "2026-01-15T10:00:00.000Z",
+      command: "ask",
+      package: "sv",
+      inputTokens: 1200,
+      outputTokens: 90,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 0,
+      calls: 1,
+      vendor: "claude",
+      model: "claude-opus-5",
+    });
+  });
+
+  it("counts a failed ask that reported no tokens", async () => {
+    writeLedger({ outcome: "error" });
+    const usage = await extractAskTokenUsage(tmp);
+    expect(usage.calls).toBe(1);
+    expect(usage.inputTokens).toBe(0);
+  });
+
+  it("skips unparseable and timestamp-less lines", async () => {
+    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    writeFileSync(
+      join(tmp, ".sourcevision", "ask-usage.jsonl"),
+      [
+        "{ truncated",
+        JSON.stringify({ inputTokens: 999 }),
+        JSON.stringify({ timestamp: "nope", inputTokens: 888 }),
+        JSON.stringify({ timestamp: "2026-01-15T10:00:00.000Z", inputTokens: 7 }),
+      ].join("\n"),
+    );
+
+    const usage = await extractAskTokenUsage(tmp);
+    expect(usage.calls).toBe(1);
+    expect(usage.inputTokens).toBe(7);
+  });
+
+  describe("time filtering", () => {
+    it("honors since/until", async () => {
+      writeLedger(
+        { timestamp: "2026-01-10T00:00:00.000Z", inputTokens: 111 },
+        { timestamp: "2026-01-20T00:00:00.000Z", inputTokens: 222 },
+      );
+
+      const usage = await extractAskTokenUsage(tmp, { since: "2026-01-15T00:00:00.000Z" });
+      expect(usage.inputTokens).toBe(222);
+      expect(usage.calls).toBe(1);
+
+      const events = await extractAskTokenEvents(tmp, { until: "2026-01-15T00:00:00.000Z" });
+      expect(events.map((e) => e.inputTokens)).toEqual([111]);
+    });
+  });
+
+  it("reaches aggregateTokenUsage inside the sv bucket", async () => {
+    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    writeFileSync(
+      join(tmp, ".sourcevision", "manifest.json"),
+      JSON.stringify({
+        analyzedAt: "2026-01-15T09:00:00.000Z",
+        tokenUsage: { calls: 2, inputTokens: 400, outputTokens: 200 },
+      }),
+    );
+    writeLedger({ inputTokens: 1200, outputTokens: 90, cacheReadTokens: 400 });
+
+    const usage = await aggregateTokenUsage([], tmp);
+    // The analyze spend and the ask spend share the bucket.
+    expect(usage.packages.sv.inputTokens).toBe(1600);
+    expect(usage.packages.sv.outputTokens).toBe(290);
+    expect(usage.packages.sv.cacheReadTokens).toBe(400);
+    expect(usage.packages.sv.calls).toBe(3);
+    expect(usage.totalInputTokens).toBe(1600);
+  });
+
+  it("reaches collectTokenEvents, distinguishable from analyze by command", async () => {
+    mkdirSync(join(tmp, ".sourcevision"), { recursive: true });
+    writeFileSync(
+      join(tmp, ".sourcevision", "manifest.json"),
+      JSON.stringify({
+        analyzedAt: "2026-01-15T09:00:00.000Z",
+        tokenUsage: { calls: 1, inputTokens: 400, outputTokens: 200 },
+      }),
+    );
+    writeLedger({ inputTokens: 1200, outputTokens: 90 });
+
+    const events = await collectTokenEvents([], tmp);
+    const commands = events.filter((e) => e.package === "sv").map((e) => e.command);
+    expect(commands).toEqual(["analyze", "ask"]);
+
+    const byCommand = groupByCommand(events);
+    expect(byCommand.find((c) => c.command === "ask")).toMatchObject({
+      package: "sv", inputTokens: 1200, calls: 1,
+    });
+  });
+
+  it("keeps the aggregate and the event list in agreement", async () => {
+    writeLedger(
+      { inputTokens: 1200, outputTokens: 90, cacheReadTokens: 400 },
+      { inputTokens: 800, outputTokens: 60 },
+    );
+
+    const [usage, events] = await Promise.all([
+      aggregateTokenUsage([], tmp),
+      collectTokenEvents([], tmp),
+    ]);
+    const eventInput = events.reduce((sum, e) => sum + e.inputTokens, 0);
+    const eventCalls = events.reduce((sum, e) => sum + e.calls, 0);
+    expect(eventInput).toBe(usage.totalInputTokens);
+    expect(eventCalls).toBe(usage.totalCalls);
   });
 });
 

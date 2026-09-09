@@ -153,6 +153,146 @@ describe("Token Usage API routes", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
+  // ── Dashboard Ask spend ──────────────────────────────────────────────
+  //
+  // Asks are booked to the sv package under command "ask": SourceVision
+  // spend (task class sourcevision.ask, grounded in .sourcevision/) that is
+  // not task-scoped, so it is not attributed to a PRD item. The command name
+  // is what separates it from hench's "run" in the per-command breakdown.
+
+  /** Append one ask ledger line. */
+  async function writeAsk(entry: Record<string, unknown>) {
+    await appendFile(
+      join(svDir, "ask-usage.jsonl"),
+      JSON.stringify({
+        timestamp: "2026-02-05T10:00:00.000Z",
+        vendor: "claude",
+        model: "claude-opus-5",
+        tier: "standard",
+        outcome: "answered",
+        durationMs: 2400,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 0,
+        ...entry,
+      }) + "\n",
+    );
+  }
+
+  it("adds ask spend to the sv bucket and the totals", async () => {
+    await writeAsk({ inputTokens: 1200, outputTokens: 90, cacheReadTokens: 400 });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/summary`);
+    const data = await res.json();
+
+    // sv was 400 in / 200 out from the manifest; the ask adds 1200 / 90.
+    expect(data.usage.packages.sv.inputTokens).toBe(1600);
+    expect(data.usage.packages.sv.outputTokens).toBe(290);
+    expect(data.usage.totalInputTokens).toBe(17600);
+    expect(data.usage.totalOutputTokens).toBe(6590);
+    expect(data.eventCount).toBe(6);
+  });
+
+  it("reports ask cache tokens rather than hiding them", async () => {
+    await writeAsk({ inputTokens: 10, cacheCreationTokens: 700, cacheReadTokens: 900 });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/summary`);
+    const data = await res.json();
+    expect(data.usage.packages.sv.cacheCreationTokens).toBe(700);
+    expect(data.usage.packages.sv.cacheReadTokens).toBe(900);
+    expect(data.usage.totalCacheCreationTokens).toBe(700);
+  });
+
+  it("attributes the ask event to its own vendor and model", async () => {
+    await writeAsk({ inputTokens: 1200, outputTokens: 90, vendor: "claude", model: "claude-opus-5" });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/events`);
+    const data = await res.json();
+    const askEvents = data.events.filter((e: { command: string }) => e.command === "ask");
+
+    expect(askEvents).toHaveLength(1);
+    expect(askEvents[0]).toMatchObject({
+      package: "sv",
+      command: "ask",
+      vendor: "claude",
+      model: "claude-opus-5",
+      inputTokens: 1200,
+      outputTokens: 90,
+      calls: 1,
+    });
+  });
+
+  it("keeps ask spend distinguishable from hench run spend", async () => {
+    await writeAsk({ inputTokens: 1200, outputTokens: 90 });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/by-command`);
+    const data = await res.json();
+
+    const ask = data.commands.find((c: { command: string }) => c.command === "ask");
+    const run = data.commands.find((c: { command: string }) => c.command === "run");
+    expect(ask).toMatchObject({ package: "sv", inputTokens: 1200, calls: 1 });
+    expect(run).toMatchObject({ package: "hench" });
+    // The ask's tokens are not swept into the hench run total.
+    expect(run.inputTokens).toBe(13000);
+  });
+
+  it("counts a failed ask as a call even though it reported no tokens", async () => {
+    await writeAsk({ outcome: "error" });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/summary`);
+    const data = await res.json();
+    // 12 before + this attempt: visible as spend-that-happened, not dropped.
+    expect(data.usage.totalCalls).toBe(13);
+    expect(data.usage.packages.sv.calls).toBe(3);
+  });
+
+  it("books a late timeout answer, which nobody saw but was paid for", async () => {
+    await writeAsk({ outcome: "timeout", late: true, inputTokens: 8000, outputTokens: 2000 });
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/summary`);
+    const data = await res.json();
+    expect(data.usage.packages.sv.inputTokens).toBe(8400);
+  });
+
+  it("invalidates the cached aggregate when a new ask is recorded", async () => {
+    const before = await (await fetch(`http://127.0.0.1:${port}/api/token/summary`)).json();
+    expect(before.usage.packages.sv.inputTokens).toBe(400);
+
+    // Without the ledger in the cache fingerprint this second read would
+    // serve the pre-ask total to someone who had just asked a question.
+    await writeAsk({ inputTokens: 1200, outputTokens: 90 });
+
+    const after = await (await fetch(`http://127.0.0.1:${port}/api/token/summary`)).json();
+    expect(after.usage.packages.sv.inputTokens).toBe(1600);
+  });
+
+  it("ignores the ledger when it holds no parseable lines", async () => {
+    await appendFile(join(svDir, "ask-usage.jsonl"), "{ truncated\n");
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/token/summary`);
+    const data = await res.json();
+    expect(data.usage.packages.sv.inputTokens).toBe(400);
+    expect(data.eventCount).toBe(5);
+  });
+
+  it("respects since/until filters on ask events", async () => {
+    await writeAsk({ timestamp: "2026-02-01T00:00:00.000Z", inputTokens: 111 });
+    await writeAsk({ timestamp: "2026-02-09T00:00:00.000Z", inputTokens: 222 });
+
+    const res = await fetch(
+      `http://127.0.0.1:${port}/api/token/summary?since=2026-02-05T00:00:00.000Z`,
+    );
+    const data = await res.json();
+    const askOnly = await (await fetch(
+      `http://127.0.0.1:${port}/api/token/events?since=2026-02-05T00:00:00.000Z`,
+    )).json();
+    const asks = askOnly.events.filter((e: { command: string }) => e.command === "ask");
+    expect(asks).toHaveLength(1);
+    expect(asks[0].inputTokens).toBe(222);
+    expect(data.usage.packages.sv.inputTokens).toBe(222);
+  });
+
   it("GET /api/token/summary returns aggregate usage with cost", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/token/summary`);
     expect(res.status).toBe(200);
