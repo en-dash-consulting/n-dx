@@ -131,7 +131,15 @@ export interface HenchConfig {
   model: string;
   maxTurns: number;
   maxTokens: number;
-  /** Total token budget per run (input + output). 0 = unlimited. */
+  /**
+   * Total token budget per run. 0 = unlimited.
+   *
+   * Counts every token the run processed at face value: uncached input,
+   * cache-write input, cache-read input, and output. Cached input counts
+   * toward the budget — otherwise a prompt-cached run would bound only its
+   * output, since caching moves nearly all input tokens out of the uncached
+   * `input` field.
+   */
   tokenBudget: number;
   rexDir: string;
   apiKeyEnv: string;

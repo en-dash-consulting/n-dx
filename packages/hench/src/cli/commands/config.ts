@@ -71,7 +71,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
   {
     path: "tokenBudget",
     label: "Token Budget",
-    description: "Total token budget per run (input+output). 0 = unlimited",
+    description: "Total token budget per run (input+cached+output). 0 = unlimited",
     type: "number",
     category: "execution",
     impact: (v) =>
