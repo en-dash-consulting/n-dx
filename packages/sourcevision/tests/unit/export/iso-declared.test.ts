@@ -145,6 +145,196 @@ resource "aws_iam_role" "irrelevant" {}
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("reports no IaC when the only YAML has nothing to do with infrastructure", () => {
+    // A repository full of CI config and k8s manifests must not read as IaC.
+    const dir = makeProject({
+      ...BASE_FILES,
+      ".github/workflows/ci.yml": `on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+`,
+      "deploy/pod.yaml": `apiVersion: v1
+kind: Pod
+metadata:
+  name: web
+`,
+    });
+    expect(discoverFromIaC(dir)).toEqual({ infrastructure: [], sawIaC: false });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("discovers CloudFormation resources with no hand declaration", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/template.yaml": `
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  DocumentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: acme-documents-prod
+  IngestQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: acme-ingest-queue
+  Ledger:
+    Type: AWS::DynamoDB::Table
+  Worker:
+    Type: AWS::Lambda::Function
+  Nightly:
+    Type: AWS::Events::Rule
+  AppRole:
+    Type: AWS::IAM::Role
+`,
+    });
+    const { infrastructure, sawIaC } = discoverFromIaC(dir);
+    expect(sawIaC).toBe(true);
+    expect(Object.fromEntries(infrastructure.map((i) => [i.name, i.kind]))).toEqual({
+      DocumentsBucket: "bucket",
+      IngestQueue: "queue",
+      Ledger: "database",
+      Worker: "compute",
+      Nightly: "scheduler",
+    });
+    // An IAM role is real infrastructure but says nothing about architecture.
+    expect(infrastructure.some((i) => i.name === "AppRole")).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("classifies both IaC conventions to the same kind from one table", () => {
+    // The point of sharing the table: AWS::S3::Bucket and aws_s3_bucket are
+    // the same architectural fact spelled two ways.
+    const pairs: Array<[string, string]> = [
+      ["aws_s3_bucket", "AWS::S3::Bucket"],
+      ["aws_sqs_queue", "AWS::SQS::Queue"],
+      ["aws_sns_topic", "AWS::SNS::Topic"],
+      ["aws_dynamodb_table", "AWS::DynamoDB::Table"],
+      ["aws_elasticache_cluster", "AWS::ElastiCache::CacheCluster"],
+      ["aws_kinesis_stream", "AWS::Kinesis::Stream"],
+      ["aws_lambda_function", "AWS::Lambda::Function"],
+      ["aws_secretsmanager_secret", "AWS::SecretsManager::Secret"],
+    ];
+    for (const [tf, cfn] of pairs) {
+      const dir = makeProject({
+        ...BASE_FILES,
+        "infra/main.tf": `resource "${tf}" "thing" {}
+`,
+        "infra/template.yaml": `Resources:
+  Thing:
+    Type: ${cfn}
+`,
+      });
+      const kinds = discoverFromIaC(dir).infrastructure.map((i) => i.kind);
+      expect(kinds).toHaveLength(2);
+      expect(kinds[0], `${tf} vs ${cfn}`).toBe(kinds[1]);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("reads Terraform and CloudFormation in the same project", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/main.tf": `resource "aws_s3_bucket" "documents" {}
+`,
+      "infra/template.yaml": `Resources:
+  IngestQueue:
+    Type: AWS::SQS::Queue
+`,
+    });
+    const { infrastructure } = discoverFromIaC(dir);
+    expect(infrastructure.map((i) => i.name).sort()).toEqual(["IngestQueue", "documents"]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("records which CloudFormation file declared each resource", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/template.yml": `Resources:
+  Docs:
+    Type: AWS::S3::Bucket
+`,
+    });
+    const { infrastructure } = discoverFromIaC(dir);
+    expect(infrastructure[0].origin).toBe("infra/template.yml");
+    expect(infrastructure[0].note).toContain("AWS::S3::Bucket");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("picks up a CloudFormation name property as a matchable literal", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/template.yaml": `Resources:
+  Docs:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: acme-documents-prod
+`,
+    });
+    const { infrastructure } = discoverFromIaC(dir);
+    expect(infrastructure[0].literals).toContain("acme-documents-prod");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("reads a resource whose Properties precede its Type", () => {
+    // YAML mapping order is free, and SAM templates commonly put Properties
+    // first. The literal has to be found either way, and the block must not
+    // be mistaken for a resource called "Properties".
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/template.yaml": `Resources:
+  ApiFn:
+    Properties:
+      FunctionName: order-api
+      Runtime: nodejs20.x
+    Type: AWS::Lambda::Function
+`,
+    });
+    const { infrastructure } = discoverFromIaC(dir);
+    expect(infrastructure).toHaveLength(1);
+    expect(infrastructure[0].name).toBe("ApiFn");
+    expect(infrastructure[0].kind).toBe("compute");
+    expect(infrastructure[0].literals).toContain("order-api");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("ignores intrinsic functions where a literal name would go", () => {
+    // `!Sub "orders-${Stage}"` is not a name that appears in code, so matching
+    // on it would attribute the resource to whatever mentions the template.
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/template.yaml": `Resources:
+  OrderQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "orders-\${Stage}"
+`,
+    });
+    const { infrastructure } = discoverFromIaC(dir);
+    expect(infrastructure[0].literals).toEqual(["OrderQueue"]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("links a CloudFormation resource to the zones naming it", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "src/core/f.ts": `export const bucket = "acme-documents-prod";
+`,
+      "infra/template.yaml": `Resources:
+  Docs:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: acme-documents-prod
+`,
+    });
+    const model = buildIsoModel(loadFromScan(dir, { useGit: false, analyzedAt: "t" }));
+    const node = model.nodes.find((n) => n.kind === "infra");
+    expect(node).toBeDefined();
+    expect(node!.name).toBe("Docs");
+    expect(node!.inbound.map((l) => l.id)).toContain("src/core");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("is deterministic across runs", () => {
     const dir = makeProject({
       ...BASE_FILES,

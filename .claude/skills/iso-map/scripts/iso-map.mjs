@@ -1980,14 +1980,17 @@ var IAC_KINDS = [
   [/dynamodb|rds|_sql|spanner|firestore|bigtable|cosmosdb|documentdb|database/, "database"],
   [/elasticache|redis|memcache/, "cache"],
   [/kinesis|kafka|msk|firehose/, "stream"],
-  [/cloudwatch_event_rule|scheduler|cron|eventbridge_rule/, "scheduler"],
+  [/cloudwatch_event_rule|scheduler|cron|eventbridge_rule|events_rule/, "scheduler"],
   [/secret|kms|vault|parameter/, "secrets"],
-  [/lambda_function|cloud_run|cloudfunctions|container_app/, "compute"]
+  [/lambda_function|cloud_run|cloudfunctions|container_app|ecs_service/, "compute"]
 ];
+function normaliseType(type) {
+  return type.toLowerCase().replace(/[:.\-/]+/g, "_");
+}
 function classifyResource(type) {
-  const lower = type.toLowerCase();
+  const normalised = normaliseType(type);
   for (const [pattern, kind] of IAC_KINDS) {
-    if (pattern.test(lower)) return kind;
+    if (pattern.test(normalised)) return kind;
   }
   return null;
 }
@@ -2000,10 +2003,11 @@ var IAC_SKIP = /* @__PURE__ */ new Set([
   "vendor",
   "coverage"
 ]);
-function findTerraform(root, limit = 400) {
-  const found = [];
+function findIaCFiles(root, limit = 400) {
+  const terraform = [];
+  const yaml = [];
   function walk(dir, depth) {
-    if (depth > 8 || found.length >= limit) return;
+    if (depth > 8 || terraform.length >= limit && yaml.length >= limit) return;
     let entries;
     try {
       entries = readdirSync2(dir, { withFileTypes: true });
@@ -2012,49 +2016,50 @@ function findTerraform(root, limit = 400) {
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
-      if (found.length >= limit) return;
       const full = join2(dir, entry.name);
       if (entry.isDirectory()) {
         if (IAC_SKIP.has(entry.name) || entry.name.startsWith(".")) continue;
         walk(full, depth + 1);
-      } else if (extname2(entry.name) === ".tf") {
-        found.push(relative2(root, full).split(sep2).join("/"));
+        continue;
       }
+      const ext = extname2(entry.name);
+      const path = relative2(root, full).split(sep2).join("/");
+      if (ext === ".tf" && terraform.length < limit) terraform.push(path);
+      else if ((ext === ".yaml" || ext === ".yml") && yaml.length < limit) yaml.push(path);
     }
   }
   walk(root, 0);
-  return found;
+  return { terraform, yaml };
 }
 var TF_RESOURCE = /resource\s+"([^"]+)"\s+"([^"]+)"\s*\{/g;
 var TF_NAME_ATTR = /^\s*(?:name|bucket|queue_name|topic_name|function_name|identifier|table_name)\s*=\s*"([^"]+)"/gm;
-function discoverFromIaC(root) {
-  const files = findTerraform(root);
-  if (files.length === 0) return { infrastructure: [], sawIaC: false };
-  const infrastructure = [];
-  const seen = /* @__PURE__ */ new Set();
+var IAC_MAX_BYTES = 512e3;
+function readCapped(root, file) {
+  try {
+    const full = join2(root, file);
+    if (statSync2(full).size > IAC_MAX_BYTES) return null;
+    return readFileSync2(full, "utf-8");
+  } catch {
+    return null;
+  }
+}
+function discoverTerraform(root, files, emit) {
   for (const file of files) {
-    let content;
-    try {
-      content = readFileSync2(join2(root, file), "utf-8");
-    } catch {
-      continue;
-    }
+    const content = readCapped(root, file);
+    if (content === null) continue;
     TF_RESOURCE.lastIndex = 0;
     let match;
     while ((match = TF_RESOURCE.exec(content)) !== null) {
       const [, type, localName] = match;
       const kind = classifyResource(type);
       if (!kind) continue;
-      const id = `infra:${type}.${localName}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
       const block = content.slice(match.index, match.index + 800);
       TF_NAME_ATTR.lastIndex = 0;
       const literals = /* @__PURE__ */ new Set([localName]);
       let attr;
       while ((attr = TF_NAME_ATTR.exec(block)) !== null) literals.add(attr[1]);
-      infrastructure.push({
-        id,
+      emit({
+        id: `infra:${type}.${localName}`,
         name: localName,
         kind,
         usedBy: [],
@@ -2064,8 +2069,94 @@ function discoverFromIaC(root) {
       });
     }
   }
+}
+var CFN_SIGNATURE = /^\s*AWSTemplateFormatVersion\s*:/m;
+var CFN_ANY_TYPE = /^\s*Type\s*:\s*["']?(?:AWS|Alexa|Custom)::/m;
+var CFN_KEY = /^(\s*)([A-Za-z0-9]+)\s*:\s*$/;
+var CFN_TYPE = /^(\s*)Type\s*:\s*["']?((?:AWS|Alexa|Custom)::[A-Za-z0-9:]+)["']?\s*$/;
+var CFN_NAME_ATTR = /^\s*(?:Name|BucketName|QueueName|TopicName|FunctionName|TableName|StreamName|DomainName|DBInstanceIdentifier|ClusterName|RoleName)\s*:\s*["']?([A-Za-z0-9._-]+)["']?\s*$/;
+var CFN_RESERVED = /* @__PURE__ */ new Set([
+  "Resources",
+  "Properties",
+  "Metadata",
+  "Outputs",
+  "Parameters",
+  "Conditions",
+  "Mappings",
+  "Transform",
+  "Globals",
+  "Tags",
+  "DependsOn",
+  "CreationPolicy",
+  "UpdatePolicy",
+  "UpdateReplacePolicy",
+  "DeletionPolicy",
+  "Environment",
+  "Variables",
+  "Policies",
+  "Events",
+  "Resource"
+]);
+function discoverCloudFormation(root, files, emit) {
+  let sawTemplate = false;
+  for (const file of files) {
+    const content = readCapped(root, file);
+    if (content === null) continue;
+    if (!CFN_SIGNATURE.test(content) && !CFN_ANY_TYPE.test(content)) continue;
+    sawTemplate = true;
+    const lines = content.split(/\r?\n/);
+    let pendingId = null;
+    for (let i = 0; i < lines.length; i += 1) {
+      const key = CFN_KEY.exec(lines[i]);
+      if (key && !CFN_RESERVED.has(key[2])) {
+        pendingId = { name: key[2], indent: key[1].length, line: i };
+        continue;
+      }
+      const type = CFN_TYPE.exec(lines[i]);
+      if (!type || !pendingId || type[1].length <= pendingId.indent) continue;
+      const resourceType = type[2];
+      const logicalId = pendingId;
+      pendingId = null;
+      const kind = classifyResource(resourceType);
+      if (!kind) continue;
+      const literals = /* @__PURE__ */ new Set([logicalId.name]);
+      for (let j = logicalId.line + 1; j < lines.length; j += 1) {
+        const line = lines[j];
+        if (line.trim() === "") continue;
+        const indent = line.length - line.trimStart().length;
+        if (indent <= logicalId.indent) break;
+        const attr = CFN_NAME_ATTR.exec(line);
+        if (attr) literals.add(attr[1]);
+      }
+      emit({
+        id: `infra:${resourceType}.${logicalId.name}`,
+        name: logicalId.name,
+        kind,
+        usedBy: [],
+        note: `${resourceType} declared in ${file}`,
+        origin: file,
+        literals: [...literals].sort()
+      });
+    }
+  }
+  return sawTemplate;
+}
+function discoverFromIaC(root) {
+  const files = findIaCFiles(root);
+  if (files.terraform.length === 0 && files.yaml.length === 0) {
+    return { infrastructure: [], sawIaC: false };
+  }
+  const infrastructure = [];
+  const seen = /* @__PURE__ */ new Set();
+  const emit = (infra) => {
+    if (seen.has(infra.id)) return;
+    seen.add(infra.id);
+    infrastructure.push(infra);
+  };
+  discoverTerraform(root, files.terraform, emit);
+  const sawTemplate = discoverCloudFormation(root, files.yaml, emit);
   infrastructure.sort((a, b) => a.id.localeCompare(b.id));
-  return { infrastructure, sawIaC: true };
+  return { infrastructure, sawIaC: files.terraform.length > 0 || sawTemplate };
 }
 var TOO_GENERIC = /* @__PURE__ */ new Set([
   "main",

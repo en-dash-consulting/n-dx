@@ -87,8 +87,11 @@ they were declared rather than inferred:
 - **`infrastructure`** — a queue, bucket, cache or database.
   `{ "id": "...", "name": "...", "kind": "queue", "usedBy": ["src/core"] }`.
 
-Terraform is also scanned automatically: `resource "aws_sqs_queue" "ingest"`
-becomes a node, attributed to the zones whose source names it.
+Infrastructure-as-code is also scanned automatically. Terraform
+(`resource "aws_sqs_queue" "ingest"`) and CloudFormation templates
+(`Type: AWS::SQS::Queue`) both become nodes, attributed to the zones whose
+source names them. Other YAML — CI workflows, Kubernetes manifests — is
+ignored.
 
 A declaration that cannot be drawn is reported in the page footer, never
 silently dropped.
@@ -114,7 +117,8 @@ rendered page also states them in its own footer.
 - **Edges are imports, not data flow.** A connector means "this zone imports
   that one", not "a request travels this way".
 - **Runtime infrastructure is declared, not detected.** Queues, caches, buckets
-  and databases appear only from `.n-dx.json` or Terraform, and a zone is
+  and databases appear only from `.n-dx.json` or IaC (Terraform,
+  CloudFormation), and a zone is
   attributed to one by naming it in source — weaker than an import.
 - **Injection inverts direction.** A callback or event seam runs the opposite
   way at runtime from how the import is drawn. Declared seams are drawn the

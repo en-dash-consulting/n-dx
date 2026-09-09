@@ -105,10 +105,15 @@ export function readDeclaredConfig(root: string): {
 // ── Infrastructure-as-code discovery ────────────────────────────────────────
 
 /**
- * Terraform resource type → coarse kind.
+ * Resource type → coarse kind, shared by every IaC format.
  *
  * Matched as substrings against the resource type so this stays useful across
  * AWS, GCP and Azure without enumerating every provider's naming.
+ *
+ * One table serves Terraform and CloudFormation because `normaliseType`
+ * reduces both spellings to the same shape — `AWS::S3::Bucket` and
+ * `aws_s3_bucket` are the same architectural fact written two ways, and a
+ * second table would be two places to forget.
  */
 const IAC_KINDS: Array<[RegExp, string]> = [
   [/bucket|blob_container|storage_account/, "bucket"],
@@ -117,15 +122,26 @@ const IAC_KINDS: Array<[RegExp, string]> = [
   [/dynamodb|rds|_sql|spanner|firestore|bigtable|cosmosdb|documentdb|database/, "database"],
   [/elasticache|redis|memcache/, "cache"],
   [/kinesis|kafka|msk|firehose/, "stream"],
-  [/cloudwatch_event_rule|scheduler|cron|eventbridge_rule/, "scheduler"],
+  [/cloudwatch_event_rule|scheduler|cron|eventbridge_rule|events_rule/, "scheduler"],
   [/secret|kms|vault|parameter/, "secrets"],
-  [/lambda_function|cloud_run|cloudfunctions|container_app/, "compute"],
+  [/lambda_function|cloud_run|cloudfunctions|container_app|ecs_service/, "compute"],
 ];
 
+/**
+ * Reduce a resource type to one comparable shape.
+ *
+ * CloudFormation separates with `::` and Azure/GCP modules sometimes with `-`
+ * or `.`; Terraform uses `_`. Folding them all to `_` lets the patterns above
+ * be written once in Terraform's idiom.
+ */
+function normaliseType(type: string): string {
+  return type.toLowerCase().replace(/[:.\-/]+/g, "_");
+}
+
 function classifyResource(type: string): string | null {
-  const lower = type.toLowerCase();
+  const normalised = normaliseType(type);
   for (const [pattern, kind] of IAC_KINDS) {
-    if (pattern.test(lower)) return kind;
+    if (pattern.test(normalised)) return kind;
   }
   return null;
 }
@@ -134,11 +150,19 @@ const IAC_SKIP = new Set([
   "node_modules", ".git", ".terraform", "dist", "build", "vendor", "coverage",
 ]);
 
-/** Find Terraform files without walking the whole tree twice. */
-function findTerraform(root: string, limit = 400): string[] {
-  const found: string[] = [];
+/**
+ * Find IaC candidate files in one pass.
+ *
+ * YAML is collected separately because most of it is not infrastructure — CI
+ * workflows and Kubernetes manifests outnumber CloudFormation templates in a
+ * typical repository — so those candidates still have to prove themselves by
+ * content before anything is parsed out of them.
+ */
+function findIaCFiles(root: string, limit = 400): { terraform: string[]; yaml: string[] } {
+  const terraform: string[] = [];
+  const yaml: string[] = [];
   function walk(dir: string, depth: number): void {
-    if (depth > 8 || found.length >= limit) return;
+    if (depth > 8 || (terraform.length >= limit && yaml.length >= limit)) return;
     let entries;
     try {
       entries = readdirSync(dir, { withFileTypes: true });
@@ -147,44 +171,48 @@ function findTerraform(root: string, limit = 400): string[] {
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
-      if (found.length >= limit) return;
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
         if (IAC_SKIP.has(entry.name) || entry.name.startsWith(".")) continue;
         walk(full, depth + 1);
-      } else if (extname(entry.name) === ".tf") {
-        found.push(relative(root, full).split(sep).join("/"));
+        continue;
       }
+      const ext = extname(entry.name);
+      const path = relative(root, full).split(sep).join("/");
+      if (ext === ".tf" && terraform.length < limit) terraform.push(path);
+      else if ((ext === ".yaml" || ext === ".yml") && yaml.length < limit) yaml.push(path);
     }
   }
   walk(root, 0);
-  return found;
+  return { terraform, yaml };
 }
 
 const TF_RESOURCE = /resource\s+"([^"]+)"\s+"([^"]+)"\s*\{/g;
 /** A `name`-ish attribute inside a resource block, used to match code literals. */
 const TF_NAME_ATTR = /^\s*(?:name|bucket|queue_name|topic_name|function_name|identifier|table_name)\s*=\s*"([^"]+)"/gm;
 
-/**
- * Discover infrastructure from Terraform.
- *
- * Deliberately shallow: it reads resource blocks, not state or modules, so it
- * finds what a reader would see scanning the `.tf` files themselves.
- */
-export function discoverFromIaC(root: string): { infrastructure: DeclaredInfra[]; sawIaC: boolean } {
-  const files = findTerraform(root);
-  if (files.length === 0) return { infrastructure: [], sawIaC: false };
+/** Largest file worth scanning for resources; templates are not huge. */
+const IAC_MAX_BYTES = 512_000;
 
-  const infrastructure: DeclaredInfra[] = [];
-  const seen = new Set<string>();
+function readCapped(root: string, file: string): string | null {
+  try {
+    const full = join(root, file);
+    if (statSync(full).size > IAC_MAX_BYTES) return null;
+    return readFileSync(full, "utf-8");
+  } catch {
+    return null;
+  }
+}
 
+/** Discover infrastructure from Terraform `resource` blocks. */
+function discoverTerraform(
+  root: string,
+  files: string[],
+  emit: (infra: DeclaredInfra) => void,
+): void {
   for (const file of files) {
-    let content: string;
-    try {
-      content = readFileSync(join(root, file), "utf-8");
-    } catch {
-      continue;
-    }
+    const content = readCapped(root, file);
+    if (content === null) continue;
 
     TF_RESOURCE.lastIndex = 0;
     let match;
@@ -193,10 +221,6 @@ export function discoverFromIaC(root: string): { infrastructure: DeclaredInfra[]
       const kind = classifyResource(type);
       if (!kind) continue; // not a resource the map has anything useful to say about
 
-      const id = `infra:${type}.${localName}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-
       // Literal names inside the block give us something to match in code.
       const block = content.slice(match.index, match.index + 800);
       TF_NAME_ATTR.lastIndex = 0;
@@ -204,8 +228,8 @@ export function discoverFromIaC(root: string): { infrastructure: DeclaredInfra[]
       let attr;
       while ((attr = TF_NAME_ATTR.exec(block)) !== null) literals.add(attr[1]);
 
-      infrastructure.push({
-        id,
+      emit({
+        id: `infra:${type}.${localName}`,
         name: localName,
         kind,
         usedBy: [],
@@ -215,9 +239,135 @@ export function discoverFromIaC(root: string): { infrastructure: DeclaredInfra[]
       });
     }
   }
+}
+
+// ── CloudFormation ──────────────────────────────────────────────────────────
+
+/**
+ * Enough to call a YAML file a template.
+ *
+ * Either the format header, or a resource type line — the header is optional
+ * in SAM and in nested stacks, so requiring it would miss real templates.
+ */
+const CFN_SIGNATURE = /^\s*AWSTemplateFormatVersion\s*:/m;
+const CFN_ANY_TYPE = /^\s*Type\s*:\s*["']?(?:AWS|Alexa|Custom)::/m;
+
+/** `  LogicalId:` — a mapping key with no inline value. */
+const CFN_KEY = /^(\s*)([A-Za-z0-9]+)\s*:\s*$/;
+/** `    Type: AWS::S3::Bucket` */
+const CFN_TYPE = /^(\s*)Type\s*:\s*["']?((?:AWS|Alexa|Custom)::[A-Za-z0-9:]+)["']?\s*$/;
+/** A `name`-ish property, used to match code literals. */
+const CFN_NAME_ATTR =
+  /^\s*(?:Name|BucketName|QueueName|TopicName|FunctionName|TableName|StreamName|DomainName|DBInstanceIdentifier|ClusterName|RoleName)\s*:\s*["']?([A-Za-z0-9._-]+)["']?\s*$/;
+
+/**
+ * Structural keys that are never a resource's logical id.
+ *
+ * Without this a `Properties:` block appearing before `Type:` would be paired
+ * with the type and reported as the resource's name.
+ */
+const CFN_RESERVED = new Set([
+  "Resources", "Properties", "Metadata", "Outputs", "Parameters", "Conditions",
+  "Mappings", "Transform", "Globals", "Tags", "DependsOn", "CreationPolicy",
+  "UpdatePolicy", "UpdateReplacePolicy", "DeletionPolicy", "Environment",
+  "Variables", "Policies", "Events", "Resource",
+]);
+
+/**
+ * Discover infrastructure from CloudFormation templates.
+ *
+ * A line scanner rather than a YAML parse, for the same reason the Terraform
+ * side reads `resource` blocks rather than state: it finds what a reader would
+ * see scanning the template, and it keeps this module on `node:` builtins so
+ * it still bundles into the standalone skill script. Nested stacks, `!Ref`
+ * intrinsics and multi-document files are out of scope by design.
+ */
+function discoverCloudFormation(
+  root: string,
+  files: string[],
+  emit: (infra: DeclaredInfra) => void,
+): boolean {
+  let sawTemplate = false;
+
+  for (const file of files) {
+    const content = readCapped(root, file);
+    if (content === null) continue;
+    if (!CFN_SIGNATURE.test(content) && !CFN_ANY_TYPE.test(content)) continue;
+    sawTemplate = true;
+
+    const lines = content.split(/\r?\n/);
+    let pendingId: { name: string; indent: number; line: number } | null = null;
+
+    for (let i = 0; i < lines.length; i += 1) {
+      const key = CFN_KEY.exec(lines[i]);
+      if (key && !CFN_RESERVED.has(key[2])) {
+        pendingId = { name: key[2], indent: key[1].length, line: i };
+        continue;
+      }
+
+      const type = CFN_TYPE.exec(lines[i]);
+      if (!type || !pendingId || type[1].length <= pendingId.indent) continue;
+
+      const resourceType = type[2];
+      const logicalId = pendingId;
+      pendingId = null;
+
+      const kind = classifyResource(resourceType);
+      if (!kind) continue;
+
+      // Scan the whole resource block, not just what follows `Type:` — key
+      // order is free in YAML and `Properties:` often comes first.
+      const literals = new Set<string>([logicalId.name]);
+      for (let j = logicalId.line + 1; j < lines.length; j += 1) {
+        const line = lines[j];
+        if (line.trim() === "") continue;
+        const indent = line.length - line.trimStart().length;
+        if (indent <= logicalId.indent) break; // dedented out of the resource
+        const attr = CFN_NAME_ATTR.exec(line);
+        if (attr) literals.add(attr[1]);
+      }
+
+      emit({
+        id: `infra:${resourceType}.${logicalId.name}`,
+        name: logicalId.name,
+        kind,
+        usedBy: [],
+        note: `${resourceType} declared in ${file}`,
+        origin: file,
+        literals: [...literals].sort(),
+      });
+    }
+  }
+
+  return sawTemplate;
+}
+
+/**
+ * Discover infrastructure from infrastructure-as-code.
+ *
+ * Deliberately shallow across both formats: it reads resource declarations,
+ * not state, modules or nested stacks, so it finds what a reader would see
+ * scanning the files themselves.
+ */
+export function discoverFromIaC(root: string): { infrastructure: DeclaredInfra[]; sawIaC: boolean } {
+  const files = findIaCFiles(root);
+  if (files.terraform.length === 0 && files.yaml.length === 0) {
+    return { infrastructure: [], sawIaC: false };
+  }
+
+  const infrastructure: DeclaredInfra[] = [];
+  const seen = new Set<string>();
+  const emit = (infra: DeclaredInfra): void => {
+    if (seen.has(infra.id)) return;
+    seen.add(infra.id);
+    infrastructure.push(infra);
+  };
+
+  discoverTerraform(root, files.terraform, emit);
+  const sawTemplate = discoverCloudFormation(root, files.yaml, emit);
 
   infrastructure.sort((a, b) => a.id.localeCompare(b.id));
-  return { infrastructure, sawIaC: true };
+  return { infrastructure, sawIaC: files.terraform.length > 0 || sawTemplate };
 }
 
 // ── Linking infrastructure to code ──────────────────────────────────────────

@@ -159,13 +159,27 @@ two SQS queues and a dead-letter queue; none of those could be derived here.
 **Closed, by declaration and by IaC.** Infrastructure now comes from two places
 and is drawn as its own trailing column:
 
-1. **Terraform.** `.tf` files are scanned for `resource "type" "name"` blocks.
-   Types are classified by substring into buckets, queues, topics, databases,
-   caches, streams, schedulers, secrets and compute; anything with no
-   architectural meaning (an IAM role, a security group) is skipped. A resource
-   is attributed to the zones whose source names it — a string match on the
-   resource's own name literals, with names shorter than five characters or too
-   generic (`main`, `default`, `data`) refused outright.
+1. **Infrastructure-as-code.** `.tf` files are scanned for
+   `resource "type" "name"` blocks, and `.yaml`/`.yml` files that prove
+   themselves CloudFormation templates — by an `AWSTemplateFormatVersion`
+   header or a `Type: AWS::…` line — are scanned for logical-id/`Type:` pairs.
+   Unrelated YAML (CI workflows, Kubernetes manifests, lockfiles) is rejected
+   by that check rather than parsed.
+
+   Both formats share one classification table. Types are normalised —
+   `::`, `-` and `.` folded to `_`, so `AWS::S3::Bucket` and `aws_s3_bucket`
+   reduce to the same shape — then classified by substring into buckets,
+   queues, topics, databases, caches, streams, schedulers, secrets and compute;
+   anything with no architectural meaning (an IAM role, a security group) is
+   skipped. A resource is attributed to the zones whose source names it — a
+   string match on the resource's own name literals, with names shorter than
+   five characters or too generic (`main`, `default`, `data`) refused outright.
+
+   Both parsers are deliberately shallow line/block scanners rather than real
+   HCL and YAML parses: they find what a reader would see scanning the files,
+   and they keep this module on `node:` builtins so it still bundles into the
+   standalone skill script. Terraform state and modules, and CloudFormation
+   nested stacks, `!Ref` intrinsics and multi-document files, are out of scope.
 2. **`.n-dx.json`**, under `sourcevision.isoMap.infrastructure`, for anything
    IaC does not cover — a managed service, another team's queue, a database that
    predates the repo:
@@ -177,8 +191,10 @@ and is drawn as its own trailing column:
 
 **Still open:** a string match is weaker evidence than an import, and the panel
 says so. Infrastructure nothing on the map references is not drawn at all, since
-a floating block asserts a relationship the map cannot support. Only Terraform
-is parsed; CloudFormation and Pulumi are not.
+a floating block asserts a relationship the map cannot support. Terraform and
+CloudFormation are parsed; Pulumi and CDK are not, since both express
+infrastructure as general-purpose code rather than a declarative file a shallow
+scan can read.
 
 ### 4. Entry points are approximate
 
