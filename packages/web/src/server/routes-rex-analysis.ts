@@ -212,6 +212,12 @@ export function routeProposals(
     return handleCaptureNextSteps(req, res, ctx, broadcast);
   }
 
+  // POST /api/rex/capture-ask — capture one Ask answer as a PRD item
+  // (SourceVision Ask panel action)
+  if (path === "capture-ask" && method === "POST") {
+    return handleCaptureAsk(req, res, ctx, broadcast);
+  }
+
   return false;
 }
 
@@ -329,6 +335,114 @@ async function handleCaptureNextSteps(
     }
 
     jsonResponse(res, 200, { ok: true, created, skipped, epicId: created > 0 ? epicId : undefined });
+  } catch (err) {
+    errorResponse(res, 400, String(err));
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Ask-answer capture
+// ---------------------------------------------------------------------------
+
+/** Title of the epic that collects answers captured from the Ask panel. */
+const ASK_CAPTURE_EPIC_TITLE = "SourceVision Ask";
+
+/** Longest title derived from a question before it is elided. */
+const ASK_TITLE_MAX = 120;
+
+/**
+ * Use the question as the item's title, elided if it is long.
+ *
+ * A question is what makes the captured answer findable later, so it becomes
+ * the title rather than a generated summary — the answer itself is the body,
+ * where its full length costs nothing.
+ */
+export function askCaptureTitle(question: string): string {
+  const single = question.trim().replace(/\s+/g, " ");
+  if (single.length <= ASK_TITLE_MAX) return single;
+  return `${single.slice(0, ASK_TITLE_MAX - 1).trimEnd()}…`;
+}
+
+/**
+ * Handle POST /api/rex/capture-ask — file one Ask exchange as a PRD item.
+ *
+ * Unlike next-step capture this does not deduplicate by title: asking the same
+ * question again after the code has moved is a legitimate reason to capture a
+ * second, different answer, and silently dropping it would lose the newer one.
+ *
+ * The response names the created item and the epic it landed under, because
+ * the panel reports where the capture went and cannot know the epic otherwise
+ * (it is created on first capture).
+ */
+async function handleCaptureAsk(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  try {
+    const body = await readBody(req);
+    const input = JSON.parse(body) as { question?: string; answer?: string };
+
+    const question = typeof input.question === "string" ? input.question.trim() : "";
+    const answer = typeof input.answer === "string" ? input.answer.trim() : "";
+    if (question.length === 0) {
+      errorResponse(res, 400, "Missing required field: question");
+      return true;
+    }
+    if (answer.length === 0) {
+      errorResponse(res, 400, "Missing required field: answer");
+      return true;
+    }
+
+    const store = await resolveStore(ctx.rexDir);
+    const doc = await store.loadDocument();
+
+    let epicId = doc.items.find(
+      (i) => i.level === "epic" && i.title === ASK_CAPTURE_EPIC_TITLE,
+    )?.id;
+    if (!epicId) {
+      epicId = randomUUID();
+      await store.addItem({
+        id: epicId,
+        title: ASK_CAPTURE_EPIC_TITLE,
+        level: "epic",
+        status: "pending",
+        source: "sv-ask",
+        description: "Answers captured from the SourceVision Ask panel.",
+        tags: ["sourcevision", "ask"],
+      });
+    }
+
+    const item: PRDItem = {
+      id: randomUUID(),
+      title: askCaptureTitle(question),
+      level: "feature",
+      status: "pending",
+      source: "sv-ask",
+      description: answer,
+      tags: ["sourcevision", "ask"],
+    };
+    await store.addItem(item, epicId);
+
+    refreshPRDCache(ctx.rexDir, await store.loadDocument());
+
+    appendLog(ctx, {
+      timestamp: new Date().toISOString(),
+      event: "sv_ask_capture",
+      detail: `Captured an Ask answer to PRD as "${item.title}" via web`,
+    });
+
+    if (broadcast) {
+      broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+    }
+
+    jsonResponse(res, 200, {
+      ok: true,
+      item: { id: item.id, title: item.title, level: item.level },
+      parent: { id: epicId, title: ASK_CAPTURE_EPIC_TITLE, level: "epic" },
+    });
   } catch (err) {
     errorResponse(res, 400, String(err));
   }

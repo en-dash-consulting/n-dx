@@ -2,7 +2,7 @@
 id: "900c5196-8073-467e-9d43-90919bb781fe"
 level: "task"
 title: "Wire Copy and Capture-to-PRD actions on the answer"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "web"
@@ -13,6 +13,11 @@ blockedBy:
   - "514d0d03-868a-4eaf-abeb-3e2abdd38bd5"
   - "74c3fee8-3281-4b30-8157-8794ea68aea5"
 source: "ndx-capture"
+startedAt: "2026-09-09T13:23:10.110Z"
+completedAt: "2026-09-09T13:39:27.344Z"
+endedAt: "2026-09-09T13:39:27.344Z"
+resolutionType: "code-change"
+resolutionDetail: "Copy and Capture-to-PRD wired on the Ask answer. Clipboard workflow lifted from pr-markdown.ts into viewer/utils/clipboard.ts (three consumers); new confirm-guarded POST /api/rex/capture-ask reports the created item and its parent. 52 new tests; web suite 3326 green, root suite 2356 green."
 acceptanceCriteria:
   - "Copy places the raw answer text on the clipboard, falling back to execCommand when navigator.clipboard is unavailable"
   - "A clipboard permission denial is reported distinctly from a generic copy failure, matching the PR Markdown view's messaging"
@@ -21,6 +26,6 @@ acceptanceCriteria:
   - "Copy/Capture feedback clears itself and does not persist across a new question"
   - "Unit tests cover copy success, copy fallback, permission denial, and capture confirm/cancel"
 description: "Add the two response actions. Copy reuses the clipboard workflow already proven in the PR Markdown view (pr-markdown.ts:91 fallbackCopyText, :308 handleCopyRawMarkdown) -- navigator.clipboard with an execCommand fallback, permission-denied distinguished from generic failure, and transient success/error feedback -- rather than reimplementing it.\n\nCapture-to-PRD follows the confirm-guarded pattern from the Overview Next Steps panel (overview.ts:204 -> POST /api/rex/capture-next-steps): the user confirms before anything is written, and the result reports what was created and where it landed.\n\nThe shared clipboard logic should be lifted to a reusable helper if that can be done without a new single-consumer module -- see the two-consumer rule in CLAUDE.md."
-lastModified: "2026-09-01T14:05:00.607Z"
+lastModified: "2026-09-09T13:39:27.368Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

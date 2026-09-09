@@ -9,6 +9,7 @@ import {
   getZoneColorByIndex,
 } from "../visualization/index.js";
 import { basename } from "../utils.js";
+import { copyTextToClipboard } from "../utils/clipboard.js";
 import { BrandedHeader } from "../components/index.js";
 
 interface SvAnalyzeStatusData {
@@ -177,28 +178,6 @@ interface NextStep {
   category: string;
 }
 
-/** Copy text to the clipboard with a legacy execCommand fallback. */
-function copyText(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    return navigator.clipboard.writeText(text);
-  }
-  return new Promise((resolve, reject) => {
-    try {
-      const input = document.createElement("textarea");
-      input.value = text;
-      input.style.position = "fixed";
-      input.style.opacity = "0";
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand("copy");
-      document.body.removeChild(input);
-      resolve();
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
 /** Format the full step list as a numbered markdown list. */
 function stepsToMarkdown(steps: NextStep[]): string {
   return steps
@@ -239,11 +218,13 @@ export function NextStepsPanel() {
   }, []);
 
   const handleCopy = useCallback((text: string, which: number | "all") => {
-    copyText(text).then(() => {
+    // Silent on failure — this panel has no room for a message, so an absent
+    // tick is the whole report. The Ask and PR Markdown views, which do have
+    // room, classify the failure instead.
+    void copyTextToClipboard(text).then((result) => {
+      if (!result.ok) return;
       setCopied(which);
       setTimeout(() => setCopied((c) => (c === which ? null : c)), 2000);
-    }).catch(() => {
-      // Silent fail — button feedback simply doesn't appear
     });
   }, []);
 

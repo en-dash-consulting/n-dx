@@ -23,18 +23,38 @@
  * of that view, not part of this shell. Until then the answer keeps its own
  * line breaks and nothing more, which is honest about what it is.
  *
+ * ## The two answer actions
+ *
+ * Copy runs the shared clipboard workflow (`utils/clipboard.ts`), lifted out
+ * of `pr-markdown.ts` when this panel needed the same execCommand fallback and
+ * the same distinction between a permission denial and a generic failure.
+ *
+ * Capture-to-PRD is confirm-guarded, like the Overview Next Steps panel: the
+ * click arms the action and a second click commits it, so no PRD write can
+ * happen from one stray click. A failed capture leaves the answer exactly
+ * where it was, still copyable, because the text is the thing the user would
+ * otherwise lose.
+ *
  * @module web/viewer/views/ask
  * @see packages/web/src/server/routes-sourcevision-ask.ts — the endpoint
+ * @see packages/web/src/viewer/utils/clipboard.ts — the shared copy workflow
  */
 
 import { h } from "preact";
-import { useCallback, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
+import { clipboardFailureMessage, copyTextToClipboard } from "../utils/clipboard.js";
 
 /** Where the panel sends the prompt. */
 const ASK_ENDPOINT = "/api/sourcevision/ask";
+
+/** Where the panel files an answer as a PRD item. */
+const CAPTURE_ENDPOINT = "/api/rex/capture-ask";
+
+/** How long transient copy feedback stays on screen. */
+const COPY_FEEDBACK_MS = 2000;
 
 const PROMPT_INPUT_ID = "sv-ask-prompt";
 
@@ -56,22 +76,57 @@ interface AskFailureResponse {
 
 type AskResponse = AskSuccessResponse | AskFailureResponse;
 
+/** Successful body from {@link CAPTURE_ENDPOINT}. */
+interface CaptureSuccessResponse {
+  ok: true;
+  item: { id: string; title: string; level: string };
+  parent: { id: string; title: string; level: string };
+}
+
+/** Failure body from {@link CAPTURE_ENDPOINT}. */
+interface CaptureFailureResponse {
+  ok?: false;
+  error?: string;
+}
+
+type CaptureResponse = CaptureSuccessResponse | CaptureFailureResponse;
+
 /**
  * The panel's display state.
  *
  * Exported so tests and future callers (the "explain this finding" entry point)
  * can name a state rather than infer it from rendered text.
+ *
+ * The `answered` state keeps the `question` that produced the answer, not the
+ * current textarea contents: the user can edit the prompt while reading, and
+ * capturing an answer under a question it did not answer would file a wrong
+ * pairing into the PRD.
  */
 export type AskState =
   | { status: "idle" }
   | { status: "submitting" }
   | {
       status: "answered";
+      question: string;
       answer: string;
       vendor: string;
       model: string;
       sources: readonly string[];
     }
+  | { status: "error"; message: string };
+
+/** Transient outcome of a copy attempt, or `null` when there is nothing to say. */
+type CopyFeedback =
+  | { kind: "success" }
+  | { kind: "error"; message: string }
+  | null;
+
+/** The capture action's own state — `confirm` is the guard before any write. */
+type CaptureState =
+  | { status: "idle" }
+  | { status: "confirm" }
+  | { status: "capturing" }
+  | { status: "done"; message: string }
   | { status: "error"; message: string };
 
 /** True when `prompt` has nothing a model could answer. */
@@ -86,10 +141,11 @@ export function isBlankPrompt(prompt: string): boolean {
  * has to land somewhere the user can act on, so it becomes an `error` naming
  * that fact rather than an `answered` state holding `undefined`.
  */
-export function stateForResponse(body: AskResponse): AskState {
+export function stateForResponse(body: AskResponse, question: string): AskState {
   if (body.ok === true && typeof body.answer === "string") {
     return {
       status: "answered",
+      question,
       answer: body.answer,
       vendor: body.vendor,
       model: body.model,
@@ -103,28 +159,67 @@ export function stateForResponse(body: AskResponse): AskState {
   };
 }
 
+/**
+ * Report where a captured answer landed.
+ *
+ * Names both the item and its parent: the epic is created on first capture, so
+ * the user has no other way to learn where to look for it.
+ */
+export function captureResultMessage(body: CaptureSuccessResponse): string {
+  return `✓ Captured "${body.item.title}" under ${body.parent.title}.`;
+}
+
 export function AskView() {
   const [prompt, setPrompt] = useState("");
   const [state, setState] = useState<AskState>({ status: "idle" });
+  const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>(null);
+  const [capture, setCapture] = useState<CaptureState>({ status: "idle" });
   const inFlightRef = useRef(false);
+  const copyTimerRef = useRef<number | null>(null);
   const deployed = isDeployedMode();
   const cliName = useCliName();
+
+  /** Show copy feedback and take it away again, replacing any pending timer. */
+  const showCopyFeedback = useCallback((next: CopyFeedback) => {
+    if (copyTimerRef.current !== null) {
+      window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
+    setCopyFeedback(next);
+    if (next !== null) {
+      copyTimerRef.current = window.setTimeout(() => {
+        setCopyFeedback(null);
+        copyTimerRef.current = null;
+      }, COPY_FEEDBACK_MS);
+    }
+  }, []);
+
+  useEffect(() => () => {
+    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     // A blank prompt is a no-op, not an error: the user has not asked anything
     // yet, so there is nothing to report and nothing to spend a model call on.
     if (isBlankPrompt(prompt) || inFlightRef.current) return;
 
+    const question = prompt.trim();
     inFlightRef.current = true;
     setState({ status: "submitting" });
+    // Both actions' feedback described the previous answer. Cleared here, at
+    // the moment that makes it stale, rather than from an effect watching the
+    // answer — an effect flushes on Preact's schedule and can land *after* a
+    // click the user has already made, undoing it.
+    showCopyFeedback(null);
+    setCapture({ status: "idle" });
     try {
       const res = await fetch(ASK_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim() }),
+        body: JSON.stringify({ prompt: question }),
       });
       const body = await res.json() as AskResponse;
-      setState(stateForResponse(body));
+      setState(stateForResponse(body, question));
     } catch (err) {
       // A rejected fetch never reached the route, so there is no classified
       // reason to report — only what the transport said.
@@ -135,7 +230,40 @@ export function AskView() {
     } finally {
       inFlightRef.current = false;
     }
-  }, [prompt]);
+  }, [prompt, showCopyFeedback]);
+
+  const handleCopy = useCallback(async () => {
+    if (state.status !== "answered") return;
+    const result = await copyTextToClipboard(state.answer);
+    showCopyFeedback(result.ok
+      ? { kind: "success" }
+      : { kind: "error", message: clipboardFailureMessage(result.kind, "answer") });
+  }, [state, showCopyFeedback]);
+
+  const handleCapture = useCallback(async () => {
+    if (state.status !== "answered") return;
+    setCapture({ status: "capturing" });
+    try {
+      const res = await fetch(CAPTURE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: state.question, answer: state.answer }),
+      });
+      const body = await res.json().catch(() => ({})) as CaptureResponse;
+      if (!res.ok || body.ok !== true) {
+        const failure = body as CaptureFailureResponse;
+        throw new Error(failure.error ?? `The capture request failed (HTTP ${res.status}).`);
+      }
+      setCapture({ status: "done", message: captureResultMessage(body) });
+    } catch (err) {
+      // The answer card stays exactly as it is, so a failed capture costs the
+      // user nothing — they can retry, or copy the text and file it by hand.
+      setCapture({
+        status: "error",
+        message: err instanceof Error ? err.message : "Failed to capture the answer.",
+      });
+    }
+  }, [state]);
 
   const submitting = state.status === "submitting";
   const submitDisabled = submitting || isBlankPrompt(prompt);
@@ -220,6 +348,55 @@ export function AskView() {
             `${state.vendor} / ${state.model}`,
             state.sources.length > 0 ? ` · grounded in ${state.sources.join(", ")}` : "",
           ),
+
+          h("div", { class: "ask-answer-actions" },
+            h("button", {
+              type: "button",
+              class: "btn ask-copy-btn",
+              onClick: () => { void handleCopy(); },
+              title: "Copy the answer text to the clipboard",
+            }, copyFeedback?.kind === "success" ? "✓ Copied" : "Copy"),
+
+            capture.status === "capturing"
+              ? h("span", { class: "ask-capture-progress", "aria-busy": "true" }, "Capturing…")
+              : capture.status === "confirm"
+                ? h("span", { class: "ask-capture-confirm" },
+                    "File this answer as a PRD item?",
+                    h("button", {
+                      type: "button",
+                      class: "btn ask-capture-confirm-btn",
+                      onClick: () => { void handleCapture(); },
+                    }, "Confirm"),
+                    h("button", {
+                      type: "button",
+                      class: "btn ask-capture-cancel-btn",
+                      onClick: () => setCapture({ status: "idle" }),
+                    }, "Cancel"),
+                  )
+                : h("button", {
+                    type: "button",
+                    class: "btn ask-capture-btn",
+                    onClick: () => setCapture({ status: "confirm" }),
+                    title: "File this answer as a PRD item so it can be worked on",
+                  }, "Capture to PRD"),
+          ),
+
+          // One always-rendered live region for both successes, so a screen
+          // reader has something to announce into rather than a node that
+          // appears at the same moment as its text.
+          h("p", { class: "ask-copy-feedback", role: "status", "aria-live": "polite" },
+            copyFeedback?.kind === "success"
+              ? "Copied answer to clipboard."
+              : capture.status === "done" ? capture.message : "",
+          ),
+          copyFeedback?.kind === "error"
+            ? h("p", { class: "ask-copy-error", role: "alert" }, copyFeedback.message)
+            : null,
+          capture.status === "error"
+            ? h("p", { class: "ask-capture-error", role: "alert" },
+                `Could not capture the answer: ${capture.message}`,
+              )
+            : null,
         )
       : null,
 
