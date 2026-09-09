@@ -39,7 +39,7 @@ import { discoverChangedFiles } from "../analysis/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
-import { runPostTaskTests, runTestGate, OUTPUT_TAIL_LINES } from "../../tools/test-runner.js";
+import { runPostTaskTests, runTestGate, OUTPUT_TAIL_LINES, TEST_GATE_TIMEOUT } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines } from "../../types/output.js";
@@ -2028,10 +2028,15 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       testGateAttempt++;
       subsection(`Full Test Suite Gate${testGateAttempt > 1 ? ` (attempt ${testGateAttempt})` : ""}`);
 
+      const gateTimeoutMs = config?.fullTestTimeoutMs ?? TEST_GATE_TIMEOUT;
+      const gateCommand = resolvedTestCommand || "pnpm test --reporter=json";
+      detail(`Running ${gateCommand} (timeout ${Math.round(gateTimeoutMs / 1000)}s)`);
+
       const testGate = await runTestGate({
         projectDir,
         filesChanged: run.structuredSummary.filesChanged,
         testCommand: resolvedTestCommand,
+        timeout: gateTimeoutMs,
       });
 
       run.testGate = testGate;

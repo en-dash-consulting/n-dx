@@ -234,6 +234,20 @@ export interface HenchConfig {
    */
   fullTestCommand?: string;
   /**
+   * Timeout for the full test suite gate, in milliseconds (default: 900_000
+   * — 15 minutes). Resolution precedence matches fullTestCommand:
+   * 1. .hench/config.json fullTestTimeoutMs field
+   * 2. .n-dx.json hench.fullTestTimeoutMs field
+   * 3. Default (900_000)
+   *
+   * Raise this if your full suite runs long under load: the gate is a HANG
+   * guardrail, not a latency SLA, so a generous budget only costs a slower
+   * failure when something is genuinely stuck — a tight one turns a slow but
+   * passing suite into a false-failure generator whenever the machine is
+   * contended (e.g. a concurrent `ndx work` in another worktree).
+   */
+  fullTestTimeoutMs?: number;
+  /**
    * Maximum number of times to re-prompt the agent when it produces a plan
    * without executing code modifications (default: 2).
    * Set to 0 to disable plan-only detection and allow completion with plans only.

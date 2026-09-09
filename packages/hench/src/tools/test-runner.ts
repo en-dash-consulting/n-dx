@@ -473,7 +473,7 @@ export interface TestGateOptions {
   filesChanged: string[];
   /** Test command to execute. If not provided, defaults to "pnpm test --reporter=json". */
   testCommand?: string;
-  /** Timeout for the test command in ms. Default: 300_000. */
+  /** Timeout for the test command in ms. Default: {@link TEST_GATE_TIMEOUT} (900_000). */
   timeout?: number;
 }
 
@@ -496,7 +496,7 @@ export interface TestGateOptions {
  * against the timeout the gate actually used (it is reported in the timeout
  * message, which now names both durations).
  */
-const TEST_GATE_TIMEOUT = 900_000; // 15 minutes — see above; measured 248s idle
+export const TEST_GATE_TIMEOUT = 900_000; // 15 minutes — see above; measured 248s idle
 
 /**
  * Vitest JSON reporter output structure.

@@ -549,6 +549,15 @@ describe("runTestGate", () => {
     expect(result.skipReason).toBe("No files modified in prior phases");
   });
 
+  // A 5-minute budget on a suite measured at 198s uncontended leaves ~100s of
+  // headroom, which a second concurrent `ndx work`/CI run erases — the gate
+  // then kills a suite that already passed. 900_000 (15 min) is the floor;
+  // see hench.fullTestTimeoutMs for the operator-configurable override.
+  it("defaults TEST_GATE_TIMEOUT to 900_000ms (15 minutes), not the old 300_000ms", async () => {
+    const { TEST_GATE_TIMEOUT } = await import("../../../src/tools/test-runner.js");
+    expect(TEST_GATE_TIMEOUT).toBe(900_000);
+  });
+
   it("returns failed gate on non-zero exit code", async () => {
     const { runTestGate } = await import("../../../src/tools/test-runner.js");
     const result = await runTestGate({
