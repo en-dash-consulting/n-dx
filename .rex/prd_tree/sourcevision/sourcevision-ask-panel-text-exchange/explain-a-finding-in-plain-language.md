@@ -2,7 +2,7 @@
 id: "a31d22af-f520-47c9-b29f-8174e75ef88e"
 level: "task"
 title: "Explain a finding in plain language from the Problems and Suggestions surfaces"
-status: "in_progress"
+status: "completed"
 priority: "medium"
 tags:
   - "web"
@@ -15,6 +15,10 @@ blockedBy:
   - "74c3fee8-3281-4b30-8157-8794ea68aea5"
 source: "ndx-capture"
 startedAt: "2026-09-09T18:17:39.978Z"
+completedAt: "2026-09-09T18:29:00.697Z"
+endedAt: "2026-09-09T18:29:00.697Z"
+resolutionType: "code-change"
+resolutionDetail: "Explain on every finding row in Problems and Suggestions, gated on sourcevision.ask; the finding reaches POST /api/sourcevision/ask as structured fields (type, severity, zone, message, files) rendered as labelled context after the digest; the panel auto-answers, shows the attached finding, and keeps Copy/Capture. 44 tests. Commit db0b31ee."
 acceptanceCriteria:
   - "Every finding row in the Problems and Suggestions views offers an Explain action"
   - "Explain navigates to the Ask panel with the finding pre-seeded as structured seed context (type, severity, zone, message, files), not as a pre-written prose prompt"
@@ -24,6 +28,6 @@ acceptanceCriteria:
   - "Explain works for every finding type and severity present in the fixture data, including findings with no severity set"
   - "A unit test asserts the seed context reaches the endpoint with the finding's zone and files intact"
 description: "Findings today are presented as classified rows (type, severity, zone, message) via FindingsList in the Problems and Suggestions views. A row tells the user that something is wrong but not what it means for this codebase or what fixing it involves.\n\nAdd an Explain action per finding that opens the Ask panel pre-seeded with that finding as structured seed context -- id, type, severity, zone, message, and the files involved -- and returns a plain-language explanation. The answer should cover what the finding means, why it matters in this specific repository (naming the zone and files, not generic advice), and what a fix would touch.\n\nThe explanation must be grounded in the finding and the analysis data. An explanation that could have been written without reading this repo is a failed explanation, and the acceptance criteria are written to make that testable."
-lastModified: "2026-09-09T18:17:40.003Z"
+lastModified: "2026-09-09T18:29:00.722Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
