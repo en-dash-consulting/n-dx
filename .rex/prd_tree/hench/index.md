@@ -4,9 +4,11 @@ level: "epic"
 title: "Hench"
 status: "completed"
 startedAt: "2026-03-26T15:22:13.999Z"
-completedAt: "2026-07-22T14:48:00.299Z"
-endedAt: "2026-07-22T14:48:00.299Z"
+completedAt: "2026-09-04T13:30:05.953Z"
+endedAt: "2026-09-04T13:30:05.953Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
+lastModified: "2026-09-04T13:30:05.975Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children

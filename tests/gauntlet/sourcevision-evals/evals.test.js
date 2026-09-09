@@ -15,6 +15,23 @@
  * Floor thresholds are calibrated to the recorder's default (--fast)
  * mode. When goldens are re-recorded with --full, thresholds may need
  * to be loosened for LLM-assigned archetypes.
+ *
+ * DO NOT NORMALISE PATHS AT COMPARISON TIME.
+ *
+ * The goldens store POSIX separators (`src/client/App.tsx`) and the scorers key
+ * their Maps on the path string byte-exactly. That is not an oversight to tidy
+ * up — it is the only check anywhere in the repo that `sv analyze` emits
+ * normalised separators in classifications.json and zones.json on Windows.
+ * Adding a `.replace(/\\/g, "/")` on either side, here or in
+ * projectForScoring, would make this suite green on output no consumer can
+ * read.
+ *
+ * Note which assertion actually carries that: on a separator regression every
+ * path misses the golden Map, so archetypeAccuracy's intersection is empty and
+ * its `total === 0` guard scores a perfect 1.0 — it clears its floor. Only
+ * zonePartitionSimilarity drops to 0. The zone floors below are load-bearing
+ * for cross-OS coverage in a way the archetype floors are not; score.test.js
+ * pins this under "degenerate inputs".
  */
 
 import { describe, it, expect, beforeAll } from "vitest";

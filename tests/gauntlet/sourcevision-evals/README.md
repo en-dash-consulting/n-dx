@@ -17,12 +17,12 @@ pnpm gauntlet:evals:record -- --full    # record with LLM enrichment enabled (sp
 
 ```
 tests/fixtures/sv-evals/
-  toy-app/              8-file fixture exercising 8 distinct archetypes, 1 zone
+  toy-app/              8 files, 8 distinct archetypes, 3 zones (components, hooks, src)
     src/...
     golden.json         committed golden snapshot
-  medium-app/           31-file fixture with server/client/shared split, 6 zones
-    src/...
-    golden.json
+  medium-app/           31 files, 12 distinct archetypes + 1 unclassified, 7 zones
+    src/...              (client, client-hooks, client-stores, server,
+    golden.json           server-middleware, shared, shared-schemas)
 
 tests/gauntlet/sourcevision-evals/
   record-goldens.js     recorder — runs sv analyze per fixture, writes golden.json
@@ -88,6 +88,20 @@ for this reason.
 
 The scorer unit tests (`score.test.js`) are cheap pure-function tests and DO run under default
 `pnpm gauntlet` — they protect the scoring logic itself.
+
+## Second, undocumented job: the sourcevision path-normalisation gate
+
+Goldens store POSIX separators (`src/client/App.tsx`) and the scorers key their Maps on the path
+string **byte-exactly**. That makes this suite the only check in the repo that `sv analyze` emits
+normalised separators in `classifications.json` and `zones.json` when run on Windows. Do not
+"simplify" it by normalising paths at comparison time — in the scorers, in `projectForScoring`, or
+in the recorder. Doing so would keep the gate green on output no consumer can read.
+
+One caveat worth knowing before you rely on it: the two scorers do **not** fail alike on a
+separator regression. Every path misses the golden Map, so `archetypeAccuracy`'s intersection is
+empty and its `total === 0` guard returns a perfect `1.0` — clearing its floor. Only
+`zonePartitionSimilarity` drops to `0`. So the zone floors are load-bearing for cross-OS coverage
+and the archetype floors are not. `score.test.js` pins this under "degenerate inputs".
 
 ## When to run the gate
 

@@ -87,11 +87,21 @@ they were declared rather than inferred:
 - **`infrastructure`** — a queue, bucket, cache or database.
   `{ "id": "...", "name": "...", "kind": "queue", "usedBy": ["src/core"] }`.
 
-Terraform is also scanned automatically: `resource "aws_sqs_queue" "ingest"`
-becomes a node, attributed to the zones whose source names it.
+Infrastructure-as-code is also scanned automatically: a Terraform
+`resource "aws_sqs_queue" "ingest"` or a CloudFormation/SAM
+`Type: AWS::SQS::Queue` becomes a node, attributed to the zones whose source
+names it. Both dialects share one classification table, so a queue is a queue
+either way. YAML is only treated as a template when it has a top-level
+`Resources:` block and a namespaced `Type:` — a CI workflow or a k8s manifest is
+not infrastructure.
 
 A declaration that cannot be drawn is reported in the page footer, never
-silently dropped.
+silently dropped. Where the analysis includes a call graph, declared seams are
+also checked against it: a seam whose named callbacks are called on the
+receiving side is corroborated, and one the call graph does not support is drawn
+faint with a sparse dash and labelled **unverified** — a declaration left behind
+by a refactor, most likely. Callbacks nothing calls are listed in the footer by
+name.
 
 ## What to tell the user
 
@@ -114,11 +124,14 @@ rendered page also states them in its own footer.
 - **Edges are imports, not data flow.** A connector means "this zone imports
   that one", not "a request travels this way".
 - **Runtime infrastructure is declared, not detected.** Queues, caches, buckets
-  and databases appear only from `.n-dx.json` or Terraform, and a zone is
-  attributed to one by naming it in source — weaker than an import.
+  and databases appear only from `.n-dx.json`, Terraform or CloudFormation, and
+  a zone is attributed to one by naming it in source — weaker than an import.
+  Pulumi and CDK are not scanned.
 - **Injection inverts direction.** A callback or event seam runs the opposite
   way at runtime from how the import is drawn. Declared seams are drawn the
-  right way round; undeclared ones are not.
+  right way round; undeclared ones are not. A declared seam marked *unverified*
+  is a claim the call graph could not support — treat it as suspect, not as
+  architecture.
 - **In scan mode, zones come from directory structure**, which reflects how code
   is filed rather than how it is organised, and imports come from regexes, so
   path aliases and build-tool mapping can be missed.

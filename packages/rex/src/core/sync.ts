@@ -254,6 +254,98 @@ export async function stampModified(
 }
 
 /**
+ * Fields excluded from an item's content signature.
+ *
+ * The first four are sync bookkeeping rather than content: including
+ * `lastModified` would make every stamp look like a further modification, and
+ * including `lastSyncedAt` would make recording a successful sync look like a
+ * local edit — each one a loop. `children` is excluded as an object graph and
+ * re-added below as an id list, so that a parent is compared on *which*
+ * children it has without being compared on their contents; each child is
+ * signed in its own right.
+ */
+const SIGNATURE_IGNORED = new Set([
+  "lastModified",
+  "lastModifiedBy",
+  "lastSyncedAt",
+  "remoteId",
+  "children",
+]);
+
+/** Content signature of one item, ignoring sync bookkeeping. */
+function itemSignature(item: PRDItem): string {
+  const record = item as unknown as Record<string, unknown>;
+  const own: Record<string, unknown> = {};
+  // Sorted so a field added by one writer and a field added by another in the
+  // opposite order do not read as a change.
+  for (const key of Object.keys(record).sort()) {
+    if (SIGNATURE_IGNORED.has(key)) continue;
+    own[key] = record[key];
+  }
+  return JSON.stringify({
+    own,
+    children: (item.children ?? []).map((child) => child.id),
+  });
+}
+
+/**
+ * Signature every item in a tree, keyed by id.
+ *
+ * Signatures are computed eagerly into strings rather than held as references:
+ * the caller mutates the same item objects in place, so a lazy comparison
+ * would be comparing each item against itself.
+ */
+export function snapshotItemContent(items: PRDItem[]): Map<string, string> {
+  const snapshot = new Map<string, string>();
+  for (const { item } of walkTree(items)) {
+    snapshot.set(item.id, itemSignature(item));
+  }
+  return snapshot;
+}
+
+/**
+ * Stamp every item whose content differs from `before`, in place.
+ *
+ * This is what makes a mutation performed directly on the tree — the pattern
+ * every batch write uses, from the dashboard's bulk update to the CLI
+ * restructurers — visible to {@link isModifiedSinceSync}. Without it the item
+ * is written to disk looking untouched: never pushed to the remote, then
+ * overwritten by the remote's value on the next pull, in silence.
+ *
+ * Two rules, both deliberate:
+ *
+ * - **Changed, not merely present.** An empty transaction is a real pattern
+ *   here (`migrate-slugs` and `reshape` each open one purely to force a
+ *   rewrite). Stamping unconditionally would mark every item in the PRD
+ *   modified and queue the whole tree for push.
+ * - **A stamp the item arrived with is kept.** `analyze.ts` stamps its accepted
+ *   items before opening the transaction, deliberately and with a comment
+ *   saying so. Only an item that is new to the tree *and* carries no stamp of
+ *   its own gets one here.
+ *
+ * @returns the ids stamped, in tree order.
+ */
+export function stampChangedItems(
+  items: PRDItem[],
+  before: Map<string, string>,
+  stamp: ModifiedFields,
+): string[] {
+  const stamped: string[] = [];
+  for (const { item } of walkTree(items)) {
+    const previous = before.get(item.id);
+    const changed = previous === undefined
+      ? item.lastModified === undefined
+      : previous !== itemSignature(item);
+    if (!changed) continue;
+    // walkTree yields live references into the tree, so assigning here is the
+    // write — no re-lookup needed.
+    Object.assign(item, stamp);
+    stamped.push(item.id);
+  }
+  return stamped;
+}
+
+/**
  * Stamp the resolved actor identity onto a log entry, unless the entry
  * already carries an explicit `actor` (e.g. one reconstructed from a
  * remote sync, authored by someone else).

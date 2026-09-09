@@ -10,6 +10,7 @@ import {
 import type { Manifest, Zone, ZoneCrossing, Zones, Inventory, FileEntry } from "../../../src/schema/index.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as childProcess from "node:child_process";
 
 // Mock node:fs
 vi.mock("node:fs", async (importOriginal) => {
@@ -23,10 +24,29 @@ vi.mock("node:fs", async (importOriginal) => {
   };
 });
 
+// Mock node:child_process — `detectSubAnalyses` shells out to
+// `git worktree list --porcelain` to identify nested checkouts.
+vi.mock("node:child_process", () => ({
+  execFileSync: vi.fn(() => {
+    throw new Error("git unavailable");
+  }),
+}));
+
 const mockedExistsSync = vi.mocked(fs.existsSync);
 const mockedReaddirSync = vi.mocked(fs.readdirSync);
 const mockedReadFileSync = vi.mocked(fs.readFileSync);
 const mockedStatSync = vi.mocked(fs.statSync);
+const mockedExecFileSync = vi.mocked(childProcess.execFileSync);
+
+/**
+ * Make `git worktree list --porcelain` report the given worktree paths.
+ * The first entry is the main worktree, matching git's real output order.
+ */
+function mockWorktrees(paths: string[]): void {
+  mockedExecFileSync.mockReturnValue(
+    paths.map((p) => `worktree ${p}\nHEAD 0000000000000000000000000000000000000000\n`).join("\n") as never,
+  );
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -450,5 +470,111 @@ describe("detectSubAnalyses", () => {
     expect(result).toHaveLength(2);
     expect(result[0].prefix).toBe("packages/alpha");
     expect(result[1].prefix).toBe("packages/zulu");
+  });
+});
+
+describe("detectSubAnalyses — git worktree exclusion", () => {
+  // Absolute, platform-native paths: the worktree comparison resolves paths,
+  // so POSIX-style literals would not match on Windows.
+  const ROOT = path.resolve(path.sep, "root");
+  const WT = path.join(ROOT, ".ndx-deploy-tmp");
+  const REX = path.join(ROOT, "packages", "rex");
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  /**
+   * A tree with a legitimate sub-analysis at packages/rex and a decoy
+   * `.sourcevision/` inside each of `.claude/worktrees/wt` and
+   * `.ndx-deploy-tmp` — the two shapes that flooded the parent analysis.
+   */
+  function mockTree(): void {
+    const claudeWt = path.join(ROOT, ".claude", "worktrees", "wt");
+
+    mockedReaddirSync.mockImplementation((dir: any) => {
+      const d = String(dir);
+      if (d === ROOT) return [".claude", ".ndx-deploy-tmp", "packages"] as any;
+      if (d === path.join(ROOT, ".claude")) return ["worktrees"] as any;
+      if (d === path.join(ROOT, ".claude", "worktrees")) return ["wt"] as any;
+      if (d === path.join(ROOT, "packages")) return ["rex"] as any;
+      return [] as any;
+    });
+
+    mockedStatSync.mockImplementation(() => ({ isDirectory: () => true } as any));
+
+    const svDirs = new Set([WT, REX, claudeWt].map((d) => path.join(d, ".sourcevision")));
+    mockedExistsSync.mockImplementation((p: any) => {
+      const s = String(p);
+      return svDirs.has(s) || svDirs.has(path.dirname(s));
+    });
+
+    mockedReadFileSync.mockReturnValue(JSON.stringify(makeManifest()));
+  }
+
+  it("does not descend into .claude, so worktree checkouts there are invisible", () => {
+    mockTree();
+    mockWorktrees([ROOT]); // git reports no nested worktree — .claude alone must suffice
+
+    const result = detectSubAnalyses(ROOT);
+
+    expect(mockedReaddirSync.mock.calls.map((c) => String(c[0]))).not.toContain(path.join(ROOT, ".claude"));
+    expect(result.map((r) => r.prefix)).not.toContain(".claude/worktrees/wt");
+  });
+
+  it("skips a registered worktree nested outside .claude", () => {
+    mockTree();
+    mockWorktrees([ROOT, WT]);
+
+    const result = detectSubAnalyses(ROOT);
+
+    expect(result.map((r) => r.prefix)).not.toContain(".ndx-deploy-tmp");
+  });
+
+  it("still promotes a normal sub-analysis alongside skipped worktrees", () => {
+    mockTree();
+    mockWorktrees([ROOT, WT]);
+
+    const result = detectSubAnalyses(ROOT);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].prefix).toBe("packages/rex");
+    expect(result[0].id).toBe("packages-rex");
+  });
+
+  it("never skips the root itself, so a worktree analyzed as its own root still works", () => {
+    mockTree();
+    // git lists ROOT first as the main worktree; ROOT must not exclude itself.
+    mockWorktrees([ROOT]);
+
+    const result = detectSubAnalyses(ROOT);
+
+    expect(result.map((r) => r.prefix)).toContain("packages/rex");
+  });
+
+  it("ignores worktrees registered outside the analysis root", () => {
+    mockTree();
+    mockWorktrees([ROOT, path.resolve(path.sep, "elsewhere", "other-wt")]);
+
+    const result = detectSubAnalyses(ROOT);
+
+    expect(result.map((r) => r.prefix)).toContain("packages/rex");
+  });
+
+  it("falls back to scanning normally when git is unavailable", () => {
+    mockTree();
+    mockedExecFileSync.mockImplementation(() => {
+      throw new Error("ENOENT: git not found");
+    });
+
+    const result = detectSubAnalyses(ROOT);
+
+    // No worktree data, so .ndx-deploy-tmp is promoted — but the scan still
+    // completes and the legitimate sub-analysis is found. No throw.
+    expect(result.map((r) => r.prefix)).toContain("packages/rex");
   });
 });

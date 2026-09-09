@@ -28,6 +28,7 @@ import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
 import type { PromptEnvelope } from "../../prd/llm-gateway.js";
+import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { saveRun } from "../../store/runs.js";
 import { persistRunLog } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
@@ -857,9 +858,15 @@ export interface FinalizeRunOptions {
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
 
 /**
- * Return the list of entries reported by `git status --porcelain`.
+ * Return the operator-authored entries reported by `git status --porcelain`.
  * Each non-blank line represents a modified, staged, or untracked path.
  * Returns an empty array when the working tree is clean or git is unavailable.
+ *
+ * Hench's own runtime artifacts are discounted (see
+ * {@link excludeHenchRuntimeArtifacts}). `.hench/locks/` is created at process
+ * startup, before the pre-run gate fires, so counting it made an autonomous
+ * run on a project without those `.gitignore` entries refuse to start against
+ * a lock it had just created itself.
  */
 async function listDirtyPaths(projectDir: string): Promise<string[]> {
   try {
@@ -867,7 +874,7 @@ async function listDirtyPaths(projectDir: string): Promise<string[]> {
       cwd: projectDir,
       timeout: 15_000,
     });
-    return output.trim().split("\n").filter(Boolean);
+    return excludeHenchRuntimeArtifacts(output.trim().split("\n").filter(Boolean));
   } catch {
     return [];
   }
@@ -2055,15 +2062,48 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             stream("Test Gate", "Skipped by user");
             gateComplete = true;
           } else {
-            // "abort" — mark run as failed and proceed to rollback
+            // "abort" — mark run as failed and proceed to rollback.
+            //
+            // Never emit a bare trailing colon: parseVitestOutput can return an
+            // empty package list for a runner whose output it cannot parse, and
+            // `Test gate failed: ` with nothing after it told the operator
+            // precisely nothing about why their run died.
             run.status = "failed";
-            run.error = `Test gate failed: ${failedPackages.join(", ")}`;
+            // `error` wins when set: it carries the specific diagnosis (a
+            // timeout and its duration), which the package list cannot express.
+            const reason =
+              testGate.error ??
+              (failedPackages.length > 0
+                ? failedPackages.join(", ")
+                : "no package results were reported");
+            run.error = `Test gate failed: ${reason}`;
             gateComplete = true;
           }
         }
       } else if (testGate.skipReason) {
         detail(`Skipped: ${testGate.skipReason}`);
         gateComplete = true;
+      } else {
+        // INCONCLUSIVE — `ran: false` with no skipReason means the gate could not
+        // be executed. The suite never started, so this is not a verdict on the
+        // code and must not be treated as one.
+        //
+        // Deliberately does NOT set run.status = "failed". Doing so skipped
+        // updateCompletedTaskStatus below and short-circuited the commit prompt,
+        // so finished, committed work went unrecorded in the PRD and the loop
+        // re-selected the same task until the 3-strike auto-cancel fired.
+        //
+        // Also sets gateComplete: without it the loop body did nothing on this
+        // branch and spun to the 5-attempt cap, re-running a command that cannot
+        // launch and then failing the run for exhausting its retries.
+        //
+        // The outcome stays on `run.testGate` (ran: false + error), so the run
+        // record and dashboard can tell this apart from a pass without a
+        // separate flag.
+        gateComplete = true;
+        stream("Test Gate", `⚠ Could not run — ${testGate.error ?? "reason unknown"}`);
+        detail("Inconclusive, not a failure: the suite never started, so nothing was tested.");
+        detail("The run continues; verify the suite yourself before trusting this commit.");
       }
     }
 

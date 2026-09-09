@@ -1,0 +1,151 @@
+/* PRD refinement proposals — the Ask panel's review surface for changes that
+ * write to the PRD.
+ *
+ * Split from ask.css to match the module split (views/ask-refinements.ts).
+ * Same token caveat as ask.css: --panel2, --line and --mono do not exist in
+ * tokens.css, so do not copy declarations using them from pr-markdown.css.
+ *
+ * Deliberately quieter than the answer it sits under: this is a list of
+ * decisions, not a result.
+ */
+
+.sv-ask-proposals {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2-5);
+}
+
+.sv-ask-proposals-intro {
+  margin: 0;
+}
+
+.sv-ask-proposal-list,
+.sv-ask-proposal-notes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sv-ask-proposal-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sv-ask-proposal-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sv-ask-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* A leading edge rather than a full accent border: each card is one pending
+     decision, and boxing every one in colour would make the list read as a
+     list of warnings. */
+  border-left: 3px solid var(--border-strong);
+}
+
+.sv-ask-proposal-applied {
+  border-left-color: var(--green);
+}
+
+.sv-ask-proposal-refused {
+  border-left-color: var(--red);
+}
+
+.sv-ask-proposal-title,
+.sv-ask-proposal-summary,
+.sv-ask-proposal-rationale,
+.sv-ask-diff-none {
+  margin: 0;
+}
+
+/* Before and after side by side where there is room, stacked where there is
+   not. Never merged into one column on a wide screen: the two values exist to
+   be compared, and a stacked pair reads as a sequence. */
+.sv-ask-diffs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sv-ask-diff {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-1) var(--space-2);
+}
+
+.sv-ask-diff-field {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--font-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.sv-ask-diff-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-hover);
+}
+
+/* The after side is the one being approved, so it carries the emphasis. The
+   before side is not dimmed: it is the content at risk of being replaced, and
+   it has to stay readable for the review to mean anything. */
+.sv-ask-diff-after {
+  border-color: var(--border-strong);
+}
+
+.sv-ask-diff-label {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sv-ask-diff-lines {
+  margin: 0;
+  padding-left: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-base);
+  line-height: 1.5;
+}
+
+.sv-ask-diff-empty {
+  margin: 0;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.sv-ask-proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.sv-ask-proposal-result {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1-5);
+  margin: 0;
+}
+
+/* Success tints only the marker; a refusal tints the whole line. Same rule as
+   the copy/capture feedback in ask.css — a confirmation should not carry more
+   weight than the thing it confirms, and a refusal should. */
+.sv-ask-proposal-result-ok .sv-ask-feedback-mark {
+  color: var(--green);
+}
+
+.sv-ask-proposal-result-fail {
+  color: var(--red);
+}

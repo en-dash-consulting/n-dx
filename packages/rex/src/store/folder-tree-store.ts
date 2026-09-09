@@ -28,7 +28,14 @@ import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
 import { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
-import { stampModified, stampActor } from "../core/sync.js";
+import {
+  stampModified,
+  stampActor,
+  stampModifiedFields,
+  snapshotItemContent,
+  stampChangedItems,
+} from "../core/sync.js";
+import { resolveActor } from "../core/identity.js";
 
 // ---------------------------------------------------------------------------
 // FolderTreeStore
@@ -244,9 +251,19 @@ export class FolderTreeStore implements PRDStore {
     // The lock file lives in rexDir, which may not exist on first write.
     await mkdir(this.rexDir, { recursive: true });
     const lockPath = prdLockPath(this.rexDir);
+    // Resolved before the lock is taken: the first call in a process shells
+    // out to git, and that is not work to do while holding the PRD lock. The
+    // result is cached process-wide, so warming it here also keeps the
+    // `stampModified` calls in addItem/updateItem/removeItem — which run
+    // inside this transaction — off the locked span.
+    const actor = await resolveActor();
     return withLock(lockPath, async () => {
       const doc = await this.loadDocument();
+      // Signatured before `fn` runs, so the stamp below covers whatever it
+      // mutated directly — callers that bypass updateItem still get one.
+      const before = snapshotItemContent(doc.items);
       const result = await fn(doc);
+      stampChangedItems(doc.items, before, await stampModifiedFields(undefined, actor));
       const check = validateDocument(doc);
       if (!check.ok) {
         throw new Error(`Invalid document after mutation: ${check.errors.message}`);

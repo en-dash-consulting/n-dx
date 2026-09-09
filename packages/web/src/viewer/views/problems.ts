@@ -1,16 +1,26 @@
 import { h, Fragment } from "preact";
 import { useMemo } from "preact/hooks";
-import type { LoadedData } from "../types.js";
+import type { LoadedData, NavigateTo } from "../types.js";
 import type { Finding } from "../external.js";
 import { FindingsList, BarChart } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
+import { findingAskSeed } from "./finding-seed.js";
 
 interface ProblemsProps {
   data: LoadedData;
+  navigateTo?: NavigateTo;
+  /**
+   * State of the `sourcevision.ask` toggle, supplied by the caller.
+   *
+   * Defaults to `false` so a caller that forgets it gets no Explain action
+   * rather than an ungated one — Ask is experimental, default-off, and spends
+   * tokens per question.
+   */
+  askEnabled?: boolean;
 }
 
-export function ProblemsView({ data }: ProblemsProps) {
+export function ProblemsView({ data, navigateTo, askEnabled = false }: ProblemsProps) {
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
@@ -94,6 +104,19 @@ export function ProblemsView({ data }: ProblemsProps) {
       legacyInsights,
       groupBy: "severity",
       searchable: true,
+      // No navigation target, no Explain action: the view renders standalone in
+      // tests and in the exported dashboard, and a button that goes nowhere is
+      // worse than an absent one. The same applies when `sourcevision.ask` is
+      // off — Explain is a second entry point into Ask, and leaving it live
+      // would make a default-off feature reachable through a side door whose
+      // only off switch lives in the sidebar the toggle already hid.
+      //
+      // `askEnabled` arrives as a prop rather than from useFeatureToggle here
+      // because the enrichment gate above returns before this component's hooks
+      // run; another hook below it would widen that conditional-hook hazard.
+      ...(navigateTo && askEnabled
+        ? { onExplain: (f: Finding) => navigateTo("ask", { askSeed: findingAskSeed(f) }) }
+        : {}),
     })
   );
 }

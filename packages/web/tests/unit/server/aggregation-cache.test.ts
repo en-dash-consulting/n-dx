@@ -56,6 +56,31 @@ describe("AggregationResultCache", () => {
     await writeFile(join(svDir, "manifest.json"), data, "utf-8");
   }
 
+  async function writeDashboardUsage(line = '{"timestamp":"2026-01-01T00:00:00.000Z"}'): Promise<void> {
+    await appendFile(join(tmpDir, ".n-dx-web-usage.jsonl"), line + "\n", "utf-8");
+  }
+
+  /**
+   * A fully-populated fingerprint the field tests vary one key of.
+   *
+   * A helper rather than six inline literals: `SourceFingerprint` gains a field
+   * whenever a new token source is added, and repeated literals turn that into
+   * six identical compile errors that say nothing about the change.
+   */
+  function fingerprint(overrides: Partial<SourceFingerprint> = {}): SourceFingerprint {
+    return {
+      henchDirMtimeMs: 1000,
+      henchFileCount: 5,
+      rexLogMtimeMs: 2000,
+      rexLogSize: 500,
+      svManifestMtimeMs: 3000,
+      svManifestSize: 200,
+      dashboardUsageMtimeMs: 4000,
+      dashboardUsageSize: 120,
+      ...overrides,
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // takeFingerprint
   // ---------------------------------------------------------------------------
@@ -71,6 +96,8 @@ describe("AggregationResultCache", () => {
         expect(fp.rexLogSize).toBe(0);
         expect(fp.svManifestMtimeMs).toBe(0);
         expect(fp.svManifestSize).toBe(0);
+        expect(fp.dashboardUsageMtimeMs).toBe(0);
+        expect(fp.dashboardUsageSize).toBe(0);
       } finally {
         await rm(emptyDir, { recursive: true, force: true });
       }
@@ -100,6 +127,14 @@ describe("AggregationResultCache", () => {
       expect(fp.svManifestSize).toBeGreaterThan(0);
     });
 
+    it("captures dashboard usage ledger state", async () => {
+      await writeDashboardUsage();
+
+      const fp = await takeFingerprint(tmpDir, rexDir);
+      expect(fp.dashboardUsageMtimeMs).toBeGreaterThan(0);
+      expect(fp.dashboardUsageSize).toBeGreaterThan(0);
+    });
+
     it("excludes hidden files from hench file count", async () => {
       await writeHenchRun("run-1.json");
       await writeFile(join(henchRunsDir, ".aggregation-checkpoint.json"), "{}", "utf-8");
@@ -123,55 +158,35 @@ describe("AggregationResultCache", () => {
 
   describe("fingerprintsMatch", () => {
     it("returns true for identical fingerprints", () => {
-      const fp: SourceFingerprint = {
-        henchDirMtimeMs: 1000,
-        henchFileCount: 5,
-        rexLogMtimeMs: 2000,
-        rexLogSize: 500,
-        svManifestMtimeMs: 3000,
-        svManifestSize: 200,
-      };
+      const fp = fingerprint();
       expect(fingerprintsMatch(fp, { ...fp })).toBe(true);
     });
 
     it("returns false when hench dir mtime differs", () => {
-      const a: SourceFingerprint = {
-        henchDirMtimeMs: 1000, henchFileCount: 5,
-        rexLogMtimeMs: 2000, rexLogSize: 500,
-        svManifestMtimeMs: 3000, svManifestSize: 200,
-      };
-      const b = { ...a, henchDirMtimeMs: 1001 };
-      expect(fingerprintsMatch(a, b)).toBe(false);
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ henchDirMtimeMs: 1001 }))).toBe(false);
     });
 
     it("returns false when hench file count differs", () => {
-      const a: SourceFingerprint = {
-        henchDirMtimeMs: 1000, henchFileCount: 5,
-        rexLogMtimeMs: 2000, rexLogSize: 500,
-        svManifestMtimeMs: 3000, svManifestSize: 200,
-      };
-      const b = { ...a, henchFileCount: 6 };
-      expect(fingerprintsMatch(a, b)).toBe(false);
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ henchFileCount: 6 }))).toBe(false);
     });
 
     it("returns false when rex log size differs", () => {
-      const a: SourceFingerprint = {
-        henchDirMtimeMs: 1000, henchFileCount: 5,
-        rexLogMtimeMs: 2000, rexLogSize: 500,
-        svManifestMtimeMs: 3000, svManifestSize: 200,
-      };
-      const b = { ...a, rexLogSize: 501 };
-      expect(fingerprintsMatch(a, b)).toBe(false);
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ rexLogSize: 501 }))).toBe(false);
     });
 
     it("returns false when sv manifest mtime differs", () => {
-      const a: SourceFingerprint = {
-        henchDirMtimeMs: 1000, henchFileCount: 5,
-        rexLogMtimeMs: 2000, rexLogSize: 500,
-        svManifestMtimeMs: 3000, svManifestSize: 200,
-      };
-      const b = { ...a, svManifestMtimeMs: 3001 };
-      expect(fingerprintsMatch(a, b)).toBe(false);
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ svManifestMtimeMs: 3001 }))).toBe(false);
+    });
+
+    // The dashboard ledger is the source this process appends to itself, so a
+    // fingerprint blind to it would serve a cached utilization response that
+    // omits the ask the user just paid for.
+    it("returns false when the dashboard usage ledger mtime differs", () => {
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ dashboardUsageMtimeMs: 4001 }))).toBe(false);
+    });
+
+    it("returns false when the dashboard usage ledger size differs", () => {
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ dashboardUsageSize: 121 }))).toBe(false);
     });
   });
 

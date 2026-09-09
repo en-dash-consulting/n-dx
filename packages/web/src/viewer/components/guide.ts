@@ -61,6 +61,12 @@ const GUIDE_CONTENT: Record<string, { title: string; description: string; lookFo
     lookFor: "Clear summary, accurate file/change grouping, and any missing sections before sharing.",
     actions: "Copy sections into your PR description and refresh after major changes to keep the text current.",
   },
+  ask: {
+    title: "Ask",
+    description: "Ask a question in plain language and get an answer grounded in this project's existing analysis. The model reads the analysis, not the source.",
+    lookFor: "Answers that cite zone IDs, file paths, and findings. An answer that says the analysis does not cover the question is telling you to run a deeper pass, not failing.",
+    actions: "Ask about coupling, hub files, or a specific finding. Re-run 'sourcevision analyze' when the answer reports a gap in what the analysis holds.",
+  },
   // ── Rex views ──
   "rex-dashboard": {
     title: "Rex Dashboard",

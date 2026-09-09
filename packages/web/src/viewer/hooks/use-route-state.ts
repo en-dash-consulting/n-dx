@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useEffect } from "preact/hooks";
-import type { ViewId, NavigateTo } from "../types.js";
+import type { ViewId, NavigateTo, AskSeed } from "../types.js";
 import { parseLegacyHashRoute, resolveLocationRoute } from "../route-state.js";
 
 export interface RouteState {
@@ -16,6 +16,16 @@ export interface RouteState {
   selectedZone: string | null;
   selectedRunId: string | null;
   selectedTaskId: string | null;
+  /**
+   * The item the Ask panel was entered with, when it was entered from one.
+   *
+   * Carried in route state alongside the scalar selections rather than in the
+   * URL: it is a structured object with no readable path form, and a shareable
+   * `/ask` link that silently loses its grounding would be worse than one that
+   * plainly opens an empty panel. It rides in the history entry's state, so
+   * Back returns to the seeded panel rather than a bare one.
+   */
+  askSeed: AskSeed | null;
   navigateTo: NavigateTo;
   handleSidebarNav: (id: ViewId) => void;
 }
@@ -47,20 +57,23 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => getInitialTaskId(validViews));
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
+  const [askSeed, setAskSeed] = useState<AskSeed | null>(null);
 
   const navigateTo: NavigateTo = useCallback((targetView, opts) => {
     const file = opts?.file ?? null;
     const zone = opts?.zone ?? null;
     const runId = opts?.runId ?? null;
     const taskId = opts?.taskId ?? null;
+    const seed = opts?.askSeed ?? null;
     setSelectedFile(file);
     setSelectedZone(zone);
     setSelectedRunId(runId);
     setSelectedTaskId(taskId);
+    setAskSeed(seed);
     setView(targetView);
     const subId = runId ?? taskId;
     const urlPath = subId ? `/${targetView}/${subId}` : `/${targetView}`;
-    history.pushState({ view: targetView, file, zone, runId, taskId }, "", urlPath);
+    history.pushState({ view: targetView, file, zone, runId, taskId, askSeed: seed }, "", urlPath);
   }, []);
 
   const handleSidebarNav = useCallback((id: ViewId) => {
@@ -68,8 +81,9 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     setSelectedZone(null);
     setSelectedRunId(null);
     setSelectedTaskId(null);
+    setAskSeed(null);
     setView(id);
-    history.pushState({ view: id, file: null, zone: null, runId: null, taskId: null }, "", `/${id}`);
+    history.pushState({ view: id, file: null, zone: null, runId: null, taskId: null, askSeed: null }, "", `/${id}`);
   }, []);
 
   useEffect(() => {
@@ -85,24 +99,33 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
       setSelectedZone(null);
       setSelectedRunId(runId);
       setSelectedTaskId(taskId);
+      setAskSeed(null);
       const hashUrl = hashRoute.subId ? `/${hashRoute.view}/${hashRoute.subId}` : `/${hashRoute.view}`;
-      history.replaceState({ view: hashRoute.view, file: null, zone: null, runId, taskId }, "", hashUrl);
+      history.replaceState({ view: hashRoute.view, file: null, zone: null, runId, taskId, askSeed: null }, "", hashUrl);
     } else {
       // Seed the initial history entry — preserve deep-link path if present
       const subId = selectedRunId ?? selectedTaskId;
       const initialUrl = subId ? `/${view}/${subId}` : `/${view}`;
-      history.replaceState({ view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId }, "", initialUrl);
+      history.replaceState({ view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed: null }, "", initialUrl);
     }
 
     const handlePopState = (e: PopStateEvent) => {
       if (e.state) {
-        const s = e.state as { view?: string; file?: string | null; zone?: string | null; runId?: string | null; taskId?: string | null };
+        const s = e.state as {
+          view?: string;
+          file?: string | null;
+          zone?: string | null;
+          runId?: string | null;
+          taskId?: string | null;
+          askSeed?: AskSeed | null;
+        };
         if (s.view && validViews.has(s.view as ViewId)) {
           setView(s.view as ViewId);
           setSelectedFile(s.file ?? null);
           setSelectedZone(s.zone ?? null);
           setSelectedRunId(s.runId ?? null);
           setSelectedTaskId(s.taskId ?? null);
+          setAskSeed(s.askSeed ?? null);
           return;
         }
       }
@@ -112,6 +135,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
       setView(parsed.view);
       setSelectedFile(null);
       setSelectedZone(null);
+      setAskSeed(null);
       const isRunView = parsed.view === "hench-runs";
       const isTaskView = parsed.view === "prd";
       setSelectedRunId(isRunView ? parsed.subId : null);
@@ -123,6 +147,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
         zone: null,
         runId: isRunView ? parsed.subId : null,
         taskId: isTaskView ? parsed.subId : null,
+        askSeed: null,
       }, "", fallbackUrl);
     };
 
@@ -132,5 +157,5 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { view, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, navigateTo, handleSidebarNav };
+  return { view, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed, navigateTo, handleSidebarNav };
 }

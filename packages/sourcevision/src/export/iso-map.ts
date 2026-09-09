@@ -140,7 +140,7 @@ const STYLES = `
   --muted:#9B9BC4; --accent:#7FAE33; --warn:#E0A33E; --crit:#E36262;
   --chip:#232253; --chip-hover:#2C2B66;
   --ground:#171639; --gridline:#222150;
-  --wire:#4A4990; --wire-hot:#7FAE33; --seam:#C9789E; --infra:#B0668A;
+  --wire:#4A4990; --wire-hot:#7FAE33; --seam:#C9789E; --seam-unver:#8C6076; --infra:#B0668A;
   --tag-bg:#1B1A45; --tag-ink:#EFEFF7; --tag-ink-on:#12122B;
   --body-ink:#D3D3E8;
 }
@@ -150,7 +150,7 @@ const STYLES = `
     --muted:#5C5F7A; --accent:#4E7A16; --warn:#9A6512; --crit:#B3352F;
     --chip:#EFF0F7; --chip-hover:#E3E5F2;
     --ground:#E7E9F5; --gridline:#D2D5E8;
-    --wire:#8E93BC; --wire-hot:#4E7A16; --seam:#A2416C; --infra:#8E4467;
+    --wire:#8E93BC; --wire-hot:#4E7A16; --seam:#A2416C; --seam-unver:#B98BA0; --infra:#8E4467;
     --tag-bg:#FFFFFF; --tag-ink:#1B1B33; --tag-ink-on:#FFFFFF;
     --body-ink:#33344F;
   }
@@ -203,6 +203,9 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
 /* Declared, not inferred: a different hue so nobody reads a human assertion
    as something the analysis proved. */
 .wire.seam{stroke:var(--seam)}
+/* A declaration the call graph does not support draws thinner and fainter, and
+   carries a sparser dash — never colour alone. */
+.wire.seam.unver{stroke:var(--seam-unver);stroke-width:1.2}
 .wire.infra{stroke:var(--infra)}
 .tagbox{fill:var(--tag-bg)}
 .tagtext{fill:var(--tag-ink)}
@@ -277,6 +280,16 @@ var NODES = MODEL.nodes, EDGES = MODEL.edges, B = MODEL.bounds;
 var COLOR = {}, LABEL = {}, GLYPH = {};
 MODEL.kinds.forEach(function(k){ COLOR[k.id] = k.color; LABEL[k.id] = k.label; GLYPH[k.id] = k.glyph; });
 var BY = {}; NODES.forEach(function(n){ BY[n.id] = n; });
+
+/**
+ * A declared seam the call graph was checked against and did not support.
+ * False for a seam nobody could check — "not checked" is not "unsupported",
+ * and drawing them the same way would invent a finding.
+ */
+function unverifiedSeam(e){
+  return !!(e.seam && e.seam.verification && e.seam.verification.status === "unverified");
+}
+var UNVERIFIED = EDGES.filter(unverifiedSeam).length;
 var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function P(u, v, z){ return [(u - v) * CX * CELL, ((u + v) * CY - (z || 0) * CZ) * CELL]; }
@@ -356,20 +369,29 @@ var edgeEls = [];
 EDGES.forEach(function(e, index){
   var projected = e.points.map(function(q){ return P(q[0], q[1], 0); });
   var from = BY[e.from], to = BY[e.to];
-  var kindWord = e.seam ? "Runtime seam: " : (e.infra ? "Uses infrastructure: " : "Dependency: ");
+  var unver = unverifiedSeam(e);
+  var kindWord = e.seam
+    ? (unver ? "Unverified runtime seam: " : "Runtime seam: ")
+    : (e.infra ? "Uses infrastructure: " : "Dependency: ");
   var relation = e.seam ? " calls back into " : (e.infra ? " talks to " : " imports ");
   var g = el("g", {
     "class": "edge", tabindex: "-1", role: "button",
     "aria-label": kindWord + (from ? from.name : e.from) + relation +
-      (to ? to.name : e.to) + (e.seam || e.infra ? "" : ", " + e.weight + " references")
+      (to ? to.name : e.to) +
+      (e.seam
+        ? (unver ? ", declared but no supporting calls in the call graph" : "")
+        : (e.infra ? "" : ", " + e.weight + " references"))
   });
   var hit = el("polyline", {
     points: pts(projected), fill: "none", stroke: "transparent",
     "stroke-width": "14", "stroke-linejoin": "round", "stroke-linecap": "round"
   });
   var line = el("polyline", { points: pts(projected), "marker-end": "url(#wire)" });
-  line.setAttribute("class", "wire" + (e.seam ? " seam" : "") + (e.infra ? " infra" : ""));
-  if (e.seam) line.setAttribute("stroke-dasharray", "2 5");
+  line.setAttribute("class", "wire" + (e.seam ? " seam" : "") + (unver ? " unver" : "") +
+    (e.infra ? " infra" : ""));
+  // Dash pattern, not just hue: an unsupported claim has to read as different
+  // for anyone who cannot separate the two pinks.
+  if (e.seam) line.setAttribute("stroke-dasharray", unver ? "1 8" : "2 5");
   else if (e.infra) line.setAttribute("stroke-dasharray", "10 4");
   else if (e.back) line.setAttribute("stroke-dasharray", "7 6");
   g.appendChild(hit); g.appendChild(line);
@@ -492,6 +514,11 @@ var INTRO =
     ? '<li>Pink connectors are <b>declared</b>, not inferred: runtime seams and infrastructure ' +
       'that no import can show. They are assertions from <code>.n-dx.json</code> or IaC.</li>'
     : '') +
+  (UNVERIFIED
+    ? '<li>' + UNVERIFIED + ' declared ' + (UNVERIFIED === 1 ? 'seam is' : 'seams are') +
+      ' <b>unverified</b> &mdash; drawn faint with a sparse dash. The call graph shows no call to ' +
+      'the callbacks they name, so the declaration is likely stale. Click one to see which.</li>'
+    : '') +
   '<li>Use the legend to isolate one kind of zone.</li>' +
   '<li>Drag to pan, scroll to zoom, <b>Reset view</b> to recentre. <b>Esc</b> clears.</li>' +
   '</ul>';
@@ -571,14 +598,28 @@ function renderEdge(e){
   if (e.seam) {
     // A declared seam is an assertion by a person, and the panel says so —
     // it is not something the analysis proved.
-    h = '<div class="kind">Runtime seam &middot; declared</div>';
+    var v = e.seam.verification;
+    h = '<div class="kind">Runtime seam &middot; declared' +
+      (v ? ' &middot; ' + (v.status === "verified" ? 'corroborated' : 'unverified') : '') + '</div>';
     sub = e.seam.callbacks.length
       ? e.seam.callbacks.length + ' injected ' + (e.seam.callbacks.length === 1 ? 'callback' : 'callbacks')
       : 'declared in .n-dx.json';
     body = esc(fromName) + ' injects into ' + esc(toName) + ', so at runtime control flows ' +
       'this way even though the import points the other way. Static analysis cannot see this &mdash; ' +
       'it is declared under <code>sourcevision.isoMap.injectionSeams</code> and is only as accurate ' +
-      'as that declaration.';
+      'as that declaration.' +
+      (v && v.status === "unverified"
+        ? ' <b>The call graph shows nothing in ' + esc(toName) + ' calling any of the declared ' +
+          'callbacks</b>, so this declaration is either stale or names the wrong end. A seam left ' +
+          'behind by a refactor keeps asserting a relationship that no longer exists.'
+        : '') +
+      (v && v.status === "verified"
+        ? ' The call graph corroborates it: the callbacks below are called on the receiving side.'
+        : '') +
+      (!v && e.seam.callbacks.length
+        ? ' Nothing here checks that claim &mdash; this view has no call graph, so the callbacks ' +
+          'are taken on trust.'
+        : '');
   } else if (e.infra) {
     h = '<div class="kind">Infrastructure &middot; declared</div>';
     sub = to ? esc(to.sub) : 'runtime resource';
@@ -601,8 +642,22 @@ function renderEdge(e){
   h += '<div class="sub">' + sub + '</div>';
   h += '<div class="body">' + body + '</div>';
   if (e.seam && e.seam.callbacks.length) {
+    // Per callback, what the call graph found — the file and the expression it
+    // matched, so a reader can judge the evidence instead of trusting a badge.
+    var found = {};
+    if (e.seam.verification) {
+      e.seam.verification.corroborated.forEach(function(c){ found[c.callback] = c; });
+    }
     h += '<h4>Injected</h4><ul>' + e.seam.callbacks.map(function(c){
-      return '<li><code>' + esc(c) + '</code></li>';
+      var hit = found[c];
+      var evidence = '';
+      if (hit) {
+        evidence = ' <span class="sub">called as <code>' + esc(hit.expression) + '</code> in ' +
+          esc(hit.file) + '</span>';
+      } else if (e.seam.verification) {
+        evidence = ' <span class="sub">&mdash; not called anywhere in ' + esc(toName) + '</span>';
+      }
+      return '<li><code>' + esc(c) + '</code>' + evidence + '</li>';
     }).join("") + '</ul>';
   }
   if (e.seam && e.seam.note) h += '<h4>Why</h4><div class="body">' + esc(e.seam.note) + '</div>';
@@ -680,7 +735,8 @@ function refresh(scrollPanel){
     var hot = (i === curEdge) || (curNode !== null && (x.e.from === curNode || x.e.to === curNode));
     var ends = kindVisible((BY[x.e.from] || {}).kind) && kindVisible((BY[x.e.to] || {}).kind);
     var weight = edgeWeight(x.e);
-    var declared = (x.e.seam ? " seam" : "") + (x.e.infra ? " infra" : "");
+    var declared = (x.e.seam ? " seam" : "") + (unverifiedSeam(x.e) ? " unver" : "") +
+      (x.e.infra ? " infra" : "");
     x.node.setAttribute("class", "wire" + declared + (hot ? " hot" : ""));
     x.node.setAttribute("marker-end", hot ? "url(#wirehot)" : "url(#wire)");
     x.node.setAttribute("stroke-width", String(Math.min(4.5, 1.6 + Math.log(weight + 1))));

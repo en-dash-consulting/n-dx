@@ -8,7 +8,7 @@
 
 import { h } from "preact";
 import type { ComponentChild, VNode } from "preact";
-import type { ViewId, NavigateTo, DetailItem, LoadedData } from "../types.js";
+import type { ViewId, NavigateTo, DetailItem, LoadedData, AskSeed } from "../types.js";
 import type { DegradableFeature } from "../performance/index.js";
 
 // ── View component imports (via domain barrels) ────────────────
@@ -30,6 +30,7 @@ import {
   SuggestionsView,
   PRMarkdownView,
   RoutesView,
+  AskView,
 } from "./domain-sourcevision.js";
 
 import {
@@ -76,8 +77,18 @@ export interface ViewRenderContext {
   selectedZone: string | null;
   selectedRunId: string | null;
   selectedTaskId: string | null;
+  /** Finding the Ask panel was entered with, when it was entered from one. */
+  askSeed: AskSeed | null;
   navigateTo: NavigateTo;
   isFeatureDisabled: (feature: DegradableFeature) => boolean;
+  /**
+   * State of the `sourcevision.ask` toggle, read by the caller.
+   *
+   * Views that offer a route into Ask must honour it: the toggle is the only
+   * control the user has over Ask, and the sidebar that hosts that control is
+   * itself hidden when the toggle is off.
+   */
+  askEnabled: boolean;
 }
 
 // ── Registry ───────────────────────────────────────────────────
@@ -106,14 +117,17 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "architecture": ({ data, setDetail, navigateTo }) =>
     h(ArchitectureView, { data, onSelect: setDetail, navigateTo }),
 
-  "problems": ({ data }) =>
-    h(ProblemsView, { data }),
+  "problems": ({ data, navigateTo, askEnabled }) =>
+    h(ProblemsView, { data, navigateTo, askEnabled }),
 
-  "suggestions": ({ data }) =>
-    h(SuggestionsView, { data }),
+  "suggestions": ({ data, navigateTo, askEnabled }) =>
+    h(SuggestionsView, { data, navigateTo, askEnabled }),
 
   "pr-markdown": () =>
     h(PRMarkdownView, null),
+
+  "ask": ({ askSeed }) =>
+    h(AskView, { seed: askSeed }),
 
   "rex-dashboard": ({ navigateTo }) =>
     h(RexDashboard, { navigateTo }),

@@ -31219,6 +31219,25 @@
         }
       ],
       "count": 1467
+    },
+    {
+      "timestamp": "2026-09-07T22:41:43.820Z",
+      "source": "rename",
+      "items": [],
+      "count": 0,
+      "reason": "title-collision rename (add path)",
+      "renameAuditTrail": [
+        {
+          "itemAId": "52ecd173-5437-47fe-b9b7-48b0c930d187",
+          "oldTitleA": "Fix suggestion in global (1 finding)",
+          "newTitleA": "Narrow jsonResponse utility scope",
+          "itemBId": "a6bc77c4-a492-4678-87cc-00f1d1954c97",
+          "oldTitleB": "Fix suggestion in global (1 finding)",
+          "newTitleB": "Refactor high-risk architectural zones",
+          "reasoning": "Item A addresses a specific utility function (jsonResponse) with problematic fan-out across 22 call sites — the title emphasizes the single-function focus and the need to reduce its scope. Item B tackles a broader architectural issue across multiple zones that violate cohesion/coupling thresholds — the title emphasizes the zone-level, system-wide nature of the refactoring work.",
+          "timestamp": "2026-09-07T22:41:43.820Z"
+        }
+      ]
     }
   ]
 }

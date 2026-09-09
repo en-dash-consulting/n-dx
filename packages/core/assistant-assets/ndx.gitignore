@@ -23,7 +23,7 @@
 .hench/reviews/
 # Per-session token-usage watermarks written by `hench record`
 .hench/usage-cursors/
-# Warm-parent CLI session ids for fork-based cold-start elimination — machine-local
+# Warm-parent session cache, rewritten on every orientation. Machine-local.
 .hench/session-cache.json
 .hench-commit-msg.txt
 
@@ -40,6 +40,8 @@
 # Server runtime
 .n-dx-web.pid
 .n-dx-web.port
+# Dashboard LLM spend ledger, one line per Ask call (`ndx start`)
+.n-dx-web-usage.jsonl
 
 # Run logs
 .run-logs/
