@@ -45,6 +45,7 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
 import { ClaudeClientError } from "@n-dx/llm-client";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleSourcevisionAskRoute } from "../../../src/server/routes-sourcevision-ask.js";
+import { readAskUsage } from "../../../src/server/ask-usage-log.js";
 import {
   startRouteTestServer,
   closeRouteTestServer,
@@ -221,6 +222,119 @@ describe("POST /api/sourcevision/ask", () => {
     expect(status).toBe(409);
     expect(body.error).toMatch(/analy/i);
     expect(completeMock).not.toHaveBeenCalled();
+  });
+
+  // ── Token accounting ──────────────────────────────────────────────────────
+
+  /**
+   * An ask is the one place n-dx spends tokens interactively, and it spent them
+   * with no trace until this log existed — invisible in the very view that
+   * reports token usage. What matters is that the record carries enough to
+   * attribute the spend (vendor, model, every counter) and that it is written
+   * whether or not the answer arrived.
+   */
+  describe("records its spend", () => {
+    it("records vendor, model, and every token counter for a successful ask", async () => {
+      completeMock.mockResolvedValue({
+        text: "An answer.",
+        tokenUsage: { input: 1200, output: 42, cacheCreationInput: 300, cacheReadInput: 900 },
+      });
+
+      await ask({ prompt: "What does the billing zone do?" });
+
+      const entries = await readAskUsage(join(tmpDir, ".sourcevision"));
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({
+        vendor: "claude",
+        model: "claude-sonnet-5",
+        inputTokens: 1200,
+        outputTokens: 42,
+        cacheCreationTokens: 300,
+        cacheReadTokens: 900,
+        ok: true,
+      });
+      expect(Date.parse(entries[0]!.timestamp)).not.toBeNaN();
+    });
+
+    it("attributes the spend to the model that actually answered", async () => {
+      loadLLMConfigMock.mockResolvedValue({ vendor: "claude", claude: { model: "claude-opus-5" } });
+
+      await ask({ prompt: "Anything." });
+
+      const entries = await readAskUsage(join(tmpDir, ".sourcevision"));
+      expect(entries[0]!.model).toBe("claude-opus-5");
+    });
+
+    it("records a failed ask as a call that happened, with its reason", async () => {
+      completeMock.mockRejectedValue(new ClaudeClientError("timed out", "timeout", true));
+
+      const { status } = await ask({ prompt: "Anything." });
+      expect(status).toBe(504);
+
+      // Dropping the failure would make a run of timeouts look free.
+      const entries = await readAskUsage(join(tmpDir, ".sourcevision"));
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({ ok: false, reason: "timeout", vendor: "claude" });
+    });
+
+    it("records the tokens a failed call reports, when it reports any", async () => {
+      // No provider attaches usage to a thrown error today; the route reads it
+      // defensively so that a provider which starts to does not need a change
+      // here to be counted.
+      const err = Object.assign(new ClaudeClientError("died mid-stream", "cli", false), {
+        tokenUsage: { input: 800, output: 0, cacheReadInput: 120 },
+      });
+      completeMock.mockRejectedValue(err);
+
+      await ask({ prompt: "Anything." });
+
+      const entries = await readAskUsage(join(tmpDir, ".sourcevision"));
+      expect(entries[0]).toMatchObject({
+        ok: false, inputTokens: 800, cacheReadTokens: 120,
+      });
+    });
+
+    it("records zeros rather than nothing when a provider reports no usage", async () => {
+      completeMock.mockResolvedValue({ text: "An answer." });
+
+      await ask({ prompt: "Anything." });
+
+      const entries = await readAskUsage(join(tmpDir, ".sourcevision"));
+      expect(entries[0]).toMatchObject({
+        inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, ok: true,
+      });
+    });
+
+    it("still answers when the spend cannot be recorded", async () => {
+      // The log lives in .sourcevision/, which the request handler does not
+      // create. If it is gone, the answer must still reach the user.
+      await rm(join(tmpDir, ".sourcevision", "CONTEXT.md"));
+      const contextSource = {
+        assemble: async () => ({ text: "Zones: billing.", sources: ["CONTEXT.md"] }),
+      };
+      const isolated = await startRouteTestServer((req, res) =>
+        handleSourcevisionAskRoute(req, res, { ...ctx, svDir: join(tmpDir, "gone") }, contextSource),
+      );
+      try {
+        const res = await fetch(`http://127.0.0.1:${isolated.port}/api/sourcevision/ask`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: "Anything." }),
+        });
+        const body = await res.json() as { ok: boolean; answer: string };
+        expect(res.status).toBe(200);
+        expect(body.answer).toBe("The billing zone owns invoice generation.");
+      } finally {
+        await closeRouteTestServer(isolated.server);
+      }
+    });
+
+    it("writes nothing for a request that never reached the model", async () => {
+      await ask({});
+      await ask({ prompt: "   " });
+
+      expect(await readAskUsage(join(tmpDir, ".sourcevision"))).toEqual([]);
+    });
   });
 
   // ── Routing ───────────────────────────────────────────────────────────────

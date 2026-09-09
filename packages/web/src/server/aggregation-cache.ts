@@ -6,10 +6,16 @@
  *
  * ## Change Detection
  *
- * Three data sources feed the token usage aggregation:
+ * Four data sources feed the token usage aggregation:
  * - Hench run files (`.hench/runs/*.json`) — tracked via directory mtime + file count
  * - Rex execution log (`.rex/execution-log.jsonl`) — tracked via mtime + size
  * - Sourcevision manifest (`.sourcevision/manifest.json`) — tracked via mtime + size
+ * - Dashboard Ask log (`.sourcevision/ask-usage.jsonl`) — tracked via mtime + size
+ *
+ * A source that feeds the aggregation but not this fingerprint is worse than an
+ * uncached one: its writes land on disk and stay invisible until something else
+ * happens to change. The Ask log is written by this same server process, so it
+ * is the one most likely to be read back a second later.
  *
  * On each cache access, the current filesystem state is compared against the
  * last-known fingerprint. If any source has changed, all cached results are
@@ -26,6 +32,7 @@
 
 import { join } from "node:path";
 import { stat, readdir } from "node:fs/promises";
+import { ASK_USAGE_FILE } from "./ask-usage-log.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,6 +56,10 @@ export interface SourceFingerprint {
   svManifestMtimeMs: number;
   /** Sourcevision manifest size in bytes. */
   svManifestSize: number;
+  /** Dashboard Ask usage log modification time. */
+  askLogMtimeMs: number;
+  /** Dashboard Ask usage log size in bytes. */
+  askLogSize: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,9 +79,10 @@ export async function takeFingerprint(
   const henchRunsDir = join(projectDir, ".hench", "runs");
   const rexLogPath = join(rexDir, "execution-log.jsonl");
   const svManifestPath = join(projectDir, ".sourcevision", "manifest.json");
+  const askLogPath = join(projectDir, ".sourcevision", ASK_USAGE_FILE);
 
   // Run all stat operations in parallel for performance
-  const [henchDirResult, henchFilesResult, rexLogResult, svManifestResult] =
+  const [henchDirResult, henchFilesResult, rexLogResult, svManifestResult, askLogResult] =
     await Promise.all([
       stat(henchRunsDir).catch(() => null),
       readdir(henchRunsDir)
@@ -78,6 +90,7 @@ export async function takeFingerprint(
         .catch(() => [] as string[]),
       stat(rexLogPath).catch(() => null),
       stat(svManifestPath).catch(() => null),
+      stat(askLogPath).catch(() => null),
     ]);
 
   return {
@@ -87,6 +100,8 @@ export async function takeFingerprint(
     rexLogSize: rexLogResult?.size ?? 0,
     svManifestMtimeMs: svManifestResult?.mtimeMs ?? 0,
     svManifestSize: svManifestResult?.size ?? 0,
+    askLogMtimeMs: askLogResult?.mtimeMs ?? 0,
+    askLogSize: askLogResult?.size ?? 0,
   };
 }
 
@@ -101,7 +116,9 @@ export function fingerprintsMatch(
     a.rexLogMtimeMs === b.rexLogMtimeMs &&
     a.rexLogSize === b.rexLogSize &&
     a.svManifestMtimeMs === b.svManifestMtimeMs &&
-    a.svManifestSize === b.svManifestSize
+    a.svManifestSize === b.svManifestSize &&
+    a.askLogMtimeMs === b.askLogMtimeMs &&
+    a.askLogSize === b.askLogSize
   );
 }
 

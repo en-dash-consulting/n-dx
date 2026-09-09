@@ -42,6 +42,7 @@ import {
   NoAnalysisError,
 } from "./sourcevision-ask-context.js";
 import type { AskContextSource } from "./sourcevision-ask-context.js";
+import { recordAskUsage, askUsageCounters } from "./ask-usage-log.js";
 
 const ASK_PATH = "/api/sourcevision/ask";
 
@@ -164,6 +165,16 @@ export async function handleSourcevisionAskRoute(
       timeoutMs: ASK_TIMEOUT_MS,
     });
 
+    // Recorded before responding, so the spend is on disk even if the client
+    // disconnects mid-response. Best-effort by design — see ask-usage-log.
+    await recordAskUsage(ctx.svDir, {
+      timestamp: new Date().toISOString(),
+      vendor,
+      model,
+      ...askUsageCounters(result.tokenUsage),
+      ok: true,
+    });
+
     jsonResponse(res, 200, {
       ok: true,
       answer: result.text,
@@ -175,6 +186,22 @@ export async function handleSourcevisionAskRoute(
   } catch (err) {
     const reason = err instanceof ClaudeClientError ? err.reason : "unknown";
     const detail = err instanceof Error ? err.message : String(err);
+
+    // A failed ask is still an ask: the prompt was sent and a timeout or a
+    // mid-stream failure can burn the input tokens anyway. Recording it as a
+    // call that spent whatever it spent keeps the rollup honest, where dropping
+    // it would quietly under-report the bill. No provider attaches usage to a
+    // thrown error today, so this reads defensively and lands on zeros — the
+    // attempt is what is being recorded.
+    await recordAskUsage(ctx.svDir, {
+      timestamp: new Date().toISOString(),
+      vendor,
+      model,
+      ...askUsageCounters((err as { tokenUsage?: Parameters<typeof askUsageCounters>[0] }).tokenUsage),
+      ok: false,
+      reason,
+    });
+
     jsonResponse(res, STATUS_BY_REASON[reason] ?? 502, {
       ok: false,
       reason,

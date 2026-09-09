@@ -100,6 +100,18 @@ describe("AggregationResultCache", () => {
       expect(fp.svManifestSize).toBeGreaterThan(0);
     });
 
+    it("captures ask usage log state", async () => {
+      await writeFile(
+        join(svDir, "ask-usage.jsonl"),
+        `${JSON.stringify({ timestamp: "2026-02-01T00:00:00.000Z", inputTokens: 1 })}\n`,
+        "utf-8",
+      );
+
+      const fp = await takeFingerprint(tmpDir, rexDir);
+      expect(fp.askLogMtimeMs).toBeGreaterThan(0);
+      expect(fp.askLogSize).toBeGreaterThan(0);
+    });
+
     it("excludes hidden files from hench file count", async () => {
       await writeHenchRun("run-1.json");
       await writeFile(join(henchRunsDir, ".aggregation-checkpoint.json"), "{}", "utf-8");
@@ -122,56 +134,58 @@ describe("AggregationResultCache", () => {
   // ---------------------------------------------------------------------------
 
   describe("fingerprintsMatch", () => {
-    it("returns true for identical fingerprints", () => {
-      const fp: SourceFingerprint = {
+    /**
+     * A complete fingerprint, so each case states only the field it is about.
+     * Built from one literal rather than five: every source added to the
+     * aggregation has to be added to the fingerprint too, and the point of
+     * these tests is that the comparison notices it.
+     */
+    function makeFingerprint(overrides: Partial<SourceFingerprint> = {}): SourceFingerprint {
+      return {
         henchDirMtimeMs: 1000,
         henchFileCount: 5,
         rexLogMtimeMs: 2000,
         rexLogSize: 500,
         svManifestMtimeMs: 3000,
         svManifestSize: 200,
+        askLogMtimeMs: 4000,
+        askLogSize: 300,
+        ...overrides,
       };
+    }
+
+    it("returns true for identical fingerprints", () => {
+      const fp = makeFingerprint();
       expect(fingerprintsMatch(fp, { ...fp })).toBe(true);
     });
 
     it("returns false when hench dir mtime differs", () => {
-      const a: SourceFingerprint = {
-        henchDirMtimeMs: 1000, henchFileCount: 5,
-        rexLogMtimeMs: 2000, rexLogSize: 500,
-        svManifestMtimeMs: 3000, svManifestSize: 200,
-      };
-      const b = { ...a, henchDirMtimeMs: 1001 };
-      expect(fingerprintsMatch(a, b)).toBe(false);
+      const a = makeFingerprint();
+      expect(fingerprintsMatch(a, { ...a, henchDirMtimeMs: 1001 })).toBe(false);
     });
 
     it("returns false when hench file count differs", () => {
-      const a: SourceFingerprint = {
-        henchDirMtimeMs: 1000, henchFileCount: 5,
-        rexLogMtimeMs: 2000, rexLogSize: 500,
-        svManifestMtimeMs: 3000, svManifestSize: 200,
-      };
-      const b = { ...a, henchFileCount: 6 };
-      expect(fingerprintsMatch(a, b)).toBe(false);
+      const a = makeFingerprint();
+      expect(fingerprintsMatch(a, { ...a, henchFileCount: 6 })).toBe(false);
     });
 
     it("returns false when rex log size differs", () => {
-      const a: SourceFingerprint = {
-        henchDirMtimeMs: 1000, henchFileCount: 5,
-        rexLogMtimeMs: 2000, rexLogSize: 500,
-        svManifestMtimeMs: 3000, svManifestSize: 200,
-      };
-      const b = { ...a, rexLogSize: 501 };
-      expect(fingerprintsMatch(a, b)).toBe(false);
+      const a = makeFingerprint();
+      expect(fingerprintsMatch(a, { ...a, rexLogSize: 501 })).toBe(false);
     });
 
     it("returns false when sv manifest mtime differs", () => {
-      const a: SourceFingerprint = {
-        henchDirMtimeMs: 1000, henchFileCount: 5,
-        rexLogMtimeMs: 2000, rexLogSize: 500,
-        svManifestMtimeMs: 3000, svManifestSize: 200,
-      };
-      const b = { ...a, svManifestMtimeMs: 3001 };
-      expect(fingerprintsMatch(a, b)).toBe(false);
+      const a = makeFingerprint();
+      expect(fingerprintsMatch(a, { ...a, svManifestMtimeMs: 3001 })).toBe(false);
+    });
+
+    it("returns false when the ask log changes", () => {
+      // The Ask log is written by the same server process that serves the
+      // token-usage routes, so a fingerprint that ignored it would serve a
+      // stale total for the spend that just happened.
+      const a = makeFingerprint();
+      expect(fingerprintsMatch(a, { ...a, askLogMtimeMs: 4001 })).toBe(false);
+      expect(fingerprintsMatch(a, { ...a, askLogSize: 301 })).toBe(false);
     });
   });
 
@@ -262,6 +276,19 @@ describe("AggregationResultCache", () => {
 
       // Append to the log file — changes size and mtime
       await writeRexLog('{"event":"second"}');
+
+      const result = await cache.getOrCompute("key", () => "recomputed");
+      expect(result).toBe("recomputed");
+    });
+
+    it("invalidates when the ask usage log is appended to", async () => {
+      const askLog = join(svDir, "ask-usage.jsonl");
+      await writeFile(askLog, `${JSON.stringify({ timestamp: "t1", inputTokens: 1 })}\n`, "utf-8");
+
+      const cache = createCache();
+      await cache.getOrCompute("key", () => "original");
+
+      await appendFile(askLog, `${JSON.stringify({ timestamp: "t2", inputTokens: 2 })}\n`);
 
       const result = await cache.getOrCompute("key", () => "recomputed");
       expect(result).toBe("recomputed");

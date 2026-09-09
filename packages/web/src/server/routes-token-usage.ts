@@ -19,6 +19,8 @@ import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse } from "./response-utils.js";
 import { AggregationResultCache } from "./aggregation-cache.js";
+import { ASK_USAGE_FILE } from "./ask-usage-log.js";
+import type { AskUsageEntry } from "./ask-usage-log.js";
 import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor } from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
@@ -83,6 +85,8 @@ interface UtilizationSourceMeta {
   rex: string;
   hench: string;
   sourcevision: string;
+  /** Dashboard Ask spend — `.sourcevision/ask-usage.jsonl`. */
+  ask: string;
 }
 
 interface ConfiguredModel {
@@ -496,12 +500,67 @@ function extractSvEvents(projectDir: string, since?: string, until?: string): To
   return events;
 }
 
+/**
+ * Dashboard Ask spend, from `.sourcevision/ask-usage.jsonl`.
+ *
+ * Booked against the `sv` package under its own `ask` command rather than a
+ * fourth top-level package bucket. An ask is a SourceVision-surface action
+ * grounded in SourceVision output, so `sv` is where it belongs; and because
+ * every grouping here keys on `package:command`, `sv:ask` already reads as its
+ * own line next to `sv:analyze` and `hench:run` in the by-command view and the
+ * package filter. A new package value would instead mean changing the
+ * `rex | hench | sv` triple that `AggregateTokenUsage`, `ToolBreakdown`, the
+ * viewer, and rex's mirrored types all spell out — a contract change for a
+ * distinction the command already draws.
+ *
+ * Read synchronously to match the other extractors: `collectAllEvents` is
+ * called inside the cache's compute callback, which is sync by contract.
+ */
+function extractAskEvents(svDir: string, since?: string, until?: string): TokenEvent[] {
+  const events: TokenEvent[] = [];
+  let raw: string;
+  try {
+    raw = readFileSync(join(svDir, ASK_USAGE_FILE), "utf-8");
+  } catch {
+    return events;
+  }
+
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue;
+    let entry: Partial<AskUsageEntry>;
+    try {
+      entry = JSON.parse(line) as Partial<AskUsageEntry>;
+    } catch {
+      continue; // Torn final line from a live append.
+    }
+    if (typeof entry.timestamp !== "string") continue;
+    if (!isInRange(entry.timestamp, since, until)) continue;
+
+    events.push({
+      timestamp: entry.timestamp,
+      command: "ask",
+      package: "sv",
+      inputTokens: entry.inputTokens ?? 0,
+      outputTokens: entry.outputTokens ?? 0,
+      cacheCreationTokens: entry.cacheCreationTokens ?? 0,
+      cacheReadTokens: entry.cacheReadTokens ?? 0,
+      // A failed ask counts as a call: it was attempted, and its tokens (if
+      // any) were spent. Dropping it would make failures look free.
+      calls: 1,
+      vendor: normalizeEventMetadata(entry.vendor),
+      model: normalizeEventMetadata(entry.model),
+    });
+  }
+  return events;
+}
+
 function collectAllEvents(ctx: ServerContext, since?: string, until?: string): TokenEvent[] {
   const logEntries = readLogEntries(ctx.rexDir);
   const rexEvents = extractRexEvents(logEntries, since, until);
   const henchEvents = extractHenchEvents(ctx.projectDir, since, until);
   const svEvents = extractSvEvents(ctx.projectDir, since, until);
-  return [...rexEvents, ...henchEvents, ...svEvents].sort(
+  const askEvents = extractAskEvents(ctx.svDir, since, until);
+  return [...rexEvents, ...henchEvents, ...svEvents, ...askEvents].sort(
     (a, b) => a.timestamp.localeCompare(b.timestamp),
   );
 }
@@ -510,10 +569,14 @@ function resolveSourceMeta(ctx: ServerContext): UtilizationSourceMeta {
   const rexPath = join(ctx.rexDir, "execution-log.jsonl");
   const henchPath = join(ctx.projectDir, ".hench", "runs");
   const svPath = join(ctx.projectDir, ".sourcevision", "manifest.json");
+  const askPath = join(ctx.svDir, ASK_USAGE_FILE);
   return {
     rex: existsSync(rexPath) ? ".rex/execution-log.jsonl" : "missing (.rex/execution-log.jsonl)",
     hench: existsSync(henchPath) ? ".hench/runs/*.json" : "missing (.hench/runs/*.json)",
     sourcevision: existsSync(svPath) ? ".sourcevision/manifest.json" : "missing (.sourcevision/manifest.json)",
+    ask: existsSync(askPath)
+      ? `.sourcevision/${ASK_USAGE_FILE}`
+      : `missing (.sourcevision/${ASK_USAGE_FILE})`,
   };
 }
 
