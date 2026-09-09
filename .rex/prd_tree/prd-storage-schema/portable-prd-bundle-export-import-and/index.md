@@ -24,6 +24,6 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Business-owner narrative Markdown PRD export](./business-owner-narrative-markdown-prd.md) | pending |
+| [Business-owner narrative Markdown PRD export](./business-owner-narrative-markdown-prd.md) | completed |
 | [Round-trip PRD bundle via ndx prd export / ndx prd import](./round-trip-prd-bundle-via-ndx-prd.md) | completed |
 | [Scoped bundle export by item — subtree and dependency closure](./scoped-bundle-export-by-item-subtree.md) | pending |
