@@ -5,7 +5,7 @@
     "perCallTokens": 21688,
     "uniqueTokens": 13201,
     "skills": 13,
-    "skillTokens": 16840
+    "skillTokens": 16882
   },
   "skills": [
     {
@@ -16,18 +16,18 @@
       "tokens": 5128
     },
     {
+      "name": "iso-map",
+      "file": ".claude/skills/iso-map/SKILL.md",
+      "shipped": false,
+      "chars": 7584,
+      "tokens": 1896
+    },
+    {
       "name": "triage",
       "file": ".claude/skills/triage/SKILL.md",
       "shipped": false,
       "chars": 7421,
       "tokens": 1856
-    },
-    {
-      "name": "iso-map",
-      "file": ".claude/skills/iso-map/SKILL.md",
-      "shipped": false,
-      "chars": 7413,
-      "tokens": 1854
     },
     {
       "name": "ndx-reshape",
@@ -985,8 +985,8 @@
       }
     ]
   },
-  "recordedAt": "2026-09-08T23:27:22.041Z",
-  "commit": "76b274e097b2",
-  "dirty": false,
-  "contentHash": "6456f53198d7b7ef"
+  "contentHash": "4b06f0f16fd3e4fb",
+  "recordedAt": "2026-09-09T20:10:30.263Z",
+  "commit": "ab682434c0ee",
+  "dirty": false
 }
