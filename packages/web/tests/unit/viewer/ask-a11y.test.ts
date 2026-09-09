@@ -441,12 +441,16 @@ describe("Ask panel accessibility", () => {
     it("names the failure in text as well as red", async () => {
       mount();
       type("a question");
-      askQueue.push(async () => jsonResponse({ error: "No analysis on disk." }, 409));
+      askQueue.push(async () => jsonResponse(
+        { error: "No analysis on disk.", category: "analysis-missing" },
+        409,
+      ));
       submitForm();
       await settle();
 
       const card = root.querySelector(".ask-error")!;
-      expect(card.textContent).toContain("Could not answer that");
+      // The heading names the mode, so the state is legible without colour.
+      expect(card.textContent).toContain("No analysis to ground an answer in");
       expect(card.querySelector(".ask-marker")).toBeTruthy();
     });
 
