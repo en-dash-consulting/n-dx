@@ -18,35 +18,25 @@ export function ProblemsView({ data, navigateTo }: ProblemsProps) {
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
-  // Before the enrichment gate below, so this hook runs on every render. (The
-  // useMemo further down does not, which predates this change.)
+  // ── Every hook, before the enrichment gate ────────────────────────────────
+  // The gate below returns early, and `enrichmentPass` comes from analysis data
+  // that arrives after the first render and changes again when an analysis
+  // finishes with the dashboard open. A hook called after the gate is therefore
+  // called on some renders and not others, and Preact matches hooks by
+  // position — so the slots shift under whatever state is already there.
   const askEnabled = useFeatureToggle("sourcevision.ask", false);
   const handleExplain = useCallback(
     (finding: Finding) => { if (navigateTo) explainFinding(finding, navigateTo); },
     [navigateTo],
   );
 
-  if (enrichmentPass < ENRICHMENT_THRESHOLDS.problems) {
-    return h(EnrichmentGate, {
-      title: "Problems",
-      requiredPass: ENRICHMENT_THRESHOLDS.problems,
-      currentPass: enrichmentPass,
-    });
-  }
-
-  const findings = (zones?.findings ?? []).filter(
-    (f: Finding) => f.type === "anti-pattern"
+  // Memoized on the source array, not recomputed per render: the chart below
+  // keys its own memo on this, and a fresh array each time made that memo a
+  // no-op that recomputed on every render anyway.
+  const findings = useMemo(
+    () => (zones?.findings ?? []).filter((f: Finding) => f.type === "anti-pattern"),
+    [zones?.findings],
   );
-
-  const legacyInsights = findings.length === 0
-    ? (zones?.insights ?? []).filter(
-        (s) => /problem|anti.?pattern|coupling|split|merge|smell|violation/i.test(s)
-      )
-    : [];
-
-  const critical = findings.filter((f) => f.severity === "critical").length;
-  const warning = findings.filter((f) => f.severity === "warning").length;
-  const info = findings.filter((f) => !f.severity || f.severity === "info").length;
 
   // Problems by zone
   const problemsByZone = useMemo(() => {
@@ -64,6 +54,26 @@ export function ProblemsView({ data, navigateTo }: ProblemsProps) {
         color: count >= 3 ? "var(--red)" : count >= 2 ? "var(--orange)" : "var(--accent)",
       }));
   }, [findings]);
+
+  if (enrichmentPass < ENRICHMENT_THRESHOLDS.problems) {
+    return h(EnrichmentGate, {
+      title: "Problems",
+      requiredPass: ENRICHMENT_THRESHOLDS.problems,
+      currentPass: enrichmentPass,
+    });
+  }
+
+  // Plain derivations — not hooks, so they stay next to the render that uses
+  // them and cost nothing on a gated render.
+  const legacyInsights = findings.length === 0
+    ? (zones?.insights ?? []).filter(
+        (s) => /problem|anti.?pattern|coupling|split|merge|smell|violation/i.test(s)
+      )
+    : [];
+
+  const critical = findings.filter((f) => f.severity === "critical").length;
+  const warning = findings.filter((f) => f.severity === "warning").length;
+  const info = findings.filter((f) => !f.severity || f.severity === "info").length;
 
   return h("div", null,
     h("div", { class: "view-header" },
