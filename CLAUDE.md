@@ -77,7 +77,7 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 | hench | `src/prd/rex-gateway.ts` | rex | 19 functions + 6 types (schema, store, tree, task selection, timestamps, auto-completion, requirements, level helpers, finding acknowledgment) |
 | hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | 30 functions + 10 types (config, constants, JSON, output, help, errors, process execution, token parsing, model resolution) |
 | web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants, tree utilities |
-| web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory |
+| web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory, next-step derivation, archetype override, iso-map builder, analysis artifact schema types |
 | web | `src/viewer/external.ts` | `src/viewer/messaging/`, `src/shared/`, `src/schema/` | Schema types (V1), data-file constants, RequestDedup — viewer↔server boundary gateway |
 | web | `src/viewer/api.ts` | `src/viewer/types.ts`, `src/viewer/route-state.ts` | Viewer types (LoadedData, NavigateTo, DetailItem), route-state functions — inbound API contract for sibling zones (crash, route, performance) |
 
