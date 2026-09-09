@@ -18,8 +18,14 @@ import {
   linkInfrastructure,
   loadDeclaredArchitecture,
 } from "../../../src/export/iso-declared.js";
-import { loadFromScan } from "../../../src/export/iso-sources.js";
+import {
+  loadFromScan,
+  buildSeamEvidence,
+  resolveSeams,
+  seamGaps,
+} from "../../../src/export/iso-sources.js";
 import { buildIsoModel } from "../../../src/export/iso-model.js";
+import type { CallEdge, CallGraph } from "../../../src/schema/v1.js";
 
 function makeProject(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "iso-decl-"));
@@ -292,6 +298,186 @@ describe("declared architecture in the model", () => {
     expect(model.meta.gaps.some((g) => g.includes("sourcevision.isoMap.infrastructure"))).toBe(true);
     expect(model.meta.gaps.some((g) => g.includes("sourcevision.isoMap.injectionSeams"))).toBe(true);
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+// ── Seam verification ───────────────────────────────────────────────────────
+
+/**
+ * A declared seam is a claim, and the call graph is the only evidence available
+ * to test it against. These tests pin the two ways that check can go wrong:
+ * believing a stale declaration, and crying wolf over a real one.
+ */
+describe("seam verification", () => {
+  const ZONE_OF_FILE = new Map<string, string>([
+    ["src/api/a.ts", "src/api"],
+    ["src/api/b.ts", "src/api"],
+    ["src/core/c.ts", "src/core"],
+  ]);
+  const ZONE_IDS = new Set(["src/api", "src/core"]);
+
+  function callGraph(edges: Array<Partial<CallEdge>>): CallGraph {
+    return {
+      functions: [],
+      edges: edges.map((e) => ({
+        callerFile: "src/api/a.ts",
+        caller: "handler",
+        calleeFile: null,
+        callee: "noop",
+        type: "direct",
+        line: 1,
+        column: 0,
+        ...e,
+      })) as CallEdge[],
+      summary: {} as CallGraph["summary"],
+    };
+  }
+
+  it("corroborates a callback called from inside the target zone", () => {
+    const evidence = buildSeamEvidence(
+      callGraph([{ callerFile: "src/api/a.ts", callee: "broadcast" }]),
+      ZONE_OF_FILE,
+    );
+    const { seams } = resolveSeams(
+      [{ from: "src/core", to: "src/api", callbacks: ["broadcast"] }],
+      ZONE_IDS,
+      ZONE_OF_FILE,
+      evidence,
+    );
+    expect(seams).toHaveLength(1);
+    expect(seams[0].verified).toBe(true);
+    expect(seams[0].unsupported).toEqual([]);
+  });
+
+  it("still corroborates a callback the target forwards rather than calls itself", () => {
+    // register-scheduler.ts receives four callbacks and passes them onward
+    // instead of invoking them. Evidence is scoped to the zone, not the file,
+    // so forwarding still counts — a file-scoped check called this real seam
+    // stale.
+    const evidence = buildSeamEvidence(
+      callGraph([{ callerFile: "src/api/b.ts", callee: "broadcast" }]),
+      ZONE_OF_FILE,
+    );
+    const { seams } = resolveSeams(
+      [{ from: "src/core", to: "src/api/a.ts", callbacks: ["broadcast"] }],
+      ZONE_IDS,
+      ZONE_OF_FILE,
+      evidence,
+    );
+    expect(seams[0].verified).toBe(true);
+  });
+
+  it("matches a callback invoked through the object it arrived on", () => {
+    const evidence = buildSeamEvidence(
+      callGraph([{ callerFile: "src/api/a.ts", callee: "opts.loadPRD", type: "method" }]),
+      ZONE_OF_FILE,
+    );
+    const { seams } = resolveSeams(
+      [{ from: "src/core", to: "src/api", callbacks: ["loadPRD"] }],
+      ZONE_IDS,
+      ZONE_OF_FILE,
+      evidence,
+    );
+    expect(seams[0].verified).toBe(true);
+  });
+
+  it("marks a seam unverified when no call in the target names its callback", () => {
+    const evidence = buildSeamEvidence(
+      callGraph([{ callerFile: "src/api/a.ts", callee: "somethingElse" }]),
+      ZONE_OF_FILE,
+    );
+    const { seams } = resolveSeams(
+      [{ from: "src/core", to: "src/api", callbacks: ["onDone", "broadcast"] }],
+      ZONE_IDS,
+      ZONE_OF_FILE,
+      evidence,
+    );
+    expect(seams[0].verified).toBe(false);
+    expect(seams[0].unsupported).toEqual(["broadcast", "onDone"]);
+  });
+
+  it("does not count a call made from the injecting side as evidence", () => {
+    // The injector naming its own callback proves nothing about the target;
+    // counting it would corroborate every seam that compiles.
+    const evidence = buildSeamEvidence(
+      callGraph([{ callerFile: "src/core/c.ts", callee: "broadcast" }]),
+      ZONE_OF_FILE,
+    );
+    const { seams } = resolveSeams(
+      [{ from: "src/core", to: "src/api", callbacks: ["broadcast"] }],
+      ZONE_IDS,
+      ZONE_OF_FILE,
+      evidence,
+    );
+    expect(seams[0].verified).toBe(false);
+  });
+
+  it("leaves verification unknown when there is no call graph", () => {
+    // Absence of evidence must not render as evidence of absence: a project
+    // analysed without --deep has nothing to check against.
+    const { seams } = resolveSeams(
+      [{ from: "src/core", to: "src/api", callbacks: ["broadcast"] }],
+      ZONE_IDS,
+      ZONE_OF_FILE,
+    );
+    expect(seams[0].verified).toBeUndefined();
+    expect(seams[0].unsupported).toBeUndefined();
+  });
+
+  it("treats a seam declaring no callbacks as nothing to verify", () => {
+    const evidence = buildSeamEvidence(callGraph([]), ZONE_OF_FILE);
+    const { seams } = resolveSeams(
+      [{ from: "src/core", to: "src/api" }],
+      ZONE_IDS,
+      ZONE_OF_FILE,
+      evidence,
+    );
+    expect(seams[0].verified).toBeUndefined();
+  });
+
+  it("reports unsupported callbacks to the reader, naming them", () => {
+    const evidence = buildSeamEvidence(callGraph([]), ZONE_OF_FILE);
+    const resolution = resolveSeams(
+      [{ from: "src/core", to: "src/api", callbacks: ["onDone"] }],
+      ZONE_IDS,
+      ZONE_OF_FILE,
+      evidence,
+    );
+    const gaps = seamGaps(resolution);
+    expect(gaps.some((g) => g.includes("onDone"))).toBe(true);
+    expect(gaps.some((g) => g.includes("no supporting call"))).toBe(true);
+  });
+
+  it("names the endpoint that could not be placed", () => {
+    // A refactor that moves a file leaves the declaration behind; "one seam
+    // could not be placed" does not tell the reader which end rotted.
+    const resolution = resolveSeams(
+      [{ from: "src/api", to: "src/server/register-scheduler.ts" }],
+      ZONE_IDS,
+      ZONE_OF_FILE,
+    );
+    expect(resolution.seams).toHaveLength(0);
+    const gaps = seamGaps(resolution);
+    expect(gaps.some((g) => g.includes("src/server/register-scheduler.ts"))).toBe(true);
+  });
+
+  it("carries the unverified mark through to the drawn edge", () => {
+    const model = buildIsoModel({
+      ...loadFromScan(makeProject(BASE_FILES), { useGit: false, analyzedAt: "t" }),
+      seams: [
+        {
+          fromZone: "src/core",
+          toZone: "src/api",
+          callbacks: ["onDone"],
+          verified: false,
+          unsupported: ["onDone"],
+        },
+      ],
+    });
+    const seam = model.edges.find((e) => e.seam);
+    expect(seam).toBeDefined();
+    expect(seam!.seam!.verified).toBe(false);
+    expect(seam!.seam!.unsupported).toEqual(["onDone"]);
   });
 });
 

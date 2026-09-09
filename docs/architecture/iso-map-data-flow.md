@@ -108,7 +108,7 @@ runtime one.
       "injectionSeams": [
         {
           "from": "packages/web/src/server/start.ts",
-          "to": "packages/web/src/server/register-scheduler.ts",
+          "to": "packages/web/src/server/task-usage/register-scheduler.ts",
           "callbacks": ["broadcast", "loadPRD"],
           "note": "why this seam exists"
         }
@@ -123,10 +123,30 @@ seam is drawn in the direction control flows at *runtime* — the opposite of th
 import — in a distinct colour and dot pattern, and its panel says plainly that
 it was declared rather than inferred.
 
+**Checked against the call graph.** A declaration is a claim, and a refactor can
+leave it behind — the seam above once named `server/register-scheduler.ts`, which
+had moved, and the map went on asserting it. Where a call graph exists (a deep
+analyze), each declared callback is looked for among the calls made inside the
+seam's **target zone**. A seam whose callbacks are all accounted for is marked
+corroborated; one with callbacks nothing calls is drawn in a fainter, sparser
+pattern, labelled unverified in its panel, and named in the footer along with the
+specific callbacks that did not resolve.
+
+Evidence is zone-scoped rather than file-scoped on purpose: a file handed a
+callback frequently forwards it instead of calling it — `register-scheduler.ts`
+passes all four of its callbacks onward — so a file-scoped check reports real
+seams as stale. A call from the *injecting* side is not evidence, since the
+injector naming its own callback says nothing about whether the target still
+uses it.
+
+This is corroboration, not proof. A generic name like `broadcast` is called all
+over a large zone, so agreement is weak; disagreement is the strong signal.
+Without a call graph, seams carry no verdict at all rather than a negative one.
+
 **Still open:** only seams somebody wrote down are drawn. An undeclared one
-still points the wrong way, and nothing verifies that a declaration is true. A
-declaration that cannot be drawn — both ends in one zone, or a file no zone owns
-— is reported in the page footer rather than silently dropped.
+still points the wrong way. A declaration that cannot be drawn — both ends in
+one zone, or a file no zone owns — is reported in the page footer rather than
+silently dropped, naming which endpoint failed to resolve.
 
 ### 3. Runtime infrastructure is invisible
 

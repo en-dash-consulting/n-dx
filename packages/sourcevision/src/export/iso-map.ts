@@ -141,6 +141,7 @@ const STYLES = `
   --chip:#232253; --chip-hover:#2C2B66;
   --ground:#171639; --gridline:#222150;
   --wire:#4A4990; --wire-hot:#7FAE33; --seam:#C9789E; --infra:#B0668A;
+  --seam-weak:#7E5A6C;
   --tag-bg:#1B1A45; --tag-ink:#EFEFF7; --tag-ink-on:#12122B;
   --body-ink:#D3D3E8;
 }
@@ -151,6 +152,7 @@ const STYLES = `
     --chip:#EFF0F7; --chip-hover:#E3E5F2;
     --ground:#E7E9F5; --gridline:#D2D5E8;
     --wire:#8E93BC; --wire-hot:#4E7A16; --seam:#A2416C; --infra:#8E4467;
+    --seam-weak:#B58EA0;
     --tag-bg:#FFFFFF; --tag-ink:#1B1B33; --tag-ink-on:#FFFFFF;
     --body-ink:#33344F;
   }
@@ -203,6 +205,8 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
 /* Declared, not inferred: a different hue so nobody reads a human assertion
    as something the analysis proved. */
 .wire.seam{stroke:var(--seam)}
+/* Desaturated rather than dimmed: the focus logic owns opacity. */
+.wire.seam.unverified{stroke:var(--seam-weak)}
 .wire.infra{stroke:var(--infra)}
 .tagbox{fill:var(--tag-bg)}
 .tagtext{fill:var(--tag-ink)}
@@ -356,7 +360,10 @@ var edgeEls = [];
 EDGES.forEach(function(e, index){
   var projected = e.points.map(function(q){ return P(q[0], q[1], 0); });
   var from = BY[e.from], to = BY[e.to];
-  var kindWord = e.seam ? "Runtime seam: " : (e.infra ? "Uses infrastructure: " : "Dependency: ");
+  var unverifiedSeam = !!(e.seam && e.seam.verified === false);
+  var kindWord = e.seam
+    ? (unverifiedSeam ? "Unverified runtime seam: " : "Runtime seam: ")
+    : (e.infra ? "Uses infrastructure: " : "Dependency: ");
   var relation = e.seam ? " calls back into " : (e.infra ? " talks to " : " imports ");
   var g = el("g", {
     "class": "edge", tabindex: "-1", role: "button",
@@ -368,8 +375,11 @@ EDGES.forEach(function(e, index){
     "stroke-width": "14", "stroke-linejoin": "round", "stroke-linecap": "round"
   });
   var line = el("polyline", { points: pts(projected), "marker-end": "url(#wire)" });
-  line.setAttribute("class", "wire" + (e.seam ? " seam" : "") + (e.infra ? " infra" : ""));
-  if (e.seam) line.setAttribute("stroke-dasharray", "2 5");
+  line.setAttribute("class", "wire" + (e.seam ? " seam" : "") + (e.infra ? " infra" : "") +
+    (unverifiedSeam ? " unverified" : ""));
+  // An unverified seam gets a fainter, sparser stroke so it does not read as
+  // established fact next to a corroborated one.
+  if (e.seam) line.setAttribute("stroke-dasharray", unverifiedSeam ? "1 8" : "2 5");
   else if (e.infra) line.setAttribute("stroke-dasharray", "10 4");
   else if (e.back) line.setAttribute("stroke-dasharray", "7 6");
   g.appendChild(hit); g.appendChild(line);
@@ -490,7 +500,8 @@ var INTRO =
   '<li>Click a connector, or a reference count in a panel, to inspect one dependency.</li>' +
   (MODEL.meta.seamCount || MODEL.meta.infraCount
     ? '<li>Pink connectors are <b>declared</b>, not inferred: runtime seams and infrastructure ' +
-      'that no import can show. They are assertions from <code>.n-dx.json</code> or IaC.</li>'
+      'that no import can show. They are assertions from <code>.n-dx.json</code> or IaC. ' +
+      'A faint, sparsely dotted seam is one the call graph could not corroborate.</li>'
     : '') +
   '<li>Use the legend to isolate one kind of zone.</li>' +
   '<li>Drag to pan, scroll to zoom, <b>Reset view</b> to recentre. <b>Esc</b> clears.</li>' +
@@ -570,8 +581,11 @@ function renderEdge(e){
 
   if (e.seam) {
     // A declared seam is an assertion by a person, and the panel says so —
-    // it is not something the analysis proved.
-    h = '<div class="kind">Runtime seam &middot; declared</div>';
+    // it is not something the analysis proved. Where a call graph exists the
+    // assertion is checked, and the verdict leads.
+    var unverified = e.seam.verified === false;
+    h = '<div class="kind">Runtime seam &middot; declared' +
+      (unverified ? ', unverified' : (e.seam.verified ? ', corroborated' : '')) + '</div>';
     sub = e.seam.callbacks.length
       ? e.seam.callbacks.length + ' injected ' + (e.seam.callbacks.length === 1 ? 'callback' : 'callbacks')
       : 'declared in .n-dx.json';
@@ -579,6 +593,14 @@ function renderEdge(e){
       'this way even though the import points the other way. Static analysis cannot see this &mdash; ' +
       'it is declared under <code>sourcevision.isoMap.injectionSeams</code> and is only as accurate ' +
       'as that declaration.';
+    if (unverified) {
+      body += ' <b>Nothing in the call graph calls ' +
+        (e.seam.unsupported && e.seam.unsupported.length === 1 ? 'this callback' : 'these callbacks') +
+        ' inside ' + esc(toName) + '</b>, so the declaration may have been left behind by a refactor.';
+    } else if (e.seam.verified) {
+      body += ' The call graph does show these callbacks being called inside ' + esc(toName) +
+        ', which corroborates the declaration without proving it.';
+    }
   } else if (e.infra) {
     h = '<div class="kind">Infrastructure &middot; declared</div>';
     sub = to ? esc(to.sub) : 'runtime resource';
@@ -601,8 +623,13 @@ function renderEdge(e){
   h += '<div class="sub">' + sub + '</div>';
   h += '<div class="body">' + body + '</div>';
   if (e.seam && e.seam.callbacks.length) {
+    var unsupported = e.seam.unsupported || [];
     h += '<h4>Injected</h4><ul>' + e.seam.callbacks.map(function(c){
-      return '<li><code>' + esc(c) + '</code></li>';
+      // Naming the specific callback that no longer resolves is the difference
+      // between "this seam is suspect" and something the reader can act on.
+      var stale = unsupported.indexOf(c) !== -1;
+      return '<li><code>' + esc(c) + '</code>' +
+        (stale ? ' <span class="sub">no supporting call</span>' : '') + '</li>';
     }).join("") + '</ul>';
   }
   if (e.seam && e.seam.note) h += '<h4>Why</h4><div class="body">' + esc(e.seam.note) + '</div>';
@@ -680,7 +707,10 @@ function refresh(scrollPanel){
     var hot = (i === curEdge) || (curNode !== null && (x.e.from === curNode || x.e.to === curNode));
     var ends = kindVisible((BY[x.e.from] || {}).kind) && kindVisible((BY[x.e.to] || {}).kind);
     var weight = edgeWeight(x.e);
-    var declared = (x.e.seam ? " seam" : "") + (x.e.infra ? " infra" : "");
+    // Rebuilt from scratch each redraw, so every static class the edge was
+    // created with has to be restated here or it is silently lost.
+    var declared = (x.e.seam ? " seam" : "") + (x.e.infra ? " infra" : "") +
+      (x.e.seam && x.e.seam.verified === false ? " unverified" : "");
     x.node.setAttribute("class", "wire" + declared + (hot ? " hot" : ""));
     x.node.setAttribute("marker-end", hot ? "url(#wirehot)" : "url(#wire)");
     x.node.setAttribute("stroke-width", String(Math.min(4.5, 1.6 + Math.log(weight + 1))));

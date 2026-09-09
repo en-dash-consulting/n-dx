@@ -106,7 +106,14 @@ export interface IsoEdge {
    * Set when this relationship was declared rather than inferred: a callback or
    * event seam whose runtime direction the import graph cannot see.
    */
-  seam?: { callbacks: string[]; note?: string };
+  seam?: {
+    callbacks: string[];
+    note?: string;
+    /** Call-graph verdict on the callbacks; undefined when unchecked. */
+    verified?: boolean;
+    /** Declared callbacks with no supporting call in the target zone. */
+    unsupported?: string[];
+  };
   /** Set when the edge connects a zone to declared runtime infrastructure. */
   infra?: boolean;
   /** Orthogonal route in grid units, precomputed so the renderer stays dumb. */
@@ -179,7 +186,20 @@ export interface IsoModelInput {
    * Runtime control-flow seams declared in .n-dx.json. Drawn in the direction
    * control actually flows, which is often the opposite of the import.
    */
-  seams?: Array<{ fromZone: string; toZone: string; callbacks?: string[]; note?: string }>;
+  seams?: Array<{
+    fromZone: string;
+    toZone: string;
+    callbacks?: string[];
+    note?: string;
+    /**
+     * Whether the call graph corroborates the declared callbacks. Undefined
+     * when there was no call graph to check against, which is not the same as
+     * refuted.
+     */
+    verified?: boolean;
+    /** Declared callbacks with no supporting call in the target zone. */
+    unsupported?: string[];
+  }>;
   /** Runtime infrastructure, declared or discovered from IaC. */
   infrastructure?: Array<{
     id: string;
@@ -596,7 +616,12 @@ export function buildIsoModel(input: IsoModelInput, options: IsoModelOptions = {
       weight: 0,
       calls: 0,
       back: b.col <= a.col,
-      seam: { callbacks: seam.callbacks ?? [], note: seam.note },
+      seam: {
+        callbacks: seam.callbacks ?? [],
+        note: seam.note,
+        verified: seam.verified,
+        unsupported: seam.unsupported?.length ? seam.unsupported : undefined,
+      },
       points: routeEdge(a, b, bounds, lanes, rawEdges.length + i),
     });
   });
