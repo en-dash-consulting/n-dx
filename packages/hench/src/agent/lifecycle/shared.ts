@@ -563,9 +563,8 @@ export async function runReviewGate(
  * - "rerun": Re-run the test command (retry)
  * - "abort": Mark run as failed and revert changes (roll back)
  * - "skip": Continue to commit without test gate (user override)
- * - "context" (autonomous-only): Proceed but preserve error context for model; don't fail/run
  */
-export type TestGateFailureAction = "rerun" | "abort" | "skip" | "context";
+export type TestGateFailureAction = "rerun" | "abort" | "skip";
 
 /**
  * Handle test gate failure: display summary and prompt for user action.
@@ -581,18 +580,11 @@ async function promptTestGateFailure(
   yes?: boolean,
   autonomous?: boolean,
 ): Promise<TestGateFailureAction> {
-  // For autonomous runs (--auto/--loop), preserve errors as context for the model.
-  // This lets the model see failure details and decide whether to retry, adjust approach,
-  // or continue with what was accomplished. Test outputs (including failures) are already
-  // captured in run.testGate, so we just need to signal continuation without treating
-  // this as a hard failure.
-  if (autonomous === true) {
-    return "context";
-  }
-
-  // In non-interactive mode (CI, --yes), abort immediately since we're not prompting
-  // and the user hasn't signaled they want to proceed.
-  if (!process.stdin.isTTY || yes) {
+  // In non-interactive mode (CI, --yes, --auto), default to abort. A gate that
+  // could not launch never reaches this handler (it reports as inconclusive),
+  // so by the time we are here the suite genuinely ran and genuinely failed —
+  // completing and committing anyway would record a false success in the PRD.
+  if (!process.stdin.isTTY || yes || autonomous) {
     return "abort";
   }
 
@@ -2084,17 +2076,6 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             // User chose to skip gate and continue to commit
             testGateSkipped = true;
             stream("Test Gate", "Skipped by user");
-            gateComplete = true;
-          } else if (action === "context") {
-            // "context" — autonomous mode: preserve errors as context, don't fail the run.
-            // Test outputs (including failures) are already captured in run.testGate.
-            // The model can see what failed and decide how to proceed without being
-            // blocked by a hard failure status. This prevents test failures from
-            // immediately aborting autonomous runs; instead they become context for
-            // the next turn's decision-making. The gate is complete — without this,
-            // the retry loop re-runs the suite to the attempt cap and then fails the
-            // run anyway, which is exactly what "context" exists to prevent.
-            stream("Test Gate", "Proceeding with errors as context");
             gateComplete = true;
           } else {
             // "abort" — mark run as failed and proceed to rollback.
