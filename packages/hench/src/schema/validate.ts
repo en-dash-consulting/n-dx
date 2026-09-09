@@ -77,6 +77,8 @@ export const HenchConfigSchema = z.object({
   parentMaxAgeHours: z.number().positive().optional().default(24),
   maxSpawnsPerTask: z.number().int().positive().optional().default(8),
   fullTestCommand: z.string().optional(),
+  // 0 means "no limit" — see the field docs on HenchConfig.
+  fullTestTimeoutMs: z.number().int().nonnegative().optional().default(300_000),
   permissionMode: z.enum(["default", "acceptEdits", "bypassPermissions", "plan"]).optional(),
   commitMsgTimeoutMs: z.number().int().nonnegative().optional().default(300_000),
   git: z

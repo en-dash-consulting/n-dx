@@ -40,7 +40,7 @@ import { discoverChangedFiles } from "../analysis/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
-import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
+import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines } from "../../types/output.js";
@@ -2133,6 +2133,19 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       info(`\n${run.error}`);
     }
 
+    // How long the full suite may take is a property of the project, not of
+    // this gate: a monorepo running every package can legitimately exceed the
+    // 5-minute default, and a timeout aborts a task whose work is already done.
+    // Undefined (a config predating the field) keeps the default.
+    const testGateTimeoutMs = config.fullTestTimeoutMs;
+    if (testGateTimeoutMs != null && testGateTimeoutMs !== DEFAULT_TEST_GATE_TIMEOUT_MS) {
+      detail(
+        testGateTimeoutMs === 0
+          ? "Test gate timeout: none (hench.fullTestTimeoutMs = 0)"
+          : `Test gate timeout: ${formatDurationMs(testGateTimeoutMs)} (hench.fullTestTimeoutMs)`,
+      );
+    }
+
     // Rerun loop: gate can fail and be retried multiple times
     let testGateAttempt = 0;
     let gateComplete = false;
@@ -2145,6 +2158,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         projectDir,
         filesChanged: run.structuredSummary.filesChanged,
         testCommand: resolvedTestCommand,
+        timeout: testGateTimeoutMs,
       });
 
       run.testGate = testGate;

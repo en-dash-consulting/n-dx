@@ -432,11 +432,22 @@ export interface TestGateOptions {
   filesChanged: string[];
   /** Test command to execute. If not provided, defaults to "pnpm test --reporter=json". */
   testCommand?: string;
-  /** Timeout for the test command in ms. Default: 300_000. */
+  /**
+   * Timeout for the test command in ms. Defaults to
+   * {@link DEFAULT_TEST_GATE_TIMEOUT_MS}; 0 means no limit. Callers pass the
+   * operator's `hench.fullTestTimeoutMs`, since how long a full suite legitimately
+   * takes is a property of the project, not of this gate.
+   */
   timeout?: number;
 }
 
-const TEST_GATE_TIMEOUT = 300_000; // 5 minutes
+/**
+ * Default ceiling on the full-suite gate: 5 minutes.
+ *
+ * Exported because it is the number an operator has to know to decide whether
+ * to raise `hench.fullTestTimeoutMs` — the CLI names it when a gate times out.
+ */
+export const DEFAULT_TEST_GATE_TIMEOUT_MS = 300_000;
 
 /**
  * Vitest JSON reporter output structure.
@@ -606,7 +617,7 @@ function opaqueFailureDetail(
 export async function runTestGate(
   options: TestGateOptions,
 ): Promise<TestGateResult> {
-  const { projectDir, filesChanged, testCommand, timeout = TEST_GATE_TIMEOUT } = options;
+  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TEST_GATE_TIMEOUT_MS } = options;
 
   // Skip if no files were modified
   if (filesChanged.length === 0) {
@@ -630,15 +641,25 @@ export async function runTestGate(
 
   const totalDurationMs = Date.now() - startMs;
 
-  // Handle timeout
+  // Handle timeout. The suite was cut off mid-flight, so nothing it might have
+  // reported is trustworthy — but the failure still has to be attributable, or
+  // callers count zero failed packages and print "0/0 package(s) failed" for a
+  // run they are about to abort. Say how long it got and which knob moves it.
   if (exitCode === null) {
+    const limit = `${Math.round(timeout / 1000)}s`;
+    const timeoutMessage =
+      `\`${command}\` did not finish within ${limit} and was killed.\n` +
+      `If the suite legitimately takes longer, raise \`hench.fullTestTimeoutMs\` ` +
+      `(in .hench/config.json or .n-dx.json; 0 disables the limit) rather than ` +
+      `skipping the gate.`;
+
     return {
       ran: true,
       passed: false,
-      packages: [],
+      packages: [{ name: "workspace", passed: false, failureOutput: timeoutMessage }],
       command,
       totalDurationMs,
-      error: "Test command timed out",
+      error: timeoutMessage,
     };
   }
 

@@ -129,4 +129,50 @@ describe("Test Suite Gate Integration", () => {
       expect(result.passed).toBe(true);
     });
   });
+
+  describe("timeout", () => {
+    it("kills a command that overruns the configured limit and says which knob moves it", async () => {
+      const result = await runTestGate({
+        projectDir,
+        filesChanged: ["src/index.ts"],
+        // Sleeps well past the limit; the gate must cut it off, not wait.
+        testCommand: `node -e "setTimeout(() => {}, 60000)"`,
+        timeout: 1_500,
+      });
+
+      expect(result.ran).toBe(true);
+      expect(result.passed).toBe(false);
+      // Attributable, like every other gate failure — not "0/0 package(s)".
+      expect(result.packages.filter((p) => !p.passed)).toHaveLength(1);
+      expect(result.error).toContain("did not finish within 2s");
+      expect(result.error).toContain("hench.fullTestTimeoutMs");
+      expect(result.packages[0]!.failureOutput).toBe(result.error);
+    });
+
+    it("honours a raised limit for a command that finishes inside it", async () => {
+      const result = await runTestGate({
+        projectDir,
+        filesChanged: ["src/index.ts"],
+        // Longer than the tight limit above, so a stale 1.5s ceiling would fail it.
+        testCommand: `node -e "setTimeout(() => process.stdout.write('slow-ok'), 2500)"`,
+        timeout: 30_000,
+      });
+
+      expect(result.ran).toBe(true);
+      expect(result.passed).toBe(true);
+      expect(result.totalDurationMs).toBeGreaterThanOrEqual(2_000);
+    });
+
+    it("treats 0 as no limit rather than as an instant timeout", async () => {
+      const result = await runTestGate({
+        projectDir,
+        filesChanged: ["src/index.ts"],
+        testCommand: `node -e "setTimeout(() => process.stdout.write('ok'), 1200)"`,
+        timeout: 0,
+      });
+
+      expect(result.ran).toBe(true);
+      expect(result.passed).toBe(true);
+    });
+  });
 });

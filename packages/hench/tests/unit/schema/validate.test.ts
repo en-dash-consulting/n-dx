@@ -151,6 +151,46 @@ describe("validateConfig", () => {
     });
   });
 
+  describe("fullTestTimeoutMs defaults and validation", () => {
+    it("is optional in schema and defaults to 5 minutes", () => {
+      // A config written before the field existed must keep working, and get
+      // the same ceiling the gate used when it was hardcoded.
+      const result = validateConfig(DEFAULT_HENCH_CONFIG());
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.fullTestTimeoutMs).toBe(300_000);
+      }
+    });
+
+    it("can be raised for a suite that legitimately runs long", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestTimeoutMs: 900_000 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.fullTestTimeoutMs).toBe(900_000);
+      }
+    });
+
+    it("accepts 0, which disables the limit", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestTimeoutMs: 0 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.fullTestTimeoutMs).toBe(0);
+      }
+    });
+
+    it("rejects a negative timeout", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestTimeoutMs: -1 };
+      expect(validateConfig(config).ok).toBe(false);
+    });
+
+    it("rejects a fractional timeout", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestTimeoutMs: 1500.5 };
+      expect(validateConfig(config).ok).toBe(false);
+    });
+  });
+
   describe("guard.spawnTimeout defaults and validation", () => {
     it("is optional in schema and defaults to 300000", () => {
       const config = DEFAULT_HENCH_CONFIG();

@@ -52,6 +52,7 @@ Test-file pointers for the scenarios added above:
 | Markdown round-trip and dual-write | `packages/rex/tests/unit/store/markdown-roundtrip.test.ts`, `packages/rex/tests/unit/store/prd-write-routing.test.ts` |
 | Cross-vendor rex authoring regression | `packages/rex/tests/integration/vendor-regression.test.ts` |
 | Self-heal test gate | `packages/hench/tests/integration/test-gate.test.ts` |
+| Test-gate timeout (`hench.fullTestTimeoutMs`) config precedence | `packages/hench/tests/integration/test-gate-timeout-config.test.ts` |
 | Self-heal Codex-batch fallback | `packages/hench/tests/integration/self-heal-codex-batch.test.ts` |
 | Pair-programming cross-vendor review | `tests/integration/pair-programming.test.js` |
 
