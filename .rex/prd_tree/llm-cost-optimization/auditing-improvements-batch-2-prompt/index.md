@@ -21,7 +21,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Dashboard token-usage aggregation has no per-model split, so dashboard costs still price everything at Sonnet rates](./dashboard-token-usage-aggregation-has.md) | pending |
 | [Full test gate reports 'Test gate failed: ' with 0/0 packages, dropping the timeout or exec error that actually failed it](./full-test-gate-reports-test-gate.md) | completed |
 | [Full test gate timeout is hard-coded at 5 minutes, so a passing suite that runs long under load fails the run](./full-test-gate-timeout-is-hard-coded.md) | completed |
-| [Keep-tail prune replays thinking blocks created before the cut, which Claude Fable 5.1's preserved-thinking check rejects](./keep-tail-prune-replays-thinking.md) | pending |
+| [Keep-tail prune replays thinking blocks created before the cut, which Claude Fable 5.1's preserved-thinking check rejects](./keep-tail-prune-replays-thinking.md) | completed |
 | [ndx usage counts hench turns as calls in the per-command breakdown, reporting 1459 runs where the package line says 8](./ndx-usage-counts-hench-turns-as-calls.md) | pending |
 | [No way to disable cache_control breakpoints for a Claude api_endpoint that rejects them](./no-way-to-disable-cache-control.md) | pending |
 | [PACKAGE_GUIDELINES .rex/ write-access protocol documented a PRD layout that no longer exists](./package-guidelines-rex-write-access.md) | completed |

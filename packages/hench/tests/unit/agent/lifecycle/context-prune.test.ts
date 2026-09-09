@@ -25,6 +25,7 @@ import {
   PRUNE_RETAIN_PAIRS,
   PRUNE_TRIGGER_PAIRS,
   SUMMARY_CHAR_LIMIT,
+  THINKING_ELIDED_TEXT,
   TRANSCRIPT_MESSAGE_CHAR_LIMIT,
   anthropicPruneShape,
   buildPruneSummaryPrompt,
@@ -32,6 +33,7 @@ import {
   normalizePruneSummary,
   renderAnthropicMessage,
   renderPruneTranscript,
+  stripAnthropicThinking,
 } from "../../../../src/agent/lifecycle/context-prune.js";
 import type { PruneShape, PruneSummary } from "../../../../src/agent/lifecycle/context-prune.js";
 import {
@@ -280,6 +282,163 @@ describe("ConversationPruner", () => {
 
     expect(await pruner.prune(messages)).toEqual({ dropped: 22, summarized: false });
     expect(pruner.summaries).toBe(0);
+  });
+});
+
+/**
+ * Preserved thinking across a prune.
+ *
+ * A thinking block's signature is bound to the conversation prefix that
+ * produced it. Keep-tail compaction retains those turns verbatim while
+ * replacing everything in front of them, so from Claude Fable 5.1 onward the
+ * next request is rejected with "Invalid signature in thinking block". The
+ * prune has to strip them out of the tail it keeps.
+ */
+describe("thinking blocks across an Anthropic prune", () => {
+  /** A turn-pair whose assistant turn reasoned before acting. */
+  function thinkingTurnPair(n: number): Anthropic.MessageParam[] {
+    return [
+      {
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: `Deliberating about step ${n}.`, signature: `sig_${n}` },
+          { type: "redacted_thinking", data: `redacted_${n}` },
+          { type: "text", text: `Working on step ${n}.` },
+          {
+            type: "tool_use",
+            id: `tool_${n}`,
+            name: "read_file",
+            input: { path: `src/step-${n}.ts` },
+          },
+        ],
+      },
+      {
+        role: "user",
+        content: [{ type: "tool_result", tool_use_id: `tool_${n}`, content: `step ${n} ok` }],
+      },
+    ];
+  }
+
+  /** A conversation of `pairs` thinking turn-pairs after the brief. */
+  function thinkingConversation(pairs: number): Anthropic.MessageParam[] {
+    const messages: Anthropic.MessageParam[] = [{ role: "user", content: BRIEF }];
+    for (let n = 1; n <= pairs; n++) messages.push(...thinkingTurnPair(n));
+    return messages;
+  }
+
+  /** Every thinking-ish block left anywhere in the array. */
+  function thinkingBlocks(messages: readonly Anthropic.MessageParam[]): unknown[] {
+    return messages.flatMap((message) =>
+      typeof message.content === "string"
+        ? []
+        : message.content.filter(
+            (block) => block.type === "thinking" || block.type === "redacted_thinking",
+          ),
+    );
+  }
+
+  it("strips thinking from the retained tail on the summarized path", async () => {
+    const pruner = new ConversationPruner(anthropicPruneShape(), stubSummarizer);
+    const messages = thinkingConversation(PRUNE_TRIGGER_PAIRS + 1);
+
+    const outcome = await pruner.prune(messages);
+
+    expect(outcome.summarized).toBe(true);
+    expect(thinkingBlocks(messages)).toEqual([]);
+  });
+
+  it("strips thinking from the retained tail on the degraded-drop path", async () => {
+    const pruner = new ConversationPruner(anthropicPruneShape(), async () => {
+      throw new Error("provider unavailable");
+    });
+    const messages = thinkingConversation(PRUNE_TRIGGER_PAIRS + 1);
+
+    const outcome = await pruner.prune(messages);
+
+    expect(outcome.summarized).toBe(false);
+    expect(thinkingBlocks(messages)).toEqual([]);
+  });
+
+  it("keeps text and tool_use blocks in their original order", async () => {
+    const pruner = new ConversationPruner(anthropicPruneShape(), stubSummarizer);
+    const messages = thinkingConversation(PRUNE_TRIGGER_PAIRS + 1);
+
+    await pruner.prune(messages);
+
+    // messages[0] brief, messages[1] summary, messages[2] first retained turn.
+    expect(messages[2].content).toEqual([
+      { type: "text", text: "Working on step 12." },
+      {
+        type: "tool_use",
+        id: "tool_12",
+        name: "read_file",
+        input: { path: "src/step-12.ts" },
+      },
+    ]);
+    // The tool_result still names a tool_use that is present in the tail.
+    expect(messages[3].content).toEqual([
+      { type: "tool_result", tool_use_id: "tool_12", content: "step 12 ok" },
+    ]);
+  });
+
+  it("leaves the head byte-identical", async () => {
+    const pruner = new ConversationPruner(anthropicPruneShape(), stubSummarizer);
+    const messages = thinkingConversation(PRUNE_TRIGGER_PAIRS + 1);
+    const head = JSON.stringify(messages[0]);
+
+    await pruner.prune(messages);
+
+    expect(JSON.stringify(messages[0])).toBe(head);
+  });
+
+  it("does not rewrite summaries an earlier prune already sent", async () => {
+    const pruner = new ConversationPruner(anthropicPruneShape(), stubSummarizer);
+    const messages = thinkingConversation(PRUNE_TRIGGER_PAIRS + 1);
+
+    await pruner.prune(messages);
+    const cachedPrefix = JSON.stringify(messages.slice(0, 2));
+
+    let prunesObserved = 0;
+    for (let round = 0; round < PRUNE_TRIGGER_PAIRS; round++) {
+      messages.push(...thinkingTurnPair(300 + round));
+      const outcome = await pruner.prune(messages);
+      expect(JSON.stringify(messages.slice(0, 2))).toBe(cachedPrefix);
+      // Only a prune invalidates signatures, so the array is only required to
+      // be clean on the turns where one fired. Turns appended since sit on a
+      // prefix that has not moved and keep their thinking legitimately.
+      if (outcome.dropped > 0) {
+        prunesObserved++;
+        expect(thinkingBlocks(messages)).toEqual([]);
+      }
+    }
+
+    expect(prunesObserved).toBe(1);
+    expect(pruner.summaries).toBe(2);
+  });
+
+  it("substitutes a marker rather than emptying a thinking-only assistant turn", () => {
+    expect(
+      stripAnthropicThinking({
+        role: "assistant",
+        content: [{ type: "thinking", thinking: "cut off mid-thought", signature: "sig" }],
+      }),
+    ).toEqual({ role: "assistant", content: [{ type: "text", text: THINKING_ELIDED_TEXT }] });
+  });
+
+  it("returns an unaffected message by reference", () => {
+    const clean: Anthropic.MessageParam = {
+      role: "assistant",
+      content: [{ type: "text", text: "no reasoning here" }],
+    };
+    const userTurn: Anthropic.MessageParam = {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: "t", content: "ok" }],
+    };
+    const stringContent: Anthropic.MessageParam = { role: "assistant", content: "plain" };
+
+    expect(stripAnthropicThinking(clean)).toBe(clean);
+    expect(stripAnthropicThinking(userTurn)).toBe(userTurn);
+    expect(stripAnthropicThinking(stringContent)).toBe(stringContent);
   });
 });
 

@@ -46,6 +46,12 @@
  * is unchanged; between prunes the prompt grows by pure append, which is
  * exactly the shape the cache rewards.
  *
+ * The retained tail is the one region a prune may rewrite, and it does: editing
+ * the middle of the history invalidates any signature in the tail that was
+ * bound to the old prefix, so a shape may supply
+ * {@link PruneShape.sanitizeRetained} to repair it. Anthropic's preserved
+ * thinking is the case that forces this — see that field.
+ *
  * The summary itself is a mechanical, single-shot, machine-checked call, so it
  * routes through the `context.summarize` task class (light tier by default).
  * If it fails — no credentials, provider down, empty answer — the prune
@@ -151,6 +157,28 @@ export interface PruneShape<M> {
    * on an assistant turn and a summary placed last would collide with it.
    */
   toSummaryMessage: (summary: string) => M | M[];
+  /**
+   * Rewrite one retained-tail message so it stays valid after the cut, or
+   * return it unchanged. Optional: formats with no prefix-bound content omit
+   * it and the pruner skips the pass entirely.
+   *
+   * This exists for Anthropic's *preserved thinking* rule. A `thinking` block's
+   * signature is bound to the exact conversation prefix that produced it, and
+   * from Claude Fable 5.1 / Claude Mythos 5.1 onward the API rejects a request
+   * whose history was edited behind a retained thinking block with
+   * `400 Invalid signature in thinking block. The block is bound to a different
+   * conversation`. Keep-tail compaction is the documented failure shape: the
+   * retained turns are byte-identical, but the prefix in front of them is now a
+   * summary rather than the turns that were summarized, so every thinking block
+   * in the tail is invalidated at once. Anthropic's documented recovery for
+   * compaction is to strip those blocks from the retained history, which is
+   * what {@link stripAnthropicThinking} does.
+   *
+   * Only the retained tail is passed through this hook. Rewriting the head or
+   * the summary region would move the cached prefix, which is the thing the
+   * whole module exists to protect.
+   */
+  sanitizeRetained?: (message: M) => M;
 }
 
 /** What one {@link ConversationPruner.prune} call did, and what it cost. */
@@ -323,6 +351,7 @@ export class ConversationPruner<M> {
     if (attempt.text === undefined) {
       // Degrade to the pre-summary behavior: drop the span, keep the run.
       messages.splice(dropStart, dropped.length);
+      this.sanitizeTail(messages, dropStart);
       detail(`Pruned ${dropped.length} messages (no summary available)`);
       return outcome;
     }
@@ -331,9 +360,25 @@ export class ConversationPruner<M> {
     const summaryMessages = Array.isArray(inserted) ? inserted : [inserted];
     messages.splice(dropStart, dropped.length, ...summaryMessages);
     this.summaryCount += summaryMessages.length;
+    this.sanitizeTail(messages, dropStart + summaryMessages.length);
     detail(`Pruned ${dropped.length} messages into a ${attempt.text.length}-char summary`);
     outcome.summarized = true;
     return outcome;
+  }
+
+  /**
+   * Run {@link PruneShape.sanitizeRetained} over the tail the prune kept.
+   *
+   * Runs on both the summarized and the degraded-drop paths: both edit the
+   * middle of the history, so both invalidate anything in the tail that was
+   * bound to the old prefix. `tailStart` is the first index after whatever the
+   * splice left in place, so the head and the summary region are never visited
+   * and their bytes cannot move.
+   */
+  private sanitizeTail(messages: M[], tailStart: number): void {
+    const sanitize = this.shape.sanitizeRetained;
+    if (!sanitize) return;
+    for (let i = tailStart; i < messages.length; i++) messages[i] = sanitize(messages[i]);
   }
 
   /**
@@ -468,6 +513,48 @@ export function anthropicSummaryMessage(summary: string): Anthropic.MessageParam
   };
 }
 
+/**
+ * Stand-in for an assistant turn that held nothing but reasoning.
+ *
+ * Rare but reachable: a response truncated by `max_tokens` while the model was
+ * still thinking carries a thinking block and nothing else, and stripping it
+ * would leave `content: []`, which the API rejects. A message must survive the
+ * strip, because the tail has to open on the assistant turn that owns the
+ * following tool results.
+ */
+export const THINKING_ELIDED_TEXT = "[reasoning from an earlier turn was dropped during compaction]";
+
+/**
+ * Drop `thinking` and `redacted_thinking` blocks from a retained assistant turn.
+ *
+ * Anthropic's preserved-thinking rule binds a thinking block's signature to the
+ * conversation prefix that produced it, so a keep-tail prune — which replaces
+ * the turns in front of the tail with a summary — invalidates every thinking
+ * block it retains. Stripping them is the documented recovery; see
+ * {@link PruneShape.sanitizeRetained}.
+ *
+ * `text` and `tool_use` blocks keep their relative order, so the tool_use ids
+ * the following `tool_result` blocks refer to are untouched. A message with no
+ * thinking in it is returned by reference, so an unaffected tail costs nothing
+ * and stays `===` to what the caller had.
+ */
+export function stripAnthropicThinking(
+  message: Anthropic.MessageParam,
+): Anthropic.MessageParam {
+  if (message.role !== "assistant" || typeof message.content === "string") return message;
+
+  const isThinking = (block: Anthropic.ContentBlockParam): boolean =>
+    block.type === "thinking" || block.type === "redacted_thinking";
+
+  if (!message.content.some(isThinking)) return message;
+
+  const content = message.content.filter((block) => !isThinking(block));
+  return {
+    ...message,
+    content: content.length > 0 ? content : [{ type: "text", text: THINKING_ELIDED_TEXT }],
+  };
+}
+
 /** Prune shape for the Anthropic API loop: brief at index 0, then turn-pairs. */
 export function anthropicPruneShape(): PruneShape<Anthropic.MessageParam> {
   return {
@@ -475,5 +562,6 @@ export function anthropicPruneShape(): PruneShape<Anthropic.MessageParam> {
     isTailStart: (message) => message.role === "assistant",
     render: renderAnthropicMessage,
     toSummaryMessage: anthropicSummaryMessage,
+    sanitizeRetained: stripAnthropicThinking,
   };
 }

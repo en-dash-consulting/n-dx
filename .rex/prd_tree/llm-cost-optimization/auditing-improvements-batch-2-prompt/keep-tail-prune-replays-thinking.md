@@ -2,7 +2,7 @@
 id: "cdb19618-ecb7-4c12-a95e-18c60a63dd14"
 level: "task"
 title: "Keep-tail prune replays thinking blocks created before the cut, which Claude Fable 5.1's preserved-thinking check rejects"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -11,6 +11,9 @@ tags:
   - "context-prune"
   - "anthropic"
 source: "ndx-adversarial-review"
+startedAt: "2026-09-09T23:28:37.523Z"
+completedAt: "2026-09-09T23:33:49.048Z"
+endedAt: "2026-09-09T23:33:49.048Z"
 acceptanceCriteria:
   - "After a prune in the Anthropic shape, no retained assistant message contains a `thinking` or `redacted_thinking` block; `text` and `tool_use` blocks are preserved in their original order"
   - "Messages before the cut (head and summary region) are byte-identical before and after the prune"
@@ -19,6 +22,6 @@ acceptanceCriteria:
   - "The Gemini and OpenAI-compatible shapes are unaffected (no-op sanitize)"
   - "A code comment in context-prune.ts cites the preserved-thinking history-editing rule as the reason"
 description: "Severity: medium. Verdict: should-fix. Found by the adversarial review of PR #353.\n\n## Failure scenario\nThe Anthropic loop pushes `response.content` back into history verbatim (packages/hench/src/agent/lifecycle/loop.ts:1474), including `thinking` and `redacted_thinking` blocks; nothing in hench strips them. `ConversationPruner.prune` (packages/hench/src/agent/lifecycle/context-prune.ts:256) replaces a span in the middle of the array and keeps the trailing 10 pairs unchanged. On Claude Fable 5.1 (and Claude Mythos 5.1) a thinking block's signature is bound to the exact conversation prefix that produced it. Organizations created on or after 2026-08-31 get a 400 (`Invalid signature in thinking block. The block is bound to a different conversation`) on the first request after any mid-history edit, and Anthropic states future models will enforce this for every account. The documented failure shape is exactly keep-tail compaction: the retained turns are unchanged but their thinking blocks predate the summary. So on an enforced org with `hench.model=claude-fable-5-1`, the run dies at turn 22 on the first prune, and the degraded-drop path fails the same way.\n\n## Reachability\nToday only with `hench.model` set to a Fable/Mythos 5.1 model on a new org; the default sonnet does not enforce. Forward-compatibility risk for every model after that. No test exercises thinking blocks through the pruner.\n\n## Solution options\n1. (Recommended) Add an optional `sanitizeRetained?: (message: M) => M` hook to `PruneShape`; the Anthropic shape strips `thinking` and `redacted_thinking` blocks from retained assistant messages at prune time, keeping `text` and `tool_use` blocks in order. Apply on both the summarized and the degraded-drop paths. This is Anthropic's documented recovery for keep-tail compaction, costs one pass over at most 20 messages, and only rewrites bytes at a point where the cache prefix is already being invalidated by the prune itself. Risk: the model loses prior reasoning once per prune, which the migration guide describes as having little effect at a compaction boundary.\n2. Send `thinking.block_binding.prefix_mismatch_behavior: \"drop_block\"` with the `thinking-binding-controls-2026-08-01` beta header on every request. Works, but adds a beta dependency and keeps sending invalidated blocks.\n\nOption 1 needs no beta header and works on every model."
-lastModified: "2026-09-07T20:28:44.805Z"
+lastModified: "2026-09-09T23:33:49.055Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
