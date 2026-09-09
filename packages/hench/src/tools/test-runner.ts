@@ -436,6 +436,30 @@ function truncateOutput(stdout: string, stderr: string, maxLen: number): string 
   return "…" + combined.slice(-(maxLen - 1));
 }
 
+/** How many trailing lines of gate output to keep for post-mortem diagnosis. */
+export const OUTPUT_TAIL_LINES = 200;
+
+/**
+ * Last `maxLines` lines of `text`, unmodified if it is already shorter.
+ *
+ * Line-based (not char-based like {@link truncateOutput}) because operators
+ * reading a post-mortem want whole lines, not a summary sliced mid-word.
+ */
+function lastLines(text: string, maxLines: number): string {
+  const lines = text.split(/\r?\n/);
+  if (lines.length <= maxLines) return text;
+  return lines.slice(-maxLines).join("\n");
+}
+
+/**
+ * BOTH streams, combined and trimmed — the same reasoning as the parse path
+ * above: a runner may write its summary to either stdout or stderr, so
+ * preferring one drops half the evidence.
+ */
+function combineStreams(stdout: string, stderr: string): string {
+  return [stdout.trim(), stderr.trim()].filter(Boolean).join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Test suite gate (mandatory full test suite validation for self-heal mode)
 // ---------------------------------------------------------------------------
@@ -699,6 +723,7 @@ export async function runTestGate(
   // Reported as `ran: false` so callers treat it as INCONCLUSIVE. It is not a
   // verdict on the code: nothing was tested, so nothing can be said to have failed.
   if (!launched) {
+    const combined = combineStreams(stdout, stderr);
     return {
       ran: false,
       passed: false,
@@ -708,6 +733,7 @@ export async function runTestGate(
       error:
         `Test gate could not be executed — the command was never launched ` +
         `(${error?.message ?? "spawn failed"})`,
+      outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
     };
   }
 
@@ -726,11 +752,8 @@ export async function runTestGate(
   if (exitCode === null) {
     // Combined for the same reason as the parse path below: a runner splits its
     // output across both streams, and preferring one drops half the evidence.
-    const partial = truncateOutput(
-      [stdout.trim(), stderr.trim()].filter(Boolean).join("\n"),
-      "",
-      RAW_OUTPUT_CHARS,
-    );
+    const combined = combineStreams(stdout, stderr);
+    const partial = truncateOutput(combined, "", RAW_OUTPUT_CHARS);
     return {
       ran: true,
       passed: false,
@@ -746,11 +769,15 @@ export async function runTestGate(
       error:
         `Test command timed out after ${formatMs(timeout)} ` +
         `(ran for ${formatMs(totalDurationMs)})`,
+      outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
     };
   }
 
   const overallPassed = exitCode === 0;
   const packages = parseVitestOutput(stdout, stderr, overallPassed);
+  // No post-mortem for a green gate — attaching output to a pass is noise, and
+  // it matches parseVitestOutput's own rule for the same case.
+  const combined = overallPassed ? "" : combineStreams(stdout, stderr);
 
   return {
     ran: true,
@@ -758,6 +785,7 @@ export async function runTestGate(
     packages,
     command,
     totalDurationMs,
+    outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
   };
 }
 

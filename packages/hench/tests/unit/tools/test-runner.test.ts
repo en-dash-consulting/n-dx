@@ -843,6 +843,85 @@ describe("runTestGate — launched vs failed", () => {
     expect(result.packages[0].failureOutput).toContain("running packages/rex");
   });
 
+  it("attaches an output tail on timeout so the lifecycle can persist a post-mortem", async () => {
+    const runTestGate = await withExecResult({
+      stdout: "running packages/rex…",
+      stderr: "",
+      exitCode: null,
+      error: new Error("ETIMEDOUT"),
+      launched: true,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+      timeout: 90_000,
+    });
+
+    expect(result.outputTail).toContain("running packages/rex");
+  });
+
+  it("caps the output tail at 200 lines, keeping the most recent ones", async () => {
+    const lines = Array.from({ length: 250 }, (_, i) => `line ${i}`);
+    const runTestGate = await withExecResult({
+      stdout: lines.join("\n"),
+      stderr: "",
+      exitCode: 1,
+      error: new Error("Command failed"),
+      launched: true,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+    });
+
+    const tailLines = (result.outputTail ?? "").split("\n");
+    expect(tailLines.length).toBe(200);
+    // The oldest 50 lines were dropped — only the tail survives.
+    expect(result.outputTail).not.toContain("line 0\n");
+    expect(result.outputTail).toContain("line 249");
+  });
+
+  it("attaches an output tail when the command could never be launched, if any was produced", async () => {
+    const runTestGate = await withExecResult({
+      stdout: "",
+      stderr: "sh: some-broken-wrapper: command not found",
+      exitCode: 1,
+      error: new Error("spawn sh ENOENT"),
+      launched: false,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+    });
+
+    expect(result.outputTail).toContain("command not found");
+  });
+
+  it("attaches no output tail on a pass — no post-mortem needed for a green gate", async () => {
+    const runTestGate = await withExecResult({
+      stdout: "6/6 suites passed",
+      stderr: "",
+      exitCode: 0,
+      error: null,
+      launched: true,
+    });
+
+    const result = await runTestGate({
+      projectDir,
+      filesChanged: ["src/foo.ts"],
+      testCommand: "npm run test",
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.outputTail).toBeUndefined();
+  });
+
   it("still reports a genuine zero exit as a pass", async () => {
     const runTestGate = await withExecResult({
       stdout: JSON.stringify({
