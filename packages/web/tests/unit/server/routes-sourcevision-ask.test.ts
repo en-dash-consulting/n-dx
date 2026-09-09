@@ -889,3 +889,127 @@ describe("POST /api/sourcevision/ask", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Explaining a finding
+// ---------------------------------------------------------------------------
+
+/**
+ * The explain contract, asserted on the assembled prompt.
+ *
+ * Whether the model's prose actually names the zone cannot be tested
+ * without calling one. What can be tested — and is the thing that would
+ * silently rot — is that the finding's specifics reach the prompt and that
+ * the prompt demands they be used. An explanation that could have been
+ * written without reading this repository is the failure being guarded
+ * against, and both halves of the guard live here.
+ */
+describe("explaining a finding", () => {
+  const seed = {
+    kind: "finding" as const,
+    type: "anti-pattern",
+    severity: "warning",
+    zone: "payments-core",
+    message: "payments-core has low cohesion and high coupling.",
+    files: ["src/payments/ledger.ts", "src/payments/refund.ts"],
+  };
+
+  it("puts every seeded field in the prompt", async () => {
+    await writeFullAnalysis();
+    const context = assembleAskContext(svDir, seed);
+    const prompt = buildAskPrompt({ prompt: "Explain this finding.", seed }, context);
+
+    expect(prompt).toContain("payments-core");
+    expect(prompt).toContain("anti-pattern");
+    expect(prompt).toContain("warning");
+    expect(prompt).toContain("payments-core has low cohesion and high coupling.");
+    expect(prompt).toContain("src/payments/ledger.ts");
+    expect(prompt).toContain("src/payments/refund.ts");
+  });
+
+  it("demands the zone and files be named, not generic advice", async () => {
+    await writeFullAnalysis();
+    const prompt = buildAskPrompt(
+      { prompt: "Explain this finding.", seed },
+      assembleAskContext(svDir, seed),
+    );
+
+    expect(prompt).toContain("HOW TO ANSWER");
+    expect(prompt).toContain("in this repository");
+    expect(prompt).toMatch(/name the seeded zone and the seeded files/i);
+    expect(prompt).toMatch(/generic advice about this finding type is not an answer/i);
+  });
+
+  it("demands the answer say what a fix would touch", async () => {
+    await writeFullAnalysis();
+    const prompt = buildAskPrompt(
+      { prompt: "Explain this finding.", seed },
+      assembleAskContext(svDir, seed),
+    );
+
+    expect(prompt).toMatch(/what a fix would touch/i);
+    expect(prompt).toMatch(/blast radius/i);
+  });
+
+  it("tells the model to say so rather than fill a gap from general knowledge", async () => {
+    await writeFullAnalysis();
+    const prompt = buildAskPrompt(
+      { prompt: "Explain this finding.", seed },
+      assembleAskContext(svDir, seed),
+    );
+    expect(prompt).toMatch(/say so for that clause rather than filling it in/i);
+  });
+
+  it("adds the directive only for a finding, not for a zone or file seed", async () => {
+    await writeFullAnalysis();
+    for (const kind of ["zone", "file"] as const) {
+      const other = { kind, id: "payments-core" };
+      const prompt = buildAskPrompt(
+        { prompt: "What is this?", seed: other },
+        assembleAskContext(svDir, other),
+      );
+      expect(prompt).not.toContain("HOW TO ANSWER");
+    }
+  });
+
+  it("adds no directive to a free-form question", async () => {
+    await writeFullAnalysis();
+    const prompt = buildAskPrompt(
+      { prompt: "Which zone is most fragile?" },
+      assembleAskContext(svDir),
+    );
+    expect(prompt).not.toContain("HOW TO ANSWER");
+  });
+
+  it("carries a seed with no severity without inventing one", async () => {
+    await writeFullAnalysis();
+    const noSeverity = { ...seed, severity: undefined };
+    const prompt = buildAskPrompt(
+      { prompt: "Explain this finding.", seed: noSeverity },
+      assembleAskContext(svDir, noSeverity),
+    );
+    expect(prompt).toContain("payments-core");
+    expect(prompt).not.toMatch(/^severity:/m);
+  });
+
+  it("attaches the seeded zone's own record, so the answer has its metrics", async () => {
+    await writeFullAnalysis();
+    const prompt = buildAskPrompt(
+      { prompt: "Explain this finding.", seed },
+      assembleAskContext(svDir, seed),
+    );
+    // Not just the zone's name echoed back — the analysis record for it.
+    expect(prompt).toContain("Zone record for the seeded subject");
+  });
+
+  it("delivers a seeded explain request to the provider end to end", async () => {
+    await writeFullAnalysis();
+    const client = answering("payments-core couples to everything.");
+    const res = await post({ prompt: "Explain this finding.", seed }, client.factory);
+
+    expect(res.status).toBe(200);
+    const prompt = client.calls[0].request.prompt;
+    expect(prompt).toContain("src/payments/ledger.ts");
+    expect(prompt).toContain("HOW TO ANSWER");
+  });
+});

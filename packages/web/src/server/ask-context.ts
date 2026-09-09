@@ -504,6 +504,29 @@ const ASK_SYSTEM_PREAMBLE = [
   "- Answer in Markdown. Be concise; prefer specifics over preamble.",
 ].join("\n");
 
+/**
+ * What an explanation of a finding has to contain.
+ *
+ * Lives here rather than in the client's prompt text for two reasons. The
+ * Problems and Suggestions surfaces know the finding, not how to phrase a
+ * question about it — that is the same reason the seed is structured — and
+ * an explanation whose requirements are typed into a button handler cannot
+ * be tested without a live model. Assembled server-side, the contract is a
+ * property of the prompt and can be asserted directly.
+ *
+ * The three clauses are the difference between a definition and an
+ * explanation: an answer that could have been written without reading this
+ * repository has failed, however fluent it is.
+ */
+const FINDING_EXPLAIN_DIRECTIVE = [
+  "This is a request to explain one finding, seeded above under \"Seeded subject\".",
+  "Structure the answer as:",
+  "1. What the finding means, in plain language.",
+  "2. Why it matters *in this repository* — name the seeded zone and the seeded files, and say what about them produced the finding. Generic advice about this finding type is not an answer.",
+  "3. What a fix would touch — the files, modules or boundaries a change would have to move, and roughly how far the blast radius reaches.",
+  "If the analysis context does not carry what a clause needs, say so for that clause rather than filling it in from general knowledge.",
+].join("\n");
+
 /** Render the assembled bundle and the user's question into one prompt. */
 export function buildAskPrompt(request: AskRequest, context: AskContext): string {
   const parts = [ASK_SYSTEM_PREAMBLE, "", "# ANALYSIS CONTEXT"];
@@ -518,5 +541,10 @@ export function buildAskPrompt(request: AskRequest, context: AskContext): string
     );
   }
   parts.push("", "# QUESTION", request.prompt);
+  // Directives go after the question so they are the last thing read, and
+  // only for a finding: a zone or file seed is not an explain request.
+  if (request.seed?.kind === "finding") {
+    parts.push("", "# HOW TO ANSWER", FINDING_EXPLAIN_DIRECTIVE);
+  }
   return parts.join("\n");
 }
