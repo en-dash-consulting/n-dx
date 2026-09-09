@@ -1060,6 +1060,8 @@ export const TASK_CLASSES = {
   "zone.enrich-scan": "light",
   "zone.enrich-deep": "standard",
   "zone.meta-eval": "standard",
+  // web
+  "sourcevision.ask": "standard",
 };
 
 /**

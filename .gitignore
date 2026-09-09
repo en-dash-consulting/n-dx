@@ -6,6 +6,7 @@ package-lock.json
 .hench/locks/
 .hench/usage-cursors/
 .hench/reviews/
+.hench/session-cache.json
 .hench-commit-msg.txt
 .run-logs/
 .n-dx.json
@@ -13,6 +14,9 @@ package-lock.json
 .n-dx2.json
 .n-dx-web.pid
 .n-dx-web.port
+# Dashboard LLM spend ledger (one line per Ask call). Machine-local history,
+# same as .hench/runs/ — safe to delete, only used for usage reporting.
+.n-dx-web-usage.jsonl
 .rex/.backups/
 .rex/.cache/
 .rex/n-dx_workflow.md

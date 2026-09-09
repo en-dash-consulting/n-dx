@@ -1002,7 +1002,13 @@ describe("parseFolderTree: performance", () => {
       `(${smallCount} items: ${smallMs.toFixed(1)}ms, ${largeCount} items: ${largeMs.toFixed(1)}ms). ` +
       `Linear would be ~${sizeRatio.toFixed(0)}x; this suggests a complexity regression.`,
     ).toBeLessThan(sizeRatio * 4);
-  });
+    // Explicit timeout, for the same reason the assertion is a ratio: this
+    // test builds and parses ~370 items six times over, which is ~6s alone and
+    // has been observed 20x slower under full-suite load — enough to blow the
+    // 30s default and go red for the machine rather than for the code. Extra
+    // wall-clock cannot weaken the assertion, since ambient load scales both
+    // readings together.
+  }, 180_000);
 
   function buildTree(
     epicCount: number,

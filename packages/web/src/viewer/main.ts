@@ -32,6 +32,7 @@ import {
   useRefreshThrottle,
   useActiveOperations,
   useGitStatus,
+  useFeatureToggle,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
 import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
@@ -83,6 +84,7 @@ function App({ scope }: { scope: string | null }) {
     selectedZone,
     selectedRunId,
     selectedTaskId,
+    askSeed,
     navigateTo,
     handleSidebarNav,
   } = useRouteState(validViews);
@@ -106,6 +108,12 @@ function App({ scope }: { scope: string | null }) {
     [openNeolithic],
   );
   const { data, loading, refreshToast, showDrop } = useAppData({ pausePolling: isFeatureDisabled("autoRefresh") });
+  // Read here rather than in the views that need it: the view renderers in
+  // view-registry.ts are plain functions dispatched by `view`, so a hook called
+  // inside one would be a conditional hook in this component. Problems and
+  // Suggestions cannot read it themselves either — both return early from an
+  // enrichment gate before their hooks run.
+  const askEnabled = useFeatureToggle("sourcevision.ask", false);
   const {
     showRecovery,
     crashLoop,
@@ -205,7 +213,7 @@ function App({ scope }: { scope: string | null }) {
       ),
       loading
         ? h("div", { class: "loading", role: "status", "aria-live": "polite" }, "Loading...")
-        : renderActiveView(view, { data, setDetail, setPrdDetailContent, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, navigateTo, isFeatureDisabled }),
+        : renderActiveView(view, { data, setDetail, setPrdDetailContent, selectedFile, setSelectedFile, selectedZone, selectedRunId, selectedTaskId, askSeed, navigateTo, isFeatureDisabled, askEnabled }),
     ),
     !isFeatureDisabled("detailPanel")
       ? h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent })

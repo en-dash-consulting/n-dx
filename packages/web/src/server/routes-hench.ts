@@ -1186,9 +1186,10 @@ async function handleExecute(
   // hench directly. `ndx work` forwards flags straight to `hench run` (see
   // handleWork in packages/core/cli.js) but also does the vendor-config
   // validation "Start Working" needs — and, critically, resolveNdxBin has a
-  // real cross-install resolution ladder (NDX_CLI_PATH env var set by the
-  // launching CLI, project-local node_modules/.bin/ndx, this server's own
-  // module graph, then the monorepo dogfood path). The hench-specific
+  // real cross-install resolution ladder (the NDX_CLI_PATH and N_DX_CLI_PATH
+  // env vars set by the launching CLI, project-local node_modules/.bin/ndx,
+  // this server's own module graph, then the monorepo dogfood path; see its
+  // doc comment for the order and why there are two env names). The hench-specific
   // equivalent this replaced (`<projectDir>/node_modules/.bin/hench`,
   // falling back to `<projectDir>/packages/hench/dist/cli/index.js`) only
   // works for the n-dx monorepo dogfooding itself — every other analyzed

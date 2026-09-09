@@ -52,9 +52,27 @@ packages/web/tests/unit/viewer/axe-audit.test.ts
 | Hench Monitor (`hench-runs`) | HenchRunsView loading state |
 | Hench Config (`hench-config`) | HenchConfigView loading state |
 | PR Tab (`pr-markdown`) | PRMarkdownView loading state |
+| Ask (`ask`) | AskView idle state, plus the deployed-mode unavailable state |
 | Settings (`project-settings`) | ProjectSettingsView loading state |
 
 Each route is tested in **both light and dark themes** to catch theme-specific structural regressions (missing ARIA labels that only appear in one theme, dynamic class applications, etc.).
+
+### Behavioural a11y suites
+
+Axe checks static structure. Behaviour that only exists across a state
+transition — live-region announcement, focus retention, non-colour state
+signalling — is covered by dedicated suites alongside it:
+
+| Suite | Covers |
+|-------|--------|
+| `tests/unit/viewer/findings-list-a11y.test.ts` | List semantics, labelled filters, result-count live region, severity by text |
+| `tests/unit/viewer/a11y-semantic-html.test.ts` | Native controls over `div[role=button]`, dialog focus trap and restore, skip link |
+| `tests/unit/viewer/ask-view-a11y.test.ts` | Async answer arrival: persistent live region (asserted by node identity), focus retained across the submit cycle, outcome marked by shape as well as hue |
+
+The Ask panel is the one view whose result arrives after an indeterminate
+delay, so its announcement is a functional requirement rather than a polish
+item — see the "Accessibility" section of
+`packages/web/src/viewer/views/ask.ts` for the reasoning behind each choice.
 
 ### CI gate
 

@@ -1,13 +1,17 @@
 import { h } from "preact";
 import { useState, useCallback, useMemo } from "preact/hooks";
-import type { LoadedData } from "../types.js";
+import type { LoadedData, NavigateTo } from "../types.js";
 import type { Finding } from "../external.js";
 import { FindingsList } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
+import { findingAskSeed } from "./finding-seed.js";
 
 interface SuggestionsProps {
   data: LoadedData;
+  navigateTo?: NavigateTo;
+  /** State of the `sourcevision.ask` toggle — see the note in problems.ts. */
+  askEnabled?: boolean;
 }
 
 function RefreshRecommendationsButton() {
@@ -78,7 +82,7 @@ function RefreshRecommendationsButton() {
   );
 }
 
-export function SuggestionsView({ data }: SuggestionsProps) {
+export function SuggestionsView({ data, navigateTo, askEnabled = false }: SuggestionsProps) {
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
@@ -143,6 +147,11 @@ export function SuggestionsView({ data }: SuggestionsProps) {
       legacyInsights,
       groupBy: "severity",
       searchable: true,
+      // Omitted without a navigation target, or with Ask toggled off — see the
+      // note in problems.ts.
+      ...(navigateTo && askEnabled
+        ? { onExplain: (f: Finding) => navigateTo("ask", { askSeed: findingAskSeed(f) }) }
+        : {}),
     })
   );
 }

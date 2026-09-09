@@ -2,7 +2,12 @@ import { join, resolve } from "node:path";
 import { access, readFile, unlink } from "node:fs/promises";
 import { atomicWriteJSON } from "../../store/atomic-write.js";
 import { randomUUID } from "node:crypto";
-import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
+// withSelfHealTag comes through the store barrel rather than
+// store/self-heal-tag.js directly: cli/commands/ has a capped bypass surface
+// (tests/integration/domain-layer-boundary.test.ts), and the barrel is already
+// on it, so this needs no new tracked exception.
+import { resolveStore, ensureLegacyPrdMigrated, withSelfHealTag } from "../../store/index.js";
+import { stampModified } from "../../core/sync.js";
 import { REX_DIR } from "./constants.js";
 import { syncFolderTree } from "./folder-tree-sync.js";
 import { CLIError, BudgetExceededError } from "../errors.js";
@@ -201,6 +206,99 @@ async function checkSentinel(dir: string): Promise<boolean> {
   }
 }
 
+/**
+ * Turn proposals into the PRD items an accept inserts, fully nested.
+ *
+ * Each epic arrives with its features attached, and each feature with its
+ * tasks, so the caller can insert the whole batch in a single transaction and
+ * the serializer writes every item in its final shape. Building the levels
+ * separately — the shape `store.addItem` per item produced — puts childless
+ * epics on disk as `<slug>.md` leaves that a later write must delete, which is
+ * what tripped the stale-save guard. See {@link acceptProposals}.
+ *
+ * Items are stamped here, outside the transaction, because resolving the actor
+ * can shell out to git and the PRD lock should not be held across that.
+ *
+ * Exported for tests: the nesting is the property that prevents the churn, and
+ * it is worth asserting directly rather than through timing.
+ */
+export async function buildAcceptedItems(proposals: Proposal[]): Promise<{
+  items: PRDItem[];
+  addedCount: number;
+  completedCount: number;
+}> {
+  const items: PRDItem[] = [];
+  let addedCount = 0;
+  let completedCount = 0;
+
+  // `withSelfHealTag` then `stampModified`, in that order, is what the store's
+  // addItem applied to each item — preserved here so switching to a batch
+  // insert does not quietly change item metadata.
+  const prepare = async (item: PRDItem): Promise<PRDItem> => stampModified(withSelfHealTag(item));
+
+  const count = (status: string): void => {
+    addedCount++;
+    if (status === "completed") completedCount++;
+  };
+
+  for (const p of proposals) {
+    const epicStatus = p.epic.status ?? "pending";
+    const features: PRDItem[] = [];
+
+    for (const f of p.features) {
+      const featureStatus = f.status ?? "pending";
+      const tasks: PRDItem[] = [];
+
+      for (const t of f.tasks) {
+        const taskStatus = t.status ?? "pending";
+        tasks.push(await prepare({
+          id: randomUUID(),
+          title: t.title,
+          level: "task",
+          status: taskStatus,
+          source: t.source,
+          description: t.description,
+          acceptanceCriteria: t.acceptanceCriteria,
+          priority: t.priority as PRDItem["priority"],
+          tags: t.tags,
+          // LoE fields — optional, present when the LLM included estimates
+          ...(t.loe !== undefined && { loe: t.loe }),
+          ...(t.loeRationale !== undefined && { loeRationale: t.loeRationale }),
+          ...(t.loeConfidence !== undefined && { loeConfidence: t.loeConfidence }),
+          ...(taskStatus === "completed" && { completedAt: new Date().toISOString() }),
+        }));
+        count(taskStatus);
+      }
+
+      features.push(await prepare({
+        id: randomUUID(),
+        title: f.title,
+        level: "feature",
+        status: featureStatus,
+        source: f.source,
+        description: f.description,
+        ...(featureStatus === "completed" && { completedAt: new Date().toISOString() }),
+        ...(tasks.length > 0 && { children: tasks }),
+      }));
+      count(featureStatus);
+    }
+
+    items.push(await prepare({
+      id: randomUUID(),
+      title: p.epic.title,
+      level: "epic",
+      status: epicStatus,
+      source: p.epic.source,
+      description: p.epic.description,
+      ...(epicStatus === "completed" && { completedAt: new Date().toISOString() }),
+      ...(features.length > 0 && { children: features }),
+    }));
+    count(epicStatus);
+  }
+
+  return { items, addedCount, completedCount };
+}
+
 async function acceptProposals(
   dir: string,
   proposals: Proposal[],
@@ -232,66 +330,22 @@ async function acceptProposals(
   // clearSentinel(), the next run will detect the inconsistency.
   await writeSentinel(dir);
 
-  let addedCount = 0;
+  const { items, addedCount, completedCount } = await buildAcceptedItems(proposals);
 
-  let completedCount = 0;
-  for (const p of proposals) {
-    const epicId = randomUUID();
-    const epicStatus = p.epic.status ?? "pending";
-    const epicItem: PRDItem = {
-      id: epicId,
-      title: p.epic.title,
-      level: "epic",
-      status: epicStatus,
-      source: p.epic.source,
-      description: p.epic.description,
-      ...(epicStatus === "completed" && { completedAt: new Date().toISOString() }),
-    };
-    await store.addItem(epicItem);
-    addedCount++;
-    if (epicStatus === "completed") completedCount++;
-
-    for (const f of p.features) {
-      const featureId = randomUUID();
-      const featureStatus = f.status ?? "pending";
-      const featureItem: PRDItem = {
-        id: featureId,
-        title: f.title,
-        level: "feature",
-        status: featureStatus,
-        source: f.source,
-        description: f.description,
-        ...(featureStatus === "completed" && { completedAt: new Date().toISOString() }),
-      };
-      await store.addItem(featureItem, epicId);
-      addedCount++;
-      if (featureStatus === "completed") completedCount++;
-
-      for (const t of f.tasks) {
-        const taskId = randomUUID();
-        const taskStatus = t.status ?? "pending";
-        const taskItem: PRDItem = {
-          id: taskId,
-          title: t.title,
-          level: "task",
-          status: taskStatus,
-          source: t.source,
-          description: t.description,
-          acceptanceCriteria: t.acceptanceCriteria,
-          priority: t.priority as PRDItem["priority"],
-          tags: t.tags,
-          // LoE fields — optional, present when the LLM included estimates
-          ...(t.loe !== undefined && { loe: t.loe }),
-          ...(t.loeRationale !== undefined && { loeRationale: t.loeRationale }),
-          ...(t.loeConfidence !== undefined && { loeConfidence: t.loeConfidence }),
-          ...(taskStatus === "completed" && { completedAt: new Date().toISOString() }),
-        };
-        await store.addItem(taskItem, featureId);
-        addedCount++;
-        if (taskStatus === "completed") completedCount++;
-      }
-    }
-  }
+  // One transaction for the whole accept, not one per item. Beyond halving the
+  // I/O, this is what keeps the intermediate shapes off disk: an epic inserted
+  // before its features serializes to the leaf `<slug>.md`, and the transaction
+  // that adds the first feature then has to DELETE that leaf to promote the
+  // epic to `<slug>/index.md`. The stale-save guard weighs every such deletion
+  // against the transaction's own load time with a 2 ms tolerance, and the
+  // leaf's mtime lands inside that window by well under a millisecond — so
+  // under the full suite's I/O pressure the timestamp drifted past it and the
+  // accept died claiming another writer's work was about to be destroyed. It
+  // was its own. Inserting the finished tree once emits the final shape
+  // directly, so no leaf is ever written and there is nothing to weigh.
+  await store.withTransaction(async (doc) => {
+    doc.items.push(...items);
+  });
 
   // Log batch acceptance with detailed record when available
   const logDetail = batchRecord

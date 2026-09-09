@@ -484,12 +484,24 @@ describe("commands route — ndx binary resolution ladder", () => {
   let ctx: ServerContext;
   let server: Server;
   let port: number;
-  let savedCliPath: string | undefined;
+  // BOTH vars, not just N_DX_CLI_PATH. resolveNdxBin checks NDX_CLI_PATH on the
+  // FIRST rung, before the project-local bin, so leaving it ambient makes every
+  // test in this block resolve to the launching CLI and assert nothing about the
+  // ladder. `ndx start` sets both for every child it spawns (see resolveNdxBin's
+  // doc comment), so anyone running this suite from a server or agent session
+  // launched by ndx saw two red tests here; CI stayed green only because it sets
+  // neither. Same save/delete/restore shape as
+  // routes-hench-execute-binary-resolution.test.ts.
+  let savedCliPaths: Record<string, string | undefined>;
 
   beforeEach(async () => {
     execMock.mockReset();
     spawnManagedMock.mockReset();
-    savedCliPath = process.env["N_DX_CLI_PATH"];
+    savedCliPaths = {
+      NDX_CLI_PATH: process.env["NDX_CLI_PATH"],
+      N_DX_CLI_PATH: process.env["N_DX_CLI_PATH"],
+    };
+    delete process.env["NDX_CLI_PATH"];
     delete process.env["N_DX_CLI_PATH"];
     tmpDir = await mkdtemp(join(tmpdir(), "commands-ndxbin-"));
     await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
@@ -507,8 +519,10 @@ describe("commands route — ndx binary resolution ladder", () => {
   });
 
   afterEach(async () => {
-    if (savedCliPath === undefined) delete process.env["N_DX_CLI_PATH"];
-    else process.env["N_DX_CLI_PATH"] = savedCliPath;
+    for (const [key, value] of Object.entries(savedCliPaths)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
     await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
   });
@@ -528,6 +542,37 @@ describe("commands route — ndx binary resolution ladder", () => {
     }
     throw new Error("refresh did not finish");
   }
+
+  // Rung 1. `cli.js` sets NDX_CLI_PATH and N_DX_CLI_PATH to the same path
+  // (its own), so these two rungs are one mechanism under two names — which is
+  // why an ambient NDX_CLI_PATH silently answered for the whole ladder and left
+  // the rungs below it untested. Covered here so it stops being invisible.
+  it("prefers NDX_CLI_PATH over the project-local .bin/ndx", async () => {
+    const { writeFile: wf, mkdir: md } = await import("node:fs/promises");
+    const binDir = join(tmpDir, "node_modules", ".bin");
+    await md(binDir, { recursive: true });
+    await wf(join(binDir, "ndx"), "#!/bin/sh\n");
+    const launcherCli = join(tmpDir, "launcher-cli.js");
+    await wf(launcherCli, "// stand-in for the launching cli.js\n");
+    process.env["NDX_CLI_PATH"] = launcherCli;
+
+    await runRefresh();
+    expect(spawnManagedMock.mock.calls[0][0]).toBe("node");
+    expect((spawnManagedMock.mock.calls[0][1] as string[])[0]).toBe(launcherCli);
+  });
+
+  it("prefers NDX_CLI_PATH over N_DX_CLI_PATH when the launcher sets both", async () => {
+    const { writeFile: wf } = await import("node:fs/promises");
+    const preferred = join(tmpDir, "preferred-cli.js");
+    const other = join(tmpDir, "other-cli.js");
+    await wf(preferred, "// NDX_CLI_PATH\n");
+    await wf(other, "// N_DX_CLI_PATH\n");
+    process.env["NDX_CLI_PATH"] = preferred;
+    process.env["N_DX_CLI_PATH"] = other;
+
+    await runRefresh();
+    expect((spawnManagedMock.mock.calls[0][1] as string[])[0]).toBe(preferred);
+  });
 
   it("prefers the project-local .bin/ndx when present", async () => {
     const { writeFile: wf, mkdir: md } = await import("node:fs/promises");
@@ -559,6 +604,21 @@ describe("commands route — ndx binary resolution ladder", () => {
   // never resolves in this workspace — web must not depend on core). Both
   // remaining rungs end in core/cli.js, so these tests pin the ladder's
   // shape, not a specific path.
+  // Both env rungs are guarded, for the same reason: the value is exported to
+  // every child of a `ndx` process, so it outlives the install that wrote it.
+  // A dev-link install that moved or was removed leaves a path that no longer
+  // exists, and using it verbatim spawns `node <missing file>` when the rungs
+  // below would have resolved.
+  it("ignores a stale NDX_CLI_PATH that points at a missing file", async () => {
+    const stale = join(tmpDir, "gone", "launcher-cli.js");
+    process.env["NDX_CLI_PATH"] = stale;
+
+    await runRefresh();
+    const target = (spawnManagedMock.mock.calls[0][1] as string[])[0];
+    expect(target).not.toBe(stale);
+    expect(target.endsWith(join("core", "cli.js"))).toBe(true);
+  });
+
   it("ignores a stale N_DX_CLI_PATH that points at a missing file", async () => {
     const stale = join(tmpDir, "gone", "cli.js");
     process.env["N_DX_CLI_PATH"] = stale;

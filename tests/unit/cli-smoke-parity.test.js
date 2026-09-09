@@ -2,11 +2,13 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import {
   normalizeText,
+  describeShape,
   extractJsonPayload,
   extractErrorCode,
   extractFailureMetadata,
   parseJsonPayload,
   compareArtifacts,
+  validateBaseline,
   collectSmokeArtifact,
   SMOKE_CASES,
   shouldUseShellForCliCommand,
@@ -35,12 +37,18 @@ function parseDocumentedCliErrorCodes() {
   );
 }
 
-function createDeterministicSmokeRunner({ incompleteVersionJson = false, statusTitle = "Test Project" } = {}) {
+function createDeterministicSmokeRunner({
+  incompleteVersionJson = false,
+  statusTitle = "Test Project",
+  // Lets a test replay a CLI that leaks to stderr on `ndx version`. Empty is the
+  // contract; see the child-lifecycle regression-replay cases.
+  versionStderr = "",
+} = {}) {
   return async function executeCli(args) {
     const key = JSON.stringify(args);
     switch (key) {
       case JSON.stringify(["version"]):
-        return { exitCode: 0, stdout: `${CORE_VERSION}\n`, stderr: "" };
+        return { exitCode: 0, stdout: `${CORE_VERSION}\n`, stderr: versionStderr };
       case JSON.stringify(["version", "--json"]):
         return {
           exitCode: 0,
@@ -60,8 +68,6 @@ function createDeterministicSmokeRunner({ incompleteVersionJson = false, statusT
         };
       case JSON.stringify(["foobar"]):
         return { exitCode: 1, stdout: "", stderr: `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: foobar\nHint:\n` };
-      case JSON.stringify(["statis"]):
-        return { exitCode: 1, stdout: "", stderr: `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: statis\nDid you mean status\n` };
       case JSON.stringify(["help", "rex"]):
         return { exitCode: 0, stdout: "Rex — available commands\nvalidate\nrex <command> --help\n", stderr: "" };
       case JSON.stringify(["help", "plan"]):
@@ -165,9 +171,48 @@ describe("cli smoke parity helpers", () => {
     );
   });
 
-  it("strips known child lifecycle platform warnings before comparing output", () => {
+  // REGRESSION REPLAY — the one historical defect in this stage's own subject
+  // matter that we have concrete evidence for, replayed against the tightened
+  // assertions.
+  //
+  // Before b0efffdd (#329), n-dx printed
+  //   [child-lifecycle] process group cleanup is not supported on this platform; ...
+  // to stderr on EVERY win32 invocation, including `ndx version`, which spawns
+  // nothing. cli.js constructed its tracker with `processGroups: true` at module
+  // load and PLATFORM_SUPPORTS_PROCESS_GROUPS is always false on win32. The fix
+  // gated the notice behind NDX_DEBUG_LIFECYCLE / NDX_DEBUG.
+  //
+  // This collector had a hardcoded strip for that exact line, added while the bug
+  // was live. That strip is why `stderrExact: ""` could not have caught it, and
+  // why these two tests exist: the first proves the noise is no longer erased, the
+  // second proves the baseline fails on the platform that emits it.
+  it("no longer erases n-dx's own output as runtime noise", () => {
     const text = [
       "[child-lifecycle] process group cleanup is not supported on this platform; falling back to direct child kill",
+      CORE_VERSION,
+      "",
+    ].join("\n");
+
+    expect(normalizeText(text)).not.toBe(CORE_VERSION);
+    expect(normalizeText(text)).toContain("[child-lifecycle]");
+  });
+
+  it("fails version-text's baseline on the child-lifecycle notice regression (b0efffdd)", async () => {
+    const notice = "[child-lifecycle] process group cleanup is not supported on this platform; falling back to direct child kill";
+    const artifact = await collectSmokeArtifact({
+      executeCli: createDeterministicSmokeRunner({ versionStderr: `${notice}\n` }),
+    });
+
+    expect(
+      validateBaseline(artifact, "win32").some((issue) =>
+        issue.includes("version-text stderr did not match expected static text")),
+    ).toBe(true);
+  });
+
+  it("still strips genuine Node runtime warnings, which are not n-dx output", () => {
+    const text = [
+      "(node:12345) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+      "(Use `node --trace-deprecation ...` to show where the warning was created)",
       CORE_VERSION,
       "",
     ].join("\n");
@@ -256,22 +301,6 @@ describe("cli smoke parity helpers", () => {
             failure: {
               code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
               detail: "Unknown command: foobar",
-            },
-          },
-        },
-        {
-          id: "typo-suggestion",
-          exitCode: 1,
-          stdoutNormalized: "",
-          stderrNormalized: `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: statis\nDid you mean status`,
-          failure: {
-            code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-            detail: "Unknown command: statis",
-          },
-          comparable: {
-            failure: {
-              code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-              detail: "Unknown command: statis",
             },
           },
         },
@@ -392,8 +421,18 @@ describe("cli smoke parity helpers", () => {
       ],
     };
 
+    // The exit-code break is a per-OS baseline failure, so it is reported by
+    // validateBaseline on the platform that produced the artifact — not by the
+    // cross-OS comparison, which now only reports divergence.
+    expect(
+      validateBaseline(windowsArtifact, "windows").some((issue) => issue.includes("exit code")),
+    ).toBe(true);
+    expect(
+      validateBaseline(macArtifact, "macos").filter((issue) => issue.includes("version-text")),
+    ).toEqual([]);
+
     const issues = compareArtifacts(macArtifact, windowsArtifact);
-    expect(issues.some((issue) => issue.includes("exit code"))).toBe(true);
+    expect(issues.some((issue) => issue.includes("exit code"))).toBe(false);
     expect(issues.some((issue) => issue.includes("parity:version-text.comparable.stdout differs"))).toBe(true);
   });
 
@@ -488,22 +527,6 @@ describe("cli smoke parity helpers", () => {
             failure: {
               code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
               detail: "Unknown command: foobar",
-            },
-          },
-        },
-        {
-          id: "typo-suggestion",
-          exitCode: 1,
-          stdoutNormalized: "",
-          stderrNormalized: `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: statis\nHint: Did you mean 'ndx status'?`,
-          failure: {
-            code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-            detail: "Unknown command: statis",
-          },
-          comparable: {
-            failure: {
-              code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-              detail: "Unknown command: statis",
             },
           },
         },
@@ -627,22 +650,6 @@ describe("cli smoke parity helpers", () => {
           },
         },
         {
-          id: "typo-suggestion",
-          exitCode: 1,
-          stdoutNormalized: "",
-          stderrNormalized: `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: statis\nDid you mean status`,
-          failure: {
-            code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-            detail: "Unknown command: statis",
-          },
-          comparable: {
-            failure: {
-              code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-              detail: "Unknown command: statis",
-            },
-          },
-        },
-        {
           id: "help-rex",
           exitCode: 0,
           stdoutNormalized: "Rex — available commands\nvalidate\nrex <command> --help",
@@ -736,7 +743,7 @@ describe("cli smoke parity helpers", () => {
 
     const versionJsonCase = artifact.cases.find((entry) => entry.id === "version-json");
     const statusJsonCase = artifact.cases.find((entry) => entry.id === "status-json");
-    const typoCase = artifact.cases.find((entry) => entry.id === "typo-suggestion");
+    const unknownCommandCase = artifact.cases.find((entry) => entry.id === "unknown-command");
     const versionTextCase = artifact.cases.find((entry) => entry.id === "version-text");
 
     expect(versionJsonCase.comparable).toEqual({ stdoutJson: { version: CORE_VERSION } });
@@ -775,16 +782,16 @@ describe("cli smoke parity helpers", () => {
     });
     expect(versionTextCase).not.toHaveProperty("failure");
     expect(versionJsonCase).not.toHaveProperty("failure");
-    expect(typoCase.failure).toEqual({
+    expect(unknownCommandCase.failure).toEqual({
       code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-      detail: "Unknown command: statis",
+      detail: "Unknown command: foobar",
     });
-    expect(typoCase).not.toHaveProperty("stdout");
-    expect(typoCase).not.toHaveProperty("stderr");
-    expect(typoCase.comparable).toEqual({
+    expect(unknownCommandCase).not.toHaveProperty("stdout");
+    expect(unknownCommandCase).not.toHaveProperty("stderr");
+    expect(unknownCommandCase.comparable).toEqual({
       failure: {
         code: CLI_ERROR_CODES.UNKNOWN_COMMAND,
-        detail: "Unknown command: statis",
+        detail: "Unknown command: foobar",
       },
     });
     expect(artifact.sequence).toEqual([
@@ -793,7 +800,8 @@ describe("cli smoke parity helpers", () => {
         fixture: "none",
         args: ["version"],
         expectedExitCode: 0,
-        expected: { stdoutExact: CORE_VERSION },
+        expected: { stdoutExact: CORE_VERSION, stderrExact: "" },
+        shapeParity: true,
       },
       {
         id: "version-json",
@@ -801,6 +809,7 @@ describe("cli smoke parity helpers", () => {
         args: ["version", "--json"],
         expectedExitCode: 0,
         expected: { stdoutJson: { version: CORE_VERSION } },
+        shapeParity: true,
       },
       {
         id: "unknown-command",
@@ -808,13 +817,7 @@ describe("cli smoke parity helpers", () => {
         args: ["foobar"],
         expectedExitCode: 1,
         expected: { stderrCode: CLI_ERROR_CODES.UNKNOWN_COMMAND, stderrIncludes: ["Unknown command: foobar", "Hint:"] },
-      },
-      {
-        id: "typo-suggestion",
-        fixture: "none",
-        args: ["statis"],
-        expectedExitCode: 1,
-        expected: { stderrCode: CLI_ERROR_CODES.UNKNOWN_COMMAND, stderrIncludes: ["Unknown command: statis", "Did you mean", "status"] },
+        shapeParity: true,
       },
       {
         id: "help-rex",
@@ -822,6 +825,7 @@ describe("cli smoke parity helpers", () => {
         args: ["help", "rex"],
         expectedExitCode: 0,
         expected: { stdoutIncludes: ["Rex — available commands", "validate", "rex <command> --help"] },
+        shapeParity: true,
       },
       {
         id: "plan-help",
@@ -829,6 +833,7 @@ describe("cli smoke parity helpers", () => {
         args: ["help", "plan"],
         expectedExitCode: 0,
         expected: { stdoutIncludes: ["ndx plan", "USAGE", "EXAMPLES", "See also:"] },
+        shapeParity: true,
       },
       {
         id: "status-missing-rex",
@@ -836,12 +841,14 @@ describe("cli smoke parity helpers", () => {
         args: ["status", "<TMPDIR>"],
         expectedExitCode: 1,
         expected: { stderrCode: CLI_ERROR_CODES.NOT_INITIALIZED, stderrIncludes: ["Missing", ".rex", "Hint:", "ndx init"] },
+        shapeParity: false,
       },
       {
         id: "status-json",
         fixture: "rex",
         args: ["status", "--format=json", "<TMPDIR>"],
         expectedExitCode: 0,
+        shapeParity: false,
         expected: {
           stdoutJson: {
             schema: "rex/v1",
@@ -896,11 +903,142 @@ describe("cli smoke parity helpers", () => {
       executeCli: createDeterministicSmokeRunner({ statusTitle: "Windows Project" }),
     });
 
-    expect(compareArtifacts(macArtifact, windowsArtifact)).toContain(
+    expect(validateBaseline(windowsArtifact, "windows")).toContain(
       'windows:status-json.stdoutJson.title differs (expected="Test Project" actual="Windows Project")',
     );
     expect(compareArtifacts(macArtifact, windowsArtifact)).toContain(
       'parity:status-json.comparable.stdoutJson.title differs (macos="Test Project" windows="Windows Project")',
+    );
+  });
+
+  it("passes the baseline for an artifact collected from a conforming CLI", async () => {
+    const artifact = await collectSmokeArtifact({
+      executeCli: createDeterministicSmokeRunner(),
+    });
+
+    expect(validateBaseline(artifact, "macos")).toEqual([]);
+  });
+
+  it("fails the baseline on the collecting platform when a case regresses", async () => {
+    const artifact = await collectSmokeArtifact({
+      executeCli: createDeterministicSmokeRunner({ statusTitle: "Windows Project" }),
+    });
+
+    expect(validateBaseline(artifact, "windows")).toContain(
+      'windows:status-json.stdoutJson.title differs (expected="Test Project" actual="Windows Project")',
+    );
+  });
+
+  it("reports a missing case as a baseline failure rather than skipping it", () => {
+    const issues = validateBaseline({ cases: [] }, "windows");
+
+    expect(issues).toContain("windows:missing collected case version-text");
+    expect(issues).toHaveLength(SMOKE_CASES.length);
+  });
+
+  it("enforces stderrExact so a clean stream is asserted per platform, not just matched", () => {
+    const versionText = SMOKE_CASES.find((smokeCase) => smokeCase.id === "version-text");
+    expect(versionText.expected.stderrExact).toBe("");
+
+    const noisy = {
+      cases: [
+        {
+          id: "version-text",
+          exitCode: 0,
+          stdoutNormalized: CORE_VERSION,
+          stderrNormalized: "warning: something leaked to stderr",
+          comparable: { stdout: CORE_VERSION, stderr: "warning: something leaked to stderr" },
+        },
+      ],
+    };
+
+    expect(
+      validateBaseline(noisy, "windows").some((issue) =>
+        issue.includes("version-text stderr did not match expected static text")),
+    ).toBe(true);
+  });
+
+  it("fingerprints raw separators and line endings before normalization erases them", () => {
+    expect(describeShape("plain output\n")).toEqual({ crlfCount: 0, backslashCount: 0 });
+    expect(describeShape("a\r\nb\r\n")).toEqual({ crlfCount: 2, backslashCount: 0 });
+    expect(describeShape("C:\\Users\\me\n")).toEqual({ crlfCount: 0, backslashCount: 2 });
+
+    // normalizeText flattens both, which is exactly the blind spot describeShape covers.
+    expect(normalizeText("a\r\nb")).toBe(normalizeText("a\nb"));
+    expect(describeShape("a\r\nb")).not.toEqual(describeShape("a\nb"));
+  });
+
+  it("excludes runtime noise from the shape fingerprint", () => {
+    const noise = "(node:12345) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n";
+
+    expect(describeShape(`${noise}1.2.3\n`)).toEqual(describeShape("1.2.3\n"));
+  });
+
+  it("records a shape fingerprint only for path-free cases", async () => {
+    const artifact = await collectSmokeArtifact({
+      executeCli: createDeterministicSmokeRunner(),
+    });
+
+    for (const smokeCase of SMOKE_CASES) {
+      const collected = artifact.cases.find((entry) => entry.id === smokeCase.id);
+      if (smokeCase.shapeParity) {
+        expect(collected.shape, `${smokeCase.id} should carry a shape fingerprint`).toEqual({
+          stdout: expect.objectContaining({ crlfCount: expect.any(Number) }),
+          stderr: expect.objectContaining({ backslashCount: expect.any(Number) }),
+        });
+      } else {
+        expect(collected, `${smokeCase.id} embeds a temp path and must not be shape-compared`)
+          .not.toHaveProperty("shape");
+      }
+    }
+
+    // The fixture cases are the excluded ones, and they are excluded because
+    // their output carries native temp paths.
+    expect(SMOKE_CASES.filter((smokeCase) => !smokeCase.shapeParity).map((smokeCase) => smokeCase.id))
+      .toEqual(["status-missing-rex", "status-json"]);
+  });
+
+  it("fails parity on separator drift that normalization would have hidden", async () => {
+    const macArtifact = await collectSmokeArtifact({
+      executeCli: createDeterministicSmokeRunner(),
+    });
+    const windowsArtifact = structuredClone(macArtifact);
+
+    expect(compareArtifacts(macArtifact, windowsArtifact)).toEqual([]);
+
+    // A hardcoded CRLF on one platform only. Every normalized field still
+    // matches, so this is invisible without the shape fingerprint.
+    const helpCase = windowsArtifact.cases.find((entry) => entry.id === "help-rex");
+    helpCase.shape.stdout.crlfCount += 3;
+
+    expect(compareArtifacts(macArtifact, windowsArtifact)).toContain(
+      "parity:help-rex.shape.stdout.crlfCount differs (macos=0 windows=3)",
+    );
+  });
+
+  it("fails parity on backslash drift in path-free output", async () => {
+    const macArtifact = await collectSmokeArtifact({
+      executeCli: createDeterministicSmokeRunner(),
+    });
+    const windowsArtifact = structuredClone(macArtifact);
+    const planCase = windowsArtifact.cases.find((entry) => entry.id === "plan-help");
+    planCase.shape.stdout.backslashCount = 4;
+
+    expect(compareArtifacts(macArtifact, windowsArtifact)).toContain(
+      "parity:plan-help.shape.stdout.backslashCount differs (macos=0 windows=4)",
+    );
+  });
+
+  it("compares shape on failure cases, which short-circuit the comparable diff", async () => {
+    const macArtifact = await collectSmokeArtifact({
+      executeCli: createDeterministicSmokeRunner(),
+    });
+    const windowsArtifact = structuredClone(macArtifact);
+    const failureCase = windowsArtifact.cases.find((entry) => entry.id === "unknown-command");
+    failureCase.shape.stderr.crlfCount = 2;
+
+    expect(compareArtifacts(macArtifact, windowsArtifact)).toContain(
+      "parity:unknown-command.shape.stderr.crlfCount differs (macos=0 windows=2)",
     );
   });
 });

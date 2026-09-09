@@ -14,13 +14,22 @@
  * from the template, or a template entry that no longer corresponds to
  * anything.
  *
+ * Pinning the two files to each other is necessary but not sufficient: they
+ * agree trivially when an artifact is missing from *both*, which is how
+ * `.hench/session-cache.json` stayed green here while being committed on every
+ * run. `HENCH_RUNTIME_GITIGNORE_ENTRIES` is a third statement of the same list
+ * — the one hench's own code reads — so it is checked against both files
+ * rather than left to drift alongside them.
+ *
  * @see packages/hench/src/agent/lifecycle/shared.ts — the `git add -A` gate
+ * @see packages/hench/src/store/artifacts.ts — the list hench itself uses
  */
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { HENCH_RUNTIME_GITIGNORE_ENTRIES } from "../../packages/hench/src/store/artifacts.ts";
 
 const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const TEMPLATE = join(ROOT, "packages/core/assistant-assets/ndx.gitignore");
@@ -58,5 +67,18 @@ describe("ndx init ignore template", () => {
     expect([...runtimeEntries(TEMPLATE)].sort()).toEqual(
       [...runtimeEntries(REPO_IGNORE)].sort(),
     );
+  });
+
+  it("ignores every path hench declares as its own runtime artifact", () => {
+    // The list hench's gate discounts and the list `hench init` writes are the
+    // same constant; both ignore files must carry it in full. Checked in this
+    // direction only — the files may legitimately ignore more than the gate
+    // discounts (`.hench/reviews/` does today).
+    const template = runtimeEntries(TEMPLATE);
+    const repo = runtimeEntries(REPO_IGNORE);
+    for (const entry of HENCH_RUNTIME_GITIGNORE_ENTRIES) {
+      expect(template, `${entry} missing from ndx.gitignore`).toContain(entry);
+      expect(repo, `${entry} missing from this repo's .gitignore`).toContain(entry);
+    }
   });
 });

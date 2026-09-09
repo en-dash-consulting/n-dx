@@ -283,7 +283,7 @@ function buildIsoModel(input, options = {}) {
       weight: 0,
       calls: 0,
       back: b.col <= a.col,
-      seam: { callbacks: seam.callbacks ?? [], note: seam.note },
+      seam: { callbacks: seam.callbacks ?? [], note: seam.note, verification: seam.verification },
       points: routeEdge(a, b, bounds, lanes, rawEdges.length + i)
     });
   });
@@ -556,11 +556,11 @@ function describeGaps(input) {
   const infraCount = (input.infrastructure ?? []).length;
   if (infraCount > 0) {
     gaps.push(
-      "Runtime infrastructure is shown from declarations, not detection: entries in .n-dx.json and resources found in Terraform. A queue nobody declared is still invisible, and a zone is attributed to a resource by naming it in source, which is weaker evidence than an import."
+      "Runtime infrastructure is shown from declarations, not detection: entries in .n-dx.json and resources found in Terraform or CloudFormation. A queue nobody declared is still invisible, and a zone is attributed to a resource by naming it in source, which is weaker evidence than an import."
     );
   } else {
     gaps.push(
-      "Runtime infrastructure — queues, caches, buckets, databases, cron — has no static signature and is absent. Declare it under sourcevision.isoMap.infrastructure in .n-dx.json, or add Terraform, and it will be drawn."
+      "Runtime infrastructure — queues, caches, buckets, databases, cron — has no static signature and is absent. Declare it under sourcevision.isoMap.infrastructure in .n-dx.json, or add Terraform or CloudFormation, and it will be drawn."
     );
   }
   const seamCount = (input.seams ?? []).length;
@@ -657,7 +657,7 @@ var STYLES = `
   --muted:#9B9BC4; --accent:#7FAE33; --warn:#E0A33E; --crit:#E36262;
   --chip:#232253; --chip-hover:#2C2B66;
   --ground:#171639; --gridline:#222150;
-  --wire:#4A4990; --wire-hot:#7FAE33; --seam:#C9789E; --infra:#B0668A;
+  --wire:#4A4990; --wire-hot:#7FAE33; --seam:#C9789E; --seam-unver:#8C6076; --infra:#B0668A;
   --tag-bg:#1B1A45; --tag-ink:#EFEFF7; --tag-ink-on:#12122B;
   --body-ink:#D3D3E8;
 }
@@ -667,7 +667,7 @@ var STYLES = `
     --muted:#5C5F7A; --accent:#4E7A16; --warn:#9A6512; --crit:#B3352F;
     --chip:#EFF0F7; --chip-hover:#E3E5F2;
     --ground:#E7E9F5; --gridline:#D2D5E8;
-    --wire:#8E93BC; --wire-hot:#4E7A16; --seam:#A2416C; --infra:#8E4467;
+    --wire:#8E93BC; --wire-hot:#4E7A16; --seam:#A2416C; --seam-unver:#B98BA0; --infra:#8E4467;
     --tag-bg:#FFFFFF; --tag-ink:#1B1B33; --tag-ink-on:#FFFFFF;
     --body-ink:#33344F;
   }
@@ -720,6 +720,9 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:
 /* Declared, not inferred: a different hue so nobody reads a human assertion
    as something the analysis proved. */
 .wire.seam{stroke:var(--seam)}
+/* A declaration the call graph does not support draws thinner and fainter, and
+   carries a sparser dash — never colour alone. */
+.wire.seam.unver{stroke:var(--seam-unver);stroke-width:1.2}
 .wire.infra{stroke:var(--infra)}
 .tagbox{fill:var(--tag-bg)}
 .tagtext{fill:var(--tag-ink)}
@@ -786,6 +789,16 @@ var NODES = MODEL.nodes, EDGES = MODEL.edges, B = MODEL.bounds;
 var COLOR = {}, LABEL = {}, GLYPH = {};
 MODEL.kinds.forEach(function(k){ COLOR[k.id] = k.color; LABEL[k.id] = k.label; GLYPH[k.id] = k.glyph; });
 var BY = {}; NODES.forEach(function(n){ BY[n.id] = n; });
+
+/**
+ * A declared seam the call graph was checked against and did not support.
+ * False for a seam nobody could check — "not checked" is not "unsupported",
+ * and drawing them the same way would invent a finding.
+ */
+function unverifiedSeam(e){
+  return !!(e.seam && e.seam.verification && e.seam.verification.status === "unverified");
+}
+var UNVERIFIED = EDGES.filter(unverifiedSeam).length;
 var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function P(u, v, z){ return [(u - v) * CX * CELL, ((u + v) * CY - (z || 0) * CZ) * CELL]; }
@@ -865,20 +878,29 @@ var edgeEls = [];
 EDGES.forEach(function(e, index){
   var projected = e.points.map(function(q){ return P(q[0], q[1], 0); });
   var from = BY[e.from], to = BY[e.to];
-  var kindWord = e.seam ? "Runtime seam: " : (e.infra ? "Uses infrastructure: " : "Dependency: ");
+  var unver = unverifiedSeam(e);
+  var kindWord = e.seam
+    ? (unver ? "Unverified runtime seam: " : "Runtime seam: ")
+    : (e.infra ? "Uses infrastructure: " : "Dependency: ");
   var relation = e.seam ? " calls back into " : (e.infra ? " talks to " : " imports ");
   var g = el("g", {
     "class": "edge", tabindex: "-1", role: "button",
     "aria-label": kindWord + (from ? from.name : e.from) + relation +
-      (to ? to.name : e.to) + (e.seam || e.infra ? "" : ", " + e.weight + " references")
+      (to ? to.name : e.to) +
+      (e.seam
+        ? (unver ? ", declared but no supporting calls in the call graph" : "")
+        : (e.infra ? "" : ", " + e.weight + " references"))
   });
   var hit = el("polyline", {
     points: pts(projected), fill: "none", stroke: "transparent",
     "stroke-width": "14", "stroke-linejoin": "round", "stroke-linecap": "round"
   });
   var line = el("polyline", { points: pts(projected), "marker-end": "url(#wire)" });
-  line.setAttribute("class", "wire" + (e.seam ? " seam" : "") + (e.infra ? " infra" : ""));
-  if (e.seam) line.setAttribute("stroke-dasharray", "2 5");
+  line.setAttribute("class", "wire" + (e.seam ? " seam" : "") + (unver ? " unver" : "") +
+    (e.infra ? " infra" : ""));
+  // Dash pattern, not just hue: an unsupported claim has to read as different
+  // for anyone who cannot separate the two pinks.
+  if (e.seam) line.setAttribute("stroke-dasharray", unver ? "1 8" : "2 5");
   else if (e.infra) line.setAttribute("stroke-dasharray", "10 4");
   else if (e.back) line.setAttribute("stroke-dasharray", "7 6");
   g.appendChild(hit); g.appendChild(line);
@@ -1001,6 +1023,11 @@ var INTRO =
     ? '<li>Pink connectors are <b>declared</b>, not inferred: runtime seams and infrastructure ' +
       'that no import can show. They are assertions from <code>.n-dx.json</code> or IaC.</li>'
     : '') +
+  (UNVERIFIED
+    ? '<li>' + UNVERIFIED + ' declared ' + (UNVERIFIED === 1 ? 'seam is' : 'seams are') +
+      ' <b>unverified</b> &mdash; drawn faint with a sparse dash. The call graph shows no call to ' +
+      'the callbacks they name, so the declaration is likely stale. Click one to see which.</li>'
+    : '') +
   '<li>Use the legend to isolate one kind of zone.</li>' +
   '<li>Drag to pan, scroll to zoom, <b>Reset view</b> to recentre. <b>Esc</b> clears.</li>' +
   '</ul>';
@@ -1080,14 +1107,28 @@ function renderEdge(e){
   if (e.seam) {
     // A declared seam is an assertion by a person, and the panel says so —
     // it is not something the analysis proved.
-    h = '<div class="kind">Runtime seam &middot; declared</div>';
+    var v = e.seam.verification;
+    h = '<div class="kind">Runtime seam &middot; declared' +
+      (v ? ' &middot; ' + (v.status === "verified" ? 'corroborated' : 'unverified') : '') + '</div>';
     sub = e.seam.callbacks.length
       ? e.seam.callbacks.length + ' injected ' + (e.seam.callbacks.length === 1 ? 'callback' : 'callbacks')
       : 'declared in .n-dx.json';
     body = esc(fromName) + ' injects into ' + esc(toName) + ', so at runtime control flows ' +
       'this way even though the import points the other way. Static analysis cannot see this &mdash; ' +
       'it is declared under <code>sourcevision.isoMap.injectionSeams</code> and is only as accurate ' +
-      'as that declaration.';
+      'as that declaration.' +
+      (v && v.status === "unverified"
+        ? ' <b>The call graph shows nothing in ' + esc(toName) + ' calling any of the declared ' +
+          'callbacks</b>, so this declaration is either stale or names the wrong end. A seam left ' +
+          'behind by a refactor keeps asserting a relationship that no longer exists.'
+        : '') +
+      (v && v.status === "verified"
+        ? ' The call graph corroborates it: the callbacks below are called on the receiving side.'
+        : '') +
+      (!v && e.seam.callbacks.length
+        ? ' Nothing here checks that claim &mdash; this view has no call graph, so the callbacks ' +
+          'are taken on trust.'
+        : '');
   } else if (e.infra) {
     h = '<div class="kind">Infrastructure &middot; declared</div>';
     sub = to ? esc(to.sub) : 'runtime resource';
@@ -1110,8 +1151,22 @@ function renderEdge(e){
   h += '<div class="sub">' + sub + '</div>';
   h += '<div class="body">' + body + '</div>';
   if (e.seam && e.seam.callbacks.length) {
+    // Per callback, what the call graph found — the file and the expression it
+    // matched, so a reader can judge the evidence instead of trusting a badge.
+    var found = {};
+    if (e.seam.verification) {
+      e.seam.verification.corroborated.forEach(function(c){ found[c.callback] = c; });
+    }
     h += '<h4>Injected</h4><ul>' + e.seam.callbacks.map(function(c){
-      return '<li><code>' + esc(c) + '</code></li>';
+      var hit = found[c];
+      var evidence = '';
+      if (hit) {
+        evidence = ' <span class="sub">called as <code>' + esc(hit.expression) + '</code> in ' +
+          esc(hit.file) + '</span>';
+      } else if (e.seam.verification) {
+        evidence = ' <span class="sub">&mdash; not called anywhere in ' + esc(toName) + '</span>';
+      }
+      return '<li><code>' + esc(c) + '</code>' + evidence + '</li>';
     }).join("") + '</ul>';
   }
   if (e.seam && e.seam.note) h += '<h4>Why</h4><div class="body">' + esc(e.seam.note) + '</div>';
@@ -1189,7 +1244,8 @@ function refresh(scrollPanel){
     var hot = (i === curEdge) || (curNode !== null && (x.e.from === curNode || x.e.to === curNode));
     var ends = kindVisible((BY[x.e.from] || {}).kind) && kindVisible((BY[x.e.to] || {}).kind);
     var weight = edgeWeight(x.e);
-    var declared = (x.e.seam ? " seam" : "") + (x.e.infra ? " infra" : "");
+    var declared = (x.e.seam ? " seam" : "") + (unverifiedSeam(x.e) ? " unver" : "") +
+      (x.e.infra ? " infra" : "");
     x.node.setAttribute("class", "wire" + declared + (hot ? " hot" : ""));
     x.node.setAttribute("marker-end", hot ? "url(#wirehot)" : "url(#wire)");
     x.node.setAttribute("stroke-width", String(Math.min(4.5, 1.6 + Math.log(weight + 1))));
@@ -1945,14 +2001,17 @@ var IAC_KINDS = [
   [/dynamodb|rds|_sql|spanner|firestore|bigtable|cosmosdb|documentdb|database/, "database"],
   [/elasticache|redis|memcache/, "cache"],
   [/kinesis|kafka|msk|firehose/, "stream"],
-  [/cloudwatch_event_rule|scheduler|cron|eventbridge_rule/, "scheduler"],
+  [/cloudwatch_event_rule|events_rule|scheduler|cron|eventbridge_rule/, "scheduler"],
   [/secret|kms|vault|parameter/, "secrets"],
-  [/lambda_function|cloud_run|cloudfunctions|container_app/, "compute"]
+  [
+    /lambda_function|serverless_function|cloud_run|cloudfunctions|container_app/,
+    "compute"
+  ]
 ];
 function classifyResource(type) {
-  const lower = type.toLowerCase();
+  const normalized = type.toLowerCase().replace(/::/g, "_").replace(/-/g, "_");
   for (const [pattern, kind] of IAC_KINDS) {
-    if (pattern.test(lower)) return kind;
+    if (pattern.test(normalized)) return kind;
   }
   return null;
 }
@@ -1965,10 +2024,11 @@ var IAC_SKIP = /* @__PURE__ */ new Set([
   "vendor",
   "coverage"
 ]);
-function findTerraform(root, limit = 400) {
-  const found = [];
+function findIaCFiles(root, limit = 400) {
+  const terraform = [];
+  const yaml = [];
   function walk(dir, depth) {
-    if (depth > 8 || found.length >= limit) return;
+    if (depth > 8 || terraform.length >= limit && yaml.length >= limit) return;
     let entries;
     try {
       entries = readdirSync2(dir, { withFileTypes: true });
@@ -1977,49 +2037,113 @@ function findTerraform(root, limit = 400) {
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
-      if (found.length >= limit) return;
       const full = join2(dir, entry.name);
       if (entry.isDirectory()) {
         if (IAC_SKIP.has(entry.name) || entry.name.startsWith(".")) continue;
         walk(full, depth + 1);
-      } else if (extname2(entry.name) === ".tf") {
-        found.push(relative2(root, full).split(sep2).join("/"));
+        continue;
       }
+      const ext = extname2(entry.name);
+      const path = relative2(root, full).split(sep2).join("/");
+      if (ext === ".tf" && terraform.length < limit) terraform.push(path);
+      else if ((ext === ".yaml" || ext === ".yml") && yaml.length < limit) yaml.push(path);
     }
   }
   walk(root, 0);
-  return found;
+  return { terraform, yaml };
 }
 var TF_RESOURCE = /resource\s+"([^"]+)"\s+"([^"]+)"\s*\{/g;
 var TF_NAME_ATTR = /^\s*(?:name|bucket|queue_name|topic_name|function_name|identifier|table_name)\s*=\s*"([^"]+)"/gm;
-function discoverFromIaC(root) {
-  const files = findTerraform(root);
-  if (files.length === 0) return { infrastructure: [], sawIaC: false };
-  const infrastructure = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const file of files) {
-    let content;
-    try {
-      content = readFileSync2(join2(root, file), "utf-8");
-    } catch {
+var CFN_RESOURCES = /^Resources:\s*$/m;
+var CFN_LOGICAL = /^(\s+)([A-Za-z0-9]+):\s*$/;
+var CFN_TYPE = /^\s*Type:\s*['"]?([A-Za-z0-9]+::[A-Za-z0-9:-]+)['"]?\s*$/;
+var CFN_NAME_PROP = /^\s*(?:Name|BucketName|QueueName|TopicName|FunctionName|TableName|DBInstanceIdentifier|StreamName|ClusterName)\s*:\s*['"]?([^'"\n]+?)['"]?\s*$/;
+function isCloudFormation(content) {
+  return CFN_RESOURCES.test(content) && /^\s*Type:\s*['"]?[A-Za-z0-9]+::/m.test(content);
+}
+function parseCloudFormation(content, file) {
+  const lines = content.split(/\r?\n/);
+  const start = lines.findIndex((l) => CFN_RESOURCES.test(l));
+  if (start === -1) return [];
+  const found = [];
+  let baseIndent = null;
+  let current = null;
+  const flush = () => {
+    if (!current?.type) return;
+    const kind = classifyResource(current.type);
+    if (!kind) return;
+    found.push({
+      id: `infra:${current.type}.${current.name}`,
+      name: current.name,
+      kind,
+      usedBy: [],
+      note: `${current.type} declared in ${file}`,
+      origin: file,
+      literals: [...current.literals].sort()
+    });
+  };
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent === 0) break;
+    const logical = CFN_LOGICAL.exec(line);
+    if (logical && (baseIndent === null || logical[1].length === baseIndent)) {
+      baseIndent = logical[1].length;
+      flush();
+      current = { name: logical[2], literals: /* @__PURE__ */ new Set([logical[2]]) };
       continue;
     }
+    if (!current) continue;
+    const type = CFN_TYPE.exec(line);
+    if (type) {
+      current.type = type[1];
+      continue;
+    }
+    const prop = CFN_NAME_PROP.exec(line);
+    if (prop && !prop[1].startsWith("!") && !prop[1].includes("Fn::")) {
+      current.literals.add(prop[1].trim());
+    }
+  }
+  flush();
+  return found;
+}
+function discoverFromIaC(root) {
+  const { terraform, yaml } = findIaCFiles(root);
+  if (terraform.length === 0 && yaml.length === 0) {
+    return { infrastructure: [], sawIaC: false };
+  }
+  const infrastructure = [];
+  const seen = /* @__PURE__ */ new Set();
+  const add = (entry) => {
+    if (seen.has(entry.id)) return;
+    seen.add(entry.id);
+    infrastructure.push(entry);
+  };
+  const read = (file) => {
+    try {
+      const full = join2(root, file);
+      if (statSync2(full).size > 1e6) return null;
+      return readFileSync2(full, "utf-8");
+    } catch {
+      return null;
+    }
+  };
+  for (const file of terraform) {
+    const content = read(file);
+    if (content === null) continue;
     TF_RESOURCE.lastIndex = 0;
     let match;
     while ((match = TF_RESOURCE.exec(content)) !== null) {
       const [, type, localName] = match;
       const kind = classifyResource(type);
       if (!kind) continue;
-      const id = `infra:${type}.${localName}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
       const block = content.slice(match.index, match.index + 800);
       TF_NAME_ATTR.lastIndex = 0;
       const literals = /* @__PURE__ */ new Set([localName]);
       let attr;
       while ((attr = TF_NAME_ATTR.exec(block)) !== null) literals.add(attr[1]);
-      infrastructure.push({
-        id,
+      add({
+        id: `infra:${type}.${localName}`,
         name: localName,
         kind,
         usedBy: [],
@@ -2029,8 +2153,15 @@ function discoverFromIaC(root) {
       });
     }
   }
+  let sawTemplate = false;
+  for (const file of yaml) {
+    const content = read(file);
+    if (content === null || !isCloudFormation(content)) continue;
+    sawTemplate = true;
+    for (const entry of parseCloudFormation(content, file)) add(entry);
+  }
   infrastructure.sort((a, b) => a.id.localeCompare(b.id));
-  return { infrastructure, sawIaC: true };
+  return { infrastructure, sawIaC: terraform.length > 0 || sawTemplate };
 }
 var TOO_GENERIC = /* @__PURE__ */ new Set([
   "main",
@@ -2181,6 +2312,36 @@ function aggregateCallEdges(callGraph, zoneOfFile) {
     (a, b) => b.weight - a.weight || a.fromZone.localeCompare(b.fromZone) || a.toZone.localeCompare(b.toZone)
   );
 }
+function indexCalleesByFile(callGraph, files) {
+  const index = /* @__PURE__ */ new Map();
+  if (files.size === 0) return index;
+  for (const edge of callGraph.edges) {
+    if (!files.has(edge.callerFile)) continue;
+    const existing = index.get(edge.callerFile);
+    if (existing) existing.add(edge.callee);
+    else index.set(edge.callerFile, /* @__PURE__ */ new Set([edge.callee]));
+  }
+  return index;
+}
+function verifySeamCallbacks(callbacks, receivingFiles, index) {
+  const files = [...receivingFiles].sort();
+  const corroborated = [];
+  const missing = [];
+  for (const callback of callbacks) {
+    let hit;
+    for (const file of files) {
+      const callees = [...index.get(file) ?? []].sort();
+      const expression = callees.find((c) => c === callback) ?? callees.find((c) => c.endsWith(`.${callback}`));
+      if (expression) {
+        hit = { callback, file, expression };
+        break;
+      }
+    }
+    if (hit) corroborated.push(hit);
+    else missing.push(callback);
+  }
+  return { status: corroborated.length > 0 ? "verified" : "unverified", corroborated, missing };
+}
 function toZoneId(ref, zoneIds, zoneOfFile) {
   if (zoneIds.has(ref)) return ref;
   const exact = zoneOfFile.get(ref);
@@ -2191,10 +2352,20 @@ function toZoneId(ref, zoneIds, zoneOfFile) {
   }
   return null;
 }
-function resolveSeams(seams, zoneIds, zoneOfFile) {
+function groupFilesByZone(zoneOfFile) {
+  const byZone = /* @__PURE__ */ new Map();
+  for (const [file, zone] of zoneOfFile) {
+    const existing = byZone.get(zone);
+    if (existing) existing.push(file);
+    else byZone.set(zone, [file]);
+  }
+  return byZone;
+}
+function resolveSeams(seams, zoneIds, zoneOfFile, callGraph) {
   const resolved = [];
   const internal = [];
   const unresolved = [];
+  const stale = [];
   for (const seam of seams) {
     const label = `${seam.from} → ${seam.to}`;
     const fromZone = toZoneId(seam.from, zoneIds, zoneOfFile);
@@ -2209,7 +2380,32 @@ function resolveSeams(seams, zoneIds, zoneOfFile) {
     }
     resolved.push({ fromZone, toZone, callbacks: seam.callbacks, note: seam.note });
   }
-  return { seams: resolved, internal, unresolved };
+  const checkable = resolved.filter((s) => (s.callbacks ?? []).length > 0);
+  if (callGraph && checkable.length > 0) {
+    const filesByZone = groupFilesByZone(zoneOfFile);
+    const receiving = /* @__PURE__ */ new Set();
+    for (const seam of checkable) {
+      for (const file of filesByZone.get(seam.toZone) ?? []) receiving.add(file);
+    }
+    const index = indexCalleesByFile(callGraph, receiving);
+    for (const seam of checkable) {
+      seam.verification = verifySeamCallbacks(
+        seam.callbacks ?? [],
+        filesByZone.get(seam.toZone) ?? [],
+        index
+      );
+      if (seam.verification.missing.length > 0) {
+        stale.push(`${seam.fromZone} → ${seam.toZone} (${seam.verification.missing.join(", ")})`);
+      }
+    }
+  }
+  return {
+    seams: resolved,
+    internal,
+    unresolved,
+    stale,
+    unchecked: callGraph ? 0 : checkable.length
+  };
 }
 function seamGaps(resolution) {
   const gaps = [];
@@ -2221,6 +2417,16 @@ function seamGaps(resolution) {
   if (resolution.unresolved.length > 0) {
     gaps.push(
       `${resolution.unresolved.length} declared seam${resolution.unresolved.length === 1 ? "" : "s"} could not be placed — the named file or zone is not in the map: ${resolution.unresolved.join(", ")}.`
+    );
+  }
+  if (resolution.stale.length > 0) {
+    gaps.push(
+      `The call graph shows no call to some declared callbacks, so those declarations may be stale — nothing on the receiving side invokes them: ${resolution.stale.join("; ")}.`
+    );
+  }
+  if (resolution.unchecked > 0) {
+    gaps.push(
+      `${resolution.unchecked} declared seam${resolution.unchecked === 1 ? "" : "s"} could not be checked against the code: there is no call graph in this view, so the injected callbacks are taken on trust. Run a full analyze for a map that verifies them.`
     );
   }
   return gaps;
@@ -2314,7 +2520,7 @@ function loadFromSourcevision(root, options = {}) {
   }
   const zoneIds = new Set(zones.map((z) => z.id));
   const declared = loadDeclaredArchitecture(root, [...files.keys()]);
-  const seamResolution = resolveSeams(declared.seams, zoneIds, zoneOfFile);
+  const seamResolution = resolveSeams(declared.seams, zoneIds, zoneOfFile, callGraph);
   extraGaps.push(...seamGaps(seamResolution));
   return {
     zones,
