@@ -29,7 +29,10 @@ import { execSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { performPreRunCommitGateIfNeeded } from "../../../src/agent/lifecycle/shared.js";
+import {
+  performPreRunCommitGateIfNeeded,
+  excludeHenchRuntimeArtifacts,
+} from "../../../src/agent/lifecycle/shared.js";
 import { HENCH_RUNTIME_ARTIFACTS } from "../../../src/schema/index.js";
 
 /** Porcelain lines as `git status --porcelain` would emit them. */
@@ -164,5 +167,149 @@ describe("the gate against a real git repository", () => {
     const dir = repoWithHenchLock();
     writeFileSync(join(dir, "src.ts"), "export const x = 1;\n");
     await expect(gate(dir)).resolves.toBe("stop");
+  });
+});
+
+// ── When the project directory is not the repository root ────────────────────
+//
+// `git status --porcelain` reports paths relative to the REPOSITORY ROOT, not
+// to the cwd it was invoked from. Every test above puts the project at the root,
+// where those two coincide and the distinction is invisible.
+//
+// Below the root they diverge: a run in `sub/` sees `?? sub/.hench/locks/…`,
+// which does not start with `.hench/locks/`, so the exclusion missed it and the
+// gate blocked on hench's own lock again — the very bug the exclusion was added
+// to fix, still live for any project nested inside a larger repo
+// (`ndx work packages/web`, a package in a monorepo, a checkout with the
+// project one level down).
+
+describe("the gate when hench lives below the repository root", () => {
+  const dirs: string[] = [];
+
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  /**
+   * A committed repo whose hench project sits in `sub/`, with the startup lock
+   * present and not gitignored.
+   *
+   * @returns the repo root and the nested project dir
+   */
+  function nestedRepo(): { root: string; project: string } {
+    const root = mkdtempSync(join(tmpdir(), "hench-nested-"));
+    dirs.push(root);
+    const git = (args: string) => execSync(`git ${args}`, { cwd: root, stdio: "pipe" });
+    git("init -q");
+    git("config user.email test@example.com");
+    git("config user.name test");
+
+    const project = join(root, "sub");
+    mkdirSync(join(project, ".hench"), { recursive: true });
+    writeFileSync(join(root, "README.md"), "# t\n");
+    // Committed so an edit to it later registers as a modification rather than
+    // as an untracked file, which would stop the run for a different reason.
+    writeFileSync(join(project, ".hench", "config.json"), '{"model":"claude-sonnet-5"}\n');
+    git("add -A");
+    git("commit -qm init");
+
+    // Exactly what process/limiter.ts does at startup.
+    mkdirSync(join(project, ".hench", "locks"), { recursive: true });
+    writeFileSync(join(project, ".hench", "locks", "run.lock"), "pid\n");
+    return { root, project };
+  }
+
+  const gate = (project: string) =>
+    performPreRunCommitGateIfNeeded({
+      projectDir: project,
+      henchDir: join(project, ".hench"),
+      model: "claude-sonnet-5",
+      yes: false,
+      autonomous: true,
+      allowDirty: false,
+      dryRun: false,
+    } as never);
+
+  it("porcelain really does report paths relative to the repo root", () => {
+    // Pinning the assumption the fix rests on, so a future reader does not have
+    // to rediscover it — and so this suite fails loudly rather than mysteriously
+    // if git ever changes that behaviour.
+    const { project } = nestedRepo();
+    const out = execSync("git status --porcelain --untracked-files=all", {
+      cwd: project,
+      encoding: "utf-8",
+    }).trim();
+
+    expect(out).toBe("?? sub/.hench/locks/run.lock");
+  });
+
+  it("starts a run whose only dirty path is its own lock, one level down", async () => {
+    const { project } = nestedRepo();
+    await expect(gate(project)).resolves.toBe("proceed");
+  });
+
+  it("still refuses when the operator has real uncommitted work", async () => {
+    const { project } = nestedRepo();
+    writeFileSync(join(project, "src.ts"), "export const x = 1;\n");
+    await expect(gate(project)).resolves.toBe("stop");
+  });
+
+  it("still counts an edit to the committed config file", async () => {
+    const { project } = nestedRepo();
+    writeFileSync(join(project, ".hench", "config.json"), '{"model":"claude-opus-5"}\n');
+    await expect(gate(project)).resolves.toBe("stop");
+  });
+
+  it("does not excuse another project's .hench/ elsewhere in the same repo", async () => {
+    // The exclusion must cover hench's artifacts for THIS project, not any
+    // path that happens to contain `.hench/`. A sibling project's run output is
+    // somebody else's uncommitted work and must still stop the run.
+    const { root, project } = nestedRepo();
+    mkdirSync(join(root, "other", ".hench", "runs"), { recursive: true });
+    writeFileSync(join(root, "other", ".hench", "runs", "r.json"), "{}\n");
+
+    await expect(gate(project)).resolves.toBe("stop");
+  });
+
+  it("filters the same way for the rollback path, which shares this code", async () => {
+    // performRollbackIfNeeded is not exported, so it is covered here through
+    // the function it calls: `projectDir` is a required parameter, so both call
+    // sites resolve the prefix identically or the package does not compile.
+    const { root, project } = nestedRepo();
+    mkdirSync(join(root, "other", ".hench", "runs"), { recursive: true });
+    writeFileSync(join(root, "other", ".hench", "runs", "r.json"), "{}\n");
+
+    const lines = execSync("git status --porcelain --untracked-files=all", {
+      cwd: project,
+      encoding: "utf-8",
+    })
+      .split("\n")
+      .filter((l) => l.trim().length > 0);
+
+    const kept = await excludeHenchRuntimeArtifacts(lines, project);
+
+    expect(
+      kept.some((l) => l.includes("sub/.hench/locks/")),
+      "this project's own lock should have been excluded",
+    ).toBe(false);
+    expect(
+      kept.some((l) => l.includes("other/.hench/runs/")),
+      "another project's runs are not this project's runtime state",
+    ).toBe(true);
+  });
+
+  it("falls back to root-relative matching when the dir is not in a repo", async () => {
+    // `git rev-parse` fails outside a repo and execStdout resolves "" rather
+    // than throwing, so the prefix is empty and behaviour is what it was before
+    // nesting was handled at all. A run outside git must not start throwing.
+    const loose = mkdtempSync(join(tmpdir(), "hench-nogit-"));
+    dirs.push(loose);
+
+    const kept = await excludeHenchRuntimeArtifacts(
+      ["?? .hench/locks/run.lock", "?? src.ts"],
+      loose,
+    );
+
+    expect(kept).toEqual(["?? src.ts"]);
   });
 });

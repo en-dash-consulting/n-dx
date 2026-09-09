@@ -2,11 +2,12 @@
 id: "4fc05c48-48b0-4da3-8126-4fa237b924d9"
 level: "epic"
 title: "Hench"
-status: "pending"
+status: "completed"
 startedAt: "2026-03-26T15:22:13.999Z"
-endedAt: "2026-07-22T14:48:00.299Z"
+completedAt: "2026-09-09T02:35:10.115Z"
+endedAt: "2026-09-09T02:35:10.115Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
-lastModified: "2026-09-08T21:07:02.855Z"
+lastModified: "2026-09-09T02:35:10.121Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
 
@@ -26,7 +27,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Feature 3: Rex Scanner Go Support](./feature-3-rex-scanner-go-support/index.md) | completed |
 | [Feature 4: Hench Go Project Support](./feature-4-hench-go-project-support/index.md) | completed |
 | [Fix Inaccurate File-Change Reporting in Run Summary and Dashboard](./fix-inaccurate-file-change-reporting/index.md) | completed |
-| [Git-Safety Hardening: express-prompt destructive actions and size-aware commit checkpoints](./git-safety-hardening-express-prompt/index.md) | pending |
+| [Git-Safety Hardening: express-prompt destructive actions and size-aware commit checkpoints](./git-safety-hardening-express-prompt/index.md) | completed |
 | [Graceful Cancellation with Rollback Prompt on Ctrl+C](./graceful-cancellation-with-rollback/index.md) | completed |
 | [Hench Process Concurrency Management](./hench-process-concurrency-management/index.md) | completed |
 | [Hench Resource Monitoring and User Feedback](./hench-resource-monitoring-and-user/index.md) | completed |
