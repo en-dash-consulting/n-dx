@@ -24,5 +24,5 @@ description: "Follow-up hardening of the isometric architecture map after the in
 
 | Title | Status |
 |-------|--------|
-| [Extend iso map IaC discovery beyond Terraform](./extend-iso-map-iac-discovery-beyond.md) | in_progress |
+| [Extend iso map IaC discovery beyond Terraform](./extend-iso-map-iac-discovery-beyond.md) | completed |
 | [Verify declared injection seams against the code](./verify-declared-injection-seams.md) | completed |
