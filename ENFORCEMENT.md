@@ -13,6 +13,7 @@ Which rules are enforced, where, and how. Prevents duplicate or conflicting enfo
 | Hand-built shell command lines / DEP0190 | `tests/e2e/architecture-policy.test.js` | Tree scan for `exec`/`execSync` imports and `shell: true`+args, with a reasoned `SHELL_STRING_EXEMPT` allowlist | Test failure |
 | Direct POSIX-shell spawns (`sh -c`) | `tests/e2e/architecture-policy.test.js` | Tree scan for a shell name paired with a `-c` argv; only `execShellCmd`'s definition site is exempt, and the exemption is staleness-checked | Test failure |
 | Shell-spawning tests are inventoried | `tests/e2e/shell-spawn-inventory-policy.test.js` | Every test file that spawns a shell must have a row in `tests/shell-spawn-inventory.md` | Test failure |
+| Clock-decided assertions are inventoried | `tests/e2e/wall-clock-inventory-policy.test.js` | Every test file that bounds a clock reading must be named in `tests/wall-clock-assertion-inventory.md` (as a conversion, a justification, or an acknowledged open item) | Test failure |
 | Intra-package layering (domain → CLI) | `tests/e2e/architecture-policy.test.js` | Ensures `src/core/` never imports from `src/cli/` | Test failure |
 | Gateway contract (hench → rex) | `packages/hench/tests/unit/prd/rex-gateway.test.ts` | EXPECTED_EXPORTS list vs actual re-exports | Test failure |
 | Gateway contract (web → sourcevision) | `packages/web/tests/unit/server/domain-gateway.test.ts` | Verifies re-export matches canonical export | Test failure |
