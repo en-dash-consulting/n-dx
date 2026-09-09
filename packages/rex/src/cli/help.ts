@@ -469,26 +469,42 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
   export: {
     tool: "rex",
     command: "export",
-    summary: "write the PRD to a portable JSON bundle",
-    usage: "rex export --out=<path.json> [dir]",
+    summary: "write the PRD to a portable JSON bundle or a prose document",
+    usage: "rex export [--format=narrative] --out=<path> [dir]",
     description:
-      "Serializes the whole PRD to a single JSON file that can be carried to\n" +
-      "another machine and imported with 'rex import-bundle'. Item ids,\n" +
-      "hierarchy, status, acceptance criteria, tags, dependencies and\n" +
-      "attribution metadata are all preserved.\n" +
+      "Two renderings, selected by --format.\n" +
       "\n" +
-      "The bundle is a transport artifact, not PRD storage: it must be written\n" +
-      "outside .rex/prd_tree/, and nothing in rex ever reads it as a backend.\n" +
+      "bundle (default) serializes the whole PRD to a single JSON file that\n" +
+      "can be carried to another machine and imported with 'rex\n" +
+      "import-bundle'. Item ids, hierarchy, status, acceptance criteria, tags,\n" +
+      "dependencies and attribution metadata are all preserved. The bundle is\n" +
+      "a transport artifact, not PRD storage: it must be written outside\n" +
+      ".rex/prd_tree/, and nothing in rex ever reads it as a backend.\n" +
+      "\n" +
+      "narrative renders the PRD as prose Markdown for a stakeholder: epics\n" +
+      "become sections with a goal and a rationale, features become described\n" +
+      "capabilities, and acceptance criteria become sentences under \"How\n" +
+      "we'll know it's done\". No ids, folder slugs or status codes appear.\n" +
+      "Finished and deleted work is left out unless --include-completed asks\n" +
+      "for it, and --item=<id-or-slug> narrows the document to one subtree.\n" +
+      "\n" +
+      "Narrative output is ONE-WAY: it cannot be imported back. Use the JSON\n" +
+      "bundle whenever the PRD has to make a round trip.\n" +
       "\n" +
       "Not to be confused with 'ndx export', which publishes the static\n" +
       "dashboard. This command is also available as 'ndx prd export'.",
     options: [
-      { flag: "--out=<path>", description: "Bundle output path (required)" },
-      { flag: "--format=json", description: "Print a JSON summary instead of a human line" },
+      { flag: "--out=<path>", description: "Output path (required)" },
+      { flag: "--format=narrative", description: "Render prose Markdown instead of the JSON bundle" },
+      { flag: "--item=<id-or-slug>", description: "Narrative only: render just this item's subtree" },
+      { flag: "--include-completed", description: "Narrative only: keep finished work, for a retrospective" },
+      { flag: "--format=json", description: "Print a JSON summary of the bundle export instead of a human line" },
     ],
     examples: [
       { command: "rex export --out=./prd-bundle.json", description: "Export the whole PRD" },
       { command: "rex export --out=/tmp/prd.json --format=json .", description: "Export and report as JSON" },
+      { command: "rex export --format=narrative --out=./prd.md", description: "Write a stakeholder document" },
+      { command: "rex export --format=narrative --item=checkout-overhaul --out=./checkout.md", description: "Document one epic" },
     ],
     related: ["import-bundle", "sync"],
   },

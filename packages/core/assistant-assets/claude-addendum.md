@@ -86,4 +86,6 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **Bundle carve-out.** `ndx prd export` (`rex export`) writes the PRD to a single JSON file, and this does not breach the invariant above: the bundle is a *transport artifact*, written only to an operator-chosen path outside `.rex/prd_tree/`, never read as a PRD backend and never a write target for a PRD mutation. `ndx prd import` (`rex import-bundle`) rebuilds the folder tree through the normal store write path, inside `store.withTransaction`. Refusing an output path inside the tree is enforced in code. Note that `ndx export` is a different command — it publishes the static dashboard.
 
+**Narrative carve-out.** `ndx prd export --format=narrative` writes prose Markdown to an operator-chosen path outside `.rex/prd_tree/`, under the same in-tree refusal. It is a *report*, not a transport artifact: deliberately lossy and one-way, with ids, folder slugs and status/priority values omitted by construction. Nothing imports it — the JSON bundle is the only round-trip surface. Do not add a narrative parser.
+
 HTTP-request concurrency notes for the web server live in `packages/web/CLAUDE.md`.

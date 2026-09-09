@@ -212,6 +212,24 @@ Named `import-bundle` because `rex import` is an alias for `rex analyze`. From t
 
 **Flags:** `--out=<path>` (export), `--in=<path>` (import), `--replace`, `--yes`, `--format=json`
 
+#### Narrative export
+
+`--format=narrative` renders the same PRD as prose Markdown, for a stakeholder rather than a machine:
+
+```bash
+rex export --format=narrative --out=./prd.md myproject
+rex export --format=narrative --item=checkout-overhaul --out=./checkout.md myproject
+rex export --format=narrative --include-completed --out=./retro.md myproject
+```
+
+Epics become sections with a goal and a rationale, features become described capabilities, and acceptance criteria become sentences under a "How we'll know it's done" heading. Dependencies read as sequencing prose ("This follows on from …") rather than id lists. No item ids, folder slugs or raw status and priority values are emitted anywhere in the document — a uuid pasted into a description is resolved to the title it names, or dropped.
+
+Finished and deleted work is left out by default; `--include-completed` keeps finished items for a retrospective-style document, and deleted items stay out regardless. `--item=<id-or-slug>` narrows the document to one subtree, accepting an item id, its exact title, its folder path, or the directory name from `.rex/prd_tree/`; an ambiguous reference lists the candidates instead of guessing.
+
+> **Narrative output is one-way.** It cannot be imported back — `rex import-bundle` reads the JSON bundle only. Export the bundle whenever the PRD has to make a round trip.
+
+**Flags:** `--format=narrative`, `--out=<path>`, `--item=<id-or-slug>`, `--include-completed`
+
 ### `rex mcp [dir]`
 
 Start an MCP (Model Context Protocol) server on stdio. This is how AI agents interact with rex programmatically.

@@ -50,6 +50,33 @@ const TASK_TWO = "55555555-5555-4555-8555-555555555555";
 
 const ATTRIBUTION = "Someone Else <someone@example.com>";
 
+const UUID_SHAPED = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
+
+/**
+ * Vocabulary the narrative rendering must never emit.
+ *
+ * Listed literally rather than derived from `VALID_STATUSES` so this stays a
+ * black-box assertion about the document: it holds even if someone renames or
+ * removes an enum member, and it fails loudly if a new status is added without
+ * being given prose.
+ */
+const INTERNAL_TOKENS = [
+  "pending",
+  "in_progress",
+  "completed",
+  "failing",
+  "deferred",
+  "blocked",
+  "cancelled",
+  "deleted",
+  "critical",
+  "high",
+  "medium",
+  "low",
+  "blockedby",
+  "acceptancecriteria",
+];
+
 /**
  * Run the CLI and return stdout + stderr combined.
  *
@@ -244,6 +271,129 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
 
     it("requires --out", () => {
       expect(run(["export", sourceDir], true)).toMatch(/Missing --out path/);
+    });
+
+    it("rejects an unknown --format rather than silently writing a bundle", () => {
+      const output = run(["export", `--out=${bundlePath}`, "--format=prose", sourceDir], true);
+      expect(output).toMatch(/Unknown --format "prose"/);
+      expect(existsSync(bundlePath)).toBe(false);
+    });
+
+    it("refuses --item for bundle export, pointing at the narrative rendering", () => {
+      const output = run(["export", `--out=${bundlePath}`, `--item=${EPIC_ONE}`, sourceDir], true);
+      expect(output).toMatch(/--item is not supported for bundle export yet/);
+      expect(existsSync(bundlePath)).toBe(false);
+    });
+  });
+
+  /**
+   * The narrative rendering shares this command's flag parsing, so its
+   * coverage lives here. The renderer's own prose rules are unit-tested in
+   * tests/unit/core/prd-narrative.test.ts; what matters at this level is that
+   * the CLI selects it, scopes it, and refuses the same unsafe paths.
+   */
+  describe("narrative export", () => {
+    let narrativePath: string;
+
+    beforeEach(() => {
+      narrativePath = join(sourceDir, "prd.md");
+    });
+
+    async function renderNarrativeDoc(extra: string[] = []): Promise<string> {
+      run(["export", "--format=narrative", `--out=${narrativePath}`, ...extra, sourceDir]);
+      return readFile(narrativePath, "utf-8");
+    }
+
+    it("writes prose Markdown while the default format stays the JSON bundle", async () => {
+      const output = run(["export", "--format=narrative", `--out=${narrativePath}`, sourceDir]);
+      expect(output).toMatch(/narrative document/);
+      expect(await renderNarrativeDoc()).toMatch(/^# Portable PRD\n/);
+
+      run(["export", `--out=${bundlePath}`, sourceDir]);
+      expect((await readBundle()).bundle).toBe("rex/prd-bundle");
+    });
+
+    it("leaks no uuids, slugs or enum tokens from a real tree", async () => {
+      const markdown = await renderNarrativeDoc(["--include-completed"]);
+
+      expect(markdown).not.toMatch(UUID_SHAPED);
+      expect(markdown).not.toContain(PRD_TREE_DIRNAME);
+      for (const token of INTERNAL_TOKENS) {
+        expect(markdown.toLowerCase(), `"${token}" leaked`).not.toMatch(
+          new RegExp(`\\b${token}\\b`),
+        );
+      }
+    });
+
+    it("renders the dependency as sequencing prose, not an id", async () => {
+      const markdown = await renderNarrativeDoc();
+      expect(markdown).toContain("This follows on from “First Task”.");
+    });
+
+    it("scopes to a subtree by id", async () => {
+      const markdown = await renderNarrativeDoc([`--item=${EPIC_TWO}`]);
+      expect(markdown).toMatch(/^# Second Epic\n/);
+      expect(markdown).not.toContain("First Feature");
+    });
+
+    it("scopes to a subtree by folder slug", async () => {
+      const markdown = await renderNarrativeDoc(["--item=first-feature"]);
+      expect(markdown).toMatch(/^# First Feature\n/);
+      expect(markdown).toContain("## First Task");
+      expect(markdown).not.toContain("Second Epic");
+    });
+
+    it("fails clearly on an unknown --item, writing nothing", () => {
+      const output = run(
+        ["export", "--format=narrative", `--out=${narrativePath}`, "--item=nope", sourceDir],
+        true,
+      );
+      expect(output).toMatch(/No PRD item matches --item="nope"/);
+      expect(existsSync(narrativePath)).toBe(false);
+    });
+
+    it("lists the candidates for an ambiguous --item instead of picking one", () => {
+      writePRD(sourceDir, {
+        schema: SCHEMA_VERSION,
+        title: "Portable PRD",
+        items: [
+          makeItem({ id: EPIC_ONE, title: "Shared Title", level: "epic" }),
+          makeItem({ id: EPIC_TWO, title: "Shared Title", level: "epic" }),
+        ],
+      });
+
+      const output = run(
+        ["export", "--format=narrative", `--out=${narrativePath}`, "--item=Shared Title", sourceDir],
+        true,
+      );
+
+      expect(output).toMatch(/matches 2 items/);
+      expect(output).toMatch(new RegExp(EPIC_ONE));
+      expect(output).toMatch(new RegExp(EPIC_TWO));
+      expect(existsSync(narrativePath)).toBe(false);
+    });
+
+    it("refuses a valueless --item instead of rendering the whole PRD", () => {
+      const output = run(
+        ["export", "--format=narrative", `--out=${narrativePath}`, "--item", sourceDir],
+        true,
+      );
+      expect(output).toMatch(/--item needs a value/);
+    });
+
+    it("refuses to write the document inside the PRD tree", () => {
+      const inside = join(sourceDir, ".rex", PRD_TREE_DIRNAME, "index.md");
+      const output = run(
+        ["export", "--format=narrative", `--out=${inside}`, sourceDir],
+        true,
+      );
+      expect(output).toMatch(/Refusing to write a narrative document inside/);
+    });
+
+    it("tells the operator the output is one-way", () => {
+      const output = run(["export", "--format=narrative", `--out=${narrativePath}`, sourceDir]);
+      expect(output).toMatch(/one-way/);
+      expect(output).toMatch(/rex export --out=<path\.json>/);
     });
   });
 

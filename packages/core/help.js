@@ -740,7 +740,7 @@ export function formatToolHelp(tool) {
 /** @type {Record<string, OrchestratorHelpDef>} */
 const ORCHESTRATOR_HELP_DEFS = {
   prd: {
-    summary: "export or import the PRD as a portable bundle",
+    summary: "export or import the PRD — as a portable bundle or a prose document",
     description:
       "Carries a PRD between machines as a single JSON file, without sharing the\n" +
       "repo or configuring a remote adapter (see 'ndx sync' for that).\n" +
@@ -756,18 +756,37 @@ const ORCHESTRATOR_HELP_DEFS = {
       ".rex/prd_tree/, and nothing reads it as a backend. Import rebuilds the\n" +
       "folder tree through the normal store write path, under the PRD lock.\n" +
       "\n" +
+      "'ndx prd export --format=narrative' renders something different: prose\n" +
+      "Markdown for a stakeholder, with no ids, folder slugs or status codes.\n" +
+      "Epics become sections with a goal and a rationale, features become\n" +
+      "described capabilities, and acceptance criteria become sentences under\n" +
+      "\"How we'll know it's done\". Scope it to one initiative with\n" +
+      "--item=<id-or-slug>.\n" +
+      "\n" +
+      "Narrative output is ONE-WAY — 'ndx prd import' cannot read it. Export the\n" +
+      "JSON bundle whenever the PRD has to make a round trip.\n" +
+      "\n" +
       "Not to be confused with 'ndx export', which publishes the static\n" +
       "dashboard.",
-    usage: ["ndx prd export --out=<path.json> [dir]", "ndx prd import --in=<path.json> [options] [dir]"],
+    usage: [
+      "ndx prd export --out=<path.json> [dir]",
+      "ndx prd export --format=narrative --out=<path.md> [dir]",
+      "ndx prd import --in=<path.json> [options] [dir]",
+    ],
     options: [
-      { flag: "--out=<path>", description: "Bundle output path (export; required)" },
+      { flag: "--out=<path>", description: "Output path (export; required)" },
       { flag: "--in=<path>", description: "Bundle input path (import; required)" },
+      { flag: "--format=narrative", description: "Export: render prose Markdown instead of the bundle (one-way)" },
+      { flag: "--item=<id-or-slug>", description: "Export: narrative only — render just this item's subtree" },
+      { flag: "--include-completed", description: "Export: narrative only — keep finished work, for a retrospective" },
       { flag: "--replace", description: "Import: overwrite the tree instead of merging into it" },
       { flag: "--yes, -y", description: "Import: skip the --replace confirmation prompt" },
       { flag: "--format=json", description: "Machine-readable summary" },
     ],
     examples: [
       { command: "ndx prd export --out=./prd-bundle.json .", description: "Write the whole PRD to a bundle" },
+      { command: "ndx prd export --format=narrative --out=./prd.md .", description: "Write a stakeholder document" },
+      { command: "ndx prd export --format=narrative --item=checkout-overhaul --out=./checkout.md .", description: "Document one epic" },
       { command: "ndx prd import --in=./prd-bundle.json .", description: "Merge a bundle into the local PRD" },
       { command: "ndx prd import --in=./prd-bundle.json --replace --yes .", description: "Replace the local PRD outright" },
     ],
