@@ -62,6 +62,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { isLLMVendor, resolveTaskModel } from "../../prd/llm-gateway.js";
 import type { LLMConfig, LLMProvider } from "../../prd/llm-gateway.js";
+import type { TokenUsage } from "../../schema/index.js";
 import { detail } from "../../types/output.js";
 
 /**
@@ -97,8 +98,26 @@ export const TRANSCRIPT_CHAR_LIMIT = 20_000;
  */
 export const PRUNE_BRIDGE_TEXT = "Understood. Continuing from the compacted context that follows.";
 
+/**
+ * One summarizer call's result: the summary, and what producing it cost.
+ *
+ * The cost is part of the contract because compaction is a real provider call —
+ * up to {@link TRANSCRIPT_CHAR_LIMIT} characters in, a capped summary out — and
+ * a run that does not count it under-reports its own spend everywhere the
+ * totals surface. Both cost fields are optional: a provider may not report
+ * usage, and a hand-written summarizer has no model to name.
+ */
+export interface PruneSummary {
+  /** Raw summary text, before {@link normalizePruneSummary} runs on it. */
+  text: string;
+  /** Tokens the call consumed, when the provider reported them. */
+  tokenUsage?: TokenUsage;
+  /** Model that produced the summary — the light tier, not the run's model. */
+  model?: string;
+}
+
 /** Generates a summary of a rendered transcript. Rejects to decline. */
-export type PruneSummarizer = (transcript: string) => Promise<string>;
+export type PruneSummarizer = (transcript: string) => Promise<PruneSummary>;
 
 /** Everything the pruner needs to know about one loop's message format. */
 export interface PruneShape<M> {
@@ -134,12 +153,33 @@ export interface PruneShape<M> {
   toSummaryMessage: (summary: string) => M | M[];
 }
 
-/** What one {@link ConversationPruner.prune} call did. */
+/** What one {@link ConversationPruner.prune} call did, and what it cost. */
 export interface PruneOutcome {
   /** Messages removed from the array. */
   dropped: number;
   /** True when the dropped span was replaced by a summary message. */
   summarized: boolean;
+  /**
+   * Tokens the summary call spent, for the caller to fold into the run.
+   *
+   * Reported whenever the call returned — including when its text was
+   * unusable and {@link summarized} is therefore false. The summary was
+   * discarded; the tokens were not. Absent when no call was made or it threw.
+   */
+  summaryUsage?: TokenUsage;
+  /**
+   * Model that spent them, so the per-turn breakdown attributes compaction to
+   * the light tier rather than to the run's primary model.
+   */
+  summaryModel?: string;
+}
+
+/** Internal result of one summarize attempt: text if usable, cost regardless. */
+interface SummarizeAttempt {
+  /** Normalized summary, or absent when the call declined, failed, or threw. */
+  text?: string;
+  tokenUsage?: TokenUsage;
+  model?: string;
 }
 
 const NO_PRUNE: PruneOutcome = { dropped: 0, summarized: false };
@@ -274,32 +314,52 @@ export class ConversationPruner<M> {
     if (cut >= messages.length || cut <= dropStart) return NO_PRUNE;
 
     const dropped = messages.slice(dropStart, cut);
-    const summary = await this.trySummarize(dropped);
+    const attempt = await this.trySummarize(dropped);
 
-    if (summary === undefined) {
+    const outcome: PruneOutcome = { dropped: dropped.length, summarized: false };
+    if (attempt.tokenUsage) outcome.summaryUsage = attempt.tokenUsage;
+    if (attempt.model) outcome.summaryModel = attempt.model;
+
+    if (attempt.text === undefined) {
       // Degrade to the pre-summary behavior: drop the span, keep the run.
       messages.splice(dropStart, dropped.length);
       detail(`Pruned ${dropped.length} messages (no summary available)`);
-      return { dropped: dropped.length, summarized: false };
+      return outcome;
     }
 
-    const inserted = this.shape.toSummaryMessage(summary);
+    const inserted = this.shape.toSummaryMessage(attempt.text);
     const summaryMessages = Array.isArray(inserted) ? inserted : [inserted];
     messages.splice(dropStart, dropped.length, ...summaryMessages);
     this.summaryCount += summaryMessages.length;
-    detail(`Pruned ${dropped.length} messages into a ${summary.length}-char summary`);
-    return { dropped: dropped.length, summarized: true };
+    detail(`Pruned ${dropped.length} messages into a ${attempt.text.length}-char summary`);
+    outcome.summarized = true;
+    return outcome;
   }
 
-  /** Summarize the span, or `undefined` when the call declines or fails. */
-  private async trySummarize(dropped: readonly M[]): Promise<string | undefined> {
+  /**
+   * Summarize the span.
+   *
+   * The cost is reported separately from the text on purpose: a call that
+   * answered with an unusable summary still consumed tokens, and the caller
+   * needs to book them either way. Only a throw — or no call at all — yields
+   * nothing to book.
+   */
+  private async trySummarize(dropped: readonly M[]): Promise<SummarizeAttempt> {
     try {
       const transcript = renderPruneTranscript(dropped, this.shape.render);
-      if (transcript.length === 0) return undefined;
-      return normalizePruneSummary(await this.summarize(transcript));
+      if (transcript.length === 0) return {};
+
+      const result = await this.summarize(transcript);
+      const attempt: SummarizeAttempt = {};
+      if (result.tokenUsage) attempt.tokenUsage = result.tokenUsage;
+      if (result.model) attempt.model = result.model;
+
+      const text = normalizePruneSummary(result.text);
+      if (text !== undefined) attempt.text = text;
+      return attempt;
     } catch (err) {
       detail(`Prune summary failed (${(err as Error).message})`);
-      return undefined;
+      return {};
     }
   }
 }
@@ -339,13 +399,17 @@ export function createContextSummarizer(opts: ContextSummarizerOptions): PruneSu
     vendor: isLLMVendor(opts.vendor) ? opts.vendor : undefined,
   });
 
-  return async (transcript: string): Promise<string> => {
+  return async (transcript: string): Promise<PruneSummary> => {
     detail(`Compacting context via ${resolution.model} (${resolution.tier} tier)`);
-    const { text } = await opts.provider.complete({
+    const { text, tokenUsage } = await opts.provider.complete({
       prompt: buildPruneSummaryPrompt(transcript, opts.taskTitle),
       model: resolution.model,
     });
-    return text;
+    // `tokenUsage` is carried, not dropped: this call is billed like any other,
+    // and the model named here is the light tier the class routed to.
+    const summary: PruneSummary = { text, model: resolution.model };
+    if (tokenUsage) summary.tokenUsage = tokenUsage;
+    return summary;
   };
 }
 

@@ -30,7 +30,7 @@ import {
   anthropicPruneShape,
   createContextSummarizer,
 } from "./context-prune.js";
-import type { PruneShape } from "./context-prune.js";
+import type { PruneOutcome, PruneShape } from "./context-prune.js";
 import { parseTokenUsage } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD } from "../analysis/spin.js";
@@ -454,6 +454,39 @@ function recordTurnTokenUsageNormalized(
 }
 
 /**
+ * Fold a prune's compaction spend into the run.
+ *
+ * A prune is a provider call, not bookkeeping: it ships up to 20,000 characters
+ * of transcript to a model and gets a summary back. Left unrecorded — as it was
+ * until this — every run that pruned under-reported itself in `hench show`, the
+ * run summary, `rex usage`, the dashboard and `get_token_usage`, and a locally
+ * served model did the work with no trace at all.
+ *
+ * Booked against the turn the prune ran on and against the model that ran it:
+ * `context.summarize` routes to the light tier, so attributing it to the run's
+ * primary model would overstate the cost at the per-turn breakdown's own
+ * pricing. `fallbackModel` covers a summarizer that names no model.
+ *
+ * Exported for the unit test that pins this contract; not part of the loop's
+ * public surface.
+ */
+export function recordPruneUsage(
+  run: RunRecord,
+  outcome: PruneOutcome,
+  turn: number,
+  vendor: string,
+  fallbackModel: string,
+): void {
+  recordTurnTokenUsageNormalized(
+    run,
+    outcome.summaryUsage,
+    turn,
+    vendor,
+    outcome.summaryModel ?? fallbackModel,
+  );
+}
+
+/**
  * Dispatch each Gemini functionCall through the shared tool dispatcher, record
  * results in the run, and return one `functionResponse` part per call to feed
  * back as the next `"user"` turn.
@@ -665,7 +698,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
         run.turns = turn + 1;
         subsection(`Turn ${turn + 1}/${maxTurns}`);
 
-        await pruner.prune(contents);
+        recordPruneUsage(run, await pruner.prune(contents), turn + 1, "google", model);
 
         const result = await withHeartbeat(
           `waiting on google/${model} response`,
@@ -1100,8 +1133,9 @@ async function runLocalToolLoop(params: {
       run.turns = turn + 1;
       subsection(`Turn ${turn + 1}/${maxTurns}`);
 
-      // Prune history to stay within context limits
-      await pruner.prune(messages);
+      // Prune history to stay within context limits. The summary is a call on
+      // the same loaded model, so its tokens go on the run like any other turn.
+      recordPruneUsage(run, await pruner.prune(messages), turn + 1, "local", model);
 
       const reqBody: Record<string, unknown> = {
         model: model || undefined,
@@ -1451,7 +1485,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
       subsection(`Turn ${turn + 1}/${maxTurns}`);
 
-      await pruner.prune(messages);
+      recordPruneUsage(run, await pruner.prune(messages), turn + 1, vendor, model);
 
       const _t0 = Date.now();
       const response = await withHeartbeat(

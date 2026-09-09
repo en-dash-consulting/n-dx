@@ -33,9 +33,14 @@ import {
   renderAnthropicMessage,
   renderPruneTranscript,
 } from "../../../../src/agent/lifecycle/context-prune.js";
-import type { PruneShape } from "../../../../src/agent/lifecycle/context-prune.js";
-import { geminiPruneShape, openAiPruneShape } from "../../../../src/agent/lifecycle/loop.js";
+import type { PruneShape, PruneSummary } from "../../../../src/agent/lifecycle/context-prune.js";
+import {
+  geminiPruneShape,
+  openAiPruneShape,
+  recordPruneUsage,
+} from "../../../../src/agent/lifecycle/loop.js";
 import type { OpenAiMessage } from "../../../../src/agent/lifecycle/loop.js";
+import type { RunRecord } from "../../../../src/schema/index.js";
 import type { GeminiContent } from "../../../../src/prd/llm-gateway.js";
 import { resolveTaskModel } from "../../../../src/prd/llm-gateway.js";
 
@@ -83,17 +88,21 @@ function extractingSummarizer(needle: string) {
   const seen: string[] = [];
   return {
     seen,
-    summarize: async (transcript: string): Promise<string> => {
+    summarize: async (transcript: string): Promise<PruneSummary> => {
       seen.push(transcript);
-      return transcript
-        .split("\n")
-        .filter((line) => line.includes(needle))
-        .join(" | ");
+      return {
+        text: transcript
+          .split("\n")
+          .filter((line) => line.includes(needle))
+          .join(" | "),
+      };
     },
   };
 }
 
-const stubSummarizer = async (): Promise<string> => "earlier turns did some work";
+const stubSummarizer = async (): Promise<PruneSummary> => ({
+  text: "earlier turns did some work",
+});
 
 describe("normalizePruneSummary", () => {
   it("passes plain prose through unchanged", () => {
@@ -235,7 +244,7 @@ describe("ConversationPruner", () => {
     let calls = 0;
     const pruner = new ConversationPruner(anthropicPruneShape(), async () => {
       calls++;
-      return "compacted";
+      return { text: "compacted" };
     });
     const messages = conversation(PRUNE_TRIGGER_PAIRS + 1);
 
@@ -264,7 +273,9 @@ describe("ConversationPruner", () => {
   });
 
   it("treats unusable summarizer output as a declined summary", async () => {
-    const pruner = new ConversationPruner(anthropicPruneShape(), async () => "```\n\n```");
+    const pruner = new ConversationPruner(anthropicPruneShape(), async () => ({
+      text: "```\n\n```",
+    }));
     const messages = conversation(PRUNE_TRIGGER_PAIRS + 1);
 
     expect(await pruner.prune(messages)).toEqual({ dropped: 22, summarized: false });
@@ -417,7 +428,7 @@ describe("openAiPruneShape", () => {
     let prunes = 0;
     const pruner = new ConversationPruner(openAiPruneShape(true), async () => {
       prunes++;
-      return "compacted";
+      return { text: "compacted" };
     });
     const messages = chat(PRUNE_TRIGGER_PAIRS + 1);
 
@@ -518,14 +529,39 @@ describe("createContextSummarizer", () => {
       taskTitle: "Implement the widget renderer",
     });
 
-    expect(await summarize("assistant: touched src/widget.ts")).toBe("compacted");
-
     const expected = resolveTaskModel(SUMMARY_TASK_CLASS, { vendor: "claude" }, {
       vendor: "claude",
     });
     expect(expected.tier).toBe("light");
+    expect(await summarize("assistant: touched src/widget.ts")).toEqual({
+      text: "compacted",
+      model: expected.model,
+    });
     expect(calls[0].model).toBe(expected.model);
     expect(calls[0].prompt).toContain("touched src/widget.ts");
+  });
+
+  it("reports what the call cost, so the prune's spend is not silently dropped", async () => {
+    const summarize = createContextSummarizer({
+      provider: {
+        complete: async () => ({
+          text: "compacted",
+          tokenUsage: { input: 4200, output: 310 },
+        }),
+      },
+      llmConfig: { vendor: "claude" },
+      vendor: "claude",
+      taskTitle: "task",
+    });
+
+    const result = await summarize("assistant: something");
+
+    expect(result.tokenUsage).toEqual({ input: 4200, output: 310 });
+    // Attributed to the model that actually ran, which is the light tier —
+    // not whatever model the run itself is using.
+    expect(result.model).toBe(
+      resolveTaskModel(SUMMARY_TASK_CLASS, { vendor: "claude" }, { vendor: "claude" }).model,
+    );
   });
 
   it("falls back to the configured vendor for an unrecognized vendor string", async () => {
@@ -547,6 +583,157 @@ describe("createContextSummarizer", () => {
     expect(calls[0]).toBe(
       resolveTaskModel(SUMMARY_TASK_CLASS, { vendor: "claude" }).model,
     );
+  });
+});
+
+/**
+ * Compaction spend is spend.
+ *
+ * A prune sends up to 20,000 characters of transcript to a real model and gets
+ * real tokens back. Before this, `createContextSummarizer` destructured
+ * only `text` from the completion and threw the usage away, so `hench show`,
+ * `rex usage`, the dashboard and `get_token_usage` all under-reported every run
+ * that pruned — and on a locally-served model the same loaded weights did the
+ * extra work with no record at all. The pruner stays vendor-neutral: it reports
+ * what the summary cost, and the loop is what folds it into the run.
+ */
+describe("prune summarizer accounting", () => {
+  const usage = { input: 4200, output: 310 };
+
+  /** Summarizer that reports a cost, as the real one now does. */
+  const costedSummarizer = async (): Promise<PruneSummary> => ({
+    text: "earlier turns did some work",
+    tokenUsage: usage,
+    model: "claude-haiku-light",
+  });
+
+  it("carries the summarizer's cost out on the outcome", async () => {
+    const pruner = new ConversationPruner(anthropicPruneShape(), costedSummarizer);
+    const messages = conversation(PRUNE_TRIGGER_PAIRS + 1);
+
+    const outcome = await pruner.prune(messages);
+
+    expect(outcome.summarized).toBe(true);
+    expect(outcome.summaryUsage).toEqual(usage);
+    expect(outcome.summaryModel).toBe("claude-haiku-light");
+  });
+
+  it("still reports the cost when the summary itself was unusable", async () => {
+    const pruner = new ConversationPruner(anthropicPruneShape(), async () => ({
+      text: "```\n\n```",
+      tokenUsage: usage,
+      model: "claude-haiku-light",
+    }));
+    const messages = conversation(PRUNE_TRIGGER_PAIRS + 1);
+
+    const outcome = await pruner.prune(messages);
+
+    // The text was thrown away; the tokens were spent regardless.
+    expect(outcome.summarized).toBe(false);
+    expect(outcome.summaryUsage).toEqual(usage);
+  });
+
+  it("reports no cost when no prune fired and no call was made", async () => {
+    const pruner = new ConversationPruner(anthropicPruneShape(), costedSummarizer);
+
+    const outcome = await pruner.prune(conversation(PRUNE_TRIGGER_PAIRS));
+
+    expect(outcome.summaryUsage).toBeUndefined();
+    expect(outcome.summaryModel).toBeUndefined();
+  });
+
+  it("reports no cost when the summarizer threw", async () => {
+    const pruner = new ConversationPruner(anthropicPruneShape(), async () => {
+      throw new Error("provider unavailable");
+    });
+
+    const outcome = await pruner.prune(conversation(PRUNE_TRIGGER_PAIRS + 1));
+
+    expect(outcome.dropped).toBe(22);
+    expect(outcome.summaryUsage).toBeUndefined();
+  });
+});
+
+describe("recordPruneUsage", () => {
+  function newRun(): RunRecord {
+    return {
+      id: "run-1",
+      taskId: "task-1",
+      taskTitle: "Implement the widget renderer",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      status: "running",
+      turns: 0,
+      tokenUsage: { input: 1000, output: 200 },
+      turnTokenUsage: [],
+      toolCalls: [],
+      model: "claude-primary",
+      vendor: "claude",
+    };
+  }
+
+  it("adds the summarizer's tokens to the run totals", () => {
+    const run = newRun();
+
+    recordPruneUsage(
+      run,
+      { dropped: 22, summarized: true, summaryUsage: { input: 4200, output: 310 } },
+      7,
+      "claude",
+      "claude-primary",
+    );
+
+    expect(run.tokenUsage.input).toBe(5200);
+    expect(run.tokenUsage.output).toBe(510);
+  });
+
+  it("attributes the turn to the light-tier model, not the run's model", () => {
+    const run = newRun();
+
+    recordPruneUsage(
+      run,
+      {
+        dropped: 22,
+        summarized: true,
+        summaryUsage: { input: 4200, output: 310 },
+        summaryModel: "claude-haiku-light",
+      },
+      7,
+      "claude",
+      "claude-primary",
+    );
+
+    expect(run.turnTokenUsage).toEqual([
+      { turn: 7, input: 4200, output: 310, vendor: "claude", model: "claude-haiku-light" },
+    ]);
+  });
+
+  it("leaves the cache fields alone — compaction is a fresh call, not a cached one", () => {
+    const run = newRun();
+    run.tokenUsage.cacheCreationInput = 900;
+    run.tokenUsage.cacheReadInput = 64_000;
+
+    recordPruneUsage(
+      run,
+      { dropped: 22, summarized: true, summaryUsage: { input: 4200, output: 310 } },
+      7,
+      "claude",
+      "claude-primary",
+    );
+
+    expect(run.tokenUsage.cacheCreationInput).toBe(900);
+    expect(run.tokenUsage.cacheReadInput).toBe(64_000);
+    expect(run.turnTokenUsage![0].cacheCreationInput).toBeUndefined();
+    expect(run.turnTokenUsage![0].cacheReadInput).toBeUndefined();
+  });
+
+  it("changes nothing, and does not throw, when the prune reported no usage", () => {
+    const run = newRun();
+
+    recordPruneUsage(run, { dropped: 22, summarized: false }, 7, "claude", "claude-primary");
+    recordPruneUsage(run, { dropped: 0, summarized: false }, 1, "claude", "claude-primary");
+
+    expect(run.tokenUsage).toEqual({ input: 1000, output: 200 });
+    expect(run.turnTokenUsage).toEqual([]);
   });
 });
 

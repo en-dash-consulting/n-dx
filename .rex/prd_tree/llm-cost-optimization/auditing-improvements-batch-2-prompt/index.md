@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Prompt cache TTL is fixed at 5 minutes, so tool calls longer than about 4 minutes rewrite the whole conversation at the cache-write price](./prompt-cache-ttl-is-fixed-at-5-minutes.md) | pending |
 | [Prompt caching in the API agent loop (cache_control breakpoints)](./prompt-caching-in-the-api-agent-loop.md) | completed |
 | [Prune retention and transcript truncation are hard-coded, halving the verbatim window and summarizing from 800-char excerpts](./prune-retention-and-transcript.md) | pending |
-| [Prune summarizer token usage is discarded, so compaction spend never reaches run records or usage rollups](./prune-summarizer-token-usage-is.md) | pending |
+| [Prune summarizer token usage is discarded, so compaction spend never reaches run records or usage rollups](./prune-summarizer-token-usage-is.md) | completed |
 | [Run summary omits cache tokens, understating input ~65,000x](./run-summary-omits-cache-tokens.md) | completed |
 | [Summarizing prune emits two consecutive user turns on the local and Gemini loops, which strict chat templates reject](./summarizing-prune-emits-two.md) | completed |
 | [Summarizing prune that preserves the cache prefix](./summarizing-prune-that-preserves-the.md) | completed |
