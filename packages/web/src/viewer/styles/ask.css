@@ -114,6 +114,43 @@
   border-left: 3px solid var(--red);
 }
 
+.ask-error-summary {
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* Remediation reads as steps, most important first — the same shape the CLI's
+   auth guidance prints, so the two surfaces look like one product. */
+.ask-error-remediation {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.ask-error-actions:empty {
+  display: none;
+}
+
+.ask-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ask-analyze-status:empty {
+  display: none;
+}
+
+.ask-analyze-status {
+  margin: 0;
+}
+
 .ask-answer {
   margin: 0;
   padding: 12px;

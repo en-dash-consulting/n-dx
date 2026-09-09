@@ -465,6 +465,73 @@ describe("POST /api/sourcevision/ask", () => {
     });
   });
 
+  // ── Degraded modes ────────────────────────────────────────────────────────
+
+  /**
+   * Each way the panel can be unusable carries its own diagnosis, so the client
+   * can name the mode and offer the action that fits it. `error` is still a
+   * one-line string for callers that only want text.
+   */
+  describe("failure payloads", () => {
+    it("tells a caller with no analysis to run one, and how", async () => {
+      await rm(join(tmpDir, ".sourcevision", "CONTEXT.md"));
+
+      const { status, body } = await ask({ prompt: "Anything." });
+
+      expect(status).toBe(409);
+      expect(body.failure).toMatchObject({ code: "no_analysis", retryable: false });
+      expect(body.failure.remediation.join(" ")).toContain("analyze");
+      expect(body.error).toMatch(/analy/i);
+    });
+
+    it("uses the project's own command name in that advice", async () => {
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ cli: { name: "mydx" } }), "utf-8");
+      await rm(join(tmpDir, ".sourcevision", "CONTEXT.md"));
+
+      const { body } = await ask({ prompt: "Anything." });
+
+      expect(body.failure.remediation.join(" ")).toContain("mydx analyze");
+    });
+
+    it("returns the canonical auth guidance, not its own wording", async () => {
+      completeMock.mockRejectedValue(new ClaudeClientError("401", "auth", false));
+
+      const { status, body } = await ask({ prompt: "Anything." });
+
+      expect(status).toBe(401);
+      expect(body.failure.code).toBe("auth");
+      expect(body.failure.remediation.at(-1)).toBe("Verify credentials: ndx auth");
+      expect(body.failure.retryable).toBe(false);
+    });
+
+    it("names a timeout and a rate limit as themselves, both retryable", async () => {
+      completeMock.mockRejectedValue(new ClaudeClientError("timed out", "timeout", true));
+      const timeout = await ask({ prompt: "Anything." });
+      expect(timeout.status).toBe(504);
+      expect(timeout.body.failure).toMatchObject({ code: "timeout", retryable: true });
+
+      completeMock.mockRejectedValue(new ClaudeClientError("slow down", "rate-limit", true));
+      const rateLimited = await ask({ prompt: "Anything." });
+      expect(rateLimited.status).toBe(429);
+      expect(rateLimited.body.failure).toMatchObject({ code: "rate_limit", retryable: true });
+
+      // Two modes, two diagnoses — not one shared "request failed".
+      expect(timeout.body.failure.summary).not.toBe(rateLimited.body.failure.summary);
+    });
+
+    it("gives every classified failure a summary and something to do", async () => {
+      for (const reason of ["auth", "rate-limit", "timeout", "not-found", "cli"] as const) {
+        completeMock.mockRejectedValue(new ClaudeClientError("detail", reason, false));
+
+        const { body } = await ask({ prompt: "Anything." });
+
+        expect(body.failure, reason).toBeDefined();
+        expect(body.failure.summary.length, reason).toBeGreaterThan(15);
+        expect(body.failure.remediation.length, reason).toBeGreaterThan(0);
+      }
+    });
+  });
+
   // ── Routing ───────────────────────────────────────────────────────────────
 
   it("ignores unrelated paths", async () => {

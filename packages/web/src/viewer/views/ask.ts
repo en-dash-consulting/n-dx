@@ -62,7 +62,7 @@
 import { h } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
-import { useCliName } from "../hooks/index.js";
+import { useCliName, useSvAnalyze } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { clipboardFailureMessage, copyTextToClipboard } from "../utils/clipboard.js";
 import { takePendingAskSeed, EXPLAIN_FINDING_PROMPT } from "../ask-seed.js";
@@ -79,6 +79,22 @@ const COPY_FEEDBACK_MS = 2000;
 
 const PROMPT_INPUT_ID = "sv-ask-prompt";
 
+/**
+ * Heading per degraded mode.
+ *
+ * Each names the mode rather than the panel's disappointment: a user who reads
+ * only the heading should already know whether to run an analysis, fix
+ * credentials, or wait and try again.
+ */
+const ERROR_HEADING: Record<string, string> = {
+  no_analysis: "No analysis to answer from",
+  auth: "Credentials rejected",
+  timeout: "The model timed out",
+  rate_limit: "Rate limited",
+  cli_not_found: "LLM CLI not found",
+  provider_error: "The model call failed",
+};
+
 /** Successful answer body from {@link ASK_ENDPOINT}. */
 interface AskSuccessResponse {
   ok: true;
@@ -88,11 +104,26 @@ interface AskSuccessResponse {
   sources?: readonly string[];
 }
 
+/**
+ * What went wrong and what to do about it.
+ *
+ * Mirrors `AskFailure` in `server/sourcevision-ask-diagnostics.ts`. Duplicated
+ * rather than imported: the viewer is built separately and does not import from
+ * the server at runtime, which is the boundary `boundary-check.test.ts` keeps.
+ */
+export interface AskFailureDetail {
+  code: "no_analysis" | "auth" | "timeout" | "rate_limit" | "cli_not_found" | "provider_error";
+  summary: string;
+  remediation: string[];
+  retryable: boolean;
+}
+
 /** Classified failure body — `reason` distinguishes auth from timeout etc. */
 interface AskFailureResponse {
   ok: false;
   reason?: string;
   error?: string;
+  failure?: AskFailureDetail;
 }
 
 type AskResponse = AskSuccessResponse | AskFailureResponse;
@@ -134,7 +165,11 @@ export type AskState =
       model: string;
       sources: readonly string[];
     }
-  | { status: "error"; message: string };
+  /**
+   * `failure` is what the panel renders; `message` is the one-line fallback for
+   * a transport error that never reached the route and so has no diagnosis.
+   */
+  | { status: "error"; message: string; failure?: AskFailureDetail };
 
 /** Transient outcome of a copy attempt, or `null` when there is nothing to say. */
 type CopyFeedback =
@@ -177,6 +212,28 @@ export function stateForResponse(body: AskResponse, question: string): AskState 
   return {
     status: "error",
     message: failure.error ?? "The request failed and the server did not say why.",
+    ...(failure.failure ? { failure: failure.failure } : {}),
+  };
+}
+
+/**
+ * The last-resort failure, for a request that never reached the route.
+ *
+ * A rejected fetch has no server-side diagnosis, but it still has a cause worth
+ * naming and an action worth offering — the server being down or the page being
+ * offline is a retry-later situation, not an unexplained one. Without this the
+ * transport path would be the one degraded mode that still rendered a bare
+ * string.
+ */
+export function transportFailure(message: string): AskFailureDetail {
+  return {
+    code: "provider_error",
+    summary: "The dashboard could not reach the n-dx server.",
+    remediation: [
+      `The request failed before it arrived: ${message}`,
+      "Check that the server is still running, then ask again.",
+    ],
+    retryable: true,
   };
 }
 
@@ -243,6 +300,8 @@ export function AskView() {
   const copyTimerRef = useRef<number | null>(null);
   const deployed = isDeployedMode();
   const cliName = useCliName();
+  // The dashboard's one analyze action, shared with the enrichment gate.
+  const analyze = useSvAnalyze();
 
   /** Show copy feedback and take it away again, replacing any pending timer. */
   const showCopyFeedback = useCallback((next: CopyFeedback) => {
@@ -299,12 +358,10 @@ export function AskView() {
       const body = await res.json() as AskResponse;
       setState(stateForResponse(body, trimmed));
     } catch (err) {
-      // A rejected fetch never reached the route, so there is no classified
-      // reason to report — only what the transport said.
-      setState({
-        status: "error",
-        message: err instanceof Error ? err.message : "Failed to reach the Ask endpoint.",
-      });
+      // A rejected fetch never reached the route, so the route's diagnosis is
+      // not available — but the mode still gets named and offered a retry.
+      const message = err instanceof Error ? err.message : "Failed to reach the Ask endpoint.";
+      setState({ status: "error", message, failure: transportFailure(message) });
     } finally {
       inFlightRef.current = false;
     }
@@ -566,10 +623,59 @@ export function AskView() {
         )
       : null,
 
+    // Every degraded mode names itself and offers the action that fits it: run
+    // an analysis, fix credentials, or try again. The prompt is untouched
+    // throughout — a failure must never cost the user their question.
     state.status === "error"
-      ? h("div", { class: "card ask-error" },
-          h("h3", { class: "section-header-sm" }, "⚠ Unable to answer"),
-          h("p", null, state.message),
+      ? h("div", { class: `card ask-error ask-error-${state.failure?.code ?? "unknown"}` },
+          h("h3", { class: "section-header-sm" },
+            `⚠ ${state.failure ? ERROR_HEADING[state.failure.code] : "Unable to answer"}`,
+          ),
+          h("p", { class: "ask-error-summary" }, state.failure?.summary ?? state.message),
+
+          state.failure && state.failure.remediation.length > 0
+            ? h("ul", { class: "ask-error-remediation" },
+                state.failure.remediation.map((line, i) =>
+                  h("li", { key: i }, line),
+                ),
+              )
+            : null,
+
+          h("div", { class: "ask-error-actions" },
+            // Retry only where retrying could plausibly work. Offering it for
+            // bad credentials would invite the user to click until they gave up.
+            state.failure?.retryable
+              ? h("button", {
+                  type: "button",
+                  class: "btn ask-retry-btn",
+                  onClick: () => { void handleSubmit(); },
+                }, "Ask again")
+              : null,
+
+            // The analyze affordance the criterion asks for: the same action
+            // the enrichment gate offers, not a printed command.
+            state.failure?.code === "no_analysis"
+              ? h("button", {
+                  type: "button",
+                  class: "btn ask-analyze-btn",
+                  disabled: analyze.busy,
+                  "aria-busy": analyze.busy ? "true" : "false",
+                  onClick: () => { void analyze.start({ full: false }); },
+                }, analyze.busy ? "Analyzing…" : "Run analysis")
+              : null,
+          ),
+
+          state.failure?.code === "no_analysis"
+            ? h("p", { class: "section-sub ask-analyze-status", role: "status", "aria-live": "polite" },
+                analyze.busy
+                  ? analyze.progress ?? "Analysis running — this can take a few minutes…"
+                  : analyze.state === "done"
+                    ? "✓ Analysis complete — ask again."
+                    : analyze.error
+                      ? `⚠ Analysis failed to start: ${analyze.error}`
+                      : "",
+              )
+            : null,
         )
       : null,
   );

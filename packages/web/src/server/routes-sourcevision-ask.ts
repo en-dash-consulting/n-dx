@@ -48,6 +48,8 @@ import {
 } from "./sourcevision-ask-context.js";
 import type { AskContextSource, AskFindingSeed } from "./sourcevision-ask-context.js";
 import { recordAskUsage, askUsageCounters } from "./ask-usage-log.js";
+import { noAnalysisFailure, askFailureForReason } from "./sourcevision-ask-diagnostics.js";
+import { readCliName } from "./cli-name.js";
 
 const ASK_PATH = "/api/sourcevision/ask";
 
@@ -196,7 +198,15 @@ export async function handleSourcevisionAskRoute(
     context = await source.assemble(parsed);
   } catch (err) {
     if (err instanceof NoAnalysisError) {
-      errorResponse(res, 409, err.message);
+      // Carries the same `error` string it always did, plus the structured
+      // failure the panel needs to offer the analyze action rather than just
+      // naming the command.
+      jsonResponse(res, 409, {
+        ok: false,
+        reason: "no-analysis",
+        error: err.message,
+        failure: noAnalysisFailure(readCliName(ctx.projectDir)),
+      });
       return true;
     }
     throw err;
@@ -260,6 +270,10 @@ export async function handleSourcevisionAskRoute(
       error: `${MESSAGE_BY_REASON[reason] ?? "The LLM call failed"}: ${detail}`,
       vendor,
       model,
+      // What the panel actually renders: what happened, what to do about it,
+      // and whether asking again could work. `error` stays for callers that
+      // only want a line of text.
+      failure: askFailureForReason(reason, vendor, detail),
     });
   }
 
