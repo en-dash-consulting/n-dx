@@ -2,8 +2,11 @@
 id: "e71dcd68-8c03-4f98-ad6a-405c5736de20"
 level: "task"
 title: "Web viewer perf assertions and the ci child-cleanup e2e still fail under machine load, reddening runs whose work succeeded"
-status: "pending"
+status: "completed"
 priority: "high"
+startedAt: "2026-09-09T20:18:58.570Z"
+completedAt: "2026-09-09T20:56:50.107Z"
+endedAt: "2026-09-09T20:56:50.107Z"
 acceptanceCriteria:
   - "The web viewer perf tests assert a scaling relationship or a min-of-N against a baseline measured in the same process, not an absolute millisecond budget"
   - "Each converted assertion states in a comment which regression it would still catch, so the stabilization cannot be mistaken for a suppression"
@@ -12,6 +15,6 @@ acceptanceCriteria:
   - "A repo-wide sweep identifies every remaining assertion whose verdict depends on wall-clock rather than on the code, and each is either converted or explicitly justified"
   - "No test is deleted, skipped, or given a raised timeout as the means of making it pass"
 description: "The 2026-08-17 pass fixed rex and write-path-profile but did not reach packages/web or the root e2e suite. Reproduced 2026-09-09 while running the batch-2 ndx work tasks.\n\nLoad-sensitive, verified both ways. packages/web/tests/unit/viewer/prd-tree-live-tick-perf.test.ts 're-rendering a 500-item tree with a new reference completes within the frame budget' asserts an absolute 160ms; under a full pnpm test it measured 420.10ms, and run alone on an idle machine the whole file completes in 108ms. Same shape in packages/web/tests/unit/viewer/large-tree-performance.test.ts (3 tests: DOM per visible item bounded, cleans up DOM nodes on unmount, diffItems scales linearly). Also failed loaded and passed on a serial rerun: packages/web/tests/unit/viewer/axe-audit.test.ts, packages/web/tests/unit/server/routes-commands.test.ts (2 tests), packages/web/tests/integration/merge-history-pipeline.test.ts, packages/rex/tests/e2e/cli-fix.test.ts (15.8s loaded) and cli-no-json-writes.test.ts (19.9s loaded) which then passed 13/13, and packages/sourcevision/tests/e2e/cli-iso.test.ts, cli-hints.test.ts and tests/unit/export/iso-map-interaction.test.ts which then passed 48/48.\n\nSeparate failure mode, not load-only: tests/e2e/cli-ci-child-cleanup.test.js fails with 'Timed out waiting for CI child PID record' and reproduces on origin/main (verified at fa50ec08), so it predates this branch and needs its own diagnosis.\n\nWhy this is now load-bearing rather than annoying: ndx work runs the full suite as its post-task gate, so a load flake marks the run failed even though the work committed and the task was marked completed. That happened twice in this batch. The operator-facing consequence is being taught to disbelieve red and to re-run work that already landed.\n\nFollow the pattern the sibling tasks established (676af18f stabilize rex's load-sensitive performance assertions, 94e03432 convert write-path-profile's absolute budgets to scaling assertions with a min-of-N). TESTING.md forbids padding timeouts to turn a red suite green, so raising budgets is not the fix."
-lastModified: "2026-09-09T20:16:03.618Z"
+lastModified: "2026-09-09T20:56:50.114Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

@@ -34,7 +34,11 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Make the tests' sh-on-PATH dependency explicit instead of failing opaquely](./make-the-tests-sh-on-path-dependency.md) | completed |
 | [Neutralize ambient color env so FORCE_COLOR does not fail 24 tests](./neutralize-ambient-color-env-so-force.md) | completed |
 | [packages/hench/tests/unit/tools/git.test.ts spawns `sh` unguarded, so 7 cases fail from PowerShell](./packages-hench-tests-unit-tools-git.md) | completed |
+| [prd-tree-atomic-writes asserts raw 500ms latency budgets and compares two adjacent micro-spans](./prd-tree-atomic-writes-asserts-raw.md) | pending |
+| [Real-timer ordering assertions are load-sensitive and invisible to the wall-clock inventory scanner](./real-timer-ordering-assertions-are.md) | pending |
+| [run-loop puts a lower bound on a real timer and dom-performance-monitor keeps an absolute count budget](./run-loop-puts-a-lower-bound-on-a-real.md) | pending |
+| [Search index rebuild and search route elapsed budgets bypass the documented BUDGET_MULTIPLIER policy](./search-index-rebuild-and-search-route.md) | pending |
 | [Stabilize rex's load-sensitive performance assertions](./stabilize-rex-s-load-sensitive.md) | completed |
 | [Triage the 39 hench/web failures now that the run no longer hides them](./triage-the-39-hench-web-failures-now.md) | completed |
 | [vi.stubEnv in child-lifecycle.test.js leaks NDX_DEBUG_LIFECYCLE into sibling e2e children](./vi-stubenv-in-child-lifecycle-test-js.md) | completed |
-| [Web viewer perf assertions and the ci child-cleanup e2e still fail under machine load, reddening runs whose work succeeded](./web-viewer-perf-assertions-and-the-ci.md) | pending |
+| [Web viewer perf assertions and the ci child-cleanup e2e still fail under machine load, reddening runs whose work succeeded](./web-viewer-perf-assertions-and-the-ci.md) | completed |
