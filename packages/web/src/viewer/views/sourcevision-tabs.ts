@@ -37,14 +37,14 @@ export const SOURCEVISION_TABS: readonly SourceVisionTab[] = [
   { id: "problems", icon: "\u26A0", label: "Problems", minPass: ENRICHMENT_THRESHOLDS.problems },
   { id: "suggestions", icon: "\u2728", label: "Suggestions", minPass: ENRICHMENT_THRESHOLDS.suggestions },
   { id: "pr-markdown", icon: "\u270D", label: "PR Markdown", minPass: 0, featureGate: "sourcevision.prMarkdown" },
-  // TODO(ask-panel): the gated "Ask" tab lands here -- a prompt/response text
-  // exchange over the analysed project (explain a finding, refine the PRD).
-  // Tracked by PRD feature d339458a "SourceVision Ask Panel".
-  //
-  // Once it works here, the same panel is wanted on the Rex and Hench surfaces.
-  // That is deliberately not tracked in the PRD yet: generalise this one first,
-  // then lift the shared piece out. Adoption markers for the other two domains
-  // are in domain-rex.ts and domain-hench.ts.
+  // Answers come from a live model call, so there is nothing to serve from an
+  // `ndx export` bundle -- hence requiresServer alongside the feature gate.
+  { id: "ask", icon: "\u2753", label: "Ask", minPass: 0, featureGate: "sourcevision.ask", requiresServer: true },
+  // TODO(ask-panel): once the Ask tab above works here, the same panel is
+  // wanted on the Rex and Hench surfaces. That is deliberately not tracked in
+  // the PRD yet: generalise this one first, then lift the shared piece out.
+  // Adoption markers for the other two domains are in domain-rex.ts and
+  // domain-hench.ts.
 ];
 
 export const SOURCEVISION_TAB_IDS: SourceVisionTabId[] = SOURCEVISION_TABS.map((tab) => tab.id);

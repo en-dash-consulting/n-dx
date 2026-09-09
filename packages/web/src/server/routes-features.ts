@@ -78,6 +78,15 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     stability: "experimental",
     defaultValue: false,
   },
+  {
+    key: "sourcevision.ask",
+    label: "Ask Panel",
+    description: "Show the SourceVision Ask page — a prompt/response exchange answered from the existing analysis.",
+    impact: "Each question is a live model call against your configured vendor, so it spends token budget. Hidden from the sidebar when disabled.",
+    package: "sourcevision",
+    stability: "experimental",
+    defaultValue: false,
+  },
   // ── Rex ────────────────────────────────────────────────────────────
   {
     key: "rex.autoComplete",

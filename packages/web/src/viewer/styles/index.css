@@ -39,6 +39,7 @@
 @import "./llm-provider.css";
 @import "./project-settings.css";
 @import "./pr-markdown.css";
+@import "./ask.css";
 @import "./memory-warning.css";
 @import "./crash-recovery.css";
 @import "./degradation-banner.css";

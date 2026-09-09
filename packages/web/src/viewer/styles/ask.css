@@ -1,0 +1,91 @@
+.ask-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ask-form,
+.ask-idle,
+.ask-submitting,
+.ask-answered,
+.ask-error,
+.ask-unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ask-prompt-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.ask-prompt-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.ask-prompt-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ask-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ask-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ask-submit-hint {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* Each state carries its own accent so the panel's mode is readable at a
+   glance rather than only from its heading text. */
+.ask-submitting {
+  border-left: 3px solid var(--accent);
+}
+
+.ask-answered {
+  border-left: 3px solid var(--green);
+}
+
+.ask-error {
+  border-left: 3px solid var(--red);
+}
+
+.ask-answer {
+  margin: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.ask-answer-meta {
+  font-family: var(--mono);
+  font-size: 12px;
+}

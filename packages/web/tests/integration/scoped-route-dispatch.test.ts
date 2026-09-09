@@ -61,12 +61,22 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const execFileAsync = promisify(execFile);
 
 const WEB_PKG = resolve(fileURLToPath(import.meta.url), "../../..");
 const SERVER_ENTRY = join(WEB_PKG, "dist/server/start.js");
+
+/**
+ * The child imports the server by absolute path, and an absolute path is only
+ * a legal ESM specifier on POSIX. On Windows `C:\...` parses as the scheme
+ * `c:`, so Node rejects the import with `ERR_UNSUPPORTED_ESM_URL_SCHEME`
+ * before the server ever boots — every case here then failed on the exit code
+ * and read as "the server died handling one POST", which is the symptom this
+ * file is built to detect. A `file://` URL is portable and unambiguous.
+ */
+const SERVER_ENTRY_URL = pathToFileURL(SERVER_ENTRY).href;
 
 /**
  * Boot the real server in a child process, POST once, report, exit.
@@ -77,7 +87,7 @@ const SERVER_ENTRY = join(WEB_PKG, "dist/server/start.js");
  */
 function driverScript(projectDir: string, scope: string, routePath: string): string {
   return `
-import { startServer } from ${JSON.stringify(SERVER_ENTRY)};
+import { startServer } from ${JSON.stringify(SERVER_ENTRY_URL)};
 
 const { port } = await startServer(${JSON.stringify(projectDir)}, 0, {
   scope: ${JSON.stringify(scope)},
