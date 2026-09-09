@@ -11,6 +11,9 @@
       "timeoutMs": 7200000
     }
   },
+  "hench": {
+    "autonomous": true
+  },
   "sourcevision": {
     "zones": {
       "mergeThreshold": 5,
