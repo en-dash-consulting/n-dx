@@ -100,6 +100,166 @@
   font-size: 11px;
 }
 
+.ask-refine-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* ── Proposed PRD changes ─────────────────────────────────────────────────
+   A proposal is a diff under review, so before and after sit side by side and
+   the card's border states the verdict — an accepted change and a rejected one
+   must not look alike at a glance. */
+.ask-proposals {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-left: 3px solid var(--accent);
+}
+
+.ask-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel2);
+}
+
+.ask-proposal-accepted {
+  border-color: var(--green);
+}
+
+.ask-proposal-rejected {
+  border-color: var(--line);
+  opacity: 0.6;
+}
+
+.ask-proposal-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ask-proposal-kind {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+
+.ask-proposal-item {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ask-proposal-rationale {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.ask-proposal-diff {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.ask-diff-side {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.ask-diff-before {
+  border-left: 2px solid var(--red);
+}
+
+.ask-diff-after {
+  border-left: 2px solid var(--green);
+}
+
+.ask-diff-label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.ask-diff-line {
+  margin: 0 0 2px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ask-diff-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.ask-proposal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ask-proposal-accept[aria-pressed="true"] {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.ask-proposal-reject[aria-pressed="true"] {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.ask-proposals-apply {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ask-apply-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ask-apply-result {
+  font-size: 13px;
+}
+
+.ask-apply-result p {
+  margin: 0;
+  color: var(--green);
+}
+
+.ask-apply-refused {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ask-apply-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--red);
+}
+
 /* Each state carries its own accent so the panel's mode is readable at a
    glance rather than only from its heading text. */
 .ask-submitting {

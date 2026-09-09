@@ -74,6 +74,9 @@ const ASK_ENDPOINT = "/api/sourcevision/ask";
 /** Where the panel files an answer as a PRD item. */
 const CAPTURE_ENDPOINT = "/api/rex/capture-ask";
 
+/** Where accepted PRD refinements are written, under the store lock. */
+const APPLY_REFINEMENTS_ENDPOINT = "/api/rex/apply-refinements";
+
 /** How long transient copy feedback stays on screen. */
 const COPY_FEEDBACK_MS = 2000;
 
@@ -95,6 +98,25 @@ const ERROR_HEADING: Record<string, string> = {
   provider_error: "The model call failed",
 };
 
+/**
+ * A proposed change to one PRD item.
+ *
+ * Mirrors `RefinementProposal` in `server/ask-refinements.ts`; duplicated
+ * because the viewer does not import from the server at runtime. `before` is
+ * what the model was shown, and is checked against the item on disk when the
+ * user accepts — a diff the reviewer can read, and a guard the applier can act
+ * on.
+ */
+export interface RefinementProposal {
+  id: string;
+  kind: "description" | "acceptanceCriteria" | "priority" | "parent" | "merge";
+  itemId: string;
+  itemTitle: string;
+  rationale: string;
+  before: string[];
+  after: string[];
+}
+
 /** Successful answer body from {@link ASK_ENDPOINT}. */
 interface AskSuccessResponse {
   ok: true;
@@ -102,6 +124,7 @@ interface AskSuccessResponse {
   vendor: string;
   model: string;
   sources?: readonly string[];
+  proposals?: RefinementProposal[];
 }
 
 /**
@@ -164,6 +187,8 @@ export type AskState =
       vendor: string;
       model: string;
       sources: readonly string[];
+      /** PRD changes the answer proposes. Empty unless the user asked for them. */
+      proposals: RefinementProposal[];
     }
   /**
    * `failure` is what the panel renders; `message` is the one-line fallback for
@@ -176,6 +201,31 @@ type CopyFeedback =
   | { kind: "success" }
   | { kind: "error"; message: string }
   | null;
+
+/**
+ * A reviewer's verdict on one proposal.
+ *
+ * `pending` is the only state that can become a write. Rejecting is recorded
+ * rather than just hiding the card, so the reviewer can see they have dealt
+ * with every proposal before they apply anything.
+ */
+type ProposalVerdict = "pending" | "accepted" | "rejected";
+
+/** The apply action's state, shared by the whole accepted batch. */
+type ApplyState =
+  | { status: "idle" }
+  | { status: "applying" }
+  | { status: "done"; applied: number; refused: { id: string; reason: string }[] }
+  | { status: "error"; message: string };
+
+/** Human label per proposal kind, used as the diff's heading. */
+const PROPOSAL_KIND_LABEL: Record<RefinementProposal["kind"], string> = {
+  description: "Description",
+  acceptanceCriteria: "Acceptance criteria",
+  priority: "Priority",
+  parent: "Parent",
+  merge: "Merge duplicate",
+};
 
 /** The capture action's own state — `confirm` is the guard before any write. */
 type CaptureState =
@@ -206,6 +256,7 @@ export function stateForResponse(body: AskResponse, question: string): AskState 
       vendor: body.vendor,
       model: body.model,
       sources: body.sources ?? [],
+      proposals: Array.isArray(body.proposals) ? body.proposals : [],
     };
   }
   const failure = body as AskFailureResponse;
@@ -296,6 +347,11 @@ export function AskView() {
   const [capture, setCapture] = useState<CaptureState>({ status: "idle" });
   /** The finding this panel was opened to explain, if it was. */
   const [attachedFinding, setAttachedFinding] = useState<FindingSeed | null>(null);
+  /** Whether the next question may propose PRD changes. */
+  const [refinePrd, setRefinePrd] = useState(false);
+  /** Per-proposal verdicts for the answer on screen. */
+  const [verdicts, setVerdicts] = useState<Record<string, ProposalVerdict>>({});
+  const [applyState, setApplyState] = useState<ApplyState>({ status: "idle" });
   const inFlightRef = useRef(false);
   const copyTimerRef = useRef<number | null>(null);
   const deployed = isDeployedMode();
@@ -332,6 +388,7 @@ export function AskView() {
   const submitQuestion = useCallback(async (
     question: string,
     finding: FindingSeed | null,
+    wantsRefinements = false,
   ) => {
     // A blank prompt is a no-op, not an error: the user has not asked anything
     // yet, so there is nothing to report and nothing to spend a model call on.
@@ -346,6 +403,10 @@ export function AskView() {
     // click the user has already made, undoing it.
     showCopyFeedback(null);
     setCapture({ status: "idle" });
+    // Verdicts belong to the answer that produced them; carrying them across
+    // would let a click on the old answer's proposals write the new one's.
+    setVerdicts({});
+    setApplyState({ status: "idle" });
     try {
       const res = await fetch(ASK_ENDPOINT, {
         method: "POST",
@@ -353,7 +414,11 @@ export function AskView() {
         // The finding travels as named fields, not folded into the question:
         // the model reads the finding itself, and a test can assert its zone
         // and files arrived.
-        body: JSON.stringify({ prompt: trimmed, ...(finding ? { finding } : {}) }),
+        body: JSON.stringify({
+          prompt: trimmed,
+          ...(finding ? { finding } : {}),
+          ...(wantsRefinements ? { refinePrd: true } : {}),
+        }),
       });
       const body = await res.json() as AskResponse;
       setState(stateForResponse(body, trimmed));
@@ -368,9 +433,59 @@ export function AskView() {
   }, [showCopyFeedback]);
 
   const handleSubmit = useCallback(
-    () => submitQuestion(prompt, attachedFinding),
-    [prompt, attachedFinding, submitQuestion],
+    () => submitQuestion(prompt, attachedFinding, refinePrd),
+    [prompt, attachedFinding, refinePrd, submitQuestion],
   );
+
+  /**
+   * Write the accepted proposals.
+   *
+   * Only proposals the reviewer accepted are sent, and each carries the
+   * `before` it was written against so the server can refuse one whose item has
+   * moved on. Rejecting every proposal never reaches this: with nothing
+   * accepted there is no request, so the tree is untouched.
+   */
+  const handleApplyRefinements = useCallback(async () => {
+    if (state.status !== "answered") return;
+    const accepted = state.proposals.filter((p) => verdicts[p.id] === "accepted");
+    if (accepted.length === 0) return;
+
+    setApplyState({ status: "applying" });
+    try {
+      const res = await fetch(APPLY_REFINEMENTS_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposals: accepted }),
+      });
+      const body = await res.json().catch(() => ({})) as {
+        ok?: boolean;
+        applied?: number;
+        outcomes?: { id: string; applied: boolean; reason?: string }[];
+        error?: string;
+      };
+      if (!res.ok || body.ok !== true) {
+        // Includes the 409 a concurrent writer produces, whose message names
+        // the process holding the lock.
+        throw new Error(body.error ?? `The apply request failed (HTTP ${res.status}).`);
+      }
+      setApplyState({
+        status: "done",
+        applied: body.applied ?? 0,
+        refused: (body.outcomes ?? [])
+          .filter((o) => !o.applied)
+          .map((o) => ({ id: o.id, reason: o.reason ?? "Refused." })),
+      });
+    } catch (err) {
+      setApplyState({
+        status: "error",
+        message: err instanceof Error ? err.message : "Failed to apply the refinements.",
+      });
+    }
+  }, [state, verdicts]);
+
+  const setVerdict = useCallback((id: string, verdict: ProposalVerdict) => {
+    setVerdicts((prev) => ({ ...prev, [id]: verdict }));
+  }, []);
 
   /**
    * Pick up a finding left by Explain, and answer it without a second click.
@@ -426,6 +541,10 @@ export function AskView() {
 
   const submitting = state.status === "submitting";
   const submitUnavailable = submitting || isBlankPrompt(prompt);
+
+  const proposals = state.status === "answered" ? state.proposals : [];
+  const acceptedCount = proposals.filter((p) => verdicts[p.id] === "accepted").length;
+  const rejectedCount = proposals.filter((p) => verdicts[p.id] === "rejected").length;
 
   const copyError = copyFeedback?.kind === "error" ? copyFeedback.message : null;
   const politeMessage = politeAnnouncement(
@@ -541,6 +660,18 @@ export function AskView() {
           onClick: () => { void handleSubmit(); },
         }, submitting ? "Asking…" : "Ask"),
         h("span", { class: "section-sub ask-submit-hint" }, "⌘/Ctrl + Enter"),
+
+        // Opt-in: an ordinary question should not come back with PRD rewrites
+        // the user then has to read and reject.
+        h("label", { class: "ask-refine-toggle" },
+          h("input", {
+            type: "checkbox",
+            class: "ask-refine-checkbox",
+            checked: refinePrd,
+            onChange: (e: Event) => setRefinePrd((e.currentTarget as HTMLInputElement).checked),
+          }),
+          " Propose PRD changes",
+        ),
       ),
     ),
 
@@ -619,6 +750,101 @@ export function AskView() {
             ? h("p", { class: "ask-capture-error" },
                 `⚠ Could not capture the answer: ${capture.message}`,
               )
+            : null,
+        )
+      : null,
+
+    // Proposed PRD changes, one reviewable card each. Nothing here writes: the
+    // verdicts are local until Apply sends the accepted ones, so a reviewer who
+    // rejects everything leaves the tree exactly as it was.
+    state.status === "answered" && state.proposals.length > 0
+      ? h("div", { class: "card ask-proposals" },
+          h("h3", { class: "section-header-sm" },
+            `Proposed PRD changes (${state.proposals.length})`,
+          ),
+          h("p", { class: "section-sub" },
+            "Each is reviewed on its own. Nothing is written until you apply what you accepted.",
+          ),
+
+          ...state.proposals.map((proposal) => {
+            const verdict = verdicts[proposal.id] ?? "pending";
+            return h("div", {
+              key: proposal.id,
+              class: `ask-proposal ask-proposal-${verdict}`,
+            },
+              h("div", { class: "ask-proposal-head" },
+                h("span", { class: "ask-proposal-kind" }, PROPOSAL_KIND_LABEL[proposal.kind]),
+                h("span", { class: "ask-proposal-item" }, proposal.itemTitle),
+              ),
+              proposal.rationale
+                ? h("p", { class: "ask-proposal-rationale" }, proposal.rationale)
+                : null,
+
+              // Before and after, both shown: an edit that replaces text the
+              // user cannot see is the thing this review exists to prevent.
+              h("div", { class: "ask-proposal-diff" },
+                h("div", { class: "ask-diff-side ask-diff-before" },
+                  h("span", { class: "ask-diff-label" }, "Before"),
+                  proposal.before.length > 0
+                    ? proposal.before.map((line, i) =>
+                        h("p", { key: i, class: "ask-diff-line" }, `− ${line}`))
+                    : h("p", { class: "ask-diff-line ask-diff-empty" }, "(empty)"),
+                ),
+                h("div", { class: "ask-diff-side ask-diff-after" },
+                  h("span", { class: "ask-diff-label" }, "After"),
+                  proposal.after.length > 0
+                    ? proposal.after.map((line, i) =>
+                        h("p", { key: i, class: "ask-diff-line" }, `+ ${line}`))
+                    : h("p", { class: "ask-diff-line ask-diff-empty" }, "(empty)"),
+                ),
+              ),
+
+              h("div", { class: "ask-proposal-actions" },
+                h("button", {
+                  type: "button",
+                  class: "btn ask-proposal-accept",
+                  "aria-pressed": String(verdict === "accepted"),
+                  "aria-label": `Accept: ${PROPOSAL_KIND_LABEL[proposal.kind]} of ${proposal.itemTitle}`,
+                  onClick: () => setVerdict(proposal.id, verdict === "accepted" ? "pending" : "accepted"),
+                }, verdict === "accepted" ? "✓ Accepted" : "Accept"),
+                h("button", {
+                  type: "button",
+                  class: "btn ask-proposal-reject",
+                  "aria-pressed": String(verdict === "rejected"),
+                  "aria-label": `Reject: ${PROPOSAL_KIND_LABEL[proposal.kind]} of ${proposal.itemTitle}`,
+                  onClick: () => setVerdict(proposal.id, verdict === "rejected" ? "pending" : "rejected"),
+                }, verdict === "rejected" ? "✗ Rejected" : "Reject"),
+              ),
+            );
+          }),
+
+          h("div", { class: "ask-proposals-apply" },
+            h("button", {
+              type: "button",
+              class: "btn ask-apply-btn",
+              // Nothing accepted means nothing to write — not an empty write.
+              "aria-disabled": String(acceptedCount === 0 || applyState.status === "applying"),
+              onClick: () => { void handleApplyRefinements(); },
+            }, applyState.status === "applying"
+              ? "Applying…"
+              : `Apply ${acceptedCount} accepted change${acceptedCount === 1 ? "" : "s"}`),
+            h("span", { class: "section-sub" },
+              `${acceptedCount} accepted · ${rejectedCount} rejected · ${state.proposals.length - acceptedCount - rejectedCount} undecided`,
+            ),
+          ),
+
+          applyState.status === "done"
+            ? h("div", { class: "ask-apply-result", role: "status", "aria-live": "polite" },
+                h("p", null, `✓ Applied ${applyState.applied} change${applyState.applied === 1 ? "" : "s"} to the PRD.`),
+                applyState.refused.length > 0
+                  ? h("ul", { class: "ask-apply-refused" },
+                      applyState.refused.map((r) => h("li", { key: r.id }, `⚠ ${r.reason}`)),
+                    )
+                  : null,
+              )
+            : null,
+          applyState.status === "error"
+            ? h("p", { class: "ask-apply-error", role: "alert" }, `⚠ ${applyState.message}`)
             : null,
         )
       : null,

@@ -35,5 +35,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Attribute Ask token spend in the usage rollup](./attribute-ask-token-spend-in-the-usage.md) | completed |
 | [Explain a finding in plain language from the Problems and Suggestions surfaces](./explain-a-finding-in-plain-language.md) | completed |
 | [Give each degraded mode a specific, actionable message](./give-each-degraded-mode-a-specific.md) | completed |
-| [Propose and apply PRD refinements from the exchange, diff-reviewed and under the store lock](./propose-and-apply-prd-refinements-from.md) | pending |
+| [Propose and apply PRD refinements from the exchange, diff-reviewed and under the store lock](./propose-and-apply-prd-refinements-from.md) | in_progress |
 | [Wire Copy and Capture-to-PRD actions on the answer](./wire-copy-and-capture-to-prd-actions.md) | completed |

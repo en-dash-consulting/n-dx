@@ -1018,6 +1018,9 @@ describe("ask state helpers", () => {
       vendor: "claude",
       model: "claude-opus-5",
       sources: ["CONTEXT.md"],
+      // An answer that proposed no PRD changes carries an empty list rather
+      // than an absent one, so the review section has nothing to render.
+      proposals: [],
     });
   });
 

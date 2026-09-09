@@ -50,6 +50,34 @@ import type { AskContextSource, AskFindingSeed } from "./sourcevision-ask-contex
 import { recordAskUsage, askUsageCounters } from "./ask-usage-log.js";
 import { noAnalysisFailure, askFailureForReason } from "./sourcevision-ask-diagnostics.js";
 import { readCliName } from "./cli-name.js";
+import {
+  refinementInstructions,
+  parseRefinementProposals,
+  stripRefinementBlock,
+} from "./ask-refinements.js";
+import { resolveStore, walkTree } from "./rex-gateway.js";
+import type { PRDItem } from "./rex-gateway.js";
+
+/**
+ * Every item a refinement could target, flattened.
+ *
+ * Read through the store rather than the cache so a proposal is written
+ * against what is actually on disk — the `before` it carries is checked against
+ * that same content when the user accepts, and a proposal built from a stale
+ * cache would be refused for a difference the user never made.
+ *
+ * A PRD that cannot be read is not an error here: the question still has an
+ * answer, it just cannot come with proposals.
+ */
+async function loadRefinableItems(rexDir: string): Promise<PRDItem[]> {
+  try {
+    const store = await resolveStore(rexDir);
+    const doc = await store.loadDocument();
+    return [...walkTree(doc.items)].map((entry) => entry.item);
+  } catch {
+    return [];
+  }
+}
 
 const ASK_PATH = "/api/sourcevision/ask";
 
@@ -61,6 +89,14 @@ interface AskRequest {
   prompt: string;
   seed?: string;
   finding?: AskFindingSeed;
+  /**
+   * Invite the answer to propose PRD changes.
+   *
+   * Opt-in per request: most questions are questions, and inviting a PRD
+   * rewrite in answer to "what does the billing zone do" produces proposals
+   * nobody asked for and everybody has to read.
+   */
+  refinePrd?: boolean;
 }
 
 /**
@@ -118,12 +154,15 @@ function parseAskRequest(raw: string): AskRequest | { error: string } {
     return { error: "Request body must be a JSON object." };
   }
 
-  const { prompt, seed, finding } = input as Record<string, unknown>;
+  const { prompt, seed, finding, refinePrd } = input as Record<string, unknown>;
   if (typeof prompt !== "string" || prompt.trim() === "") {
     return { error: "`prompt` is required and must be a non-empty string." };
   }
   if (seed !== undefined && typeof seed !== "string") {
     return { error: "`seed` must be a string when supplied." };
+  }
+  if (refinePrd !== undefined && typeof refinePrd !== "boolean") {
+    return { error: "`refinePrd` must be a boolean when supplied." };
   }
 
   const parsedFinding = parseFinding(finding);
@@ -133,6 +172,7 @@ function parseAskRequest(raw: string): AskRequest | { error: string } {
     prompt,
     ...(seed === undefined ? {} : { seed }),
     ...(parsedFinding === undefined ? {} : { finding: parsedFinding }),
+    ...(refinePrd ? { refinePrd: true } : {}),
   };
 }
 
@@ -219,10 +259,17 @@ export async function handleSourcevisionAskRoute(
   const vendor = (llmConfig?.vendor ?? "claude") as LLMVendor;
   const model = resolveVendorModel(vendor, llmConfig);
 
+  // The items a refinement may target. Loaded only when the caller asked for
+  // proposals — an ordinary question should not pay to read the PRD, and the
+  // model cannot propose a change to an item it was never shown.
+  const refinableItems = parsed.refinePrd ? await loadRefinableItems(ctx.rexDir) : [];
+
   try {
     const client = createLLMClient({ llmConfig, vendor });
     const result = await client.complete({
-      prompt: renderAskPrompt(context, parsed.prompt),
+      prompt: parsed.refinePrd
+        ? `${renderAskPrompt(context, parsed.prompt)}\n\n${refinementInstructions(refinableItems)}`
+        : renderAskPrompt(context, parsed.prompt),
       model,
       timeoutMs: ASK_TIMEOUT_MS,
     });
@@ -237,9 +284,17 @@ export async function handleSourcevisionAskRoute(
       ok: true,
     });
 
+    // Parsed out of the answer and removed from it: the block is machine input
+    // rendered as review cards, and leaving it in would show the same changes
+    // twice, once as JSON.
+    const proposals = parsed.refinePrd
+      ? parseRefinementProposals(result.text, refinableItems)
+      : [];
+
     jsonResponse(res, 200, {
       ok: true,
-      answer: result.text,
+      answer: parsed.refinePrd ? stripRefinementBlock(result.text) : result.text,
+      proposals,
       vendor,
       model,
       tokens: result.tokenUsage ?? null,

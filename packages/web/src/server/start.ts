@@ -16,6 +16,7 @@ import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleSourcevisionAskRoute } from "./routes-sourcevision-ask.js";
 import { handleIsoMapRoute } from "./routes-iso-map.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
+import { handleApplyRefinementsRoute } from "./routes-rex-refinements.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
@@ -649,6 +650,7 @@ async function handleApiRoutes(
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleWorkflowRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleAdaptiveRoute(req, res, ctx))) return true;
   if (isInScope(ctx.scope, "rex") && handleValidationRoute(req, res, ctx)) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleApplyRefinementsRoute(req, res, ctx, ws.broadcast))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleTokenUsageRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleMergeGraphRoute(req, res, ctx))) return true;
   if (handleDataRoute(req, res, ctx, watcher)) return true;
