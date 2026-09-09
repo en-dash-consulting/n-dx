@@ -1,9 +1,9 @@
 {
   "schema": "hench/v1",
-  "provider": "cli",
-  "model": "opus",
+  "provider": "api",
+  "model": "qwen/qwen3.5-9b",
   "permissionMode": "acceptEdits",
-  "maxTurns": 50,
+  "maxTurns": 150,
   "maxTokens": 8192,
   "rexDir": ".rex",
   "apiKeyEnv": "ANTHROPIC_API_KEY",
@@ -22,12 +22,13 @@
       "tsc",
       "vitest"
     ],
-    "commandTimeout": 30000,
+    "commandTimeout": 3600000,
     "maxFileSize": 1048576,
     "memoryThrottle": {
       "enabled": false
     }
   },
   "claudePath": "claude",
-  "autoCommit": true
+  "autoCommit": true,
+  "tokenBudget": 0
 }
