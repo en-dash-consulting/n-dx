@@ -33,5 +33,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Run summary omits cache tokens, understating input ~65,000x](./run-summary-omits-cache-tokens.md) | completed |
 | [Summarizing prune emits two consecutive user turns on the local and Gemini loops, which strict chat templates reject](./summarizing-prune-emits-two.md) | completed |
 | [Summarizing prune that preserves the cache prefix](./summarizing-prune-that-preserves-the.md) | completed |
-| [tokenBudget counts uncached input only, so prompt caching silently disables the budget on API runs](./tokenbudget-counts-uncached-input-only.md) | pending |
+| [tokenBudget counts uncached input only, so prompt caching silently disables the budget on API runs](./tokenbudget-counts-uncached-input-only.md) | completed |
 | [Wire the sourcevision PRIMER.md into ndx work and hench orientation](./wire-the-sourcevision-primer-md-into.md) | completed |

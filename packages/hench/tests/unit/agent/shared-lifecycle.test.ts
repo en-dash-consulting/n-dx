@@ -334,6 +334,48 @@ describe("shared lifecycle", () => {
 
       vi.restoreAllMocks();
     });
+
+    // Pins the caller contract both loops rely on: the figure in the error
+    // message is whatever checkTokenBudget totalled, so a prompt-cached run
+    // must report its cache tokens rather than the bare uncached input.
+    it("reports the cache-inclusive total when fed a checkTokenBudget result", async () => {
+      const { handleBudgetExceeded } = await import("../../../src/agent/lifecycle/shared.js");
+      const { checkTokenBudget } = await import("../../../src/agent/lifecycle/token-budget.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+      const { randomUUID } = await import("node:crypto");
+
+      const store = createStore("file", join(projectDir, ".rex"));
+      vi.spyOn(console, "log");
+      await store.updateItem("task-1", { status: "in_progress" });
+
+      const tokenUsage = {
+        input: 534,
+        output: 40,
+        cacheCreationInput: 876_000,
+        cacheReadInput: 34_100_000,
+      };
+      const run = {
+        id: randomUUID(),
+        taskId: "task-1",
+        taskTitle: "Test task",
+        startedAt: new Date().toISOString(),
+        status: "running" as const,
+        turns: 83,
+        tokenUsage,
+        toolCalls: [],
+        model: "claude-sonnet-4-6",
+      };
+
+      const check = checkTokenBudget(tokenUsage, 1_000_000);
+      expect(check.exceeded).toBe(true);
+
+      await handleBudgetExceeded(store, "task-1", run, check.totalUsed, check.budget);
+
+      // 534 + 40 + 876_000 + 34_100_000 — not the 574 an uncached sum reports.
+      expect(run.error).toBe("Token budget exceeded: 34976574 used of 1000000 budget");
+
+      vi.restoreAllMocks();
+    });
   });
 
   describe("initRunRecord with diagnostics", () => {

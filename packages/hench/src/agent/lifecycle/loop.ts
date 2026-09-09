@@ -55,7 +55,7 @@ import {
 
 export interface AgentLoopOptions extends SharedLoopOptions {
   maxTurns?: number;
-  /** Total token budget per run (input + output). Overrides config. */
+  /** Total token budget per run (input + cached input + output). Overrides config. */
   tokenBudget?: number;
 }
 
