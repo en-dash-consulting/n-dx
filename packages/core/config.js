@@ -79,7 +79,6 @@ const PROJECT_SECTIONS = new Set([
   "features",
   "sourcevision",
   "selfHeal",
-  "hench",
 ]);
 
 /**

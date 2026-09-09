@@ -82,7 +82,7 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope", () => {
 
     // `claude` resolves the project key through realpath, so compare on the
     // suffix rather than the raw temp path (/var vs /private/var on macOS).
-    const base = (p) => p.split("/").pop();
+    const base = (p) => p.split(/[\\/]/).pop();
     expect(
       projects.map(base),
       `MCP servers were registered under ${projects.join(", ")}, ` +
@@ -105,7 +105,7 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope", () => {
     });
 
     const byProject = await readRegistrations();
-    const base = (p) => p.split("/").pop();
+    const base = (p) => p.split(/[\\/]/).pop();
     const offenders = [];
 
     for (const [project, servers] of Object.entries(byProject)) {
@@ -148,7 +148,7 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope", () => {
     });
 
     const byProject = await readRegistrations();
-    const base = (p) => p.split("/").pop();
+    const base = (p) => p.split(/[\\/]/).pop();
     const callerEntry = Object.entries(byProject).find(([p]) => base(p) === base(cwdDir));
 
     expect(

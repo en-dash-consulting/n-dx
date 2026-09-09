@@ -693,7 +693,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     await runReviewGate(projectDir, store, taskId, run, {
       rollbackOnFailure: opts.rollbackOnFailure,
       yes: opts.yes,
-      autonomous: opts.autonomous,
+      autonomous: opts.autonomous === true || config.autonomous === true,
       baselineUntracked,
     });
   }
@@ -709,7 +709,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     selfHeal: config.selfHeal,
     rollbackOnFailure: opts.rollbackOnFailure,
     yes: opts.yes,
-    autonomous: opts.autonomous,
+    autonomous: opts.autonomous === true || config.autonomous === true,
     store,
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
@@ -1163,7 +1163,7 @@ async function runLocalToolLoop(params: {
     await runReviewGate(projectDir, store, taskId, run, {
       rollbackOnFailure: opts.rollbackOnFailure,
       yes: opts.yes,
-      autonomous: opts.autonomous,
+      autonomous: opts.autonomous === true || config.autonomous === true,
       baselineUntracked,
     });
   }
@@ -1179,7 +1179,7 @@ async function runLocalToolLoop(params: {
     selfHeal: config.selfHeal,
     rollbackOnFailure: opts.rollbackOnFailure,
     yes: opts.yes,
-    autonomous: opts.autonomous,
+    autonomous: opts.autonomous === true || config.autonomous === true,
     store,
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,
@@ -1525,7 +1525,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     await runReviewGate(projectDir, store, taskId, run, {
       rollbackOnFailure: opts.rollbackOnFailure,
       yes: opts.yes,
-      autonomous: opts.autonomous,
+      autonomous: opts.autonomous === true || config.autonomous === true,
       baselineUntracked,
     });
   }
@@ -1542,7 +1542,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     selfHeal: config.selfHeal,
     rollbackOnFailure: opts.rollbackOnFailure,
     yes: opts.yes,
-    autonomous: opts.autonomous,
+    autonomous: opts.autonomous === true || config.autonomous === true,
     store,
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,

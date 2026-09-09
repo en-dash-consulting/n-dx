@@ -1998,6 +1998,12 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   let testGateSkipped = false;
   let resolvedTestCommand: string | undefined;
 
+  if (run.status === "completed" && skipFullTestGate) {
+    // Say so explicitly — a silently absent gate looks identical to a gate
+    // that never should have run, which hides misconfiguration.
+    stream("Test Gate", "Skipped (--skip-test-gate / hench.skipFullTestGate)");
+  }
+
   if (run.status === "completed" && !skipFullTestGate && run.structuredSummary) {
     // Resolve test command first (before attempting gate)
     // This will prompt the user if no command is configured
@@ -2078,8 +2084,11 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             // The model can see what failed and decide how to proceed without being
             // blocked by a hard failure status. This prevents test failures from
             // immediately aborting autonomous runs; instead they become context for
-            // the next turn's decision-making.
+            // the next turn's decision-making. The gate is complete — without this,
+            // the retry loop re-runs the suite to the attempt cap and then fails the
+            // run anyway, which is exactly what "context" exists to prevent.
             stream("Test Gate", "Proceeding with errors as context");
+            gateComplete = true;
           } else {
             // "abort" — mark run as failed and proceed to rollback
             run.status = "failed";
@@ -2093,7 +2102,9 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       }
     }
 
-    if (testGateAttempt >= 5) {
+    // Only a gate that never completed exhausts the attempt cap — a pass (or
+    // skip/context resolution) on the final attempt is still a success.
+    if (!gateComplete && testGateAttempt >= 5) {
       info("\nTest gate max attempts reached");
       run.status = "failed";
       run.error = "Test gate max retry attempts exceeded";
