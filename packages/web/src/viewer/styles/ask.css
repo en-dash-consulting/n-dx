@@ -4,6 +4,42 @@
   gap: 12px;
 }
 
+/* The finding a seeded question is about. Accented like the answer card so the
+   pair reads as one exchange rather than two unrelated panels. */
+.ask-finding {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-left: 3px solid var(--accent);
+}
+
+.ask-finding-text {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.ask-finding-fields {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.ask-finding-key {
+  color: var(--fg);
+}
+
+.ask-finding-detach-btn {
+  align-self: flex-start;
+  font-size: 12px;
+}
+
 .ask-form,
 .ask-idle,
 .ask-submitting,

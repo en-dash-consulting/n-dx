@@ -107,11 +107,11 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "architecture": ({ data, setDetail, navigateTo }) =>
     h(ArchitectureView, { data, onSelect: setDetail, navigateTo }),
 
-  "problems": ({ data }) =>
-    h(ProblemsView, { data }),
+  "problems": ({ data, navigateTo }) =>
+    h(ProblemsView, { data, navigateTo }),
 
-  "suggestions": ({ data }) =>
-    h(SuggestionsView, { data }),
+  "suggestions": ({ data, navigateTo }) =>
+    h(SuggestionsView, { data, navigateTo }),
 
   "pr-markdown": () =>
     h(PRMarkdownView, null),

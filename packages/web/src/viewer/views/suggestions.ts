@@ -1,13 +1,17 @@
 import { h } from "preact";
 import { useState, useCallback, useMemo } from "preact/hooks";
-import type { LoadedData } from "../types.js";
+import type { LoadedData, NavigateTo } from "../types.js";
 import type { Finding } from "../external.js";
 import { FindingsList } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
+import { useFeatureToggle } from "../hooks/index.js";
+import { explainFinding } from "../ask-seed.js";
 
 interface SuggestionsProps {
   data: LoadedData;
+  /** Absent in contexts with nowhere to navigate; Explain is then not offered. */
+  navigateTo?: NavigateTo;
 }
 
 function RefreshRecommendationsButton() {
@@ -78,9 +82,17 @@ function RefreshRecommendationsButton() {
   );
 }
 
-export function SuggestionsView({ data }: SuggestionsProps) {
+export function SuggestionsView({ data, navigateTo }: SuggestionsProps) {
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
+
+  // Before the enrichment gate below, so this hook runs on every render. (The
+  // useMemo further down does not, which predates this change.)
+  const askEnabled = useFeatureToggle("sourcevision.ask", false);
+  const handleExplain = useCallback(
+    (finding: Finding) => { if (navigateTo) explainFinding(finding, navigateTo); },
+    [navigateTo],
+  );
 
   if (enrichmentPass < ENRICHMENT_THRESHOLDS.suggestions) {
     return h(EnrichmentGate, {
@@ -143,6 +155,8 @@ export function SuggestionsView({ data }: SuggestionsProps) {
       legacyInsights,
       groupBy: "severity",
       searchable: true,
+      // Only when the panel it leads to is actually reachable.
+      ...(askEnabled && navigateTo ? { onExplain: handleExplain } : {}),
     })
   );
 }

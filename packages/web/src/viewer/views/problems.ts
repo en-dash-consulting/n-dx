@@ -1,18 +1,30 @@
 import { h, Fragment } from "preact";
-import { useMemo } from "preact/hooks";
-import type { LoadedData } from "../types.js";
+import { useCallback, useMemo } from "preact/hooks";
+import type { LoadedData, NavigateTo } from "../types.js";
 import type { Finding } from "../external.js";
 import { FindingsList, BarChart } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
+import { useFeatureToggle } from "../hooks/index.js";
+import { explainFinding } from "../ask-seed.js";
 
 interface ProblemsProps {
   data: LoadedData;
+  /** Absent in contexts with nowhere to navigate; Explain is then not offered. */
+  navigateTo?: NavigateTo;
 }
 
-export function ProblemsView({ data }: ProblemsProps) {
+export function ProblemsView({ data, navigateTo }: ProblemsProps) {
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
+
+  // Before the enrichment gate below, so this hook runs on every render. (The
+  // useMemo further down does not, which predates this change.)
+  const askEnabled = useFeatureToggle("sourcevision.ask", false);
+  const handleExplain = useCallback(
+    (finding: Finding) => { if (navigateTo) explainFinding(finding, navigateTo); },
+    [navigateTo],
+  );
 
   if (enrichmentPass < ENRICHMENT_THRESHOLDS.problems) {
     return h(EnrichmentGate, {
@@ -94,6 +106,8 @@ export function ProblemsView({ data }: ProblemsProps) {
       legacyInsights,
       groupBy: "severity",
       searchable: true,
+      // Only when the panel it leads to is actually reachable.
+      ...(askEnabled && navigateTo ? { onExplain: handleExplain } : {}),
     })
   );
 }

@@ -65,6 +65,8 @@ import { BrandedHeader } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { clipboardFailureMessage, copyTextToClipboard } from "../utils/clipboard.js";
+import { takePendingAskSeed, EXPLAIN_FINDING_PROMPT } from "../ask-seed.js";
+import type { FindingSeed } from "../ask-seed.js";
 
 /** Where the panel sends the prompt. */
 const ASK_ENDPOINT = "/api/sourcevision/ask";
@@ -235,6 +237,8 @@ export function AskView() {
   const [state, setState] = useState<AskState>({ status: "idle" });
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>(null);
   const [capture, setCapture] = useState<CaptureState>({ status: "idle" });
+  /** The finding this panel was opened to explain, if it was. */
+  const [attachedFinding, setAttachedFinding] = useState<FindingSeed | null>(null);
   const inFlightRef = useRef(false);
   const copyTimerRef = useRef<number | null>(null);
   const deployed = isDeployedMode();
@@ -259,12 +263,22 @@ export function AskView() {
     if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
   }, []);
 
-  const handleSubmit = useCallback(async () => {
+  /**
+   * Ask one question, optionally about a finding.
+   *
+   * Takes both explicitly rather than reading the textarea state, because the
+   * seeded path submits in the same tick it sets them — reading state there
+   * would send the values from before the seed arrived.
+   */
+  const submitQuestion = useCallback(async (
+    question: string,
+    finding: FindingSeed | null,
+  ) => {
     // A blank prompt is a no-op, not an error: the user has not asked anything
     // yet, so there is nothing to report and nothing to spend a model call on.
-    if (isBlankPrompt(prompt) || inFlightRef.current) return;
+    if (isBlankPrompt(question) || inFlightRef.current) return;
 
-    const question = prompt.trim();
+    const trimmed = question.trim();
     inFlightRef.current = true;
     setState({ status: "submitting" });
     // Both actions' feedback described the previous answer. Cleared here, at
@@ -277,10 +291,13 @@ export function AskView() {
       const res = await fetch(ASK_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: question }),
+        // The finding travels as named fields, not folded into the question:
+        // the model reads the finding itself, and a test can assert its zone
+        // and files arrived.
+        body: JSON.stringify({ prompt: trimmed, ...(finding ? { finding } : {}) }),
       });
       const body = await res.json() as AskResponse;
-      setState(stateForResponse(body, question));
+      setState(stateForResponse(body, trimmed));
     } catch (err) {
       // A rejected fetch never reached the route, so there is no classified
       // reason to report — only what the transport said.
@@ -291,7 +308,31 @@ export function AskView() {
     } finally {
       inFlightRef.current = false;
     }
-  }, [prompt, showCopyFeedback]);
+  }, [showCopyFeedback]);
+
+  const handleSubmit = useCallback(
+    () => submitQuestion(prompt, attachedFinding),
+    [prompt, attachedFinding, submitQuestion],
+  );
+
+  /**
+   * Pick up a finding left by Explain, and answer it without a second click.
+   *
+   * The user already said what they wanted by clicking Explain; making them
+   * press Ask again would be asking twice. The question is still placed in the
+   * textarea, editable, so a follow-up starts from it rather than from blank.
+   *
+   * The seed is taken even in the deployed export, where nothing can be asked:
+   * taking clears it, and a seed left behind would attach itself to whatever
+   * the user asked next in a later session.
+   */
+  useEffect(() => {
+    const seed = takePendingAskSeed();
+    if (!seed || deployed) return;
+    setAttachedFinding(seed);
+    setPrompt(EXPLAIN_FINDING_PROMPT);
+    void submitQuestion(EXPLAIN_FINDING_PROMPT, seed);
+  }, [deployed, submitQuestion]);
 
   const handleCopy = useCallback(async () => {
     if (state.status !== "answered") return;
@@ -374,6 +415,38 @@ export function AskView() {
       h("code", null, ".sourcevision/"),
       " analysis — run an analysis first if it is stale.",
     ),
+
+    // What is being explained, shown rather than implied: the answer below
+    // will talk about a zone and some files, and the user needs to be able to
+    // see which finding sent them here — especially after editing the question.
+    attachedFinding
+      ? h("div", { class: "card ask-finding" },
+          h("h3", { class: "section-header-sm" }, "Explaining a finding"),
+          h("p", { class: "ask-finding-text" }, attachedFinding.message),
+          h("ul", { class: "ask-finding-fields" },
+            h("li", null, h("span", { class: "ask-finding-key" }, "Type: "), attachedFinding.type),
+            attachedFinding.severity
+              ? h("li", null,
+                  h("span", { class: "ask-finding-key" }, "Severity: "),
+                  attachedFinding.severity,
+                )
+              : null,
+            h("li", null, h("span", { class: "ask-finding-key" }, "Zone: "), attachedFinding.zone),
+            h("li", null,
+              h("span", { class: "ask-finding-key" }, "Files: "),
+              attachedFinding.files.length > 0
+                ? attachedFinding.files.join(", ")
+                : "none recorded",
+            ),
+          ),
+          h("button", {
+            type: "button",
+            class: "btn ask-finding-detach-btn",
+            onClick: () => setAttachedFinding(null),
+            title: "Ask about the project generally instead of this finding",
+          }, "Detach finding"),
+        )
+      : null,
 
     h("div", { class: "card ask-form" },
       h("label", { class: "ask-prompt-label", for: PROMPT_INPUT_ID }, "Your question"),

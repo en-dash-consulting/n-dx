@@ -224,6 +224,134 @@ describe("POST /api/sourcevision/ask", () => {
     expect(completeMock).not.toHaveBeenCalled();
   });
 
+  // ── Explaining a finding ──────────────────────────────────────────────────
+
+  /**
+   * The finding arrives as named fields, which is the point: an explanation
+   * that could have been written without reading this repository is a failed
+   * explanation, and the zone and files are what make that impossible. Asserted
+   * on the prompt handed to the model, because a route that accepted the
+   * finding and forgot to include it would still return fluent prose.
+   */
+  describe("structured finding seed", () => {
+    const FINDING = {
+      type: "anti-pattern",
+      severity: "critical",
+      zone: "billing",
+      message: "High coupling between billing and api",
+      files: ["src/billing/invoice.ts", "src/api/handlers.ts"],
+    };
+
+    /** The prompt text handed to the model on the most recent call. */
+    function lastPrompt(): string {
+      return completeMock.mock.calls.at(-1)![0].prompt as string;
+    }
+
+    it("puts the finding's zone, files and message in front of the model", async () => {
+      const { status } = await ask({ prompt: "Explain this.", finding: FINDING });
+
+      expect(status).toBe(200);
+      const prompt = lastPrompt();
+      expect(prompt).toContain("zone: billing");
+      expect(prompt).toContain("src/billing/invoice.ts");
+      expect(prompt).toContain("src/api/handlers.ts");
+      expect(prompt).toContain("High coupling between billing and api");
+      expect(prompt).toContain("type: anti-pattern");
+      expect(prompt).toContain("severity: critical");
+    });
+
+    it("keeps the finding alongside the analysis, not instead of it", async () => {
+      await ask({ prompt: "Explain this.", finding: FINDING });
+
+      // Grounding is what lets the answer say something true about `billing`
+      // rather than about coupling in general.
+      const prompt = lastPrompt();
+      expect(prompt).toContain("Invoice generation and dunning");
+      expect(prompt.indexOf("Invoice generation")).toBeLessThan(prompt.indexOf("the finding to explain"));
+    });
+
+    it("reports the finding as a source of the answer", async () => {
+      const { body } = await ask({ prompt: "Explain this.", finding: FINDING });
+
+      expect(body.sources).toContain("CONTEXT.md");
+      expect(body.sources).toContain("finding");
+    });
+
+    it("omits severity the analysis never set rather than defaulting it", async () => {
+      const { severity: _omitted, ...unclassified } = FINDING;
+      await ask({ prompt: "Explain this.", finding: unclassified });
+
+      // "severity: info" would be the route asserting a classification the
+      // analysis declined to make.
+      expect(lastPrompt()).not.toContain("severity:");
+      expect(lastPrompt()).toContain("zone: billing");
+    });
+
+    it("says so plainly when a finding names no files", async () => {
+      await ask({ prompt: "Explain this.", finding: { ...FINDING, files: [] } });
+
+      // An empty list would read as a truncated line; this cannot be mistaken
+      // for a filename.
+      expect(lastPrompt()).toContain("files: (none recorded)");
+    });
+
+    it("still answers a plain question with no finding attached", async () => {
+      const { status, body } = await ask({ prompt: "What does the billing zone do?" });
+
+      expect(status).toBe(200);
+      expect(body.sources).not.toContain("finding");
+      expect(lastPrompt()).not.toContain("the finding to explain");
+    });
+
+    it("carries a free-text seed and a finding together", async () => {
+      await ask({ prompt: "Explain this.", finding: FINDING, seed: "The user is new to this repo." });
+
+      expect(lastPrompt()).toContain("zone: billing");
+      expect(lastPrompt()).toContain("The user is new to this repo.");
+    });
+
+    // ── Validation ───────────────────────────────────────────────────────────
+
+    it("rejects a finding that is not an object", async () => {
+      const { status, body } = await ask({ prompt: "Explain.", finding: "billing coupling" });
+
+      expect(status).toBe(400);
+      expect(body.error).toMatch(/finding/i);
+      expect(completeMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects a finding missing a required field", async () => {
+      for (const field of ["type", "zone", "message"]) {
+        completeMock.mockClear();
+        const partial: Record<string, unknown> = { ...FINDING };
+        delete partial[field];
+
+        const { status, body } = await ask({ prompt: "Explain.", finding: partial });
+
+        expect(status, `missing ${field}`).toBe(400);
+        expect(body.error).toContain(`finding.${field}`);
+        expect(completeMock).not.toHaveBeenCalled();
+      }
+    });
+
+    it("rejects a files list that is not strings", async () => {
+      // Numbers would reach the prompt as "1, 2" and read as filenames.
+      const { status, body } = await ask({ prompt: "Explain.", finding: { ...FINDING, files: [1, 2] } });
+
+      expect(status).toBe(400);
+      expect(body.error).toContain("finding.files");
+      expect(completeMock).not.toHaveBeenCalled();
+    });
+
+    it("accepts a finding that omits files entirely", async () => {
+      const { files: _omitted, ...noFiles } = FINDING;
+      const { status } = await ask({ prompt: "Explain.", finding: noFiles });
+
+      expect(status).toBe(200);
+      expect(lastPrompt()).toContain("files: (none recorded)");
+    });
+  });
+
   // ── Token accounting ──────────────────────────────────────────────────────
 
   /**

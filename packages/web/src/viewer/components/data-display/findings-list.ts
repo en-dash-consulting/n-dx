@@ -10,6 +10,19 @@ interface FindingsListProps {
   groupBy?: "severity" | "scope" | "type";
   searchable?: boolean;
   threshold?: number;
+  /**
+   * Offer an Explain action on each finding.
+   *
+   * A callback rather than a `navigateTo`, so this component stays
+   * presentational: the caller decides what explaining means and whether it is
+   * available at all. Omitted — by a surface with nowhere to send the user, or
+   * one whose Ask tab is gated off — no button renders, rather than one that
+   * leads somewhere that is not there.
+   *
+   * Legacy insight rows do not get one. They are free text, not findings, and
+   * have no type, severity, zone, or files to explain.
+   */
+  onExplain?: (finding: Finding) => void;
 }
 
 const SEVERITY_ICON: Record<string, string> = {
@@ -37,6 +50,7 @@ export function FindingsList({
   groupBy = "severity",
   searchable = true,
   threshold = 8,
+  onExplain,
 }: FindingsListProps) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -190,6 +204,21 @@ export function FindingsList({
         : h("div", { class: "finding-header" }, ...headerContent),
       // Main text — always visible
       h("p", { class: "finding-text" }, f.text),
+      // Explain — outside the header, which is itself a button when the row
+      // expands; nesting one button inside another is invalid and would make
+      // the row's own toggle unreachable.
+      onExplain
+        ? h("div", { class: "finding-actions" },
+            h("button", {
+              type: "button",
+              class: "btn finding-explain-btn",
+              // Every row shares the visible label, so the accessible name
+              // carries which finding this one explains.
+              "aria-label": `Explain finding: ${f.text}`,
+              onClick: () => onExplain(f),
+            }, "Explain"),
+          )
+        : null,
       // Expandable detail (related files)
       hasDetail
         ? h("div", {

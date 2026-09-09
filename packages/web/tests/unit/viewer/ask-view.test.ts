@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { AskView, isBlankPrompt, stateForResponse, captureResultMessage } from "../../../src/viewer/views/ask.js";
+import { setPendingAskSeed } from "../../../src/viewer/ask-seed.js";
 import { SOURCEVISION_TABS } from "../../../src/viewer/views/index.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import { Sidebar } from "../../../src/viewer/components/sidebar.js";
@@ -814,6 +815,165 @@ describe("AskView accessibility", () => {
       expect(btn.getAttribute("tabindex")).toBeNull();
       expect(btn.textContent?.trim()).not.toBe("");
     }
+  });
+});
+
+/**
+ * Explaining a finding.
+ *
+ * The panel is opened by a click on a findings row, so it has to answer without
+ * a second click — and the finding has to reach the endpoint as fields, not as
+ * a sentence, or the acceptance criterion ("the seed reaches the endpoint with
+ * the finding's zone and files intact") cannot be checked at all.
+ */
+describe("AskView with a seeded finding", () => {
+  let root: HTMLDivElement;
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  const SEED = {
+    type: "anti-pattern",
+    severity: "critical",
+    zone: "billing",
+    message: "High coupling between billing and api",
+    files: ["src/billing/invoice.ts", "src/api/handlers.ts"],
+  };
+
+  beforeEach(() => {
+    root = document.createElement("div");
+    document.body.appendChild(root);
+    fetchSpy = vi.fn(async () => ({ ok: true, status: 200, json: async () => ANSWER_BODY }));
+    vi.stubGlobal("fetch", fetchSpy);
+    setPendingAskSeed(null);
+  });
+
+  afterEach(() => {
+    render(null, root);
+    root.remove();
+    setPendingAskSeed(null);
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  async function mountWithSeed(seed = SEED) {
+    setPendingAskSeed(seed);
+    await act(async () => { render(h(AskView, null), root); });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
+  }
+
+  function askBody(): Record<string, unknown> {
+    const call = fetchSpy.mock.calls.find(([url]) => String(url) === "/api/sourcevision/ask");
+    return JSON.parse(String((call![1] as RequestInit).body)) as Record<string, unknown>;
+  }
+
+  it("sends the finding as structured fields, zone and files intact", async () => {
+    await mountWithSeed();
+
+    // The acceptance criterion, asserted at the wire: named fields, not prose.
+    expect(askBody().finding).toEqual(SEED);
+  });
+
+  it("asks for meaning and for what a fix would touch", async () => {
+    await mountWithSeed();
+
+    const prompt = String(askBody().prompt);
+    expect(prompt).toMatch(/what it means/i);
+    expect(prompt).toMatch(/fix would touch/i);
+    // The finding travels in `finding`; the question does not restate it.
+    expect(prompt).not.toContain(SEED.message);
+  });
+
+  it("answers without a second click", async () => {
+    await mountWithSeed();
+
+    // The user already asked by clicking Explain.
+    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows which finding is being explained, fields and all", async () => {
+    await mountWithSeed();
+
+    const card = root.querySelector(".ask-finding");
+    expect(card).not.toBeNull();
+    expect(card!.textContent).toContain("High coupling between billing and api");
+    expect(card!.textContent).toContain("billing");
+    expect(card!.textContent).toContain("src/api/handlers.ts");
+    expect(card!.textContent).toContain("critical");
+  });
+
+  it("leaves the question in the textarea so a follow-up starts from it", async () => {
+    await mountWithSeed();
+
+    const input = root.querySelector<HTMLTextAreaElement>(".ask-prompt-input")!;
+    expect(input.value).toMatch(/what it means/i);
+    expect(input.disabled).toBe(false);
+  });
+
+  it("keeps Copy and Capture on the explained answer", async () => {
+    await mountWithSeed();
+    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
+
+    // An explanation is worth capturing at least as much as a free-form answer.
+    expect(root.querySelector(".ask-copy-btn")).not.toBeNull();
+    expect(root.querySelector(".ask-capture-btn")).not.toBeNull();
+  });
+
+  it("explains a finding the analysis never classified", async () => {
+    const { severity: _omitted, ...unclassified } = SEED;
+    await mountWithSeed(unclassified as typeof SEED);
+
+    expect(askBody().finding).toEqual(unclassified);
+    // No invented severity, and the card does not imply one.
+    expect(JSON.stringify(askBody())).not.toContain("severity");
+  });
+
+  it("explains a finding with no files recorded", async () => {
+    await mountWithSeed({ ...SEED, files: [] });
+
+    expect(askBody().finding).toMatchObject({ files: [] });
+    expect(root.querySelector(".ask-finding")?.textContent).toContain("none recorded");
+  });
+
+  it("detaches the finding so the next question is about the project", async () => {
+    await mountWithSeed();
+    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
+
+    act(() => { root.querySelector<HTMLButtonElement>(".ask-finding-detach-btn")!.click(); });
+    expect(root.querySelector(".ask-finding")).toBeNull();
+
+    const input = root.querySelector<HTMLTextAreaElement>(".ask-prompt-input")!;
+    act(() => {
+      input.value = "What does the api zone do?";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    act(() => { root.querySelector<HTMLButtonElement>(".ask-submit-btn")!.click(); });
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    const second = JSON.parse(String((fetchSpy.mock.calls[1]![1] as RequestInit).body));
+    expect(second.finding).toBeUndefined();
+  });
+
+  it("asks nothing when no finding was seeded", async () => {
+    await act(async () => { render(h(AskView, null), root); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(root.querySelector(".ask-finding")).toBeNull();
+    expect(root.querySelector(".ask-idle")).not.toBeNull();
+  });
+
+  it("does not carry a seed into a later mount", async () => {
+    await mountWithSeed();
+    render(null, root);
+    fetchSpy.mockClear();
+
+    // Taking clears it — a stale finding must not attach itself to whatever the
+    // user asks next.
+    await act(async () => { render(h(AskView, null), root); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(root.querySelector(".ask-finding")).toBeNull();
   });
 });
 

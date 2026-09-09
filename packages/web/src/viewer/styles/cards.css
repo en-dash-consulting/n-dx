@@ -240,6 +240,19 @@
   font-size: 11px;
 }
 
+/* Explain. Its own row below the text rather than inside the header, which is
+   itself a button on expandable rows — a button cannot nest in a button. */
+.finding-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.finding-explain-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+}
+
 .finding-related {
   display: flex;
   flex-wrap: wrap;

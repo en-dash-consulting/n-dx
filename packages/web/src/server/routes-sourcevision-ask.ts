@@ -1,8 +1,13 @@
 /**
  * POST /api/sourcevision/ask — answer a question about the analyzed project.
  *
- * Request:  `{ prompt: string, seed?: string }`
+ * Request:  `{ prompt: string, seed?: string, finding?: AskFindingSeed }`
  * Response: `{ answer, vendor, model, tokens, sources }`
+ *
+ * `finding` is the structured form used by Explain on the Problems and
+ * Suggestions surfaces — named fields, so what reaches the model is the finding
+ * rather than someone's sentence about it. `seed` remains free text for callers
+ * that have context but no finding.
  *
  * The answer is grounded in the `.sourcevision/` analysis rather than the
  * model's own impression of the codebase — see
@@ -41,7 +46,7 @@ import {
   renderAskPrompt,
   NoAnalysisError,
 } from "./sourcevision-ask-context.js";
-import type { AskContextSource } from "./sourcevision-ask-context.js";
+import type { AskContextSource, AskFindingSeed } from "./sourcevision-ask-context.js";
 import { recordAskUsage, askUsageCounters } from "./ask-usage-log.js";
 
 const ASK_PATH = "/api/sourcevision/ask";
@@ -53,6 +58,46 @@ const ASK_TIMEOUT_MS = 120_000;
 interface AskRequest {
   prompt: string;
   seed?: string;
+  finding?: AskFindingSeed;
+}
+
+/**
+ * Validate the optional `finding`.
+ *
+ * A finding arrives as named fields rather than a sentence, so the fields are
+ * checked rather than trusted: a `files` array holding numbers would otherwise
+ * reach the prompt as `1, 2` and read to the model as filenames. Severity is
+ * the only optional one — the analysis does not always classify a finding, and
+ * defaulting it here would assert something it never said.
+ *
+ * @returns the finding, or a message naming what is wrong with it
+ */
+function parseFinding(raw: unknown): AskFindingSeed | { error: string } | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { error: "`finding` must be an object when supplied." };
+  }
+
+  const { type, severity, zone, message, files } = raw as Record<string, unknown>;
+  for (const [name, value] of [["type", type], ["zone", zone], ["message", message]] as const) {
+    if (typeof value !== "string" || value.trim() === "") {
+      return { error: `\`finding.${name}\` is required and must be a non-empty string.` };
+    }
+  }
+  if (severity !== undefined && typeof severity !== "string") {
+    return { error: "`finding.severity` must be a string when supplied." };
+  }
+  if (files !== undefined && (!Array.isArray(files) || files.some((f) => typeof f !== "string"))) {
+    return { error: "`finding.files` must be an array of strings when supplied." };
+  }
+
+  return {
+    type: type as string,
+    ...(severity === undefined ? {} : { severity: severity as string }),
+    zone: zone as string,
+    message: message as string,
+    files: (files as string[] | undefined) ?? [],
+  };
 }
 
 /**
@@ -71,7 +116,7 @@ function parseAskRequest(raw: string): AskRequest | { error: string } {
     return { error: "Request body must be a JSON object." };
   }
 
-  const { prompt, seed } = input as Record<string, unknown>;
+  const { prompt, seed, finding } = input as Record<string, unknown>;
   if (typeof prompt !== "string" || prompt.trim() === "") {
     return { error: "`prompt` is required and must be a non-empty string." };
   }
@@ -79,7 +124,14 @@ function parseAskRequest(raw: string): AskRequest | { error: string } {
     return { error: "`seed` must be a string when supplied." };
   }
 
-  return { prompt, ...(seed === undefined ? {} : { seed }) };
+  const parsedFinding = parseFinding(finding);
+  if (parsedFinding && "error" in parsedFinding) return parsedFinding;
+
+  return {
+    prompt,
+    ...(seed === undefined ? {} : { seed }),
+    ...(parsedFinding === undefined ? {} : { finding: parsedFinding }),
+  };
 }
 
 /**

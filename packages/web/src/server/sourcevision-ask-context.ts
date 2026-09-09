@@ -50,6 +50,42 @@ export interface AskContext {
   readonly sources: readonly string[];
 }
 
+/**
+ * A finding handed to the endpoint to be explained.
+ *
+ * Structured rather than prose. The caller could send a sentence naming the
+ * zone, but the model would then be reading someone's summary of the finding
+ * instead of the finding, and whatever the summary left out would be gone. Named
+ * fields also survive assertion: a test can check the zone and files arrived.
+ */
+export interface AskFindingSeed {
+  type: string;
+  severity?: string;
+  zone: string;
+  message: string;
+  files: string[];
+}
+
+/**
+ * Render a finding as labelled context lines.
+ *
+ * Field-per-line rather than JSON: both are structured, but this is the form
+ * the surrounding digest is already in, and a model reading `zone: billing`
+ * beside a `CONTEXT.md` section about `billing` connects them without being
+ * told to. Absent severity is omitted rather than defaulted — the analysis did
+ * not classify it, and saying "info" would be asserting something it never did.
+ */
+export function renderFindingSeed(finding: AskFindingSeed): string {
+  const lines = [
+    `type: ${finding.type}`,
+    ...(finding.severity ? [`severity: ${finding.severity}`] : []),
+    `zone: ${finding.zone}`,
+    `files: ${finding.files.length > 0 ? finding.files.join(", ") : "(none recorded)"}`,
+    `message: ${finding.message}`,
+  ];
+  return lines.join("\n");
+}
+
 /** Raised when the project has no analysis to answer from. */
 export class NoAnalysisError extends Error {
   constructor(message: string) {
@@ -70,10 +106,15 @@ export interface AskContextSource {
    * Build the context for one question.
    *
    * @param input.prompt - the user's question, available to selective sources
-   * @param input.seed - caller-supplied context, e.g. the finding being explained
+   * @param input.seed - caller-supplied free text to include alongside it
+   * @param input.finding - a finding to explain, as structured fields
    * @throws {NoAnalysisError} when there is no analysis to ground an answer in
    */
-  assemble(input: { prompt: string; seed?: string }): Promise<AskContext>;
+  assemble(input: {
+    prompt: string;
+    seed?: string;
+    finding?: AskFindingSeed;
+  }): Promise<AskContext>;
 }
 
 /**
@@ -85,7 +126,7 @@ export interface AskContextSource {
  */
 export function createDigestContextSource(svDir: string): AskContextSource {
   return {
-    async assemble({ seed }) {
+    async assemble({ seed, finding }) {
       let digest: string;
       try {
         digest = await readFile(join(svDir, "CONTEXT.md"), "utf-8");
@@ -105,6 +146,14 @@ export function createDigestContextSource(svDir: string): AskContextSource {
         "--- .sourcevision/CONTEXT.md ---",
         digest.trim(),
       ];
+
+      // After the digest, so the finding is read against the analysis it came
+      // from rather than in isolation — the zone named here is a zone the
+      // digest above has already described.
+      if (finding) {
+        sources.push("finding");
+        parts.push("", "--- the finding to explain ---", renderFindingSeed(finding));
+      }
 
       if (seed?.trim()) {
         sources.push("seed");
