@@ -146,8 +146,10 @@ describe("AskView", () => {
 
     await waitFor(() => expect(root.querySelector(".ask-submitting")).not.toBeNull());
     expect(root.querySelector(".ask-idle")).toBeNull();
-    expect(submitButton().disabled).toBe(true);
-    expect(promptInput().disabled).toBe(true);
+    // Unavailable via aria-disabled, and the textarea stays live — both so the
+    // keyboard user keeps their place. See the accessibility describe below.
+    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
+    expect(promptInput().disabled).toBe(false);
 
     pending.release();
 
@@ -173,7 +175,7 @@ describe("AskView", () => {
     expect(root.querySelector(".ask-error")?.textContent).toContain("LLM rate limit reached");
     expect(root.querySelector(".ask-answered")).toBeNull();
     // The control comes back — a rate limit is worth retrying.
-    expect(submitButton().disabled).toBe(false);
+    expect(submitButton().getAttribute("aria-disabled")).toBe("false");
   });
 
   it("reports a rejected fetch as an error rather than hanging in submitting", async () => {
@@ -211,13 +213,13 @@ describe("AskView", () => {
   it("issues no request for an empty or whitespace-only prompt", () => {
     mount();
 
-    // Empty — the button is disabled, and a click on it does nothing.
-    expect(submitButton().disabled).toBe(true);
+    // Empty — the button reports itself unavailable, and a click does nothing.
+    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
     act(() => { submitButton().click(); });
 
     // Whitespace only — same, even though the field is non-empty.
     typePrompt("   \n\t  ");
-    expect(submitButton().disabled).toBe(true);
+    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
     act(() => { submitButton().click(); });
 
     // And via the keyboard shortcut, which bypasses the disabled attribute.
@@ -556,6 +558,262 @@ describe("AskView answer actions", () => {
     expect(feedback()).toBe("");
     expect(root.querySelector(".ask-capture-btn")).not.toBeNull();
     expect(root.querySelector(".ask-capture-confirm")).toBeNull();
+  });
+});
+
+/**
+ * Accessibility contract.
+ *
+ * An async text exchange has one requirement the sibling SourceVision views do
+ * not: the answer arrives after an indeterminate delay, so it has to be
+ * announced without the user losing their place. Both halves of that are
+ * asserted here — the announcement, and the place.
+ */
+describe("AskView accessibility", () => {
+  let root: HTMLDivElement;
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    root = document.createElement("div");
+    document.body.appendChild(root);
+    fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    Object.defineProperty(document, "execCommand", {
+      value: vi.fn(() => true), configurable: true, writable: true,
+    });
+  });
+
+  afterEach(() => {
+    render(null, root);
+    root.remove();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined, configurable: true, writable: true,
+    });
+  });
+
+  function mount() {
+    act(() => { render(h(AskView, null), root); });
+  }
+
+  function promptInput(): HTMLTextAreaElement {
+    return root.querySelector<HTMLTextAreaElement>(".ask-prompt-input")!;
+  }
+
+  function submitButton(): HTMLButtonElement {
+    return root.querySelector<HTMLButtonElement>(".ask-submit-btn")!;
+  }
+
+  function typePrompt(value: string) {
+    const input = promptInput();
+    act(() => {
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  /** The persistent polite region — the one a screen reader is listening to. */
+  function politeRegion(): HTMLElement {
+    const el = root.querySelector<HTMLElement>("[aria-live='polite'].sr-only");
+    if (!el) throw new Error("no persistent polite live region is rendered");
+    return el;
+  }
+
+  function assertiveRegion(): HTMLElement {
+    const el = root.querySelector<HTMLElement>("[aria-live='assertive'].sr-only");
+    if (!el) throw new Error("no persistent assertive live region is rendered");
+    return el;
+  }
+
+  function deferredJson(body: unknown) {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => { release = r; });
+    fetchSpy.mockImplementation(async () => {
+      await gate;
+      return { ok: true, status: 200, json: async () => body };
+    });
+    return { release: () => release() };
+  }
+
+  it("mounts the live regions before there is anything to announce", () => {
+    mount();
+
+    // Empty, but present: a region inserted at the same moment as its text is
+    // not reliably announced, which is the whole reason these are separate
+    // from the state cards.
+    expect(politeRegion().textContent).toBe("");
+    expect(assertiveRegion().textContent).toBe("");
+    expect(politeRegion().getAttribute("aria-atomic")).toBe("true");
+  });
+
+  it("announces the loading state and then the answer through the same region", async () => {
+    const pending = deferredJson(ANSWER_BODY);
+    mount();
+    typePrompt("Which zone is the hub?");
+
+    act(() => { submitButton().click(); });
+    await waitFor(() => expect(politeRegion().textContent).toContain("Asking"));
+
+    pending.release();
+    await waitFor(() => expect(politeRegion().textContent).toContain("Answer received"));
+  });
+
+  it("announces a failure assertively rather than politely", async () => {
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({ ok: false, error: "LLM authentication failed: no key" }),
+    });
+    mount();
+    typePrompt("Anything");
+
+    act(() => { submitButton().click(); });
+
+    await waitFor(() => expect(assertiveRegion().textContent).toContain("LLM authentication failed"));
+    expect(politeRegion().textContent).toBe("");
+  });
+
+  it("does not double-announce: the answer card is not itself a live region", async () => {
+    fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ANSWER_BODY });
+    mount();
+    typePrompt("Which zone is the hub?");
+    act(() => { submitButton().click(); });
+    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
+
+    // The card carries the answer visually; the region announces it. If the
+    // card were also live the answer would be read twice.
+    expect(root.querySelector(".ask-answered")?.getAttribute("aria-live")).toBeNull();
+  });
+
+  it("keeps focus in the textarea across a Cmd/Ctrl+Enter round-trip", async () => {
+    const pending = deferredJson(ANSWER_BODY);
+    mount();
+    typePrompt("Which zone is the hub?");
+    promptInput().focus();
+
+    act(() => {
+      promptInput().dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }),
+      );
+    });
+
+    // Disabling the focused element would have dropped focus to <body> here —
+    // the user submits from the textarea, so that is the common path.
+    await waitFor(() => expect(politeRegion().textContent).toContain("Asking"));
+    expect(document.activeElement).toBe(promptInput());
+
+    pending.release();
+    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
+    expect(document.activeElement).toBe(promptInput());
+  });
+
+  it("keeps focus on the submit control across a click round-trip", async () => {
+    const pending = deferredJson(ANSWER_BODY);
+    mount();
+    typePrompt("Which zone is the hub?");
+    submitButton().focus();
+
+    act(() => { submitButton().click(); });
+    await waitFor(() => expect(politeRegion().textContent).toContain("Asking"));
+
+    // aria-disabled rather than disabled: the control still reports itself as
+    // unavailable, but a keyboard user does not lose their position.
+    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
+    expect(submitButton().disabled).toBe(false);
+    expect(document.activeElement).toBe(submitButton());
+
+    pending.release();
+    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
+    expect(document.activeElement).toBe(submitButton());
+    expect(submitButton().getAttribute("aria-disabled")).toBe("false");
+  });
+
+  it("reports a blank prompt as unavailable without removing it from the tab order", () => {
+    mount();
+
+    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
+    expect(submitButton().disabled).toBe(false);
+
+    // And clicking it anyway is a no-op, not a request.
+    act(() => { submitButton().click(); });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("leaves the textarea editable while a question is in flight", async () => {
+    const pending = deferredJson(ANSWER_BODY);
+    mount();
+    typePrompt("First question");
+    act(() => { submitButton().click(); });
+    await waitFor(() => expect(politeRegion().textContent).toContain("Asking"));
+
+    expect(promptInput().disabled).toBe(false);
+    // Typing during the flight does not change the question that was sent —
+    // the view snapshots it at submit — so there is no reason to freeze it.
+    typePrompt("Second question");
+    pending.release();
+    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
+    expect(JSON.parse(String((fetchSpy.mock.calls[0]![1] as RequestInit).body)))
+      .toEqual({ prompt: "First question" });
+  });
+
+  it("marks success and failure feedback with more than a colour", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: async () => {} }, configurable: true, writable: true,
+    });
+    fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ANSWER_BODY });
+    mount();
+    typePrompt("Which zone is the hub?");
+    act(() => { submitButton().click(); });
+    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
+
+    act(() => { root.querySelector<HTMLButtonElement>(".ask-copy-btn")!.click(); });
+
+    // ✓ / ⚠ carry the outcome for anyone who cannot separate green from red.
+    await waitFor(() => {
+      expect(root.querySelector(".ask-copy-feedback")?.textContent).toContain("✓");
+    });
+  });
+
+  it("marks a copy failure with a warning glyph and announces it", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: async () => { throw new Error("clipboard is broken"); } },
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(document, "execCommand", {
+      value: vi.fn(() => false), configurable: true, writable: true,
+    });
+    fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ANSWER_BODY });
+    mount();
+    typePrompt("Which zone is the hub?");
+    act(() => { submitButton().click(); });
+    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
+
+    act(() => { root.querySelector<HTMLButtonElement>(".ask-copy-btn")!.click(); });
+
+    await waitFor(() => {
+      expect(root.querySelector(".ask-copy-error")?.textContent).toContain("⚠");
+    });
+    expect(assertiveRegion().textContent).toContain("Failed to copy answer to clipboard.");
+  });
+
+  it("keeps the answer actions reachable by keyboard", async () => {
+    fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ANSWER_BODY });
+    mount();
+    typePrompt("Which zone is the hub?");
+    act(() => { submitButton().click(); });
+    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
+
+    // Native buttons, so they are in the tab order and respond to Enter/Space
+    // without a keydown handler of their own.
+    for (const selector of [".ask-copy-btn", ".ask-capture-btn"]) {
+      const btn = root.querySelector<HTMLButtonElement>(selector)!;
+      expect(btn.tagName).toBe("BUTTON");
+      expect(btn.type).toBe("button");
+      expect(btn.getAttribute("tabindex")).toBeNull();
+      expect(btn.textContent?.trim()).not.toBe("");
+    }
   });
 });
 

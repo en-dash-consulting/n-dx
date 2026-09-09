@@ -35,6 +35,25 @@
  * where it was, still copyable, because the text is the thing the user would
  * otherwise lose.
  *
+ * ## Announcing an answer that arrives whenever it arrives
+ *
+ * This panel has one accessibility requirement its sibling views do not: the
+ * answer lands after an indeterminate delay, so it has to reach a screen reader
+ * without the user losing their place. Two things follow, and neither is
+ * optional.
+ *
+ * The announcement comes from a persistent pair of `sr-only` regions at the top
+ * of the container, never from the state cards. A live region that mounts at
+ * the same moment as its text is not reliably announced — the region has to
+ * already be there when the text changes — so the cards are visual only and
+ * {@link politeAnnouncement} / {@link assertiveAnnouncement} say what is heard.
+ *
+ * And nothing that has focus is ever disabled. Submitting used to disable both
+ * the textarea and the button, which meant Ctrl+Enter — the documented submit
+ * path — destroyed the focused element and dropped the user at `<body>`, right
+ * before the thing they were waiting for appeared. The button reports itself
+ * with `aria-disabled` instead, and the textarea stays live.
+ *
  * @module web/viewer/views/ask
  * @see packages/web/src/server/routes-sourcevision-ask.ts — the endpoint
  * @see packages/web/src/viewer/utils/clipboard.ts — the shared copy workflow
@@ -169,6 +188,48 @@ export function captureResultMessage(body: CaptureSuccessResponse): string {
   return `✓ Captured "${body.item.title}" under ${body.parent.title}.`;
 }
 
+/**
+ * What the polite live region should currently say.
+ *
+ * The answer arrives after an indeterminate delay, so a screen reader user has
+ * to be told it arrived — and the region announcing it must already be in the
+ * document when the text lands, which is why this feeds a persistent node
+ * rather than the answer card itself. A card that mounts together with its own
+ * `aria-live` is not reliably announced at all.
+ *
+ * Action feedback outranks the state: a copy or capture that just succeeded is
+ * newer news than an answer the user has been reading.
+ */
+export function politeAnnouncement(
+  state: AskState,
+  copySucceeded: boolean,
+  captureMessage: string | null,
+): string {
+  if (copySucceeded) return "Copied answer to clipboard.";
+  if (captureMessage) return captureMessage;
+  if (state.status === "submitting") return "Asking. Waiting on the model.";
+  if (state.status === "answered") return `Answer received from ${state.vendor} ${state.model}.`;
+  return "";
+}
+
+/**
+ * What the assertive live region should currently say.
+ *
+ * Failures interrupt; successes wait their turn. The glyphs the visible nodes
+ * carry are deliberately absent here — they are a substitute for colour, not
+ * something to read aloud.
+ */
+export function assertiveAnnouncement(
+  state: AskState,
+  copyError: string | null,
+  captureError: string | null,
+): string {
+  if (state.status === "error") return `Unable to answer: ${state.message}`;
+  if (copyError) return copyError;
+  if (captureError) return `Could not capture the answer: ${captureError}`;
+  return "";
+}
+
 export function AskView() {
   const [prompt, setPrompt] = useState("");
   const [state, setState] = useState<AskState>({ status: "idle" });
@@ -266,7 +327,19 @@ export function AskView() {
   }, [state]);
 
   const submitting = state.status === "submitting";
-  const submitDisabled = submitting || isBlankPrompt(prompt);
+  const submitUnavailable = submitting || isBlankPrompt(prompt);
+
+  const copyError = copyFeedback?.kind === "error" ? copyFeedback.message : null;
+  const politeMessage = politeAnnouncement(
+    state,
+    copyFeedback?.kind === "success",
+    capture.status === "done" ? capture.message : null,
+  );
+  const assertiveMessage = assertiveAnnouncement(
+    state,
+    copyError,
+    capture.status === "error" ? capture.message : null,
+  );
 
   const header = h("div", { class: "view-header" },
     h(BrandedHeader, { product: "sourcevision", title: "SourceVision", class: "branded-header-sv" }),
@@ -289,6 +362,12 @@ export function AskView() {
   }
 
   return h("div", { class: "ask-container" },
+    // Mounted before there is anything to announce, and never unmounted — the
+    // house idiom (see hench-runs.ts, prd-tree.ts). Polite carries progress and
+    // the answer; assertive carries failures, which interrupt.
+    h("div", { class: "sr-only", "aria-live": "polite", "aria-atomic": "true" }, politeMessage),
+    h("div", { class: "sr-only", "aria-live": "assertive", "aria-atomic": "true" }, assertiveMessage),
+
     header,
     h("p", { class: "section-sub" },
       "Ask a question about this project. Answers are grounded in the existing ",
@@ -298,13 +377,17 @@ export function AskView() {
 
     h("div", { class: "card ask-form" },
       h("label", { class: "ask-prompt-label", for: PROMPT_INPUT_ID }, "Your question"),
+      // Deliberately NOT disabled while a question is in flight. Ctrl+Enter
+      // from here is the documented submit path, so disabling it would destroy
+      // the focused element and drop the user at <body> — and there is nothing
+      // to protect: handleSubmit snapshots the question, so an edit made during
+      // the flight cannot change what was asked.
       h("textarea", {
         id: PROMPT_INPUT_ID,
         class: "ask-prompt-input",
         rows: 4,
         value: prompt,
         placeholder: "Which zones carry the most coupling, and why?",
-        disabled: submitting,
         onInput: (e: Event) => setPrompt((e.currentTarget as HTMLTextAreaElement).value),
         onKeyDown: (e: KeyboardEvent) => {
           // Cmd/Ctrl+Enter submits — Enter alone stays a newline, because the
@@ -316,32 +399,41 @@ export function AskView() {
         },
       }),
       h("div", { class: "ask-form-actions" },
+        // aria-disabled, not disabled: a disabled control loses focus and
+        // leaves the tab order, so submitting by keyboard would strand the user
+        // at <body> exactly when the answer they are waiting for arrives.
+        // handleSubmit already no-ops on a blank prompt and on a second click
+        // during a flight, so the control being clickable costs nothing.
         h("button", {
           type: "button",
           class: "btn ask-submit-btn",
-          disabled: submitDisabled,
+          "aria-disabled": String(submitUnavailable),
           onClick: () => { void handleSubmit(); },
         }, submitting ? "Asking…" : "Ask"),
         h("span", { class: "section-sub ask-submit-hint" }, "⌘/Ctrl + Enter"),
       ),
     ),
 
+    // None of the state cards is a live region: they mount at the same moment
+    // as their text, which is the one shape a live region cannot announce
+    // reliably. The persistent pair at the top of the container speaks for
+    // them, and having both would read every answer twice.
     state.status === "idle"
-      ? h("div", { class: "card ask-idle", role: "status", "aria-live": "polite" },
+      ? h("div", { class: "card ask-idle" },
           h("h3", { class: "section-header-sm" }, "No question asked yet"),
           h("p", null, "The answer appears here once you ask something."),
         )
       : null,
 
     state.status === "submitting"
-      ? h("div", { class: "card ask-submitting", role: "status", "aria-live": "polite" },
+      ? h("div", { class: "card ask-submitting" },
           h("h3", { class: "section-header-sm" }, "Asking…"),
           h("p", null, "Assembling analysis context and waiting on the model."),
         )
       : null,
 
     state.status === "answered"
-      ? h("div", { class: "card ask-answered", role: "status", "aria-live": "polite" },
+      ? h("div", { class: "card ask-answered" },
           h("h3", { class: "section-header-sm" }, "Answer"),
           h("div", { class: "ask-answer" }, state.answer),
           h("p", { class: "section-sub ask-answer-meta" },
@@ -381,28 +473,29 @@ export function AskView() {
                   }, "Capture to PRD"),
           ),
 
-          // One always-rendered live region for both successes, so a screen
-          // reader has something to announce into rather than a node that
-          // appears at the same moment as its text.
-          h("p", { class: "ask-copy-feedback", role: "status", "aria-live": "polite" },
+          // Visible feedback only — the live regions above do the announcing.
+          // The ✓ and ⚠ are what tells success from failure when green and red
+          // are indistinguishable; the announcements omit them, because a
+          // glyph read aloud is noise, not information.
+          h("p", { class: "ask-copy-feedback" },
             copyFeedback?.kind === "success"
-              ? "Copied answer to clipboard."
+              ? "✓ Copied answer to clipboard."
               : capture.status === "done" ? capture.message : "",
           ),
-          copyFeedback?.kind === "error"
-            ? h("p", { class: "ask-copy-error", role: "alert" }, copyFeedback.message)
+          copyError !== null
+            ? h("p", { class: "ask-copy-error" }, `⚠ ${copyError}`)
             : null,
           capture.status === "error"
-            ? h("p", { class: "ask-capture-error", role: "alert" },
-                `Could not capture the answer: ${capture.message}`,
+            ? h("p", { class: "ask-capture-error" },
+                `⚠ Could not capture the answer: ${capture.message}`,
               )
             : null,
         )
       : null,
 
     state.status === "error"
-      ? h("div", { class: "card ask-error", role: "alert" },
-          h("h3", { class: "section-header-sm" }, "Unable to answer"),
+      ? h("div", { class: "card ask-error" },
+          h("h3", { class: "section-header-sm" }, "⚠ Unable to answer"),
           h("p", null, state.message),
         )
       : null,

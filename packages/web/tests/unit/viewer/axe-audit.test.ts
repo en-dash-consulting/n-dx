@@ -660,6 +660,97 @@ describe.skipIf(!axeRun)("[a11y] PRMarkdownView — axe audit", () => {
   });
 });
 
+// ── [a11y] AskView (all four display states) ─────────────────────────────────
+
+/**
+ * The Ask panel is audited in every state, not just its initial one: its
+ * states are a union and each renders a different tree, so an idle-only audit
+ * would leave the answer card — the part with the actions in it — unchecked.
+ */
+describe.skipIf(!axeRun)("[a11y] AskView — axe audit", () => {
+  let root: HTMLElement;
+  let cleanup: () => void;
+  let originalFetch: typeof globalThis.fetch;
+
+  const ANSWER = {
+    ok: true,
+    answer: "web-viewer is the hub zone.",
+    vendor: "claude",
+    model: "claude-opus-5",
+    sources: ["CONTEXT.md"],
+  };
+
+  /** Render the panel and drive it into `state` before auditing. */
+  async function renderAsk(state: "idle" | "submitting" | "answered" | "error"): Promise<HTMLElement> {
+    globalThis.fetch = vi.fn().mockImplementation(() => {
+      if (state === "submitting") return new Promise(() => { /* never resolves */ });
+      if (state === "error") {
+        return Promise.resolve({
+          ok: false, status: 500,
+          json: async () => ({ ok: false, error: "LLM authentication failed: no key" }),
+        });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => ANSWER });
+    });
+
+    const { AskView } = await import("../../../src/viewer/views/ask.js");
+    const el = renderToDiv(h(AskView, {}));
+    if (state === "idle") return el;
+
+    const input = el.querySelector<HTMLTextAreaElement>(".ask-prompt-input")!;
+    act(() => {
+      input.value = "Which zone is the hub?";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    act(() => { el.querySelector<HTMLButtonElement>(".ask-submit-btn")!.click(); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+
+    // Prove the panel is in the state being audited. Without this, a fetch stub
+    // that stopped working would leave the idle tree on screen and every audit
+    // below would pass against the wrong markup.
+    if (!el.querySelector(`.ask-${state}`)) {
+      throw new Error(`AskView did not reach the ${state} state`);
+    }
+    return el;
+  }
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    act(() => {
+      render(null, root);
+    });
+    root.remove();
+    cleanup?.();
+    globalThis.fetch = originalFetch;
+  });
+
+  for (const state of ["idle", "submitting", "answered", "error"] as const) {
+    for (const theme of ["light", "dark"] as const) {
+      it(`has zero critical/serious violations (${theme} theme, ${state} state)`, async () => {
+        cleanup = setTheme(theme);
+        root = await renderAsk(state);
+        const violations = await runAxe(root);
+        expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+      });
+    }
+  }
+
+  it("has zero critical/serious violations in the deployed-export state", async () => {
+    cleanup = setTheme("light");
+    window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "2026-09-09T00:00:00.000Z" };
+    try {
+      root = await renderAsk("idle");
+      const violations = await runAxe(root);
+      expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+    } finally {
+      delete window.__NDX_DEPLOYED__;
+    }
+  });
+});
+
 // ── [a11y] ProjectSettings (loading state) ───────────────────────────────────
 
 describe.skipIf(!axeRun)("[a11y] ProjectSettings — axe audit", () => {

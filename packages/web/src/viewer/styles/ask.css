@@ -37,8 +37,14 @@
   resize: vertical;
 }
 
-.ask-prompt-input:disabled {
-  opacity: 0.6;
+/* No `:disabled` rule for the textarea: it is never disabled, because
+   disabling the element the user submits from would take their focus with it. */
+
+/* The submit control reports itself unavailable with aria-disabled rather than
+   the disabled attribute, so it keeps focus and its place in the tab order —
+   see the comment on the button. It still has to *look* unavailable. */
+.ask-submit-btn[aria-disabled="true"] {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
