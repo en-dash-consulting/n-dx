@@ -756,6 +756,13 @@ const ORCHESTRATOR_HELP_DEFS = {
       ".rex/prd_tree/, and nothing reads it as a backend. Import rebuilds the\n" +
       "folder tree through the normal store write path, under the PRD lock.\n" +
       "\n" +
+      "--item=<id-or-slug> scopes the export to one epic, feature or task. The\n" +
+      "scope is a closure: the item arrives with every descendant, with the\n" +
+      "transitive blockedBy closure so nothing imports with a dangling\n" +
+      "dependency, and with the ancestor containers that place it at its\n" +
+      "original depth. The summary counts the requested subtree and the\n" +
+      "closure's contribution separately.\n" +
+      "\n" +
       "'ndx prd export --format=narrative' renders something different: prose\n" +
       "Markdown for a stakeholder, with no ids, folder slugs or status codes.\n" +
       "Epics become sections with a goal and a rationale, features become\n" +
@@ -770,6 +777,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       "dashboard.",
     usage: [
       "ndx prd export --out=<path.json> [dir]",
+      "ndx prd export --item=<id-or-slug> --out=<path.json> [dir]",
       "ndx prd export --format=narrative --out=<path.md> [dir]",
       "ndx prd import --in=<path.json> [options] [dir]",
     ],
@@ -777,7 +785,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--out=<path>", description: "Output path (export; required)" },
       { flag: "--in=<path>", description: "Bundle input path (import; required)" },
       { flag: "--format=narrative", description: "Export: render prose Markdown instead of the bundle (one-way)" },
-      { flag: "--item=<id-or-slug>", description: "Export: narrative only — render just this item's subtree" },
+      { flag: "--item=<id-or-slug>", description: "Export: scope to one item — its subtree, blockers and ancestors" },
       { flag: "--include-completed", description: "Export: narrative only — keep finished work, for a retrospective" },
       { flag: "--replace", description: "Import: overwrite the tree instead of merging into it" },
       { flag: "--yes, -y", description: "Import: skip the --replace confirmation prompt" },
@@ -785,6 +793,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     examples: [
       { command: "ndx prd export --out=./prd-bundle.json .", description: "Write the whole PRD to a bundle" },
+      { command: "ndx prd export --item=checkout-overhaul --out=./checkout.json .", description: "Carry one epic to another machine" },
       { command: "ndx prd export --format=narrative --out=./prd.md .", description: "Write a stakeholder document" },
       { command: "ndx prd export --format=narrative --item=checkout-overhaul --out=./checkout.md .", description: "Document one epic" },
       { command: "ndx prd import --in=./prd-bundle.json .", description: "Merge a bundle into the local PRD" },

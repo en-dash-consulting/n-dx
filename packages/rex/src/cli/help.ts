@@ -470,16 +470,24 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     tool: "rex",
     command: "export",
     summary: "write the PRD to a portable JSON bundle or a prose document",
-    usage: "rex export [--format=narrative] --out=<path> [dir]",
+    usage: "rex export [--format=narrative] [--item=<id-or-slug>] --out=<path> [dir]",
     description:
       "Two renderings, selected by --format.\n" +
       "\n" +
-      "bundle (default) serializes the whole PRD to a single JSON file that\n" +
-      "can be carried to another machine and imported with 'rex\n" +
-      "import-bundle'. Item ids, hierarchy, status, acceptance criteria, tags,\n" +
-      "dependencies and attribution metadata are all preserved. The bundle is\n" +
-      "a transport artifact, not PRD storage: it must be written outside\n" +
-      ".rex/prd_tree/, and nothing in rex ever reads it as a backend.\n" +
+      "bundle (default) serializes the PRD to a single JSON file that can be\n" +
+      "carried to another machine and imported with 'rex import-bundle'. Item\n" +
+      "ids, hierarchy, status, acceptance criteria, tags, dependencies and\n" +
+      "attribution metadata are all preserved. The bundle is a transport\n" +
+      "artifact, not PRD storage: it must be written outside .rex/prd_tree/,\n" +
+      "and nothing in rex ever reads it as a backend.\n" +
+      "\n" +
+      "--item=<id-or-slug> scopes the bundle to one epic, feature or task. The\n" +
+      "scope is a closure rather than a filter: the item arrives with every\n" +
+      "descendant beneath it, with the transitive blockedBy closure so no\n" +
+      "dependency edge dangles on import, and with the ancestor containers\n" +
+      "that place it back at its original depth. The export reports the\n" +
+      "requested subtree and the closure's contribution separately, because a\n" +
+      "scoped export can reach a long way past the item you named.\n" +
       "\n" +
       "narrative renders the PRD as prose Markdown for a stakeholder: epics\n" +
       "become sections with a goal and a rationale, features become described\n" +
@@ -496,12 +504,13 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     options: [
       { flag: "--out=<path>", description: "Output path (required)" },
       { flag: "--format=narrative", description: "Render prose Markdown instead of the JSON bundle" },
-      { flag: "--item=<id-or-slug>", description: "Narrative only: render just this item's subtree" },
+      { flag: "--item=<id-or-slug>", description: "Scope to one item: its subtree, its blockers, and its ancestors" },
       { flag: "--include-completed", description: "Narrative only: keep finished work, for a retrospective" },
       { flag: "--format=json", description: "Print a JSON summary of the bundle export instead of a human line" },
     ],
     examples: [
       { command: "rex export --out=./prd-bundle.json", description: "Export the whole PRD" },
+      { command: "rex export --item=checkout-overhaul --out=./checkout.json", description: "Carry one epic to another machine" },
       { command: "rex export --out=/tmp/prd.json --format=json .", description: "Export and report as JSON" },
       { command: "rex export --format=narrative --out=./prd.md", description: "Write a stakeholder document" },
       { command: "rex export --format=narrative --item=checkout-overhaul --out=./checkout.md", description: "Document one epic" },

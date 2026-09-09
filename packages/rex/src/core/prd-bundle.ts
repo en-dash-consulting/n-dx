@@ -19,6 +19,14 @@
  * into the tree. {@link parseBundle} therefore rejects anything newer than the
  * running schema, and does so before any write happens.
  *
+ * ## A scoped bundle is a closure, not a filter
+ *
+ * {@link scopeItems} carves one item out of the tree for transport. It cannot
+ * simply keep the matching subtree: a task inside it may be `blockedBy` an
+ * item in another epic, and a fragment that keeps the edge without the target
+ * imports a dangling dependency. So the selection is closed under descendants,
+ * `blockedBy`, and ancestry — see that function for the rules and their cost.
+ *
  * @module rex/core/prd-bundle
  */
 
@@ -95,6 +103,170 @@ export function buildBundle(doc: PRDDocument, options: BuildBundleOptions = {}):
     ...(Object.keys(provenance).length > 0 ? { exportedFrom: provenance } : {}),
     items: structuredClone(doc.items),
   };
+}
+
+// ── Scope ────────────────────────────────────────────────────────────────────
+
+/**
+ * Why an item is in a scoped bundle.
+ *
+ * Reported back to the operator because a scoped export can grow well past
+ * what was asked for: "requested" is what they named and everything beneath
+ * it, the other two are what the closure dragged along.
+ */
+export type ScopeReason = "requested" | "dependency" | "ancestor";
+
+/** A `blockedBy` edge whose target does not exist in the source PRD. */
+export interface DroppedEdge {
+  /** The item carrying the edge. */
+  id: string;
+  title: string;
+  /** The unresolvable target id. */
+  blockedBy: string;
+}
+
+export interface ScopedSelection {
+  /** The pruned tree, ready to hand to {@link buildBundle}. */
+  items: PRDItem[];
+  /** Every included id, and why. */
+  reasons: Map<string, ScopeReason>;
+  counts: Record<ScopeReason, number>;
+  /**
+   * Edges dropped because their target is missing from the source PRD — a
+   * pre-existing break, surfaced rather than carried into the bundle.
+   */
+  droppedEdges: DroppedEdge[];
+}
+
+/**
+ * Precedence when an item qualifies for more than one reason.
+ *
+ * Lower wins. "requested" outranks everything because the operator named it;
+ * "dependency" outranks "ancestor" because a blocker pulled in from another
+ * epic is the interesting half of the report, while a container is expected.
+ */
+const REASON_RANK: Record<ScopeReason, number> = {
+  requested: 0,
+  dependency: 1,
+  ancestor: 2,
+};
+
+/**
+ * Select the items a scoped bundle must carry, rooted at `rootId`.
+ *
+ * This is a closure, not a filter. Three rules feed each other until nothing
+ * new is reachable:
+ *
+ * 1. The requested item brings **every descendant** — otherwise the fragment
+ *    arrives as a childless stub.
+ * 2. Any included item brings **the items it is `blockedBy`**. A bundle that
+ *    keeps the edge but omits the target imports into a tree with a dangling
+ *    dependency; one that drops the edge loses sequencing information.
+ * 3. Any included item brings **its ancestor containers**, so import places
+ *    the subtree at its original depth instead of re-parenting it to the root.
+ *
+ * Rules 2 and 3 apply to items the closure itself pulled in, which is why this
+ * is a worklist rather than three passes: a blocker in another epic drags in
+ * its own containers, and those containers may carry `blockedBy` edges of
+ * their own.
+ *
+ * Blockers are carried without their descendants. Only the requested item
+ * expands downward — a blocker is needed as a dependency target, not as a body
+ * of work, and pulling its subtree would make a scoped export unbounded in
+ * practice. It is included exactly the way an ancestor container is.
+ *
+ * @throws {BundleError} If `rootId` is not in `items`.
+ */
+export function scopeItems(items: PRDItem[], rootId: string): ScopedSelection {
+  const byId = new Map<string, PRDItem>();
+  const parentOf = new Map<string, string>();
+
+  const index = (siblings: PRDItem[], parentId?: string): void => {
+    for (const item of siblings) {
+      byId.set(item.id, item);
+      if (parentId !== undefined) parentOf.set(item.id, parentId);
+      if (item.children?.length) index(item.children, item.id);
+    }
+  };
+  index(items);
+
+  if (!byId.has(rootId)) {
+    throw new BundleError(`No PRD item with id "${rootId}" — nothing to scope the bundle to.`);
+  }
+
+  const reasons = new Map<string, ScopeReason>();
+  const queue: string[] = [];
+
+  /** Record a reason, re-queueing only when it improves on what we knew. */
+  const select = (id: string, reason: ScopeReason): void => {
+    if (!byId.has(id)) return;
+    const current = reasons.get(id);
+    if (current !== undefined && REASON_RANK[current] <= REASON_RANK[reason]) return;
+    reasons.set(id, reason);
+    queue.push(id);
+  };
+
+  select(rootId, "requested");
+
+  while (queue.length > 0) {
+    const id = queue.pop() as string;
+    const item = byId.get(id) as PRDItem;
+
+    if (reasons.get(id) === "requested") {
+      for (const child of item.children ?? []) select(child.id, "requested");
+    }
+
+    for (const blocker of item.blockedBy ?? []) select(blocker, "dependency");
+
+    const parentId = parentOf.get(id);
+    if (parentId !== undefined) select(parentId, "ancestor");
+  }
+
+  const droppedEdges: DroppedEdge[] = [];
+
+  /**
+   * Rebuild the tree with only the selected items, preserving order and depth.
+   *
+   * A `blockedBy` target absent from the selection can only be one that is
+   * absent from the PRD entirely — the closure above selected every
+   * resolvable one — so filtering here is what makes "no dangling edges in a
+   * bundle" true even for a PRD that already had a broken edge.
+   */
+  const prune = (siblings: PRDItem[]): PRDItem[] => {
+    const kept: PRDItem[] = [];
+
+    for (const item of siblings) {
+      if (!reasons.has(item.id)) continue;
+
+      const node = structuredClone(item);
+      delete node.children;
+
+      if (node.blockedBy) {
+        const resolved = node.blockedBy.filter((target) => reasons.has(target));
+        for (const target of node.blockedBy) {
+          if (!reasons.has(target)) {
+            droppedEdges.push({ id: item.id, title: item.title, blockedBy: target });
+          }
+        }
+        if (resolved.length > 0) node.blockedBy = resolved;
+        else delete node.blockedBy;
+      }
+
+      const children = prune(item.children ?? []);
+      if (children.length > 0) node.children = children;
+
+      kept.push(node);
+    }
+
+    return kept;
+  };
+
+  const pruned = prune(items);
+
+  const counts: Record<ScopeReason, number> = { requested: 0, dependency: 0, ancestor: 0 };
+  for (const reason of reasons.values()) counts[reason] += 1;
+
+  return { items: pruned, reasons, counts, droppedEdges };
 }
 
 // ── Import ───────────────────────────────────────────────────────────────────

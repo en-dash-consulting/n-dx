@@ -210,7 +210,23 @@ It is a transport artifact, not storage: it must be written outside `.rex/prd_tr
 
 Named `import-bundle` because `rex import` is an alias for `rex analyze`. From the orchestrator these are `ndx prd export` and `ndx prd import` (`ndx export` is the unrelated static-dashboard exporter).
 
-**Flags:** `--out=<path>` (export), `--in=<path>` (import), `--replace`, `--yes`, `--format=json`
+**Flags:** `--out=<path>` (export), `--in=<path>` (import), `--item=<id-or-slug>` (export), `--replace`, `--yes`, `--format=json`
+
+#### Scoped export
+
+`--item=<id-or-slug>` scopes the bundle to one epic, feature or task, so a single initiative can be carried between machines without the rest of the PRD:
+
+```bash
+rex export --item=checkout-overhaul --out=./checkout.json myproject
+```
+
+The scope is a closure, not a filter — a filtered subtree is not importable. The named item arrives with **every descendant** beneath it (including the subtask sections inside a task), with the **transitive `blockedBy` closure** so a task blocked by an item in another epic brings that item along, and with the **ancestor containers** of everything selected so import reconstructs the subtree at its original depth rather than re-parenting it to the root. Ancestors are pulled for closure-selected items too, so a blocker from another epic brings its own chain of containers.
+
+Blockers are carried without their own descendants: a blocker is needed as a dependency target, not as a body of work, and expanding it downward would make a scoped export unbounded in practice.
+
+Every `blockedBy` id in a scoped bundle resolves to an item in the same bundle. An edge whose target is missing from the source PRD — already broken before the export — is dropped rather than carried, and reported with the item that held it.
+
+Because a closure can reach well past what was asked for, the summary counts the requested subtree and the closure's contribution separately, and `--format=json` reports the same breakdown under a `scope` key.
 
 #### Narrative export
 
@@ -224,7 +240,7 @@ rex export --format=narrative --include-completed --out=./retro.md myproject
 
 Epics become sections with a goal and a rationale, features become described capabilities, and acceptance criteria become sentences under a "How we'll know it's done" heading. Dependencies read as sequencing prose ("This follows on from …") rather than id lists. No item ids, folder slugs or raw status and priority values are emitted anywhere in the document — a uuid pasted into a description is resolved to the title it names, or dropped.
 
-Finished and deleted work is left out by default; `--include-completed` keeps finished items for a retrospective-style document, and deleted items stay out regardless. `--item=<id-or-slug>` narrows the document to one subtree, accepting an item id, its exact title, its folder path, or the directory name from `.rex/prd_tree/`; an ambiguous reference lists the candidates instead of guessing.
+Finished and deleted work is left out by default; `--include-completed` keeps finished items for a retrospective-style document, and deleted items stay out regardless. `--item=<id-or-slug>` narrows the document to one subtree, resolved exactly as for a scoped bundle: an item id, its exact title, its folder path, or the directory name from `.rex/prd_tree/`; an ambiguous reference lists the candidates instead of guessing. Prose has no dependency edges, so the narrative scope is the subtree alone — the `blockedBy` closure applies to bundles only.
 
 > **Narrative output is one-way.** It cannot be imported back — `rex import-bundle` reads the JSON bundle only. Export the bundle whenever the PRD has to make a round trip.
 

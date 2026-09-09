@@ -3,14 +3,13 @@
  *
  * Two very different renderings share this command, because they share the
  * question an operator is asking ("give me the PRD as a file") and the
- * arguments that answer it — `--out`, the in-tree guard, and eventually
- * `--item`, which the narrative rendering scopes with today and scoped bundle
- * export will scope with through the same resolver:
+ * arguments that answer it — `--out`, the in-tree guard, and `--item`, which
+ * both renderings scope with through the same resolver:
  *
  * - **bundle** (default) — the portable JSON transport artifact. It goes to an
  *   operator-chosen path outside `.rex/prd_tree/` and nothing in rex ever
- *   reads it as storage. See `../../core/prd-bundle.ts` for the format and the
- *   carve-out rationale.
+ *   reads it as storage. See `../../core/prd-bundle.ts` for the format, the
+ *   carve-out rationale, and what `--item` scoping pulls in.
  * - **narrative** (`--format=narrative`) — prose Markdown for a stakeholder,
  *   with no ids, slugs or status codes. Deliberately one-way; the bundle is
  *   the round-trip surface. See `../../core/prd-narrative.ts`.
@@ -29,12 +28,13 @@ import {
 } from "../../store/index.js";
 import { atomicWrite, atomicWriteJSON } from "../../store/atomic-write.js";
 import { captureGitCommitHash } from "../../core/git-utils.js";
-import { buildBundle, countItems } from "../../core/prd-bundle.js";
+import { buildBundle, countItems, scopeItems } from "../../core/prd-bundle.js";
+import type { ScopedSelection } from "../../core/prd-bundle.js";
 import { renderNarrative } from "../../core/prd-narrative.js";
 import type { PRDDocument, PRDItem } from "../../schema/index.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
-import { result, info } from "../output.js";
+import { result, info, warn } from "../output.js";
 
 /** Renderings `--format` selects between. `json` is bundle output with a machine-readable report. */
 const FORMATS = ["bundle", "json", "narrative"] as const;
@@ -185,23 +185,25 @@ export async function cmdExport(dir: string, flags: Record<string, string>): Pro
   const store = await resolveStore(join(dir, REX_DIR));
   const doc = await store.loadDocument();
 
+  // Resolution happens before any write, so an unknown --item leaves no file
+  // behind — an operator who mistyped a slug must not be left holding a
+  // whole-PRD bundle named after the item they meant to scope to.
+  const target = scope === undefined ? undefined : resolveScope(doc, scope);
+
   if (narrative) {
-    await writeNarrative(doc, outPath, scope, flags);
+    await writeNarrative(doc, outPath, target, flags);
     return;
   }
 
-  if (scope !== undefined) {
-    throw new CLIError(
-      "--item is not supported for bundle export yet.",
-      "Scoped export is currently available for the narrative rendering: " +
-        "rex export --format=narrative --item=<id-or-slug> --out=<path.md>",
-    );
-  }
+  const selection = target === undefined ? undefined : scopeItems(doc.items, target.item.id);
 
-  const bundle = buildBundle(doc, {
-    branch: resolveGitBranch(dir),
-    commit: await captureGitCommitHash(dir),
-  });
+  const bundle = buildBundle(
+    { ...doc, items: selection?.items ?? doc.items },
+    {
+      branch: resolveGitBranch(dir),
+      commit: await captureGitCommitHash(dir),
+    },
+  );
 
   await mkdir(dirname(outPath), { recursive: true });
   await atomicWriteJSON(outPath, bundle);
@@ -209,12 +211,107 @@ export async function cmdExport(dir: string, flags: Record<string, string>): Pro
   const items = countItems(bundle.items);
 
   if (format === "json") {
-    result(JSON.stringify({ out: outPath, items, schema: bundle.schema, exportedAt: bundle.exportedAt }, null, 2));
+    result(
+      JSON.stringify(
+        {
+          out: outPath,
+          items,
+          schema: bundle.schema,
+          exportedAt: bundle.exportedAt,
+          ...(selection && target
+            ? { scope: scopeReport(selection, target) }
+            : {}),
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
   result(`Exported ${items} item${items === 1 ? "" : "s"} to ${outPath}`);
+  if (selection && target) reportScope(selection, target);
   info(`Import elsewhere with: rex import-bundle --in=${out}`);
+}
+
+/** Machine-readable counterpart of {@link reportScope}. */
+function scopeReport(
+  selection: ScopedSelection,
+  target: ItemRefMatch,
+): Record<string, unknown> {
+  return {
+    item: { id: target.item.id, title: target.item.title, path: target.path },
+    requested: selection.counts.requested,
+    dependencies: selection.counts.dependency,
+    ancestors: selection.counts.ancestor,
+    droppedEdges: selection.droppedEdges,
+  };
+}
+
+/**
+ * Say what the scope actually cost.
+ *
+ * A closure can reach well past the item an operator named — a single task
+ * blocked across two epics drags in both, and their containers. Reporting one
+ * total would let a "scoped" export quietly grow to half the PRD without
+ * anyone noticing, so the requested subtree and the closure's contribution are
+ * counted separately.
+ */
+function reportScope(selection: ScopedSelection, target: ItemRefMatch): void {
+  const { requested, dependency, ancestor } = selection.counts;
+
+  info(
+    `Scoped to "${target.item.title}": ${requested} requested item${requested === 1 ? "" : "s"} ` +
+      `(the item and everything beneath it)`,
+  );
+
+  if (dependency > 0 || ancestor > 0) {
+    const pulled = [
+      dependency > 0 ? `${dependency} blocking item${dependency === 1 ? "" : "s"}` : null,
+      ancestor > 0 ? `${ancestor} ancestor container${ancestor === 1 ? "" : "s"}` : null,
+    ].filter((part): part is string => part !== null);
+    info(`Closure pulled in ${pulled.join(" and ")} to keep dependencies and placement intact`);
+  }
+
+  if (selection.droppedEdges.length > 0) {
+    warn(
+      `Dropped ${selection.droppedEdges.length} blockedBy edge${selection.droppedEdges.length === 1 ? "" : "s"} ` +
+        `pointing at items that no longer exist in this PRD:`,
+    );
+    for (const edge of selection.droppedEdges) {
+      warn(`  ${edge.title} (${edge.id}) → ${edge.blockedBy}`);
+    }
+  }
+}
+
+/**
+ * Resolve `--item` to exactly one item, or fail.
+ *
+ * Shared by both renderings so one flag keeps one meaning. Refusing an
+ * ambiguous reference — rather than taking the first match — is the point:
+ * silently exporting whichever of two same-titled items the walk reached first
+ * would be indistinguishable from success.
+ */
+function resolveScope(doc: PRDDocument, scope: string): ItemRefMatch {
+  const matches = resolveItemRef(doc.items, scope);
+
+  if (matches.length === 0) {
+    throw new CLIError(
+      `No PRD item matches --item="${scope}".`,
+      "Pass an item id, its exact title, or its folder slug from .rex/prd_tree/. Run 'rex status' to list items.",
+    );
+  }
+
+  if (matches.length > 1) {
+    throw new CLIError(
+      `--item="${scope}" matches ${matches.length} items.`,
+      `Narrow it with a full path or an id:\n${matches
+        .map((match) => `  ${match.path}  (${match.item.id})`)
+        .join("\n")}`,
+    );
+  }
+
+  return matches[0];
 }
 
 /**
@@ -250,35 +347,11 @@ function readScope(flags: Record<string, string>): string | undefined {
 async function writeNarrative(
   doc: PRDDocument,
   outPath: string,
-  scope: string | undefined,
+  target: ItemRefMatch | undefined,
   flags: Record<string, string>,
 ): Promise<void> {
-  let rootId: string | undefined;
-
-  if (scope !== undefined) {
-    const matches = resolveItemRef(doc.items, scope);
-
-    if (matches.length === 0) {
-      throw new CLIError(
-        `No PRD item matches --item="${scope}".`,
-        "Pass an item id, its exact title, or its folder slug from .rex/prd_tree/. Run 'rex status' to list items.",
-      );
-    }
-
-    if (matches.length > 1) {
-      throw new CLIError(
-        `--item="${scope}" matches ${matches.length} items.`,
-        `Narrow it with a full path or an id:\n${matches
-          .map((match) => `  ${match.path}  (${match.item.id})`)
-          .join("\n")}`,
-      );
-    }
-
-    rootId = matches[0].item.id;
-  }
-
   const { markdown, items } = renderNarrative(doc, {
-    rootId,
+    rootId: target?.item.id,
     includeCompleted: flags["include-completed"] === "true",
   });
 

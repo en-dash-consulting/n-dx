@@ -48,6 +48,17 @@ const TASK_ONE = "33333333-3333-4333-8333-333333333333";
 const EPIC_TWO = "44444444-4444-4444-8444-444444444444";
 const TASK_TWO = "55555555-5555-4555-8555-555555555555";
 
+// Cross-epic tree used by the scoped-export block.
+const ALPHA_EPIC = "a0000000-0000-4000-8000-000000000001";
+const ALPHA_ONE = "a0000000-0000-4000-8000-000000000002";
+const ALPHA_TASK = "a0000000-0000-4000-8000-000000000003";
+const ALPHA_TWO = "a0000000-0000-4000-8000-000000000004";
+const ALPHA_SPARE = "a0000000-0000-4000-8000-000000000005";
+const BETA_EPIC = "b0000000-0000-4000-8000-000000000001";
+const BETA_ONE = "b0000000-0000-4000-8000-000000000002";
+const BETA_TASK = "b0000000-0000-4000-8000-000000000003";
+const BETA_TWO = "b0000000-0000-4000-8000-000000000004";
+
 const ATTRIBUTION = "Someone Else <someone@example.com>";
 
 const UUID_SHAPED = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
@@ -279,9 +290,206 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
       expect(existsSync(bundlePath)).toBe(false);
     });
 
-    it("refuses --item for bundle export, pointing at the narrative rendering", () => {
-      const output = run(["export", `--out=${bundlePath}`, `--item=${EPIC_ONE}`, sourceDir], true);
-      expect(output).toMatch(/--item is not supported for bundle export yet/);
+  });
+
+  /**
+   * Scoped export carries one item between machines. The risk is not the
+   * subtree — it is everything the subtree silently needs: a task blocked by
+   * an item in a different epic, and the containers that place both. These
+   * tests are about the closure and the report on it.
+   */
+  describe("scoped export", () => {
+    /**
+     * Replace the source PRD with a tree that has somewhere to reach.
+     *
+     * Two epics, each with two features, and a cross-epic dependency from a
+     * task in the first to a task in the second — so a scope on ALPHA_ONE has
+     * to leave its own epic to stay importable, and has three items it must
+     * leave behind.
+     */
+    async function seedCrossEpic(): Promise<void> {
+      const path = join(sourceDir, "cross-epic.json");
+      await writeFile(
+        path,
+        JSON.stringify({
+          bundle: "rex/prd-bundle",
+          bundleVersion: 1,
+          schema: SCHEMA_VERSION,
+          title: "Portable PRD",
+          exportedAt: "2026-01-01T00:00:00.000Z",
+          items: [
+            makeItem({
+              id: ALPHA_EPIC,
+              title: "Alpha Epic",
+              level: "epic",
+              children: [
+                makeItem({
+                  id: ALPHA_ONE,
+                  title: "Alpha One",
+                  level: "feature",
+                  children: [makeItem({ id: ALPHA_TASK, title: "Alpha Task", blockedBy: [BETA_TASK] })],
+                }),
+                makeItem({
+                  id: ALPHA_TWO,
+                  title: "Alpha Two",
+                  level: "feature",
+                  children: [makeItem({ id: ALPHA_SPARE, title: "Alpha Spare" })],
+                }),
+              ],
+            }),
+            makeItem({
+              id: BETA_EPIC,
+              title: "Beta Epic",
+              level: "epic",
+              children: [
+                makeItem({
+                  id: BETA_ONE,
+                  title: "Beta One",
+                  level: "feature",
+                  children: [makeItem({ id: BETA_TASK, title: "Beta Task" })],
+                }),
+                makeItem({ id: BETA_TWO, title: "Beta Two", level: "feature" }),
+              ],
+            }),
+          ],
+        }),
+      );
+      run(["import-bundle", `--in=${path}`, "--replace", "--yes", sourceDir]);
+    }
+
+    beforeEach(seedCrossEpic);
+
+    it("carries the requested subtree, the cross-epic blocker, and both ancestor chains", async () => {
+      run(["export", `--item=${ALPHA_ONE}`, `--out=${bundlePath}`, sourceDir]);
+
+      const present = flatten((await readBundle()).items as PRDItem[]);
+
+      // Requested: the feature and the task beneath it.
+      expect(present.has(ALPHA_ONE)).toBe(true);
+      expect(present.has(ALPHA_TASK)).toBe(true);
+      // Dependency closure: the blocker in the other epic.
+      expect(present.has(BETA_TASK)).toBe(true);
+      // Ancestors, so both land at their original depth.
+      expect(present.get(ALPHA_ONE)?.parentId).toBe(ALPHA_EPIC);
+      expect(present.get(BETA_TASK)?.parentId).toBe(BETA_ONE);
+      expect(present.get(BETA_ONE)?.parentId).toBe(BETA_EPIC);
+      expect(present.get(BETA_EPIC)?.parentId).toBeNull();
+      // Nothing the closure did not need.
+      expect([...present.keys()].sort()).toEqual(
+        [ALPHA_EPIC, ALPHA_ONE, ALPHA_TASK, BETA_EPIC, BETA_ONE, BETA_TASK].sort(),
+      );
+    });
+
+    it("resolves a folder slug to the same item as its uuid", async () => {
+      run(["export", `--item=${ALPHA_ONE}`, `--out=${bundlePath}`, sourceDir]);
+      const byId = await readBundle();
+
+      const bySlugPath = join(sourceDir, "by-slug.json");
+      run(["export", "--item=alpha-one", `--out=${bySlugPath}`, sourceDir]);
+      const bySlug = await readBundle(bySlugPath);
+
+      expect(flatten(bySlug.items as PRDItem[])).toEqual(flatten(byId.items as PRDItem[]));
+    });
+
+    it("leaves no blockedBy edge pointing outside the bundle", async () => {
+      run(["export", `--item=${ALPHA_ONE}`, `--out=${bundlePath}`, sourceDir]);
+
+      const items = (await readBundle()).items as PRDItem[];
+      const present = flatten(items);
+
+      const targets: string[] = [];
+      for (const [, entry] of present) {
+        for (const target of (entry.fields.blockedBy as string[] | undefined) ?? []) {
+          targets.push(target);
+        }
+      }
+
+      expect(targets).toEqual([BETA_TASK]);
+      for (const target of targets) expect(present.has(target)).toBe(true);
+    });
+
+    it("reports the requested subtree separately from what the closure pulled in", () => {
+      const output = run(["export", `--item=${ALPHA_ONE}`, `--out=${bundlePath}`, sourceDir]);
+
+      expect(output).toContain("6 items");
+      expect(output).toMatch(/Scoped to "Alpha One": 2 requested items/);
+      expect(output).toMatch(/Closure pulled in 1 blocking item and 3 ancestor containers/);
+    });
+
+    it("reports the scope as JSON when asked", () => {
+      const output = run([
+        "export",
+        `--item=${ALPHA_ONE}`,
+        `--out=${bundlePath}`,
+        "--format=json",
+        sourceDir,
+      ]);
+
+      const parsed = JSON.parse(jsonPayload(output)) as Record<string, unknown>;
+      const scope = parsed.scope as Record<string, unknown>;
+
+      expect(parsed.items).toBe(6);
+      expect(scope.item).toEqual({
+        id: ALPHA_ONE,
+        title: "Alpha One",
+        path: "alpha-epic/alpha-one",
+      });
+      expect(scope.requested).toBe(2);
+      expect(scope.dependencies).toBe(1);
+      expect(scope.ancestors).toBe(3);
+      expect(scope.droppedEdges).toEqual([]);
+    });
+
+    it("round-trips a scoped bundle into an empty project with hierarchy and edges intact", () => {
+      run(["export", `--item=${ALPHA_ONE}`, `--out=${bundlePath}`, sourceDir]);
+      run(["init", targetDir]);
+      run(["import-bundle", `--in=${bundlePath}`, targetDir]);
+
+      const imported = flatten(readPRD(targetDir).items);
+
+      expect([...imported.keys()].sort()).toEqual(
+        [ALPHA_EPIC, ALPHA_ONE, ALPHA_TASK, BETA_EPIC, BETA_ONE, BETA_TASK].sort(),
+      );
+      expect(imported.get(ALPHA_ONE)?.parentId).toBe(ALPHA_EPIC);
+      expect(imported.get(ALPHA_TASK)?.parentId).toBe(ALPHA_ONE);
+      expect(imported.get(BETA_TASK)?.parentId).toBe(BETA_ONE);
+      expect(imported.get(ALPHA_TASK)?.fields.blockedBy).toEqual([BETA_TASK]);
+    });
+
+    it("fails clearly on an unknown --item, writing no bundle", () => {
+      const output = run(["export", "--item=nope", `--out=${bundlePath}`, sourceDir], true);
+      expect(output).toMatch(/No PRD item matches --item="nope"/);
+      expect(existsSync(bundlePath)).toBe(false);
+    });
+
+    it("refuses an ambiguous --item instead of exporting one of the candidates", () => {
+      writePRD(sourceDir, {
+        schema: SCHEMA_VERSION,
+        title: "Portable PRD",
+        items: [
+          makeItem({
+            id: ALPHA_EPIC,
+            title: "Alpha Epic",
+            level: "epic",
+            children: [
+              makeItem({ id: ALPHA_ONE, title: "Shared Title", level: "feature" }),
+              makeItem({ id: ALPHA_TWO, title: "Shared Title", level: "feature" }),
+            ],
+          }),
+        ],
+      });
+
+      const output = run(["export", "--item=Shared Title", `--out=${bundlePath}`, sourceDir], true);
+
+      expect(output).toMatch(/matches 2 items/);
+      expect(output).toMatch(new RegExp(ALPHA_ONE));
+      expect(output).toMatch(new RegExp(ALPHA_TWO));
+      expect(existsSync(bundlePath)).toBe(false);
+    });
+
+    it("refuses a valueless --item instead of exporting the whole PRD", () => {
+      const output = run(["export", "--item", `--out=${bundlePath}`, sourceDir], true);
+      expect(output).toMatch(/--item needs a value/);
       expect(existsSync(bundlePath)).toBe(false);
     });
   });
