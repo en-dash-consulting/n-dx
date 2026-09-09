@@ -171,7 +171,21 @@ export {
   MODEL_CONTEXT_WINDOWS,
   MODEL_COSTS,
 } from "./config.js";
-export type { TaskModelResolution } from "./config.js";
+export type { TaskModelResolution, ModelCost } from "./config.js";
+
+// Model-aware token pricing (the single price table for every cost surface)
+export {
+  resolveModelPricing,
+  priceTokens,
+  FALLBACK_MODEL_PRICING,
+  FALLBACK_PRICING_MODEL,
+} from "./model-pricing.js";
+export type {
+  ModelTokenPricing,
+  ResolvedModelPricing,
+  BillableTokens,
+  TokenCostBreakdown,
+} from "./model-pricing.js";
 
 // Budget preflight
 export { budgetPreflight } from "./budget-preflight.js";

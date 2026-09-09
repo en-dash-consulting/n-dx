@@ -31,7 +31,13 @@ import {
   dashboardUsagePath,
   readDashboardUsage,
 } from "./dashboard-usage.js";
-import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor } from "@n-dx/llm-client";
+import {
+  DEFAULT_LLM_VENDOR,
+  LLM_VENDOR,
+  isLLMVendor,
+  FALLBACK_MODEL_PRICING,
+  priceTokens,
+} from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors rex/core/token-usage but kept local to avoid cross-package import)
@@ -307,30 +313,34 @@ function normalizeWeeklyBudgetConfig(
 }
 
 /**
- * Default Sonnet pricing.
+ * Rates applied when the tokens carry no model attribution.
  *
- * Must stay in step with `DEFAULT_PRICING` in
- * `packages/rex/src/core/token-usage.ts` — the dashboard and `ndx usage` are
- * expected to quote the same figure for the same runs. Cache rates are
- * multiples of the input rate: a write costs a premium, a read a fraction.
+ * Sourced from the shared foundation-tier table rather than a local literal.
+ * The dashboard and `ndx usage` are expected to quote the same figure for the
+ * same runs, and two hand-maintained copies of a price table drift silently —
+ * the same run set ends up quoted at two different dollar figures with nothing
+ * failing. `tests/unit/token-pricing-parity.test.js` pins both surfaces here.
+ *
+ * The dashboard's aggregation does not yet carry a per-model split the way
+ * rex's does, so every token still lands on this fallback. That is a known
+ * gap, not the intended end state: see the PRD item for wiring `byModel`
+ * through the dashboard's own aggregation.
  */
-const DEFAULT_PRICING = {
-  inputPerMillion: 3,
-  outputPerMillion: 15,
-  cacheWritePerMillion: 3.75, // 1.25x input
-  cacheReadPerMillion: 0.3, // 0.1x input
-};
+const DEFAULT_PRICING = FALLBACK_MODEL_PRICING;
 
 function estimateCost(usage: AggregateTokenUsage): CostEstimate {
-  const inputCost = (usage.totalInputTokens / 1_000_000) * DEFAULT_PRICING.inputPerMillion;
-  const outputCost = (usage.totalOutputTokens / 1_000_000) * DEFAULT_PRICING.outputPerMillion;
-  // Counted in the totals already; they were simply never priced, so the
-  // dashboard quoted a figure that ignored most of the bill.
-  const cacheWriteCost =
-    (usage.totalCacheCreationTokens / 1_000_000) * DEFAULT_PRICING.cacheWritePerMillion;
-  const cacheReadCost =
-    (usage.totalCacheReadTokens / 1_000_000) * DEFAULT_PRICING.cacheReadPerMillion;
-  const totalRaw = inputCost + outputCost + cacheWriteCost + cacheReadCost;
+  // All four kinds are billed. Cache tokens were counted in the totals long
+  // before they were priced, so the dashboard quoted a figure that ignored
+  // most of the bill on any cache-heavy workload.
+  const { inputCost, outputCost, cacheWriteCost, cacheReadCost, totalRaw } = priceTokens(
+    {
+      inputTokens: usage.totalInputTokens,
+      outputTokens: usage.totalOutputTokens,
+      cacheCreationTokens: usage.totalCacheCreationTokens,
+      cacheReadTokens: usage.totalCacheReadTokens,
+    },
+    DEFAULT_PRICING,
+  );
   return {
     total: `$${totalRaw.toFixed(2)}`,
     totalRaw,
