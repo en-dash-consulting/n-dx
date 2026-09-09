@@ -22,7 +22,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [autoCommit leaves reviewer must-fix repairs uncommitted when the executor self-commits](./autocommit-leaves-reviewer-must-fix.md) | completed |
 | [Correct the remaining stale entries in MODEL_COSTS](./correct-the-remaining-stale-entries-in.md) | completed |
 | [Give review its own model tier with a review-model override](./give-review-its-own-model-tier-with-a.md) | completed |
-| [Merge the review pass's per-turn token usage into the run record](./merge-the-review-pass-s-per-turn-token.md) | pending |
+| [Merge the review pass's per-turn token usage into the run record](./merge-the-review-pass-s-per-turn-token.md) | completed |
 | [Post-review full-suite gate skips because filesChanged misses executor and reviewer modifications](./post-review-full-suite-gate-skips.md) | completed |
 | [Resume the work session for the reviewer on --resume](./resume-the-work-session-for-the.md) | completed |
 | [Review report transport, parsing, and run-record recording](./review-report-transport-parsing-and.md) | completed |

@@ -53,7 +53,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Workflow Use Case Guides](./workflow-use-case-guides/index.md) | completed |
 | [`date -Is`, the timestamp example in every recording skill, fails on macOS (BSD date)](./date-is-the-timestamp-example-in-every.md) | completed |
 | [Diagnose why the auto-commit step does not fire after MCP-driven PRD mutations in Claude Code skills](./diagnose-why-the-auto-commit-step-does.md) | completed |
-| [hench init must gitignore .hench/locks/ or the first autonomous run self-blocks](./hench-init-must-gitignore-hench-locks.md) | pending |
+| [hench init must gitignore .hench/locks/ or the first autonomous run self-blocks](./hench-init-must-gitignore-hench-locks.md) | completed |
 | [`hench record --no-tokens` leaves the session watermark behind, so the suppressed spend lands on the next record](./hench-record-no-tokens-leaves-the.md) | completed |
 | [`hench record` with no usage window silently claims the entire session transcript](./hench-record-with-no-usage-window.md) | completed |
 | [ndx ci architecture-policy gate fails on a clean main — four allowlist paths can never match](./ndx-ci-architecture-policy-gate-fails.md) | pending |

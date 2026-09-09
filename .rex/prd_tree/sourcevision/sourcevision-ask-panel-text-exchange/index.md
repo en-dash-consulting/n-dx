@@ -29,11 +29,11 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Accessibility and regression coverage for the Ask panel](./accessibility-and-regression-coverage.md) | pending |
-| [Add gated Ask tab and prompt/response view shell](./add-gated-ask-tab-and-prompt-response.md) | pending |
-| [Add POST /api/sourcevision/ask backed by analysis context and llm-client](./add-post-api-sourcevision-ask-backed.md) | pending |
-| [Attribute Ask token spend in the usage rollup](./attribute-ask-token-spend-in-the-usage.md) | pending |
-| [Explain a finding in plain language from the Problems and Suggestions surfaces](./explain-a-finding-in-plain-language.md) | pending |
-| [Give each degraded mode a specific, actionable message](./give-each-degraded-mode-a-specific.md) | pending |
-| [Propose and apply PRD refinements from the exchange, diff-reviewed and under the store lock](./propose-and-apply-prd-refinements-from.md) | pending |
-| [Wire Copy and Capture-to-PRD actions on the answer](./wire-copy-and-capture-to-prd-actions.md) | pending |
+| [Accessibility and regression coverage for the Ask panel](./accessibility-and-regression-coverage.md) | completed |
+| [Add gated Ask tab and prompt/response view shell](./add-gated-ask-tab-and-prompt-response.md) | completed |
+| [Add POST /api/sourcevision/ask backed by analysis context and llm-client](./add-post-api-sourcevision-ask-backed.md) | completed |
+| [Attribute Ask token spend in the usage rollup](./attribute-ask-token-spend-in-the-usage.md) | completed |
+| [Explain a finding in plain language from the Problems and Suggestions surfaces](./explain-a-finding-in-plain-language.md) | completed |
+| [Give each degraded mode a specific, actionable message](./give-each-degraded-mode-a-specific.md) | completed |
+| [Propose and apply PRD refinements from the exchange, diff-reviewed and under the store lock](./propose-and-apply-prd-refinements-from.md) | completed |
+| [Wire Copy and Capture-to-PRD actions on the answer](./wire-copy-and-capture-to-prd-actions.md) | completed |
