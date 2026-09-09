@@ -17,6 +17,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [append_log is MCP-only — no CLI equivalent, so ndx work runs cannot write execution-log entries](./append-log-is-mcp-only-no-cli.md) | pending |
+| [Cost estimates price every run at Sonnet rates regardless of the model actually used](./cost-estimates-price-every-run-at.md) | pending |
 | [Full test gate reports 'Test gate failed: ' with 0/0 packages, dropping the timeout or exec error that actually failed it](./full-test-gate-reports-test-gate.md) | pending |
 | [Full test gate timeout is hard-coded at 5 minutes, so a passing suite that runs long under load fails the run](./full-test-gate-timeout-is-hard-coded.md) | pending |
 | [Keep-tail prune replays thinking blocks created before the cut, which Claude Fable 5.1's preserved-thinking check rejects](./keep-tail-prune-replays-thinking.md) | pending |
