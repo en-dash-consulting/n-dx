@@ -1,0 +1,30 @@
+/**
+ * Block styles for the shared Markdown preview renderer
+ * (`viewer/views/markdown-preview.ts`). Consumers supply the container;
+ * these style the blocks it emits.
+ */
+
+.md-preview-heading {
+  margin: 0 0 8px;
+}
+
+.md-preview-paragraph {
+  margin: 0 0 8px;
+}
+
+.md-preview-list {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.md-preview-code {
+  margin: 0 0 8px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--bg-surface) 80%, black 20%);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
