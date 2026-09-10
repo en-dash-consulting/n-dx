@@ -35,6 +35,7 @@ import type { PRDDocument, PRDItem, ItemLevel } from "../schema/index.js";
 import { validateDocument } from "../schema/validate.js";
 import { findItem } from "./tree.js";
 import { findDependencyCycles } from "./dag.js";
+import { ITEM_BOOKKEEPING_FIELDS } from "./sync.js";
 
 /** Discriminator stored in every bundle, so a stray JSON file is rejected by shape. */
 export const BUNDLE_KIND = "rex/prd-bundle";
@@ -489,11 +490,27 @@ export function countItems(items: PRDItem[]): number {
 }
 
 /**
- * Compare two items by content, ignoring their children.
+ * Compare two items by content, ignoring their children and their bookkeeping.
  *
- * Placement is deliberately excluded: `merge` never moves a local item, so a
- * bundle item that sits under a different parent locally is still "identical"
- * when its own fields match. Hierarchy divergence is a `--replace` concern.
+ * Two exclusions, for two different reasons.
+ *
+ * `children` is excluded because placement is not this comparison's business:
+ * `merge` never moves a local item, so a bundle item that sits under a
+ * different parent locally is still "identical" when its own fields match, and
+ * each child is reported in its own right as it is walked. Hierarchy
+ * divergence is a `--replace` concern.
+ *
+ * {@link ITEM_BOOKKEEPING_FIELDS} is excluded because the answer decides
+ * whether the operator is told to reach for `--replace`. A "differing"
+ * collision is what makes `reportOutcome` recommend overwriting the tree, so
+ * it has to mean the content differs. It did not: the stamps diverge as a
+ * matter of course — the import stamps the local copy with the importing actor
+ * and the time it landed, while a local `rex sync` writes `lastSyncedAt` and
+ * `remoteId` that the bundle no longer carries at all, since export strips
+ * them. Round-tripped items were therefore reported as content collisions and
+ * the operator was pointed at a destructive command over deltas that were not
+ * content. Sharing the list with `sync.ts` is what keeps the two notions of
+ * "same item" from drifting apart again.
  */
 function sameContent(a: PRDItem, b: PRDItem): boolean {
   return stableKey(a) === stableKey(b);
@@ -501,7 +518,7 @@ function sameContent(a: PRDItem, b: PRDItem): boolean {
 
 function stableKey(item: PRDItem): string {
   const entries = Object.entries(item)
-    .filter(([key]) => key !== "children")
+    .filter(([key]) => key !== "children" && !ITEM_BOOKKEEPING_FIELDS.has(key))
     .sort(([left], [right]) => left.localeCompare(right));
   return JSON.stringify(entries, (_key, value) =>
     // Nested objects need the same key ordering, or two equal items with

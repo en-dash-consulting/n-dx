@@ -390,6 +390,64 @@ describe("mergeBundle", () => {
     expect(() => mergeBundle(existing, bundle, "merge")).toThrow(/task/);
   });
 
+  // ── Collision kind ignores bookkeeping ─────────────────────────────────
+  //
+  // A "differing" collision is what makes `reportOutcome` close with "Use
+  // --replace to overwrite the tree with the bundle instead" — a pointer at
+  // the one command that can discard the whole tree. It has to be earned by a
+  // real content difference, not by a stamp.
+
+  it("calls a collision identical when only the local sync bookkeeping differs", () => {
+    // The most likely shape now that export strips lastSyncedAt/remoteId: the
+    // bundle has none, while the local copy carries what its own `rex sync`
+    // wrote. Nothing about the item's content differs.
+    const bundle = buildBundle(makeDoc());
+    const existing = structuredClone(bundle.items);
+    existing[0].lastSyncedAt = "2026-02-01T00:00:00.000Z";
+    existing[0].remoteId = "notion-page-123";
+
+    const outcome = mergeBundle(existing, bundle, "merge");
+    const e1 = outcome.collisions.find((c) => c.id === "e1");
+
+    expect(e1?.kind).toBe("identical");
+  });
+
+  it("calls a collision identical when only the modification stamps differ", () => {
+    // The import stamped the local copy with the importing actor and the time
+    // it landed; the bundle carries whatever the source project recorded.
+    const bundle = buildBundle(makeDoc());
+    const existing = structuredClone(bundle.items);
+    existing[0].lastModified = "2026-05-05T00:00:00.000Z";
+    existing[0].lastModifiedBy = "Importer <importer@example.com>";
+
+    const outcome = mergeBundle(existing, bundle, "merge");
+
+    expect(outcome.collisions.find((c) => c.id === "e1")?.kind).toBe("identical");
+  });
+
+  it("still calls a collision differing when the content really differs", () => {
+    // The guard on the fix: ignoring bookkeeping must not blind the comparison
+    // to an edit the operator needs to know about.
+    const bundle = buildBundle(makeDoc());
+    const existing = structuredClone(bundle.items);
+    existing[0].title = "Epic One, renamed locally";
+
+    const outcome = mergeBundle(existing, bundle, "merge");
+
+    expect(outcome.collisions.find((c) => c.id === "e1")?.kind).toBe("differing");
+  });
+
+  it("reports every collision as identical when re-importing an unmodified export", () => {
+    const bundle = buildBundle(makeDoc());
+    const first = mergeBundle([], bundle, "merge");
+
+    const second = mergeBundle(first.items, bundle, "merge");
+
+    expect(second.added).toBe(0);
+    expect(second.collisions).toHaveLength(5);
+    expect(second.collisions.every((c) => c.kind === "identical")).toBe(true);
+  });
+
   it("refuses to add a non-root-legal bundle item at the local tree root", () => {
     // Merge mode pushes unseen bundle roots onto the local root list. A
     // feature there is as illegal as it would be in replace mode.

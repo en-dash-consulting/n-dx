@@ -849,10 +849,20 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
       const first = flatten(readPRD(targetDir).items);
 
       const output = run(["import-bundle", `--in=${bundlePath}`, "--format=json", targetDir]);
-      const parsed = JSON.parse(jsonPayload(output)) as { added: number; collisions: unknown[] };
+      const parsed = JSON.parse(jsonPayload(output)) as {
+        added: number;
+        collisions: Array<{ id: string; kind: string }>;
+      };
 
       expect(parsed.added).toBe(0);
       expect(parsed.collisions).toHaveLength(5);
+      // The kind, not just the count. A re-import reports collisions either
+      // way, so asserting the count alone passes even when every one of them
+      // is "differing" — and a differing collision is what makes the command
+      // recommend `--replace`, over items that did not change at all.
+      expect(parsed.collisions.map((c) => c.kind)).toEqual(
+        Array(5).fill("identical"),
+      );
       expect([...flatten(readPRD(targetDir).items).keys()].sort()).toEqual(
         [...first.keys()].sort(),
       );

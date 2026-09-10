@@ -38,15 +38,36 @@ export interface SyncResult {
 }
 
 /**
- * Fields that are sync metadata and should not be compared for conflict detection.
+ * Per-item bookkeeping that is never content.
+ *
+ * The modification stamps record *that* an item changed and the remote
+ * pointers record where it was last sent; neither says anything about what the
+ * item is. Every "are these the same item?" comparison in the codebase has to
+ * exclude them or it answers its own writes: including `lastModified` makes a
+ * stamp look like a further modification and including `lastSyncedAt` makes
+ * recording a successful sync look like a local edit — each one a loop.
+ *
+ * Exported because `rex import-bundle` asks the same question of a bundle item
+ * and its local counterpart, and answered it differently: it compared the
+ * bookkeeping too, so a round-tripped item whose only delta was a stamp was
+ * reported as a content collision and the operator was pointed at `--replace`
+ * over nothing. One list, so the two cannot drift apart again.
+ *
+ * `children` is not here: it is excluded by these comparisons too, but for a
+ * structural reason rather than this one, and the bundle comparison excludes
+ * it on different terms — see `sameContent` in core/prd-bundle.ts.
  */
-const SYNC_META_FIELDS = new Set([
+export const ITEM_BOOKKEEPING_FIELDS: ReadonlySet<string> = new Set([
   "lastModified",
   "lastModifiedBy",
   "lastSyncedAt",
   "remoteId",
-  "children",
 ]);
+
+/**
+ * Fields that are sync metadata and should not be compared for conflict detection.
+ */
+const SYNC_META_FIELDS = new Set<string>([...ITEM_BOOKKEEPING_FIELDS, "children"]);
 
 /**
  * Fields considered structural and should not trigger conflict resolution.
@@ -264,13 +285,7 @@ export async function stampModified(
  * children it has without being compared on their contents; each child is
  * signed in its own right.
  */
-const SIGNATURE_IGNORED = new Set([
-  "lastModified",
-  "lastModifiedBy",
-  "lastSyncedAt",
-  "remoteId",
-  "children",
-]);
+const SIGNATURE_IGNORED = new Set<string>([...ITEM_BOOKKEEPING_FIELDS, "children"]);
 
 /** Content signature of one item, ignoring sync bookkeeping. */
 function itemSignature(item: PRDItem): string {

@@ -42,6 +42,6 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [`rex export` reads the PRD tree without the lock, so a concurrent writer can yield a torn bundle](./rex-export-reads-the-prd-tree-without.md) | completed |
 | [Round-trip PRD bundle via ndx prd export / ndx prd import](./round-trip-prd-bundle-via-ndx-prd.md) | completed |
 | [Scoped bundle export by item — subtree and dependency closure](./scoped-bundle-export-by-item-subtree.md) | completed |
-| [stableKey collision comparison counts sync bookkeeping as content, steering operators toward --replace](./stablekey-collision-comparison-counts.md) | pending |
+| [stableKey collision comparison counts sync bookkeeping as content, steering operators toward --replace](./stablekey-collision-comparison-counts.md) | completed |
 | [`stampChangedItems` attribution-only widening changes the rule for every `withTransaction` caller](./stampchangeditems-attribution-only.md) | completed |
 | [The folder tree persists no schema marker, so a newer-minor writer leaves no trace](./the-folder-tree-persists-no-schema.md) | pending |
