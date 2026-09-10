@@ -375,7 +375,7 @@ expected 'claude-opus-5' to be 'claude-sonnet-4-6'
 ```
 
 **Cause:** production code is *right* to consult the environment, and the test
-inherited whatever the developer's shell happened to export. Four instances so
+inherited whatever the developer's shell happened to export. Three instances so
 far, each found the hard way:
 
 | Variable | Read by | What it did to the suite |
@@ -383,25 +383,17 @@ far, each found the hard way:
 | `FORCE_COLOR` | `supportsColor()` in `cli.js` / `help.js` | 24 failures across 8 files when set to `3`; ANSI codes in output compared against plain strings |
 | `PATH` (whether `sh` resolves) | tests spawning `sh -c`, and hench's `execShell` on every platform | 21 failures across 5 files from PowerShell, **and 5 vacuous passes** — assertions like "nothing was written after the timeout" hold trivially when nothing ever ran |
 | `CLAUDE_CODE_SESSION_ID` | `hench record`, to read the session's own token usage | Claude Code exports it to `pnpm test` too, so the suite read a live, growing transcript and asserted against numbers that change between runs |
-| `NDX_CLI_PATH` / `N_DX_CLI_PATH` | `resolveNdxBin()` in `packages/web/src/server/routes-commands.ts`, as the top rung of its binary-resolution ladder | A dev-link install exports both from the shell, short-circuiting the ladder above every rung under test: two failures asserting against the contributor's own global `cli.js`. Two of the remaining ladder tests **passed vacuously** — they only assert the target ends in `core/cli.js`, which the ambient global path also does |
 
-CI set none of them, so CI stayed green in all four cases and only humans — or
+CI set none of them, so CI stayed green in all three cases and only humans — or
 an agent running the suite inside Claude Code — ever saw the failure.
 
 **Rules:**
 
 - **Pin the variable in a setupFile, not in each test.** `setupFiles` run inside
   every worker before it loads any test module, which is early enough to beat
-  memoised reads. `tests/setup-color-env.js`, `tests/setup-session-env.js` and
-  `tests/setup-cli-path-env.js` do this, and every package's `vitest.config.ts`
-  registers all three. `globalSetup` is the wrong hook — it runs in another
-  process and does not affect the workers.
-- **A per-`describe` hook is not enough on its own.** The `NDX_CLI_PATH` leak
-  reached a block that already saved and restored `N_DX_CLI_PATH` — the second
-  variable simply was not in the list. A setupFile covers every suite, including
-  ones nobody thought to audit; the local hooks then only ever *set* fixture
-  values. Assert the setupFile stays wired by sampling the variable at module
-  scope (see `routes-commands.test.ts`), or unwiring it fails nothing.
+  memoised reads. `tests/setup-color-env.js` and `tests/setup-session-env.js` do
+  this, and every package's `vitest.config.ts` registers both. `globalSetup` is
+  the wrong hook — it runs in another process and does not affect the workers.
 - **Guard, do not remove, a genuine environment dependency.** `sh -c` in the
   process-tree tests is load-bearing: libuv puts every non-detached child it
   spawns on Windows into a global job object, so spawning `node` directly reaps

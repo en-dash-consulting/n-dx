@@ -482,101 +482,6 @@ export async function extractSvTokenEvents(
   return events;
 }
 
-/** One line of `.sourcevision/ask-usage.jsonl`. */
-interface AskUsageEntry {
-  timestamp?: string;
-  vendor?: string;
-  model?: string;
-  inputTokens?: number;
-  outputTokens?: number;
-  cacheCreationTokens?: number;
-  cacheReadTokens?: number;
-}
-
-/**
- * Read the dashboard's Ask spend ledger.
- *
- * Read straight off disk rather than through an import, the same way hench's
- * run files are — the producer is the web server's ask endpoint, and rex must
- * not depend on it. A malformed or timestamp-less line is skipped rather than
- * throwing, so one bad append cannot take down `ndx usage`.
- *
- * @see packages/web/src/server/ask-usage-log.ts — the format and its rationale
- */
-async function readAskEntries(
-  projectDir: string,
-  filter: TokenUsageFilter,
-): Promise<AskUsageEntry[]> {
-  const path = join(projectDir, PROJECT_DIRS.SOURCEVISION, "ask-usage.jsonl");
-  let raw: string;
-  try {
-    raw = await readFile(path, "utf-8");
-  } catch {
-    return [];
-  }
-
-  const entries: AskUsageEntry[] = [];
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const entry = JSON.parse(trimmed) as AskUsageEntry;
-      if (!entry.timestamp || Number.isNaN(Date.parse(entry.timestamp))) continue;
-      if (!isInRange(entry.timestamp, filter)) continue;
-      entries.push(entry);
-    } catch {
-      // Unparseable line — skip.
-    }
-  }
-  return entries;
-}
-
-/**
- * Aggregate dashboard Ask spend.
- *
- * Folded into the `sv` bucket by the callers: an ask is SourceVision spend
- * (task class `sourcevision.ask`, grounded in `.sourcevision/`) and is not
- * task-scoped, so it is not attributed to a PRD item.
- */
-export async function extractAskTokenUsage(
-  projectDir: string,
-  filter: TokenUsageFilter = {},
-): Promise<PackageTokenUsage> {
-  const usage = emptyPackageUsage();
-  for (const entry of await readAskEntries(projectDir, filter)) {
-    usage.calls += 1;
-    usage.inputTokens += entry.inputTokens ?? 0;
-    usage.outputTokens += entry.outputTokens ?? 0;
-    usage.cacheCreationTokens += entry.cacheCreationTokens ?? 0;
-    usage.cacheReadTokens += entry.cacheReadTokens ?? 0;
-  }
-  return usage;
-}
-
-/**
- * Ask spend as individual events, under `command: "ask"`.
- *
- * The command name is what separates dashboard Ask spend from hench's
- * `command: "run"` in the per-command breakdown.
- */
-export async function extractAskTokenEvents(
-  projectDir: string,
-  filter: TokenUsageFilter = {},
-): Promise<TokenEvent[]> {
-  return (await readAskEntries(projectDir, filter)).map((entry) => ({
-    timestamp: entry.timestamp!,
-    command: "ask",
-    package: "sv" as const,
-    inputTokens: entry.inputTokens ?? 0,
-    outputTokens: entry.outputTokens ?? 0,
-    cacheCreationTokens: entry.cacheCreationTokens ?? 0,
-    cacheReadTokens: entry.cacheReadTokens ?? 0,
-    calls: 1,
-    vendor: entry.vendor,
-    model: entry.model,
-  }));
-}
-
 /**
  * Collect all token events across all packages.
  */
@@ -586,13 +491,12 @@ export async function collectTokenEvents(
   filter: TokenUsageFilter = {},
 ): Promise<TokenEvent[]> {
   const rexEvents = extractRexTokenEvents(logEntries, filter);
-  const [henchEvents, svEvents, askEvents] = await Promise.all([
+  const [henchEvents, svEvents] = await Promise.all([
     extractHenchTokenEvents(projectDir, filter),
     extractSvTokenEvents(projectDir, filter),
-    extractAskTokenEvents(projectDir, filter),
   ]);
 
-  return [...rexEvents, ...henchEvents, ...svEvents, ...askEvents].sort(
+  return [...rexEvents, ...henchEvents, ...svEvents].sort(
     (a, b) => a.timestamp.localeCompare(b.timestamp),
   );
 }
@@ -731,8 +635,7 @@ function eventsToAggregate(events: TokenEvent[]): AggregateTokenUsage {
  * Aggregate token usage across all packages.
  *
  * @param logEntries Rex execution log entries (from store.readLog())
- * @param projectDir Project root directory (for reading hench runs, the sv
- *   manifest and the dashboard's ask ledger)
+ * @param projectDir Project root directory (for reading hench runs and sv manifest)
  * @param filter Optional time-based filter
  */
 export async function aggregateTokenUsage(
@@ -741,30 +644,12 @@ export async function aggregateTokenUsage(
   filter: TokenUsageFilter = {},
 ): Promise<AggregateTokenUsage> {
   const rex = extractRexTokenUsage(logEntries, filter);
-  const [hench, sv, ask] = await Promise.all([
+  const [hench, sv] = await Promise.all([
     extractHenchTokenUsage(projectDir, filter),
     extractSvTokenUsage(projectDir, filter),
-    extractAskTokenUsage(projectDir, filter),
   ]);
 
-  // Ask spend joins the sv bucket rather than adding a fourth: it is
-  // SourceVision's spend, and the summary must agree with the event list,
-  // which books it under `sv` / `command: "ask"`.
-  return combinePackages(rex, hench, addPackageUsage(sv, ask));
-}
-
-/** Sum two package buckets into a new one. */
-function addPackageUsage(
-  a: PackageTokenUsage,
-  b: PackageTokenUsage,
-): PackageTokenUsage {
-  return {
-    inputTokens: a.inputTokens + b.inputTokens,
-    outputTokens: a.outputTokens + b.outputTokens,
-    cacheCreationTokens: a.cacheCreationTokens + b.cacheCreationTokens,
-    cacheReadTokens: a.cacheReadTokens + b.cacheReadTokens,
-    calls: a.calls + b.calls,
-  };
+  return combinePackages(rex, hench, sv);
 }
 
 // ---------------------------------------------------------------------------

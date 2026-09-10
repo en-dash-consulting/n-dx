@@ -171,6 +171,25 @@ describe.each(STORES)("$name withTransaction stamping", ({ create }) => {
     expect(item!.lastModifiedBy).toBe("Someone Else <someone@example.com>");
   });
 
+  it("treats attribution alone as a stamp the caller already set", async () => {
+    // A bundle import carries `lastModifiedBy` for items whose source project
+    // never recorded a `lastModified`. Keying "carries its own stamp" on the
+    // timestamp alone rewrote the original author to the importer on exactly
+    // those items — the provenance a transport artifact exists to preserve.
+    await store.withTransaction(async (doc) => {
+      insertChild(doc.items, "epic-1", {
+        id: "task-e",
+        title: "Task E",
+        level: "task",
+        status: "pending",
+        lastModifiedBy: "Someone Else <someone@example.com>",
+      } as PRDItem);
+    });
+
+    const item = await store.getItem("task-e");
+    expect(item!.lastModifiedBy).toBe("Someone Else <someone@example.com>");
+  });
+
   it("advances an existing stamp rather than only setting an absent one", async () => {
     // The sync consequence is a comparison, not a presence check:
     // isModifiedSinceSync asks whether lastModified > lastSyncedAt. An item

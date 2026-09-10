@@ -20,10 +20,10 @@
   --font-3xl: 24px;
 
   /* Monospace stack. Theme-independent, so it lives here rather than in the
-     per-theme blocks. `call-graph-explorer.css` already referenced this name
-     through a `monospace` fallback; the markdown, ask and command panels
-     referenced a `--mono` that was never defined and silently fell back to
-     the inherited sans stack. */
+     per-theme blocks. Eight stylesheets already referenced this name through a
+     `monospace` fallback; the markdown and command panels referenced a
+     `--mono` that was never defined anywhere and so fell back to the
+     inherited sans stack. */
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Font weights */

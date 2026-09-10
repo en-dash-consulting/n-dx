@@ -610,7 +610,12 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
       run(["export", `--out=${bundlePath}`, sourceDir]);
       const exported = await readBundle();
 
-      expect(flatten(exported.items as PRDItem[])).toEqual(flatten(fixtureItems()));
+      // Compared against the tree on disk, not the in-memory fixture: writing
+      // the fixture is itself a local mutation, so the store stamps
+      // lastModified/lastModifiedBy onto items that arrived without one. The
+      // claim under test is that export is lossless against what the tree
+      // holds, which is the stamped form.
+      expect(flatten(exported.items as PRDItem[])).toEqual(flatten(readPRD(sourceDir).items));
     });
 
     it("reproduces an equivalent tree in an empty project", async () => {

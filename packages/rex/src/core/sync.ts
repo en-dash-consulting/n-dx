@@ -333,8 +333,12 @@ export function stampChangedItems(
   const stamped: string[] = [];
   for (const { item } of walkTree(items)) {
     const previous = before.get(item.id);
+    // `lastModifiedBy` counts as a stamp of its own just as `lastModified`
+    // does. A bundle import carries attribution for items whose source
+    // project never recorded a timestamp; checking only `lastModified` would
+    // overwrite the original author with the importer on exactly those items.
     const changed = previous === undefined
-      ? item.lastModified === undefined
+      ? item.lastModified === undefined && item.lastModifiedBy === undefined
       : previous !== itemSignature(item);
     if (!changed) continue;
     // walkTree yields live references into the tree, so assigning here is the
