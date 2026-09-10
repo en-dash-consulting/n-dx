@@ -699,6 +699,39 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
       );
     });
 
+    it("refuses a bundle carrying the same item id twice, in merge and replace modes alike", async () => {
+      // Hand-crafted — export can never produce this, which is exactly why
+      // import has to check: bundles arrive from outside rex's write path.
+      const dupe = join(sourceDir, "duplicate-ids.json");
+      await writeFile(
+        dupe,
+        JSON.stringify({
+          bundle: "rex/prd-bundle",
+          bundleVersion: 1,
+          schema: SCHEMA_VERSION,
+          title: "Duplicate Ids",
+          exportedAt: "2026-01-01T00:00:00.000Z",
+          items: [
+            makeItem({ id: EPIC_ONE, title: "First claim", level: "epic" }),
+            makeItem({ id: EPIC_ONE, title: "Second claim", level: "epic" }),
+          ],
+        }),
+      );
+      run(["init", targetDir]);
+
+      const merged = run(["import-bundle", `--in=${dupe}`, targetDir], true);
+      expect(merged).toMatch(new RegExp(EPIC_ONE));
+      expect(merged).toMatch(/Nothing was written to the PRD/);
+      expect(readPRD(targetDir).items).toHaveLength(0);
+
+      const replaced = run(
+        ["import-bundle", `--in=${dupe}`, "--replace", "--yes", targetDir],
+        true,
+      );
+      expect(replaced).toMatch(/Nothing was written to the PRD/);
+      expect(readPRD(targetDir).items).toHaveLength(0);
+    });
+
     it("refuses malformed JSON", async () => {
       const broken = join(sourceDir, "broken.json");
       await writeFile(broken, "{ not json");

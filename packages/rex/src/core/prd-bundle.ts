@@ -279,13 +279,37 @@ function parseSchemaVersion(version: string): { major: number; minor: number } |
 }
 
 /**
+ * Reject a tree in which two items claim the same id.
+ *
+ * `rex export` can never produce one — this guards the bundles it did not
+ * write. Titles of both claimants are named so the operator can tell a
+ * copy-paste slip from two genuinely different items.
+ *
+ * @throws {BundleError} On the first duplicated id, before any write.
+ */
+function assertUniqueIds(items: PRDItem[], seen = new Map<string, string>()): void {
+  for (const item of items) {
+    const first = seen.get(item.id);
+    if (first !== undefined) {
+      throw new BundleError(
+        `Bundle contains the same item id twice: "${item.id}" (as "${first}" and "${item.title}"). ` +
+          `Every item id must be unique. Nothing was written.`,
+      );
+    }
+    seen.set(item.id, item.title);
+    if (item.children?.length) assertUniqueIds(item.children, seen);
+  }
+}
+
+/**
  * Validate an untrusted parsed-JSON payload as a bundle.
  *
  * Every check here runs before the caller touches the tree, so a rejected
  * bundle leaves the PRD untouched.
  *
  * @throws {BundleError} If the payload is not a bundle, is newer than this
- *   rex can read, or carries items that fail schema validation.
+ *   rex can read, carries items that fail schema validation, or claims the
+ *   same item id twice.
  */
 export function parseBundle(raw: unknown): PRDBundle {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
@@ -349,6 +373,13 @@ export function parseBundle(raw: unknown): PRDBundle {
   if (!validation.ok) {
     throw new BundleError(`Bundle contains invalid PRD items: ${validation.errors.message}`);
   }
+
+  // The field validator checks each item alone; id uniqueness is a property of
+  // the whole tree, and it is the one this boundary exists to defend. Two
+  // items claiming one id would survive `--replace` into the tree (the
+  // serializer is positional and loses nothing), where every id-keyed
+  // operation — findItem, update, remove — resolves them ambiguously.
+  assertUniqueIds(candidate.items as PRDItem[]);
 
   const parsed: PRDBundle = {
     bundle: BUNDLE_KIND,

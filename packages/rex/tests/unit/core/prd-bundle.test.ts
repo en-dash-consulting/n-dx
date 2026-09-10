@@ -128,6 +128,32 @@ describe("parseBundle", () => {
     };
     expect(() => parseBundle(bundle)).toThrow(BundleError);
   });
+
+  it("rejects a bundle carrying the same item id at two positions, naming the id", () => {
+    // t1 already lives under f1; a second t1 under e2 is two items claiming
+    // one identity. Imported with --replace this would land in the tree as-is,
+    // where findItem/update/remove resolve it ambiguously.
+    const doc = makeDoc();
+    (doc.items[1].children as PRDItem[]).push(
+      makeItem({ id: "t1", title: "Task One again" }),
+    );
+    const bundle = JSON.parse(JSON.stringify(buildBundle(doc))) as unknown;
+
+    expect(() => parseBundle(bundle)).toThrow(BundleError);
+    expect(() => parseBundle(bundle)).toThrow(/"t1"/);
+  });
+
+  it("rejects a duplicate id even when the copies are content-identical", () => {
+    // Same id, same fields, different parents — still two tree entries, and
+    // still ambiguous to every id-keyed operation after import.
+    const doc = makeDoc();
+    (doc.items[1].children as PRDItem[]).push(
+      structuredClone((doc.items[0].children as PRDItem[])[0].children![0]),
+    );
+    const bundle = JSON.parse(JSON.stringify(buildBundle(doc))) as unknown;
+
+    expect(() => parseBundle(bundle)).toThrow(/"t1"/);
+  });
 });
 
 describe("mergeBundle", () => {
