@@ -224,8 +224,14 @@ export function classifyPortOccupant(payload, absDir) {
  * Callers must first rule out a peer dashboard via {@link probeStatusEndpoint}
  * plus {@link classifyPortOccupant}: this SIGKILLs whatever it finds, and the
  * occupant of 3117 is frequently another project's `ndx start`.
+ *
+ * Refuses to signal this process. lsof/netstat name whoever owns the listening
+ * socket, which is this process whenever the listener was opened in-process —
+ * the shape every in-process test of the peer path has. Without the guard a
+ * regression in the peer branch does not fail an assertion, it SIGKILLs the
+ * test runner, and CI reports a dead worker instead of a broken feature.
  */
-async function killPortOccupant(port) {
+export async function killPortOccupant(port) {
   try {
     let pid = null;
     if (process.platform === "win32") {
@@ -239,19 +245,21 @@ async function killPortOccupant(port) {
           break;
         }
       }
-      if (pid) {
-        execFileSyncCli("taskkill", ["/F", "/PID", String(pid)], { stdio: "ignore" });
-      }
     } else {
       // lsof is available on macOS and most Linux distros
       const out = execFileSyncCli("lsof", ["-ti", `tcp:${port}`], { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] }).trim();
-      if (out) {
-        pid = parseInt(out.split("\n")[0], 10);
-        // SIGKILL direct, rather than spawning /bin/kill for a number we already have.
-        process.kill(pid, "SIGKILL");
-      }
+      if (out) pid = parseInt(out.split("\n")[0], 10);
     }
     if (!pid) return false;
+    // Self-preservation, before any signal is sent — see the note above.
+    if (pid === process.pid) return false;
+
+    if (process.platform === "win32") {
+      execFileSyncCli("taskkill", ["/F", "/PID", String(pid)], { stdio: "ignore" });
+    } else {
+      // SIGKILL direct, rather than spawning /bin/kill for a number we already have.
+      process.kill(pid, "SIGKILL");
+    }
     // Wait for the port to free up
     for (let i = 0; i < 15; i++) {
       await new Promise((r) => setTimeout(r, 200));

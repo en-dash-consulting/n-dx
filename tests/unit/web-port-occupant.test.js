@@ -25,6 +25,7 @@ import {
   classifyPortOccupant,
   probeStatusEndpoint,
   findFreePortInRange,
+  killPortOccupant,
   runWeb,
 } from "../../packages/core/web.js";
 
@@ -188,6 +189,23 @@ describe("the probe decision, end to end", () => {
     const occupant = classifyPortOccupant(await probeStatusEndpoint(port), "/tmp/project-a");
     expect(occupant).toEqual({ kind: "unknown" });
   });
+});
+
+describe("killPortOccupant", () => {
+  it("refuses to signal this process", async () => {
+    // lsof/netstat name whoever owns the listening socket. Every in-process
+    // test of the peer path binds its fake dashboard HERE, so that owner is
+    // the test runner: without the guard, this call SIGKILLs the process
+    // executing it and the peer test below stops being able to fail cleanly.
+    //
+    // If this test ever starts killing the runner, the guard was removed —
+    // that is the regression it exists to catch, and it cannot be asserted
+    // any more gently than by surviving the call.
+    const { server, port } = await startServer(() => {});
+
+    expect(await killPortOccupant(port)).toBe(false);
+    expect(server.listening).toBe(true);
+  }, 20_000);
 });
 
 describe("runWeb, on a busy port", () => {
