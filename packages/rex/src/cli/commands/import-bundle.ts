@@ -12,16 +12,23 @@
  * ## Write discipline
  *
  * The bundle is parsed and version-gated *before* the store is touched, so a
- * rejected bundle leaves the tree untouched. The merge itself runs inside
- * `store.withTransaction`, which holds the PRD lock across the whole
- * read-modify-write — a concurrent writer cannot interleave with an import.
+ * rejected bundle leaves the tree untouched. The tree is snapshotted before
+ * the write (`ensureSnapshot`, undone with `rex restore`), and on `--replace`
+ * the discarded items are additionally archived to `.rex/archive.json` — the
+ * whole-tree wipe is the one loss this command can cause that nothing else
+ * would remember. The merge itself runs inside `store.withTransaction`, which
+ * holds the PRD lock across the whole read-modify-write — a concurrent writer
+ * cannot interleave with an import.
  */
 
 import { join, resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { resolveStore } from "../../store/index.js";
-import { parseBundle, mergeBundle, BundleError } from "../../core/prd-bundle.js";
+import { parseBundle, mergeBundle, countItems, BundleError } from "../../core/prd-bundle.js";
 import type { ImportMode, MergeOutcome, PRDBundle } from "../../core/prd-bundle.js";
+import type { PRDItem } from "../../schema/index.js";
+import { appendArchiveBatch } from "../../core/archive.js";
+import { ensureSnapshot } from "../snapshot-guard.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { result, info, warn } from "../output.js";
@@ -134,11 +141,13 @@ export async function cmdImportBundle(dir: string, flags: Record<string, string>
   // Resolved against the caller's cwd — see the note in export.ts.
   const bundle = await readBundleFile(resolve(input));
 
-  const store = await resolveStore(join(dir, REX_DIR));
+  const rexDir = join(dir, REX_DIR);
+  const store = await resolveStore(rexDir);
 
   // Confirmation happens before the transaction so the lock is not held while
-  // waiting on a human.
-  if (mode === "replace" && flags.yes !== "true") {
+  // waiting on a human. Help documents `--yes, -y`; honour both.
+  const autoConfirm = flags.yes === "true" || flags.y === "true";
+  if (mode === "replace" && !autoConfirm) {
     const existing = await store.loadDocument();
     const confirmed = await confirmReplace(existing.items.length);
     if (!confirmed) {
@@ -149,17 +158,39 @@ export async function cmdImportBundle(dir: string, flags: Record<string, string>
     }
   }
 
+  // Snapshot before the tree is rewritten so `rex restore` can undo the
+  // import — on --replace this is the only local copy of the outgoing tree.
+  // Taken after the confirmation, not before: a declined replace must not
+  // burn a slot in the snapshot retention cap. Fails closed, like every
+  // other tree-rewriting command (see cli/snapshot-guard.ts).
+  await ensureSnapshot(rexDir, "import-bundle", flags);
+
+  let discarded: PRDItem[] = [];
   const outcome = await store.withTransaction(async (doc) => {
     // Adopt the bundle's title when replacing, and when merging into a project
     // that has no items yet: a freshly initialised PRD carries a placeholder
     // title, and keeping it would mean an import into an empty project did not
     // actually reproduce the source.
     const wasEmpty = doc.items.length === 0;
+    if (mode === "replace") discarded = doc.items;
     const merged = mergeBundle(doc.items, bundle, mode);
     doc.items = merged.items;
     if (mode === "replace" || wasEmpty) doc.title = bundle.title;
     return merged;
   });
+
+  // The snapshot covers rollback; the archive batch covers recovering an
+  // individual item after the snapshot has aged out of the retention cap —
+  // the same double record prune and reshape keep.
+  if (discarded.length > 0) {
+    await appendArchiveBatch(rexDir, {
+      timestamp: new Date().toISOString(),
+      source: "import",
+      items: discarded,
+      count: countItems(discarded),
+      reason: "Local tree discarded by import-bundle --replace",
+    });
+  }
 
   reportOutcome(outcome, bundle, mode, flags.format === "json");
 }

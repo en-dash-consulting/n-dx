@@ -21,7 +21,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, readdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -838,6 +838,110 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
       expect([...flatten(readPRD(targetDir).items).keys()].sort()).toEqual(
         [...first.keys()].sort(),
       );
+    });
+  });
+
+  /**
+   * The snapshot guard is what makes `--replace` survivable: it is the one
+   * command that can discard the whole tree in a single step, so it must leave
+   * the same two records every other destructive command leaves — a snapshot
+   * `rex restore` can roll back to, and an archive batch for the discarded
+   * items after the snapshot ages out of the retention cap.
+   */
+  describe("snapshot guard", () => {
+    const LOCAL_EPIC = "66666666-6666-4666-8666-666666666666";
+
+    /** An id the bundle does not carry, so its survival proves a restore. */
+    function seedTargetWithLocalOnlyEpic(): void {
+      writePRD(targetDir, {
+        schema: SCHEMA_VERSION,
+        title: "Local PRD",
+        items: [makeItem({ id: LOCAL_EPIC, title: "Local-only epic", level: "epic" })],
+      });
+    }
+
+    async function snapshotIds(dir: string): Promise<string[]> {
+      try {
+        return (await readdir(join(dir, ".rex", ".backups"))).filter((name) =>
+          name.startsWith("prd_tree_"),
+        );
+      } catch {
+        return [];
+      }
+    }
+
+    it("a --replace import can be undone with rex restore", async () => {
+      run(["export", `--out=${bundlePath}`, sourceDir]);
+      seedTargetWithLocalOnlyEpic();
+
+      run(["import-bundle", `--in=${bundlePath}`, "--replace", "--yes", targetDir]);
+      expect(flatten(readPRD(targetDir).items).size).toBe(5);
+
+      run(["restore", "--latest", targetDir]);
+
+      const restored = flatten(readPRD(targetDir).items);
+      expect(restored.size).toBe(1);
+      expect(restored.get(LOCAL_EPIC)?.fields.title).toBe("Local-only epic");
+    });
+
+    it("merge mode snapshots too — every import rewrites the tree", async () => {
+      run(["export", `--out=${bundlePath}`, sourceDir]);
+      seedTargetWithLocalOnlyEpic();
+
+      expect(await snapshotIds(targetDir)).toHaveLength(0);
+      run(["import-bundle", `--in=${bundlePath}`, targetDir]);
+      expect(await snapshotIds(targetDir)).toHaveLength(1);
+    });
+
+    it("a declined replace leaves no snapshot behind", async () => {
+      run(["export", `--out=${bundlePath}`, sourceDir]);
+      seedTargetWithLocalOnlyEpic();
+
+      run(["import-bundle", `--in=${bundlePath}`, "--replace", targetDir], true);
+
+      expect(await snapshotIds(targetDir)).toHaveLength(0);
+    });
+
+    it("--no-snapshot opts out with the standard warning", async () => {
+      run(["export", `--out=${bundlePath}`, sourceDir]);
+      seedTargetWithLocalOnlyEpic();
+
+      const output = run([
+        "import-bundle",
+        `--in=${bundlePath}`,
+        "--replace",
+        "--yes",
+        "--no-snapshot",
+        targetDir,
+      ]);
+
+      expect(output).toMatch(/Skipping PRD snapshot/);
+      expect(await snapshotIds(targetDir)).toHaveLength(0);
+      expect(flatten(readPRD(targetDir).items).size).toBe(5);
+    });
+
+    it("--replace archives the discarded items to .rex/archive.json", async () => {
+      run(["export", `--out=${bundlePath}`, sourceDir]);
+      seedTargetWithLocalOnlyEpic();
+
+      run(["import-bundle", `--in=${bundlePath}`, "--replace", "--yes", targetDir]);
+
+      const archive = JSON.parse(
+        await readFile(join(targetDir, ".rex", "archive.json"), "utf-8"),
+      ) as { batches: Array<{ source: string; count: number; items: PRDItem[] }> };
+      const batch = archive.batches.at(-1);
+      expect(batch?.source).toBe("import");
+      expect(batch?.count).toBe(1);
+      expect(batch?.items[0]?.id).toBe(LOCAL_EPIC);
+    });
+
+    it("merge mode writes no archive batch — nothing is discarded", () => {
+      run(["export", `--out=${bundlePath}`, sourceDir]);
+      seedTargetWithLocalOnlyEpic();
+
+      run(["import-bundle", `--in=${bundlePath}`, targetDir]);
+
+      expect(existsSync(join(targetDir, ".rex", "archive.json"))).toBe(false);
     });
   });
 });

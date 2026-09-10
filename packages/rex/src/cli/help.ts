@@ -533,12 +533,16 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "with different content are reported rather than overwritten. --replace\n" +
       "discards the local tree and needs --yes when not on a terminal.\n" +
       "\n" +
+      "The tree is snapshotted before the write, so 'rex restore' can undo an\n" +
+      "import; on --replace the discarded items are also kept in .rex/archive.json.\n" +
+      "\n" +
       "Named 'import-bundle' because 'rex import' is an alias for 'rex analyze'.\n" +
       "Also available as 'ndx prd import'.",
     options: [
       { flag: "--in=<path>", description: "Bundle input path (required)" },
       { flag: "--replace", description: "Overwrite the tree with the bundle instead of merging" },
       { flag: "--yes, -y", description: "Skip the --replace confirmation prompt" },
+      { flag: "--no-snapshot", description: "Skip the pre-import snapshot ('rex restore' cannot undo the import)" },
       { flag: "--format=json", description: "Print a JSON summary instead of human output" },
     ],
     examples: [
