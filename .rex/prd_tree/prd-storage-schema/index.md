@@ -2,12 +2,11 @@
 id: "a4992835-70eb-4d9d-a79f-d0577b8927bc"
 level: "epic"
 title: "PRD Storage & Schema"
-status: "completed"
+status: "pending"
 startedAt: "2026-05-06T13:26:50.051Z"
-completedAt: "2026-09-10T17:30:15.959Z"
 endedAt: "2026-09-10T17:30:15.959Z"
 description: "PRD persistence model: folder-tree storage, markdown serialization, schema evolution, visibility/reporting, branch attribution, and the migration history that produced the current single-source-of-truth tree at .rex/prd_tree/."
-lastModified: "2026-09-10T17:30:15.984Z"
+lastModified: "2026-09-10T19:08:32.135Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -37,7 +36,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Multi-File PRD Aggregation and Write Routing Layer](./multi-file-prd-aggregation-and-write/index.md) | completed |
 | [Optimize prd_tree Write Performance for Add and Edit Commands](./optimize-prd-tree-write-performance/index.md) | completed |
 | [Per-PRD Status Breakdown via --show-individual](./per-prd-status-breakdown-via-show/index.md) | completed |
-| [Portable PRD Bundle — Export, Import, and Narrative Rendering](./portable-prd-bundle-export-import-and/index.md) | completed |
+| [Portable PRD Bundle — Export, Import, and Narrative Rendering](./portable-prd-bundle-export-import-and/index.md) | pending |
 | [PRD File Naming, Discovery, and Branch Resolution](./prd-file-naming-discovery-and-branch/index.md) | completed |
 | [PRD Store Integration with Dual-Write and First-Run Migration](./prd-store-integration-with-dual-write/index.md) | completed |
 | [Rename .rex/tree to .rex/prd_tree as Canonical PRD Storage Location](./rename-rex-tree-to-rex-prd-tree-as/index.md) | completed |
