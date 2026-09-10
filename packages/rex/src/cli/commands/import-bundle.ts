@@ -19,6 +19,12 @@
  * would remember. The merge itself runs inside `store.withTransaction`, which
  * holds the PRD lock across the whole read-modify-write — a concurrent writer
  * cannot interleave with an import.
+ *
+ * A successful import also appends a `bundle_imported` entry to
+ * `.rex/execution-log.jsonl`. That is an audit record rather than a third
+ * recovery mechanism: the snapshot and the archive exist to get items back,
+ * while the log answers what ran, in which direction, and from where — none of
+ * which the resulting tree records.
  */
 
 import { join, resolve } from "node:path";
@@ -32,6 +38,11 @@ import { ensureSnapshot } from "../snapshot-guard.js";
 import { REX_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
 import { result, info, warn } from "../output.js";
+
+/** `3 items` / `1 item` — the log detail reads like the command's own output. */
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
 
 /** Ask before discarding the local tree. Non-interactive callers must pass --yes. */
 async function confirmReplace(itemCount: number): Promise<boolean> {
@@ -197,6 +208,28 @@ export async function cmdImportBundle(dir: string, flags: Record<string, string>
       reason: "Local tree discarded by import-bundle --replace",
     });
   }
+
+  // Recorded after the write, so a rejected bundle or a declined replace —
+  // both of which throw above — leaves the log as silent as it left the tree.
+  // `appendLog` stamps the actor, which supplies the "who" half; the rest is
+  // what an operator reading the log afterwards cannot reconstruct from the
+  // tree alone: which direction the import ran, how much it moved, and which
+  // project and commit the items came from.
+  await store.appendLog({
+    timestamp: new Date().toISOString(),
+    event: "bundle_imported",
+    detail:
+      mode === "replace"
+        ? `Replaced ${plural(outcome.replaced, "item")} with ${outcome.added} from ${input}`
+        : `Imported ${plural(outcome.added, "new item")} from ${input}, ` +
+          `${outcome.collisions.length} already present`,
+    mode,
+    added: outcome.added,
+    replaced: outcome.replaced,
+    collisions: outcome.collisions.length,
+    bundleExportedAt: bundle.exportedAt,
+    ...(bundle.exportedFrom ? { exportedFrom: bundle.exportedFrom } : {}),
+  });
 
   reportOutcome(outcome, bundle, mode, flags.format === "json");
 }

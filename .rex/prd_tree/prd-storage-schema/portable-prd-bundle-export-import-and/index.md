@@ -33,7 +33,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Business-owner narrative Markdown PRD export](./business-owner-narrative-markdown-prd.md) | completed |
 | [Export in-tree guard stops one directory short of the legacy PRD backend paths](./export-in-tree-guard-stops-one.md) | completed |
 | [`import-bundle --replace` rewrites the tree with no snapshot, no archive batch](./import-bundle-replace-rewrites-the.md) | completed |
-| [import-bundle writes no execution-log entry — the only PRD-mutating command that leaves no trace](./import-bundle-writes-no-execution-log.md) | pending |
+| [import-bundle writes no execution-log entry — the only PRD-mutating command that leaves no trace](./import-bundle-writes-no-execution-log.md) | completed |
 | [Narrative export of an empty PRD claims "everything on the plan is finished"](./narrative-export-of-an-empty-prd.md) | completed |
 | [`ndx prd` dispatch has no functional test coverage](./ndx-prd-dispatch-has-no-functional.md) | completed |
 | [`ndx prd export --out <path>` (space form) drops the value and misroutes the export](./ndx-prd-export-out-path-space-form.md) | completed |
