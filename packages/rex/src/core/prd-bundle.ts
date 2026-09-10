@@ -128,7 +128,15 @@ export function buildBundle(doc: PRDDocument, options: BuildBundleOptions = {}):
   return {
     bundle: BUNDLE_KIND,
     bundleVersion: BUNDLE_VERSION,
-    schema: SCHEMA_VERSION,
+    // The *document's* version, not the exporter's. `isCompatibleSchema`
+    // admits newer minors and the document schema is a `.passthrough()`, so a
+    // tree written by a future rex loads here intact, unrecognised fields and
+    // all. Stamping the running version relabelled such a document downward,
+    // which made `parseBundle`'s minor gate compare 0 > 0 — never firing — and
+    // those fields then reached the tree unvalidated on import. The fallback
+    // covers a legacy-backend load whose file carried no marker: a bundle
+    // labelled `undefined` is one no version gate can read.
+    schema: doc.schema ?? SCHEMA_VERSION,
     title: doc.title,
     exportedAt: options.exportedAt ?? new Date().toISOString(),
     ...(Object.keys(provenance).length > 0 ? { exportedFrom: provenance } : {}),

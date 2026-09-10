@@ -26,7 +26,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [buildBundle stamps the exporter's SCHEMA_VERSION instead of the document's schema](./buildbundle-stamps-the-exporter-s.md) | pending |
+| [buildBundle stamps the exporter's SCHEMA_VERSION instead of the document's schema](./buildbundle-stamps-the-exporter-s.md) | completed |
 | [Bundle import skips validateDAG and LEVEL_HIERARCHY — cycles and illegal placement reach the tree](./bundle-import-skips-validatedag-and.md) | pending |
 | [Bundle-imported item with `lastModifiedBy` but no `lastModified` is never pushed by remote sync](./bundle-imported-item-with.md) | completed |
 | [Bundles transport the source project's lastSyncedAt/remoteId, corrupting the destination's remote sync](./bundles-transport-the-source-project-s.md) | completed |
@@ -44,3 +44,4 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Scoped bundle export by item — subtree and dependency closure](./scoped-bundle-export-by-item-subtree.md) | completed |
 | [stableKey collision comparison counts sync bookkeeping as content, steering operators toward --replace](./stablekey-collision-comparison-counts.md) | pending |
 | [`stampChangedItems` attribution-only widening changes the rule for every `withTransaction` caller](./stampchangeditems-attribution-only.md) | completed |
+| [The folder tree persists no schema marker, so a newer-minor writer leaves no trace](./the-folder-tree-persists-no-schema.md) | pending |

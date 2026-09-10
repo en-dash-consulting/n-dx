@@ -66,7 +66,7 @@ function makeDoc(): PRDDocument {
 }
 
 describe("buildBundle", () => {
-  it("captures the whole document with its schema version", () => {
+  it("captures the whole document in the bundle envelope", () => {
     const bundle = buildBundle(makeDoc());
 
     expect(bundle.bundle).toBe(BUNDLE_KIND);
@@ -75,6 +75,38 @@ describe("buildBundle", () => {
     expect(bundle.title).toBe("Test PRD");
     expect(bundle.items).toHaveLength(2);
     expect(bundle.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  // `makeDoc()` is already at the running version, so the assertion above
+  // cannot tell `doc.schema` from `SCHEMA_VERSION`. These three can.
+  it("labels the bundle with the document's schema, not the exporter's", () => {
+    const doc = { ...makeDoc(), schema: "rex/v1.1" };
+
+    expect(buildBundle(doc).schema).toBe("rex/v1.1");
+  });
+
+  it("falls back to the running schema when the document carries none", () => {
+    // `PRDDocument.schema` is typed as required, but a legacy backend load
+    // parses whatever the file holds — an absent marker must not produce a
+    // bundle labelled `undefined`, which no version gate can read.
+    const doc = { ...makeDoc() } as PRDDocument;
+    delete (doc as { schema?: string }).schema;
+
+    expect(buildBundle(doc).schema).toBe(SCHEMA_VERSION);
+  });
+
+  it("keeps a newer-minor document refusable by a rex that cannot read it", () => {
+    // The whole point of stamping the document's own version. `isCompatibleSchema`
+    // admits newer minors and `.passthrough()` keeps their unrecognised fields,
+    // so a document written by a future rex loads here intact. Relabelling it
+    // down to the running version on export made `parseBundle`'s minor gate
+    // compare 0 > 0 — never firing — and those fields then reached the tree
+    // unvalidated, which is exactly what the gate exists to prevent.
+    const bundle = buildBundle({ ...makeDoc(), schema: "rex/v1.1" });
+    const roundTripped = JSON.parse(JSON.stringify(bundle)) as unknown;
+
+    expect(() => parseBundle(roundTripped)).toThrow(BundleError);
+    expect(() => parseBundle(roundTripped)).toThrow(/newer than this rex supports/);
   });
 
   it("records export provenance when given", () => {
