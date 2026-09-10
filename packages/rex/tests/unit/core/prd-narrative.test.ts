@@ -278,13 +278,63 @@ describe("renderNarrative", () => {
   });
 
   describe("empty documents", () => {
-    it("renders a heading and an explanatory line when nothing survives the filter", () => {
+    /**
+     * The two empty states are different claims and must not share a message:
+     * a PRD that never held work has nothing "finished", and telling a
+     * stakeholder the plan is done when no plan exists is a wrong statement in
+     * exactly the document built to be handed to one.
+     */
+    it("says no work is recorded yet for a PRD with no items", () => {
       const doc = fixture();
       doc.items = [];
       const result = renderNarrative(doc);
       expect(result.items).toBe(0);
       expect(result.markdown).toContain("# Portable PRD");
-      expect(result.markdown).toContain("No open work");
+      expect(result.markdown).toContain("No work is recorded for this project yet.");
+      expect(result.markdown).not.toContain("finished");
+    });
+
+    it("says the plan is finished when items exist but are all completed", () => {
+      const doc = fixture();
+      const complete = (items: PRDItem[]): void => {
+        for (const entry of items) {
+          entry.status = "completed";
+          if (entry.children) complete(entry.children);
+        }
+      };
+      complete(doc.items);
+
+      const result = renderNarrative(doc);
+      expect(result.items).toBe(0);
+      expect(result.markdown).toContain("everything on the plan is finished");
+    });
+
+    it("treats a PRD holding only deleted items as having no work, not finished work", () => {
+      const doc = fixture();
+      const tombstone = (items: PRDItem[]): void => {
+        for (const entry of items) {
+          entry.status = "deleted";
+          if (entry.children) tombstone(entry.children);
+        }
+      };
+      tombstone(doc.items);
+
+      for (const options of [undefined, { includeCompleted: true }]) {
+        const result = renderNarrative(doc, options);
+        expect(result.markdown).toContain("No work is recorded for this project yet.");
+        expect(result.markdown).not.toContain("finished");
+      }
+    });
+
+    it("speaks of the initiative, not the project, when a scoped item is all done", () => {
+      const doc = fixture();
+      const done = doc.items[0].children![0].children![1];
+      expect(done.status).toBe("completed"); // DONE_TASK from the fixture
+
+      const result = renderNarrative(doc, { rootId: done.id });
+      expect(result.markdown).toContain(
+        "No open work is recorded for this initiative — everything on the plan is finished.",
+      );
     });
   });
 });

@@ -343,6 +343,16 @@ export function renderNarrative(
   let heading = doc.title;
   let lead: Node | null = null;
   let nodes: Node[];
+  /**
+   * Whether the document (or the scoped item) ever held work at all — a
+   * non-deleted item, whatever its progress. Decides which empty-state
+   * sentence is true: a plan whose items are all finished has been delivered;
+   * a plan with no items (or only tombstones) never existed, and telling a
+   * stakeholder it is "finished" would be a wrong statement in exactly the
+   * document built to be handed to one. Deleted items don't count as planned
+   * work: the renderer never shows them, at any depth, under any flag.
+   */
+  let planned: boolean;
 
   if (options.rootId !== undefined) {
     const entry = findItem(doc.items, options.rootId);
@@ -350,8 +360,12 @@ export function renderNarrative(
     heading = entry.item.title;
     lead = select([entry.item], includeCompleted)[0] ?? null;
     nodes = lead ? lead.children : [];
+    planned = !ALWAYS_HIDDEN.has(entry.item.status);
   } else {
     nodes = select(doc.items, includeCompleted);
+    // Top level suffices: a deleted epic hides its whole subtree, so work
+    // beneath it was removed from the plan along with it.
+    planned = doc.items.some((item) => !ALWAYS_HIDDEN.has(item.status));
   }
 
   const blocks: string[] = [`# ${scrubIds(heading, titles)}`];
@@ -359,10 +373,11 @@ export function renderNarrative(
   if (lead) blocks.push(...renderBody(lead, titles));
 
   if (nodes.length === 0 && !lead) {
+    const scope = options.rootId !== undefined ? "this initiative" : "this project";
     blocks.push(
-      includeCompleted
-        ? "No work is recorded for this project yet."
-        : "No open work is recorded for this project — everything on the plan is finished.",
+      planned
+        ? `No open work is recorded for ${scope} — everything on the plan is finished.`
+        : `No work is recorded for ${scope} yet.`,
     );
   }
 
