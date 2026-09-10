@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 36,
-    "perCallTokens": 21688,
-    "uniqueTokens": 13201,
+    "perCallTokens": 21872,
+    "uniqueTokens": 13385,
     "skills": 13,
     "skillTokens": 17217
   },
@@ -113,8 +113,8 @@
     },
     "hench": {
       "surfaces": 9,
-      "perCallTokens": 3531,
-      "uniqueTokens": 3531
+      "perCallTokens": 3715,
+      "uniqueTokens": 3715
     },
     "core": {
       "surfaces": 1,
@@ -797,11 +797,11 @@
       "builder": "buildOrientationPrompt",
       "purpose": "Orientation task prompt — what to establish about the repo.",
       "inline": false,
-      "literals": 15,
+      "literals": 36,
       "constants": {},
-      "ownTokens": 191,
-      "fixedChars": 761,
-      "fixedTokens": 191
+      "ownTokens": 375,
+      "fixedChars": 1497,
+      "fixedTokens": 375
     },
     {
       "pkg": "hench",
@@ -985,8 +985,8 @@
       }
     ]
   },
-  "contentHash": "e10365e5d95f379b",
-  "recordedAt": "2026-09-10T03:09:48.470Z",
-  "commit": "9a5952332716",
+  "contentHash": "fe1ceb35c4ce1562",
+  "recordedAt": "2026-09-10T18:50:58.513Z",
+  "commit": "unknown",
   "dirty": false
 }
