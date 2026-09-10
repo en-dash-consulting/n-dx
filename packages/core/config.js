@@ -1625,7 +1625,7 @@ Hench test-gate settings (mandatory full-suite gate before commit):
                                      from the project (Makefile validate target, package.json
                                      test:all/test, swift/cargo/go/pytest), then prompted for.
   hench.fullTestTimeoutMs  number    How long that command may run before it is killed and the
-                                     run fails (default: 300000 — 5 minutes; 0 means no limit).
+                                     run fails (default: 900000 — 15 minutes; 0 means no limit).
                                      Raise it for a large monorepo: the gate runs while an agent
                                      is also using the machine, and a timeout aborts a task whose
                                      work is already done. Prefer raising this over skipping the

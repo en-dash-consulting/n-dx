@@ -235,11 +235,14 @@ export interface HenchConfig {
   fullTestCommand?: string;
   /**
    * Milliseconds the full test suite gate may take before it is killed and the
-   * run fails. Default: 300000 (5 min).
+   * run fails. Default: 900000 (15 min), mirroring
+   * `DEFAULT_TEST_GATE_TIMEOUT_MS` in `tools/test-runner.ts` — see its docblock
+   * for the measurement the number comes from.
    *
-   * The default suits a suite that finishes in a couple of minutes. A large
-   * monorepo running every package can legitimately exceed it — and because
-   * the gate runs while an agent is also competing for CPU, headroom matters:
+   * The default is roughly 3x this repo's own measured suite duration. A large
+   * monorepo running every package can still legitimately exceed it — and
+   * because the gate runs while an agent is also competing for CPU, headroom
+   * matters:
    * a timeout aborts a task whose work was already done and committed. Raise
    * this rather than reaching for `skipFullTestGate`, which gives up the check
    * entirely.

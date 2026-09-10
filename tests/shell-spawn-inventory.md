@@ -79,6 +79,7 @@ exercised.
 | Unit tests asserting the resolved shell (`llm-client/tests/unit/exec.test.ts`, `hench/tests/unit/process/exec.test.ts`, `hench/tests/unit/agent/completion.test.ts`) | Inspect a fake spawn's arguments; no process is created. All three now pass `_platform`/`_posixShellAvailable` explicitly, or accept either shell — the earlier unconditional `cmd === "sh"` assertions passed from Git Bash and failed from PowerShell once `execShellCmd` became platform-aware |
 | `packages/llm-client/tests/integration/exec-shell-windows.test.ts` | Runs real commands, but only through `cmd.exe`, and the whole suite is `describe.skip` off win32. It is the inverse of every other row here: it needs the *absence* of a POSIX shell, which it arranges by forcing the cmd.exe branch and scrubbing Git/MSYS/Cygwin directories from the child's PATH. Nothing to guard — a host with `sh` still runs it |
 | `tests/e2e/architecture-policy.test.js` | Spawns nothing. The flagged `"sh", ["-c"` text is the POSIX_SHELL_SPAWN_RE detector and its exemption prose — the guard that keeps production code from spawning a shell by name |
+| `packages/hench/tests/unit/schema/validate.test.ts` | Spawns nothing. Imports exactly one binding from `tools/test-runner.js` — the numeric constant `DEFAULT_TEST_GATE_TIMEOUT_MS` — to hold the zod default to the gate's own budget rather than to a third copy of the literal. `runTestGate` is never called; the detector flags the module edge, not a spawn |
 
 ## Helpers
 

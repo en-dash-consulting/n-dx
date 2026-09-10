@@ -1,8 +1,9 @@
 /**
  * The full-suite gate's ceiling is an operator setting, not a constant.
  *
- * It was hardcoded at 5 minutes. A monorepo that runs every package can
- * legitimately exceed that — and since the gate runs while an agent is also
+ * It was hardcoded at 15 minutes (`TEST_GATE_TIMEOUT`, itself already raised
+ * from 5m after measurement). A monorepo that runs every package can
+ * legitimately exceed even that — and since the gate runs while an agent is also
  * using the machine, overrunning aborts a task whose work was already done and
  * committed. These tests pin the two things that promise makes: the value is
  * settable from either config file, and the gate actually obeys it.
