@@ -5,7 +5,7 @@
     "perCallTokens": 21688,
     "uniqueTokens": 13201,
     "skills": 13,
-    "skillTokens": 16882
+    "skillTokens": 17217
   },
   "skills": [
     {
@@ -19,8 +19,8 @@
       "name": "iso-map",
       "file": ".claude/skills/iso-map/SKILL.md",
       "shipped": false,
-      "chars": 7584,
-      "tokens": 1896
+      "chars": 8285,
+      "tokens": 2072
     },
     {
       "name": "triage",
@@ -37,18 +37,18 @@
       "tokens": 1454
     },
     {
+      "name": "dev-link",
+      "file": ".claude/skills/dev-link/SKILL.md",
+      "shipped": false,
+      "chars": 5054,
+      "tokens": 1264
+    },
+    {
       "name": "ndx-plan",
       "file": "packages/core/assistant-assets/skills/ndx-plan.md",
       "shipped": true,
       "chars": 4437,
       "tokens": 1110
-    },
-    {
-      "name": "dev-link",
-      "file": ".claude/skills/dev-link/SKILL.md",
-      "shipped": false,
-      "chars": 4419,
-      "tokens": 1105
     },
     {
       "name": "ndx-capture",
@@ -985,8 +985,8 @@
       }
     ]
   },
-  "contentHash": "4b06f0f16fd3e4fb",
-  "recordedAt": "2026-09-09T20:10:30.263Z",
-  "commit": "ab682434c0ee",
+  "contentHash": "e10365e5d95f379b",
+  "recordedAt": "2026-09-10T03:09:48.470Z",
+  "commit": "9a5952332716",
   "dirty": false
 }
