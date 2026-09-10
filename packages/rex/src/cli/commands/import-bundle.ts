@@ -149,7 +149,13 @@ export async function cmdImportBundle(dir: string, flags: Record<string, string>
   const autoConfirm = flags.yes === "true" || flags.y === "true";
   if (mode === "replace" && !autoConfirm) {
     const existing = await store.loadDocument();
-    const confirmed = await confirmReplace(existing.items.length);
+    // The whole tree, not `existing.items.length`. This prompt is the operator's
+    // last chance to stop an irreversible wipe, and the top-level count reads as
+    // a fraction of the loss: 3 epics holding 240 descendants asked to replace
+    // "3 items" and then reported "Replaced 240 items". `countItems` is what
+    // `mergeBundle` uses for the `replaced` count reported afterwards, so the
+    // number agreed to and the number charged cannot disagree.
+    const confirmed = await confirmReplace(countItems(existing.items));
     if (!confirmed) {
       throw new CLIError(
         "Replace declined — nothing was written.",
