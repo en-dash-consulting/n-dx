@@ -2,11 +2,12 @@
 id: "4d62fa6c-ad0d-4e1e-91f8-c2f1ebe696e7"
 level: "epic"
 title: "Web Dashboard"
-status: "pending"
+status: "completed"
 startedAt: "2026-03-24T05:27:03.754Z"
-endedAt: "2026-09-08T23:14:14.907Z"
+completedAt: "2026-09-10T17:46:28.941Z"
+endedAt: "2026-09-10T17:46:28.941Z"
 description: "Unified web dashboard and MCP HTTP server. Preact-based UI with SourceVision, Rex, and Hench views. Includes server architecture, real-time updates, performance optimization, and landing page."
-lastModified: "2026-09-10T17:07:59.234Z"
+lastModified: "2026-09-10T17:46:28.947Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
 
@@ -38,7 +39,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Transparent task selection and completion reasoning](./transparent-task-selection-and/index.md) | completed |
 | [UI Density Toggle (Small / Medium / Large)](./ui-density-toggle-small-medium-large/index.md) | completed |
 | [Web Dashboard Accessibility (a11y)](./web-dashboard-accessibility-a11y/index.md) | completed |
-| [findAvailablePort reports a requested port of 0 as "in use"](./findavailableport-reports-a-requested.md) | pending |
+| [findAvailablePort reports a requested port of 0 as "in use"](./findavailableport-reports-a-requested.md) | completed |
 | [Fix undefined design tokens and standardize buttons on General and analyze/plan settings pages](./fix-undefined-design-tokens-and.md) | completed |
 | [Hot-reload MCP tool schemas on HTTP transport without server restart](./hot-reload-mcp-tool-schemas-on-http.md) | completed |
 | [Match settings-page text boxes to the Analyze & Import input style and fix dark-mode native form chrome](./match-settings-page-text-boxes-to-the.md) | completed |

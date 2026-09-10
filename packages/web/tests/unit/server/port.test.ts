@@ -181,6 +181,16 @@ describe("port utilities", () => {
       expect(result.requestedPort).toBe(0);
     });
 
+    it("does not call a resolved port 0 a fallback", async () => {
+      // isOriginal stays false — the bound port is not the number requested,
+      // which is what that flag means. But nothing fell back: port 0 asks for
+      // "any free port" and got exactly that. Reporting it as a fallback made
+      // the server announce "Port 0 is in use", and handed the same false
+      // signal to programmatic callers through StartResult.isFallback.
+      const result = await findAvailablePort(0);
+      expect(result.isFallback, "port 0 was honoured, not substituted").toBe(false);
+    });
+
     it("returns the preferred port when it is available", async () => {
       // Find a free port to use as our "preferred"
       const tmp = createServer();
@@ -196,6 +206,7 @@ describe("port utilities", () => {
       expect(result.port).toBe(freePort);
       expect(result.isOriginal).toBe(true);
       expect(result.requestedPort).toBe(freePort);
+      expect(result.isFallback).toBe(false);
     });
 
     it("falls back to next available port when preferred is occupied", async () => {
@@ -218,6 +229,7 @@ describe("port utilities", () => {
       expect(result.requestedPort).toBe(port1);
       expect(result.port).toBeGreaterThan(port1);
       expect(result.port).toBeLessThanOrEqual(port1 + 10);
+      expect(result.isFallback, "a genuinely occupied port did fall back").toBe(true);
     });
 
     it("throws when no port is available in range", async () => {

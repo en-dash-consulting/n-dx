@@ -205,7 +205,13 @@ export function registerShutdownHandlers(
 export interface StartResult {
   /** The actual port the server is listening on. */
   port: number;
-  /** Whether a fallback port was used (requested port was unavailable). */
+  /**
+   * Whether a fallback port was used because the requested one was unavailable.
+   *
+   * False when a requested port of 0 was resolved to an ephemeral port: that
+   * is the request being honoured, not substituted, even though the bound port
+   * is not the number passed in.
+   */
   isFallback: boolean;
 }
 
@@ -774,7 +780,10 @@ export async function startServer(
   });
   const actualPort = allocation.port;
 
-  if (!allocation.isOriginal) {
+  // `isFallback`, not `!isOriginal`: a requested port of 0 binds a port that
+  // is not the number asked for, but the request was honoured, so there is no
+  // fallback to announce. See PortAllocationResult.isFallback.
+  if (allocation.isFallback) {
     console.log(
       `Port ${allocation.requestedPort} is in use — using port ${actualPort} instead.`,
     );
@@ -912,7 +921,7 @@ export async function startServer(
 
       resolvePromise({
         port: actualPort,
-        isFallback: !allocation.isOriginal,
+        isFallback: allocation.isFallback,
       });
     });
   });
