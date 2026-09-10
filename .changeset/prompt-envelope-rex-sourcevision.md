@@ -3,6 +3,7 @@
 "@n-dx/sourcevision": patch
 "@n-dx/hench": patch
 "@n-dx/core": patch
+"@n-dx/llm-client": patch
 ---
 
 Build rex's and sourcevision's LLM prompts through `PromptEnvelope` so their cost
