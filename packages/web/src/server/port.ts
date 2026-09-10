@@ -183,6 +183,19 @@ export async function findAvailablePort(
   rangeEnd: number = PORT_RANGE_END,
   retryOpts?: PortRetryOptions,
 ): Promise<PortAllocationResult> {
+  // Port 0 is the OS convention for "any free port" — resolve it to a real
+  // ephemeral port up front. Probing 0 through checkPort is platform-dependent:
+  // on Linux, connect() to port 0 fails ECONNREFUSED, the bind phase then
+  // succeeds (binding 0 always does), and the literal 0 came back as the
+  // "available" port — which the caller then reported as the bound port and
+  // wrote to the port file, and which no client can connect to. On Windows the
+  // same connect fails EADDRNOTAVAIL, so the check read as unavailable and the
+  // ephemeral fallback below masked the bug.
+  if (preferred === 0) {
+    const port = await allocateEphemeralPort();
+    return { port, isOriginal: false, requestedPort: 0 };
+  }
+
   // Try the preferred port first (with retries if opts provided)
   const check = retryOpts !== undefined
     ? await checkPortWithRetry(preferred, retryOpts)

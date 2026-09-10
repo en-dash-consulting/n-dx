@@ -168,6 +168,19 @@ describe("port utilities", () => {
   });
 
   describe("findAvailablePort", () => {
+    it("resolves port 0 to a real ephemeral port, never the literal 0", async () => {
+      // Port 0 means "any free port". Probing it through checkPort is
+      // platform-dependent: on Linux the connect probe fails ECONNREFUSED and
+      // the bind phase succeeds (binding 0 always does), so the literal 0 was
+      // returned as the port — the server then reported a port no client can
+      // connect to. Windows masked this by failing the connect probe with
+      // EADDRNOTAVAIL and taking the ephemeral fallback.
+      const result = await findAvailablePort(0);
+      expect(result.port).toBeGreaterThan(0);
+      expect(result.isOriginal).toBe(false);
+      expect(result.requestedPort).toBe(0);
+    });
+
     it("returns the preferred port when it is available", async () => {
       // Find a free port to use as our "preferred"
       const tmp = createServer();
