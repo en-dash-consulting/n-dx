@@ -24,6 +24,8 @@ import type {ClaudeResult} from "./reason.js";import {
   OUTPUT_INSTRUCTION,
 } from "./reason.js";
 import { z } from "zod";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import { section, rexPromptEnvelope, rexPrompt } from "./prompt-envelope.js";
 
 // ── Types ──
 
@@ -70,31 +72,48 @@ const DecompositionResponseSchema = z.array(DecompositionChildSchema);
  *
  * Pure function — no I/O.
  */
+export function buildDecompositionEnvelope(
+  task: ProposalTask,
+  thresholdWeeks: number,
+): PromptEnvelope {
+  const weeks = `${thresholdWeeks} engineer-week${thresholdWeeks === 1 ? "" : "s"}`;
+
+  return rexPromptEnvelope([
+    section(
+      "role",
+      `You are a product requirements analyst. The following task has a level-of-effort (LoE) estimate that exceeds the project's threshold of ${weeks}. Break it down into smaller, independently deliverable child tasks.`,
+    ),
+    section("input", `Task to decompose:\n${JSON.stringify(task)}`),
+    section(
+      "input-rules",
+      [
+        "Rules:",
+        `- Each child task MUST have an LoE at or below ${weeks}.`,
+        '- Each child task MUST include "loe" (number, in engineer-weeks), "loeRationale" (string explaining the estimate), and "loeConfidence" ("low"|"medium"|"high").',
+        `- The sum of child LoE values should approximate the parent's LoE (${task.loe ?? "unknown"} weeks).`,
+        // Verb-first titles and the description + acceptanceCriteria
+        // requirement come from TASK_QUALITY_RULES, which this prompt includes;
+        // children are tasks like any other.
+        "- Distribute the parent's acceptance criteria among children — do not lose any.",
+        `- Keep priorities consistent with the parent (${task.priority ?? "medium"}).`,
+        "- Preserve tags from the parent where relevant.",
+        "- Do NOT add entirely new functionality — only decompose what exists.",
+        "- Produce 2-5 child tasks.",
+      ].join("\n"),
+    ),
+    section("quality", TASK_QUALITY_RULES),
+    section(
+      "output",
+      "Respond with ONLY a valid, minified JSON array of task objects — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, and do not restate the input task — just the JSON.",
+    ),
+  ]);
+}
+
 export function buildDecompositionPrompt(
   task: ProposalTask,
   thresholdWeeks: number,
 ): string {
-  const taskJson = JSON.stringify(task);
-
-  return `You are a product requirements analyst. The following task has a level-of-effort (LoE) estimate that exceeds the project's threshold of ${thresholdWeeks} engineer-week${thresholdWeeks === 1 ? "" : "s"}. Break it down into smaller, independently deliverable child tasks.
-
-Task to decompose:
-${taskJson}
-
-Rules:
-- Each child task MUST have an LoE at or below ${thresholdWeeks} engineer-week${thresholdWeeks === 1 ? "" : "s"}.
-- Each child task MUST include "loe" (number, in engineer-weeks), "loeRationale" (string explaining the estimate), and "loeConfidence" ("low"|"medium"|"high").
-- The sum of child LoE values should approximate the parent's LoE (${task.loe ?? "unknown"} weeks).
-- Each child MUST have a verb-first title, a description, and acceptanceCriteria.
-- Distribute the parent's acceptance criteria among children — do not lose any.
-- Keep priorities consistent with the parent (${task.priority ?? "medium"}).
-- Preserve tags from the parent where relevant.
-- Do NOT add entirely new functionality — only decompose what exists.
-- Produce 2-5 child tasks.
-
-${TASK_QUALITY_RULES}
-
-Respond with ONLY a valid, minified JSON array of task objects — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, and do not restate the input task — just the JSON.`;
+  return rexPrompt(buildDecompositionEnvelope(task, thresholdWeeks));
 }
 
 // ── Response parsing ──

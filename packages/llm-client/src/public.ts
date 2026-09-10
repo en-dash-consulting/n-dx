@@ -304,6 +304,7 @@ export {
 export type {
   ExecResult,
   ExecOptions,
+  ShellInvocation,
   SpawnToolOptions,
   SpawnToolResult,
   ManagedChild,
@@ -395,11 +396,25 @@ export {
   ALL_FAILURE_CATEGORIES,
   createPromptEnvelope,
   assemblePrompt,
+  assemblePromptText,
   mapErrorReasonToFailureCategory,
   mapRunFailureToCategory,
   classifyVendorError,
   failureCategoryLabel,
 } from "./runtime-contract.js";
+
+// Per-section prompt measurement — shared by rex, sourcevision, and hench
+export type {
+  PromptSectionDiagnostic,
+  PromptSectionCost,
+} from "./prompt-diagnostics.js";
+
+export {
+  extractPromptSectionDiagnostics,
+  promptSectionCosts,
+  dominantPromptSections,
+  formatPromptSectionCosts,
+} from "./prompt-diagnostics.js";
 
 // Vendor-neutral tool schema
 export type {

@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import {
   getManifest,
@@ -111,4 +111,55 @@ describe("skill file sync", () => {
       );
     }
   });
+});
+
+// ── The shipped copy differs from the source by frontmatter and nothing else ──
+
+describe("shipped skills differ from their source only by frontmatter", () => {
+  /**
+   * The one permitted difference, asserted rather than assumed.
+   *
+   * `.claude/skills/<name>/SKILL.md` is generated as YAML frontmatter followed
+   * by the canonical body verbatim, which is why its line count runs a few
+   * higher than `assistant-assets/skills/<name>.md`. That gap has been read as
+   * drift before now; it is not.
+   *
+   * `assistant-body-drift.test.js` compares the committed artifact against what
+   * the generator produces today, so the two always agree — including when the
+   * generator is what is wrong. Nothing compared the generated *body* against
+   * the canonical source, so a renderer that dropped or reordered a section
+   * would keep both suites green while shipping a skill that no longer matched
+   * the file its authors edit.
+   */
+  const normalize = (s) => s.replace(/\r\n/g, "\n");
+
+  /** Split a generated skill into its frontmatter block and its body. */
+  function splitGenerated(text) {
+    const match = /^---\n[\s\S]*?\n---\n\n/.exec(normalize(text));
+    return match
+      ? { frontmatter: match[0], body: normalize(text).slice(match[0].length) }
+      : { frontmatter: "", body: normalize(text) };
+  }
+
+  for (const name of getSkillNames()) {
+    const installed = join(ROOT, ".claude", "skills", name, "SKILL.md");
+
+    it(`${name}: body is byte-identical to the canonical source`, () => {
+      expect(existsSync(installed), `${installed} not generated`).toBe(true);
+      const { body } = splitGenerated(readFileSync(installed, "utf-8"));
+      expect(body).toBe(normalize(getSkillBody(name)));
+    });
+
+    it(`${name}: adds YAML frontmatter and nothing else`, () => {
+      const { frontmatter } = splitGenerated(readFileSync(installed, "utf-8"));
+      expect(frontmatter, "generated skill has no frontmatter block").not.toBe("");
+      // Only the keys the renderer is documented to emit. A new key here is a
+      // real change to what ships and should be a deliberate edit, not a
+      // surprise found later.
+      const keys = [...frontmatter.matchAll(/^([a-z-]+):/gm)].map((m) => m[1]);
+      expect(keys.every((k) => ["name", "description", "argument-hint"].includes(k))).toBe(true);
+      expect(keys).toContain("name");
+      expect(keys).toContain("description");
+    });
+  }
 });

@@ -13,6 +13,8 @@
 
 import { z } from "zod";
 import { spawnClaude, resolveConfiguredModel, extractJson } from "./reason.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import { section, rexPromptEnvelope, rexPrompt } from "./prompt-envelope.js";
 
 // ── Input types ────────────────────────────────────────────────────────────────
 // Defined locally so this module stays in the domain layer (analyze/) and does
@@ -100,34 +102,50 @@ function formatMemberSection(member: GroupRenameMember, index: number): string {
  *
  * @public — exported for testing.
  */
-export function buildGroupRenamePrompt(group: GroupRenameInput): string {
-  const itemSections = group.members
-    .map((m, i) => formatMemberSection(m, i))
-    .join("\n\n");
+export function buildGroupRenameEnvelope(group: GroupRenameInput): PromptEnvelope {
   const idList = group.members.map((m) => `"${m.id}"`).join(", ");
 
-  return (
-    `${group.members.length} sibling PRD items were grouped under a parent because they all ` +
-    `shared the base title "${group.baseTitle}" — the only differences were trailing ` +
-    `machine-generated hash suffixes. Propose a distinct, descriptive title for each item ` +
-    `that captures what makes it uniquely different from the others.\n\n` +
-    `${itemSections}\n\n` +
-    `Rules:\n` +
-    `- Propose a new title for every item (one entry per ID: ${idList}).\n` +
-    `- All proposed titles must be different from each other.\n` +
-    `- No proposed title may equal the shared base title "${group.baseTitle}".\n` +
-    `- Titles should be concise (3–8 words) and grounded in the descriptions above.\n` +
-    `- If an item has no description, use the base title as-is — there is no content to differentiate it.\n` +
-    `\n` +
-    `Respond with JSON only (no markdown wrapper, no prose):\n` +
-    `{\n` +
-    `  "renames": [\n` +
-    `    {"id": "<item-id>", "title": "<new title>"},\n` +
-    `    ...\n` +
-    `  ],\n` +
-    `  "reasoning": "<brief explanation>"\n` +
-    `}`
-  );
+  return rexPromptEnvelope([
+    section(
+      "role",
+      `${group.members.length} sibling PRD items were grouped under a parent because they all ` +
+        `shared the base title "${group.baseTitle}" — the only differences were trailing ` +
+        "machine-generated hash suffixes. Propose a distinct, descriptive title for each item " +
+        "that captures what makes it uniquely different from the others.",
+    ),
+    section(
+      "input",
+      group.members.map((m, i) => formatMemberSection(m, i)).join("\n\n"),
+    ),
+    section(
+      "input-rules",
+      [
+        "Rules:",
+        `- Propose a new title for every item (one entry per ID: ${idList}).`,
+        "- All proposed titles must be different from each other.",
+        `- No proposed title may equal the shared base title "${group.baseTitle}".`,
+        "- Titles should be concise (3–8 words) and grounded in the descriptions above.",
+        "- If an item has no description, use the base title as-is — there is no content to differentiate it.",
+      ].join("\n"),
+    ),
+    section(
+      "output",
+      [
+        "Respond with JSON only (no markdown wrapper, no prose):",
+        "{",
+        '  "renames": [',
+        '    {"id": "<item-id>", "title": "<new title>"},',
+        "    ...",
+        "  ],",
+        '  "reasoning": "<brief explanation>"',
+        "}",
+      ].join("\n"),
+    ),
+  ]);
+}
+
+export function buildGroupRenamePrompt(group: GroupRenameInput): string {
+  return rexPrompt(buildGroupRenameEnvelope(group));
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────

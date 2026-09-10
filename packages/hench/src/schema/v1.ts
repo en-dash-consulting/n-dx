@@ -131,15 +131,7 @@ export interface HenchConfig {
   model: string;
   maxTurns: number;
   maxTokens: number;
-  /**
-   * Total token budget per run. 0 = unlimited.
-   *
-   * Counts every token the run processed at face value: uncached input,
-   * cache-write input, cache-read input, and output. Cached input counts
-   * toward the budget — otherwise a prompt-cached run would bound only its
-   * output, since caching moves nearly all input tokens out of the uncached
-   * `input` field.
-   */
+  /** Total token budget per run (input + output). 0 = unlimited. */
   tokenBudget: number;
   rexDir: string;
   apiKeyEnv: string;
@@ -242,17 +234,24 @@ export interface HenchConfig {
    */
   fullTestCommand?: string;
   /**
-   * Timeout for the full test suite gate, in milliseconds (default: 900_000
-   * — 15 minutes). Resolution precedence matches fullTestCommand:
-   * 1. .hench/config.json fullTestTimeoutMs field
-   * 2. .n-dx.json hench.fullTestTimeoutMs field
-   * 3. Default (900_000)
+   * Milliseconds the full test suite gate may take before it is killed and the
+   * run fails. Default: 900000 (15 min), mirroring
+   * `DEFAULT_TEST_GATE_TIMEOUT_MS` in `tools/test-runner.ts` — see its docblock
+   * for the measurement the number comes from.
    *
-   * Raise this if your full suite runs long under load: the gate is a HANG
-   * guardrail, not a latency SLA, so a generous budget only costs a slower
-   * failure when something is genuinely stuck — a tight one turns a slow but
-   * passing suite into a false-failure generator whenever the machine is
-   * contended (e.g. a concurrent `ndx work` in another worktree).
+   * The default is roughly 3x this repo's own measured suite duration. A large
+   * monorepo running every package can still legitimately exceed it — and
+   * because the gate runs while an agent is also competing for CPU, headroom
+   * matters:
+   * a timeout aborts a task whose work was already done and committed. Raise
+   * this rather than reaching for `skipFullTestGate`, which gives up the check
+   * entirely.
+   *
+   * Set to 0 for no limit. That trades a hung suite blocking the run forever
+   * against never being cut off mid-suite; prefer a generous number over 0.
+   *
+   * Resolution: `.hench/config.json` is merged with `.n-dx.json`'s
+   * `hench.fullTestTimeoutMs`, which wins (see `loadConfig`).
    */
   fullTestTimeoutMs?: number;
   /**

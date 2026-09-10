@@ -18,6 +18,7 @@
     "validate": "pnpm -r run validate",
     "verify": "pnpm security:obfuscation && vitest run tests/e2e && node packages/core/ci.js .",
     "security:obfuscation": "node scripts/check-obfuscated-code.mjs",
+    "prompt-census": "node scripts/prompt-census.mjs",
     "gauntlet": "vitest run tests/gauntlet --exclude '**/sourcevision-evals/evals.test.js'",
     "gauntlet:evals": "vitest run tests/gauntlet/sourcevision-evals/evals.test.js",
     "gauntlet:evals:record": "node tests/gauntlet/sourcevision-evals/record-goldens.js",

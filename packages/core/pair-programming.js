@@ -371,6 +371,26 @@ export function getChangedFiles(dir) {
  * the test command, while explicitly capping any fixes at 20 lines per file
  * and prohibiting refactors or architectural changes.
  *
+ * ## Why a prompt lives in the orchestration tier
+ *
+ * This is the only prompt text in `packages/core/`, which invites the question
+ * of whether it belongs here at all. It does, and the reasoning is worth
+ * recording so the question is not reopened on every audit.
+ *
+ * The orchestration-tier rule is **spawn-only**: `cli.js`, `web.js` and `ci.js`
+ * must not import from package internals (`tests/e2e/architecture-policy.test.js`
+ * enumerates exactly those three files; `config.js` is the documented
+ * exception). The rule constrains *imports*, not string composition. This
+ * module imports nothing but Node built-ins and its core siblings, builds a
+ * string, and hands it to a spawned CLI via `runReviewerLlmCapturing` — which
+ * is the compliant pattern, not a deviation from it.
+ *
+ * Moving the prompt into a package would make things worse, not better: core
+ * would then have to import it, which is the thing the rule actually forbids.
+ *
+ * The prompt is measured alongside every other surface by
+ * `scripts/prompt-census.mjs`, so its cost is visible rather than exempt.
+ *
  * @param {{
  *   changedFiles: string[];
  *   testCommand?: string;

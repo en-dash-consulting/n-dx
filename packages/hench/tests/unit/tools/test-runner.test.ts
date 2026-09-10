@@ -553,9 +553,9 @@ describe("runTestGate", () => {
   // headroom, which a second concurrent `ndx work`/CI run erases — the gate
   // then kills a suite that already passed. 900_000 (15 min) is the floor;
   // see hench.fullTestTimeoutMs for the operator-configurable override.
-  it("defaults TEST_GATE_TIMEOUT to 900_000ms (15 minutes), not the old 300_000ms", async () => {
-    const { TEST_GATE_TIMEOUT } = await import("../../../src/tools/test-runner.js");
-    expect(TEST_GATE_TIMEOUT).toBe(900_000);
+  it("defaults DEFAULT_TEST_GATE_TIMEOUT_MS to 900_000ms (15 minutes), not the old 300_000ms", async () => {
+    const { DEFAULT_TEST_GATE_TIMEOUT_MS } = await import("../../../src/tools/test-runner.js");
+    expect(DEFAULT_TEST_GATE_TIMEOUT_MS).toBe(900_000);
   });
 
   it("returns failed gate on non-zero exit code", async () => {
@@ -841,11 +841,12 @@ describe("runTestGate — launched vs failed", () => {
     });
 
     // A timeout still fails the run — a gate that cannot finish on freshly
-    // changed code is a reason to stop — but says so in its own words.
+    // changed code is a reason to stop — but says so in its own words, and
+    // names the knob (`hench.fullTestTimeoutMs`) that moves the limit.
     expect(result.ran).toBe(true);
     expect(result.passed).toBe(false);
-    expect(result.error).toContain("timed out");
-    expect(result.error).toContain("1m 30s");
+    expect(result.error).toContain("did not finish within 1m 30s");
+    expect(result.error).toContain("hench.fullTestTimeoutMs");
 
     // Distinct from a never-launched suite, which reports `ran: false`.
     expect(result.packages.length).toBeGreaterThan(0);

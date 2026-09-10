@@ -5,10 +5,12 @@ title: "Git-Safety Hardening: express-prompt destructive actions and size-aware 
 status: "completed"
 priority: "high"
 startedAt: "2026-07-17T18:11:46.449Z"
-completedAt: "2026-07-17T18:11:46.449Z"
-endedAt: "2026-07-17T18:11:46.449Z"
+completedAt: "2026-09-09T02:35:09.315Z"
+endedAt: "2026-09-09T02:35:09.315Z"
 acceptanceCriteria: []
 description: "Close three gaps found while reviewing the #279 pre-run commit gate and the ndx init git preflight. Goal: no destructive git action (rollback/reset/checkout/clean) happens without being expressly prompted, and commit checkpoints escalate based on how large the uncommitted changes are — all enforced programmatically.\n\nRelated existing work in this epic: 'Pre-run commit gate' {9af68a23}, 'Run Failure Recovery and Rollback' {3415b5f0}, 'Ctrl-C Interrupt Rollback Prompt Coordination' {469c7900}, 'Commit Approval Bypass for Autonomous Runs' {3ca4d0d8}.\n\nContains three independent tasks, one per gap."
+lastModified: "2026-09-09T02:35:09.321Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -18,3 +20,4 @@ description: "Close three gaps found while reviewing the #279 pre-run commit gat
 | [Add change-magnitude threshold and config to the pre-run commit gate](./add-change-magnitude-threshold-and.md) | completed |
 | [Enforce the git-subcommand allowlist in CLI provider mode (default), not just API mode](./enforce-the-git-subcommand-allowlist.md) | completed |
 | [Gate rollbackOnFailure reverts behind an express prompt in interactive runs](./gate-rollbackonfailure-reverts-behind.md) | completed |
+| [Hench runtime-artifact filter misses porcelain paths when the project dir is below the git root](./hench-runtime-artifact-filter-misses.md) | completed |

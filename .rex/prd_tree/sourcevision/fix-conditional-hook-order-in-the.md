@@ -1,0 +1,25 @@
+---
+id: "cbcc2814-37b6-4bbb-8b32-b45c752f33b0"
+level: "task"
+title: "Fix conditional hook order in the Problems and Suggestions views"
+status: "completed"
+priority: "medium"
+tags:
+  - "web"
+  - "viewer"
+  - "correctness"
+source: "ndx-work (found while adding Explain)"
+startedAt: "2026-09-09T18:39:30.703Z"
+completedAt: "2026-09-09T18:46:05.782Z"
+endedAt: "2026-09-09T18:46:05.782Z"
+resolutionType: "code-change"
+resolutionDetail: "Both views call every hook before the enrichment gate; findings memoized on the source array so the memo keyed on it works. Invariant pinned structurally (no use*() after an early return) because Preact does not surface hook-count changes at runtime, plus six threshold-transition tests. Commit ab6fa604."
+acceptanceCriteria:
+  - "ProblemsView and SuggestionsView call the same hooks in the same order on every render, gated or not"
+  - "The enrichment gate still renders when enrichmentPass is below the threshold, with no findings list behind it"
+  - "A test mounts each view below the threshold and then re-renders it above the threshold without hook-order corruption"
+  - "No behaviour change to what either view renders in either state"
+description: "Both `ProblemsView` and `SuggestionsView` return the `EnrichmentGate` early when `enrichmentPass` is below their threshold, and then call `useMemo` further down — so the number of hooks a render calls depends on data that changes while the component is mounted.\n\nPreact matches hooks positionally. `enrichmentPass` is read from loaded analysis data, which arrives after the first render and can also change when an analysis completes while the dashboard is open. When the gate flips, the render goes from calling no hooks (Problems) or none (Suggestions) to calling `useMemo`, and any hook state at that index is read against the wrong slot.\n\nFound while adding the Explain action, which needed `useFeatureToggle` in both views. That hook was placed above the early return so the one being added is unconditional, which is why the bug is currently masked rather than made worse — the hook at index 0 is now stable across both paths. The `useMemo` below the gate is still conditional.\n\nThe fix is to compute the findings list and the memo before the gate check and return the gate afterwards, so every render calls the same hooks in the same order. Both views have the same shape, so the change is the same in each."
+lastModified: "2026-09-09T18:46:05.810Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---

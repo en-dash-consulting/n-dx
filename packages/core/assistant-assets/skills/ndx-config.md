@@ -44,3 +44,10 @@ ndx hench record --task=<id> --status=completed --startedAt=<the time you noted>
 Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. Use `--task=skill:ndx-config`. A config change belongs to no PRD item, so it is recorded against a synthetic id that `get_token_usage` reports in its `orphans` bucket.
 
 Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.
+
+## Done when
+
+The requested setting is written, committed, and recorded. Do not change
+settings that were not asked for, and do not run the commands the new setting
+affects to "verify" it — a config skill that triggers an analysis or a work run
+has done something the user did not ask for. Report the new value instead.

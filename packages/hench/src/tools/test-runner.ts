@@ -473,12 +473,17 @@ export interface TestGateOptions {
   filesChanged: string[];
   /** Test command to execute. If not provided, defaults to "pnpm test --reporter=json". */
   testCommand?: string;
-  /** Timeout for the test command in ms. Default: {@link TEST_GATE_TIMEOUT} (900_000). */
+  /**
+   * Timeout for the test command in ms. Defaults to
+   * {@link DEFAULT_TEST_GATE_TIMEOUT_MS}; 0 means no limit. Callers pass the
+   * operator's `hench.fullTestTimeoutMs`, since how long a full suite
+   * legitimately takes is a property of the project, not of this gate.
+   */
   timeout?: number;
 }
 
 /**
- * Budget for the whole-suite gate.
+ * Default budget for the whole-suite gate.
  *
  * RAISED 5m → 15m, from measurement. This repo's `npm run test` was timed at
  * **248s** on an idle machine (2026-09-03, Windows 11, Node v22) — 83% of the
@@ -492,11 +497,16 @@ export interface TestGateOptions {
  * failure when something is genuinely stuck. 3x the measured duration leaves
  * room for a suite that grows and for a loaded machine, and still bounds a hang.
  *
+ * Exported because it is the number an operator has to know to decide whether
+ * to raise `hench.fullTestTimeoutMs` — the CLI names that knob when a gate
+ * times out, and `schema/validate.ts` mirrors this value as the config default
+ * (it cannot import from here without inverting the schema→tools layering).
+ *
  * Re-measure before tightening: `npm run test` at the repo root, and compare
  * against the timeout the gate actually used (it is reported in the timeout
- * message, which now names both durations).
+ * message, which names both durations).
  */
-export const TEST_GATE_TIMEOUT = 900_000; // 15 minutes — see above; measured 248s idle
+export const DEFAULT_TEST_GATE_TIMEOUT_MS = 900_000; // 15 minutes — see above; measured 248s idle
 
 /**
  * Vitest JSON reporter output structure.
@@ -686,7 +696,7 @@ function parseVitestOutput(
 export async function runTestGate(
   options: TestGateOptions,
 ): Promise<TestGateResult> {
-  const { projectDir, filesChanged, testCommand, timeout = TEST_GATE_TIMEOUT } = options;
+  const { projectDir, filesChanged, testCommand, timeout = DEFAULT_TEST_GATE_TIMEOUT_MS } = options;
 
   // Skip if no files were modified
   if (filesChanged.length === 0) {
@@ -767,8 +777,10 @@ export async function runTestGate(
       command,
       totalDurationMs,
       error:
-        `Test command timed out after ${formatMs(timeout)} ` +
-        `(ran for ${formatMs(totalDurationMs)})`,
+        `\`${command}\` did not finish within ${formatMs(timeout)} and was killed ` +
+        `(ran for ${formatMs(totalDurationMs)}). If the suite legitimately takes ` +
+        `longer, raise \`hench.fullTestTimeoutMs\` (in .hench/config.json or ` +
+        `.n-dx.json; 0 disables the limit) rather than skipping the gate.`,
       outputTail: combined ? lastLines(combined, OUTPUT_TAIL_LINES) : undefined,
     };
   }

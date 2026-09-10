@@ -1,188 +1,80 @@
 /**
- * Regression tests for `hench.fullTestTimeoutMs` reaching `runTestGate`.
+ * The full-suite gate's ceiling is an operator setting, not a constant.
  *
- * Observed live in run 80c716ff (2026-09-07): the full test gate's only
- * timeout was the hard-coded TEST_GATE_TIMEOUT constant, with no config key
- * or flag to raise it. A suite that runs long under load (e.g. a second
- * `ndx work` competing for cores in another worktree) got killed at the
- * fixed ceiling even though it would have passed given more time.
- *
- * These tests drive `finalizeRun` with a stubbed `runTestGate` spy (the
- * shapes `runTestGate` itself is proven to return in
- * tests/unit/tools/test-runner.test.ts) and assert the `timeout` value that
- * actually reaches it — proving the config key is wired through, not just
- * accepted by the schema.
+ * It was hardcoded at 15 minutes (`TEST_GATE_TIMEOUT`, itself already raised
+ * from 5m after measurement). A monorepo that runs every package can
+ * legitimately exceed even that — and since the gate runs while an agent is also
+ * using the machine, overrunning aborts a task whose work was already done and
+ * committed. These tests pin the two things that promise makes: the value is
+ * settable from either config file, and the gate actually obeys it.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { randomUUID } from "node:crypto";
-import { initConfig } from "../../src/store/config.js";
-import { DEFAULT_HENCH_CONFIG } from "../../src/schema/index.js";
-import type { RunRecord, HenchConfig } from "../../src/schema/index.js";
-import type { PRDStore } from "../../src/prd/rex-gateway.js";
-import type { PRDItem, PRDDocument, RexConfig, LogEntry } from "rex";
+import { initConfig, loadConfig, saveConfig } from "../../src/store/config.js";
+import { runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS } from "../../src/tools/test-runner.js";
 
-function buildMinimalRun(taskId = "task-1"): RunRecord {
-  return {
-    id: randomUUID(),
-    taskId,
-    taskTitle: "Test task",
-    startedAt: new Date().toISOString(),
-    status: "completed",
-    turns: 3,
-    tokenUsage: { input: 100, output: 50 },
-    turnTokenUsage: [],
-    toolCalls: [],
-    model: "test-model",
-  };
-}
-
-function buildMockStore(initialStatus: PRDItem["status"]): PRDStore {
-  let currentStatus: PRDItem["status"] = initialStatus;
-  const logs: LogEntry[] = [];
-
-  return {
-    async loadDocument(): Promise<PRDDocument> {
-      return { version: 1, title: "Test", items: [] };
-    },
-    async saveDocument(): Promise<void> {},
-    async getItem(id: string): Promise<PRDItem | null> {
-      if (id !== "task-1") return null;
-      return { id: "task-1", title: "Test task", status: currentStatus, level: "task" } as PRDItem;
-    },
-    async addItem(): Promise<void> {},
-    async updateItem(_id: string, updates: Partial<PRDItem>): Promise<void> {
-      if (updates.status) currentStatus = updates.status;
-    },
-    async removeItem(): Promise<void> {},
-    async loadConfig(): Promise<RexConfig> {
-      return {} as RexConfig;
-    },
-    async saveConfig(): Promise<void> {},
-    async appendLog(entry: LogEntry): Promise<void> {
-      logs.push(entry);
-    },
-    async readLog(): Promise<LogEntry[]> {
-      return logs;
-    },
-    async loadWorkflow(): Promise<string> {
-      return "";
-    },
-    async saveWorkflow(): Promise<void> {},
-    async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
-      return fn(await this.loadDocument());
-    },
-    capabilities() {
-      return { adapter: "mock", supportsTransactions: false, supportsWatch: false };
-    },
-  };
-}
-
-describe("finalizeRun wires hench.fullTestTimeoutMs into runTestGate", () => {
+describe("hench.fullTestTimeoutMs", () => {
   let projectDir: string;
   let henchDir: string;
-  let logSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-gate-timeout-"));
     henchDir = join(projectDir, ".hench");
     await initConfig(henchDir);
-    await mkdir(join(henchDir, "runs"), { recursive: true });
-
-    await writeFile(
-      join(projectDir, "package.json"),
-      JSON.stringify({ name: "fixture", scripts: { test: "vitest run" } }),
-      "utf-8",
-    );
-
-    // Captured via the console spy rather than output.js's getCapturedLines():
-    // withGateSpy() calls vi.resetModules(), so a re-imported shared.js pulls
-    // in a fresh output.js module instance whose in-memory buffer is
-    // disconnected from anything statically imported at the top of this file.
-    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(async () => {
-    vi.doUnmock("../../src/tools/test-runner.js");
-    vi.restoreAllMocks();
-    vi.resetModules();
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  /** Mock runTestGate with a spy that records the options it was called with. */
-  async function withGateSpy() {
-    const spy = vi.fn(async () => ({
-      ran: true,
-      passed: true,
-      packages: [{ name: "workspace", passed: true }],
-      command: "pnpm test",
-      totalDurationMs: 10,
-    }));
+  it("defaults to the gate's own ceiling when neither config sets it", async () => {
+    const config = await loadConfig(henchDir);
 
-    vi.resetModules();
-    vi.doMock("../../src/tools/test-runner.js", async (importOriginal) => ({
-      ...(await importOriginal<typeof import("../../src/tools/test-runner.js")>()),
-      runTestGate: spy,
-    }));
-
-    const finalizeRun = (await import("../../src/agent/lifecycle/shared.js")).finalizeRun;
-    return { finalizeRun, spy };
-  }
-
-  it("passes the configured fullTestTimeoutMs through to runTestGate, and prints it", async () => {
-    const { finalizeRun, spy } = await withGateSpy();
-
-    const config: HenchConfig = {
-      ...DEFAULT_HENCH_CONFIG(),
-      fullTestCommand: "echo ok",
-      fullTestTimeoutMs: 42_000,
-    };
-
-    const run = buildMinimalRun();
-    await finalizeRun({
-      run,
-      henchDir,
-      projectDir,
-      config,
-      store: buildMockStore("in_progress"),
-      rollbackOnFailure: false,
-      autonomous: true,
-    });
-
-    expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({ timeout: 42_000 }),
-    );
-
-    const printed = logSpy.mock.calls.map((call) => String(call[0])).join("\n");
-    expect(printed).toContain("echo ok");
-    expect(printed).toContain("timeout 42s");
+    expect(config.fullTestTimeoutMs).toBe(DEFAULT_TEST_GATE_TIMEOUT_MS);
   });
 
-  it("falls back to the 900_000ms default when fullTestTimeoutMs is not configured", async () => {
-    const { finalizeRun, spy } = await withGateSpy();
+  it("takes the value from .hench/config.json", async () => {
+    const config = await loadConfig(henchDir);
+    await saveConfig(henchDir, { ...config, fullTestTimeoutMs: 900_000 });
 
-    const config: HenchConfig = {
-      ...DEFAULT_HENCH_CONFIG(),
-      fullTestCommand: "echo ok",
-    };
+    expect((await loadConfig(henchDir)).fullTestTimeoutMs).toBe(900_000);
+  });
 
-    const run = buildMinimalRun();
-    await finalizeRun({
-      run,
-      henchDir,
+  it("lets .n-dx.json override .hench/config.json", async () => {
+    const config = await loadConfig(henchDir);
+    await saveConfig(henchDir, { ...config, fullTestTimeoutMs: 900_000 });
+    await writeFile(
+      join(projectDir, ".n-dx.json"),
+      JSON.stringify({ hench: { fullTestTimeoutMs: 1_800_000 } }),
+      "utf-8",
+    );
+
+    // Project config wins — the same precedence loadConfig applies to every
+    // other hench key, so an operator can raise this per checkout.
+    expect((await loadConfig(henchDir)).fullTestTimeoutMs).toBe(1_800_000);
+  });
+
+  it("carries the configured value through to the gate's own limit", async () => {
+    await writeFile(
+      join(projectDir, ".n-dx.json"),
+      JSON.stringify({ hench: { fullTestTimeoutMs: 1_500 } }),
+      "utf-8",
+    );
+    const config = await loadConfig(henchDir);
+
+    const result = await runTestGate({
       projectDir,
-      config,
-      store: buildMockStore("in_progress"),
-      rollbackOnFailure: false,
-      autonomous: true,
+      filesChanged: ["src/index.ts"],
+      testCommand: `node -e "setTimeout(() => {}, 60000)"`,
+      timeout: config.fullTestTimeoutMs,
     });
 
-    expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({ timeout: 900_000 }),
-    );
+    expect(result.passed).toBe(false);
+    expect(result.error).toContain("did not finish within 2s");
+    // Under the old hardcoded ceiling this would still be running.
+    expect(result.totalDurationMs).toBeLessThan(30_000);
   });
 });

@@ -104,7 +104,11 @@ describe("buildAddPrompt", () => {
   it("instructs LLM to avoid duplicates against existing PRD", async () => {
     const prompt = await buildAddPrompt("Add feature X", [], tmpDir);
 
-    expect(prompt).toMatch(/[Dd]o NOT include items that duplicate/);
+    // The rule lives in ANTI_PATTERNS. The dedup section used to state it a
+    // second time in the same prompt; asserting it appears exactly once keeps
+    // the pair from creeping back.
+    const stated = [...prompt.matchAll(/duplicat\w*[^\n]{0,80}existing PRD/gi)];
+    expect(stated).toHaveLength(1);
   });
 
   it("instructs LLM to avoid duplicates within generated output", async () => {

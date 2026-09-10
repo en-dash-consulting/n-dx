@@ -39,7 +39,7 @@ import { discoverChangedFiles } from "../analysis/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
-import { runPostTaskTests, runTestGate, OUTPUT_TAIL_LINES, TEST_GATE_TIMEOUT } from "../../tools/test-runner.js";
+import { runPostTaskTests, runTestGate, OUTPUT_TAIL_LINES, DEFAULT_TEST_GATE_TIMEOUT_MS } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines } from "../../types/output.js";
@@ -865,23 +865,31 @@ export interface FinalizeRunOptions {
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
 
 /**
- * Return the operator-authored entries reported by `git status --porcelain`.
+ * Return the list of entries reported by `git status --porcelain`.
  * Each non-blank line represents a modified, staged, or untracked path.
  * Returns an empty array when the working tree is clean or git is unavailable.
  *
- * Hench's own runtime artifacts are discounted (see
- * {@link excludeHenchRuntimeArtifacts}). `.hench/locks/` is created at process
- * startup, before the pre-run gate fires, so counting it made an autonomous
- * run on a project without those `.gitignore` entries refuse to start against
- * a lock it had just created itself.
+ * Hench's own runtime artifacts are discounted by the callers via
+ * {@link excludeHenchRuntimeArtifacts} rather than in here, because that is a
+ * policy about what counts as operator work, not a detail of how the paths
+ * were obtained — and this function is an injectable seam, so a filter hidden
+ * inside the default implementation would silently not apply wherever a
+ * caller supplied its own.
+ *
+ * `--untracked-files=all` matters twice over. By default git collapses a
+ * wholly-untracked directory to a single entry — a fresh project reports
+ * `?? .hench/`, never `?? .hench/locks/` — so
+ * {@link excludeHenchRuntimeArtifacts} could not see what was inside and the
+ * run blocked on its own lock file anyway. It also makes the count honest: a
+ * directory of forty new files was being reported as "1 uncommitted file(s)".
  */
 async function listDirtyPaths(projectDir: string): Promise<string[]> {
   try {
-    const output = await execStdout("git", ["status", "--porcelain"], {
+    const output = await execStdout("git", ["status", "--porcelain", "--untracked-files=all"], {
       cwd: projectDir,
       timeout: 15_000,
     });
-    return excludeHenchRuntimeArtifacts(output.trim().split("\n").filter(Boolean));
+    return output.trim().split("\n").filter(Boolean);
   } catch {
     return [];
   }
@@ -1052,7 +1060,12 @@ async function performRollbackIfNeeded(
   projectDir: string,
   options: PerformRollbackOptions = {},
 ): Promise<void> {
-  const dirtyPaths = await listDirtyPaths(projectDir);
+  // Same exclusion as the pre-run gate: hench's own lock and run files are not
+  // the agent's work, so they must not make a rollback look necessary.
+  const dirtyPaths = await excludeHenchRuntimeArtifacts(
+    await listDirtyPaths(projectDir),
+    projectDir,
+  );
   if (dirtyPaths.length === 0) {
     return;
   }
@@ -1413,7 +1426,7 @@ export async function performPreRunCommitGateIfNeeded(
   // Dry runs never touch the working tree; skip the gate entirely.
   if (dryRun) return "proceed";
 
-  const dirty = await listDirty(projectDir);
+  const dirty = await excludeHenchRuntimeArtifacts(await listDirty(projectDir), projectDir);
   if (dirty.length === 0) return "proceed"; // Clean tree → start immediately, no prompt.
 
   const magnitude = await measureMagnitude(projectDir);
@@ -2020,6 +2033,20 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       info(`\n${run.error}`);
     }
 
+    // How long the full suite may take is a property of the project, not of
+    // this gate: a monorepo running every package can legitimately exceed the
+    // default, and a timeout aborts a task whose work is already done.
+    // Undefined (a config predating the field, or a caller that supplies no
+    // config at all) keeps the gate's own default.
+    const testGateTimeoutMs = config?.fullTestTimeoutMs;
+    if (testGateTimeoutMs != null && testGateTimeoutMs !== DEFAULT_TEST_GATE_TIMEOUT_MS) {
+      detail(
+        testGateTimeoutMs === 0
+          ? "Test gate timeout: none (hench.fullTestTimeoutMs = 0)"
+          : `Test gate timeout: ${formatDurationMs(testGateTimeoutMs)} (hench.fullTestTimeoutMs)`,
+      );
+    }
+
     // Rerun loop: gate can fail and be retried multiple times
     let testGateAttempt = 0;
     let gateComplete = false;
@@ -2028,15 +2055,16 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       testGateAttempt++;
       subsection(`Full Test Suite Gate${testGateAttempt > 1 ? ` (attempt ${testGateAttempt})` : ""}`);
 
-      const gateTimeoutMs = config?.fullTestTimeoutMs ?? TEST_GATE_TIMEOUT;
+      // The timeout itself is announced once above, and only when it differs
+      // from the default; this line names the command each attempt runs.
       const gateCommand = resolvedTestCommand || "pnpm test --reporter=json";
-      detail(`Running ${gateCommand} (timeout ${Math.round(gateTimeoutMs / 1000)}s)`);
+      detail(`Running ${gateCommand}`);
 
       const testGate = await runTestGate({
         projectDir,
         filesChanged: run.structuredSummary.filesChanged,
         testCommand: resolvedTestCommand,
-        timeout: gateTimeoutMs,
+        timeout: testGateTimeoutMs,
       });
 
       run.testGate = testGate;

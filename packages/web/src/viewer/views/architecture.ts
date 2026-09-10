@@ -17,6 +17,21 @@ export function ArchitectureView({ data, onSelect, navigateTo }: ArchitecturePro
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
+  // ── Every hook, before the enrichment gate ────────────────────────────────
+  // The gate below returns early, and `enrichmentPass` comes from analysis data
+  // that arrives after the first render and changes again when an analysis
+  // finishes with the dashboard open. A hook called after the gate is therefore
+  // called on some renders and not others, and Preact matches hooks by
+  // position — so the slots shift under whatever state is already there.
+  const zoneHealthData = useMemo(() => {
+    if (!zones) return [];
+    return zones.zones.map((z) => ({
+      label: z.name,
+      value: z.files.length,
+      color: z.cohesion >= 0.6 ? "var(--green)" : z.cohesion >= 0.4 ? "var(--orange)" : "var(--red)",
+    }));
+  }, [zones]);
+
   if (enrichmentPass < ENRICHMENT_THRESHOLDS.architecture) {
     return h(EnrichmentGate, {
       title: "Architecture",
@@ -25,6 +40,8 @@ export function ArchitectureView({ data, onSelect, navigateTo }: ArchitecturePro
     });
   }
 
+  // Plain derivations — not hooks, so they stay next to the render that uses
+  // them and cost nothing on a gated render.
   const findings = (zones?.findings ?? []).filter(
     (f: Finding) => f.type === "pattern" || f.type === "relationship"
   );
@@ -37,16 +54,6 @@ export function ArchitectureView({ data, onSelect, navigateTo }: ArchitecturePro
 
   const patterns = findings.filter((f) => f.type === "pattern");
   const relationships = findings.filter((f) => f.type === "relationship");
-
-  // Zone health overview
-  const zoneHealthData = useMemo(() => {
-    if (!zones) return [];
-    return zones.zones.map((z) => ({
-      label: z.name,
-      value: z.files.length,
-      color: z.cohesion >= 0.6 ? "var(--green)" : z.cohesion >= 0.4 ? "var(--orange)" : "var(--red)",
-    }));
-  }, [zones]);
 
   // Cross-zone traffic summary
   const crossingCount = zones?.crossings?.length ?? 0;

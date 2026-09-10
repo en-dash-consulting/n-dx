@@ -25,6 +25,13 @@ import {
   accumulateTokenUsage,
 } from "./reason.js";
 import { withEscalation } from "./escalate.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import {
+  section,
+  rexPromptEnvelope,
+  rexPrompt,
+  logRexPromptSections,
+} from "./prompt-envelope.js";
 
 // ── Zod schemas for LLM response validation ──
 
@@ -182,13 +189,62 @@ export interface ReshapeReasonResult {
 /**
  * Use LLM to analyze the PRD and propose reshape actions.
  */
+/** Which of the three reshape briefs a call is asking for. */
+export type ReshapeMode = "reshape" | "prune" | "consolidate";
+
+/** Pick the opening brief for a reshape mode. */
+export function reshapeRoleContent(mode: ReshapeMode): string {
+  switch (mode) {
+    case "consolidate":
+      return POST_PRUNE_CONSOLIDATION_PROMPT;
+    case "prune":
+      return SMART_PRUNE_PROMPT;
+    case "reshape":
+      return RESHAPE_SYSTEM_PROMPT;
+  }
+}
+
+/**
+ * Prompt asking for structural changes to an existing PRD.
+ *
+ * Extracted from {@link reasonForReshape}. Unlike the other rex prompts this
+ * one joins its sections with a single newline rather than a blank line, which
+ * is what the original inline `[...].join("\n")` produced — assembling it with
+ * the default separator would insert a blank line between every section and
+ * change the prompt.
+ */
+export function buildReshapeEnvelope(
+  items: PRDItem[],
+  mode: ReshapeMode,
+  projectContext = "",
+): PromptEnvelope {
+  return rexPromptEnvelope([
+    section("role", reshapeRoleContent(mode)),
+    section("input", `## Current PRD\n${summarizePRD(items)}`),
+    section(
+      "project-context",
+      projectContext ? `## Project Context\n${projectContext}` : "",
+    ),
+    section("example", RESHAPE_FEW_SHOT),
+  ]);
+}
+
+/** Assembled form of {@link buildReshapeEnvelope}. */
+export function buildReshapePrompt(
+  items: PRDItem[],
+  mode: ReshapeMode,
+  projectContext = "",
+): string {
+  return rexPrompt(buildReshapeEnvelope(items, mode, projectContext), {
+    separator: "\n",
+  });
+}
+
 export async function reasonForReshape(
   items: PRDItem[],
   options: ReshapeReasonOptions = {},
 ): Promise<ReshapeReasonResult> {
   const tokenUsage = emptyAnalyzeTokenUsage();
-
-  const prdSummary = summarizePRD(items);
 
   // Load project context for domain understanding
   let projectContext = "";
@@ -196,21 +252,15 @@ export async function reasonForReshape(
     projectContext = await readProjectContext(options.dir);
   }
 
-  const systemPrompt = options.consolidateMode
-    ? POST_PRUNE_CONSOLIDATION_PROMPT
+  const mode: ReshapeMode = options.consolidateMode
+    ? "consolidate"
     : options.pruneMode
-      ? SMART_PRUNE_PROMPT
-      : RESHAPE_SYSTEM_PROMPT;
+      ? "prune"
+      : "reshape";
 
-  const prompt = [
-    systemPrompt,
-    "",
-    "## Current PRD",
-    prdSummary,
-    "",
-    projectContext ? `## Project Context\n${projectContext}\n` : "",
-    RESHAPE_FEW_SHOT,
-  ].filter(Boolean).join("\n");
+  const envelope = buildReshapeEnvelope(items, mode, projectContext);
+  const prompt = rexPrompt(envelope, { separator: "\n" });
+  logRexPromptSections(`reasonForReshape (${mode})`, envelope);
 
   const result = await spawnClaude(prompt, options.model, undefined, { taskClass: "prd.restructure" });
   accumulateTokenUsage(tokenUsage, result.tokenUsage);
@@ -398,12 +448,13 @@ export function validateMergedDescription(text: string): string {
  * Mechanical single-shot call: when no explicit model is given, routes to the
  * vendor's light-tier model (e.g. haiku) instead of the standard tier.
  */
-export async function reasonForBodyMerge(
-  group: PRDItem[],
-  model?: string,
-): Promise<BodyMergeResult> {
-  const tokenUsage = emptyAnalyzeTokenUsage();
-
+/**
+ * Prompt merging several duplicate items' descriptions into one.
+ *
+ * Extracted from {@link reasonForBodyMerge}. Like the reshape prompt above,
+ * its sections join with a single newline.
+ */
+export function buildBodyMergeEnvelope(group: PRDItem[]): PromptEnvelope {
   const itemSummary = group
     .map((item, i) => {
       const lines = [`${i + 1}. Title: ${item.title}`];
@@ -412,20 +463,38 @@ export async function reasonForBodyMerge(
     })
     .join("\n\n");
 
-  const prompt = [
-    "You are a product manager merging duplicate PRD items that refer to the same feature or task.",
-    "Given the following items (with titles and descriptions), write a single combined description",
-    "that covers the full scope of all items. The description should be concise, clear, and complete.",
-    "Return only the plain-text description — no JSON, no markdown, no labels.",
-    "",
-    "## Items to merge",
-    itemSummary,
-  ].join("\n");
+  return rexPromptEnvelope([
+    section(
+      "role",
+      [
+        "You are a product manager merging duplicate PRD items that refer to the same feature or task.",
+        "Given the following items (with titles and descriptions), write a single combined description",
+        "that covers the full scope of all items. The description should be concise, clear, and complete.",
+        "Return only the plain-text description — no JSON, no markdown, no labels.",
+      ].join("\n"),
+    ),
+    section("input", `## Items to merge\n${itemSummary}`),
+  ]);
+}
+
+/** Assembled form of {@link buildBodyMergeEnvelope}. */
+export function buildBodyMergePrompt(group: PRDItem[]): string {
+  return rexPrompt(buildBodyMergeEnvelope(group), { separator: "\n" });
+}
+
+export async function reasonForBodyMerge(
+  group: PRDItem[],
+  model?: string,
+): Promise<BodyMergeResult> {
+  const tokenUsage = emptyAnalyzeTokenUsage();
+
+  const envelope = buildBodyMergeEnvelope(group);
+  logRexPromptSections("reasonForBodyMerge", envelope);
 
   // Light-tier with escalation: an unusable description retries on the
   // standard tier carrying the reason, instead of throwing away the merge.
   const escalation = await withEscalation({
-    prompt,
+    prompt: rexPrompt(envelope, { separator: "\n" }),
     taskClass: "prd.merge",
     model,
     validate: (text: string) => validateMergedDescription(text),

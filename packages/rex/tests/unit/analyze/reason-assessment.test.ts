@@ -69,7 +69,13 @@ describe("buildAssessmentPrompt", () => {
     const proposals = [makeProposal("Auth")];
     const prompt = buildAssessmentPrompt(proposals);
 
-    expect(prompt).toMatch(/focused session|1-4 hours/);
+    // Sizing is stated in engineer-weeks, matching the `loe` field on the
+    // proposals being assessed, the 0.5–4 week range the generators are asked
+    // for, and the 2-week decomposition threshold. This used to read "one
+    // focused session (1-4 hours)", which graded week-scale work against an
+    // hour-scale bar and recommended break_down on correctly-sized tasks.
+    expect(prompt).toMatch(/engineer-weeks/);
+    expect(prompt).not.toMatch(/focused session|1-4 hours/);
     expect(prompt).toContain("acceptance criteria");
     expect(prompt.toLowerCase()).toContain("independently testable");
   });
