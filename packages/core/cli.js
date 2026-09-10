@@ -2391,7 +2391,10 @@ const PRD_SUBCOMMANDS = { export: "export", import: "import-bundle" };
 async function handlePrd(rest) {
   const subIndex = rest.findIndex((a) => !a.startsWith("-"));
   const sub = subIndex === -1 ? undefined : rest[subIndex];
-  const rexCommand = sub ? PRD_SUBCOMMANDS[sub] : undefined;
+  // Own-property lookup only: a plain read would resolve "constructor" and
+  // friends to Object.prototype members and spawn them as rex commands.
+  const rexCommand =
+    sub && Object.hasOwn(PRD_SUBCOMMANDS, sub) ? PRD_SUBCOMMANDS[sub] : undefined;
 
   if (!rexCommand) {
     console.error(
