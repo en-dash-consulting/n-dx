@@ -2407,6 +2407,25 @@ async function handlePrd(rest) {
   // Drop the subcommand token by position — a directory argument could
   // legitimately be named "export".
   const args = [...rest.slice(0, subIndex), ...rest.slice(subIndex + 1)];
+
+  // Value-carrying flags must be written --flag=value at this tier. The
+  // orchestrator keeps only `-`-prefixed tokens and reads the last bare token
+  // as the project directory, so in `--out bundle.json` the path would be
+  // dropped from the spawn — rex would receive `--out <dir>` and try to write
+  // the bundle over the project directory itself. rex's own parser accepts
+  // the space form; the garbling is purely this tier, so reject it here with
+  // the spelling that works.
+  const PRD_VALUE_FLAGS = ["--out", "--in", "--item", "--format"];
+  const bareFlag = args.find((a) => PRD_VALUE_FLAGS.includes(a));
+  if (bareFlag) {
+    console.error(`Error: [${CLI_ERROR_CODES.GENERIC}] ${bareFlag} needs a value.`);
+    console.error(
+      `Hint: Write it as ${bareFlag}=<value> — 'ndx prd' does not support the space-separated form.`,
+    );
+    exitWithCleanup(1);
+    return;
+  }
+
   const dir = resolveDir(args);
   requireInit(dir, [".rex"]);
   const flags = extractFlags(args);
