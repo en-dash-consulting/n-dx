@@ -31,7 +31,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Narrative export of an empty PRD claims "everything on the plan is finished"](./narrative-export-of-an-empty-prd.md) | pending |
 | [`ndx prd` dispatch has no functional test coverage](./ndx-prd-dispatch-has-no-functional.md) | pending |
 | [`ndx prd export --out <path>` (space form) drops the value and misroutes the export](./ndx-prd-export-out-path-space-form.md) | pending |
-| [`parseBundle` accepts duplicate item ids; `--replace` writes them into the tree](./parsebundle-accepts-duplicate-item-ids.md) | pending |
+| [`parseBundle` accepts duplicate item ids; `--replace` writes them into the tree](./parsebundle-accepts-duplicate-item-ids.md) | completed |
 | [`rex export` reads the PRD tree without the lock, so a concurrent writer can yield a torn bundle](./rex-export-reads-the-prd-tree-without.md) | pending |
 | [Round-trip PRD bundle via ndx prd export / ndx prd import](./round-trip-prd-bundle-via-ndx-prd.md) | completed |
 | [Scoped bundle export by item — subtree and dependency closure](./scoped-bundle-export-by-item-subtree.md) | completed |
