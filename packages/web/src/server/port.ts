@@ -31,6 +31,21 @@ export interface PortAllocationResult {
   port: number;
   /** Whether this is the originally requested port (true) or a fallback (false). */
   isOriginal: boolean;
+  /**
+   * Whether the request could **not** be honoured, so a different port was
+   * substituted.
+   *
+   * Not the inverse of {@link isOriginal}, and that gap is the reason this
+   * field exists. A requested port of 0 means "any free port": the bound port
+   * is not the number asked for, so `isOriginal` is false — but the request
+   * was satisfied exactly, so nothing fell back. Callers that read
+   * `!isOriginal` as "your port was taken" announced `Port 0 is in use` and
+   * reported a fallback to programmatic callers, both untrue.
+   *
+   * Report to a user, or branch on, this field. `isOriginal` answers only the
+   * narrower question of whether the number matched.
+   */
+  isFallback: boolean;
   /** The originally requested port. */
   requestedPort: number;
 }
@@ -183,13 +198,27 @@ export async function findAvailablePort(
   rangeEnd: number = PORT_RANGE_END,
   retryOpts?: PortRetryOptions,
 ): Promise<PortAllocationResult> {
+  // Port 0 is the OS convention for "any free port" — resolve it to a real
+  // ephemeral port up front. Probing 0 through checkPort is platform-dependent:
+  // on Linux, connect() to port 0 fails ECONNREFUSED, the bind phase then
+  // succeeds (binding 0 always does), and the literal 0 came back as the
+  // "available" port — which the caller then reported as the bound port and
+  // wrote to the port file, and which no client can connect to. On Windows the
+  // same connect fails EADDRNOTAVAIL, so the check read as unavailable and the
+  // ephemeral fallback below masked the bug.
+  if (preferred === 0) {
+    const port = await allocateEphemeralPort();
+    // Not a fallback: this is the request being satisfied, not substituted.
+    return { port, isOriginal: false, isFallback: false, requestedPort: 0 };
+  }
+
   // Try the preferred port first (with retries if opts provided)
   const check = retryOpts !== undefined
     ? await checkPortWithRetry(preferred, retryOpts)
     : await checkPort(preferred);
 
   if (check.available) {
-    return { port: preferred, isOriginal: true, requestedPort: preferred };
+    return { port: preferred, isOriginal: true, isFallback: false, requestedPort: preferred };
   }
 
   // If the error is a permission issue, don't try other ports in the same range
@@ -204,7 +233,7 @@ export async function findAvailablePort(
   const preferredInFallbackRange = preferred >= rangeStart && preferred <= rangeEnd;
   if (!preferredInFallbackRange) {
     const port = await allocateEphemeralPort();
-    return { port, isOriginal: false, requestedPort: preferred };
+    return { port, isOriginal: false, isFallback: true, requestedPort: preferred };
   }
 
   // Scan the range for an available port
@@ -213,7 +242,7 @@ export async function findAvailablePort(
 
     const result = await checkPort(p);
     if (result.available) {
-      return { port: p, isOriginal: false, requestedPort: preferred };
+      return { port: p, isOriginal: false, isFallback: true, requestedPort: preferred };
     }
   }
 

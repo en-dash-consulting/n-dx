@@ -624,7 +624,12 @@ describe("gateway export auto-detection", () => {
         "accumulateTokenUsage", "emptyAggregateTokenUsage",
         "resolveModel", "resolveVendorModel", "resolveReviewModel", "resolveTaskModel",
         "isModelCompatibleWithVendor", "resetStaleModel", "formatVendorChangeWarning",
-        "formatUsage", "createPromptEnvelope", "assemblePrompt",
+        "formatUsage", "createPromptEnvelope", "assemblePrompt", "assemblePromptText",
+        // Prompt section measurement. Lives in llm-client rather than hench so
+        // rex and sourcevision — below hench, unable to import from it — share
+        // one implementation; hench keeps only the CLI rendering.
+        "extractPromptSectionDiagnostics", "promptSectionCosts",
+        "dominantPromptSections", "formatPromptSectionCosts",
         "mapErrorReasonToFailureCategory", "mapRunFailureToCategory", "classifyVendorError",
         "failureCategoryLabel", "compileCodexPolicyFlags", "mapSandboxToCodexFlag",
         "mapApprovalToCodexFlag", "toAnthropicToolDef", "toAnthropicToolDefs",

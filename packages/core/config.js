@@ -1619,6 +1619,18 @@ Hench settings (.hench/config.json):
                                      multiplying. Hitting it fails the task with the breakdown
                                      instead of continuing to spend.
 
+Hench test-gate settings (mandatory full-suite gate before commit):
+  hench.fullTestCommand    string    Command that runs the whole suite. Resolved from this key,
+                                     then .n-dx.json hench.fullTestCommand, then auto-detected
+                                     from the project (Makefile validate target, package.json
+                                     test:all/test, swift/cargo/go/pytest), then prompted for.
+  hench.fullTestTimeoutMs  number    How long that command may run before it is killed and the
+                                     run fails (default: 900000 — 15 minutes; 0 means no limit).
+                                     Raise it for a large monorepo: the gate runs while an agent
+                                     is also using the machine, and a timeout aborts a task whose
+                                     work is already done. Prefer raising this over skipping the
+                                     gate.
+
 Hench git-safety settings (pre-run commit gate):
   hench.git.checkpointThreshold  number    Lines-changed threshold at/above which the pre-run
                                            commit gate escalates: the interactive prompt warns

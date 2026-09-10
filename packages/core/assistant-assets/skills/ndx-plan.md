@@ -41,3 +41,11 @@ ndx hench record --task=<id> --status=completed --startedAt=<the time you noted>
 Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. Use `--task=skill:ndx-plan`. Planning produces many items, so charging one of them for work that created all of them would misattribute it; `get_token_usage` surfaces ids that match no item in its `orphans` bucket, which is the honest place for planning overhead.
 
 Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.
+
+## Done when
+
+The accepted proposals are in the PRD, committed, and the run is recorded.
+Planning ends at proposals accepted — do not begin implementing any of them, and
+do not keep re-analysing to find more. If the analysis surfaced nothing worth
+accepting, say so and stop; a plan run that accepts nothing is a complete run,
+not a failed one.

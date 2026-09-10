@@ -832,11 +832,12 @@ describe("runTestGate — launched vs failed", () => {
     });
 
     // A timeout still fails the run — a gate that cannot finish on freshly
-    // changed code is a reason to stop — but says so in its own words.
+    // changed code is a reason to stop — but says so in its own words, and
+    // names the knob (`hench.fullTestTimeoutMs`) that moves the limit.
     expect(result.ran).toBe(true);
     expect(result.passed).toBe(false);
-    expect(result.error).toContain("timed out");
-    expect(result.error).toContain("1m 30s");
+    expect(result.error).toContain("did not finish within 1m 30s");
+    expect(result.error).toContain("hench.fullTestTimeoutMs");
 
     // Distinct from a never-launched suite, which reports `ran: false`.
     expect(result.packages.length).toBeGreaterThan(0);

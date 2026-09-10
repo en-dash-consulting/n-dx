@@ -53,13 +53,33 @@ describe("PRD serialized files are pinned to LF (issue #283)", () => {
     // rex always serializes with LF. Without the .gitattributes rule and with
     // core.autocrlf=true, git flags every such write as modified. With the
     // rule, LF is the pinned form, so an LF write is a no-op to git.
+    //
+    // The probe file must be one git currently reports as clean. Picking the
+    // first tracked file unconditionally made this test fail whenever that
+    // particular file happened to have uncommitted edits — which is routine,
+    // since working on a PRD task rewrites its own item file to mark it
+    // in_progress. The assertion below cannot tell content churn from
+    // line-ending churn, so it is only meaningful on an already-clean file.
+    const dirty = new Set(
+      execFileSync("git", ["status", "--porcelain", "--", ".rex/prd_tree/"], {
+        encoding: "utf8",
+        cwd: REPO_ROOT,
+      })
+        .split("\n")
+        .filter(Boolean)
+        // Porcelain v1 is `XY <path>`; paths here never contain spaces or
+        // rename arrows, so the first space-run split is enough.
+        .map((line) => line.slice(3).trim()),
+    );
+
     const tracked = execFileSync("git", ["ls-files", "--", ".rex/prd_tree/"], {
       encoding: "utf8",
       cwd: REPO_ROOT,
     })
       .split("\n")
-      .filter((p) => p.endsWith(".md"))[0];
-    expect(tracked, "expected a tracked PRD markdown file").toBeTruthy();
+      .filter((p) => p.endsWith(".md"))
+      .find((p) => !dirty.has(p));
+    expect(tracked, "expected a clean tracked PRD markdown file").toBeTruthy();
 
     const abs = join(REPO_ROOT, tracked);
     const original = readFileSync(abs);
