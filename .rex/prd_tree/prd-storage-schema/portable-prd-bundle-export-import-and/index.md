@@ -32,7 +32,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Bundles transport the source project's lastSyncedAt/remoteId, corrupting the destination's remote sync](./bundles-transport-the-source-project-s.md) | pending |
 | [Business-owner narrative Markdown PRD export](./business-owner-narrative-markdown-prd.md) | completed |
 | [Export in-tree guard stops one directory short of the legacy PRD backend paths](./export-in-tree-guard-stops-one.md) | pending |
-| [`import-bundle --replace` rewrites the tree with no snapshot, no archive batch](./import-bundle-replace-rewrites-the.md) | pending |
+| [`import-bundle --replace` rewrites the tree with no snapshot, no archive batch](./import-bundle-replace-rewrites-the.md) | completed |
 | [import-bundle writes no execution-log entry — the only PRD-mutating command that leaves no trace](./import-bundle-writes-no-execution-log.md) | pending |
 | [Narrative export of an empty PRD claims "everything on the plan is finished"](./narrative-export-of-an-empty-prd.md) | completed |
 | [`ndx prd` dispatch has no functional test coverage](./ndx-prd-dispatch-has-no-functional.md) | completed |
