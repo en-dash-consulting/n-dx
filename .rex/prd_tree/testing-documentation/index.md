@@ -2,15 +2,14 @@
 id: "738f6000-aa94-41a0-86da-1d505e2674dd"
 level: "epic"
 title: "Testing & Documentation"
-status: "completed"
+status: "pending"
 startedAt: "2026-05-06T13:27:57.504Z"
-completedAt: "2026-09-08T19:04:31.905Z"
 endedAt: "2026-09-08T19:04:31.905Z"
 resolutionType: "acknowledgment"
 resolutionDetail: "Fixed final architecture policy test failure (PRD storage invariant violations). All child tasks completed. Test suite passes (1628 tests). Epic infrastructure and documentation goals met."
 description: "Local testing infrastructure (gauntlet config validation), platform/prerequisite documentation, and ongoing documentation refresh for PRD-related changes."
-lastModified: "2026-09-08T19:04:31.928Z"
-lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
+lastModified: "2026-09-10T20:38:30.682Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -49,6 +48,7 @@ lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
 | [Web Viewer Architecture: Package Extraction and Independent Viewers](./web-viewer-architecture-package/index.md) | completed |
 | [Auto Re-Init Detection for Stale Projects](./auto-re-init-detection-for-stale.md) | completed |
 | [Auto-Update Detection from npm Registry](./auto-update-detection-from-npm-registry.md) | completed |
+| [`@n-dx/rex` fails intermittently under `pnpm test` but passes standalone](./n-dx-rex-fails-intermittently-under.md) | pending |
 | [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-the.md) | completed |
 | [routes-commands ndx-ladder tests leak the ambient NDX_CLI_PATH env var](./routes-commands-ndx-ladder-tests-leak.md) | completed |
 | [Zone cohesion gate silently passes in CI instead of reporting it did not run](./zone-cohesion-gate-silently-passes-in.md) | completed |
