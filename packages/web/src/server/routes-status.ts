@@ -75,6 +75,15 @@ export interface HenchStatus {
 }
 
 export interface ProjectStatus {
+  /**
+   * Absolute path of the project directory this server serves.
+   *
+   * Identifies the server to anything probing the port from outside the
+   * process — `ndx start` reads it to tell a peer dashboard for another
+   * directory apart from a stranger squatting on 3117, and relocates rather
+   * than killing when it is a peer (see `runWeb` in `packages/core/web.js`).
+   */
+  projectDir: string;
   sv: SourceVisionStatus;
   rex: RexStatus;
   hench: HenchStatus;
@@ -270,6 +279,7 @@ function extractHenchStatus(ctx: ServerContext): HenchStatus {
 
 function buildProjectStatus(ctx: ServerContext): ProjectStatus {
   return {
+    projectDir: ctx.projectDir,
     sv: extractSvStatus(ctx),
     rex: extractRexStatus(ctx),
     hench: extractHenchStatus(ctx),

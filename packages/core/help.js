@@ -962,6 +962,14 @@ const ORCHESTRATOR_HELP_DEFS = {
         title: "Subcommands",
         content: "(none)              Start the server (foreground)\nstop                Stop a background server\nstatus              Check if a background server is running",
       },
+      {
+        title: "Port handling",
+        content:
+          "Starting again for the same directory restarts that server on the same port.\n" +
+          "If the port is held by an n-dx dashboard for a DIFFERENT directory, that\n" +
+          "server is left running and this one moves to the next free port in\n" +
+          "3117–3200. A non-n-dx occupant is cleared to free the port.",
+      },
     ],
     options: [
       { flag: "--port=<N>", description: "Server port (default: 3117)" },

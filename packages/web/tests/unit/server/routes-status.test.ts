@@ -61,6 +61,15 @@ describe("Status API routes", () => {
     expect(data).toHaveProperty("hench");
   });
 
+  it("reports the served projectDir so an external probe can identify the server", async () => {
+    // `ndx start` probes this field to tell a peer dashboard for another
+    // directory apart from a stranger on the port, and relocates instead of
+    // killing when it is a peer. See classifyPortOccupant in packages/core/web.js.
+    const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+    const data = await res.json();
+    expect(data.projectDir).toBe(tmpDir);
+  });
+
   it("returns 404 for non-status routes", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/other`);
     expect(res.status).toBe(404);

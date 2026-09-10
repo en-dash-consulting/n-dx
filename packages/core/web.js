@@ -6,6 +6,8 @@
  *   - Background/daemon mode (--background)
  *   - PID file management (.n-dx-web.pid)
  *   - Graceful stop (ndx start stop / ndx web stop)
+ *   - Peer detection on a busy port: another project's dashboard is left alone
+ *     and this one relocates within 3117–3200, rather than being killed
  *
  * Used by both `ndx start` (unified: dashboard + MCP) and `ndx web` (alias).
  *
@@ -18,6 +20,7 @@
  */
 
 import { spawn } from "child_process";
+import { get as httpGet } from "http";
 import { createConnection } from "net";
 import { readFile, writeFile, unlink, access } from "fs/promises";
 import { join, resolve } from "path";
@@ -27,6 +30,18 @@ import { execFileSyncCli } from "./win-spawn.js";
 const DEFAULT_PORT = 3117;
 const PID_FILE = ".n-dx-web.pid";
 const PORT_FILE = ".n-dx-web.port";
+
+// Mirrors the server's own fallback allocator (PORT_RANGE_START / PORT_RANGE_END
+// in packages/web/src/server/port.ts). Duplicated rather than imported: this is
+// the orchestration tier, which spawns packages instead of importing them.
+const PORT_RANGE_START = 3117;
+const PORT_RANGE_END = 3200;
+
+/** Ceiling on the port probe: a dashboard answers /api/status in single-digit ms. */
+const PROBE_TIMEOUT_MS = 1_500;
+
+/** Cap on the probe response we will buffer — the real payload is a few KB. */
+const PROBE_MAX_BYTES = 256 * 1024;
 
 // ── Output helpers ───────────────────────────────────────────────────────────
 // Orchestration files avoid importing from packages (they spawn CLIs instead).
@@ -84,8 +99,131 @@ function isPortInUse(port) {
 }
 
 /**
+ * Find the first free port in [start, end], skipping `exclude`.
+ * Returns the port, or null when every port in the range is taken.
+ */
+export async function findFreePortInRange(exclude, start = PORT_RANGE_START, end = PORT_RANGE_END) {
+  for (let p = start; p <= end; p++) {
+    if (p === exclude) continue;
+    if (!(await isPortInUse(p))) return p;
+  }
+  return null;
+}
+
+/**
+ * GET http://127.0.0.1:<port>/api/status and return the parsed JSON body.
+ *
+ * Returns null for anything that is not a parseable 200 — no listener, a
+ * connection reset, a non-JSON body, a timeout, an oversized response. The
+ * caller treats null as "cannot identify the occupant", which keeps the
+ * pre-existing kill path in charge whenever the probe is inconclusive.
+ *
+ * Plain node:http on purpose: this is the orchestration tier, which must not
+ * import from packages.
+ *
+ * @param {number} port
+ * @param {number} [timeoutMs]
+ * @returns {Promise<unknown>} Parsed body, or null.
+ */
+export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS) {
+  return new Promise((res) => {
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      res(value);
+    };
+
+    const req = httpGet(
+      { host: "127.0.0.1", port, path: "/api/status", timeout: timeoutMs },
+      (response) => {
+        if (response.statusCode !== 200) {
+          response.resume();
+          req.destroy();
+          done(null);
+          return;
+        }
+        let body = "";
+        response.setEncoding("utf-8");
+        response.on("data", (chunk) => {
+          body += chunk;
+          if (body.length > PROBE_MAX_BYTES) {
+            req.destroy();
+            done(null);
+          }
+        });
+        response.on("end", () => {
+          try {
+            done(JSON.parse(body));
+          } catch {
+            done(null);
+          }
+        });
+        response.on("error", () => done(null));
+      },
+    );
+
+    // `timeout` above only arms the socket timer; it does not abort the request.
+    req.on("timeout", () => {
+      req.destroy();
+      done(null);
+    });
+    req.on("error", () => done(null));
+  });
+}
+
+/**
+ * Who is on the port, according to its /api/status response.
+ *
+ * @typedef {{ kind: "peer", projectDir: string }
+ *          | { kind: "self", projectDir: string }
+ *          | { kind: "unknown" }} PortOccupant
+ */
+
+/**
+ * Decide what a probed /api/status payload says about the port's occupant.
+ *
+ *   peer     — an n-dx dashboard serving a DIFFERENT directory. Must not be
+ *              killed; the caller relocates to another port instead.
+ *   self     — an n-dx dashboard serving THIS directory with no live PID file
+ *              (deleted, or started from another checkout of the same tree).
+ *              Restarting it is the documented idempotent behaviour of
+ *              `ndx start`, so the caller keeps the existing kill path.
+ *   unknown  — not an n-dx dashboard, or one too old to report `projectDir`.
+ *              Attribution is impossible, so the caller keeps the existing
+ *              kill path rather than guessing.
+ *
+ * @param {unknown} payload  Parsed /api/status body, or null.
+ * @param {string} absDir    Absolute project directory this invocation serves.
+ * @returns {PortOccupant}
+ */
+export function classifyPortOccupant(payload, absDir) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return { kind: "unknown" };
+  }
+  // Shape check against the dashboard status payload — see ProjectStatus in
+  // packages/web/src/server/routes-status.ts. A bare `projectDir` on some
+  // unrelated service's JSON must not read as an n-dx server.
+  for (const key of ["sv", "rex", "hench"]) {
+    const section = payload[key];
+    if (!section || typeof section !== "object") return { kind: "unknown" };
+  }
+  const served = payload.projectDir;
+  if (typeof served !== "string" || served.length === 0) return { kind: "unknown" };
+
+  const resolved = resolve(served);
+  return resolved === resolve(absDir)
+    ? { kind: "self", projectDir: resolved }
+    : { kind: "peer", projectDir: resolved };
+}
+
+/**
  * Find and kill whichever process is listening on `port`.
  * Returns true if the port was freed, false if kill failed.
+ *
+ * Callers must first rule out a peer dashboard via {@link probeStatusEndpoint}
+ * plus {@link classifyPortOccupant}: this SIGKILLs whatever it finds, and the
+ * occupant of 3117 is frequently another project's `ndx start`.
  */
 async function killPortOccupant(port) {
   try {
@@ -416,12 +554,32 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       if (!(await isPortInUse(port))) { portFree = true; break; }
     }
     if (!portFree) {
-      // Something else is holding the port — kill it
-      log(`Port ${port} is in use by another process — clearing it…`);
-      const freed = await killPortOccupant(port);
-      if (!freed) {
-        console.error(`Port ${port} is occupied and could not be cleared. Choose a different port with --port=N or set web.port in .n-dx.json`);
-        return 1;
+      // Ask the occupant who it is before killing it. The PID file above only
+      // knows about servers started for THIS directory, so a second project or
+      // worktree used to look like a stranger squatting on 3117 and got
+      // SIGKILLed — taking a working dashboard down with it.
+      const occupant = classifyPortOccupant(await probeStatusEndpoint(port), absDir);
+
+      if (occupant.kind === "peer") {
+        const next = await findFreePortInRange(port);
+        if (next === null) {
+          console.error(
+            `n-dx dashboard for ${occupant.projectDir} is already on :${port}, and no port in ` +
+            `${PORT_RANGE_START}–${PORT_RANGE_END} is free. Choose one with --port=N or set web.port in .n-dx.json`,
+          );
+          return 1;
+        }
+        log(`n-dx dashboard for ${occupant.projectDir} is already on :${port}; starting this one on :${next}`);
+        port = next;
+      } else {
+        // Not identifiable as a peer — either a stranger, or this directory's
+        // own untracked server, which `ndx start` restarts by contract.
+        log(`Port ${port} is in use by another process — clearing it…`);
+        const freed = await killPortOccupant(port);
+        if (!freed) {
+          console.error(`Port ${port} is occupied and could not be cleared. Choose a different port with --port=N or set web.port in .n-dx.json`);
+          return 1;
+        }
       }
     }
   }
