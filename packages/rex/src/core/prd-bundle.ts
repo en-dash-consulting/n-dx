@@ -30,10 +30,11 @@
  * @module rex/core/prd-bundle
  */
 
-import { SCHEMA_VERSION } from "../schema/index.js";
-import type { PRDDocument, PRDItem } from "../schema/index.js";
+import { SCHEMA_VERSION, LEVEL_HIERARCHY } from "../schema/index.js";
+import type { PRDDocument, PRDItem, ItemLevel } from "../schema/index.js";
 import { validateDocument } from "../schema/validate.js";
 import { findItem } from "./tree.js";
+import { findDependencyCycles } from "./dag.js";
 
 /** Discriminator stored in every bundle, so a stray JSON file is rejected by shape. */
 export const BUNDLE_KIND = "rex/prd-bundle";
@@ -420,6 +421,13 @@ export function parseBundle(raw: unknown): PRDBundle {
   // operation — findItem, update, remove — resolves them ambiguously.
   assertUniqueIds(candidate.items as PRDItem[]);
 
+  // Two more whole-tree properties the field validator cannot see. Both are
+  // checked here rather than at the write, because a rejection before the
+  // store is opened costs nothing and leaves the tree untouched by
+  // construction.
+  assertNoCycles(candidate.items as PRDItem[]);
+  assertLegalLevels(candidate.items as PRDItem[]);
+
   // `rex export` strips these, but a bundle from an older rex or another tool
   // may still carry them — the guarantee that imported items arrive without
   // another project's remote pointers has to hold at this boundary too.
@@ -528,6 +536,86 @@ function defaultTimestampFromExport(item: PRDItem, exportedAt: string): void {
 }
 
 /**
+ * Reject a bundle whose `blockedBy` edges close a loop.
+ *
+ * A cycle is not a field fault, so `validateDocument` cannot see it, and it is
+ * silent on import: the tree saves cleanly and the damage appears later as a
+ * wedged `get_next_task` and `report`, which walk dependencies expecting a DAG.
+ *
+ * Only cycles are checked, not {@link findDependencyCycles}'s sibling faults in
+ * `validateDAG`. An edge pointing at an id absent from the bundle is legitimate
+ * here — a merge resolves it against the destination tree, and a scoped export
+ * prunes the ones it cannot close — so rejecting those would refuse valid
+ * imports.
+ *
+ * @throws {BundleError} naming the cycle, before any write.
+ */
+function assertNoCycles(items: PRDItem[]): void {
+  const cycles = findDependencyCycles(items);
+  if (cycles.length === 0) return;
+
+  const rendered = cycles.map((cycle) => cycle.join(" → ")).join("; ");
+  throw new BundleError(
+    `Bundle contains a blockedBy cycle: ${rendered}. ` +
+      `A cycle has no valid execution order — nothing was written.`,
+  );
+}
+
+/** The levels that may sit at the top of the tree, per {@link LEVEL_HIERARCHY}. */
+const ROOT_LEGAL_LEVELS = (Object.keys(LEVEL_HIERARCHY) as ItemLevel[]).filter((level) =>
+  LEVEL_HIERARCHY[level].includes(null),
+);
+
+/**
+ * Reject a bundle whose nesting violates {@link LEVEL_HIERARCHY}.
+ *
+ * Every other insertion path enforces this — `insertChild`, `core/move.ts` —
+ * and `core/structural.ts` reports existing violations. A bundle bypassed all
+ * of them: `--replace` installs its tree wholesale, so a feature at root or a
+ * subtask under an epic would be saved without complaint and surface later as
+ * `rex health` / `reorganize` placement violations.
+ *
+ * This checks the bundle against *itself*, which is the whole story for
+ * `--replace` (its tree becomes the tree) and the bundle's own share of it for
+ * a merge. Where a merge grafts onto a local parent, the legality depends on
+ * the destination and is checked in {@link mergeBundle} instead.
+ *
+ * @throws {BundleError} naming both levels, before any write.
+ */
+function assertLegalLevels(items: PRDItem[], parentLevel: ItemLevel | null = null): void {
+  for (const item of items) {
+    assertLegalPlacement(item, parentLevel);
+    if (item.children?.length) assertLegalLevels(item.children, item.level);
+  }
+}
+
+/**
+ * Reject one item sitting under one parent level.
+ *
+ * Shared by {@link assertLegalLevels}, which checks the bundle against itself
+ * before any write, and by {@link mergeBundle}'s graft, which checks each
+ * added item against the level of the parent it is actually landing under in
+ * the destination tree. One rule, so the two cannot drift.
+ *
+ * @param parentLevel `null` for the tree root.
+ * @throws {BundleError} naming both levels.
+ */
+function assertLegalPlacement(item: PRDItem, parentLevel: ItemLevel | null): void {
+  const allowed = LEVEL_HIERARCHY[item.level];
+  if (!allowed || allowed.includes(parentLevel)) return;
+
+  throw new BundleError(
+    parentLevel === null
+      ? `Bundle has a "${item.level}" item at the tree root ("${item.title}"). ` +
+        `Only ${ROOT_LEGAL_LEVELS.join(", ")} may sit at the root — nothing was written.`
+      : `Bundle would nest a "${item.level}" item ("${item.title}") under a parent of level ` +
+        `"${parentLevel}". ` +
+        `A ${item.level} may only sit under ${allowed.filter((p) => p !== null).join(" or ")} ` +
+        `— nothing was written.`,
+  );
+}
+
+/**
  * Apply a bundle to an existing tree.
  *
  * `merge` (default) is additive and never destructive: every local item keeps
@@ -572,7 +660,11 @@ export function mergeBundle(
    * limited to `target`, so an item that lives under a different parent
    * locally is recognised instead of being cloned into a second home.
    */
-  const graft = (bundleSiblings: PRDItem[], target: PRDItem[]): void => {
+  const graft = (
+    bundleSiblings: PRDItem[],
+    target: PRDItem[],
+    parentLevel: ItemLevel | null,
+  ): void => {
     for (const incoming of bundleSiblings) {
       const local = findItem(items, incoming.id);
 
@@ -585,10 +677,16 @@ export function mergeBundle(
         if (incoming.children?.length) {
           const localItem = local.item as PRDItem;
           localItem.children ??= [];
-          graft(incoming.children, localItem.children);
+          // Recurse with the *local* item's level, not the bundle's. The two
+          // can disagree — a local reshape may have re-levelled a same-id
+          // item since the export — and it is the local one that will be the
+          // parent on disk.
+          graft(incoming.children, localItem.children, localItem.level);
         }
         continue;
       }
+
+      assertLegalPlacement(incoming, parentLevel);
 
       const node = structuredClone(incoming);
       delete node.children;
@@ -598,12 +696,12 @@ export function mergeBundle(
 
       if (incoming.children?.length) {
         node.children = [];
-        graft(incoming.children, node.children);
+        graft(incoming.children, node.children, node.level);
       }
     }
   };
 
-  graft(bundle.items, items);
+  graft(bundle.items, items, null);
 
   return { items, collisions, added, replaced: 0 };
 }

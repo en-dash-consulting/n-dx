@@ -227,6 +227,94 @@ describe("parseBundle", () => {
 
     expect(() => parseBundle(bundle)).toThrow(/"t1"/);
   });
+
+  it("rejects a blockedBy cycle, naming the items in it", () => {
+    // A cycle imports cleanly today and only surfaces afterwards, as a wedged
+    // `get_next_task` and `report`. Rejecting here costs nothing: parseBundle
+    // runs before the store is touched at all.
+    const doc = makeDoc();
+    const t1 = (doc.items[0].children as PRDItem[])[0].children![0];
+    t1.blockedBy = ["t2"]; // t2 is already blockedBy t1
+    const bundle = JSON.parse(JSON.stringify(buildBundle(doc))) as unknown;
+
+    expect(() => parseBundle(bundle)).toThrow(BundleError);
+    expect(() => parseBundle(bundle)).toThrow(/cycle/i);
+    expect(() => parseBundle(bundle)).toThrow(/t1/);
+  });
+
+  it("rejects an item that blocks itself", () => {
+    const doc = makeDoc();
+    (doc.items[0].children as PRDItem[])[0].children![0].blockedBy = ["t1"];
+    const bundle = JSON.parse(JSON.stringify(buildBundle(doc))) as unknown;
+
+    expect(() => parseBundle(bundle)).toThrow(BundleError);
+    expect(() => parseBundle(bundle)).toThrow(/t1/);
+  });
+
+  it("accepts a blockedBy edge pointing outside the bundle", () => {
+    // Not a cycle, and not this validator's business: a merge resolves such an
+    // edge against the local tree, and a scoped export deliberately drops the
+    // ones it cannot close. Rejecting these would refuse valid imports, which
+    // is why the cycle check is used here rather than validateDAG wholesale.
+    const doc = makeDoc();
+    (doc.items[0].children as PRDItem[])[0].children![0].blockedBy = ["lives-locally"];
+    const bundle = JSON.parse(JSON.stringify(buildBundle(doc))) as unknown;
+
+    expect(() => parseBundle(bundle)).not.toThrow();
+  });
+
+  it("rejects a bundle whose root item is not root-legal, naming the level", () => {
+    // Only an epic may sit at PRD root (LEVEL_HIERARCHY.epic === [null]).
+    // In replace mode the bundle's tree *becomes* the tree, so a feature at
+    // root would be saved as an illegal placement with no complaint.
+    const bundle = {
+      ...buildBundle(makeDoc()),
+      items: [makeItem({ id: "f-root", title: "Rootless Feature", level: "feature" })],
+    };
+    const raw = JSON.parse(JSON.stringify(bundle)) as unknown;
+
+    expect(() => parseBundle(raw)).toThrow(BundleError);
+    expect(() => parseBundle(raw)).toThrow(/feature/);
+    expect(() => parseBundle(raw)).toThrow(/root/i);
+  });
+
+  it("rejects a bundle nesting a child under an illegal parent level, naming both", () => {
+    const bundle = {
+      ...buildBundle(makeDoc()),
+      items: [
+        makeItem({
+          id: "e-x",
+          title: "Epic X",
+          level: "epic",
+          children: [makeItem({ id: "s-x", title: "Subtask X", level: "subtask" })],
+        }),
+      ],
+    };
+    const raw = JSON.parse(JSON.stringify(bundle)) as unknown;
+
+    expect(() => parseBundle(raw)).toThrow(BundleError);
+    expect(() => parseBundle(raw)).toThrow(/subtask/);
+    expect(() => parseBundle(raw)).toThrow(/epic/);
+  });
+
+  it("accepts a task directly under an epic, which the hierarchy allows", () => {
+    // LEVEL_HIERARCHY.task === ["feature", "epic"] — the check must not
+    // assume one canonical depth per level.
+    const bundle = {
+      ...buildBundle(makeDoc()),
+      items: [
+        makeItem({
+          id: "e-y",
+          title: "Epic Y",
+          level: "epic",
+          children: [makeItem({ id: "t-y", title: "Task Y", level: "task" })],
+        }),
+      ],
+    };
+    const raw = JSON.parse(JSON.stringify(bundle)) as unknown;
+
+    expect(() => parseBundle(raw)).not.toThrow();
+  });
 });
 
 describe("mergeBundle", () => {
@@ -275,6 +363,43 @@ describe("mergeBundle", () => {
 
     expect(e1?.children?.map((c) => c.id)).toEqual(["f1"]);
     expect(outcome.items.map((i) => i.id)).toEqual(["e1", "e2"]);
+  });
+
+  it("refuses to graft under a local parent whose level was re-levelled, naming both levels", () => {
+    // The case parseBundle cannot see: the bundle's own structure is legal
+    // (f1 under epic e1), but locally e1 has since been reshaped into a task,
+    // and a feature under a task is illegal. The graft target is the local
+    // tree's, so only mergeBundle can catch this.
+    const bundle = buildBundle(makeDoc());
+    const existing: PRDItem[] = [
+      makeItem({
+        id: "eX",
+        title: "Epic X",
+        level: "epic",
+        children: [
+          makeItem({ id: "tX", title: "Task X", level: "task", children: [
+            // Same id as the bundle's epic, but re-levelled locally.
+            makeItem({ id: "e1", title: "Epic One, now a task", level: "task" }),
+          ] }),
+        ],
+      }),
+    ];
+
+    expect(() => mergeBundle(existing, bundle, "merge")).toThrow(BundleError);
+    expect(() => mergeBundle(existing, bundle, "merge")).toThrow(/feature/);
+    expect(() => mergeBundle(existing, bundle, "merge")).toThrow(/task/);
+  });
+
+  it("refuses to add a non-root-legal bundle item at the local tree root", () => {
+    // Merge mode pushes unseen bundle roots onto the local root list. A
+    // feature there is as illegal as it would be in replace mode.
+    const bundle = {
+      ...buildBundle(makeDoc()),
+      items: [makeItem({ id: "f-loose", title: "Loose Feature", level: "feature" })],
+    };
+
+    expect(() => mergeBundle([], bundle, "merge")).toThrow(BundleError);
+    expect(() => mergeBundle([], bundle, "merge")).toThrow(/root/i);
   });
 
   it("treats an id that exists elsewhere in the tree as a collision, not a duplicate", () => {
