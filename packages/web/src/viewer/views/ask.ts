@@ -1,233 +1,337 @@
 /**
- * Ask panel — a prompt/response text exchange over the analysed project.
+ * SourceVision Ask view -- a prompt/response text exchange over the analysed
+ * project.
  *
- * The shell owns the prompt textarea, the submit control, and the four display
- * states below. It does not assemble context or call a model itself: that is
- * `POST /api/sourcevision/ask`, which grounds the answer in `.sourcevision/`
- * output and reports back the vendor and model that produced it.
+ * This module is the panel shell: it owns the prompt textarea, the submit
+ * control, and the four display states the exchange can be in. It does not
+ * assemble context or talk to a model -- that is the server's job behind
+ * `POST /api/sourcevision/ask`, which grounds every answer in the existing
+ * `.sourcevision/` analysis.
  *
- * ## The four states are a union, not a set of booleans
+ * ## The four states
  *
- * `idle`, `submitting`, `answered`, and `error` are mutually exclusive, and
- * modelling them as one discriminated union rather than three `useState` flags
- * makes that unrepresentable-by-construction. The sibling views here predate
- * that choice and carry a flag per concern (`pr-markdown.ts` holds fourteen),
- * which is why they each need a chain of `!loading && !error && …` guards to
- * decide what to render. A new panel does not have to inherit that.
+ * `idle` | `submitting` | `answered` | `error`, held in one discriminated
+ * union rather than the `loading`/`error`/`data` boolean triple the older
+ * views use. Three booleans admit eight combinations for four legal states,
+ * and the illegal ones ("submitting and answered") are exactly the renders
+ * that look like a bug to the person waiting on an answer. A single state
+ * value cannot express them.
  *
- * ## Answers render as preserved text, not markdown
+ * The panel holds one exchange at a time, so a new question replaces the
+ * previous answer. Keeping a transcript is a product decision the feature has
+ * not made; a single exchange is what the acceptance criteria describe, and
+ * growing it into a list later is additive.
  *
- * The model is asked for prose and it arrives as prose. Rendering it as
- * markdown needs a renderer the viewer does not yet share — `pr-markdown.ts`
- * has one, but it is private to that module and lifting it out is a refactor
- * of that view, not part of this shell. Until then the answer keeps its own
- * line breaks and nothing more, which is honest about what it is.
+ * ## Answer actions
  *
- * ## The two answer actions
+ * Two actions sit under an answer. **Copy** goes through
+ * {@link copyTextToClipboard}, the copy path lifted out of `pr-markdown.ts`, so
+ * both surfaces fall back to `execCommand` identically and word a permission
+ * denial identically. **Capture to PRD** is confirm-guarded: the first press
+ * only arms it, and nothing is written until Confirm — the same shape as the
+ * Overview Next Steps panel, and for the same reason, since the action mutates
+ * the PRD.
  *
- * Copy runs the shared clipboard workflow (`utils/clipboard.ts`), lifted out
- * of `pr-markdown.ts` when this panel needed the same execCommand fallback and
- * the same distinction between a permission denial and a generic failure.
+ * Both kinds of feedback are transient and both are cleared when a new question
+ * is submitted, so a "Copied" or "Captured" line can never be read as applying
+ * to an answer it did not come from. Capture's window is much longer than
+ * Copy's because its message names where the item landed, which the user needs
+ * time to read; Copy's only confirms an action whose result is already on the
+ * clipboard.
  *
- * Capture-to-PRD is confirm-guarded, like the Overview Next Steps panel: the
- * click arms the action and a second click commits it, so no PRD write can
- * happen from one stray click. A failed capture leaves the answer exactly
- * where it was, still copyable, because the text is the thing the user would
- * otherwise lose.
+ * ## Accessibility
  *
- * ## Announcing an answer that arrives whenever it arrives
+ * An async text exchange has one requirement the other SourceVision subviews
+ * do not: the answer arrives after an indeterminate delay, so its arrival has
+ * to be *announced* rather than merely rendered.
  *
- * This panel has one accessibility requirement its sibling views do not: the
- * answer lands after an indeterminate delay, so it has to reach a screen reader
- * without the user losing their place. Two things follow, and neither is
- * optional.
+ * Four decisions follow from that, and each is load-bearing:
  *
- * The announcement comes from a persistent pair of `sr-only` regions at the top
- * of the container, never from the state cards. A live region that mounts at
- * the same moment as its text is not reliably announced — the region has to
- * already be there when the text changes — so the cards are visual only and
- * {@link politeAnnouncement} / {@link assertiveAnnouncement} say what is heard.
+ * 1. **One persistent polite live region** ({@link askAnnouncement}), mounted
+ *    on every render with empty text while idle. A region created in the same
+ *    render as its content is not reliably announced, which is why the answer
+ *    card cannot be the live region itself.
+ * 2. **Arrival is announced, not content.** The region says an answer is
+ *    ready and how long it is; the answer itself is a `role="region"` labelled
+ *    by its heading, so the reader navigates to it when they choose. Piping
+ *    hundreds of words through a live region buries the one fact the waiting
+ *    user needs and talks over whatever they were reading.
+ * 3. **Nothing is disabled while a request is in flight.** Disabling the
+ *    element the user just activated moves focus to `<body>`, dropping a
+ *    keyboard user back at the top of the document mid-wait. The textarea goes
+ *    `readOnly` and the submit button carries `aria-disabled`; the real
+ *    `disabled` attribute is reserved for the unsubmittable-prompt case, which
+ *    can only be reached while focus is in the textarea.
+ * 4. **State is never signalled by colour alone.** Every feedback line carries
+ *    a shape marker ({@link FEEDBACK_MARK_OK} / {@link FEEDBACK_MARK_FAIL})
+ *    alongside its colour, and a capture failure adds a screen-reader-only
+ *    "Capture failed:" prefix because the reason itself comes from the server
+ *    and may not read as a failure on its own.
  *
- * And nothing that has focus is ever disabled. Submitting used to disable both
- * the textarea and the button, which meant Ctrl+Enter — the documented submit
- * path — destroyed the focused element and dropped the user at `<body>`, right
- * before the thing they were waiting for appeared. The button reports itself
- * with `aria-disabled` instead, and the textarea stays live.
+ * ## Seeded questions
+ *
+ * The panel can be entered from a finding row on the Problems or Suggestions
+ * view. That hands over an {@link AskSeed} — the finding's own type, severity,
+ * zone, message, and files — which rides beside the prompt rather than inside
+ * it, so the endpoint can render it as a focus section and require the answer
+ * to name those files. The prompt is pre-filled with a short, editable
+ * question; rewording it does not cost the grounding, because the grounding
+ * was never in the text.
+ *
+ * The seed is shown as well as sent, and can be detached. An answer that names
+ * files the user was never shown reads as a guess, and a seed that could not be
+ * removed would silently ground every later question in the finding the user
+ * happened to arrive from.
+ *
+ * ## Refine mode
+ *
+ * An opt-in toggle sends the question with `mode: "refine"`, which puts the PRD
+ * in the model's context and lets the answer carry proposed mutations to
+ * existing items alongside its prose. The proposals render below the answer as
+ * before/after diffs and are accepted or rejected one at a time — see
+ * {@link RefinementList}.
+ *
+ * Two things about that flow live here rather than there:
+ *
+ * - **Accept posts one proposal, not the list.** Approving one change can never
+ *   apply another the user has not looked at.
+ * - **Reject issues no request.** It filters the proposal out of the answered
+ *   state and stops. Nothing on the reject path can reach the PRD.
+ *
+ * The toggle is off by default: refine mode costs tokens rendering the whole
+ * PRD into the prompt, and returns a surface whose buttons mutate it. Neither
+ * belongs in the path of someone who only wanted to ask about a zone.
+ *
+ * ## Degraded modes
+ *
+ * The panel has several distinct ways to be unusable and they do not share a
+ * fix, so they do not share a card. {@link describeAskFailure} decides the
+ * naming, the guidance, and which affordance to offer for each; this module
+ * only renders that decision and owns the two actions it can take — a Retry
+ * that re-sends *the question that failed*, and the analysis run offered when
+ * there is nothing to answer from. The prompt is never cleared on failure, so
+ * no degraded path costs the user their question.
+ *
+ * ## Deliberately not here yet
+ *
+ * Markdown in the answer is currently shown as-is in a pre-wrapped block. The
+ * renderer that would format it lives in `pr-markdown.ts` behind
+ * `pr-markdown-*` class names; lifting it out is a separate shared-module
+ * change, and unlike the clipboard path it has only one would-be second
+ * consumer, so it stays where it is for now.
  *
  * @module web/viewer/views/ask
- * @see packages/web/src/server/routes-sourcevision-ask.ts — the endpoint
- * @see packages/web/src/viewer/utils/clipboard.ts — the shared copy workflow
+ * @see ../../server/routes-sourcevision-ask.ts -- the endpoint this consumes
+ * @see ../../server/routes-rex-analysis.ts -- POST /api/rex/capture-ask
+ * @see ./ask-refinements.ts -- the proposal cards and their diffs
  */
 
 import { h } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { BrandedHeader } from "../components/index.js";
-import { useCliName, useSvAnalyze } from "../hooks/index.js";
+import { AnalyzeControls, BrandedHeader } from "../components/index.js";
+import { useCliName } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
-import { clipboardFailureMessage, copyTextToClipboard } from "../utils/clipboard.js";
-import { takePendingAskSeed, EXPLAIN_FINDING_PROMPT } from "../ask-seed.js";
-import type { FindingSeed } from "../ask-seed.js";
+import type { AskSeed } from "../types.js";
+import { EXPLAIN_PROMPT } from "./finding-seed.js";
+import {
+  askFailureKindFromStatus,
+  describeAskFailure,
+  isAskFailureKind,
+  type AskFailure,
+} from "./ask-failure.js";
+import {
+  clipboardFailureMessage,
+  clipboardSuccessMessage,
+  copyTextToClipboard,
+  type ClipboardFailureReason,
+} from "../utils/clipboard.js";
+import {
+  REFINEMENT_APPLY_ENDPOINT,
+  RefinementList,
+  outcomeStates,
+  type RefinementCardState,
+  type RefinementOutcome,
+  type RefinementProposal,
+} from "./ask-refinements.js";
 
-/** Where the panel sends the prompt. */
-const ASK_ENDPOINT = "/api/sourcevision/ask";
+// ---------------------------------------------------------------------------
+// Endpoint contract
+// ---------------------------------------------------------------------------
 
-/** Where the panel files an answer as a PRD item. */
-const CAPTURE_ENDPOINT = "/api/rex/capture-ask";
-
-/** Where accepted PRD refinements are written, under the store lock. */
-const APPLY_REFINEMENTS_ENDPOINT = "/api/rex/apply-refinements";
-
-/** How long transient copy feedback stays on screen. */
-const COPY_FEEDBACK_MS = 2000;
-
-const PROMPT_INPUT_ID = "sv-ask-prompt";
-
-/**
- * Heading per degraded mode.
- *
- * Each names the mode rather than the panel's disappointment: a user who reads
- * only the heading should already know whether to run an analysis, fix
- * credentials, or wait and try again.
- */
-const ERROR_HEADING: Record<string, string> = {
-  no_analysis: "No analysis to answer from",
-  auth: "Credentials rejected",
-  timeout: "The model timed out",
-  rate_limit: "Rate limited",
-  cli_not_found: "LLM CLI not found",
-  provider_error: "The model call failed",
-};
+/** Path of the Ask endpoint. Exported so tests assert on the real string. */
+export const ASK_ENDPOINT = "/api/sourcevision/ask";
 
 /**
- * A proposed change to one PRD item.
- *
- * Mirrors `RefinementProposal` in `server/ask-refinements.ts`; duplicated
- * because the viewer does not import from the server at runtime. `before` is
- * what the model was shown, and is checked against the item on disk when the
- * user accepts — a diff the reviewer can read, and a guard the applier can act
- * on.
+ * Path of the capture endpoint. On the rex prefix, not the sourcevision one:
+ * the request writes a PRD item, and the route that does that lives with the
+ * other PRD writers so it shares their store resolution and cache refresh.
  */
-export interface RefinementProposal {
-  id: string;
-  kind: "description" | "acceptanceCriteria" | "priority" | "parent" | "merge";
-  itemId: string;
-  itemTitle: string;
-  rationale: string;
-  before: string[];
-  after: string[];
-}
+export const ASK_CAPTURE_ENDPOINT = "/api/rex/capture-ask";
 
-/** Successful answer body from {@link ASK_ENDPOINT}. */
-interface AskSuccessResponse {
-  ok: true;
+/** Mirrors the server's `MAX_PROMPT_CHARS` so the textarea refuses first. */
+export const ASK_MAX_PROMPT_CHARS = 4_000;
+
+const PROMPT_FIELD_ID = "sv-ask-prompt";
+
+/** Ids for the refine-mode toggle and the hint that describes what it does. */
+const REFINE_FIELD_ID = "sv-ask-refine-mode";
+const REFINE_HINT_ID = "sv-ask-refine-hint";
+
+/** Labels the answer region, so a reader can find it by name. */
+const ANSWER_HEADING_ID = "sv-ask-answer-heading";
+
+/** Success marker. A shape, so colour is never the only success cue. */
+export const FEEDBACK_MARK_OK = "✓";
+
+/** Failure marker. A shape, so colour is never the only failure cue. */
+export const FEEDBACK_MARK_FAIL = "⚠";
+
+/** What the copy action's manual-copy guidance tells the user to select. */
+const COPY_SUBJECT = "answer";
+
+/** How long a "Copied" confirmation stays up. Matches the PR Markdown view. */
+const COPY_FEEDBACK_MS = 2_000;
+
+/**
+ * How long a capture result stays up.
+ *
+ * Five times the copy window: this message names the item and the epic it
+ * landed under, and a confirmation that disappears before it can be read is
+ * indistinguishable from one that never appeared.
+ */
+const CAPTURE_FEEDBACK_MS = 10_000;
+
+/** Success payload of `POST /api/sourcevision/ask`. */
+interface AskSuccessPayload {
   answer: string;
-  vendor: string;
-  model: string;
-  sources?: readonly string[];
+  vendor?: string;
+  model?: string;
+  contextSources?: string[];
+  /** Refine mode only: proposed mutations to existing PRD items. */
   proposals?: RefinementProposal[];
+  /** Refine mode only: why entries in the model's block were dropped. */
+  refinementNotes?: string[];
 }
 
-/**
- * What went wrong and what to do about it.
- *
- * Mirrors `AskFailure` in `server/sourcevision-ask-diagnostics.ts`. Duplicated
- * rather than imported: the viewer is built separately and does not import from
- * the server at runtime, which is the boundary `boundary-check.test.ts` keeps.
- */
-export interface AskFailureDetail {
-  code: "no_analysis" | "auth" | "timeout" | "rate_limit" | "cli_not_found" | "provider_error";
-  summary: string;
-  remediation: string[];
-  retryable: boolean;
-}
-
-/** Classified failure body — `reason` distinguishes auth from timeout etc. */
-interface AskFailureResponse {
-  ok: false;
-  reason?: string;
-  error?: string;
-  failure?: AskFailureDetail;
-}
-
-type AskResponse = AskSuccessResponse | AskFailureResponse;
-
-/** Successful body from {@link CAPTURE_ENDPOINT}. */
-interface CaptureSuccessResponse {
-  ok: true;
-  item: { id: string; title: string; level: string };
-  parent: { id: string; title: string; level: string };
-}
-
-/** Failure body from {@link CAPTURE_ENDPOINT}. */
-interface CaptureFailureResponse {
-  ok?: false;
+/** Payload of `POST /api/rex/apply-refinements`, success or failure. */
+interface RefinementApplyPayload {
+  outcomes?: RefinementOutcome[];
   error?: string;
 }
 
-type CaptureResponse = CaptureSuccessResponse | CaptureFailureResponse;
+/** Failure payload of `POST /api/sourcevision/ask`. */
+interface AskErrorPayload {
+  error?: string;
+  kind?: string;
+  suggestion?: string;
+  /** Canonical vendor remediation, sent for credential failures. */
+  remediation?: string[];
+  retryAfterMs?: number;
+}
 
-/**
- * The panel's display state.
- *
- * Exported so tests and future callers (the "explain this finding" entry point)
- * can name a state rather than infer it from rendered text.
- *
- * The `answered` state keeps the `question` that produced the answer, not the
- * current textarea contents: the user can edit the prompt while reading, and
- * capturing an answer under a question it did not answer would file a wrong
- * pairing into the PRD.
- */
+/** Payload of `POST /api/rex/capture-ask`, success or failure. */
+interface AskCapturePayload {
+  item?: { id?: string; title?: string };
+  parent?: { title?: string; created?: boolean };
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Panel state
+// ---------------------------------------------------------------------------
+
+/** The answered/error variants carry the question they belong to. */
 export type AskState =
   | { status: "idle" }
-  | { status: "submitting" }
+  | { status: "submitting"; question: string }
   | {
       status: "answered";
       question: string;
       answer: string;
-      vendor: string;
-      model: string;
-      sources: readonly string[];
-      /** PRD changes the answer proposes. Empty unless the user asked for them. */
+      vendor: string | null;
+      model: string | null;
+      contextSources: string[];
+      /**
+       * Proposals still awaiting a decision. A rejected proposal is dropped
+       * from this list, which is the whole of the reject path: there is no
+       * request it could make.
+       */
       proposals: RefinementProposal[];
+      refinementNotes: string[];
     }
-  /**
-   * `failure` is what the panel renders; `message` is the one-line fallback for
-   * a transport error that never reached the route and so has no diagnosis.
-   */
-  | { status: "error"; message: string; failure?: AskFailureDetail };
-
-/** Transient outcome of a copy attempt, or `null` when there is nothing to say. */
-type CopyFeedback =
-  | { kind: "success" }
-  | { kind: "error"; message: string }
-  | null;
+  | {
+      status: "error";
+      question: string;
+      failure: AskFailure;
+      /** The mode the failed question was asked in, so Retry re-sends it. */
+      refine: boolean;
+    };
 
 /**
- * A reviewer's verdict on one proposal.
+ * True when `prompt` is worth sending.
  *
- * `pending` is the only state that can become a write. Rejecting is recorded
- * rather than just hiding the card, so the reviewer can see they have dealt
- * with every proposal before they apply anything.
+ * Whitespace-only input is not a request: the endpoint would reject it as
+ * `invalid_request` after a round trip, and the user would have paid a
+ * network hop to be told they typed nothing.
  */
-type ProposalVerdict = "pending" | "accepted" | "rejected";
+export function isSubmittablePrompt(prompt: string): boolean {
+  const trimmed = prompt.trim();
+  return trimmed.length > 0 && trimmed.length <= ASK_MAX_PROMPT_CHARS;
+}
 
-/** The apply action's state, shared by the whole accepted batch. */
-type ApplyState =
+/**
+ * What the panel's polite live region says for a given state.
+ *
+ * `answered` reports arrival and length rather than the answer, because a
+ * live region reads its entire text: a 400-word answer announced in full
+ * buries "it is here now" and talks over whatever the reader was on. The
+ * length is what tells them whether to jump to the region straight away or
+ * finish the sentence they were reading first.
+ *
+ * `idle` and `error` are deliberately silent. Idle is the state the panel
+ * renders in, so there is no transition to announce; the error card is a
+ * `role="alert"`, which announces itself, and repeating it here would read
+ * the same failure twice.
+ */
+export function askAnnouncement(state: AskState): string {
+  switch (state.status) {
+    case "submitting":
+      return "Reading the analysis and composing an answer.";
+    case "answered": {
+      const words = state.answer.trim().split(/\s+/).filter((word) => word.length > 0).length;
+      const proposals = state.proposals.length;
+      return `Answer ready, ${words} ${words === 1 ? "word" : "words"}.`
+        + " It is in the Answer region below the question."
+        // Announced with the arrival rather than left to be discovered: a
+        // proposal list that writes to the PRD is not something a reader
+        // should meet only by scrolling into it.
+        + (proposals > 0
+          ? ` ${proposals} proposed PRD ${proposals === 1 ? "change is" : "changes are"} waiting for review.`
+          : "");
+    }
+    default:
+      return "";
+  }
+}
+
+/**
+ * Where the copy action stands. `error` carries a reason so the message can
+ * distinguish a blocked clipboard from a copy that simply did not work.
+ */
+type CopyState =
   | { status: "idle" }
-  | { status: "applying" }
-  | { status: "done"; applied: number; refused: { id: string; reason: string }[] }
-  | { status: "error"; message: string };
+  | { status: "success" }
+  | { status: "error"; reason: ClipboardFailureReason };
 
-/** Human label per proposal kind, used as the diff's heading. */
-const PROPOSAL_KIND_LABEL: Record<RefinementProposal["kind"], string> = {
-  description: "Description",
-  acceptanceCriteria: "Acceptance criteria",
-  priority: "Priority",
-  parent: "Parent",
-  merge: "Merge duplicate",
-};
-
-/** The capture action's own state — `confirm` is the guard before any write. */
+/**
+ * Where the capture action stands.
+ *
+ * `confirm` is the whole point of the type: the button that starts a capture
+ * only moves the action into `confirm`, and no request is issued until the
+ * separate Confirm control is pressed. A boolean "capturing" flag could not
+ * express the armed-but-not-yet-written state that the acceptance criterion
+ * requires.
+ */
 type CaptureState =
   | { status: "idle" }
   | { status: "confirm" }
@@ -235,674 +339,770 @@ type CaptureState =
   | { status: "done"; message: string }
   | { status: "error"; message: string };
 
-/** True when `prompt` has nothing a model could answer. */
-export function isBlankPrompt(prompt: string): boolean {
-  return prompt.trim() === "";
+/**
+ * Describe a completed capture in terms of what was created and where.
+ *
+ * The parent is named because "Captured to PRD" leaves the user hunting for
+ * the item; naming the epic tells them which branch of the tree to open, and
+ * whether that epic is new tells them why they have not seen it before.
+ */
+export function describeCapture(payload: AskCapturePayload): string {
+  const title = typeof payload.item?.title === "string" && payload.item.title.trim().length > 0
+    ? payload.item.title.trim()
+    : "the answer";
+  const parent = typeof payload.parent?.title === "string" && payload.parent.title.trim().length > 0
+    ? payload.parent.title.trim()
+    : null;
+  if (!parent) return `Captured "${title}" to the PRD.`;
+  const suffix = payload.parent?.created === true ? " (new epic)" : "";
+  return `Captured "${title}" under "${parent}"${suffix}.`;
 }
 
 /**
- * Reduce an endpoint response to the next display state.
+ * Read a failed response into the named mode it belongs to.
  *
- * A body that is neither a well-formed success nor a well-formed failure still
- * has to land somewhere the user can act on, so it becomes an `error` naming
- * that fact rather than an `answered` state holding `undefined`.
+ * The endpoint names every failure it can (`kind`, `error`, `suggestion`,
+ * `remediation`), so the shell reports what it was told rather than
+ * re-deriving it. What it must not do is fall back to the status code when the
+ * body is not the documented shape: a proxy returning HTML on a 502, or a dev
+ * server answering 404, used to surface as "The Ask request failed (502)" —
+ * the bare generic this panel exists to avoid. The status is mapped onto a
+ * mode instead, and {@link describeAskFailure} names it.
  */
-export function stateForResponse(body: AskResponse, question: string): AskState {
-  if (body.ok === true && typeof body.answer === "string") {
-    return {
-      status: "answered",
-      question,
-      answer: body.answer,
-      vendor: body.vendor,
-      model: body.model,
-      sources: body.sources ?? [],
-      proposals: Array.isArray(body.proposals) ? body.proposals : [],
-    };
+async function readErrorPayload(res: Response): Promise<AskFailure> {
+  let payload: AskErrorPayload | null = null;
+  try {
+    payload = await res.json() as AskErrorPayload;
+  } catch {
+    payload = null;
   }
-  const failure = body as AskFailureResponse;
+  const message = typeof payload?.error === "string" && payload.error.trim().length > 0
+    ? payload.error
+    : null;
   return {
-    status: "error",
-    message: failure.error ?? "The request failed and the server did not say why.",
-    ...(failure.failure ? { failure: failure.failure } : {}),
+    kind: isAskFailureKind(payload?.kind) ? payload.kind : askFailureKindFromStatus(res.status),
+    message,
+    suggestion: typeof payload?.suggestion === "string" ? payload.suggestion : null,
+    remediation: Array.isArray(payload?.remediation)
+      ? payload.remediation.filter((step): step is string => typeof step === "string")
+      : [],
+    retryAfterMs: typeof payload?.retryAfterMs === "number" ? payload.retryAfterMs : null,
   };
 }
 
-/**
- * The last-resort failure, for a request that never reached the route.
- *
- * A rejected fetch has no server-side diagnosis, but it still has a cause worth
- * naming and an action worth offering — the server being down or the page being
- * offline is a retry-later situation, not an unexplained one. Without this the
- * transport path would be the one degraded mode that still rendered a bare
- * string.
- */
-export function transportFailure(message: string): AskFailureDetail {
-  return {
-    code: "provider_error",
-    summary: "The dashboard could not reach the n-dx server.",
-    remediation: [
-      `The request failed before it arrived: ${message}`,
-      "Check that the server is still running, then ask again.",
-    ],
-    retryable: true,
-  };
+// ---------------------------------------------------------------------------
+// View
+// ---------------------------------------------------------------------------
+
+export interface AskViewProps {
+  /**
+   * The item the user arrived from, if they arrived from one.
+   *
+   * Supplied by `navigateTo("ask", { askSeed })` and threaded through the view
+   * registry, so a surface that can explain something does not need a
+   * reference to this component.
+   */
+  seed?: AskSeed | null;
 }
 
 /**
- * Report where a captured answer landed.
+ * A value that changes exactly when the seed identifies a different thing.
  *
- * Names both the item and its parent: the epic is created on first capture, so
- * the user has no other way to learn where to look for it.
+ * Route state hands back a fresh object on every render, so an effect keyed on
+ * the seed itself would re-run forever and keep resetting the prompt out from
+ * under whoever was typing.
  */
-export function captureResultMessage(body: CaptureSuccessResponse): string {
-  return `✓ Captured "${body.item.title}" under ${body.parent.title}.`;
+function seedIdentity(seed: AskSeed | null | undefined): string | null {
+  if (!seed) return null;
+  return `${seed.kind ?? ""}:${seed.id ?? ""}:${seed.text ?? ""}`;
 }
 
-/**
- * What the polite live region should currently say.
- *
- * The answer arrives after an indeterminate delay, so a screen reader user has
- * to be told it arrived — and the region announcing it must already be in the
- * document when the text lands, which is why this feeds a persistent node
- * rather than the answer card itself. A card that mounts together with its own
- * `aria-live` is not reliably announced at all.
- *
- * Action feedback outranks the state: a copy or capture that just succeeded is
- * newer news than an answer the user has been reading.
- */
-export function politeAnnouncement(
-  state: AskState,
-  copySucceeded: boolean,
-  captureMessage: string | null,
-): string {
-  if (copySucceeded) return "Copied answer to clipboard.";
-  if (captureMessage) return captureMessage;
-  if (state.status === "submitting") return "Asking. Waiting on the model.";
-  if (state.status === "answered") return `Answer received from ${state.vendor} ${state.model}.`;
-  return "";
-}
-
-/**
- * What the assertive live region should currently say.
- *
- * Failures interrupt; successes wait their turn. The glyphs the visible nodes
- * carry are deliberately absent here — they are a substitute for colour, not
- * something to read aloud.
- */
-export function assertiveAnnouncement(
-  state: AskState,
-  copyError: string | null,
-  captureError: string | null,
-): string {
-  if (state.status === "error") return `Unable to answer: ${state.message}`;
-  if (copyError) return copyError;
-  if (captureError) return `Could not capture the answer: ${captureError}`;
-  return "";
-}
-
-export function AskView() {
-  const [prompt, setPrompt] = useState("");
-  const [state, setState] = useState<AskState>({ status: "idle" });
-  const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>(null);
-  const [capture, setCapture] = useState<CaptureState>({ status: "idle" });
-  /** The finding this panel was opened to explain, if it was. */
-  const [attachedFinding, setAttachedFinding] = useState<FindingSeed | null>(null);
-  /** Whether the next question may propose PRD changes. */
-  const [refinePrd, setRefinePrd] = useState(false);
-  /** Per-proposal verdicts for the answer on screen. */
-  const [verdicts, setVerdicts] = useState<Record<string, ProposalVerdict>>({});
-  const [applyState, setApplyState] = useState<ApplyState>({ status: "idle" });
-  const inFlightRef = useRef(false);
-  const copyTimerRef = useRef<number | null>(null);
+export function AskView({ seed = null }: AskViewProps = {}) {
   const deployed = isDeployedMode();
   const cliName = useCliName();
-  // The dashboard's one analyze action, shared with the enrichment gate.
-  const analyze = useSvAnalyze();
 
-  /** Show copy feedback and take it away again, replacing any pending timer. */
-  const showCopyFeedback = useCallback((next: CopyFeedback) => {
-    if (copyTimerRef.current !== null) {
-      window.clearTimeout(copyTimerRef.current);
-      copyTimerRef.current = null;
-    }
-    setCopyFeedback(next);
-    if (next !== null) {
+  const [prompt, setPrompt] = useState(() => (seed ? EXPLAIN_PROMPT : ""));
+  /**
+   * The seed actually attached to the next request.
+   *
+   * Held in state rather than read from the prop so the user can detach it:
+   * a seed that could not be removed would silently ground every later
+   * question in the finding they first arrived from.
+   */
+  const [activeSeed, setActiveSeed] = useState<AskSeed | null>(seed);
+  const [state, setState] = useState<AskState>({ status: "idle" });
+  const [copy, setCopy] = useState<CopyState>({ status: "idle" });
+  const [capture, setCapture] = useState<CaptureState>({ status: "idle" });
+
+  /**
+   * Whether the next question asks the model to act on the PRD.
+   *
+   * Opt-in, and off by default. Refine mode spends tokens rendering the whole
+   * PRD into the prompt and returns a surface whose buttons mutate it; neither
+   * belongs in the path of someone who only wanted to ask about a zone.
+   */
+  const [refineMode, setRefineMode] = useState(false);
+
+  /** Per-proposal card state, keyed by proposal id. */
+  const [proposalStates, setProposalStates] = useState<Map<string, RefinementCardState>>(
+    () => new Map(),
+  );
+
+  /**
+   * Guards a second submit while one is in flight. `state.status` cannot do
+   * this job on its own: the setState that moves the panel to `submitting`
+   * has not been applied yet when a double click's second handler runs.
+   */
+  const inFlightRef = useRef(false);
+
+  /** The same guard for capture — a double-pressed Confirm must write once. */
+  const capturingRef = useRef(false);
+
+  /**
+   * Proposal ids with an apply in flight.
+   *
+   * A set rather than a boolean: two cards can be accepted in quick
+   * succession, and each must be refused a *second* press without blocking the
+   * other's first.
+   */
+  const applyingRef = useRef<Set<string>>(new Set());
+
+  const copyTimerRef = useRef<number | null>(null);
+  const captureTimerRef = useRef<number | null>(null);
+
+  /** Show `next` and schedule it away, replacing any pending clear. */
+  const showCopyFeedback = useCallback((next: CopyState) => {
+    setCopy(next);
+    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = null;
+    if (next.status !== "idle") {
       copyTimerRef.current = window.setTimeout(() => {
-        setCopyFeedback(null);
+        setCopy({ status: "idle" });
         copyTimerRef.current = null;
       }, COPY_FEEDBACK_MS);
     }
   }, []);
 
-  useEffect(() => () => {
-    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+  /**
+   * Move the capture action to `next`, auto-clearing only its terminal stages.
+   *
+   * `confirm` and `capturing` are stages the user is inside and must not time
+   * out from underneath them; `done` and `error` are results, and those do
+   * clear themselves.
+   */
+  const setCaptureStage = useCallback((next: CaptureState) => {
+    setCapture(next);
+    if (captureTimerRef.current !== null) window.clearTimeout(captureTimerRef.current);
+    captureTimerRef.current = null;
+    if (next.status === "done" || next.status === "error") {
+      captureTimerRef.current = window.setTimeout(() => {
+        setCapture({ status: "idle" });
+        captureTimerRef.current = null;
+      }, CAPTURE_FEEDBACK_MS);
+    }
   }, []);
 
   /**
-   * Ask one question, optionally about a finding.
+   * Drop both actions back to idle and cancel their pending clears.
    *
-   * Takes both explicitly rather than reading the textarea state, because the
-   * seeded path submits in the same tick it sets them — reading state there
-   * would send the values from before the seed arrived.
+   * Called when a question is submitted rather than from an effect keyed on
+   * the answer: the reset must happen even when the request fails, and it must
+   * be observable in the same render as the `submitting` state, so that no
+   * intermediate frame can show the previous answer's "Copied" line.
    */
-  const submitQuestion = useCallback(async (
-    question: string,
-    finding: FindingSeed | null,
-    wantsRefinements = false,
-  ) => {
-    // A blank prompt is a no-op, not an error: the user has not asked anything
-    // yet, so there is nothing to report and nothing to spend a model call on.
-    if (isBlankPrompt(question) || inFlightRef.current) return;
+  const resetActions = useCallback(() => {
+    showCopyFeedback({ status: "idle" });
+    setCaptureStage({ status: "idle" });
+    // Card states belong to the previous answer's proposals. Carrying them
+    // over would mark a fresh proposal "applied" because the one it replaced
+    // happened to share an id — ids are only unique within one answer.
+    setProposalStates(new Map());
+  }, [showCopyFeedback, setCaptureStage]);
 
-    const trimmed = question.trim();
+  // A timer that outlives the panel would set state on an unmounted component.
+  useEffect(() => () => {
+    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+    if (captureTimerRef.current !== null) window.clearTimeout(captureTimerRef.current);
+  }, []);
+
+  /**
+   * Identity of the seed already applied.
+   *
+   * Seeded on the first render rather than left null, so arriving *with* a
+   * seed does not immediately re-apply it and overwrite the initial prompt.
+   */
+  const appliedSeedRef = useRef<string | null>(seedIdentity(seed));
+
+  // Explaining a second finding without leaving the panel has to replace the
+  // exchange, not append to it: the previous answer is about the previous
+  // finding, and leaving it on screen under a new seed misattributes it.
+  const seedKey = seedIdentity(seed);
+  useEffect(() => {
+    if (seedKey === appliedSeedRef.current) return;
+    appliedSeedRef.current = seedKey;
+    setActiveSeed(seed);
+    if (seed) {
+      setPrompt(EXPLAIN_PROMPT);
+      setState({ status: "idle" });
+      resetActions();
+    }
+  }, [seedKey, seed, resetActions]);
+
+  /**
+   * Send one question.
+   *
+   * Takes the question rather than reading `prompt`, because Retry re-sends
+   * the question that failed — which is not necessarily what is in the
+   * textarea by then. The prompt is never cleared, so a user who edited it
+   * while an error was on screen keeps their edit and still gets a retry of
+   * the exchange the error belongs to.
+   *
+   * `refine` is a parameter for the same reason: a retry must re-send the mode
+   * the question was asked in, which is not necessarily the toggle's position
+   * by the time the user presses Retry.
+   */
+  const runAsk = useCallback(async (question: string, refine: boolean) => {
+    if (inFlightRef.current) return;
+    // The no-op case: an empty or whitespace-only prompt issues no request.
+    if (!isSubmittablePrompt(question)) return;
+
     inFlightRef.current = true;
-    setState({ status: "submitting" });
-    // Both actions' feedback described the previous answer. Cleared here, at
-    // the moment that makes it stale, rather than from an effect watching the
-    // answer — an effect flushes on Preact's schedule and can land *after* a
-    // click the user has already made, undoing it.
-    showCopyFeedback(null);
-    setCapture({ status: "idle" });
-    // Verdicts belong to the answer that produced them; carrying them across
-    // would let a click on the old answer's proposals write the new one's.
-    setVerdicts({});
-    setApplyState({ status: "idle" });
+    resetActions();
+    setState({ status: "submitting", question });
+
     try {
       const res = await fetch(ASK_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // The finding travels as named fields, not folded into the question:
-        // the model reads the finding itself, and a test can assert its zone
-        // and files arrived.
+        // The seed goes as a sibling of the prompt, not folded into it. The
+        // endpoint renders it as its own focus section and adds the rules that
+        // make the answer name this finding's zone and files, which it cannot
+        // do for facts buried in the question text. `mode` rides beside them
+        // for the same reason: it selects prompt rules and context, not text.
         body: JSON.stringify({
-          prompt: trimmed,
-          ...(finding ? { finding } : {}),
-          ...(wantsRefinements ? { refinePrd: true } : {}),
+          prompt: question,
+          ...(activeSeed ? { seed: activeSeed } : {}),
+          ...(refine ? { mode: "refine" } : {}),
         }),
       });
-      const body = await res.json() as AskResponse;
-      setState(stateForResponse(body, trimmed));
+
+      if (!res.ok) {
+        setState({ status: "error", question, refine, failure: await readErrorPayload(res) });
+        return;
+      }
+
+      const payload = await res.json() as AskSuccessPayload;
+      const answer = typeof payload.answer === "string" ? payload.answer : "";
+      if (answer.trim().length === 0) {
+        // A 200 with nothing in it is a failure the user can act on (ask
+        // again, or check the vendor), not an answer to display as blank. It
+        // is the provider's fault, not the transport's, so it is reported as
+        // one rather than as a generic failure.
+        setState({
+          status: "error",
+          question,
+          refine,
+          failure: {
+            kind: "llm_error",
+            message: "The model returned an empty answer.",
+            suggestion: null,
+            remediation: [],
+            retryAfterMs: null,
+          },
+        });
+        return;
+      }
+
+      setState({
+        status: "answered",
+        question,
+        answer,
+        vendor: typeof payload.vendor === "string" ? payload.vendor : null,
+        model: typeof payload.model === "string" ? payload.model : null,
+        contextSources: Array.isArray(payload.contextSources) ? payload.contextSources : [],
+        proposals: Array.isArray(payload.proposals) ? payload.proposals : [],
+        refinementNotes: Array.isArray(payload.refinementNotes) ? payload.refinementNotes : [],
+      });
     } catch (err) {
-      // A rejected fetch never reached the route, so the route's diagnosis is
-      // not available — but the mode still gets named and offered a retry.
-      const message = err instanceof Error ? err.message : "Failed to reach the Ask endpoint.";
-      setState({ status: "error", message, failure: transportFailure(message) });
+      // `fetch` rejects only for transport faults, so this is never a provider
+      // verdict. The thrown text ("Failed to fetch") is kept as detail rather
+      // than as the whole card: on its own it names nothing the user can act on.
+      setState({
+        status: "error",
+        question,
+        refine,
+        failure: {
+          kind: "network",
+          message: err instanceof Error ? err.message : null,
+          suggestion: null,
+          remediation: [],
+          retryAfterMs: null,
+        },
+      });
     } finally {
       inFlightRef.current = false;
     }
-  }, [showCopyFeedback]);
+  }, [activeSeed, resetActions]);
 
-  const handleSubmit = useCallback(
-    () => submitQuestion(prompt, attachedFinding, refinePrd),
-    [prompt, attachedFinding, refinePrd, submitQuestion],
-  );
+  /** Submit whatever is in the textarea, in whichever mode is selected. */
+  const submit = useCallback(() => runAsk(prompt.trim(), refineMode), [runAsk, prompt, refineMode]);
 
-  /**
-   * Write the accepted proposals.
-   *
-   * Only proposals the reviewer accepted are sent, and each carries the
-   * `before` it was written against so the server can refuse one whose item has
-   * moved on. Rejecting every proposal never reaches this: with nothing
-   * accepted there is no request, so the tree is untouched.
-   */
-  const handleApplyRefinements = useCallback(async () => {
-    if (state.status !== "answered") return;
-    const accepted = state.proposals.filter((p) => verdicts[p.id] === "accepted");
-    if (accepted.length === 0) return;
-
-    setApplyState({ status: "applying" });
-    try {
-      const res = await fetch(APPLY_REFINEMENTS_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proposals: accepted }),
-      });
-      const body = await res.json().catch(() => ({})) as {
-        ok?: boolean;
-        applied?: number;
-        outcomes?: { id: string; applied: boolean; reason?: string }[];
-        error?: string;
-      };
-      if (!res.ok || body.ok !== true) {
-        // Includes the 409 a concurrent writer produces, whose message names
-        // the process holding the lock.
-        throw new Error(body.error ?? `The apply request failed (HTTP ${res.status}).`);
-      }
-      setApplyState({
-        status: "done",
-        applied: body.applied ?? 0,
-        refused: (body.outcomes ?? [])
-          .filter((o) => !o.applied)
-          .map((o) => ({ id: o.id, reason: o.reason ?? "Refused." })),
-      });
-    } catch (err) {
-      setApplyState({
-        status: "error",
-        message: err instanceof Error ? err.message : "Failed to apply the refinements.",
-      });
-    }
-  }, [state, verdicts]);
-
-  const setVerdict = useCallback((id: string, verdict: ProposalVerdict) => {
-    setVerdicts((prev) => ({ ...prev, [id]: verdict }));
-  }, []);
-
-  /**
-   * Pick up a finding left by Explain, and answer it without a second click.
-   *
-   * The user already said what they wanted by clicking Explain; making them
-   * press Ask again would be asking twice. The question is still placed in the
-   * textarea, editable, so a follow-up starts from it rather than from blank.
-   *
-   * The seed is taken even in the deployed export, where nothing can be asked:
-   * taking clears it, and a seed left behind would attach itself to whatever
-   * the user asked next in a later session.
-   */
-  useEffect(() => {
-    const seed = takePendingAskSeed();
-    if (!seed || deployed) return;
-    setAttachedFinding(seed);
-    setPrompt(EXPLAIN_FINDING_PROMPT);
-    void submitQuestion(EXPLAIN_FINDING_PROMPT, seed);
-  }, [deployed, submitQuestion]);
+  const answerText = state.status === "answered" ? state.answer : null;
 
   const handleCopy = useCallback(async () => {
-    if (state.status !== "answered") return;
-    const result = await copyTextToClipboard(state.answer);
-    showCopyFeedback(result.ok
-      ? { kind: "success" }
-      : { kind: "error", message: clipboardFailureMessage(result.kind, "answer") });
-  }, [state, showCopyFeedback]);
+    if (answerText === null) return;
+    const result = await copyTextToClipboard(answerText);
+    showCopyFeedback(result.ok ? { status: "success" } : { status: "error", reason: result.reason });
+  }, [answerText, showCopyFeedback]);
 
   const handleCapture = useCallback(async () => {
     if (state.status !== "answered") return;
+    if (capturingRef.current) return;
+    capturingRef.current = true;
     setCapture({ status: "capturing" });
+
     try {
-      const res = await fetch(CAPTURE_ENDPOINT, {
+      const res = await fetch(ASK_CAPTURE_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: state.question, answer: state.answer }),
       });
-      const body = await res.json().catch(() => ({})) as CaptureResponse;
-      if (!res.ok || body.ok !== true) {
-        const failure = body as CaptureFailureResponse;
-        throw new Error(failure.error ?? `The capture request failed (HTTP ${res.status}).`);
+      let payload: AskCapturePayload = {};
+      try {
+        payload = await res.json() as AskCapturePayload;
+      } catch {
+        payload = {};
       }
-      setCapture({ status: "done", message: captureResultMessage(body) });
+      if (!res.ok) {
+        // The endpoint's own wording when it supplied any, the status code
+        // otherwise -- a proxy returning HTML must still name what went wrong.
+        const reason = typeof payload.error === "string" && payload.error.trim().length > 0
+          ? payload.error
+          : `The capture request failed (${res.status}).`;
+        setCaptureStage({ status: "error", message: reason });
+        return;
+      }
+      setCaptureStage({ status: "done", message: describeCapture(payload) });
     } catch (err) {
-      // The answer card stays exactly as it is, so a failed capture costs the
-      // user nothing — they can retry, or copy the text and file it by hand.
-      setCapture({
+      setCaptureStage({
         status: "error",
-        message: err instanceof Error ? err.message : "Failed to capture the answer.",
+        message: err instanceof Error ? err.message : "The capture request failed.",
       });
+    } finally {
+      capturingRef.current = false;
     }
-  }, [state]);
+  }, [state, setCaptureStage]);
 
-  const submitting = state.status === "submitting";
-  const submitUnavailable = submitting || isBlankPrompt(prompt);
+  /**
+   * Reject one proposal.
+   *
+   * Drops the card and nothing else. There is deliberately no request here and
+   * no server-side "rejected" record: the acceptance criterion is that
+   * rejecting leaves the PRD tree byte-identical, and the strongest way to
+   * guarantee that is for the reject path to have no code that could write.
+   */
+  const handleRejectProposal = useCallback((proposal: RefinementProposal) => {
+    setState((current) => current.status === "answered"
+      ? { ...current, proposals: current.proposals.filter((p) => p.id !== proposal.id) }
+      : current);
+  }, []);
 
-  const proposals = state.status === "answered" ? state.proposals : [];
-  const acceptedCount = proposals.filter((p) => verdicts[p.id] === "accepted").length;
-  const rejectedCount = proposals.filter((p) => verdicts[p.id] === "rejected").length;
+  /**
+   * Accept one proposal.
+   *
+   * Posts that proposal alone — not the pending list — so accepting one change
+   * can never apply another the user has not looked at yet. The proposal goes
+   * back exactly as it arrived: its `baseline` fingerprints are what the apply
+   * route re-checks under the lock, and editing them here would turn the
+   * staleness guard into a formality.
+   */
+  const handleAcceptProposal = useCallback(async (proposal: RefinementProposal) => {
+    if (applyingRef.current.has(proposal.id)) return;
+    applyingRef.current.add(proposal.id);
+    setProposalStates((current) => new Map(current).set(proposal.id, { status: "applying" }));
 
-  const copyError = copyFeedback?.kind === "error" ? copyFeedback.message : null;
-  const politeMessage = politeAnnouncement(
-    state,
-    copyFeedback?.kind === "success",
-    capture.status === "done" ? capture.message : null,
-  );
-  const assertiveMessage = assertiveAnnouncement(
-    state,
-    copyError,
-    capture.status === "error" ? capture.message : null,
-  );
+    const settle = (next: RefinementCardState) => {
+      setProposalStates((current) => new Map(current).set(proposal.id, next));
+    };
+
+    try {
+      const res = await fetch(REFINEMENT_APPLY_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposals: [proposal] }),
+      });
+      let payload: RefinementApplyPayload = {};
+      try {
+        payload = await res.json() as RefinementApplyPayload;
+      } catch {
+        payload = {};
+      }
+      if (!res.ok) {
+        // The endpoint's wording when it gave any — for a held lock that is
+        // the sentence naming the holder's PID, which is the whole value of
+        // the failure. Only a response our server did not write falls back.
+        settle({
+          status: "refused",
+          reason: typeof payload.error === "string" && payload.error.trim().length > 0
+            ? payload.error
+            : `The change could not be applied (${res.status}).`,
+        });
+        return;
+      }
+      const states = outcomeStates([proposal], Array.isArray(payload.outcomes) ? payload.outcomes : []);
+      settle(states.get(proposal.id) ?? {
+        status: "refused",
+        reason: "The server did not report what happened to this change.",
+      });
+    } catch (err) {
+      settle({
+        status: "refused",
+        reason: err instanceof Error ? err.message : "The change could not be applied.",
+      });
+    } finally {
+      applyingRef.current.delete(proposal.id);
+    }
+  }, []);
 
   const header = h("div", { class: "view-header" },
     h(BrandedHeader, { product: "sourcevision", title: "SourceVision", class: "branded-header-sv" }),
     h("h2", { class: "section-header" }, "Ask"),
   );
 
-  // The tab is hidden in a static export, but a direct URL still reaches this
-  // view — say why it cannot work here instead of failing on first submit.
   if (deployed) {
-    return h("div", { class: "ask-container" },
+    return h("div", { class: "sv-ask-container" },
       header,
-      h("div", { class: "card ask-unavailable", role: "status" },
+      h("p", { class: "section-sub" },
+        "Ask a question about this project and get an answer grounded in the analysis.",
+      ),
+      h("div", { class: "card sv-ask-unavailable", role: "status" },
         h("h3", { class: "section-header-sm" }, "Not available in the exported dashboard"),
         h("p", null,
-          "Answering a question needs a live model call, which the n-dx server makes and a static export cannot. ",
+          "Answering a question calls a model from the n-dx server, which is not part of a static export. ",
           "Run ", h("code", null, `${cliName} start .`), " on the project and open this view there.",
         ),
       ),
     );
   }
 
-  return h("div", { class: "ask-container" },
-    // Mounted before there is anything to announce, and never unmounted — the
-    // house idiom (see hench-runs.ts, prd-tree.ts). Polite carries progress and
-    // the answer; assertive carries failures, which interrupt.
-    h("div", { class: "sr-only", "aria-live": "polite", "aria-atomic": "true" }, politeMessage),
-    h("div", { class: "sr-only", "aria-live": "assertive", "aria-atomic": "true" }, assertiveMessage),
+  const submitting = state.status === "submitting";
+  const tooLong = prompt.trim().length > ASK_MAX_PROMPT_CHARS;
 
+  // The state modifier is namespaced `sv-ask-state-*` rather than `sv-ask-*`:
+  // the latter collides with the `sv-ask-error` card class, which put the
+  // error card's red border on the whole container and made a `.sv-ask-error`
+  // query resolve to the container instead of the card.
+  return h("div", { class: `sv-ask-container sv-ask-state-${state.status}` },
     header,
     h("p", { class: "section-sub" },
-      "Ask a question about this project. Answers are grounded in the existing ",
-      h("code", null, ".sourcevision/"),
-      " analysis — run an analysis first if it is stale.",
+      "Answers come from this project's ",
+      h("code", null, ".sourcevision"),
+      " analysis. Run an analysis first for anything it does not yet cover.",
     ),
 
-    // What is being explained, shown rather than implied: the answer below
-    // will talk about a zone and some files, and the user needs to be able to
-    // see which finding sent them here — especially after editing the question.
-    attachedFinding
-      ? h("div", { class: "card ask-finding" },
-          h("h3", { class: "section-header-sm" }, "Explaining a finding"),
-          h("p", { class: "ask-finding-text" }, attachedFinding.message),
-          h("ul", { class: "ask-finding-fields" },
-            h("li", null, h("span", { class: "ask-finding-key" }, "Type: "), attachedFinding.type),
-            attachedFinding.severity
-              ? h("li", null,
-                  h("span", { class: "ask-finding-key" }, "Severity: "),
-                  attachedFinding.severity,
-                )
-              : null,
-            h("li", null, h("span", { class: "ask-finding-key" }, "Zone: "), attachedFinding.zone),
-            h("li", null,
-              h("span", { class: "ask-finding-key" }, "Files: "),
-              attachedFinding.files.length > 0
-                ? attachedFinding.files.join(", ")
-                : "none recorded",
-            ),
+    // The panel's one live region, mounted on every render with empty text
+    // while there is nothing to say. A region inserted alongside its content
+    // is not reliably announced, so it cannot be created when the answer is.
+    h("p", {
+      class: "sr-only sv-ask-announcer",
+      role: "status",
+      "aria-live": "polite",
+      "aria-atomic": "true",
+    }, askAnnouncement(state)),
+
+    // What the seed carries is shown, not just sent. A grounded answer that
+    // names files the user never saw offered looks like the model guessed;
+    // showing the facts first makes the answer's specificity legible, and the
+    // detach control keeps the panel usable for an unrelated question without
+    // a round trip through the Problems view.
+    activeSeed
+      ? h("div", { class: "card sv-ask-seed" },
+          h("div", { class: "sv-ask-seed-head" },
+            h("h3", { class: "section-header-sm" }, "About this finding"),
+            h("button", {
+              type: "button",
+              class: "btn sv-ask-seed-clear-btn",
+              title: "Ask without this finding attached",
+              onClick: () => { setActiveSeed(null); },
+            }, "Detach"),
           ),
-          h("button", {
-            type: "button",
-            class: "btn ask-finding-detach-btn",
-            onClick: () => setAttachedFinding(null),
-            title: "Ask about the project generally instead of this finding",
-          }, "Detach finding"),
+          activeSeed.text
+            ? h("p", { class: "sv-ask-seed-text" }, activeSeed.text)
+            : null,
+          h("dl", { class: "sv-ask-seed-facts" },
+            ...Object.entries(activeSeed.labels ?? {}).flatMap(([label, value]) => [
+              h("dt", { key: `dt-${label}` }, label),
+              h("dd", { key: `dd-${label}` }, value),
+            ]),
+            ...(activeSeed.zone
+              ? [h("dt", { key: "dt-zone" }, "zone"), h("dd", { key: "dd-zone" }, h("code", null, activeSeed.zone))]
+              : []),
+            ...(activeSeed.files?.length
+              ? [
+                  h("dt", { key: "dt-files" }, activeSeed.files.length === 1 ? "file" : "files"),
+                  h("dd", { key: "dd-files", class: "sv-ask-seed-files" },
+                    ...activeSeed.files.map((file, i) => h("code", { key: i }, file)),
+                  ),
+                ]
+              : []),
+          ),
         )
       : null,
 
-    h("div", { class: "card ask-form" },
-      h("label", { class: "ask-prompt-label", for: PROMPT_INPUT_ID }, "Your question"),
-      // Deliberately NOT disabled while a question is in flight. Ctrl+Enter
-      // from here is the documented submit path, so disabling it would destroy
-      // the focused element and drop the user at <body> — and there is nothing
-      // to protect: handleSubmit snapshots the question, so an edit made during
-      // the flight cannot change what was asked.
+    h("form", {
+      class: "card sv-ask-form",
+      "aria-busy": submitting ? "true" : "false",
+      onSubmit: (e: Event) => {
+        e.preventDefault();
+        void submit();
+      },
+    },
+      h("label", { class: "sv-ask-label", for: PROMPT_FIELD_ID }, "Your question"),
       h("textarea", {
-        id: PROMPT_INPUT_ID,
-        class: "ask-prompt-input",
+        id: PROMPT_FIELD_ID,
+        class: "sv-ask-textarea",
         rows: 4,
         value: prompt,
-        placeholder: "Which zones carry the most coupling, and why?",
-        onInput: (e: Event) => setPrompt((e.currentTarget as HTMLTextAreaElement).value),
-        onKeyDown: (e: KeyboardEvent) => {
-          // Cmd/Ctrl+Enter submits — Enter alone stays a newline, because the
-          // prompt is prose and multi-line questions are the norm.
-          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-            e.preventDefault();
-            void handleSubmit();
-          }
-        },
+        placeholder: "Which zones are most coupled, and what is driving it?",
+        // `readOnly`, not `disabled`: disabling the field the user is typing
+        // in moves focus to <body>, so pressing Enter to submit would cost a
+        // keyboard user their place and their way back to the prompt. Read-only
+        // still refuses edits while the answer is in flight.
+        readOnly: submitting,
+        "aria-describedby": "sv-ask-prompt-hint",
+        onInput: (e: Event) => setPrompt((e.target as HTMLTextAreaElement).value),
       }),
-      h("div", { class: "ask-form-actions" },
-        // aria-disabled, not disabled: a disabled control loses focus and
-        // leaves the tab order, so submitting by keyboard would strand the user
-        // at <body> exactly when the answer they are waiting for arrives.
-        // handleSubmit already no-ops on a blank prompt and on a second click
-        // during a flight, so the control being clickable costs nothing.
-        h("button", {
-          type: "button",
-          class: "btn ask-submit-btn",
-          "aria-disabled": String(submitUnavailable),
-          onClick: () => { void handleSubmit(); },
-        }, submitting ? "Asking…" : "Ask"),
-        h("span", { class: "section-sub ask-submit-hint" }, "⌘/Ctrl + Enter"),
-
-        // Opt-in: an ordinary question should not come back with PRD rewrites
-        // the user then has to read and reject.
-        h("label", { class: "ask-refine-toggle" },
-          h("input", {
-            type: "checkbox",
-            class: "ask-refine-checkbox",
-            checked: refinePrd,
-            onChange: (e: Event) => setRefinePrd((e.currentTarget as HTMLInputElement).checked),
-          }),
-          " Propose PRD changes",
+      // A checkbox rather than a second submit button: the mode belongs to the
+      // question being composed, and a "Refine the PRD" button beside "Ask"
+      // would read as an action that writes something.
+      h("div", { class: "sv-ask-mode" },
+        h("input", {
+          type: "checkbox",
+          id: REFINE_FIELD_ID,
+          class: "sv-ask-mode-toggle",
+          checked: refineMode,
+          "aria-describedby": REFINE_HINT_ID,
+          onChange: (e: Event) => setRefineMode((e.target as HTMLInputElement).checked),
+        }),
+        h("label", { class: "sv-ask-mode-label", for: REFINE_FIELD_ID },
+          "Propose changes to the PRD",
         ),
+        h("p", { class: "section-sub sv-ask-mode-hint", id: REFINE_HINT_ID },
+          "Sends the PRD with the question and offers edits to existing items. "
+          + "Each edit is reviewed as a diff; nothing is written until you accept it.",
+        ),
+      ),
+
+      h("div", { class: "sv-ask-form-footer" },
+        h("p", { class: "section-sub sv-ask-hint", id: "sv-ask-prompt-hint" },
+          tooLong
+            ? `That question is ${prompt.trim().length} characters; the limit is ${ASK_MAX_PROMPT_CHARS}.`
+            : `${ASK_MAX_PROMPT_CHARS - prompt.trim().length} characters remaining.`,
+        ),
+        h("button", {
+          type: "submit",
+          class: "btn sv-ask-submit",
+          // The real `disabled` attribute is reserved for a prompt that cannot
+          // be sent — a state only reachable while focus is in the textarea,
+          // so it can never take focus away from this button. While a request
+          // is in flight the control stays focusable and merely reports itself
+          // unavailable, because disabling the button a keyboard user just
+          // pressed drops their focus to <body>. `submit()` refuses the second
+          // request either way.
+          //
+          // Set only while submitting, never as a standing `"false"`: paired
+          // with the native `disabled` above that would be a control claiming
+          // to be both unavailable and available at once.
+          disabled: !isSubmittablePrompt(prompt),
+          "aria-disabled": submitting ? "true" : undefined,
+        }, submitting ? "Asking..." : "Ask"),
       ),
     ),
 
-    // None of the state cards is a live region: they mount at the same moment
-    // as their text, which is the one shape a live region cannot announce
-    // reliably. The persistent pair at the top of the container speaks for
-    // them, and having both would read every answer twice.
+    // No live semantics on either of the next two: the announcer above owns
+    // every state transition. Marking these as regions too would announce the
+    // same transition a second time.
     state.status === "idle"
-      ? h("div", { class: "card ask-idle" },
+      ? h("div", { class: "card sv-ask-idle" },
           h("h3", { class: "section-header-sm" }, "No question asked yet"),
-          h("p", null, "The answer appears here once you ask something."),
+          h("p", null, "Type a question above to get an answer grounded in the analysis."),
         )
       : null,
 
-    state.status === "submitting"
-      ? h("div", { class: "card ask-submitting" },
-          h("h3", { class: "section-header-sm" }, "Asking…"),
-          h("p", null, "Assembling analysis context and waiting on the model."),
+    submitting
+      ? h("div", { class: "sv-ask-status" },
+          h("p", { class: "loading" }, "Reading the analysis and composing an answer..."),
         )
+      : null,
+
+    // Every degraded mode is named as itself and carries what to do about it.
+    // The heading states the fault, the steps are doable from here, and the
+    // affordance that actually fixes the mode sits under them: the analysis run
+    // when there is nothing to answer from, a retry when the fault is transient.
+    // Nothing here can render as a bare status code — see ask-failure.ts.
+    state.status === "error"
+      ? (() => {
+          const failure = describeAskFailure(state.failure);
+          return h("div", {
+            class: `card sv-ask-error sv-ask-error-${failure.kind}`,
+            role: "alert",
+            "data-ask-error-kind": failure.kind,
+          },
+            h("h3", { class: "section-header-sm" }, failure.title),
+            h("p", { class: "sv-ask-error-message" }, failure.message),
+            state.failure.suggestion
+              ? h("p", { class: "section-sub sv-ask-error-suggestion" }, state.failure.suggestion)
+              : null,
+            h("ul", { class: "sv-ask-error-steps" },
+              ...failure.steps.map((step, i) => h("li", { key: i, class: "section-sub" }, step)),
+            ),
+            failure.canRetry
+              ? h("div", { class: "sv-ask-error-actions" },
+                  h("button", {
+                    type: "button",
+                    class: "btn sv-ask-retry-btn",
+                    title: "Send the same question again",
+                    onClick: () => { void runAsk(state.question, state.refine); },
+                  }, "Retry"),
+                )
+              : null,
+            // The affordance the acceptance criterion asks for: the run itself,
+            // not the name of the command that would do it.
+            failure.needsAnalysis
+              ? h("div", { class: "sv-ask-error-analyze" },
+                  h(AnalyzeControls, null),
+                )
+              : null,
+          );
+        })()
       : null,
 
     state.status === "answered"
-      ? h("div", { class: "card ask-answered" },
-          h("h3", { class: "section-header-sm" }, "Answer"),
-          h("div", { class: "ask-answer" }, state.answer),
-          h("p", { class: "section-sub ask-answer-meta" },
-            `${state.vendor} / ${state.model}`,
-            state.sources.length > 0 ? ` · grounded in ${state.sources.join(", ")}` : "",
-          ),
+      // A labelled region rather than a live one: the announcer has already
+      // said the answer arrived, and this is where the reader goes to read it
+      // at their own pace. Making the card itself live would read the whole
+      // answer -- plus its metadata, its buttons, and every later "Copied"
+      // line, since a live ancestor claims all of its descendants' updates.
+      ? h("div", {
+          class: "card sv-ask-answer",
+          role: "region",
+          "aria-labelledby": ANSWER_HEADING_ID,
+        },
+          h("h3", { class: "section-header-sm", id: ANSWER_HEADING_ID }, "Answer"),
+          h("p", { class: "section-sub sv-ask-question" }, state.question),
+          h("div", { class: "sv-ask-answer-body" }, state.answer),
+          state.model
+            ? h("p", { class: "section-sub sv-ask-answer-meta" },
+                `${state.vendor ?? "llm"} / ${state.model}`,
+                state.contextSources.length > 0
+                  ? ` · grounded in ${state.contextSources.join(", ")}`
+                  : "",
+              )
+            : null,
 
-          h("div", { class: "ask-answer-actions" },
+          h("div", { class: "sv-ask-actions" },
             h("button", {
               type: "button",
-              class: "btn ask-copy-btn",
+              class: "btn sv-ask-copy-btn",
               onClick: () => { void handleCopy(); },
-              title: "Copy the answer text to the clipboard",
-            }, copyFeedback?.kind === "success" ? "✓ Copied" : "Copy"),
+            }, copy.status === "success" ? "Copied" : "Copy answer"),
+
+            capture.status === "idle" || capture.status === "done" || capture.status === "error"
+              ? h("button", {
+                  type: "button",
+                  class: "btn sv-ask-capture-btn",
+                  title: "File this answer as a PRD task so it can be worked on",
+                  onClick: () => { setCaptureStage({ status: "confirm" }); },
+                }, "Capture to PRD")
+              : null,
+
+            capture.status === "confirm"
+              ? h("span", { class: "sv-ask-capture-confirm" },
+                  h("span", { class: "sv-ask-capture-confirm-prompt" },
+                    "File this answer as a PRD task?",
+                  ),
+                  h("button", {
+                    type: "button",
+                    class: "btn sv-ask-capture-confirm-btn",
+                    onClick: () => { void handleCapture(); },
+                  }, "Confirm"),
+                  h("button", {
+                    type: "button",
+                    class: "btn sv-ask-capture-cancel-btn",
+                    onClick: () => { setCaptureStage({ status: "idle" }); },
+                  }, "Cancel"),
+                )
+              : null,
 
             capture.status === "capturing"
-              ? h("span", { class: "ask-capture-progress", "aria-busy": "true" }, "Capturing…")
-              : capture.status === "confirm"
-                ? h("span", { class: "ask-capture-confirm" },
-                    "File this answer as a PRD item?",
-                    h("button", {
-                      type: "button",
-                      class: "btn ask-capture-confirm-btn",
-                      onClick: () => { void handleCapture(); },
-                    }, "Confirm"),
-                    h("button", {
-                      type: "button",
-                      class: "btn ask-capture-cancel-btn",
-                      onClick: () => setCapture({ status: "idle" }),
-                    }, "Cancel"),
-                  )
-                : h("button", {
-                    type: "button",
-                    class: "btn ask-capture-btn",
-                    onClick: () => setCapture({ status: "confirm" }),
-                    title: "File this answer as a PRD item so it can be worked on",
-                  }, "Capture to PRD"),
+              ? h("span", { class: "sv-ask-capture-busy", "aria-busy": "true" }, "Capturing...")
+              : null,
           ),
 
-          // Visible feedback only — the live regions above do the announcing.
-          // The ✓ and ⚠ are what tells success from failure when green and red
-          // are indistinguishable; the announcements omit them, because a
-          // glyph read aloud is noise, not information.
-          h("p", { class: "ask-copy-feedback" },
-            copyFeedback?.kind === "success"
-              ? "✓ Copied answer to clipboard."
-              : capture.status === "done" ? capture.message : "",
-          ),
-          copyError !== null
-            ? h("p", { class: "ask-copy-error" }, `⚠ ${copyError}`)
-            : null,
-          capture.status === "error"
-            ? h("p", { class: "ask-capture-error" },
-                `⚠ Could not capture the answer: ${capture.message}`,
-              )
-            : null,
-        )
-      : null,
-
-    // Proposed PRD changes, one reviewable card each. Nothing here writes: the
-    // verdicts are local until Apply sends the accepted ones, so a reviewer who
-    // rejects everything leaves the tree exactly as it was.
-    state.status === "answered" && state.proposals.length > 0
-      ? h("div", { class: "card ask-proposals" },
-          h("h3", { class: "section-header-sm" },
-            `Proposed PRD changes (${state.proposals.length})`,
-          ),
-          h("p", { class: "section-sub" },
-            "Each is reviewed on its own. Nothing is written until you apply what you accepted.",
-          ),
-
-          ...state.proposals.map((proposal) => {
-            const verdict = verdicts[proposal.id] ?? "pending";
-            return h("div", {
-              key: proposal.id,
-              class: `ask-proposal ask-proposal-${verdict}`,
-            },
-              h("div", { class: "ask-proposal-head" },
-                h("span", { class: "ask-proposal-kind" }, PROPOSAL_KIND_LABEL[proposal.kind]),
-                h("span", { class: "ask-proposal-item" }, proposal.itemTitle),
-              ),
-              proposal.rationale
-                ? h("p", { class: "ask-proposal-rationale" }, proposal.rationale)
-                : null,
-
-              // Before and after, both shown: an edit that replaces text the
-              // user cannot see is the thing this review exists to prevent.
-              h("div", { class: "ask-proposal-diff" },
-                h("div", { class: "ask-diff-side ask-diff-before" },
-                  h("span", { class: "ask-diff-label" }, "Before"),
-                  proposal.before.length > 0
-                    ? proposal.before.map((line, i) =>
-                        h("p", { key: i, class: "ask-diff-line" }, `− ${line}`))
-                    : h("p", { class: "ask-diff-line ask-diff-empty" }, "(empty)"),
-                ),
-                h("div", { class: "ask-diff-side ask-diff-after" },
-                  h("span", { class: "ask-diff-label" }, "After"),
-                  proposal.after.length > 0
-                    ? proposal.after.map((line, i) =>
-                        h("p", { key: i, class: "ask-diff-line" }, `+ ${line}`))
-                    : h("p", { class: "ask-diff-line ask-diff-empty" }, "(empty)"),
-                ),
-              ),
-
-              h("div", { class: "ask-proposal-actions" },
-                h("button", {
-                  type: "button",
-                  class: "btn ask-proposal-accept",
-                  "aria-pressed": String(verdict === "accepted"),
-                  "aria-label": `Accept: ${PROPOSAL_KIND_LABEL[proposal.kind]} of ${proposal.itemTitle}`,
-                  onClick: () => setVerdict(proposal.id, verdict === "accepted" ? "pending" : "accepted"),
-                }, verdict === "accepted" ? "✓ Accepted" : "Accept"),
-                h("button", {
-                  type: "button",
-                  class: "btn ask-proposal-reject",
-                  "aria-pressed": String(verdict === "rejected"),
-                  "aria-label": `Reject: ${PROPOSAL_KIND_LABEL[proposal.kind]} of ${proposal.itemTitle}`,
-                  onClick: () => setVerdict(proposal.id, verdict === "rejected" ? "pending" : "rejected"),
-                }, verdict === "rejected" ? "✗ Rejected" : "Reject"),
-              ),
-            );
-          }),
-
-          h("div", { class: "ask-proposals-apply" },
-            h("button", {
-              type: "button",
-              class: "btn ask-apply-btn",
-              // Nothing accepted means nothing to write — not an empty write.
-              "aria-disabled": String(acceptedCount === 0 || applyState.status === "applying"),
-              onClick: () => { void handleApplyRefinements(); },
-            }, applyState.status === "applying"
-              ? "Applying…"
-              : `Apply ${acceptedCount} accepted change${acceptedCount === 1 ? "" : "s"}`),
-            h("span", { class: "section-sub" },
-              `${acceptedCount} accepted · ${rejectedCount} rejected · ${state.proposals.length - acceptedCount - rejectedCount} undecided`,
+          // Both feedback lines are always mounted so their live regions exist
+          // before the text arrives -- a region created in the same render as
+          // its content is not reliably announced. The marker span carries the
+          // outcome as a shape so colour is not the only signal; it is
+          // aria-hidden because the message beside it already says which
+          // outcome this is.
+          h("p", {
+            class: `sv-ask-feedback sv-ask-feedback-${copy.status}`,
+            role: "status",
+            "aria-live": "polite",
+          },
+            h("span", { class: "sv-ask-feedback-mark", "aria-hidden": "true" },
+              copy.status === "success"
+                ? FEEDBACK_MARK_OK
+                : copy.status === "error" ? FEEDBACK_MARK_FAIL : "",
+            ),
+            h("span", { class: "section-sub sv-ask-copy-feedback" },
+              copy.status === "success"
+                ? clipboardSuccessMessage(COPY_SUBJECT)
+                : copy.status === "error"
+                  ? clipboardFailureMessage(copy.reason, COPY_SUBJECT)
+                  : "",
             ),
           ),
-
-          applyState.status === "done"
-            ? h("div", { class: "ask-apply-result", role: "status", "aria-live": "polite" },
-                h("p", null, `✓ Applied ${applyState.applied} change${applyState.applied === 1 ? "" : "s"} to the PRD.`),
-                applyState.refused.length > 0
-                  ? h("ul", { class: "ask-apply-refused" },
-                      applyState.refused.map((r) => h("li", { key: r.id }, `⚠ ${r.reason}`)),
-                    )
-                  : null,
+          h("p", {
+            class: `sv-ask-feedback sv-ask-feedback-${capture.status === "done" ? "success" : "idle"}`,
+            role: "status",
+            "aria-live": "polite",
+          },
+            h("span", { class: "sv-ask-feedback-mark", "aria-hidden": "true" },
+              capture.status === "done" ? FEEDBACK_MARK_OK : "",
+            ),
+            h("span", { class: "section-sub sv-ask-capture-feedback" },
+              capture.status === "done" ? capture.message : "",
+            ),
+          ),
+          // A failed write is an alert, not a status: it needs the interruption
+          // that a polite live region deliberately does not give it.
+          //
+          // The message is the server's, so it may not read as a failure on its
+          // own -- "PRD is locked by pid 4212" states a fact. The marker says
+          // so by shape and the screen-reader prefix says so in words, which is
+          // what keeps the red from being the only thing carrying the outcome.
+          capture.status === "error"
+            ? h("p", { class: "sv-ask-feedback sv-ask-feedback-error", role: "alert" },
+                h("span", { class: "sv-ask-feedback-mark", "aria-hidden": "true" }, FEEDBACK_MARK_FAIL),
+                h("span", { class: "sr-only" }, "Capture failed: "),
+                h("span", { class: "section-sub sv-ask-capture-error" }, capture.message),
               )
-            : null,
-          applyState.status === "error"
-            ? h("p", { class: "ask-apply-error", role: "alert" }, `⚠ ${applyState.message}`)
             : null,
         )
       : null,
 
-    // Every degraded mode names itself and offers the action that fits it: run
-    // an analysis, fix credentials, or try again. The prompt is untouched
-    // throughout — a failure must never cost the user their question.
-    state.status === "error"
-      ? h("div", { class: `card ask-error ask-error-${state.failure?.code ?? "unknown"}` },
-          h("h3", { class: "section-header-sm" },
-            `⚠ ${state.failure ? ERROR_HEADING[state.failure.code] : "Unable to answer"}`,
-          ),
-          h("p", { class: "ask-error-summary" }, state.failure?.summary ?? state.message),
-
-          state.failure && state.failure.remediation.length > 0
-            ? h("ul", { class: "ask-error-remediation" },
-                state.failure.remediation.map((line, i) =>
-                  h("li", { key: i }, line),
-                ),
-              )
-            : null,
-
-          h("div", { class: "ask-error-actions" },
-            // Retry only where retrying could plausibly work. Offering it for
-            // bad credentials would invite the user to click until they gave up.
-            state.failure?.retryable
-              ? h("button", {
-                  type: "button",
-                  class: "btn ask-retry-btn",
-                  onClick: () => { void handleSubmit(); },
-                }, "Ask again")
-              : null,
-
-            // The analyze affordance the criterion asks for: the same action
-            // the enrichment gate offers, not a printed command.
-            state.failure?.code === "no_analysis"
-              ? h("button", {
-                  type: "button",
-                  class: "btn ask-analyze-btn",
-                  disabled: analyze.busy,
-                  "aria-busy": analyze.busy ? "true" : "false",
-                  onClick: () => { void analyze.start({ full: false }); },
-                }, analyze.busy ? "Analyzing…" : "Run analysis")
-              : null,
-          ),
-
-          state.failure?.code === "no_analysis"
-            ? h("p", { class: "section-sub ask-analyze-status", role: "status", "aria-live": "polite" },
-                analyze.busy
-                  ? analyze.progress ?? "Analysis running — this can take a few minutes…"
-                  : analyze.state === "done"
-                    ? "✓ Analysis complete — ask again."
-                    : analyze.error
-                      ? `⚠ Analysis failed to start: ${analyze.error}`
-                      : "",
-              )
-            : null,
-        )
+    // Outside the answer region, not inside it. The region is labelled "Answer"
+    // and is where a reader goes to read prose; a list of controls that mutate
+    // the PRD is a different thing and gets its own place in the document.
+    state.status === "answered"
+      ? h(RefinementList, {
+          proposals: state.proposals,
+          states: proposalStates,
+          notes: state.refinementNotes,
+          onAccept: (proposal: RefinementProposal) => { void handleAcceptProposal(proposal); },
+          onReject: handleRejectProposal,
+        })
       : null,
   );
 }

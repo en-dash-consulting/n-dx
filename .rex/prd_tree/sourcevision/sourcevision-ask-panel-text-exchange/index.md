@@ -11,9 +11,9 @@ tags:
   - "llm"
   - "text-exchange"
 source: "ndx-capture"
-startedAt: "2026-09-09T19:23:52.245Z"
-completedAt: "2026-09-09T19:23:52.245Z"
-endedAt: "2026-09-09T19:23:52.245Z"
+startedAt: "2026-09-04T20:07:24.656Z"
+completedAt: "2026-09-04T20:07:24.656Z"
+endedAt: "2026-09-04T20:07:24.656Z"
 acceptanceCriteria:
   - "An \"Ask\" tab appears on the SourceVision surface behind feature gate `sourcevision.ask`, following the existing `pr-markdown` gating pattern in sourcevision-tabs.ts"
   - "Submitting a question returns a text answer grounded in the current .sourcevision/ analysis data, not in the model's own assumptions about the repository"
@@ -24,7 +24,7 @@ acceptanceCriteria:
   - "Token spend from an ask is attributed in the usage rollup rather than lost"
   - "The rex and hench surfaces are untouched, with TODO comments marking where their equivalent panels would later be added"
 description: "A gated \"Ask\" tab on the SourceVision dashboard surface providing a prompt -> response text exchange over the analyzed project. The user types a natural-language question in a textarea; the web server assembles context from the existing .sourcevision/ analysis and calls the LLM through @n-dx/llm-client (web already imports the foundation tier directly at 11 call sites, so no new gateway is required); the answer renders as markdown in the panel.\n\nBeyond free-form Q&A the panel serves two directed uses: (1) explaining a sourcevision finding in plain language, entered from the Problems/Suggestions surfaces, and (2) refining the PRD from the user's feedback and recommendations -- proposing edits to existing items, not only capturing new ones, with every mutation reviewed as a before/after diff before it is written.\n\nScope is the SourceVision surface only. Adoption on the rex and hench surfaces is deliberately out of scope and is marked with TODO comments in packages/web/src/viewer/views/sourcevision-tabs.ts, domain-rex.ts, and domain-hench.ts rather than captured as PRD items.\n\nReuse anchors already in the codebase: the pr-markdown tab gating pattern (sourcevision-tabs.ts:30), the clipboard copy workflow with execCommand fallback and permission-denied handling (pr-markdown.ts:91,308), the confirm-guarded capture-to-PRD action (overview.ts:204 -> POST /api/rex/capture-next-steps), and the rex gateway's resolveStore for in-process PRD writes (rex-gateway.ts:31)."
-lastModified: "2026-09-09T19:23:52.270Z"
+lastModified: "2026-09-04T20:07:24.684Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 

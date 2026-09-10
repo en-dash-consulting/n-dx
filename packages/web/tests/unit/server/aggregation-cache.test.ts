@@ -56,6 +56,31 @@ describe("AggregationResultCache", () => {
     await writeFile(join(svDir, "manifest.json"), data, "utf-8");
   }
 
+  async function writeDashboardUsage(line = '{"timestamp":"2026-01-01T00:00:00.000Z"}'): Promise<void> {
+    await appendFile(join(tmpDir, ".n-dx-web-usage.jsonl"), line + "\n", "utf-8");
+  }
+
+  /**
+   * A fully-populated fingerprint the field tests vary one key of.
+   *
+   * A helper rather than six inline literals: `SourceFingerprint` gains a field
+   * whenever a new token source is added, and repeated literals turn that into
+   * six identical compile errors that say nothing about the change.
+   */
+  function fingerprint(overrides: Partial<SourceFingerprint> = {}): SourceFingerprint {
+    return {
+      henchDirMtimeMs: 1000,
+      henchFileCount: 5,
+      rexLogMtimeMs: 2000,
+      rexLogSize: 500,
+      svManifestMtimeMs: 3000,
+      svManifestSize: 200,
+      dashboardUsageMtimeMs: 4000,
+      dashboardUsageSize: 120,
+      ...overrides,
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // takeFingerprint
   // ---------------------------------------------------------------------------
@@ -71,6 +96,8 @@ describe("AggregationResultCache", () => {
         expect(fp.rexLogSize).toBe(0);
         expect(fp.svManifestMtimeMs).toBe(0);
         expect(fp.svManifestSize).toBe(0);
+        expect(fp.dashboardUsageMtimeMs).toBe(0);
+        expect(fp.dashboardUsageSize).toBe(0);
       } finally {
         await rm(emptyDir, { recursive: true, force: true });
       }
@@ -100,16 +127,12 @@ describe("AggregationResultCache", () => {
       expect(fp.svManifestSize).toBeGreaterThan(0);
     });
 
-    it("captures ask usage log state", async () => {
-      await writeFile(
-        join(svDir, "ask-usage.jsonl"),
-        `${JSON.stringify({ timestamp: "2026-02-01T00:00:00.000Z", inputTokens: 1 })}\n`,
-        "utf-8",
-      );
+    it("captures dashboard usage ledger state", async () => {
+      await writeDashboardUsage();
 
       const fp = await takeFingerprint(tmpDir, rexDir);
-      expect(fp.askLogMtimeMs).toBeGreaterThan(0);
-      expect(fp.askLogSize).toBeGreaterThan(0);
+      expect(fp.dashboardUsageMtimeMs).toBeGreaterThan(0);
+      expect(fp.dashboardUsageSize).toBeGreaterThan(0);
     });
 
     it("excludes hidden files from hench file count", async () => {
@@ -134,58 +157,36 @@ describe("AggregationResultCache", () => {
   // ---------------------------------------------------------------------------
 
   describe("fingerprintsMatch", () => {
-    /**
-     * A complete fingerprint, so each case states only the field it is about.
-     * Built from one literal rather than five: every source added to the
-     * aggregation has to be added to the fingerprint too, and the point of
-     * these tests is that the comparison notices it.
-     */
-    function makeFingerprint(overrides: Partial<SourceFingerprint> = {}): SourceFingerprint {
-      return {
-        henchDirMtimeMs: 1000,
-        henchFileCount: 5,
-        rexLogMtimeMs: 2000,
-        rexLogSize: 500,
-        svManifestMtimeMs: 3000,
-        svManifestSize: 200,
-        askLogMtimeMs: 4000,
-        askLogSize: 300,
-        ...overrides,
-      };
-    }
-
     it("returns true for identical fingerprints", () => {
-      const fp = makeFingerprint();
+      const fp = fingerprint();
       expect(fingerprintsMatch(fp, { ...fp })).toBe(true);
     });
 
     it("returns false when hench dir mtime differs", () => {
-      const a = makeFingerprint();
-      expect(fingerprintsMatch(a, { ...a, henchDirMtimeMs: 1001 })).toBe(false);
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ henchDirMtimeMs: 1001 }))).toBe(false);
     });
 
     it("returns false when hench file count differs", () => {
-      const a = makeFingerprint();
-      expect(fingerprintsMatch(a, { ...a, henchFileCount: 6 })).toBe(false);
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ henchFileCount: 6 }))).toBe(false);
     });
 
     it("returns false when rex log size differs", () => {
-      const a = makeFingerprint();
-      expect(fingerprintsMatch(a, { ...a, rexLogSize: 501 })).toBe(false);
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ rexLogSize: 501 }))).toBe(false);
     });
 
     it("returns false when sv manifest mtime differs", () => {
-      const a = makeFingerprint();
-      expect(fingerprintsMatch(a, { ...a, svManifestMtimeMs: 3001 })).toBe(false);
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ svManifestMtimeMs: 3001 }))).toBe(false);
     });
 
-    it("returns false when the ask log changes", () => {
-      // The Ask log is written by the same server process that serves the
-      // token-usage routes, so a fingerprint that ignored it would serve a
-      // stale total for the spend that just happened.
-      const a = makeFingerprint();
-      expect(fingerprintsMatch(a, { ...a, askLogMtimeMs: 4001 })).toBe(false);
-      expect(fingerprintsMatch(a, { ...a, askLogSize: 301 })).toBe(false);
+    // The dashboard ledger is the source this process appends to itself, so a
+    // fingerprint blind to it would serve a cached utilization response that
+    // omits the ask the user just paid for.
+    it("returns false when the dashboard usage ledger mtime differs", () => {
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ dashboardUsageMtimeMs: 4001 }))).toBe(false);
+    });
+
+    it("returns false when the dashboard usage ledger size differs", () => {
+      expect(fingerprintsMatch(fingerprint(), fingerprint({ dashboardUsageSize: 121 }))).toBe(false);
     });
   });
 
@@ -276,19 +277,6 @@ describe("AggregationResultCache", () => {
 
       // Append to the log file — changes size and mtime
       await writeRexLog('{"event":"second"}');
-
-      const result = await cache.getOrCompute("key", () => "recomputed");
-      expect(result).toBe("recomputed");
-    });
-
-    it("invalidates when the ask usage log is appended to", async () => {
-      const askLog = join(svDir, "ask-usage.jsonl");
-      await writeFile(askLog, `${JSON.stringify({ timestamp: "t1", inputTokens: 1 })}\n`, "utf-8");
-
-      const cache = createCache();
-      await cache.getOrCompute("key", () => "original");
-
-      await appendFile(askLog, `${JSON.stringify({ timestamp: "t2", inputTokens: 2 })}\n`);
 
       const result = await cache.getOrCompute("key", () => "recomputed");
       expect(result).toBe("recomputed");

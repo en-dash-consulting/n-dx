@@ -18,14 +18,8 @@ import {
   linkInfrastructure,
   loadDeclaredArchitecture,
 } from "../../../src/export/iso-declared.js";
-import {
-  loadFromScan,
-  buildSeamEvidence,
-  resolveSeams,
-  seamGaps,
-} from "../../../src/export/iso-sources.js";
+import { loadFromScan } from "../../../src/export/iso-sources.js";
 import { buildIsoModel } from "../../../src/export/iso-model.js";
-import type { CallEdge, CallGraph } from "../../../src/schema/v1.js";
 
 function makeProject(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "iso-decl-"));
@@ -345,6 +339,143 @@ Resources:
   });
 });
 
+// ── CloudFormation ──────────────────────────────────────────────────────────
+
+/** A template header that makes the file unambiguously CloudFormation. */
+const CFN_HEADER = "AWSTemplateFormatVersion: '2010-09-09'\n";
+
+describe("discoverFromIaC, CloudFormation", () => {
+  it("classifies CloudFormation types into the same kinds as Terraform", () => {
+    // The type is normalized (AWS::SQS::Queue → aws_sqs_queue) so one table
+    // serves both dialects; a second table would drift from the first.
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/template.yaml": `${CFN_HEADER}Resources:
+  Documents:
+    Type: AWS::S3::Bucket
+  Ingest:
+    Type: AWS::SQS::Queue
+  Ledger:
+    Type: AWS::DynamoDB::Table
+  Sessions:
+    Type: AWS::ElastiCache::CacheCluster
+  Fanout:
+    Type: AWS::SNS::Topic
+  Worker:
+    Type: AWS::Lambda::Function
+  Nightly:
+    Type: AWS::Events::Rule
+  ApiRole:
+    Type: AWS::IAM::Role
+`,
+    });
+    const { infrastructure, sawIaC } = discoverFromIaC(dir);
+    expect(sawIaC).toBe(true);
+    expect(Object.fromEntries(infrastructure.map((i) => [i.name, i.kind]))).toEqual({
+      Documents: "bucket",
+      Ingest: "queue",
+      Ledger: "database",
+      Sessions: "cache",
+      Fanout: "topic",
+      Worker: "compute",
+      Nightly: "scheduler",
+    });
+    // An IAM role is real infrastructure but says nothing about architecture.
+    expect(infrastructure.some((i) => i.name === "ApiRole")).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("recognises a SAM template", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "template.yml": `${CFN_HEADER}Transform: AWS::Serverless-2016-10-31
+Resources:
+  Api:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: acme-api-handler
+`,
+    });
+    const { infrastructure } = discoverFromIaC(dir);
+    expect(infrastructure).toHaveLength(1);
+    expect(infrastructure[0]).toMatchObject({ name: "Api", kind: "compute" });
+    expect(infrastructure[0].literals).toContain("acme-api-handler");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("takes name literals from properties but not from intrinsic functions", () => {
+    // `!Sub '${AWS::StackName}-docs'` is not a name, and matching source
+    // against it would attribute the bucket to nothing or to everything.
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/s.yaml": `${CFN_HEADER}Resources:
+  Documents:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: acme-documents-prod
+  Uploads:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '\${AWS::StackName}-uploads'
+`,
+    });
+    const byName = Object.fromEntries(
+      discoverFromIaC(dir).infrastructure.map((i) => [i.name, i.literals]),
+    );
+    expect(byName.Documents).toContain("acme-documents-prod");
+    expect(byName.Uploads).toEqual(["Uploads"]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("records which template declared each resource", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "deploy/stack.yaml": `${CFN_HEADER}Resources:\n  Ingest:\n    Type: AWS::SQS::Queue\n`,
+    });
+    const [infra] = discoverFromIaC(dir).infrastructure;
+    expect(infra.origin).toBe("deploy/stack.yaml");
+    expect(infra.note).toContain("AWS::SQS::Queue");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("ignores YAML that is not a CloudFormation template", () => {
+    // A repository is full of YAML. Treating a CI workflow or a k8s manifest as
+    // IaC would invent infrastructure, and flip the "this project has IaC" flag
+    // that decides which caveat the page shows.
+    const dir = makeProject({
+      ...BASE_FILES,
+      "ci.yaml": `name: build\njobs:\n  test:\n    steps:\n      - run: pnpm test\n`,
+      "k8s/deploy.yml": `apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: queue-worker\n`,
+    });
+    expect(discoverFromIaC(dir)).toEqual({ infrastructure: [], sawIaC: false });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("finds resources in both dialects at once, deterministically", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "infra/main.tf": `resource "aws_s3_bucket" "from_tf" {}\n`,
+      "infra/stack.yaml": `${CFN_HEADER}Resources:\n  FromCfn:\n    Type: AWS::SQS::Queue\n`,
+    });
+    const names = discoverFromIaC(dir).infrastructure.map((i) => i.name);
+    expect(names).toContain("from_tf");
+    expect(names).toContain("FromCfn");
+    expect(JSON.stringify(discoverFromIaC(dir))).toBe(JSON.stringify(discoverFromIaC(dir)));
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("survives a template whose Resources block is empty or malformed", () => {
+    const dir = makeProject({
+      ...BASE_FILES,
+      "a.yaml": `${CFN_HEADER}Resources:\n`,
+      "b.yaml": `${CFN_HEADER}Resources:\n  Broken:\n`,
+      "c.yaml": `${CFN_HEADER}Resources:\n  Ok:\n    Type: AWS::SQS::Queue\n`,
+    });
+    expect(discoverFromIaC(dir).infrastructure.map((i) => i.name)).toEqual(["Ok"]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 // ── Linking ─────────────────────────────────────────────────────────────────
 
 describe("linkInfrastructure", () => {
@@ -473,6 +604,29 @@ describe("declared architecture in the model", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("draws CloudFormation resources with nothing declared by hand", () => {
+    // The point of IaC discovery: a team on CloudFormation gets nodes without
+    // writing a .n-dx.json at all.
+    const dir = makeProject({
+      ...BASE_FILES,
+      "src/core/f.ts": `export const queue = "acme-ingest-queue";\n`,
+      "infra/stack.yaml": `AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  Ingest:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: acme-ingest-queue
+`,
+    });
+    const model = buildIsoModel(loadFromScan(dir, { useGit: false, analyzedAt: "t" }));
+    const node = model.nodes.find((n) => n.kind === "infra");
+    expect(node).toBeDefined();
+    expect(node!.name).toBe("Ingest");
+    expect(node!.body).toContain("infra/stack.yaml");
+    expect(node!.inbound.map((l) => l.id)).toContain("src/core");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("states that infrastructure is declared, not detected", () => {
     const dir = withConfig({
       infrastructure: [{ id: "infra:jobs", name: "jobs", kind: "queue", usedBy: ["src/core"] }],
@@ -488,186 +642,6 @@ describe("declared architecture in the model", () => {
     expect(model.meta.gaps.some((g) => g.includes("sourcevision.isoMap.infrastructure"))).toBe(true);
     expect(model.meta.gaps.some((g) => g.includes("sourcevision.isoMap.injectionSeams"))).toBe(true);
     rmSync(dir, { recursive: true, force: true });
-  });
-});
-
-// ── Seam verification ───────────────────────────────────────────────────────
-
-/**
- * A declared seam is a claim, and the call graph is the only evidence available
- * to test it against. These tests pin the two ways that check can go wrong:
- * believing a stale declaration, and crying wolf over a real one.
- */
-describe("seam verification", () => {
-  const ZONE_OF_FILE = new Map<string, string>([
-    ["src/api/a.ts", "src/api"],
-    ["src/api/b.ts", "src/api"],
-    ["src/core/c.ts", "src/core"],
-  ]);
-  const ZONE_IDS = new Set(["src/api", "src/core"]);
-
-  function callGraph(edges: Array<Partial<CallEdge>>): CallGraph {
-    return {
-      functions: [],
-      edges: edges.map((e) => ({
-        callerFile: "src/api/a.ts",
-        caller: "handler",
-        calleeFile: null,
-        callee: "noop",
-        type: "direct",
-        line: 1,
-        column: 0,
-        ...e,
-      })) as CallEdge[],
-      summary: {} as CallGraph["summary"],
-    };
-  }
-
-  it("corroborates a callback called from inside the target zone", () => {
-    const evidence = buildSeamEvidence(
-      callGraph([{ callerFile: "src/api/a.ts", callee: "broadcast" }]),
-      ZONE_OF_FILE,
-    );
-    const { seams } = resolveSeams(
-      [{ from: "src/core", to: "src/api", callbacks: ["broadcast"] }],
-      ZONE_IDS,
-      ZONE_OF_FILE,
-      evidence,
-    );
-    expect(seams).toHaveLength(1);
-    expect(seams[0].verified).toBe(true);
-    expect(seams[0].unsupported).toEqual([]);
-  });
-
-  it("still corroborates a callback the target forwards rather than calls itself", () => {
-    // register-scheduler.ts receives four callbacks and passes them onward
-    // instead of invoking them. Evidence is scoped to the zone, not the file,
-    // so forwarding still counts — a file-scoped check called this real seam
-    // stale.
-    const evidence = buildSeamEvidence(
-      callGraph([{ callerFile: "src/api/b.ts", callee: "broadcast" }]),
-      ZONE_OF_FILE,
-    );
-    const { seams } = resolveSeams(
-      [{ from: "src/core", to: "src/api/a.ts", callbacks: ["broadcast"] }],
-      ZONE_IDS,
-      ZONE_OF_FILE,
-      evidence,
-    );
-    expect(seams[0].verified).toBe(true);
-  });
-
-  it("matches a callback invoked through the object it arrived on", () => {
-    const evidence = buildSeamEvidence(
-      callGraph([{ callerFile: "src/api/a.ts", callee: "opts.loadPRD", type: "method" }]),
-      ZONE_OF_FILE,
-    );
-    const { seams } = resolveSeams(
-      [{ from: "src/core", to: "src/api", callbacks: ["loadPRD"] }],
-      ZONE_IDS,
-      ZONE_OF_FILE,
-      evidence,
-    );
-    expect(seams[0].verified).toBe(true);
-  });
-
-  it("marks a seam unverified when no call in the target names its callback", () => {
-    const evidence = buildSeamEvidence(
-      callGraph([{ callerFile: "src/api/a.ts", callee: "somethingElse" }]),
-      ZONE_OF_FILE,
-    );
-    const { seams } = resolveSeams(
-      [{ from: "src/core", to: "src/api", callbacks: ["onDone", "broadcast"] }],
-      ZONE_IDS,
-      ZONE_OF_FILE,
-      evidence,
-    );
-    expect(seams[0].verified).toBe(false);
-    expect(seams[0].unsupported).toEqual(["broadcast", "onDone"]);
-  });
-
-  it("does not count a call made from the injecting side as evidence", () => {
-    // The injector naming its own callback proves nothing about the target;
-    // counting it would corroborate every seam that compiles.
-    const evidence = buildSeamEvidence(
-      callGraph([{ callerFile: "src/core/c.ts", callee: "broadcast" }]),
-      ZONE_OF_FILE,
-    );
-    const { seams } = resolveSeams(
-      [{ from: "src/core", to: "src/api", callbacks: ["broadcast"] }],
-      ZONE_IDS,
-      ZONE_OF_FILE,
-      evidence,
-    );
-    expect(seams[0].verified).toBe(false);
-  });
-
-  it("leaves verification unknown when there is no call graph", () => {
-    // Absence of evidence must not render as evidence of absence: a project
-    // analysed without --deep has nothing to check against.
-    const { seams } = resolveSeams(
-      [{ from: "src/core", to: "src/api", callbacks: ["broadcast"] }],
-      ZONE_IDS,
-      ZONE_OF_FILE,
-    );
-    expect(seams[0].verified).toBeUndefined();
-    expect(seams[0].unsupported).toBeUndefined();
-  });
-
-  it("treats a seam declaring no callbacks as nothing to verify", () => {
-    const evidence = buildSeamEvidence(callGraph([]), ZONE_OF_FILE);
-    const { seams } = resolveSeams(
-      [{ from: "src/core", to: "src/api" }],
-      ZONE_IDS,
-      ZONE_OF_FILE,
-      evidence,
-    );
-    expect(seams[0].verified).toBeUndefined();
-  });
-
-  it("reports unsupported callbacks to the reader, naming them", () => {
-    const evidence = buildSeamEvidence(callGraph([]), ZONE_OF_FILE);
-    const resolution = resolveSeams(
-      [{ from: "src/core", to: "src/api", callbacks: ["onDone"] }],
-      ZONE_IDS,
-      ZONE_OF_FILE,
-      evidence,
-    );
-    const gaps = seamGaps(resolution);
-    expect(gaps.some((g) => g.includes("onDone"))).toBe(true);
-    expect(gaps.some((g) => g.includes("no supporting call"))).toBe(true);
-  });
-
-  it("names the endpoint that could not be placed", () => {
-    // A refactor that moves a file leaves the declaration behind; "one seam
-    // could not be placed" does not tell the reader which end rotted.
-    const resolution = resolveSeams(
-      [{ from: "src/api", to: "src/server/register-scheduler.ts" }],
-      ZONE_IDS,
-      ZONE_OF_FILE,
-    );
-    expect(resolution.seams).toHaveLength(0);
-    const gaps = seamGaps(resolution);
-    expect(gaps.some((g) => g.includes("src/server/register-scheduler.ts"))).toBe(true);
-  });
-
-  it("carries the unverified mark through to the drawn edge", () => {
-    const model = buildIsoModel({
-      ...loadFromScan(makeProject(BASE_FILES), { useGit: false, analyzedAt: "t" }),
-      seams: [
-        {
-          fromZone: "src/core",
-          toZone: "src/api",
-          callbacks: ["onDone"],
-          verified: false,
-          unsupported: ["onDone"],
-        },
-      ],
-    });
-    const seam = model.edges.find((e) => e.seam);
-    expect(seam).toBeDefined();
-    expect(seam!.seam!.verified).toBe(false);
-    expect(seam!.seam!.unsupported).toEqual(["onDone"]);
   });
 });
 

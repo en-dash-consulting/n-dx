@@ -10,7 +10,7 @@
 
 import { readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { PROJECT_DIRS, execShellCmd as foundationExecShell } from "@n-dx/llm-client";
+import { PROJECT_DIRS, execShellCmd } from "@n-dx/llm-client";
 import { walkTree } from "./tree.js";
 import { extractKeywords, scoreMatch } from "./keywords.js";
 import type {PRDItem} from "../schema/index.js";
@@ -193,18 +193,20 @@ export function collectVerifiableTasks(
 // ---------------------------------------------------------------------------
 
 /**
- * Run a command string through a shell.
+ * Run the configured test command, which is a shell STRING (it may hold
+ * `&&`, pipes, or a shell-quoted path).
  *
- * Delegates shell choice to the foundation layer rather than spawning `sh`
- * directly — `sh` is not on a stock Windows PATH, and a failed spawn is
- * indistinguishable from a test suite that ran and failed.
+ * Delegates to the foundation `execShellCmd` rather than `exec("sh", ["-c",
+ * …])`: `sh` does not resolve on Windows outside a POSIX environment, and the
+ * ENOENT surfaced as exitCode 1 with no output, so `passed: false` was
+ * reported for a suite that never ran.
  */
 function execShell(
   command: string,
   cwd: string,
   timeout: number,
-): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
-  return foundationExecShell(command, { cwd, timeout, maxBuffer: 2 * 1024 * 1024 });
+): Promise<{ stdout: string; stderr: string; exitCode: number | null; launched: boolean }> {
+  return execShellCmd(command, { cwd, timeout, maxBuffer: 2 * 1024 * 1024 });
 }
 
 // ---------------------------------------------------------------------------
@@ -289,18 +291,27 @@ export async function verify(options: VerifyOptions): Promise<VerifyResult> {
     const command = `${testCommand} ${files.join(" ")}`;
 
     const startMs = Date.now();
-    const { stdout, stderr, exitCode } = await execShell(command, projectDir, timeout);
+    const { stdout, stderr, exitCode, launched } = await execShell(
+      command, projectDir, timeout,
+    );
     const durationMs = Date.now() - startMs;
 
     const output = (stdout.trim() || stderr.trim()).slice(-2000);
     testRun = {
-      ran: true,
-      passed: exitCode === 0,
+      // A shell that could not be spawned means the command never ran, so
+      // `ran: false` — reporting ran/passed:false would blame the tests for a
+      // launch failure.
+      ran: launched,
+      passed: launched && exitCode === 0,
       command,
       output: output || undefined,
       durationMs,
       testFiles: files,
-      error: exitCode === null ? "Test command timed out" : undefined,
+      error: !launched
+        ? "Test command could not be launched"
+        : exitCode === null
+          ? "Test command timed out"
+          : undefined,
     };
   } else if (runTests && testCommand && allTestFiles.size === 0) {
     testRun = {

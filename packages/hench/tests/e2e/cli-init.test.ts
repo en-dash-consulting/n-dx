@@ -149,13 +149,34 @@ describe("hench init", () => {
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
     const first = await readFile(join(testDir, ".gitignore"), "utf-8");
 
-    // hench init is a no-op past the first run (".hench/ already
-    // initialized, skipping"), so re-running must not touch .gitignore.
+    // The gitignore write runs on every invocation (see below), but it is a
+    // no-op once the entries are present — re-running leaves the file
+    // byte-identical rather than appending a second copy.
     execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
     const second = await readFile(join(testDir, ".gitignore"), "utf-8");
 
     expect(second).toBe(first);
     expect(second.match(/\.hench\/locks\//g)?.length).toBe(1);
+  });
+
+  it("backfills .gitignore on a project that was already initialized", async () => {
+    // Every project initialized before these entries existed is still exposed
+    // to the self-blocking run, because init short-circuits on
+    // ".hench/ already initialized, skipping". The gitignore write therefore
+    // runs ahead of that early return.
+    execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(join(testDir, ".gitignore"), "node_modules\n", "utf-8");
+
+    const output = execSync(`node ${CLI_PATH} init ${testDir}`, { encoding: "utf-8" });
+    expect(output).toContain("already initialized");
+
+    const gitignore = await readFile(join(testDir, ".gitignore"), "utf-8");
+    expect(gitignore).toContain("node_modules");
+    expect(gitignore).toContain(".hench/locks/");
+    expect(gitignore).toContain(".hench/runs/");
+    expect(gitignore).toContain(".hench/usage-cursors/");
+    expect(gitignore).toContain(".hench-commit-msg.txt");
   });
 
   it("preserves valid config on re-run", async () => {

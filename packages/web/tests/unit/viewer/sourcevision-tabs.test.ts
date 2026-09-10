@@ -71,9 +71,11 @@ describe("SOURCEVISION_TABS", () => {
   });
 
   it("gates Ask behind a default-off feature flag and marks it server-rendered", () => {
-    const ask = SOURCEVISION_TABS.find((t) => t.id === "ask");
-    expect(ask?.featureGate).toBe("sourcevision.ask");
-    expect(ask?.requiresServer).toBe(true);
+    const ask = SOURCEVISION_TABS.find((t) => t.id === "ask")!;
+    expect(ask.featureGate).toBe("sourcevision.ask");
+    // The answer is an on-demand LLM call, so a static export cannot serve it.
+    expect(ask.requiresServer).toBe(true);
+    expect(ask.label).toBe("Ask");
   });
 });
 

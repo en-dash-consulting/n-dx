@@ -13,21 +13,8 @@ The `sh` indirection is deliberate everywhere it appears and must not be replace
 by spawning `node` directly. libuv assigns every non-detached child it spawns on
 Windows to a global job object, so a node-spawns-node tree reaps itself when the
 parent dies and the test passes without proving anything — an earlier version of
-the orphan test was vacuous for exactly that reason.
-
-**Changed 2026-09-09.** The product no longer hard-requires `sh`.
-`execShellCmd` (`packages/llm-client/src/exec.ts`) now resolves a shell the
-host actually has — `sh` where `sh` is on PATH, `cmd.exe /d /s /c` otherwise —
-via `resolveShellInvocation`. It used to spawn `sh` unconditionally, which on a
-stock Windows PATH failed with ENOENT ~2 ms in and, because a failed spawn
-reports as `exitCode: 1` with empty output, was read as a command that ran and
-failed: the hench test gate aborted otherwise-good `ndx work` runs with
-`0/0 package(s) failed`. So a missing `sh` no longer means hench's shell-backed
-tools are broken on that machine; it means only that POSIX command *syntax*
-(pipes into `head`, single-quoted globs, `&&` chains written for sh) is
-unavailable. Guards below that exist for a test's own POSIX command string are
-still correct; guards that existed because the tool could not spawn at all are
-not.
+the orphan test was vacuous for exactly that reason. `sh -c` is also the real
+production path (`execShell`).
 
 ## Two kinds of dependency
 
@@ -35,12 +22,19 @@ not.
 tree is worth testing. A missing shell is a test-environment problem, and the
 test skips.
 
-**Under test.** hench's tools shell out on *every* platform, so the command
-string a test hands them is executed for real. Since the 2026-09-09 change above
-the tool itself runs anywhere, but a command written in POSIX syntax still needs
-a POSIX shell — `echo hello | head` has no `head` under cmd.exe. Those tests
-skip, and the skip message says which product capability went unverified: not
-"shelling out" any more, but "shelling out to a POSIX shell".
+**Under test.** hench's tools used to run `exec("sh", ["-c", cmd])` on *every*
+platform, which made a POSIX shell a genuine runtime requirement of the product
+on Windows: without it, `run_command` and the post-task test runner did not work
+on that machine either.
+
+That is no longer true. `execShellCmd` now resolves the shell per platform —
+`sh -c` where a POSIX shell exists, `cmd.exe /d /s /c` on a Windows box without
+one (`buildShellInvocation`, `packages/llm-client/src/exec.ts`) — so the product
+runs shell commands from PowerShell and cmd.exe. The tests in this category
+still skip without `sh`, because what they assert IS POSIX shell behaviour
+(pipes, single quotes, `2>/dev/null`); the skip now means "POSIX semantics went
+unverified on this host", not "the product does not work here". Un-skipping them
+would mean writing cmd.exe-semantics twins, which is a separate piece of work.
 
 ## Inventory
 
@@ -55,13 +49,6 @@ PowerShell (no `sh`) and from Git Bash (`sh` at `/usr/bin/sh`), same commit.
 | `packages/hench/tests/unit/tools/shell.test.ts` | under test | 14 of 34 | 13 false failures + **1 false pass** | `describeNeedsPosixShell` ×4, `itNeedsPosixShell` ×2 |
 | `packages/hench/tests/unit/tools/test-runner.test.ts` | under test | 4 of 58 | 2 false failures + **2 false passes** | `itNeedsPosixShell` ×4 |
 | `packages/hench/tests/unit/tools/git.test.ts` | under test | 7 of 25 | 7 false failures (`expected 'Exit code: 1' to contain 'branch'` etc.) | `itNeedsPosixShell` ×7 |
-
-Guards removed 2026-09-09: `packages/hench/tests/integration/gate-changed-files.test.ts`
-had 2 cases guarded because a failed `sh` launch made the gate's `ran` false.
-That was the bug, not the environment — its command is `exit 0`, a builtin in
-both shells — so both cases now run on every host and are the coverage that
-catches a gate which cannot launch its shell. The remaining `sh` guards in the
-table above are for POSIX command syntax, which is a real environment limit.
 
 Totals: 33 guarded cases across 5 files — 26 were failing, 5 were passing
 vacuously, and 2 are the POSIX-only interrupt cases that skip on Windows for a
@@ -85,11 +72,13 @@ exercised.
 | `packages/hench/tests/unit/tools/go-test-runner.test.ts` | Passes from PowerShell — verified, no shell-dependent assertion |
 | `runTestGate` cases in `test-runner.test.ts` | Assert shape only (`typeof passed === "boolean"`, `duration >= 0`), so they neither fail nor pass *because of* the shell. Weak, but not shell-dependent |
 | `packages/hench/tests/integration/test-gate.test.ts` | Same shape-only rationale as the `runTestGate` cases above — asserts result structure, never shell output |
-| `packages/hench/tests/integration/gate-changed-files.test.ts` (all 3 cases) | One returns before any spawn (empty changed set); the other two shell out with `exit 0`, a builtin in both `sh` and `cmd.exe`. Guards removed 2026-09-09 — see above |
-| `packages/hench/tests/integration/test-gate-timeout-config.test.ts` | Shells out with `node -e "…"`, which runs identically under `sh` and `cmd.exe` — the assertions are about the gate's timeout and config precedence, not shell semantics |
+| `packages/hench/tests/integration/test-gate-timeout-config.test.ts` | The one spawning case runs `node -e "setTimeout(...)"` — node is on PATH by definition of running the suite, and the command is shell-syntax-free, so it launches identically through `sh` and cmd.exe. The case asserts the timeout kill, not shell output |
+| `packages/hench/tests/integration/gate-changed-files.test.ts` | Guards removed 2026-09-09: `execShellCmd` now resolves a shell the platform actually has (`sh` where present, else cmd.exe), and `exit 0` is a builtin in both — so the gate cases run everywhere. The empty-changed-set case never spawned at all |
 | 4 cases in `packages/hench/tests/unit/tools/git.test.ts` (`runs git branch`, `properly handles quoted args…`, `handles args with special characters…`, `records git operations in policy audit log`) | Assert shape (`typeof result === "string"`) or guard bookkeeping that happens before the spawn — verified passing from PowerShell without `sh` |
 | Files writing `#!/bin/sh` shims (`cli-auth`, `cli-config`, `cli-stale-check`, `codex-integration`, `assistant-parity-smoke`, `llm-client/tests/helpers/fake-cli.ts`) | Write a script; execution is either POSIX-only (where `/bin/sh` exists by definition) or routed through cmd.exe on Windows |
-| Unit tests asserting `cmd === "sh"` (`llm-client/tests/unit/exec.test.ts:270`, `hench/tests/unit/process/exec.test.ts:124`, `hench/tests/unit/agent/completion.test.ts:320`) | Inspect a fake spawn's arguments; no process is created |
+| Unit tests asserting the resolved shell (`llm-client/tests/unit/exec.test.ts`, `hench/tests/unit/process/exec.test.ts`, `hench/tests/unit/agent/completion.test.ts`) | Inspect a fake spawn's arguments; no process is created. All three now pass `_platform`/`_posixShellAvailable` explicitly, or accept either shell — the earlier unconditional `cmd === "sh"` assertions passed from Git Bash and failed from PowerShell once `execShellCmd` became platform-aware |
+| `packages/llm-client/tests/integration/exec-shell-windows.test.ts` | Runs real commands, but only through `cmd.exe`, and the whole suite is `describe.skip` off win32. It is the inverse of every other row here: it needs the *absence* of a POSIX shell, which it arranges by forcing the cmd.exe branch and scrubbing Git/MSYS/Cygwin directories from the child's PATH. Nothing to guard — a host with `sh` still runs it |
+| `tests/e2e/architecture-policy.test.js` | Spawns nothing. The flagged `"sh", ["-c"` text is the POSIX_SHELL_SPAWN_RE detector and its exemption prose — the guard that keeps production code from spawning a shell by name |
 
 ## Helpers
 

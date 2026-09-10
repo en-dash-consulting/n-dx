@@ -23,7 +23,10 @@ import { join } from "node:path";
 // cross-tier contract tests — run `pnpm build` if this import fails).
 import { DEFAULT_ROUTES } from "../../packages/llm-client/dist/public.js";
 
-const PACKAGES = ["rex", "sourcevision", "hench"];
+// web declares classes too (the SourceVision Ask endpoint), so it is scanned
+// alongside the domain packages — an unregistered class there resolves silently
+// to the standard tier exactly as it would anywhere else.
+const PACKAGES = ["rex", "sourcevision", "hench", "web"];
 const ROOT = join(import.meta.dirname, "../..");
 
 /** Recursively collect .ts sources under a directory. */
@@ -110,6 +113,13 @@ describe("task-class registry contract", () => {
     const classes = byPackage.get("hench");
     for (const cls of ["agent.execute", "git.commit-message"]) {
       expect(classes.has(cls), `hench no longer declares ${cls}`).toBe(true);
+    }
+  });
+
+  it("web declares its routed classes", () => {
+    const classes = byPackage.get("web");
+    for (const cls of ["sourcevision.ask"]) {
+      expect(classes.has(cls), `web no longer declares ${cls}`).toBe(true);
     }
   });
 });

@@ -110,9 +110,9 @@ describe("Test Suite Gate Integration", () => {
       expect(result.ran).toBe(true);
       expect(result.passed).toBe(false);
       expect(result.packages.filter((p) => !p.passed)).toHaveLength(1);
-      expect(result.error).toContain("exited 3");
-      expect(result.error).toContain("without reporting any test results");
-      expect(result.packages[0]!.failureOutput).toBe(result.error);
+      // The parser never returns an empty package list for a run that exited
+      // non-zero: the fabricated workspace entry carries the diagnosis.
+      expect(result.packages[0]!.failureOutput).toContain("produced no output");
     });
 
     // The gate runs a command STRING, so it needs a shell — and `sh` is not on
@@ -146,7 +146,11 @@ describe("Test Suite Gate Integration", () => {
       expect(result.packages.filter((p) => !p.passed)).toHaveLength(1);
       expect(result.error).toContain("did not finish within 2s");
       expect(result.error).toContain("hench.fullTestTimeoutMs");
-      expect(result.packages[0]!.failureOutput).toBe(result.error);
+      // failureOutput carries whatever the suite printed before the kill — the
+      // hang's location when there is one; here the command printed nothing.
+      expect(result.packages[0]!.failureOutput).toBe(
+        "No output was produced before the timeout.",
+      );
     });
 
     it("honours a raised limit for a command that finishes inside it", async () => {

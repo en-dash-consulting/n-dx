@@ -62,14 +62,21 @@ export async function execShell(opts: ExecShellOptions): Promise<string> {
   } = opts;
 
   const liveTail = createLiveTail();
-  // execShellCmd, not exec("sh", …): `sh` is absent from a stock Windows PATH,
-  // where it failed to spawn and reported as a command that ran and exited 1.
+  // execShellCmd, not exec("sh", ...) — `sh` does not resolve on Windows
+  // outside a POSIX environment, and the resulting ENOENT reported as
+  // exitCode 1 with no output looked exactly like a failing command.
   const result = await execShellCmd(command, { cwd, timeout, maxBuffer, env, onData: liveTail.onData });
   liveTail.flush();
 
   // Timeout — exitCode is null when the process was killed
   if (result.exitCode === null) {
     return `Command timed out after ${timeout}ms`;
+  }
+
+  // Never started: the shell itself could not be spawned. Say so, rather than
+  // reporting the exitCode 1 that a command which ran and failed would give.
+  if (!result.launched) {
+    return `Command could not be launched: ${result.error?.message ?? "shell not available"}`;
   }
 
   const output: string[] = [];

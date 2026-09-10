@@ -1,364 +1,257 @@
-.ask-container {
+/* SourceVision Ask panel.
+ *
+ * Uses the tokens defined in tokens.css (--bg-surface, --border, --red,
+ * --brand-teal, --space-*, --radius-*). Note for anyone copying from
+ * pr-markdown.css or commands.css: those files reference --panel2, --line and
+ * --mono, none of which tokens.css defines, so those declarations are dropped
+ * by the browser. Do not propagate them here.
+ */
+
+.sv-ask-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
-/* The finding a seeded question is about. Accented like the answer card so the
-   pair reads as one exchange rather than two unrelated panels. */
-.ask-finding {
+.sv-ask-form,
+.sv-ask-idle,
+.sv-ask-answer,
+.sv-ask-error,
+.sv-ask-seed,
+.sv-ask-unavailable {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  border-left: 3px solid var(--accent);
+  gap: var(--space-2-5);
 }
 
-.ask-finding-text {
+/* The seeded finding, shown above the question it grounds. Tinted on its
+   leading edge rather than boxed in an accent colour: it is context for the
+   question, not a result or a warning. */
+.sv-ask-seed {
+  border-left: 3px solid var(--brand-teal);
+  gap: var(--space-2);
+}
+
+.sv-ask-seed-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.sv-ask-seed-clear-btn {
+  flex: none;
+  font-size: var(--font-sm);
+}
+
+.sv-ask-seed-text {
   margin: 0;
+  font-size: var(--font-base);
   line-height: 1.55;
 }
 
-.ask-finding-fields {
+/* Two columns: label, value. The labels come from the seed's own classification
+   map, so the grid sizes to whatever the surface supplied rather than to a
+   fixed set of fields. */
+.sv-ask-seed-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-2);
   margin: 0;
-  padding: 0;
-  list-style: none;
+  font-size: var(--font-sm);
+}
+
+.sv-ask-seed-facts dt {
+  color: var(--text-dim);
+}
+
+.sv-ask-seed-facts dd {
+  margin: 0;
+}
+
+.sv-ask-seed-files {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 16px;
-  font-size: 12px;
-  font-family: var(--mono);
-  color: var(--muted);
-  word-break: break-word;
+  gap: var(--space-1);
 }
 
-.ask-finding-key {
-  color: var(--fg);
+.sv-ask-label {
+  font-size: var(--font-base);
+  font-weight: var(--weight-semibold);
 }
 
-.ask-finding-detach-btn {
-  align-self: flex-start;
-  font-size: 12px;
-}
-
-.ask-form,
-.ask-idle,
-.ask-submitting,
-.ask-answered,
-.ask-error,
-.ask-unavailable {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.ask-prompt-label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--muted);
-  text-transform: uppercase;
-}
-
-.ask-prompt-input {
+.sv-ask-textarea {
   width: 100%;
   box-sizing: border-box;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--panel2);
-  color: var(--fg);
+  padding: var(--space-2-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
   font-family: inherit;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: var(--font-base);
+  line-height: var(--leading-normal);
   resize: vertical;
 }
 
-/* No `:disabled` rule for the textarea: it is never disabled, because
-   disabling the element the user submits from would take their focus with it. */
-
-/* The submit control reports itself unavailable with aria-disabled rather than
-   the disabled attribute, so it keeps focus and its place in the tab order —
-   see the comment on the button. It still has to *look* unavailable. */
-.ask-submit-btn[aria-disabled="true"] {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ask-form-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.ask-submit-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ask-submit-hint {
-  font-family: var(--mono);
-  font-size: 11px;
-}
-
-.ask-refine-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-/* ── Proposed PRD changes ─────────────────────────────────────────────────
-   A proposal is a diff under review, so before and after sit side by side and
-   the card's border states the verdict — an accepted change and a rejected one
-   must not look alike at a glance. */
-.ask-proposals {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border-left: 3px solid var(--accent);
-}
-
-.ask-proposal {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel2);
-}
-
-.ask-proposal-accepted {
-  border-color: var(--green);
-}
-
-.ask-proposal-rejected {
-  border-color: var(--line);
+.sv-ask-textarea:disabled {
   opacity: 0.6;
 }
 
-.ask-proposal-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.ask-proposal-kind {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: var(--accent);
-}
-
-.ask-proposal-item {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.ask-proposal-rationale {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-
-.ask-proposal-diff {
+/* Refine-mode toggle. Two columns so the hint aligns under the label rather
+   than under the checkbox, which would read as describing the checkbox's
+   state instead of what the mode does. */
+.sv-ask-mode {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px;
+  grid-template-columns: max-content 1fr;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
 }
 
-.ask-diff-side {
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  min-width: 0;
+.sv-ask-mode-label {
+  font-size: var(--font-base);
 }
 
-.ask-diff-before {
-  border-left: 2px solid var(--red);
+.sv-ask-mode-hint {
+  grid-column: 2;
+  margin: 0;
 }
 
-.ask-diff-after {
-  border-left: 2px solid var(--green);
-}
-
-.ask-diff-label {
-  display: block;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-
-.ask-diff-line {
-  margin: 0 0 2px;
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.ask-diff-empty {
-  color: var(--muted);
-  font-style: italic;
-}
-
-.ask-proposal-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.ask-proposal-accept[aria-pressed="true"] {
-  border-color: var(--green);
-  color: var(--green);
-}
-
-.ask-proposal-reject[aria-pressed="true"] {
-  border-color: var(--red);
-  color: var(--red);
-}
-
-.ask-proposals-apply {
+.sv-ask-form-footer {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
-.ask-apply-btn[aria-disabled="true"] {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ask-apply-result {
-  font-size: 13px;
-}
-
-.ask-apply-result p {
+.sv-ask-hint {
   margin: 0;
-  color: var(--green);
 }
 
-.ask-apply-refused {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  color: var(--muted);
-  font-size: 12px;
+/* The submitting state is the one the user waits through, so it gets a marker
+   of its own rather than only a disabled button. Reserving the line height
+   keeps the answer card from jumping when the marker appears and clears. */
+.sv-ask-status {
+  min-height: 1.25em;
 }
 
-.ask-apply-error {
-  margin: 0;
-  font-size: 13px;
-  color: var(--red);
-}
-
-/* Each state carries its own accent so the panel's mode is readable at a
-   glance rather than only from its heading text. */
-.ask-submitting {
-  border-left: 3px solid var(--accent);
-}
-
-.ask-answered {
-  border-left: 3px solid var(--green);
-}
-
-.ask-error {
+.sv-ask-error {
   border-left: 3px solid var(--red);
 }
 
-.ask-error-summary {
+.sv-ask-error-message,
+.sv-ask-error-suggestion {
   margin: 0;
-  line-height: 1.55;
 }
 
-/* Remediation reads as steps, most important first — the same shape the CLI's
-   auth guidance prints, so the two surfaces look like one product. */
-.ask-error-remediation {
+/* What to do about this particular mode. A list rather than a paragraph: the
+   steps are ordered and each is independently actionable, and the canonical
+   vendor remediation arrives as separate lines already. */
+.sv-ask-error-steps {
   margin: 0;
-  padding-left: 20px;
+  padding-left: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--muted);
-  word-break: break-word;
+  gap: var(--space-1);
 }
 
-.ask-error-actions:empty {
-  display: none;
-}
-
-.ask-error-actions {
+.sv-ask-error-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.ask-analyze-status:empty {
-  display: none;
+/* The analyze affordance sits inside the error card, so it needs the separation
+   from the steps above it that a card boundary would otherwise give it. */
+.sv-ask-error-analyze {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
 }
 
-.ask-analyze-status {
+.sv-ask-answer {
+  border-left: 3px solid var(--brand-teal);
+}
+
+.sv-ask-question {
   margin: 0;
+  font-style: italic;
 }
 
-.ask-answer {
-  margin: 0;
-  padding: 12px;
-  border-radius: 10px;
-  background: var(--panel2);
-  border: 1px solid var(--line);
+.sv-ask-answer-body {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  border: 1px solid var(--border);
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.55;
+  line-height: var(--leading-relaxed);
   max-height: 60vh;
   overflow: auto;
 }
 
-.ask-answer-meta {
-  font-family: var(--mono);
-  font-size: 12px;
-}
-
-.ask-answer-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.ask-capture-confirm {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.ask-capture-progress {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-/* Always rendered so a screen reader has a live region to announce into; with
-   no margin and no text it occupies no space. */
-.ask-copy-feedback {
+.sv-ask-answer-meta {
   margin: 0;
-  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--font-xs);
+}
+
+/* Answer actions: Copy and the confirm-guarded Capture to PRD. */
+.sv-ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sv-ask-capture-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sv-ask-capture-confirm-prompt {
+  font-size: var(--font-sm);
+}
+
+.sv-ask-capture-busy {
+  font-size: var(--font-sm);
+  opacity: 0.8;
+}
+
+/* Both feedback lines stay mounted so their live regions pre-exist the text.
+   Reserving the height keeps the card from resizing as messages come and go. */
+.sv-ask-feedback {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1-5);
+  margin: 0;
+  min-height: 1.25em;
+}
+
+.sv-ask-copy-feedback,
+.sv-ask-capture-feedback,
+.sv-ask-capture-error {
+  margin: 0;
+}
+
+/* The outcome marker. Success and failure differ in glyph as well as in hue,
+   so the state survives a reader who cannot separate the two colours. */
+.sv-ask-feedback-mark {
+  flex: none;
+  font-size: var(--font-sm);
+  line-height: 1.25em;
+}
+
+/* Success tints only the marker, leaving the message in body colour: the line
+   is a confirmation, not a warning, and recolouring its text would give it
+   more weight than the answer it sits under. A failure tints the whole line,
+   which is what the capture error already did. */
+.sv-ask-feedback-success .sv-ask-feedback-mark {
   color: var(--green);
 }
 
-.ask-copy-error,
-.ask-capture-error {
-  margin: 0;
-  font-size: 12px;
+.sv-ask-feedback-error {
   color: var(--red);
 }

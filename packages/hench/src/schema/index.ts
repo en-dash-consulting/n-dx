@@ -6,7 +6,6 @@ export {
   PERMISSION_MODES,
   isPermissionMode,
   DEFAULT_CHECKPOINT_THRESHOLD,
-  HENCH_RUNTIME_ARTIFACTS,
 } from "./v1.js";
 
 export type {
@@ -45,6 +44,7 @@ export type {
   DependencyVulnerability,
   DependencyOutdated,
   DependencyAuditPackageResult,
+  DependencyAuditCommandRecord,
   DependencyAuditResult,
   CleanupTransformationRecord,
   CleanupBatchRecord,

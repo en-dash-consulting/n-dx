@@ -152,22 +152,22 @@ describe("validateConfig", () => {
   });
 
   describe("fullTestTimeoutMs defaults and validation", () => {
-    it("is optional in schema and defaults to 5 minutes", () => {
+    it("is optional in schema and defaults to 15 minutes", () => {
       // A config written before the field existed must keep working, and get
-      // the same ceiling the gate used when it was hardcoded.
+      // the same ceiling the gate uses when the field is absent.
       const result = validateConfig(DEFAULT_HENCH_CONFIG());
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data.fullTestTimeoutMs).toBe(300_000);
+        expect(result.data.fullTestTimeoutMs).toBe(900_000);
       }
     });
 
     it("can be raised for a suite that legitimately runs long", () => {
-      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestTimeoutMs: 900_000 };
+      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestTimeoutMs: 1_800_000 };
       const result = validateConfig(config);
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data.fullTestTimeoutMs).toBe(900_000);
+        expect(result.data.fullTestTimeoutMs).toBe(1_800_000);
       }
     });
 

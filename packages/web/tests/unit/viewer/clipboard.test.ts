@@ -1,171 +1,168 @@
 // @vitest-environment jsdom
 /**
- * Tests for the shared clipboard helper.
+ * The shared clipboard helper.
  *
- * The four paths that matter to callers: the async API succeeds, the async API
- * is absent so `execCommand` carries the copy, the async API rejects but
- * `execCommand` recovers it, and both fail — where a permission denial has to
- * stay distinguishable from a generic failure.
+ * The view-level suites (`ask-view.test.ts`, `pr-markdown.test.ts`) already
+ * cover copying through the UI. What only this file can check is the
+ * classification at the boundary — which failures count as a permission
+ * denial, what happens when the modern API is absent versus present-and-
+ * rejecting — and the wording parity that is the whole reason both views
+ * share one module.
  */
-
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  copyTextToClipboard,
-  fallbackCopyText,
-  isPermissionDeniedClipboardError,
   clipboardFailureMessage,
+  clipboardSuccessMessage,
+  copyTextToClipboard,
+  copyTextWithExecCommand,
+  isPermissionDeniedClipboardError,
+  manualCopyHint,
 } from "../../../src/viewer/utils/clipboard.js";
 
-/** Install a `document.execCommand` that reports `ok` and records the copy. */
-function stubExecCommand(ok: boolean) {
-  const copied: string[] = [];
-  const exec = vi.fn((command: string) => {
-    if (command !== "copy") return false;
-    // The helper selects a textarea it just appended; read what it holds.
-    const active = document.querySelector("textarea");
-    if (active) copied.push((active as HTMLTextAreaElement).value);
-    return ok;
-  });
-  Object.defineProperty(document, "execCommand", { value: exec, configurable: true, writable: true });
-  return { exec, copied };
-}
-
-/** Replace `navigator.clipboard` — jsdom does not provide one. */
-function stubAsyncClipboard(writeText: ((text: string) => Promise<void>) | null) {
+function setClipboard(writeText: ReturnType<typeof vi.fn> | null): void {
   Object.defineProperty(navigator, "clipboard", {
-    value: writeText ? { writeText } : undefined,
+    value: writeText === null ? undefined : { writeText },
     configurable: true,
     writable: true,
   });
 }
 
 describe("copyTextToClipboard", () => {
+  let writeText: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
-    stubExecCommand(true);
+    writeText = vi.fn(async () => {});
+    setClipboard(writeText);
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
-    stubAsyncClipboard(null);
+    setClipboard(null);
+    delete (document as unknown as { execCommand?: unknown }).execCommand;
   });
 
-  it("uses navigator.clipboard when it is available", async () => {
-    const writeText = vi.fn(async () => {});
-    stubAsyncClipboard(writeText);
+  function stubExecCommand(result: boolean): ReturnType<typeof vi.fn> {
+    const spy = vi.fn(() => result);
+    (document as unknown as { execCommand: unknown }).execCommand = spy;
+    return spy;
+  }
 
-    const result = await copyTextToClipboard("the answer text");
+  it("prefers the modern API and does not touch the fallback when it works", async () => {
+    const execCommand = stubExecCommand(true);
 
-    expect(result).toEqual({ ok: true });
-    expect(writeText).toHaveBeenCalledWith("the answer text");
+    expect(await copyTextToClipboard("hello")).toEqual({ ok: true });
+    expect(writeText).toHaveBeenCalledWith("hello");
+    // A browser that grants clipboard access must not be routed through a
+    // hidden textarea as well.
+    expect(execCommand).not.toHaveBeenCalled();
   });
 
-  it("falls back to execCommand when navigator.clipboard is unavailable", async () => {
-    stubAsyncClipboard(null);
-    const { exec, copied } = stubExecCommand(true);
+  it("uses execCommand when the clipboard API is absent", async () => {
+    setClipboard(null);
+    const execCommand = stubExecCommand(true);
 
-    const result = await copyTextToClipboard("the answer text");
-
-    expect(result).toEqual({ ok: true });
-    expect(exec).toHaveBeenCalledWith("copy");
-    expect(copied).toEqual(["the answer text"]);
+    expect(await copyTextToClipboard("hello")).toEqual({ ok: true });
+    expect(execCommand).toHaveBeenCalledWith("copy");
   });
 
-  it("falls back to execCommand when navigator.clipboard rejects", async () => {
-    stubAsyncClipboard(async () => { throw new Error("Document is not focused"); });
-    const { copied } = stubExecCommand(true);
-
-    const result = await copyTextToClipboard("the answer text");
-
-    // Reporting a failure the fallback would have handled sends the user to
-    // copy manually for nothing, so the fallback runs on rejection too.
-    expect(result).toEqual({ ok: true });
-    expect(copied).toEqual(["the answer text"]);
+  it("reports generic failure — not a denial — when there is no API and no fallback", async () => {
+    setClipboard(null);
+    // No execCommand at all, which is the insecure-context-plus-old-browser
+    // case. Nothing here is evidence of a permission decision.
+    expect(await copyTextToClipboard("hello")).toEqual({ ok: false, reason: "generic" });
   });
 
-  it("reports a permission denial distinctly when the fallback also fails", async () => {
-    const denied = new Error("Write permission denied.");
+  it("treats a successful fallback as success whatever the API's reason was", async () => {
+    const denied = new Error("Permission denied");
     denied.name = "NotAllowedError";
-    stubAsyncClipboard(async () => { throw denied; });
-    stubExecCommand(false);
-
-    expect(await copyTextToClipboard("the answer text")).toEqual({
-      ok: false,
-      kind: "permission-denied",
-    });
-  });
-
-  it("reports any other double failure as generic", async () => {
-    stubAsyncClipboard(async () => { throw new Error("clipboard is broken"); });
-    stubExecCommand(false);
-
-    expect(await copyTextToClipboard("the answer text")).toEqual({
-      ok: false,
-      kind: "generic",
-    });
-  });
-
-  it("cannot classify a failure with no async API, so calls it generic", async () => {
-    stubAsyncClipboard(null);
-    stubExecCommand(false);
-
-    expect(await copyTextToClipboard("the answer text")).toEqual({
-      ok: false,
-      kind: "generic",
-    });
-  });
-
-  it("leaves no textarea behind after a successful fallback", async () => {
-    stubAsyncClipboard(null);
+    writeText.mockRejectedValueOnce(denied);
     stubExecCommand(true);
 
-    await copyTextToClipboard("the answer text");
-
-    expect(document.querySelector("textarea")).toBeNull();
+    expect(await copyTextToClipboard("hello")).toEqual({ ok: true });
   });
-});
 
-describe("fallbackCopyText", () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  it("classifies a denial only once the fallback has also failed", async () => {
+    const denied = new Error("Permission denied");
+    denied.name = "NotAllowedError";
+    writeText.mockRejectedValueOnce(denied);
+    stubExecCommand(false);
 
-  it("returns false rather than throwing when execCommand throws", () => {
-    Object.defineProperty(document, "execCommand", {
-      value: () => { throw new Error("not supported"); },
-      configurable: true,
-      writable: true,
-    });
+    expect(await copyTextToClipboard("hello")).toEqual({ ok: false, reason: "permission-denied" });
+  });
 
-    expect(fallbackCopyText("text")).toBe(false);
+  it("classifies any other rejection as generic", async () => {
+    writeText.mockRejectedValueOnce(new Error("clipboard is on fire"));
+    stubExecCommand(false);
+
+    expect(await copyTextToClipboard("hello")).toEqual({ ok: false, reason: "generic" });
+  });
+
+  it("does not leave the hidden textarea behind", async () => {
+    setClipboard(null);
+    stubExecCommand(true);
+    const before = document.body.childElementCount;
+
+    await copyTextToClipboard("hello");
+
+    expect(document.body.childElementCount).toBe(before);
+  });
+
+  it("returns false rather than throwing when execCommand is unavailable", () => {
+    expect(copyTextWithExecCommand("hello")).toBe(false);
   });
 });
 
 describe("isPermissionDeniedClipboardError", () => {
-  it("recognises NotAllowedError by name", () => {
+  it("recognises the spec'd error name", () => {
     const err = new Error("nope");
     err.name = "NotAllowedError";
     expect(isPermissionDeniedClipboardError(err)).toBe(true);
   });
 
-  it("recognises browsers that only say so in the message", () => {
-    expect(isPermissionDeniedClipboardError(new Error("Clipboard permission missing"))).toBe(true);
-    expect(isPermissionDeniedClipboardError(new Error("write access denied"))).toBe(true);
+  it("recognises vendors that only say so in the message", () => {
+    expect(isPermissionDeniedClipboardError(new Error("Write permission denied."))).toBe(true);
+    expect(isPermissionDeniedClipboardError(new Error("DENIED by user"))).toBe(true);
   });
 
-  it("does not claim a permission problem for other failures", () => {
-    expect(isPermissionDeniedClipboardError(new Error("Document is not focused"))).toBe(false);
-    expect(isPermissionDeniedClipboardError("denied")).toBe(false);
+  it("does not guess from a non-Error or an unrelated failure", () => {
+    expect(isPermissionDeniedClipboardError("permission denied")).toBe(false);
     expect(isPermissionDeniedClipboardError(null)).toBe(false);
+    expect(isPermissionDeniedClipboardError(new Error("document is not focused"))).toBe(false);
   });
 });
 
-describe("clipboardFailureMessage", () => {
-  it("names the browser permission and how to copy by hand", () => {
-    const message = clipboardFailureMessage("permission-denied", "answer");
-    expect(message).toContain("Clipboard access was blocked by browser permissions.");
-    expect(message).toContain("select the answer");
+describe("wording", () => {
+  it("keeps the PR Markdown view's messages byte-identical", () => {
+    // These four strings were the PR Markdown view's inlined literals before
+    // the helper existed. If a refactor changes them, that view's own suite
+    // fails too — this assertion says which change caused it.
+    expect(clipboardSuccessMessage("markdown")).toBe("Copied markdown to clipboard.");
+    expect(clipboardFailureMessage("permission-denied", "markdown")).toBe(
+      "Clipboard access was blocked by browser permissions. "
+      + "Copy manually: select the markdown and press Cmd+C (macOS) or Ctrl+C (Windows/Linux).",
+    );
+    expect(clipboardFailureMessage("generic", "markdown")).toBe(
+      "Failed to copy markdown to clipboard. "
+      + "Copy manually: select the markdown and press Cmd+C (macOS) or Ctrl+C (Windows/Linux).",
+    );
+    expect(manualCopyHint("markdown")).toBe(
+      "Copy manually: select the markdown and press Cmd+C (macOS) or Ctrl+C (Windows/Linux).",
+    );
   });
 
-  it("says what could not be copied for a generic failure", () => {
-    expect(clipboardFailureMessage("generic", "markdown"))
-      .toContain("Failed to copy markdown to clipboard.");
+  it("names the subject the caller supplied", () => {
+    expect(clipboardSuccessMessage("answer")).toBe("Copied answer to clipboard.");
+    expect(clipboardFailureMessage("generic", "answer")).toContain("Failed to copy answer to clipboard.");
+    expect(clipboardFailureMessage("permission-denied", "answer")).toContain("select the answer");
+  });
+
+  it("distinguishes the two failure reasons", () => {
+    const denied = clipboardFailureMessage("permission-denied", "answer");
+    const generic = clipboardFailureMessage("generic", "answer");
+    expect(denied).not.toBe(generic);
+    expect(denied).toContain("browser permissions");
+    expect(generic).not.toContain("browser permissions");
+    // Both still tell the user how to copy by hand.
+    expect(denied).toContain(manualCopyHint("answer"));
+    expect(generic).toContain(manualCopyHint("answer"));
   });
 });

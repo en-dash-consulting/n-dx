@@ -660,62 +660,46 @@ describe.skipIf(!axeRun)("[a11y] PRMarkdownView — axe audit", () => {
   });
 });
 
-// ── [a11y] AskView (all four display states) ─────────────────────────────────
+// ── [a11y] AskView ───────────────────────────────────────────────────────────
 
-/**
- * The Ask panel is audited in every state, not just its initial one: its
- * states are a union and each renders a different tree, so an idle-only audit
- * would leave the answer card — the part with the actions in it — unchecked.
- */
 describe.skipIf(!axeRun)("[a11y] AskView — axe audit", () => {
+  // The Ask panel is stateful in a way its sibling views are not: the answer
+  // arrives after an indeterminate delay, so idle, submitting, answered, and
+  // error are four different DOM shapes, and an ARIA regression in one is
+  // invisible from the others. Each state is audited in both themes.
+  // Behavioural a11y (live regions, focus, keyboard) is pinned separately in
+  // ask-view-a11y.test.ts.
   let root: HTMLElement;
   let cleanup: () => void;
   let originalFetch: typeof globalThis.fetch;
+  let askResponse: () => Promise<Response>;
 
-  const ANSWER = {
-    ok: true,
-    answer: "web-viewer is the hub zone.",
-    vendor: "claude",
-    model: "claude-opus-5",
-    sources: ["CONTEXT.md"],
-  };
-
-  /** Render the panel and drive it into `state` before auditing. */
-  async function renderAsk(state: "idle" | "submitting" | "answered" | "error"): Promise<HTMLElement> {
-    globalThis.fetch = vi.fn().mockImplementation(() => {
-      if (state === "submitting") return new Promise(() => { /* never resolves */ });
-      if (state === "error") {
-        return Promise.resolve({
-          ok: false, status: 500,
-          json: async () => ({ ok: false, error: "LLM authentication failed: no key" }),
-        });
-      }
-      return Promise.resolve({ ok: true, status: 200, json: async () => ANSWER });
+  function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
     });
-
-    const { AskView } = await import("../../../src/viewer/views/ask.js");
-    const el = renderToDiv(h(AskView, {}));
-    if (state === "idle") return el;
-
-    const input = el.querySelector<HTMLTextAreaElement>(".ask-prompt-input")!;
-    act(() => {
-      input.value = "Which zone is the hub?";
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    act(() => { el.querySelector<HTMLButtonElement>(".ask-submit-btn")!.click(); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-
-    // Prove the panel is in the state being audited. Without this, a fetch stub
-    // that stopped working would leave the idle tree on screen and every audit
-    // below would pass against the wrong markup.
-    if (!el.querySelector(`.ask-${state}`)) {
-      throw new Error(`AskView did not reach the ${state} state`);
-    }
-    return el;
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    const { clearProjectMetadataCache } = await import(
+      "../../../src/viewer/hooks/use-project-metadata.js"
+    );
+    clearProjectMetadataCache();
+    const { ASK_ENDPOINT } = await import("../../../src/viewer/views/ask.js");
     originalFetch = globalThis.fetch;
+    askResponse = () => new Promise(() => { /* never resolves */ });
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === ASK_ENDPOINT) return askResponse();
+      if (url === "/api/project") {
+        return jsonResponse({
+          name: "n-dx", description: null, version: null, git: null,
+          nameSource: "directory", cliName: "n-dx",
+        });
+      }
+      return jsonResponse({}, 404);
+    }) as typeof globalThis.fetch;
   });
 
   afterEach(() => {
@@ -725,24 +709,71 @@ describe.skipIf(!axeRun)("[a11y] AskView — axe audit", () => {
     root.remove();
     cleanup?.();
     globalThis.fetch = originalFetch;
+    delete window.__NDX_DEPLOYED__;
   });
 
-  for (const state of ["idle", "submitting", "answered", "error"] as const) {
-    for (const theme of ["light", "dark"] as const) {
+  type AskAuditState = "idle" | "submitting" | "answered" | "error";
+
+  /** Mount the panel and drive it into `state` through its own form. */
+  async function renderAskAt(state: AskAuditState): Promise<void> {
+    const { AskView } = await import("../../../src/viewer/views/ask.js");
+    root = renderToDiv(h(AskView, {}));
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    if (state === "idle") return;
+
+    if (state === "answered") {
+      askResponse = async () =>
+        jsonResponse({ answer: "web-viewer is the hub zone.", vendor: "claude", model: "m" });
+    } else if (state === "error") {
+      askResponse = async () =>
+        jsonResponse({ error: "The vendor CLI exited 1.", kind: "llm_error" }, 502);
+    } // "submitting" keeps the never-resolving default.
+
+    const textarea = root.querySelector<HTMLTextAreaElement>("textarea.sv-ask-textarea");
+    const form = root.querySelector<HTMLFormElement>("form.sv-ask-form");
+    if (!textarea || !form) throw new Error("Ask panel did not render its form");
+    await act(async () => {
+      textarea.value = "Which zones are most coupled?";
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await new Promise<void>((r) => setTimeout(r, 0));
+      await new Promise<void>((r) => setTimeout(r, 0));
+    });
+
+    // Guard that the audit really sees the state it claims to — an audit of
+    // the wrong DOM passes vacuously.
+    if (state === "answered" && !root.querySelector(".sv-ask-answer")) {
+      throw new Error("Ask panel did not reach the answered state");
+    }
+    if (state === "error" && !root.querySelector(".sv-ask-error")) {
+      throw new Error("Ask panel did not reach the error state");
+    }
+  }
+
+  const STATES: AskAuditState[] = ["idle", "submitting", "answered", "error"];
+  for (const theme of ["light", "dark"] as const) {
+    for (const state of STATES) {
       it(`has zero critical/serious violations (${theme} theme, ${state} state)`, async () => {
         cleanup = setTheme(theme);
-        root = await renderAsk(state);
+        await renderAskAt(state);
         const violations = await runAxe(root);
         expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
       });
     }
   }
 
-  it("has zero critical/serious violations in the deployed-export state", async () => {
+  it("has zero violations in the deployed-mode unavailable state", async () => {
     cleanup = setTheme("light");
-    window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "2026-09-09T00:00:00.000Z" };
+    window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "2026-01-01T00:00:00.000Z" };
     try {
-      root = await renderAsk("idle");
+      const { AskView } = await import("../../../src/viewer/views/ask.js");
+      root = renderToDiv(h(AskView, {}));
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
       const violations = await runAxe(root);
       expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
     } finally {

@@ -314,8 +314,10 @@ describe("iso-map view registration", () => {
       selectedZone: null,
       selectedRunId: null,
       selectedTaskId: null,
+      askSeed: null,
       navigateTo: () => {},
       isFeatureDisabled: () => false,
+      askEnabled: false,
     };
   }
 

@@ -15,12 +15,10 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { relative as relativePath } from "node:path";
-import { realpath } from "node:fs/promises";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, findItem, PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
-import { DEFAULT_CHECKPOINT_THRESHOLD, HENCH_RUNTIME_ARTIFACTS } from "../../schema/index.js";
+import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { getCurrentHead, execStdout } from "../../process/exec.js";
@@ -30,6 +28,7 @@ import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
 import type { PromptEnvelope } from "../../prd/llm-gateway.js";
+import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { saveRun } from "../../store/runs.js";
 import { persistRunLog } from "../../store/run-log.js";
 import { buildRunSummary } from "../analysis/summary.js";
@@ -589,8 +588,7 @@ async function promptTestGateFailure(
 
   info(`\n${failCount}/${packageCount} package(s) failed testing`);
   detail(`Command: ${testGate.command}`);
-  if (failedPackages) detail(`Failed packages: ${failedPackages}`);
-  else if (testGate.error) detail(testGate.error);
+  detail(`Failed packages: ${failedPackages}`);
 
   const question =
     "[r]erun tests, [a]bort (revert & skip commit), or [s]kip gate (continue to commit)? [a] ";
@@ -860,121 +858,16 @@ export interface FinalizeRunOptions {
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
 
 /**
- * Strip the porcelain status prefix, leaving the path.
- *
- * `git status --porcelain` emits `XY <path>` — two status columns, a space,
- * then the path. Renames arrive as `R  old -> new`; the new path is the one
- * that matters for matching.
- */
-function porcelainPath(line: string): string {
-  const path = line.slice(3).trim();
-  const arrow = path.lastIndexOf(" -> ");
-  return arrow === -1 ? path : path.slice(arrow + 4);
-}
-
-/**
- * Where the project sits inside its repository, as a porcelain path prefix.
- *
- * **`git status --porcelain` reports paths relative to the repository root, not
- * to the directory it was invoked from.** That is the whole reason this
- * function exists, and it is the assumption every match below rests on. A run
- * in `sub/` sees `?? sub/.hench/locks/run.lock`, so matching that against a
- * bare `.hench/locks/` fails and hench's own lock file counts as operator work
- * — which made the gate refuse to start on a file it had just created, then
- * remove it on exit so the tree read clean to anyone who looked afterwards.
- *
- * Every path hench cares about is expressed relative to `projectDir`, so the
- * prefix is applied to the pattern rather than stripped from each line. That
- * keeps a sibling project's `other/.hench/runs/` outside the match: it is
- * somebody else's uncommitted work, not this project's runtime state.
- *
- * @param projectDir - the directory hench is operating on
- * @returns `""` when the project *is* the repo root, otherwise a `sub/`-style
- *   prefix. Also `""` when the directory is not in a repository or git is
- *   unavailable — `execStdout` resolves empty rather than throwing, and the
- *   pre-nesting behaviour is the right thing to fall back to.
- */
-async function repoRelativePrefix(projectDir: string): Promise<string> {
-  const root = (
-    await execStdout("git", ["rev-parse", "--show-toplevel"], {
-      cwd: projectDir,
-      timeout: 15_000,
-    })
-  ).trim();
-  if (!root) return "";
-
-  // Both sides must be canonical before they can be subtracted. `git rev-parse`
-  // resolves symlinks and `projectDir` generally has not: on macOS a path under
-  // `/var/...` or `/tmp/...` comes back as `/private/var/...`, and a symlinked
-  // home or checkout does the same anywhere. Comparing the two raw strings
-  // yields a `..`-laden relative path, the guard below discards it, and the
-  // prefix silently falls back to "" — leaving exactly the bug this function
-  // was written to fix, on developer machines only.
-  const canonical = await realpath(projectDir).catch(() => projectDir);
-  const canonicalRoot = await realpath(root).catch(() => root);
-
-  const rel = relativePath(canonicalRoot, canonical).replaceAll("\\", "/");
-  // `..` means projectDir is outside the reported root, which should not happen
-  // — treat it as unknown rather than building a nonsense prefix.
-  if (!rel || rel.startsWith("..")) return "";
-  return `${rel}/`;
-}
-
-/**
- * Whether a porcelain line names a path hench wrote for its own bookkeeping.
- *
- * @param prefix - the project's location within the repo, from
- *   {@link repoRelativePrefix}; `""` when the project is the repo root
- */
-function isHenchRuntimeArtifact(line: string, prefix: string): boolean {
-  const path = porcelainPath(line).replace(/^"|"$/g, "").replaceAll("\\", "/");
-  return HENCH_RUNTIME_ARTIFACTS.some((artifact) => {
-    const own = `${prefix}${artifact}`;
-    return path === own || path === own.replace(/\/$/, "") || path.startsWith(own);
-  });
-}
-
-/**
- * Drop hench's own runtime state from a porcelain listing.
- *
- * Applied by the callers rather than folded into {@link listDirtyPaths},
- * because this is a policy about what counts as operator work, not a detail of
- * how the paths were obtained — and `listDirtyPaths` is an injectable seam, so
- * a filter hidden inside the default implementation would silently not apply
- * wherever a caller supplied its own.
- *
- * The policy: a file hench wrote for itself is never something the operator
- * must commit or stash. `.hench/locks/` is created the instant a run starts
- * and removed on exit, so counting it made an autonomous run refuse to start
- * on a file it had just written — then erase the evidence, leaving a
- * "1 uncommitted file(s), 0 line(s) changed" message against a tree that read
- * clean by the time anyone looked. `.gitignore` normally hides these and
- * `hench init` writes those entries, but the gate must not depend on that: a
- * project initialised before they existed still self-blocks.
- *
- * `projectDir` is required rather than defaulted because porcelain paths are
- * repo-root-relative and the artifact list is project-relative: without it the
- * two cannot be compared, and a default would silently reintroduce the
- * nested-project bug at whichever call site forgot to pass one. Making it
- * mandatory means the compiler, not a reviewer, checks that both callers agree.
- *
- * @param lines - porcelain lines, as produced for `projectDir`
- * @param projectDir - the directory those lines were collected for
- * @see HENCH_RUNTIME_ARTIFACTS — the list, shared with `hench init`
- * @see repoRelativePrefix — why the project's position in the repo matters
- */
-export async function excludeHenchRuntimeArtifacts(
-  lines: string[],
-  projectDir: string,
-): Promise<string[]> {
-  const prefix = await repoRelativePrefix(projectDir);
-  return lines.filter((line) => !isHenchRuntimeArtifact(line, prefix));
-}
-
-/**
  * Return the list of entries reported by `git status --porcelain`.
  * Each non-blank line represents a modified, staged, or untracked path.
  * Returns an empty array when the working tree is clean or git is unavailable.
+ *
+ * Hench's own runtime artifacts are discounted by the callers via
+ * {@link excludeHenchRuntimeArtifacts} rather than in here, because that is a
+ * policy about what counts as operator work, not a detail of how the paths
+ * were obtained — and this function is an injectable seam, so a filter hidden
+ * inside the default implementation would silently not apply wherever a
+ * caller supplied its own.
  *
  * `--untracked-files=all` matters twice over. By default git collapses a
  * wholly-untracked directory to a single entry — a fresh project reports
@@ -2135,9 +2028,10 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
 
     // How long the full suite may take is a property of the project, not of
     // this gate: a monorepo running every package can legitimately exceed the
-    // 5-minute default, and a timeout aborts a task whose work is already done.
-    // Undefined (a config predating the field) keeps the default.
-    const testGateTimeoutMs = config.fullTestTimeoutMs;
+    // default, and a timeout aborts a task whose work is already done.
+    // Undefined (a config predating the field, or a caller that supplies no
+    // config at all) keeps the gate's own default.
+    const testGateTimeoutMs = config?.fullTestTimeoutMs;
     if (testGateTimeoutMs != null && testGateTimeoutMs !== DEFAULT_TEST_GATE_TIMEOUT_MS) {
       detail(
         testGateTimeoutMs === 0
@@ -2182,11 +2076,6 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
           const firstFailure = testGate.packages.find((p) => p.failureOutput);
           if (firstFailure?.failureOutput) {
             detail(firstFailure.failureOutput);
-          } else if (testGate.error) {
-            // Gate-level failure with nothing per-package to print — a timeout,
-            // or a command that never produced test output. Printing nothing
-            // here is what made an aborted run look unexplained.
-            detail(testGate.error);
           }
 
           // Prompt for action
@@ -2202,19 +2091,47 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
             gateComplete = true;
           } else {
             // "abort" — mark run as failed and proceed to rollback.
-            // Never leave the reason blank: with no failing package named (a
-            // timeout, an unlaunchable command) the run record used to read
-            // "Test gate failed: " and the loop stopped without saying why.
+            //
+            // Never emit a bare trailing colon: parseVitestOutput can return an
+            // empty package list for a runner whose output it cannot parse, and
+            // `Test gate failed: ` with nothing after it told the operator
+            // precisely nothing about why their run died.
             run.status = "failed";
-            run.error = failedPackages.length > 0
-              ? `Test gate failed: ${failedPackages.join(", ")}`
-              : `Test gate failed: ${testGate.error ?? `\`${testGate.command}\` reported no results`}`;
+            // `error` wins when set: it carries the specific diagnosis (a
+            // timeout and its duration), which the package list cannot express.
+            const reason =
+              testGate.error ??
+              (failedPackages.length > 0
+                ? failedPackages.join(", ")
+                : "no package results were reported");
+            run.error = `Test gate failed: ${reason}`;
             gateComplete = true;
           }
         }
       } else if (testGate.skipReason) {
         detail(`Skipped: ${testGate.skipReason}`);
         gateComplete = true;
+      } else {
+        // INCONCLUSIVE — `ran: false` with no skipReason means the gate could not
+        // be executed. The suite never started, so this is not a verdict on the
+        // code and must not be treated as one.
+        //
+        // Deliberately does NOT set run.status = "failed". Doing so skipped
+        // updateCompletedTaskStatus below and short-circuited the commit prompt,
+        // so finished, committed work went unrecorded in the PRD and the loop
+        // re-selected the same task until the 3-strike auto-cancel fired.
+        //
+        // Also sets gateComplete: without it the loop body did nothing on this
+        // branch and spun to the 5-attempt cap, re-running a command that cannot
+        // launch and then failing the run for exhausting its retries.
+        //
+        // The outcome stays on `run.testGate` (ran: false + error), so the run
+        // record and dashboard can tell this apart from a pass without a
+        // separate flag.
+        gateComplete = true;
+        stream("Test Gate", `⚠ Could not run — ${testGate.error ?? "reason unknown"}`);
+        detail("Inconclusive, not a failure: the suite never started, so nothing was tested.");
+        detail("The run continues; verify the suite yourself before trusting this commit.");
       }
     }
 

@@ -1,1152 +1,1036 @@
 // @vitest-environment jsdom
 /**
- * Tests for the SourceVision Ask panel shell.
+ * SourceVision Ask panel shell.
  *
- * Covers the four display states and the transitions between them, that a
- * blank prompt never reaches the network, and that the tab stays hidden while
- * the `sourcevision.ask` gate is off.
+ * Covers what a typecheck cannot see: the four display states and the
+ * transitions between them, the empty-prompt no-op, the feature gate hiding
+ * the tab, and the deep-link path from a URL segment to a rendered panel.
  */
-
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { AskView, isBlankPrompt, stateForResponse, captureResultMessage } from "../../../src/viewer/views/ask.js";
-import { setPendingAskSeed } from "../../../src/viewer/ask-seed.js";
+import {
+  AskView,
+  ASK_ENDPOINT,
+  ASK_CAPTURE_ENDPOINT,
+  describeCapture,
+  isSubmittablePrompt,
+} from "../../../src/viewer/views/ask.js";
+import { Sidebar } from "../../../src/viewer/components/sidebar.js";
 import { SOURCEVISION_TABS } from "../../../src/viewer/views/index.js";
 import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
-import { Sidebar } from "../../../src/viewer/components/sidebar.js";
-import { SOURCEVISION_SCOPE_VIEWS, buildValidViews, isKnownViewPath } from "../../../src/shared/index.js";
-import type { LoadedData } from "../../../src/viewer/types.js";
+import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
+import { buildValidViews } from "../../../src/shared/index.js";
+import { resolveLocationRoute } from "../../../src/viewer/route-state.js";
+import type { LoadedData, ViewId } from "../../../src/viewer/types.js";
 
-/** Minimal render context — the Ask view takes no props from it. */
-function askRenderContext(): ViewRenderContext {
-  const data: LoadedData = {
-    manifest: null,
-    inventory: null,
-    imports: null,
-    zones: null,
-    components: null,
-    callGraph: null,
-  };
-  return {
-    data,
-    setDetail: () => {},
-    setPrdDetailContent: () => {},
-    selectedFile: null,
-    setSelectedFile: () => {},
-    selectedZone: null,
-    selectedRunId: null,
-    selectedTaskId: null,
-    navigateTo: () => {},
-    isFeatureDisabled: () => false,
-  };
+// ---------------------------------------------------------------------------
+// Harness
+// ---------------------------------------------------------------------------
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
-/** Poll until an assertion passes or the timeout is reached. */
-async function waitFor(fn: () => void, timeout = 2000) {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    try {
-      fn();
-      return;
-    } catch {
-      await new Promise<void>((r) => setTimeout(r, 10));
-    }
-  }
-  fn(); // Final attempt — let it throw
+/** Let the mounted effects and the fetch promise chain settle. */
+async function settle(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await new Promise<void>((r) => setTimeout(r, 0));
+    await new Promise<void>((r) => setTimeout(r, 0));
+  });
 }
 
-const ANSWER_BODY = {
-  ok: true,
-  answer: "web-viewer is the hub zone; everything else imports through it.",
-  vendor: "claude",
-  model: "claude-opus-5",
-  sources: ["CONTEXT.md"],
-};
+/**
+ * Install (or remove) `navigator.clipboard`.
+ *
+ * `configurable: true` matters: the modern-API and no-API cases both run in
+ * the same worker, so the property has to be replaceable between tests.
+ */
+function setClipboard(writeText: ReturnType<typeof vi.fn> | null): void {
+  Object.defineProperty(navigator, "clipboard", {
+    value: writeText === null ? undefined : { writeText },
+    configurable: true,
+    writable: true,
+  });
+}
 
 describe("AskView", () => {
   let root: HTMLDivElement;
+  /** Response served to the next POST /api/sourcevision/ask. */
+  let askResponse: () => Promise<Response>;
+  /** Response served to the next POST /api/rex/capture-ask. */
+  let captureResponse: () => Promise<Response>;
   let fetchSpy: ReturnType<typeof vi.fn>;
+  let clipboardWriteText: ReturnType<typeof vi.fn>;
+  /** Set when a test installs a fake execCommand, so afterEach can remove it. */
+  let stubbedExecCommand = false;
 
-  beforeEach(() => {
-    root = document.createElement("div");
-    document.body.appendChild(root);
-    fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-  });
-
-  afterEach(() => {
-    render(null, root);
-    root.remove();
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-  });
-
-  function mount() {
-    act(() => {
-      render(h(AskView, null), root);
-    });
+  /** Stub `document.execCommand("copy")`, which jsdom does not implement. */
+  function stubExecCommand(result: boolean): ReturnType<typeof vi.fn> {
+    const spy = vi.fn(() => result);
+    (document as unknown as { execCommand: unknown }).execCommand = spy;
+    stubbedExecCommand = true;
+    return spy;
   }
 
-  function promptInput(): HTMLTextAreaElement {
-    const el = root.querySelector<HTMLTextAreaElement>(".ask-prompt-input");
-    if (!el) throw new Error("prompt textarea is not rendered");
+  function mount() {
+    root = document.createElement("div");
+    document.body.appendChild(root);
+    render(h(AskView, null), root);
+    return root;
+  }
+
+  function textarea(): HTMLTextAreaElement {
+    const el = root.querySelector<HTMLTextAreaElement>("textarea.sv-ask-textarea");
+    if (!el) throw new Error("prompt textarea not rendered");
     return el;
   }
 
   function submitButton(): HTMLButtonElement {
-    const el = root.querySelector<HTMLButtonElement>(".ask-submit-btn");
-    if (!el) throw new Error("submit button is not rendered");
+    const el = root.querySelector<HTMLButtonElement>("button.sv-ask-submit");
+    if (!el) throw new Error("submit control not rendered");
     return el;
   }
 
-  function typePrompt(value: string) {
-    const input = promptInput();
-    act(() => {
-      input.value = value;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
+  /** Type into the prompt the way a user does — value plus an input event. */
+  async function type(value: string): Promise<void> {
+    const el = textarea();
+    await act(async () => {
+      el.value = value;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
 
-  /** Resolve `fetch` only when told to, so the submitting state is observable. */
-  function deferredJson(body: unknown) {
-    let release: () => void = () => {};
-    const gate = new Promise<void>((r) => { release = r; });
-    fetchSpy.mockImplementation(async () => {
-      await gate;
-      return { ok: true, status: 200, json: async () => body };
+  /**
+   * Submit through the form rather than by clicking the button.
+   *
+   * The button is disabled for an unsubmittable prompt, so clicking it would
+   * prove nothing about the guard inside the handler — which is the path an
+   * Enter keypress or a programmatic submit takes.
+   */
+  async function submitForm(): Promise<void> {
+    const form = root.querySelector<HTMLFormElement>("form.sv-ask-form");
+    if (!form) throw new Error("form not rendered");
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
-    return { release: () => release() };
+    await settle();
   }
-
-  it("renders a labelled textarea wired to the submit control", () => {
-    mount();
-
-    const label = root.querySelector<HTMLLabelElement>(".ask-prompt-label");
-    expect(label).not.toBeNull();
-    expect(label?.htmlFor).toBe(promptInput().id);
-    expect(promptInput().id).toBeTruthy();
-    expect(submitButton().textContent).toBe("Ask");
-  });
-
-  it("starts in the idle state", () => {
-    mount();
-
-    expect(root.querySelector(".ask-idle")).not.toBeNull();
-    expect(root.querySelector(".ask-submitting")).toBeNull();
-    expect(root.querySelector(".ask-answered")).toBeNull();
-    expect(root.querySelector(".ask-error")).toBeNull();
-  });
-
-  it("transitions idle → submitting → answered", async () => {
-    const pending = deferredJson(ANSWER_BODY);
-    mount();
-    typePrompt("Which zone is the hub?");
-
-    act(() => { submitButton().click(); });
-
-    await waitFor(() => expect(root.querySelector(".ask-submitting")).not.toBeNull());
-    expect(root.querySelector(".ask-idle")).toBeNull();
-    // Unavailable via aria-disabled, and the textarea stays live — both so the
-    // keyboard user keeps their place. See the accessibility describe below.
-    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
-    expect(promptInput().disabled).toBe(false);
-
-    pending.release();
-
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-    expect(root.querySelector(".ask-submitting")).toBeNull();
-    expect(root.querySelector(".ask-answer")?.textContent).toBe(ANSWER_BODY.answer);
-    expect(root.querySelector(".ask-answer-meta")?.textContent).toContain("claude-opus-5");
-    expect(root.querySelector(".ask-answer-meta")?.textContent).toContain("CONTEXT.md");
-  });
-
-  it("transitions to the error state on a classified failure, naming the reason", async () => {
-    fetchSpy.mockResolvedValue({
-      ok: false,
-      status: 429,
-      json: async () => ({ ok: false, reason: "rate-limit", error: "LLM rate limit reached: slow down" }),
-    });
-    mount();
-    typePrompt("Why is coupling high?");
-
-    act(() => { submitButton().click(); });
-
-    await waitFor(() => expect(root.querySelector(".ask-error")).not.toBeNull());
-    expect(root.querySelector(".ask-error")?.textContent).toContain("LLM rate limit reached");
-    expect(root.querySelector(".ask-answered")).toBeNull();
-    // The control comes back — a rate limit is worth retrying.
-    expect(submitButton().getAttribute("aria-disabled")).toBe("false");
-  });
-
-  it("reports a rejected fetch as an error rather than hanging in submitting", async () => {
-    fetchSpy.mockRejectedValue(new Error("connect ECONNREFUSED 127.0.0.1:3117"));
-    mount();
-    typePrompt("Anything");
-
-    act(() => { submitButton().click(); });
-
-    await waitFor(() => expect(root.querySelector(".ask-error")).not.toBeNull());
-    expect(root.querySelector(".ask-error")?.textContent).toContain("ECONNREFUSED");
-  });
-
-  it("replaces a previous answer when asked again", async () => {
-    fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ANSWER_BODY });
-    mount();
-    typePrompt("First question");
-    act(() => { submitButton().click(); });
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-
-    fetchSpy.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ ...ANSWER_BODY, answer: "A different answer." }),
-    });
-    typePrompt("Second question");
-    act(() => { submitButton().click(); });
-
-    await waitFor(() => {
-      expect(root.querySelector(".ask-answer")?.textContent).toBe("A different answer.");
-    });
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
-  });
-
-  it("issues no request for an empty or whitespace-only prompt", () => {
-    mount();
-
-    // Empty — the button reports itself unavailable, and a click does nothing.
-    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
-    act(() => { submitButton().click(); });
-
-    // Whitespace only — same, even though the field is non-empty.
-    typePrompt("   \n\t  ");
-    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
-    act(() => { submitButton().click(); });
-
-    // And via the keyboard shortcut, which bypasses the disabled attribute.
-    act(() => {
-      promptInput().dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }),
-      );
-    });
-
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(root.querySelector(".ask-idle")).not.toBeNull();
-  });
-
-  it("submits on Cmd/Ctrl+Enter and sends the trimmed prompt", async () => {
-    fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ANSWER_BODY });
-    mount();
-    typePrompt("  Which zone is the hub?  ");
-
-    act(() => {
-      promptInput().dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }),
-      );
-    });
-
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
-    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/api/sourcevision/ask");
-    expect(init.method).toBe("POST");
-    expect(JSON.parse(String(init.body))).toEqual({ prompt: "Which zone is the hub?" });
-  });
-
-  it("does not issue a second request while one is in flight", async () => {
-    const pending = deferredJson(ANSWER_BODY);
-    mount();
-    typePrompt("Which zone is the hub?");
-
-    act(() => { submitButton().click(); });
-    await waitFor(() => expect(root.querySelector(".ask-submitting")).not.toBeNull());
-    act(() => {
-      promptInput().dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }),
-      );
-    });
-
-    pending.release();
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-  });
-});
-
-/**
- * The two answer actions. Copy is asserted through its rendered feedback
- * rather than by spying on the shared helper — the helper has its own tests
- * (`clipboard.test.ts`), and what this view is responsible for is turning its
- * result into the right words.
- */
-describe("AskView answer actions", () => {
-  let root: HTMLDivElement;
-  let fetchSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    root = document.createElement("div");
-    document.body.appendChild(root);
+    clearProjectMetadataCache();
+    delete window.__NDX_DEPLOYED__;
+    askResponse = async () => jsonResponse({ answer: "unset", vendor: "claude", model: "test-model" });
+    captureResponse = async () => jsonResponse({
+      ok: true,
+      item: { id: "task-1", title: "Which zones are most coupled?", level: "task" },
+      parent: { id: "epic-1", title: "SourceVision Ask", level: "epic", created: true },
+    });
     fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input) === "/api/sourcevision/ask") {
-        return { ok: true, status: 200, json: async () => ANSWER_BODY };
+      const url = String(input);
+      if (url === ASK_ENDPOINT) return askResponse();
+      if (url === ASK_CAPTURE_ENDPOINT) return captureResponse();
+      if (url === "/api/project") {
+        return jsonResponse({ name: "n-dx", description: null, version: null, git: null, nameSource: "directory", cliName: "n-dx" });
       }
-      throw new Error(`unstubbed fetch: ${String(input)}`);
+      return jsonResponse({}, 404);
     });
     vi.stubGlobal("fetch", fetchSpy);
-    Object.defineProperty(document, "execCommand", {
-      value: vi.fn(() => true), configurable: true, writable: true,
-    });
+    clipboardWriteText = vi.fn(async () => {});
+    setClipboard(clipboardWriteText);
   });
 
   afterEach(() => {
-    render(null, root);
-    root.remove();
+    if (root) render(null, root);
+    if (root?.parentNode) root.parentNode.removeChild(root);
+    document.body.innerHTML = "";
+    // Vitest shares one worker process across test files, so a deployed-mode
+    // flag left on `window` would silently hide every `requiresServer` tab in
+    // whatever ran next — which is how the gate-on case below first failed.
+    delete window.__NDX_DEPLOYED__;
+    // jsdom ships no execCommand; leaving a fake behind would make the
+    // permission-denied case in another file silently succeed via the fallback.
+    if (stubbedExecCommand) {
+      delete (document as unknown as { execCommand?: unknown }).execCommand;
+      stubbedExecCommand = false;
+    }
+    setClipboard(null);
+    // Restored here as well as in the tests that install them: a fake clock
+    // abandoned by a timed-out test deadlocks every later `settle()`, which
+    // presents as a dozen unrelated failures rather than as one.
+    vi.useRealTimers();
     vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-    Object.defineProperty(navigator, "clipboard", {
-      value: undefined, configurable: true, writable: true,
+  });
+
+  // ── State transitions ────────────────────────────────────────────
+
+  it("starts idle: a prompt field, a disabled submit, and no request", () => {
+    mount();
+
+    expect(root.querySelector(".sv-ask-idle")).not.toBeNull();
+    expect(root.querySelector(".sv-ask-answer")).toBeNull();
+    expect(root.querySelector(".sv-ask-error")).toBeNull();
+    expect(submitButton().disabled).toBe(true);
+    expect(fetchSpy.mock.calls.filter(([u]) => String(u) === ASK_ENDPOINT)).toHaveLength(0);
+  });
+
+  it("labels the prompt textarea", () => {
+    mount();
+    const label = root.querySelector<HTMLLabelElement>("label.sv-ask-label");
+    expect(label?.textContent).toBe("Your question");
+    // The label points at the field it names, so clicking it focuses the field.
+    expect(label?.getAttribute("for")).toBe(textarea().id);
+    expect(textarea().id).toBeTruthy();
+  });
+
+  it("moves idle -> submitting -> answered and shows the answer", async () => {
+    mount();
+    await settle();
+
+    // Hold the response open so the submitting state is observable.
+    let release: (r: Response) => void = () => {};
+    askResponse = () => new Promise<Response>((resolve) => { release = resolve; });
+
+    await type("Which zones are most coupled?");
+    expect(submitButton().disabled).toBe(false);
+
+    const form = root.querySelector<HTMLFormElement>("form.sv-ask-form")!;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    // submitting
+    expect(root.querySelector(".sv-ask-status")).not.toBeNull();
+    expect(root.querySelector(".sv-ask-idle")).toBeNull();
+    expect(submitButton().textContent).toBe("Asking...");
+    // Neither control is hard-disabled while the request is in flight — see
+    // the focus-retention test below for why. They report unavailable instead.
+    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
+    expect(textarea().readOnly).toBe(true);
+
+    await act(async () => {
+      release(jsonResponse({
+        answer: "web-viewer is the hub zone.",
+        vendor: "claude",
+        model: "claude-opus-5",
+        contextSources: ["zones.json"],
+      }));
+      await settle();
+    });
+
+    // answered
+    const answer = root.querySelector(".sv-ask-answer");
+    expect(answer).not.toBeNull();
+    expect(root.querySelector(".sv-ask-answer-body")?.textContent).toBe("web-viewer is the hub zone.");
+    expect(root.querySelector(".sv-ask-status")).toBeNull();
+    expect(root.querySelector(".sv-ask-error")).toBeNull();
+    expect(root.querySelector(".sv-ask-question")?.textContent).toBe("Which zones are most coupled?");
+    expect(root.querySelector(".sv-ask-answer-meta")?.textContent).toContain("claude-opus-5");
+    expect(root.querySelector(".sv-ask-answer-meta")?.textContent).toContain("zones.json");
+  });
+
+  it("moves idle -> submitting -> error and reports the endpoint's wording", async () => {
+    mount();
+    await settle();
+
+    askResponse = async () => jsonResponse({
+      error: "No analysis data to answer from.",
+      kind: "no_analysis",
+      suggestion: "Run 'n-dx analyze .' first, then ask again.",
+    }, 404);
+
+    await type("What does this project do?");
+    await submitForm();
+
+    const error = root.querySelector(".sv-ask-error");
+    expect(error).not.toBeNull();
+    expect(root.querySelector(".sv-ask-error-message")?.textContent).toBe("No analysis data to answer from.");
+    expect(error?.textContent).toContain("Run 'n-dx analyze .' first");
+    expect(error?.getAttribute("role")).toBe("alert");
+    expect(root.querySelector(".sv-ask-answer")).toBeNull();
+    expect(root.querySelector(".sv-ask-status")).toBeNull();
+    // The panel is usable again rather than stuck in the failed submit.
+    expect(submitButton().disabled).toBe(false);
+    expect(submitButton().getAttribute("aria-disabled")).toBeNull();
+    expect(textarea().readOnly).toBe(false);
+  });
+
+  it("reports a transport failure as an error rather than throwing", async () => {
+    mount();
+    await settle();
+
+    askResponse = async () => { throw new Error("connect ECONNREFUSED 127.0.0.1:3117"); };
+
+    await type("Anything?");
+    await submitForm();
+
+    expect(root.querySelector(".sv-ask-error-message")?.textContent).toContain("ECONNREFUSED");
+  });
+
+  it("treats a 200 with an empty answer as an error, not a blank answer", async () => {
+    mount();
+    await settle();
+
+    askResponse = async () => jsonResponse({ answer: "   ", vendor: "claude", model: "m" });
+
+    await type("Anything?");
+    await submitForm();
+
+    expect(root.querySelector(".sv-ask-error")).not.toBeNull();
+    expect(root.querySelector(".sv-ask-answer")).toBeNull();
+  });
+
+  it("keeps a non-JSON failure body from producing an empty error card", async () => {
+    mount();
+    await settle();
+
+    askResponse = async () => new Response("<html>502 Bad Gateway</html>", {
+      status: 502,
+      headers: { "Content-Type": "text/html" },
+    });
+
+    await type("Anything?");
+    await submitForm();
+
+    // The status is mapped onto a mode rather than shown as one — see the
+    // degraded-mode section below for what the card says instead.
+    expect(root.querySelector(".sv-ask-error-message")?.textContent?.trim().length)
+      .toBeGreaterThan(0);
+    expect(root.querySelector(".sv-ask-error h3")?.textContent?.trim().length)
+      .toBeGreaterThan(0);
+  });
+
+  it("replaces a previous answer when a new question is asked", async () => {
+    mount();
+    await settle();
+
+    askResponse = async () => jsonResponse({ answer: "First answer.", vendor: "claude", model: "m" });
+    await type("First question?");
+    await submitForm();
+    expect(root.querySelector(".sv-ask-answer-body")?.textContent).toBe("First answer.");
+
+    askResponse = async () => jsonResponse({ answer: "Second answer.", vendor: "claude", model: "m" });
+    await type("Second question?");
+    await submitForm();
+    expect(root.querySelector(".sv-ask-answer-body")?.textContent).toBe("Second answer.");
+  });
+
+  // ── Degraded modes ───────────────────────────────────────────────
+  //
+  // Three distinct ways to be unusable, three distinct cards. The assertions
+  // below are about what the user is told and what they can do next, not about
+  // which HTTP status arrived — that mapping is covered in ask-failure.test.ts.
+
+  /** Text of every guidance step in the error card. */
+  function errorSteps(): string[] {
+    return Array.from(root.querySelectorAll(".sv-ask-error-steps li"))
+      .map((li) => li.textContent ?? "");
+  }
+
+  function errorKind(): string | null {
+    return root.querySelector(".sv-ask-error")?.getAttribute("data-ask-error-kind") ?? null;
+  }
+
+  function retryButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>("button.sv-ask-retry-btn");
+  }
+
+  /** Drive one failed exchange and leave the error card on screen. */
+  async function failWith(response: () => Promise<Response>, question = "Which zones are most coupled?"): Promise<void> {
+    mount();
+    await settle();
+    askResponse = response;
+    await type(question);
+    await submitForm();
+  }
+
+  it("offers the analysis run itself when there is nothing to answer from", async () => {
+    await failWith(async () => jsonResponse({
+      error: "No analysis data to answer from.",
+      kind: "no_analysis",
+      suggestion: "Run 'n-dx analyze .' first, then ask again.",
+    }, 404));
+
+    expect(errorKind()).toBe("no_analysis");
+    // The affordance, not just the command name: the same control the Overview
+    // uses, so the user can start the run without leaving the panel.
+    const analyze = root.querySelector(".sv-ask-error-analyze .overview-reanalyze");
+    expect(analyze).not.toBeNull();
+    expect(analyze?.textContent).toContain("Re-analyze");
+    expect(analyze?.textContent).toContain("Full analysis");
+    // Retrying the question would hit the same absent data.
+    expect(retryButton()).toBeNull();
+  });
+
+  it("shows the endpoint's canonical credential steps for an auth failure", async () => {
+    // Exactly what the route sends: authFailureGuidance(vendor).remediation,
+    // ending in VERIFY_CREDENTIALS_STEP. The panel renders them; it does not
+    // author credential wording of its own.
+    await failWith(async () => jsonResponse({
+      error: "Authentication failed for Claude — Invalid or expired credentials.",
+      kind: "auth",
+      suggestion: "Re-authenticate: claude logout && claude login  Verify credentials: ndx auth",
+      remediation: [
+        "Re-authenticate: claude logout && claude login",
+        "Verify credentials: ndx auth",
+      ],
+    }, 401));
+
+    expect(errorKind()).toBe("auth");
+    expect(errorSteps()).toContain("Re-authenticate: claude logout && claude login");
+    expect(errorSteps()).toContain("Verify credentials: ndx auth");
+    // Neither an analysis nor a retry fixes a rejected credential.
+    expect(retryButton()).toBeNull();
+    expect(root.querySelector(".sv-ask-error-analyze")).toBeNull();
+  });
+
+  it("names a timeout as itself and offers a retry", async () => {
+    await failWith(async () => jsonResponse({
+      error: "Ask request timed out after 120s.",
+      kind: "timeout",
+    }, 504));
+
+    expect(errorKind()).toBe("timeout");
+    expect(root.querySelector(".sv-ask-error h3")?.textContent).toMatch(/time/i);
+    expect(retryButton()).not.toBeNull();
+  });
+
+  it("names a rate limit as itself and states the delay the vendor asked for", async () => {
+    await failWith(async () => jsonResponse({
+      error: "Rate limit exceeded — the API is temporarily throttling requests.",
+      kind: "rate_limit",
+      retryAfterMs: 30_000,
+    }, 429));
+
+    expect(errorKind()).toBe("rate_limit");
+    expect(root.querySelector(".sv-ask-error h3")?.textContent).toMatch(/rate limit/i);
+    expect(errorSteps().join(" ")).toContain("30-second");
+    expect(retryButton()).not.toBeNull();
+  });
+
+  it("names a provider error as itself without offering a retry", async () => {
+    await failWith(async () => jsonResponse({
+      error: "The API is temporarily overloaded or experiencing errors.",
+      kind: "llm_error",
+    }, 502));
+
+    expect(errorKind()).toBe("llm_error");
+    expect(root.querySelector(".sv-ask-error h3")?.textContent).toMatch(/provider/i);
+    expect(retryButton()).toBeNull();
+    // Still not a dead end: the card says what to do instead.
+    expect(errorSteps().length).toBeGreaterThan(0);
+  });
+
+  it("re-sends the question that failed when Retry is pressed", async () => {
+    await failWith(async () => jsonResponse({ error: "timed out", kind: "timeout" }, 504), "Why is checkout coupled?");
+
+    askResponse = async () => jsonResponse({ answer: "Because of the pipeline file.", vendor: "claude", model: "m" });
+    await act(async () => {
+      retryButton()!.click();
+      await settle();
+    });
+
+    const bodies = fetchSpy.mock.calls
+      .filter(([u]) => String(u) === ASK_ENDPOINT)
+      .map(([, init]) => JSON.parse((init as RequestInit).body as string));
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1].prompt).toBe("Why is checkout coupled?");
+    expect(root.querySelector(".sv-ask-answer-body")?.textContent).toBe("Because of the pipeline file.");
+  });
+
+  it("keeps the question in the textarea through every degraded mode", async () => {
+    const question = "Which zones are most coupled, and what is driving it?";
+    const failures: Array<() => Promise<Response>> = [
+      async () => jsonResponse({ error: "no analysis", kind: "no_analysis" }, 404),
+      async () => jsonResponse({ error: "auth", kind: "auth", remediation: ["Verify credentials: ndx auth"] }, 401),
+      async () => jsonResponse({ error: "timed out", kind: "timeout" }, 504),
+      async () => jsonResponse({ error: "throttled", kind: "rate_limit" }, 429),
+      async () => { throw new TypeError("Failed to fetch"); },
+      async () => new Response("<html>502</html>", { status: 502, headers: { "Content-Type": "text/html" } }),
+    ];
+
+    mount();
+    await settle();
+    await type(question);
+    for (const response of failures) {
+      askResponse = response;
+      await submitForm();
+      expect(root.querySelector(".sv-ask-error")).not.toBeNull();
+      // The whole point: a failure never costs the user their question.
+      expect(textarea().value).toBe(question);
+      expect(submitButton().disabled).toBe(false);
+    }
+  });
+
+  it("names a mode rather than a status code when the body is not ours", async () => {
+    // A proxy's HTML 502 used to render as "The Ask request failed (502)".
+    await failWith(async () => new Response("<html>502 Bad Gateway</html>", {
+      status: 502,
+      headers: { "Content-Type": "text/html" },
+    }));
+
+    expect(errorKind()).toBe("llm_error");
+    const message = root.querySelector(".sv-ask-error-message")?.textContent ?? "";
+    expect(message).not.toMatch(/^The Ask request failed/);
+    expect(message.trim().length).toBeGreaterThan(0);
+    expect(errorSteps().length).toBeGreaterThan(0);
+  });
+
+  it("reports a transport failure as unreachable, not as the raw fetch text alone", async () => {
+    await failWith(async () => { throw new TypeError("Failed to fetch"); });
+
+    expect(errorKind()).toBe("network");
+    // The thrown text is kept as detail, but the heading is what names the fault.
+    expect(root.querySelector(".sv-ask-error h3")?.textContent).toMatch(/reach/i);
+    expect(retryButton()).not.toBeNull();
+  });
+
+  // ── The empty-prompt no-op ───────────────────────────────────────
+
+  it("issues no request for an empty or whitespace-only prompt", async () => {
+    mount();
+    await settle();
+
+    const askCalls = () => fetchSpy.mock.calls.filter(([u]) => String(u) === ASK_ENDPOINT).length;
+
+    // Never typed at all.
+    await submitForm();
+    expect(askCalls()).toBe(0);
+    expect(root.querySelector(".sv-ask-idle")).not.toBeNull();
+
+    // Whitespace only — the submit control refuses, and so does the handler
+    // the Enter key reaches.
+    for (const blank of ["   ", "\n\n", "\t "]) {
+      await type(blank);
+      expect(submitButton().disabled).toBe(true);
+      await submitForm();
+      expect(askCalls()).toBe(0);
+      expect(root.querySelector(".sv-ask-status")).toBeNull();
+      expect(root.querySelector(".sv-ask-idle")).not.toBeNull();
+    }
+
+    // A real question still goes through, so the guard is not simply broken.
+    askResponse = async () => jsonResponse({ answer: "Yes.", vendor: "claude", model: "m" });
+    await type("A real question?");
+    await submitForm();
+    expect(askCalls()).toBe(1);
+  });
+
+  it("sends the trimmed prompt as the request body", async () => {
+    mount();
+    await settle();
+
+    askResponse = async () => jsonResponse({ answer: "Yes.", vendor: "claude", model: "m" });
+    await type("  Which files are hubs?  ");
+    await submitForm();
+
+    const call = fetchSpy.mock.calls.find(([u]) => String(u) === ASK_ENDPOINT)!;
+    const init = call[1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ prompt: "Which files are hubs?" });
+  });
+
+  it("does not issue a second request while one is in flight", async () => {
+    mount();
+    await settle();
+
+    let release: (r: Response) => void = () => {};
+    askResponse = () => new Promise<Response>((resolve) => { release = resolve; });
+
+    await type("Which zones are most coupled?");
+    await act(async () => {
+      const form = root.querySelector<HTMLFormElement>("form.sv-ask-form")!;
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(fetchSpy.mock.calls.filter(([u]) => String(u) === ASK_ENDPOINT)).toHaveLength(1);
+
+    await act(async () => {
+      release(jsonResponse({ answer: "Once.", vendor: "claude", model: "m" }));
+      await settle();
     });
   });
 
-  function stubAsyncClipboard(writeText: ((text: string) => Promise<void>) | null) {
-    Object.defineProperty(navigator, "clipboard", {
-      value: writeText ? { writeText } : undefined,
-      configurable: true,
-      writable: true,
-    });
-  }
-
-  /** Mount, ask a question, and settle on the answered card. */
-  async function askAndAnswer(question = "Which zone is the hub?") {
-    act(() => { render(h(AskView, null), root); });
-    const input = root.querySelector<HTMLTextAreaElement>(".ask-prompt-input")!;
-    act(() => {
-      input.value = question;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    act(() => { root.querySelector<HTMLButtonElement>(".ask-submit-btn")!.click(); });
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-  }
-
-  function click(selector: string) {
-    const el = root.querySelector<HTMLButtonElement>(selector);
-    if (!el) throw new Error(`${selector} is not rendered`);
-    act(() => { el.click(); });
-  }
-
-  function feedback(): string {
-    return root.querySelector(".ask-copy-feedback")?.textContent ?? "";
-  }
-
-  it("copies the raw answer text via navigator.clipboard", async () => {
-    const writeText = vi.fn(async () => {});
-    stubAsyncClipboard(writeText);
-    await askAndAnswer();
-
-    click(".ask-copy-btn");
-
-    await waitFor(() => expect(feedback()).toContain("Copied answer to clipboard."));
-    expect(writeText).toHaveBeenCalledWith(ANSWER_BODY.answer);
-    expect(root.querySelector(".ask-copy-btn")?.textContent).toContain("Copied");
+  it("rejects a prompt over the endpoint's character limit before sending", () => {
+    expect(isSubmittablePrompt("")).toBe(false);
+    expect(isSubmittablePrompt("   \n\t ")).toBe(false);
+    expect(isSubmittablePrompt("ok")).toBe(true);
+    expect(isSubmittablePrompt("x".repeat(4_000))).toBe(true);
+    expect(isSubmittablePrompt("x".repeat(4_001))).toBe(false);
   });
 
-  it("copies via execCommand when navigator.clipboard is unavailable", async () => {
-    stubAsyncClipboard(null);
-    await askAndAnswer();
+  // ── Answer actions: Copy ─────────────────────────────────────────
 
-    click(".ask-copy-btn");
+  /** Get to an answered panel with `answer` on screen. */
+  async function askAndAnswer(answer = "web-viewer is the hub zone."): Promise<void> {
+    mount();
+    await settle();
+    askResponse = async () => jsonResponse({ answer, vendor: "claude", model: "m" });
+    await type("Which zones are most coupled?");
+    await submitForm();
+  }
 
-    await waitFor(() => expect(feedback()).toContain("Copied answer to clipboard."));
-    expect(document.execCommand).toHaveBeenCalledWith("copy");
+  function copyButton(): HTMLButtonElement {
+    const el = root.querySelector<HTMLButtonElement>("button.sv-ask-copy-btn");
+    if (!el) throw new Error("copy control not rendered");
+    return el;
+  }
+
+  function captureButton(): HTMLButtonElement {
+    const el = root.querySelector<HTMLButtonElement>("button.sv-ask-capture-btn");
+    if (!el) throw new Error("capture control not rendered");
+    return el;
+  }
+
+  async function click(el: HTMLButtonElement): Promise<void> {
+    await act(async () => { el.click(); });
+    await settle();
+  }
+
+  function copyFeedback(): string {
+    return root.querySelector(".sv-ask-copy-feedback")?.textContent ?? "";
+  }
+
+  function captureFeedback(): string {
+    return root.querySelector(".sv-ask-capture-feedback")?.textContent ?? "";
+  }
+
+  it("offers no actions until there is an answer to act on", async () => {
+    mount();
+    await settle();
+    expect(root.querySelector(".sv-ask-actions")).toBeNull();
+    expect(root.querySelector("button.sv-ask-copy-btn")).toBeNull();
+    expect(root.querySelector("button.sv-ask-capture-btn")).toBeNull();
+  });
+
+  it("copies the raw answer text through the clipboard API", async () => {
+    await askAndAnswer("## Coupling\n\n`web-viewer` is the hub.");
+    await click(copyButton());
+
+    // The raw text, not the rendered node text — a markdown answer must round
+    // trip through the clipboard unchanged.
+    expect(clipboardWriteText).toHaveBeenCalledWith("## Coupling\n\n`web-viewer` is the hub.");
+    expect(copyFeedback()).toBe("Copied answer to clipboard.");
+    expect(copyButton().textContent).toBe("Copied");
+  });
+
+  it("falls back to execCommand when the clipboard API is unavailable", async () => {
+    setClipboard(null);
+    const execCommand = stubExecCommand(true);
+
+    await askAndAnswer("Fallback body.");
+    await click(copyButton());
+
+    expect(execCommand).toHaveBeenCalledWith("copy");
+    expect(copyFeedback()).toBe("Copied answer to clipboard.");
+  });
+
+  it("falls back to execCommand when the clipboard API rejects", async () => {
+    clipboardWriteText.mockRejectedValueOnce(new Error("write failed"));
+    const execCommand = stubExecCommand(true);
+
+    await askAndAnswer("Fallback body.");
+    await click(copyButton());
+
+    expect(clipboardWriteText).toHaveBeenCalled();
+    expect(execCommand).toHaveBeenCalledWith("copy");
+    // A fallback that worked is a successful copy, whatever the API said.
+    expect(copyFeedback()).toBe("Copied answer to clipboard.");
   });
 
   it("reports a permission denial distinctly from a generic failure", async () => {
-    const denied = new Error("Write permission denied.");
+    const denied = new Error("Permission denied");
     denied.name = "NotAllowedError";
-    stubAsyncClipboard(async () => { throw denied; });
-    Object.defineProperty(document, "execCommand", {
-      value: vi.fn(() => false), configurable: true, writable: true,
-    });
-    await askAndAnswer();
+    clipboardWriteText.mockRejectedValueOnce(denied);
+    // No execCommand stub: the fallback must fail too, or the denial never
+    // reaches the message.
 
-    click(".ask-copy-btn");
+    await askAndAnswer("Denied body.");
+    await click(copyButton());
 
-    await waitFor(() => expect(root.querySelector(".ask-copy-error")).not.toBeNull());
-    const message = root.querySelector(".ask-copy-error")?.textContent ?? "";
-    expect(message).toContain("Clipboard access was blocked by browser permissions.");
-    expect(message).not.toContain("Failed to copy");
+    expect(copyFeedback()).toBe(
+      "Clipboard access was blocked by browser permissions. "
+      + "Copy manually: select the answer and press Cmd+C (macOS) or Ctrl+C (Windows/Linux).",
+    );
+    // Same wording as the PR Markdown view, which is the point of sharing the
+    // helper — and distinct from the generic case asserted next.
+    expect(copyFeedback()).not.toContain("Failed to copy answer");
   });
 
-  it("reports a generic copy failure without blaming permissions", async () => {
-    stubAsyncClipboard(async () => { throw new Error("clipboard is broken"); });
-    Object.defineProperty(document, "execCommand", {
-      value: vi.fn(() => false), configurable: true, writable: true,
-    });
-    await askAndAnswer();
+  it("reports a non-permission failure with generic wording", async () => {
+    clipboardWriteText.mockRejectedValueOnce(new Error("clipboard is on fire"));
+    stubExecCommand(false);
 
-    click(".ask-copy-btn");
+    await askAndAnswer("Broken body.");
+    await click(copyButton());
 
-    await waitFor(() => expect(root.querySelector(".ask-copy-error")).not.toBeNull());
-    const message = root.querySelector(".ask-copy-error")?.textContent ?? "";
-    expect(message).toContain("Failed to copy answer to clipboard.");
-    expect(message).not.toContain("browser permissions");
+    expect(copyFeedback()).toBe(
+      "Failed to copy answer to clipboard. "
+      + "Copy manually: select the answer and press Cmd+C (macOS) or Ctrl+C (Windows/Linux).",
+    );
+    expect(copyFeedback()).not.toContain("browser permissions");
   });
 
-  it("writes nothing to the PRD until the capture is confirmed", async () => {
-    await askAndAnswer();
-
-    click(".ask-capture-btn");
-
-    // Armed, not sent — the confirm control is showing and no request went out.
-    expect(root.querySelector(".ask-capture-confirm")).not.toBeNull();
-    expect(fetchSpy.mock.calls.map(([url]) => String(url)))
-      .not.toContain("/api/rex/capture-ask");
-  });
-
-  it("sends nothing when the capture is cancelled", async () => {
-    await askAndAnswer();
-
-    click(".ask-capture-btn");
-    click(".ask-capture-cancel-btn");
-
-    expect(root.querySelector(".ask-capture-confirm")).toBeNull();
-    expect(root.querySelector(".ask-capture-btn")).not.toBeNull();
-    expect(fetchSpy.mock.calls.map(([url]) => String(url)))
-      .not.toContain("/api/rex/capture-ask");
-    // The answer is untouched, so nothing was lost by backing out.
-    expect(root.querySelector(".ask-answer")?.textContent).toBe(ANSWER_BODY.answer);
-  });
-
-  it("captures on confirm and reports the created item and its parent", async () => {
-    await askAndAnswer("Which zone is the hub?");
-    fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
-      if (String(input) === "/api/rex/capture-ask") {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            ok: true,
-            item: { id: "i1", title: "Which zone is the hub?", level: "feature" },
-            parent: { id: "e1", title: "SourceVision Ask", level: "epic" },
-          }),
-        };
-      }
-      throw new Error(`unstubbed fetch: ${String(input)}`);
-    });
-
-    click(".ask-capture-btn");
-    click(".ask-capture-confirm-btn");
-
-    await waitFor(() => expect(feedback()).toContain("SourceVision Ask"));
-    expect(feedback()).toContain("Which zone is the hub?");
-
-    const captureCall = fetchSpy.mock.calls
-      .find(([url]) => String(url) === "/api/rex/capture-ask")!;
-    const init = captureCall[1] as RequestInit;
-    expect(init.method).toBe("POST");
-    // The question that produced the answer, not whatever the textarea holds.
-    expect(JSON.parse(String(init.body))).toEqual({
-      question: "Which zone is the hub?",
-      answer: ANSWER_BODY.answer,
-    });
-  });
-
-  it("captures the question that produced the answer, not a later edit", async () => {
-    await askAndAnswer("Original question?");
-    fetchSpy.mockImplementation(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        ok: true,
-        item: { id: "i1", title: "Original question?", level: "feature" },
-        parent: { id: "e1", title: "SourceVision Ask", level: "epic" },
-      }),
-    }));
-
-    // The user edits the prompt while reading the answer.
-    const input = root.querySelector<HTMLTextAreaElement>(".ask-prompt-input")!;
-    act(() => {
-      input.value = "A different question I have not asked yet";
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-
-    click(".ask-capture-btn");
-    click(".ask-capture-confirm-btn");
-
-    await waitFor(() => expect(feedback()).toContain("SourceVision Ask"));
-    const captureCall = fetchSpy.mock.calls
-      .find(([url]) => String(url) === "/api/rex/capture-ask")!;
-    expect(JSON.parse(String((captureCall[1] as RequestInit).body)).question)
-      .toBe("Original question?");
-  });
-
-  it("surfaces a capture failure and leaves the answer copyable", async () => {
-    const writeText = vi.fn(async () => {});
-    stubAsyncClipboard(writeText);
-    await askAndAnswer();
-    fetchSpy.mockImplementation(async () => ({
-      ok: false,
-      status: 500,
-      json: async () => ({ error: "PRD file lock held by pid 4242" }),
-    }));
-
-    click(".ask-capture-btn");
-    click(".ask-capture-confirm-btn");
-
-    await waitFor(() => expect(root.querySelector(".ask-capture-error")).not.toBeNull());
-    expect(root.querySelector(".ask-capture-error")?.textContent)
-      .toContain("PRD file lock held by pid 4242");
-
-    // The answer survived, and copy still works — the text is not lost.
-    expect(root.querySelector(".ask-answer")?.textContent).toBe(ANSWER_BODY.answer);
-    click(".ask-copy-btn");
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith(ANSWER_BODY.answer));
-  });
-
-  it("clears copy feedback on its own after a moment", async () => {
-    stubAsyncClipboard(async () => {});
-    // Real timers for the answer round-trip; fake ones only for the expiry,
-    // which is the thing under test.
-    await askAndAnswer();
-
-    vi.useFakeTimers();
+  it("clears copy feedback on its own", async () => {
+    // `shouldAdvanceTime` keeps the real clock driving the zero-delay timers
+    // that `settle()` awaits. Without it the harness deadlocks and the test
+    // times out before it can assert anything — and the abandoned fake clock
+    // then deadlocks every test after it in the file.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
-      // The copy handler awaits the clipboard before it renders anything, so
-      // the microtask queue has to drain before the feedback is observable —
-      // `advanceTimersByTimeAsync` does that as well as moving the clock.
-      act(() => { root.querySelector<HTMLButtonElement>(".ask-copy-btn")!.click(); });
-      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
-      expect(feedback()).toContain("Copied answer to clipboard.");
+      await askAndAnswer("Body.");
+      await click(copyButton());
+      expect(copyFeedback()).toContain("Copied answer");
 
-      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-      expect(feedback()).toBe("");
+      await act(async () => { vi.advanceTimersByTime(2_000); });
+      expect(copyFeedback()).toBe("");
+      expect(copyButton().textContent).toBe("Copy answer");
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("does not carry action feedback across a new question", async () => {
-    await askAndAnswer("First question");
-    fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
-      if (String(input) === "/api/rex/capture-ask") {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            ok: true,
-            item: { id: "i1", title: "First question", level: "feature" },
-            parent: { id: "e1", title: "SourceVision Ask", level: "epic" },
-          }),
-        };
-      }
-      return { ok: true, status: 200, json: async () => ({ ...ANSWER_BODY, answer: "A second answer." }) };
+  // ── Answer actions: Capture to PRD ───────────────────────────────
+
+  it("writes nothing until the capture is confirmed", async () => {
+    await askAndAnswer();
+
+    const captureCalls = () => fetchSpy.mock.calls.filter(([u]) => String(u) === ASK_CAPTURE_ENDPOINT).length;
+    expect(captureCalls()).toBe(0);
+
+    // Arming the action is not the action.
+    await click(captureButton());
+    expect(captureCalls()).toBe(0);
+    expect(root.querySelector(".sv-ask-capture-confirm")).not.toBeNull();
+    expect(root.textContent).toContain("File this answer as a PRD task?");
+    // The arming button is replaced while armed, so it cannot be pressed twice.
+    expect(root.querySelector("button.sv-ask-capture-btn")).toBeNull();
+
+    const confirm = root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!;
+    await click(confirm);
+    expect(captureCalls()).toBe(1);
+  });
+
+  it("cancels without writing and can be armed again", async () => {
+    await askAndAnswer();
+
+    await click(captureButton());
+    const cancel = root.querySelector<HTMLButtonElement>("button.sv-ask-capture-cancel-btn")!;
+    await click(cancel);
+
+    expect(fetchSpy.mock.calls.filter(([u]) => String(u) === ASK_CAPTURE_ENDPOINT)).toHaveLength(0);
+    expect(root.querySelector(".sv-ask-capture-confirm")).toBeNull();
+    expect(captureFeedback()).toBe("");
+    // Cancelling returns the action to its resting state rather than consuming it.
+    expect(root.querySelector("button.sv-ask-capture-btn")).not.toBeNull();
+  });
+
+  it("sends the question and answer, and reports the item and its parent", async () => {
+    await askAndAnswer("Split the hub zone.");
+
+    await click(captureButton());
+    await click(root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!);
+
+    const call = fetchSpy.mock.calls.find(([u]) => String(u) === ASK_CAPTURE_ENDPOINT)!;
+    const init = call[1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({
+      question: "Which zones are most coupled?",
+      answer: "Split the hub zone.",
     });
 
-    click(".ask-capture-btn");
-    click(".ask-capture-confirm-btn");
-    await waitFor(() => expect(feedback()).toContain("SourceVision Ask"));
-
-    const input = root.querySelector<HTMLTextAreaElement>(".ask-prompt-input")!;
-    act(() => {
-      input.value = "Second question";
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    act(() => { root.querySelector<HTMLButtonElement>(".ask-submit-btn")!.click(); });
-
-    await waitFor(() => {
-      expect(root.querySelector(".ask-answer")?.textContent).toBe("A second answer.");
-    });
-    // Neither the capture confirmation nor a stale copy notice follows the
-    // new answer, and the capture control is armed again from scratch.
-    expect(feedback()).toBe("");
-    expect(root.querySelector(".ask-capture-btn")).not.toBeNull();
-    expect(root.querySelector(".ask-capture-confirm")).toBeNull();
-  });
-});
-
-/**
- * Accessibility contract.
- *
- * An async text exchange has one requirement the sibling SourceVision views do
- * not: the answer arrives after an indeterminate delay, so it has to be
- * announced without the user losing their place. Both halves of that are
- * asserted here — the announcement, and the place.
- */
-describe("AskView accessibility", () => {
-  let root: HTMLDivElement;
-  let fetchSpy: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    root = document.createElement("div");
-    document.body.appendChild(root);
-    fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    Object.defineProperty(document, "execCommand", {
-      value: vi.fn(() => true), configurable: true, writable: true,
-    });
+    expect(captureFeedback()).toBe(
+      'Captured "Which zones are most coupled?" under "SourceVision Ask" (new epic).',
+    );
   });
 
-  afterEach(() => {
-    render(null, root);
-    root.remove();
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-    Object.defineProperty(navigator, "clipboard", {
-      value: undefined, configurable: true, writable: true,
-    });
+  it("surfaces a capture failure and leaves the answer re-copyable", async () => {
+    captureResponse = async () => jsonResponse({ error: "PRD is locked by pid 4212" }, 409);
+
+    await askAndAnswer("Answer worth keeping.");
+    await click(captureButton());
+    await click(root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!);
+
+    expect(root.querySelector(".sv-ask-capture-error")?.textContent).toBe("PRD is locked by pid 4212");
+    // The alert is the line, not the message span, so the marker and the
+    // screen-reader prefix are announced with the reason rather than after it.
+    const alert = root.querySelector("p[role='alert'].sv-ask-feedback-error");
+    expect(alert).not.toBeNull();
+    expect(alert?.querySelector(".sv-ask-capture-error")).not.toBeNull();
+
+    // The answer survived the failed write, and Copy still works on it.
+    expect(root.querySelector(".sv-ask-answer-body")?.textContent).toBe("Answer worth keeping.");
+    await click(copyButton());
+    expect(clipboardWriteText).toHaveBeenCalledWith("Answer worth keeping.");
+    expect(copyFeedback()).toContain("Copied answer");
   });
 
-  function mount() {
-    act(() => { render(h(AskView, null), root); });
-  }
-
-  function promptInput(): HTMLTextAreaElement {
-    return root.querySelector<HTMLTextAreaElement>(".ask-prompt-input")!;
-  }
-
-  function submitButton(): HTMLButtonElement {
-    return root.querySelector<HTMLButtonElement>(".ask-submit-btn")!;
-  }
-
-  function typePrompt(value: string) {
-    const input = promptInput();
-    act(() => {
-      input.value = value;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-  }
-
-  /** The persistent polite region — the one a screen reader is listening to. */
-  function politeRegion(): HTMLElement {
-    const el = root.querySelector<HTMLElement>("[aria-live='polite'].sr-only");
-    if (!el) throw new Error("no persistent polite live region is rendered");
-    return el;
-  }
-
-  function assertiveRegion(): HTMLElement {
-    const el = root.querySelector<HTMLElement>("[aria-live='assertive'].sr-only");
-    if (!el) throw new Error("no persistent assertive live region is rendered");
-    return el;
-  }
-
-  function deferredJson(body: unknown) {
-    let release: () => void = () => {};
-    const gate = new Promise<void>((r) => { release = r; });
-    fetchSpy.mockImplementation(async () => {
-      await gate;
-      return { ok: true, status: 200, json: async () => body };
-    });
-    return { release: () => release() };
-  }
-
-  it("mounts the live regions before there is anything to announce", () => {
-    mount();
-
-    // Empty, but present: a region inserted at the same moment as its text is
-    // not reliably announced, which is the whole reason these are separate
-    // from the state cards.
-    expect(politeRegion().textContent).toBe("");
-    expect(assertiveRegion().textContent).toBe("");
-    expect(politeRegion().getAttribute("aria-atomic")).toBe("true");
-  });
-
-  it("announces the loading state and then the answer through the same region", async () => {
-    const pending = deferredJson(ANSWER_BODY);
-    mount();
-    typePrompt("Which zone is the hub?");
-
-    act(() => { submitButton().click(); });
-    await waitFor(() => expect(politeRegion().textContent).toContain("Asking"));
-
-    pending.release();
-    await waitFor(() => expect(politeRegion().textContent).toContain("Answer received"));
-  });
-
-  it("announces a failure assertively rather than politely", async () => {
-    fetchSpy.mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: async () => ({ ok: false, error: "LLM authentication failed: no key" }),
-    });
-    mount();
-    typePrompt("Anything");
-
-    act(() => { submitButton().click(); });
-
-    await waitFor(() => expect(assertiveRegion().textContent).toContain("LLM authentication failed"));
-    expect(politeRegion().textContent).toBe("");
-  });
-
-  it("does not double-announce: the answer card is not itself a live region", async () => {
-    fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ANSWER_BODY });
-    mount();
-    typePrompt("Which zone is the hub?");
-    act(() => { submitButton().click(); });
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-
-    // The card carries the answer visually; the region announces it. If the
-    // card were also live the answer would be read twice.
-    expect(root.querySelector(".ask-answered")?.getAttribute("aria-live")).toBeNull();
-  });
-
-  it("keeps focus in the textarea across a Cmd/Ctrl+Enter round-trip", async () => {
-    const pending = deferredJson(ANSWER_BODY);
-    mount();
-    typePrompt("Which zone is the hub?");
-    promptInput().focus();
-
-    act(() => {
-      promptInput().dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }),
-      );
+  it("names the status code when a capture failure carries no message", async () => {
+    captureResponse = async () => new Response("<html>502</html>", {
+      status: 502,
+      headers: { "Content-Type": "text/html" },
     });
 
-    // Disabling the focused element would have dropped focus to <body> here —
-    // the user submits from the textarea, so that is the common path.
-    await waitFor(() => expect(politeRegion().textContent).toContain("Asking"));
-    expect(document.activeElement).toBe(promptInput());
+    await askAndAnswer();
+    await click(captureButton());
+    await click(root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!);
 
-    pending.release();
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-    expect(document.activeElement).toBe(promptInput());
+    expect(root.querySelector(".sv-ask-capture-error")?.textContent).toContain("502");
   });
 
-  it("keeps focus on the submit control across a click round-trip", async () => {
-    const pending = deferredJson(ANSWER_BODY);
-    mount();
-    typePrompt("Which zone is the hub?");
-    submitButton().focus();
+  it("does not write twice when Confirm is pressed twice", async () => {
+    let release: (r: Response) => void = () => {};
+    captureResponse = () => new Promise<Response>((resolve) => { release = resolve; });
 
-    act(() => { submitButton().click(); });
-    await waitFor(() => expect(politeRegion().textContent).toContain("Asking"));
+    await askAndAnswer();
+    await click(captureButton());
 
-    // aria-disabled rather than disabled: the control still reports itself as
-    // unavailable, but a keyboard user does not lose their position.
-    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
-    expect(submitButton().disabled).toBe(false);
-    expect(document.activeElement).toBe(submitButton());
-
-    pending.release();
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-    expect(document.activeElement).toBe(submitButton());
-    expect(submitButton().getAttribute("aria-disabled")).toBe("false");
-  });
-
-  it("reports a blank prompt as unavailable without removing it from the tab order", () => {
-    mount();
-
-    expect(submitButton().getAttribute("aria-disabled")).toBe("true");
-    expect(submitButton().disabled).toBe(false);
-
-    // And clicking it anyway is a no-op, not a request.
-    act(() => { submitButton().click(); });
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("leaves the textarea editable while a question is in flight", async () => {
-    const pending = deferredJson(ANSWER_BODY);
-    mount();
-    typePrompt("First question");
-    act(() => { submitButton().click(); });
-    await waitFor(() => expect(politeRegion().textContent).toContain("Asking"));
-
-    expect(promptInput().disabled).toBe(false);
-    // Typing during the flight does not change the question that was sent —
-    // the view snapshots it at submit — so there is no reason to freeze it.
-    typePrompt("Second question");
-    pending.release();
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-    expect(JSON.parse(String((fetchSpy.mock.calls[0]![1] as RequestInit).body)))
-      .toEqual({ prompt: "First question" });
-  });
-
-  it("marks success and failure feedback with more than a colour", async () => {
-    Object.defineProperty(navigator, "clipboard", {
-      value: { writeText: async () => {} }, configurable: true, writable: true,
+    const confirm = root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!;
+    await act(async () => {
+      confirm.click();
+      confirm.click();
     });
-    fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ANSWER_BODY });
-    mount();
-    typePrompt("Which zone is the hub?");
-    act(() => { submitButton().click(); });
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
 
-    act(() => { root.querySelector<HTMLButtonElement>(".ask-copy-btn")!.click(); });
+    expect(fetchSpy.mock.calls.filter(([u]) => String(u) === ASK_CAPTURE_ENDPOINT)).toHaveLength(1);
+    expect(root.querySelector(".sv-ask-capture-busy")).not.toBeNull();
 
-    // ✓ / ⚠ carry the outcome for anyone who cannot separate green from red.
-    await waitFor(() => {
-      expect(root.querySelector(".ask-copy-feedback")?.textContent).toContain("✓");
+    await act(async () => {
+      release(jsonResponse({ item: { title: "T" }, parent: { title: "SourceVision Ask" } }));
+      await settle();
     });
   });
 
-  it("marks a copy failure with a warning glyph and announces it", async () => {
-    Object.defineProperty(navigator, "clipboard", {
-      value: { writeText: async () => { throw new Error("clipboard is broken"); } },
-      configurable: true,
-      writable: true,
-    });
-    Object.defineProperty(document, "execCommand", {
-      value: vi.fn(() => false), configurable: true, writable: true,
-    });
-    fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ANSWER_BODY });
-    mount();
-    typePrompt("Which zone is the hub?");
-    act(() => { submitButton().click(); });
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
+  it("clears capture feedback on its own", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await askAndAnswer();
+      await click(captureButton());
+      await click(root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!);
+      expect(captureFeedback()).toContain("Captured");
 
-    act(() => { root.querySelector<HTMLButtonElement>(".ask-copy-btn")!.click(); });
-
-    await waitFor(() => {
-      expect(root.querySelector(".ask-copy-error")?.textContent).toContain("⚠");
-    });
-    expect(assertiveRegion().textContent).toContain("Failed to copy answer to clipboard.");
-  });
-
-  it("keeps the answer actions reachable by keyboard", async () => {
-    fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ANSWER_BODY });
-    mount();
-    typePrompt("Which zone is the hub?");
-    act(() => { submitButton().click(); });
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-
-    // Native buttons, so they are in the tab order and respond to Enter/Space
-    // without a keydown handler of their own.
-    for (const selector of [".ask-copy-btn", ".ask-capture-btn"]) {
-      const btn = root.querySelector<HTMLButtonElement>(selector)!;
-      expect(btn.tagName).toBe("BUTTON");
-      expect(btn.type).toBe("button");
-      expect(btn.getAttribute("tabindex")).toBeNull();
-      expect(btn.textContent?.trim()).not.toBe("");
+      await act(async () => { vi.advanceTimersByTime(10_000); });
+      expect(captureFeedback()).toBe("");
+    } finally {
+      vi.useRealTimers();
     }
   });
-});
 
-/**
- * Explaining a finding.
- *
- * The panel is opened by a click on a findings row, so it has to answer without
- * a second click — and the finding has to reach the endpoint as fields, not as
- * a sentence, or the acceptance criterion ("the seed reaches the endpoint with
- * the finding's zone and files intact") cannot be checked at all.
- */
-describe("AskView with a seeded finding", () => {
-  let root: HTMLDivElement;
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  // ── Feedback does not outlive its answer ─────────────────────────
 
-  const SEED = {
-    type: "anti-pattern",
-    severity: "critical",
-    zone: "billing",
-    message: "High coupling between billing and api",
-    files: ["src/billing/invoice.ts", "src/api/handlers.ts"],
-  };
+  it("drops both kinds of feedback when a new question is asked", async () => {
+    await askAndAnswer("First answer.");
 
-  beforeEach(() => {
-    root = document.createElement("div");
-    document.body.appendChild(root);
-    fetchSpy = vi.fn(async () => ({ ok: true, status: 200, json: async () => ANSWER_BODY }));
-    vi.stubGlobal("fetch", fetchSpy);
-    setPendingAskSeed(null);
+    await click(copyButton());
+    await click(captureButton());
+    await click(root.querySelector<HTMLButtonElement>("button.sv-ask-capture-confirm-btn")!);
+    expect(copyFeedback()).toContain("Copied answer");
+    expect(captureFeedback()).toContain("Captured");
+
+    askResponse = async () => jsonResponse({ answer: "Second answer.", vendor: "claude", model: "m" });
+    await type("A different question?");
+    await submitForm();
+
+    expect(root.querySelector(".sv-ask-answer-body")?.textContent).toBe("Second answer.");
+    expect(copyFeedback()).toBe("");
+    expect(captureFeedback()).toBe("");
+    expect(copyButton().textContent).toBe("Copy answer");
   });
 
-  afterEach(() => {
-    render(null, root);
-    root.remove();
-    setPendingAskSeed(null);
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
+  it("drops feedback even when the new question fails", async () => {
+    await askAndAnswer("First answer.");
+    await click(copyButton());
+    expect(copyFeedback()).toContain("Copied answer");
+
+    askResponse = async () => jsonResponse({ error: "Vendor refused.", kind: "rate_limit" }, 429);
+    await type("A doomed question?");
+    await submitForm();
+
+    // The answer card is gone, so the feedback lines are gone with it — the
+    // assertion that matters is that neither reappears attached to the error.
+    expect(root.querySelector(".sv-ask-answer")).toBeNull();
+    expect(root.textContent).not.toContain("Copied answer to clipboard.");
   });
 
-  async function mountWithSeed(seed = SEED) {
-    setPendingAskSeed(seed);
-    await act(async () => { render(h(AskView, null), root); });
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalled());
-  }
+  // ── Capture result wording ───────────────────────────────────────
 
-  function askBody(): Record<string, unknown> {
-    const call = fetchSpy.mock.calls.find(([url]) => String(url) === "/api/sourcevision/ask");
-    return JSON.parse(String((call![1] as RequestInit).body)) as Record<string, unknown>;
-  }
+  it("describes a capture from whatever the endpoint returned", () => {
+    expect(describeCapture({
+      item: { title: "Split the hub" },
+      parent: { title: "SourceVision Ask", created: false },
+    })).toBe('Captured "Split the hub" under "SourceVision Ask".');
 
-  it("sends the finding as structured fields, zone and files intact", async () => {
-    await mountWithSeed();
+    expect(describeCapture({
+      item: { title: "Split the hub" },
+      parent: { title: "SourceVision Ask", created: true },
+    })).toBe('Captured "Split the hub" under "SourceVision Ask" (new epic).');
 
-    // The acceptance criterion, asserted at the wire: named fields, not prose.
-    expect(askBody().finding).toEqual(SEED);
+    // A 200 that names nothing still reports that something was written,
+    // rather than rendering `Captured "undefined" under "undefined"`.
+    expect(describeCapture({})).toBe('Captured "the answer" to the PRD.');
+    expect(describeCapture({ item: { title: "   " } })).toBe('Captured "the answer" to the PRD.');
   });
 
-  it("asks for meaning and for what a fix would touch", async () => {
-    await mountWithSeed();
+  // ── Deployed mode ────────────────────────────────────────────────
 
-    const prompt = String(askBody().prompt);
-    expect(prompt).toMatch(/what it means/i);
-    expect(prompt).toMatch(/fix would touch/i);
-    // The finding travels in `finding`; the question does not restate it.
-    expect(prompt).not.toContain(SEED.message);
-  });
+  it("explains itself instead of offering a prompt in a static export", async () => {
+    window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "2026-01-01T00:00:00.000Z" };
+    mount();
+    await settle();
 
-  it("answers without a second click", async () => {
-    await mountWithSeed();
-
-    // The user already asked by clicking Explain.
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("shows which finding is being explained, fields and all", async () => {
-    await mountWithSeed();
-
-    const card = root.querySelector(".ask-finding");
-    expect(card).not.toBeNull();
-    expect(card!.textContent).toContain("High coupling between billing and api");
-    expect(card!.textContent).toContain("billing");
-    expect(card!.textContent).toContain("src/api/handlers.ts");
-    expect(card!.textContent).toContain("critical");
-  });
-
-  it("leaves the question in the textarea so a follow-up starts from it", async () => {
-    await mountWithSeed();
-
-    const input = root.querySelector<HTMLTextAreaElement>(".ask-prompt-input")!;
-    expect(input.value).toMatch(/what it means/i);
-    expect(input.disabled).toBe(false);
-  });
-
-  it("keeps Copy and Capture on the explained answer", async () => {
-    await mountWithSeed();
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-
-    // An explanation is worth capturing at least as much as a free-form answer.
-    expect(root.querySelector(".ask-copy-btn")).not.toBeNull();
-    expect(root.querySelector(".ask-capture-btn")).not.toBeNull();
-  });
-
-  it("explains a finding the analysis never classified", async () => {
-    const { severity: _omitted, ...unclassified } = SEED;
-    await mountWithSeed(unclassified as typeof SEED);
-
-    expect(askBody().finding).toEqual(unclassified);
-    // No invented severity, and the card does not imply one.
-    expect(JSON.stringify(askBody())).not.toContain("severity");
-  });
-
-  it("explains a finding with no files recorded", async () => {
-    await mountWithSeed({ ...SEED, files: [] });
-
-    expect(askBody().finding).toMatchObject({ files: [] });
-    expect(root.querySelector(".ask-finding")?.textContent).toContain("none recorded");
-  });
-
-  it("detaches the finding so the next question is about the project", async () => {
-    await mountWithSeed();
-    await waitFor(() => expect(root.querySelector(".ask-answered")).not.toBeNull());
-
-    act(() => { root.querySelector<HTMLButtonElement>(".ask-finding-detach-btn")!.click(); });
-    expect(root.querySelector(".ask-finding")).toBeNull();
-
-    const input = root.querySelector<HTMLTextAreaElement>(".ask-prompt-input")!;
-    act(() => {
-      input.value = "What does the api zone do?";
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    act(() => { root.querySelector<HTMLButtonElement>(".ask-submit-btn")!.click(); });
-
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
-    const second = JSON.parse(String((fetchSpy.mock.calls[1]![1] as RequestInit).body));
-    expect(second.finding).toBeUndefined();
-  });
-
-  it("asks nothing when no finding was seeded", async () => {
-    await act(async () => { render(h(AskView, null), root); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
-
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(root.querySelector(".ask-finding")).toBeNull();
-    expect(root.querySelector(".ask-idle")).not.toBeNull();
-  });
-
-  it("does not carry a seed into a later mount", async () => {
-    await mountWithSeed();
-    render(null, root);
-    fetchSpy.mockClear();
-
-    // Taking clears it — a stale finding must not attach itself to whatever the
-    // user asks next.
-    await act(async () => { render(h(AskView, null), root); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
-
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(root.querySelector(".ask-finding")).toBeNull();
+    expect(root.querySelector(".sv-ask-unavailable")).not.toBeNull();
+    expect(root.querySelector("textarea.sv-ask-textarea")).toBeNull();
+    expect(root.textContent).toContain("Not available in the exported dashboard");
+    expect(fetchSpy.mock.calls.filter(([u]) => String(u) === ASK_ENDPOINT)).toHaveLength(0);
   });
 });
 
-describe("AskView in deployed mode", () => {
+// ---------------------------------------------------------------------------
+// Registration and gating
+// ---------------------------------------------------------------------------
+
+describe("Ask view registration", () => {
+  it("is a deep-linkable sourcevision view", () => {
+    const valid = buildValidViews(null);
+    expect(valid.has("ask" as ViewId)).toBe(true);
+    expect(buildValidViews("sourcevision").has("ask" as ViewId)).toBe(true);
+    // Not a rex view — a rex-scoped viewer must not resolve it.
+    expect(buildValidViews("rex").has("ask" as ViewId)).toBe(false);
+  });
+
+  it("restores from a direct /ask URL", () => {
+    const valid = buildValidViews("sourcevision");
+    expect(resolveLocationRoute("/ask", "", valid)).toEqual({ view: "ask", subId: null });
+    // And from the legacy hash form the older links use.
+    expect(resolveLocationRoute("/overview", "#ask", valid)).toEqual({ view: "ask", subId: null });
+  });
+
+  it("renders through the view registry", () => {
+    const ctx = {
+      data: {} as LoadedData,
+      setDetail: () => {},
+      setPrdDetailContent: () => {},
+      selectedFile: null,
+      setSelectedFile: () => {},
+      selectedZone: null,
+      selectedRunId: null,
+      selectedTaskId: null,
+      navigateTo: () => {},
+      isFeatureDisabled: () => false,
+    } as unknown as ViewRenderContext;
+
+    expect(renderActiveView("ask", ctx)).not.toBeNull();
+  });
+
+  it("appears in the tab registry after PR Markdown", () => {
+    const ids = SOURCEVISION_TABS.map((t) => t.id);
+    expect(ids.indexOf("ask")).toBe(ids.indexOf("pr-markdown") + 1);
+  });
+});
+
+describe("Ask tab feature gate", () => {
   let root: HTMLDivElement;
 
-  beforeEach(() => {
-    root = document.createElement("div");
-    document.body.appendChild(root);
-    window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "2026-09-09T00:00:00.000Z" };
-  });
-
-  afterEach(() => {
-    render(null, root);
-    root.remove();
-    delete window.__NDX_DEPLOYED__;
-  });
-
-  it("explains itself instead of offering a control that cannot work", () => {
-    act(() => {
-      render(h(AskView, null), root);
-    });
-
-    expect(root.querySelector(".ask-unavailable")).not.toBeNull();
-    expect(root.querySelector(".ask-prompt-input")).toBeNull();
-    expect(root.querySelector(".ask-submit-btn")).toBeNull();
-  });
-});
-
-describe("ask state helpers", () => {
-  it("treats whitespace-only prompts as blank", () => {
-    expect(isBlankPrompt("")).toBe(true);
-    expect(isBlankPrompt("   \n\t ")).toBe(true);
-    expect(isBlankPrompt(" a ")).toBe(false);
-  });
-
-  it("maps a success body to the answered state, keeping the question asked", () => {
-    expect(stateForResponse(ANSWER_BODY, "Which zone is the hub?")).toEqual({
-      status: "answered",
-      question: "Which zone is the hub?",
-      answer: ANSWER_BODY.answer,
-      vendor: "claude",
-      model: "claude-opus-5",
-      sources: ["CONTEXT.md"],
-      // An answer that proposed no PRD changes carries an empty list rather
-      // than an absent one, so the review section has nothing to render.
-      proposals: [],
-    });
-  });
-
-  it("maps a failure body to the error state", () => {
-    expect(stateForResponse({ ok: false, reason: "auth", error: "LLM authentication failed: no key" }, "q"))
-      .toEqual({ status: "error", message: "LLM authentication failed: no key" });
-  });
-
-  it("does not report a malformed body as an answer", () => {
-    // A 200 with no `answer` would otherwise render an empty answered card.
-    const state = stateForResponse({ ok: true } as unknown as Parameters<typeof stateForResponse>[0], "q");
-    expect(state.status).toBe("error");
-  });
-});
-
-describe("captureResultMessage", () => {
-  it("names both the created item and the epic it landed under", () => {
-    const message = captureResultMessage({
-      ok: true,
-      item: { id: "i1", title: "Which zone is the hub?", level: "feature" },
-      parent: { id: "e1", title: "SourceVision Ask", level: "epic" },
-    });
-    expect(message).toContain("Which zone is the hub?");
-    expect(message).toContain("SourceVision Ask");
-  });
-});
-
-describe("Ask tab gating", () => {
-  it("is registered behind the sourcevision.ask feature gate", () => {
-    const tab = SOURCEVISION_TABS.find((t) => t.id === "ask");
-    expect(tab).toBeDefined();
-    expect(tab?.featureGate).toBe("sourcevision.ask");
-    expect(tab?.label).toBe("Ask");
-    expect(tab?.minPass).toBe(0);
-  });
-
-  it("is deep-linkable in the sourcevision scope", () => {
-    expect(SOURCEVISION_SCOPE_VIEWS).toContain("ask");
-    expect(buildValidViews("sourcevision").has("ask")).toBe(true);
-    expect(buildValidViews(null).has("ask")).toBe(true);
-    expect(isKnownViewPath("ask")).toBe(true);
-  });
-
-  it("has a registry renderer, so a direct URL resolves to the view", () => {
-    expect(renderActiveView("ask", askRenderContext())).toBeTruthy();
-  });
-});
-
-/**
- * The gate-off case, asserted against the real sidebar rather than a restated
- * predicate — the failure this guards is the tab being *added* to the strip
- * without its gate reaching the sidebar's map, which a re-implemented filter
- * would happily pass.
- */
-describe("Ask tab visibility in the sidebar", () => {
-  let root: HTMLDivElement;
-
-  function stubFeatures(askEnabled: boolean) {
+  /** Boot the sidebar with `sourcevision.ask` reported at `enabled`. */
+  async function renderSidebarWithGate(enabled: boolean): Promise<HTMLDivElement> {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === "/api/features") {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            toggles: [{ key: "sourcevision.ask", enabled: askEnabled }],
-          }),
-        };
+        return jsonResponse({
+          toggles: [{
+            key: "sourcevision.ask",
+            label: "Ask Panel",
+            description: "",
+            impact: "",
+            package: "sourcevision",
+            stability: "experimental",
+            defaultValue: false,
+            enabled,
+          }],
+        });
       }
-      return { ok: false, status: 404, json: async () => ({}) };
+      if (url === "/api/project") {
+        return jsonResponse({ name: "n-dx", description: null, version: null, git: null, nameSource: "directory", cliName: "n-dx" });
+      }
+      if (url === "/api/status") {
+        return jsonResponse({
+          sv: { freshness: "fresh", analyzedAt: null, minutesAgo: 0, modulesComplete: 0, modulesTotal: 0 },
+          rex: { exists: false, percentComplete: 0, stats: null, hasInProgress: false, hasPending: false, nextTaskTitle: null },
+          hench: { configured: false, totalRuns: 0, activeRuns: 0, staleRuns: 0 },
+        });
+      }
+      return jsonResponse({}, 404);
     }));
-  }
 
-  async function renderSidebar() {
     root = document.createElement("div");
     document.body.appendChild(root);
-    act(() => {
+    await act(async () => {
       render(
         h(Sidebar, {
-          view: "overview" as const,
+          view: "overview" as ViewId,
           onNavigate: () => {},
           manifest: null,
           zones: null,
           sidebarCollapsed: false,
           onToggleSidebar: () => {},
+          scope: "sourcevision",
         }),
         root,
       );
     });
-    // The gate arrives from /api/features, so wait for the nav strip to settle
-    // rather than for a fixed number of ticks — the toggle fetch resolves on
-    // its own schedule and a tick count that happens to work is a flake.
-    await waitFor(() => expect(root.querySelectorAll(".nav-item").length).toBeGreaterThan(0));
+    // Two settles: the toggle fetch, then the re-render it triggers.
+    for (let i = 0; i < 4; i += 1) {
+      await act(async () => { await new Promise<void>((r) => setTimeout(r, 0)); });
+    }
     return root;
   }
 
+  /**
+   * Nav item labels, excluding the icon and enrichment-badge spans.
+   *
+   * `textContent` on a `.nav-item` concatenates the icon glyph onto the label
+   * ("▣Overview"), so an exact-match assertion has to read only the
+   * element's own text nodes.
+   */
   function navLabels(): string[] {
-    return Array.from(root.querySelectorAll(".nav-item")).map((el) => el.textContent ?? "");
+    return Array.from(root.querySelectorAll(".nav-item")).map((item) =>
+      Array.from(item.childNodes)
+        .filter((node) => node.nodeType === Node.TEXT_NODE)
+        .map((node) => node.textContent ?? "")
+        .join("")
+        .trim(),
+    );
   }
 
   beforeEach(() => {
+    clearProjectMetadataCache();
     localStorage.clear();
+    // The tab is `requiresServer`, so a stray deployed-mode flag would hide it
+    // for reasons that have nothing to do with the gate under test.
+    delete window.__NDX_DEPLOYED__;
   });
 
   afterEach(() => {
     if (root) render(null, root);
-    root?.remove();
+    if (root?.parentNode) root.parentNode.removeChild(root);
+    document.body.innerHTML = "";
     vi.unstubAllGlobals();
   });
 
-  it("hides the Ask tab while the gate is off", async () => {
-    stubFeatures(false);
-    await renderSidebar();
-
-    expect(navLabels().some((label) => label.includes("Ask"))).toBe(false);
+  it("hides the Ask tab when the gate is off", async () => {
+    await renderSidebarWithGate(false);
+    expect(navLabels()).not.toContain("Ask");
     // The ungated sibling is still there, so this is the gate and not a
-    // sidebar that failed to render.
-    expect(navLabels().some((label) => label.includes("Overview"))).toBe(true);
+    // sidebar that failed to render its SourceVision section at all.
+    expect(navLabels()).toContain("Overview");
   });
 
-  it("shows the Ask tab once the gate is on", async () => {
-    stubFeatures(true);
-    await renderSidebar();
-
-    await waitFor(() => {
-      expect(navLabels().some((label) => label.includes("Ask"))).toBe(true);
-    });
+  it("shows the Ask tab when the gate is on", async () => {
+    await renderSidebarWithGate(true);
+    expect(navLabels()).toContain("Ask");
   });
 });

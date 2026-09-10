@@ -1,98 +1,257 @@
 /**
- * Unit tests for POST /api/sourcevision/ask.
+ * POST /api/sourcevision/ask — success path, grounding, config-driven
+ * vendor/model resolution, and every named failure mode.
  *
- * The endpoint answers a question about the analyzed project, grounded in the
- * `.sourcevision/` artifacts rather than the model's own recollection of the
- * codebase. Three properties matter enough to pin:
- *
- * 1. **The context actually reaches the model.** An endpoint that reads
- *    CONTEXT.md and then forgets to include it would still return plausible
- *    prose — the failure is invisible from the response alone, so the test
- *    asserts on the prompt handed to `complete()`.
- * 2. **The vendor and model are resolved from config, not hardcoded**, and are
- *    reported back. A caller cannot judge an answer without knowing what
- *    produced it.
- * 3. **Failures are named.** `ClaudeClientError` already classifies auth,
- *    timeout, rate-limit and CLI failures; a route that collapses them into a
- *    500 throws that away, and "it hung" and "you are rate limited" need
- *    different responses from the operator.
- *
- * @see packages/web/src/server/routes-sourcevision-ask.ts
- * @see packages/web/src/server/sourcevision-ask-context.ts
+ * The LLM client is injected rather than mocked at the module level, so these
+ * tests never touch a vendor, a credential, or the network. The stub records
+ * the request it was handed, which is what makes the grounding assertion
+ * possible: the test can check exactly which analysis facts reached the model.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
-
-const { completeMock, createLLMClientMock, loadLLMConfigMock } = vi.hoisted(() => ({
-  completeMock: vi.fn(),
-  createLLMClientMock: vi.fn(),
-  loadLLMConfigMock: vi.fn(),
-}));
-
-vi.mock("@n-dx/llm-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@n-dx/llm-client")>();
-  return {
-    ...actual,
-    createLLMClient: createLLMClientMock,
-    loadLLMConfig: loadLLMConfigMock,
-  };
-});
-
-import { ClaudeClientError } from "@n-dx/llm-client";
+import { ClaudeClientError, VERIFY_CREDENTIALS_STEP, authFailureGuidance } from "@n-dx/llm-client";
+import type { CompletionRequest, CompletionResult, LLMClient } from "@n-dx/llm-client";
+import { resolveStore } from "@n-dx/rex";
+import { REFINEMENT_FENCE_TAG } from "../../../src/server/prd-refinement.js";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleSourcevisionAskRoute } from "../../../src/server/routes-sourcevision-ask.js";
-import { readAskUsage } from "../../../src/server/ask-usage-log.js";
 import {
-  startRouteTestServer,
-  closeRouteTestServer,
-} from "../../helpers/server-route-test-support.js";
+  handleSourcevisionAskRoute,
+  type HandleSourcevisionAskOptions,
+} from "../../../src/server/routes-sourcevision-ask.js";
+import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
-const CONTEXT_MD = [
-  "# Project Context",
-  "",
-  "## Zones",
-  "- `billing` — 12 files, cohesion 0.91. Invoice generation and dunning.",
-  "- `api` — 8 files, cohesion 0.88. HTTP handlers.",
-].join("\n");
+// ---------------------------------------------------------------------------
+// Fixture analysis data
+// ---------------------------------------------------------------------------
+
+const MANIFEST = {
+  schemaVersion: "1",
+  toolVersion: "0.5.1",
+  analyzedAt: "2026-02-02T00:00:00.000Z",
+  targetPath: "/repo/ask-fixture",
+  gitBranch: "feature/ask",
+  language: "typescript",
+  languages: ["typescript"],
+  modules: {},
+};
+
+const INVENTORY = {
+  files: [
+    {
+      path: "src/checkout/pipeline.ts",
+      size: 40_000,
+      language: "typescript",
+      lineCount: 1_400,
+      hash: "h1",
+      role: "source",
+      category: "payments",
+    },
+    {
+      path: "src/util/format.ts",
+      size: 900,
+      language: "typescript",
+      lineCount: 40,
+      hash: "h2",
+      role: "source",
+      category: "formatting",
+    },
+  ],
+  summary: {
+    totalFiles: 2,
+    totalLines: 1_440,
+    byLanguage: { typescript: 2 },
+    byRole: { source: 2 },
+    byCategory: { payments: 1, formatting: 1 },
+  },
+};
+
+const ZONES = {
+  zones: [
+    {
+      id: "checkout-core",
+      name: "Checkout Core",
+      description: "Order capture, payment authorization, and receipt emission.",
+      files: ["src/checkout/pipeline.ts"],
+      entryPoints: ["src/checkout/pipeline.ts"],
+      cohesion: 0.41,
+      coupling: 0.72,
+    },
+    {
+      id: "shared-format",
+      name: "Shared Formatting",
+      description: "Currency and date formatting helpers.",
+      files: ["src/util/format.ts"],
+      entryPoints: [],
+      cohesion: 0.95,
+      coupling: 0.05,
+    },
+  ],
+  crossings: [],
+  unzoned: [],
+  insights: ["Checkout Core carries both transport and domain concerns."],
+  findings: [
+    {
+      type: "anti-pattern",
+      pass: 2,
+      scope: "checkout-core",
+      text: "God file: src/checkout/pipeline.ts owns routing, validation, and persistence.",
+      severity: "critical",
+    },
+    {
+      type: "suggestion",
+      pass: 2,
+      scope: "shared-format",
+      text: "Formatting helpers could move next to their only consumer.",
+      severity: "info",
+    },
+  ],
+};
+
+const IMPORTS = {
+  edges: [],
+  external: [],
+  summary: {
+    totalEdges: 12,
+    totalExternal: 3,
+    circularCount: 1,
+    circulars: [{ cycle: ["src/checkout/pipeline.ts", "src/util/format.ts"] }],
+    mostImported: [{ path: "src/util/format.ts", count: 7 }],
+    avgImportsPerFile: 6,
+  },
+};
+
+const COMPONENTS = {
+  components: [{ name: "CheckoutForm", file: "src/checkout/Form.tsx", kind: "function", props: [] }],
+  usageEdges: [],
+  routeModules: [],
+  routeTree: [],
+  serverRoutes: [],
+  summary: {
+    totalComponents: 1,
+    totalRouteModules: 0,
+    totalUsageEdges: 0,
+    totalServerRoutes: 0,
+    routeConventions: {},
+    mostUsedComponents: [],
+    layoutDepth: 0,
+  },
+};
+
+const CONTEXT_MD = "# Ask fixture\n\nCheckout is the riskiest area of this repository.";
+
+// ---------------------------------------------------------------------------
+// Stub client
+// ---------------------------------------------------------------------------
+
+interface StubClient {
+  /** Requests the route handed to `complete()`, in order. */
+  requests: CompletionRequest[];
+  /** Vendors the factory was asked for, in order. */
+  vendors: string[];
+  options: HandleSourcevisionAskOptions;
+}
+
+/**
+ * Build an injected client factory backed by `respond`.
+ *
+ * `respond` may resolve a {@link CompletionResult}, reject, or never settle —
+ * the last of which is how the timeout path is exercised without waiting on a
+ * real provider.
+ */
+function stubClient(respond: () => Promise<CompletionResult>): StubClient {
+  const stub: StubClient = {
+    requests: [],
+    vendors: [],
+    options: {},
+  };
+  stub.options = {
+    createClient: ({ vendor }) => {
+      stub.vendors.push(vendor);
+      const client: LLMClient = {
+        mode: "api",
+        complete: (request) => {
+          stub.requests.push(request);
+          return respond();
+        },
+      };
+      return client;
+    },
+  };
+  return stub;
+}
+
+function answering(text: string, tokenUsage?: CompletionResult["tokenUsage"]): () => Promise<CompletionResult> {
+  return () => Promise.resolve(tokenUsage ? { text, tokenUsage } : { text });
+}
+
+function failing(err: Error): () => Promise<CompletionResult> {
+  return () => Promise.reject(err);
+}
+
+// ---------------------------------------------------------------------------
+// Harness
+// ---------------------------------------------------------------------------
 
 describe("POST /api/sourcevision/ask", () => {
   let tmpDir: string;
+  let svDir: string;
   let ctx: ServerContext;
   let server: Server;
-  let port: number;
+  let baseUrl: string;
+  /** Reassigned per test before the request is made. */
+  let routeOptions: HandleSourcevisionAskOptions;
+
+  async function writeAnalysis(): Promise<void> {
+    await writeFile(join(svDir, "manifest.json"), JSON.stringify(MANIFEST));
+    await writeFile(join(svDir, "inventory.json"), JSON.stringify(INVENTORY));
+    await writeFile(join(svDir, "zones.json"), JSON.stringify(ZONES));
+    await writeFile(join(svDir, "imports.json"), JSON.stringify(IMPORTS));
+    await writeFile(join(svDir, "components.json"), JSON.stringify(COMPONENTS));
+    await writeFile(join(svDir, "CONTEXT.md"), CONTEXT_MD);
+  }
+
+  /**
+   * Write `.n-dx.json` with the Ask toggle on.
+   *
+   * The endpoint refuses when `sourcevision.ask` is off, and off is the default
+   * — so a fixture project that writes no config, or writes one for some other
+   * reason and drops the feature key, gets a 403 instead of whatever the test
+   * meant to exercise. Every write of this file goes through here so that
+   * cannot happen by omission.
+   */
+  function writeNdxConfig(dir: string, extra: Record<string, unknown> = {}): Promise<void> {
+    return writeFile(
+      join(dir, ".n-dx.json"),
+      JSON.stringify({ ...extra, features: { sourcevision: { ask: true } } }),
+    );
+  }
+
+  function ask(body: unknown): Promise<Response> {
+    return fetch(`${baseUrl}/api/sourcevision/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: typeof body === "string" ? body : JSON.stringify(body),
+    });
+  }
 
   beforeEach(async () => {
-    completeMock.mockReset();
-    createLLMClientMock.mockReset();
-    loadLLMConfigMock.mockReset();
-
-    createLLMClientMock.mockReturnValue({ mode: "cli", complete: completeMock });
-    loadLLMConfigMock.mockResolvedValue({ vendor: "claude", claude: { model: "claude-sonnet-5" } });
-    completeMock.mockResolvedValue({
-      text: "The billing zone owns invoice generation.",
-      tokenUsage: { input: 1200, output: 42 },
-    });
-
     tmpDir = await mkdtemp(join(tmpdir(), "sv-ask-"));
-    await mkdir(join(tmpDir, ".sourcevision"), { recursive: true });
-    await writeFile(join(tmpDir, ".sourcevision", "CONTEXT.md"), CONTEXT_MD, "utf-8");
+    svDir = join(tmpDir, ".sourcevision");
+    await mkdir(svDir, { recursive: true });
+    await writeAnalysis();
+    await writeNdxConfig(tmpDir);
 
-    ctx = {
-      projectDir: tmpDir,
-      svDir: join(tmpDir, ".sourcevision"),
-      rexDir: join(tmpDir, ".rex"),
-      dev: false,
-    } as ServerContext;
-
+    ctx = { projectDir: tmpDir, svDir, rexDir: join(tmpDir, ".rex"), dev: false };
+    routeOptions = {};
     const started = await startRouteTestServer((req, res) =>
-      handleSourcevisionAskRoute(req, res, ctx),
+      handleSourcevisionAskRoute(req, res, ctx, routeOptions),
     );
     server = started.server;
-    port = started.port;
+    baseUrl = started.baseUrl;
   });
 
   afterEach(async () => {
@@ -100,447 +259,633 @@ describe("POST /api/sourcevision/ask", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  /** POST a body to the ask endpoint. */
-  async function ask(body: unknown): Promise<{ status: number; body: any }> {
-    const res = await fetch(`http://127.0.0.1:${port}/api/sourcevision/ask`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    return { status: res.status, body: await res.json() };
-  }
+  // ── Success ───────────────────────────────────────────────────────────────
 
-  // ── Success path ──────────────────────────────────────────────────────────
+  it("answers with the model text, resolved vendor/model, tokens, and sources", async () => {
+    const stub = stubClient(answering("Checkout Core is the weak point.", { input: 900, output: 60 }));
+    routeOptions = stub.options;
 
-  it("answers, and reports the vendor and model that produced the answer", async () => {
-    const { status, body } = await ask({ prompt: "What does the billing zone do?" });
+    const res = await ask({ prompt: "Where is the architectural risk?" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
 
-    expect(status).toBe(200);
-    expect(body.answer).toBe("The billing zone owns invoice generation.");
+    expect(body.answer).toBe("Checkout Core is the weak point.");
     expect(body.vendor).toBe("claude");
-    expect(body.model).toBe("claude-sonnet-5");
-    expect(body.tokens).toEqual({ input: 1200, output: 42 });
+    expect(typeof body.model).toBe("string");
+    expect(body.model.length).toBeGreaterThan(0);
+    expect(body.tokens).toEqual({ input: 900, output: 60 });
+    expect(body.contextSources).toEqual([
+      "manifest.json",
+      "inventory.json",
+      "imports.json",
+      "zones.json",
+      "components.json",
+      "CONTEXT.md",
+    ]);
   });
 
-  it("grounds the answer in .sourcevision/ data", async () => {
-    // The property the endpoint exists for. Asserted on the prompt rather than
-    // the response, because a route that dropped the context would still
-    // return fluent text.
-    await ask({ prompt: "What does the billing zone do?" });
+  it("reports zeroed tokens rather than omitting them when the provider counts none", async () => {
+    // The usage rollup adds these up; an absent field would make every consumer
+    // handle two shapes for the same successful call.
+    routeOptions = stubClient(answering("No usage reported.")).options;
 
-    const prompt = completeMock.mock.calls[0][0].prompt as string;
-    expect(prompt).toContain("Invoice generation and dunning");
-    expect(prompt).toContain("What does the billing zone do?");
-    expect(prompt).toContain("cohesion 0.91");
+    const body = await (await ask({ prompt: "Anything?" })).json();
+    expect(body.tokens).toEqual({ input: 0, output: 0 });
   });
 
-  it("includes the caller's seed context when supplied", async () => {
-    await ask({ prompt: "Why does this matter?", seed: "Finding: api imports billing directly." });
+  // ── Grounding ─────────────────────────────────────────────────────────────
 
-    const prompt = completeMock.mock.calls[0][0].prompt as string;
-    expect(prompt).toContain("api imports billing directly");
+  it("sends the assembled .sourcevision context to the LLM call", async () => {
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
+
+    await ask({ prompt: "Summarize the risk." });
+
+    expect(stub.requests).toHaveLength(1);
+    const prompt = stub.requests[0].prompt;
+
+    // Every artifact's distinguishing fact must be present — this is the
+    // assertion that the answer is grounded in analysis rather than in the
+    // model's priors.
+    expect(prompt).toContain("/repo/ask-fixture"); // manifest
+    expect(prompt).toContain("src/checkout/pipeline.ts"); // inventory
+    expect(prompt).toContain("Checkout Core"); // zones
+    expect(prompt).toContain("cohesion 0.41");
+    expect(prompt).toContain("God file: src/checkout/pipeline.ts"); // findings
+    expect(prompt).toContain("Checkout is the riskiest area"); // CONTEXT.md
+    expect(prompt).toContain("imported by 7"); // imports summary
+
+    // And the question itself, plus the instruction that fences the model in.
+    expect(prompt).toContain("Summarize the risk.");
+    expect(prompt).toContain("Answer ONLY from the analysis provided.");
   });
 
-  it("resolves the model from config rather than hardcoding it", async () => {
-    loadLLMConfigMock.mockResolvedValue({ vendor: "claude", claude: { model: "claude-opus-5" } });
+  it("derives next steps from the findings and includes them in the context", async () => {
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
 
-    const { body } = await ask({ prompt: "Anything." });
+    await ask({ prompt: "What should I do first?" });
+    expect(stub.requests[0].prompt).toContain("Prioritized next steps");
+  });
 
-    expect(completeMock.mock.calls[0][0].model).toBe("claude-opus-5");
-    expect(body.model).toBe("claude-opus-5");
+  it("carries an optional seed into the context as a focus section", async () => {
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
+
+    await ask({
+      prompt: "Explain this in plain language.",
+      seed: {
+        kind: "finding",
+        id: "checkout-core",
+        text: "God file: src/checkout/pipeline.ts owns routing, validation, and persistence.",
+      },
+    });
+
+    const prompt = stub.requests[0].prompt;
+    expect(prompt).toContain("What the user is looking at");
+    expect(prompt).toContain("Surface: finding");
+    expect(prompt).toContain("Identifier: `checkout-core`");
+  });
+
+  it("carries a finding seed's zone and files through to the model intact", async () => {
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
+
+    const res = await ask({
+      prompt: "Explain this finding in plain language.",
+      seed: {
+        kind: "finding",
+        id: "anti-pattern:checkout-core:God file",
+        text: "God file: src/checkout/pipeline.ts owns routing, validation, and persistence.",
+        zone: "checkout-core",
+        files: ["src/checkout/pipeline.ts", "src/checkout/validate.ts"],
+        labels: { type: "anti-pattern", severity: "critical" },
+      },
+    });
+    expect(res.status).toBe(200);
+
+    const prompt = stub.requests[0].prompt;
+    // The fields the row showed, reaching the model as fields — this is the
+    // difference between an explanation of THIS finding and an explanation of
+    // its category.
+    expect(prompt).toContain("Zone: `checkout-core`");
+    expect(prompt).toContain("`src/checkout/pipeline.ts`");
+    expect(prompt).toContain("`src/checkout/validate.ts`");
+    expect(prompt).toContain("type: anti-pattern");
+    expect(prompt).toContain("severity: critical");
+    // And the instructions that make the answer use them.
+    expect(prompt).toContain("name its zone and its files explicitly");
+    expect(prompt).toContain("Say what a fix would touch");
+  });
+
+  it("does not add the seeded rules to an unseeded question", async () => {
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
+
+    await ask({ prompt: "Which zones are most coupled?" });
+
+    const prompt = stub.requests[0].prompt;
+    expect(prompt).not.toContain("What the user is looking at");
+    expect(prompt).not.toContain("Say what a fix would touch");
+  });
+
+  it("refuses a seed field it does not honor rather than dropping it", async () => {
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
+
+    const res = await ask({
+      prompt: "Explain this.",
+      seed: { kind: "finding", severity: "critical" },
+    });
+
+    // `severity` belongs inside `labels`. A client that guessed the shape must
+    // be told, not silently answered without the field it thought it sent.
+    expect(res.status).toBe(400);
+    expect(stub.requests).toHaveLength(0);
+  });
+
+  // ── Vendor / model resolution ─────────────────────────────────────────────
+
+  it("resolves vendor and model from project config, not from a hardcoded pair", async () => {
+    await writeNdxConfig(tmpDir, { llm: { vendor: "local", local: { model: "qwen-3-coder" } } });
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
+
+    const body = await (await ask({ prompt: "Which model answered?" })).json();
+
+    expect(body.vendor).toBe("local");
+    expect(body.model).toBe("qwen-3-coder");
+    // The same pair reached the client factory and the completion request.
+    expect(stub.vendors).toEqual(["local"]);
+    expect(stub.requests[0].model).toBe("qwen-3-coder");
+  });
+
+  it("honors an llm.routes reroute of the sourcevision.ask task class", async () => {
+    await writeNdxConfig(tmpDir, {
+      llm: {
+        vendor: "local",
+        local: { model: "qwen-3-coder" },
+        routes: { "sourcevision.ask": "light" },
+        tiers: { local: { light: "qwen-1.5b" } },
+      },
+    });
+    routeOptions = stubClient(answering("ok")).options;
+
+    const body = await (await ask({ prompt: "Cheap question." })).json();
+    expect(body.model).toBe("qwen-1.5b");
+  });
+
+  it("lets .n-dx.local.json override the shared vendor choice", async () => {
+    await writeNdxConfig(tmpDir, { llm: { vendor: "claude" } });
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ llm: { vendor: "local", local: { model: "on-this-machine" } } }),
+    );
+    routeOptions = stubClient(answering("ok")).options;
+
+    const body = await (await ask({ prompt: "Whose config wins?" })).json();
+    expect(body.vendor).toBe("local");
+    expect(body.model).toBe("on-this-machine");
   });
 
   // ── Request validation ────────────────────────────────────────────────────
 
-  it("rejects a missing prompt with 400", async () => {
-    const { status, body } = await ask({});
-    expect(status).toBe(400);
-    expect(body.error).toMatch(/prompt/i);
-    expect(completeMock).not.toHaveBeenCalled();
+  it("rejects a missing prompt", async () => {
+    routeOptions = stubClient(answering("never")).options;
+    const res = await ask({});
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.kind).toBe("invalid_request");
+    expect(body.error).toContain("prompt");
   });
 
-  it("rejects a blank prompt with 400", async () => {
-    const { status } = await ask({ prompt: "   " });
-    expect(status).toBe(400);
-    expect(completeMock).not.toHaveBeenCalled();
+  it("rejects an empty prompt", async () => {
+    const stub = stubClient(answering("never"));
+    routeOptions = stub.options;
+    const res = await ask({ prompt: "   " });
+    expect(res.status).toBe(400);
+    expect((await res.json()).kind).toBe("invalid_request");
+    // No tokens were spent on an unanswerable request.
+    expect(stub.requests).toHaveLength(0);
   });
 
-  it("rejects a non-string seed with 400", async () => {
-    const { status } = await ask({ prompt: "ok", seed: { not: "a string" } });
-    expect(status).toBe(400);
-    expect(completeMock).not.toHaveBeenCalled();
+  it("rejects an over-long prompt", async () => {
+    const res = await ask({ prompt: "x".repeat(4_001) });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("4000 characters");
   });
 
-  // ── Error paths ───────────────────────────────────────────────────────────
-
-  it("returns 504 and names the timeout", async () => {
-    completeMock.mockRejectedValue(new ClaudeClientError("took too long", "timeout", true));
-
-    const { status, body } = await ask({ prompt: "Anything." });
-
-    expect(status).toBe(504);
-    expect(body.reason).toBe("timeout");
-    expect(body.error).toMatch(/timed out/i);
+  it("rejects an unrecognized field instead of silently dropping it", async () => {
+    const res = await ask({ prompt: "hello", model: "claude-opus-5" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).kind).toBe("invalid_request");
   });
 
-  it("returns 429 and names the rate limit", async () => {
-    completeMock.mockRejectedValue(new ClaudeClientError("slow down", "rate-limit", true));
-
-    const { status, body } = await ask({ prompt: "Anything." });
-
-    expect(status).toBe(429);
-    expect(body.reason).toBe("rate-limit");
-    expect(body.error).toMatch(/rate limit/i);
+  it("rejects a non-JSON body", async () => {
+    const res = await ask("not json at all");
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.kind).toBe("invalid_request");
+    expect(body.error).toContain("JSON");
   });
 
-  it("returns 401 and names the auth failure", async () => {
-    completeMock.mockRejectedValue(new ClaudeClientError("not logged in", "auth", false));
-
-    const { status, body } = await ask({ prompt: "Anything." });
-
-    expect(status).toBe(401);
-    expect(body.reason).toBe("auth");
-  });
-
-  it("names an unclassified failure rather than surfacing a bare 500", async () => {
-    completeMock.mockRejectedValue(new Error("socket hang up"));
-
-    const { status, body } = await ask({ prompt: "Anything." });
-
-    expect(status).toBe(502);
-    expect(body.reason).toBe("unknown");
-    expect(body.error).toMatch(/socket hang up/);
-  });
-
-  it("returns 409 when the project has not been analyzed", async () => {
-    // No CONTEXT.md means there is no ground truth to answer from. Saying so
-    // is more useful than letting the model answer from imagination.
-    await rm(join(tmpDir, ".sourcevision", "CONTEXT.md"));
-
-    const { status, body } = await ask({ prompt: "Anything." });
-
-    expect(status).toBe(409);
-    expect(body.error).toMatch(/analy/i);
-    expect(completeMock).not.toHaveBeenCalled();
-  });
-
-  // ── Explaining a finding ──────────────────────────────────────────────────
+  // ── Feature toggle ────────────────────────────────────────────────────────
 
   /**
-   * The finding arrives as named fields, which is the point: an explanation
-   * that could have been written without reading this repository is a failed
-   * explanation, and the zone and files are what make that impossible. Asserted
-   * on the prompt handed to the model, because a route that accepted the
-   * finding and forgot to include it would still return fluent prose.
+   * `sourcevision.ask` is experimental and defaults to off, and its stated
+   * impact is that each question spends tokens. Gating only the viewer would
+   * make that a property of one client: anything else that can reach the port
+   * still spends the project's tokens. The assertion that matters in each case
+   * below is `stub.requests` — a refusal that still called the provider has
+   * refused nothing that costs money.
    */
-  describe("structured finding seed", () => {
-    const FINDING = {
-      type: "anti-pattern",
-      severity: "critical",
-      zone: "billing",
-      message: "High coupling between billing and api",
-      files: ["src/billing/invoice.ts", "src/api/handlers.ts"],
+  it("refuses when sourcevision.ask is off", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ features: { sourcevision: { ask: false } } }),
+    );
+    const stub = stubClient(answering("should not be called"));
+    routeOptions = stub.options;
+
+    const res = await ask({ prompt: "Where is the architectural risk?" });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.kind).toBe("disabled");
+    expect(body.suggestion).toContain("sourcevision.ask");
+    expect(stub.requests).toHaveLength(0);
+  });
+
+  it("refuses on a project with no config at all, because the toggle defaults to off", async () => {
+    await rm(join(tmpDir, ".n-dx.json"), { force: true });
+    const stub = stubClient(answering("should not be called"));
+    routeOptions = stub.options;
+
+    const res = await ask({ prompt: "Anything?" });
+
+    expect(res.status).toBe(403);
+    expect((await res.json()).kind).toBe("disabled");
+    expect(stub.requests).toHaveLength(0);
+  });
+
+  it("fails closed when .n-dx.json is unparseable rather than reading past it", async () => {
+    // The config reader swallows a parse error and returns {}. That must reach
+    // the registry default, not an assumed-on feature.
+    await writeFile(join(tmpDir, ".n-dx.json"), "{ not json");
+    const stub = stubClient(answering("should not be called"));
+    routeOptions = stub.options;
+
+    expect((await ask({ prompt: "Anything?" })).status).toBe(403);
+    expect(stub.requests).toHaveLength(0);
+  });
+
+  it("refuses before validating the request, so the reason given is the real one", async () => {
+    // An over-long prompt is also invalid. With the feature off, "the panel is
+    // off" is the fact worth reporting — fixing the prompt would change nothing.
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ features: { sourcevision: { ask: false } } }),
+    );
+    routeOptions = stubClient(answering("should not be called")).options;
+
+    const res = await ask({ prompt: "x".repeat(4_001) });
+    expect(res.status).toBe(403);
+    expect((await res.json()).kind).toBe("disabled");
+  });
+
+  it("picks the toggle up without a restart when it is switched on", async () => {
+    // The dashboard writes .n-dx.json while the server runs. A gate that read
+    // the value once at startup would keep refusing after the user enabled it.
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ features: { sourcevision: { ask: false } } }),
+    );
+    const stub = stubClient(answering("Now it answers."));
+    routeOptions = stub.options;
+
+    expect((await ask({ prompt: "First try." })).status).toBe(403);
+
+    await writeNdxConfig(tmpDir);
+
+    const res = await ask({ prompt: "Second try." });
+    expect(res.status).toBe(200);
+    expect((await res.json()).answer).toBe("Now it answers.");
+    expect(stub.requests).toHaveLength(1);
+  });
+
+  it("still rejects a non-POST method when the feature is on", async () => {
+    const res = await fetch(`${baseUrl}/api/sourcevision/ask`, { method: "GET" });
+    expect(res.status).toBe(405);
+  });
+
+  // ── No analysis ───────────────────────────────────────────────────────────
+
+  it("refuses to answer when there is no analysis to ground the answer in", async () => {
+    const emptyDir = await mkdtemp(join(tmpdir(), "sv-ask-empty-"));
+    const emptySvDir = join(emptyDir, ".sourcevision");
+    await mkdir(emptySvDir, { recursive: true });
+    await writeNdxConfig(emptyDir);
+    const stub = stubClient(answering("should not be called"));
+    const emptyCtx: ServerContext = {
+      projectDir: emptyDir,
+      svDir: emptySvDir,
+      rexDir: join(emptyDir, ".rex"),
+      dev: false,
+    };
+    const started = await startRouteTestServer((req, res) =>
+      handleSourcevisionAskRoute(req, res, emptyCtx, stub.options),
+    );
+    try {
+      const res = await fetch(`${started.baseUrl}/api/sourcevision/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: "What does this project do?" }),
+      });
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.kind).toBe("no_analysis");
+      expect(body.suggestion).toContain("analyze");
+      expect(stub.requests).toHaveLength(0);
+    } finally {
+      await closeRouteTestServer(started.server);
+      await rm(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  // ── LLM failure modes ─────────────────────────────────────────────────────
+
+  it("names a timeout, rather than hanging, when the call outlives the configured budget", async () => {
+    await writeNdxConfig(tmpDir, { sourcevision: { ask: { timeoutMs: 50 } } });
+    // Never settles: without the timeout race this request would hang until the
+    // client gave up or the test timed out.
+    routeOptions = stubClient(() => new Promise<CompletionResult>(() => {})).options;
+
+    const res = await ask({ prompt: "Take your time." });
+    expect(res.status).toBe(504);
+    const body = await res.json();
+    expect(body.kind).toBe("timeout");
+    expect(body.error.length).toBeGreaterThan(0);
+  });
+
+  it("passes the configured budget down to the provider as well as racing it", async () => {
+    await writeNdxConfig(tmpDir, { sourcevision: { ask: { timeoutMs: 4_000 } } });
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
+
+    await ask({ prompt: "Bound yourself." });
+    expect(stub.requests[0].timeoutMs).toBe(4_000);
+  });
+
+  it("names a rate limit and reports the retry delay the vendor supplied", async () => {
+    routeOptions = stubClient(
+      failing(new ClaudeClientError("429 rate limit exceeded", "rate-limit", true, 7_500)),
+    ).options;
+
+    const res = await ask({ prompt: "Too many questions." });
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.kind).toBe("rate_limit");
+    expect(body.retryAfterMs).toBe(7_500);
+  });
+
+  it("distinguishes an auth failure from a rate limit and a timeout", async () => {
+    routeOptions = stubClient(
+      failing(new ClaudeClientError("401 invalid api key", "auth", false)),
+    ).options;
+
+    const res = await ask({ prompt: "Who am I?" });
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.kind).toBe("auth");
+    expect(body.suggestion.length).toBeGreaterThan(0);
+  });
+
+  // The dashboard must state the same cause and the same fix as every CLI
+  // surface, so the steps are asserted to BE llm-client's array rather than to
+  // merely resemble it — a paraphrase would satisfy a reader and still leave a
+  // second copy free to drift from the canonical one.
+  it("sends llm-client's canonical remediation for a credential failure", async () => {
+    routeOptions = stubClient(
+      failing(new ClaudeClientError("401 invalid api key", "auth", false)),
+    ).options;
+
+    const body = await (await ask({ prompt: "Who am I?" })).json();
+    const guidance = authFailureGuidance("claude");
+    expect(body.remediation).toEqual(guidance.remediation);
+    expect(body.remediation.at(-1)).toBe(VERIFY_CREDENTIALS_STEP);
+    expect(body.error).toContain(guidance.headline);
+  });
+
+  it("still sends canonical remediation when the message carries no auth signal", async () => {
+    // The provider knew this was auth; the message says nothing a text
+    // classifier can match. Without deriving from the resolved kind, the reply
+    // was "Failed to ask SourceVision: the door is shut" under an auth code.
+    routeOptions = stubClient(
+      failing(new ClaudeClientError("the door is shut", "auth", false)),
+    ).options;
+
+    const body = await (await ask({ prompt: "Who am I?" })).json();
+    expect(body.kind).toBe("auth");
+    expect(body.error).toBe(authFailureGuidance("claude").headline);
+    expect(body.error).not.toContain("the door is shut");
+    expect(body.remediation.at(-1)).toBe(VERIFY_CREDENTIALS_STEP);
+  });
+
+  it("describes the mode it named when the classifier could not read the message", async () => {
+    // Same defect as above for a non-auth mode: the code said rate_limit while
+    // the wording fell through to the generic "Failed to ..." branch.
+    routeOptions = stubClient(
+      failing(new ClaudeClientError("", "rate-limit", true)),
+    ).options;
+
+    const body = await (await ask({ prompt: "Again?" })).json();
+    expect(body.kind).toBe("rate_limit");
+    expect(body.error).toMatch(/rate limit/i);
+    expect(body.error).not.toMatch(/^Failed to ask SourceVision/);
+    expect(body.suggestion.trim().length).toBeGreaterThan(0);
+  });
+
+  it("reports an unclassifiable provider failure as a named llm_error, not a bare 500", async () => {
+    routeOptions = stubClient(failing(new Error("something went sideways"))).options;
+
+    const res = await ask({ prompt: "What now?" });
+    expect(res.status).toBe(502);
+    expect((await res.json()).kind).toBe("llm_error");
+  });
+
+  it("reports a client that cannot be constructed as a named failure", async () => {
+    routeOptions = {
+      createClient: () => {
+        throw new ClaudeClientError("not logged in", "auth", false);
+      },
     };
 
-    /** The prompt text handed to the model on the most recent call. */
-    function lastPrompt(): string {
-      return completeMock.mock.calls.at(-1)![0].prompt as string;
+    const res = await ask({ prompt: "Ready?" });
+    expect(res.status).toBe(401);
+    expect((await res.json()).kind).toBe("auth");
+  });
+
+  // ── Dispatch ──────────────────────────────────────────────────────────────
+
+  it("rejects a non-POST method on the ask path", async () => {
+    const res = await fetch(`${baseUrl}/api/sourcevision/ask`);
+    expect(res.status).toBe(405);
+    expect((await res.json()).error).toContain("POST");
+  });
+
+  it("does not claim unrelated paths", async () => {
+    const res = await fetch(`${baseUrl}/api/sv/manifest`);
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("Not found");
+  });
+
+  it("matches the ask path with a query string attached", async () => {
+    routeOptions = stubClient(answering("ok")).options;
+    const res = await fetch(`${baseUrl}/api/sourcevision/ask?_=1`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "Cache-buster attached." }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  // ── Refine mode ───────────────────────────────────────────────────────────
+
+  describe("mode: refine", () => {
+    /** Seed a PRD through the store, so the tree on disk is the real shape. */
+    async function seedPRD(): Promise<void> {
+      await mkdir(ctx.rexDir, { recursive: true });
+      await (await resolveStore(ctx.rexDir)).saveDocument({
+        schema: "rex/v1",
+        title: "Ask Fixture PRD",
+        items: [{
+          id: "epic-1",
+          title: "Checkout hardening",
+          level: "epic",
+          status: "pending",
+          children: [{
+            id: "task-1",
+            title: "Split the god file",
+            level: "task",
+            status: "pending",
+            priority: "medium",
+            description: "Original description.",
+            acceptanceCriteria: ["It is smaller"],
+          }],
+        }],
+      } as never);
     }
 
-    it("puts the finding's zone, files and message in front of the model", async () => {
-      const { status } = await ask({ prompt: "Explain this.", finding: FINDING });
+    /** A model answer carrying one proposal block. */
+    function withProposals(prose: string, raw: unknown[]): string {
+      return `${prose}\n\n\`\`\`${REFINEMENT_FENCE_TAG}\n${JSON.stringify(raw)}\n\`\`\``;
+    }
 
-      expect(status).toBe(200);
-      const prompt = lastPrompt();
-      expect(prompt).toContain("zone: billing");
-      expect(prompt).toContain("src/billing/invoice.ts");
-      expect(prompt).toContain("src/api/handlers.ts");
-      expect(prompt).toContain("High coupling between billing and api");
-      expect(prompt).toContain("type: anti-pattern");
-      expect(prompt).toContain("severity: critical");
+    it("puts the PRD in the prompt and asks for proposals", async () => {
+      await seedPRD();
+      const stub = stubClient(answering("The criteria are vague."));
+      routeOptions = stub.options;
+
+      const res = await ask({ prompt: "Is this epic well specified?", mode: "refine" });
+      expect(res.status).toBe(200);
+
+      const prompt = stub.requests[0].prompt;
+      expect(prompt).toContain("## Current PRD");
+      expect(prompt).toContain("`task-1`");
+      expect(prompt).toContain("Original description.");
+      expect(prompt).toContain(REFINEMENT_FENCE_TAG);
+      // The analysis is still there — refine mode adds the PRD, it does not
+      // replace the grounding the panel exists to provide.
+      expect(prompt).toContain("checkout-core");
+      expect((await res.json()).contextSources).toContain("the PRD");
     });
 
-    it("keeps the finding alongside the analysis, not instead of it", async () => {
-      await ask({ prompt: "Explain this.", finding: FINDING });
+    it("does not send the PRD or the refine rules for a plain ask", async () => {
+      await seedPRD();
+      const stub = stubClient(answering("Checkout Core is the weak point."));
+      routeOptions = stub.options;
 
-      // Grounding is what lets the answer say something true about `billing`
-      // rather than about coupling in general.
-      const prompt = lastPrompt();
-      expect(prompt).toContain("Invoice generation and dunning");
-      expect(prompt.indexOf("Invoice generation")).toBeLessThan(prompt.indexOf("the finding to explain"));
+      const res = await ask({ prompt: "Where is the risk?" });
+      expect(res.status).toBe(200);
+
+      expect(stub.requests[0].prompt).not.toContain("## Current PRD");
+      expect(stub.requests[0].prompt).not.toContain(REFINEMENT_FENCE_TAG);
+      const body = await res.json();
+      // Absent, not empty: a plain ask has no opinion about the PRD, and an
+      // empty list would read as "the model proposed nothing".
+      expect(body.proposals).toBeUndefined();
+      expect(body.contextSources).not.toContain("the PRD");
     });
 
-    it("reports the finding as a source of the answer", async () => {
-      const { body } = await ask({ prompt: "Explain this.", finding: FINDING });
+    it("returns proposals built against the PRD, and strips the block from the prose", async () => {
+      await seedPRD();
+      routeOptions = stubClient(answering(withProposals(
+        "The criteria do not say what done looks like.",
+        [{
+          op: "edit",
+          itemId: "task-1",
+          acceptanceCriteria: ["No file over 400 lines", "Each split module has one owner"],
+          rationale: "\"It is smaller\" is not checkable.",
+        }],
+      ))).options;
 
-      expect(body.sources).toContain("CONTEXT.md");
-      expect(body.sources).toContain("finding");
+      const body = await (await ask({ prompt: "Improve this task.", mode: "refine" })).json();
+
+      expect(body.answer).toBe("The criteria do not say what done looks like.");
+      // The JSON is not shown twice: it renders as diffs, and leaving it in the
+      // prose would put every change on screen in a form nobody reviews.
+      expect(body.answer).not.toContain("acceptanceCriteria");
+      expect(body.proposals).toHaveLength(1);
+      expect(body.proposals[0].itemId).toBe("task-1");
+      // The before side is the server's reading of the item, not the model's.
+      expect(body.proposals[0].diffs[0].before).toEqual(["It is smaller"]);
+      expect(body.proposals[0].baseline[0].fingerprint).toEqual(expect.any(String));
     });
 
-    it("omits severity the analysis never set rather than defaulting it", async () => {
-      const { severity: _omitted, ...unclassified } = FINDING;
-      await ask({ prompt: "Explain this.", finding: unclassified });
+    it("reports proposals it had to drop rather than silently shrinking the list", async () => {
+      await seedPRD();
+      routeOptions = stubClient(answering(withProposals("Two ideas.", [
+        { op: "edit", itemId: "task-1", priority: "high" },
+        { op: "edit", itemId: "does-not-exist", priority: "high" },
+      ]))).options;
 
-      // "severity: info" would be the route asserting a classification the
-      // analysis declined to make.
-      expect(lastPrompt()).not.toContain("severity:");
-      expect(lastPrompt()).toContain("zone: billing");
+      const body = await (await ask({ prompt: "Improve this.", mode: "refine" })).json();
+      expect(body.proposals).toHaveLength(1);
+      expect(body.refinementNotes.join(" ")).toContain("unknown item");
     });
 
-    it("says so plainly when a finding names no files", async () => {
-      await ask({ prompt: "Explain this.", finding: { ...FINDING, files: [] } });
+    it("stands in for prose when the model replied with the block alone", async () => {
+      await seedPRD();
+      routeOptions = stubClient(answering(withProposals("", [
+        { op: "edit", itemId: "task-1", priority: "high" },
+      ]))).options;
 
-      // An empty list would read as a truncated line; this cannot be mistaken
-      // for a filename.
-      expect(lastPrompt()).toContain("files: (none recorded)");
+      const res = await ask({ prompt: "Just do it.", mode: "refine" });
+      // Not an empty answer — the panel treats one as a provider failure and
+      // would throw away proposals that are perfectly good.
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.answer).toContain("1 proposed PRD change");
+      expect(body.proposals).toHaveLength(1);
     });
 
-    it("still answers a plain question with no finding attached", async () => {
-      const { status, body } = await ask({ prompt: "What does the billing zone do?" });
+    it("names an empty PRD as its own degraded mode, without calling a model", async () => {
+      const stub = stubClient(answering("never reached"));
+      routeOptions = stub.options;
 
-      expect(status).toBe(200);
-      expect(body.sources).not.toContain("finding");
-      expect(lastPrompt()).not.toContain("the finding to explain");
+      const res = await ask({ prompt: "Refine what?", mode: "refine" });
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.kind).toBe("no_prd");
+      expect(body.error).toContain("no PRD items to refine");
+      // No tokens are spent asking a model to refine nothing.
+      expect(stub.requests).toHaveLength(0);
     });
 
-    it("carries a free-text seed and a finding together", async () => {
-      await ask({ prompt: "Explain this.", finding: FINDING, seed: "The user is new to this repo." });
-
-      expect(lastPrompt()).toContain("zone: billing");
-      expect(lastPrompt()).toContain("The user is new to this repo.");
+    it("rejects a mode it does not implement", async () => {
+      const res = await ask({ prompt: "Do something else.", mode: "rewrite" });
+      expect(res.status).toBe(400);
+      expect((await res.json()).kind).toBe("invalid_request");
     });
-
-    // ── Validation ───────────────────────────────────────────────────────────
-
-    it("rejects a finding that is not an object", async () => {
-      const { status, body } = await ask({ prompt: "Explain.", finding: "billing coupling" });
-
-      expect(status).toBe(400);
-      expect(body.error).toMatch(/finding/i);
-      expect(completeMock).not.toHaveBeenCalled();
-    });
-
-    it("rejects a finding missing a required field", async () => {
-      for (const field of ["type", "zone", "message"]) {
-        completeMock.mockClear();
-        const partial: Record<string, unknown> = { ...FINDING };
-        delete partial[field];
-
-        const { status, body } = await ask({ prompt: "Explain.", finding: partial });
-
-        expect(status, `missing ${field}`).toBe(400);
-        expect(body.error).toContain(`finding.${field}`);
-        expect(completeMock).not.toHaveBeenCalled();
-      }
-    });
-
-    it("rejects a files list that is not strings", async () => {
-      // Numbers would reach the prompt as "1, 2" and read as filenames.
-      const { status, body } = await ask({ prompt: "Explain.", finding: { ...FINDING, files: [1, 2] } });
-
-      expect(status).toBe(400);
-      expect(body.error).toContain("finding.files");
-      expect(completeMock).not.toHaveBeenCalled();
-    });
-
-    it("accepts a finding that omits files entirely", async () => {
-      const { files: _omitted, ...noFiles } = FINDING;
-      const { status } = await ask({ prompt: "Explain.", finding: noFiles });
-
-      expect(status).toBe(200);
-      expect(lastPrompt()).toContain("files: (none recorded)");
-    });
-  });
-
-  // ── Token accounting ──────────────────────────────────────────────────────
-
-  /**
-   * An ask is the one place n-dx spends tokens interactively, and it spent them
-   * with no trace until this log existed — invisible in the very view that
-   * reports token usage. What matters is that the record carries enough to
-   * attribute the spend (vendor, model, every counter) and that it is written
-   * whether or not the answer arrived.
-   */
-  describe("records its spend", () => {
-    it("records vendor, model, and every token counter for a successful ask", async () => {
-      completeMock.mockResolvedValue({
-        text: "An answer.",
-        tokenUsage: { input: 1200, output: 42, cacheCreationInput: 300, cacheReadInput: 900 },
-      });
-
-      await ask({ prompt: "What does the billing zone do?" });
-
-      const entries = await readAskUsage(join(tmpDir, ".sourcevision"));
-      expect(entries).toHaveLength(1);
-      expect(entries[0]).toMatchObject({
-        vendor: "claude",
-        model: "claude-sonnet-5",
-        inputTokens: 1200,
-        outputTokens: 42,
-        cacheCreationTokens: 300,
-        cacheReadTokens: 900,
-        ok: true,
-      });
-      expect(Date.parse(entries[0]!.timestamp)).not.toBeNaN();
-    });
-
-    it("attributes the spend to the model that actually answered", async () => {
-      loadLLMConfigMock.mockResolvedValue({ vendor: "claude", claude: { model: "claude-opus-5" } });
-
-      await ask({ prompt: "Anything." });
-
-      const entries = await readAskUsage(join(tmpDir, ".sourcevision"));
-      expect(entries[0]!.model).toBe("claude-opus-5");
-    });
-
-    it("records a failed ask as a call that happened, with its reason", async () => {
-      completeMock.mockRejectedValue(new ClaudeClientError("timed out", "timeout", true));
-
-      const { status } = await ask({ prompt: "Anything." });
-      expect(status).toBe(504);
-
-      // Dropping the failure would make a run of timeouts look free.
-      const entries = await readAskUsage(join(tmpDir, ".sourcevision"));
-      expect(entries).toHaveLength(1);
-      expect(entries[0]).toMatchObject({ ok: false, reason: "timeout", vendor: "claude" });
-    });
-
-    it("records the tokens a failed call reports, when it reports any", async () => {
-      // No provider attaches usage to a thrown error today; the route reads it
-      // defensively so that a provider which starts to does not need a change
-      // here to be counted.
-      const err = Object.assign(new ClaudeClientError("died mid-stream", "cli", false), {
-        tokenUsage: { input: 800, output: 0, cacheReadInput: 120 },
-      });
-      completeMock.mockRejectedValue(err);
-
-      await ask({ prompt: "Anything." });
-
-      const entries = await readAskUsage(join(tmpDir, ".sourcevision"));
-      expect(entries[0]).toMatchObject({
-        ok: false, inputTokens: 800, cacheReadTokens: 120,
-      });
-    });
-
-    it("records zeros rather than nothing when a provider reports no usage", async () => {
-      completeMock.mockResolvedValue({ text: "An answer." });
-
-      await ask({ prompt: "Anything." });
-
-      const entries = await readAskUsage(join(tmpDir, ".sourcevision"));
-      expect(entries[0]).toMatchObject({
-        inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, ok: true,
-      });
-    });
-
-    it("still answers when the spend cannot be recorded", async () => {
-      // The log lives in .sourcevision/, which the request handler does not
-      // create. If it is gone, the answer must still reach the user.
-      await rm(join(tmpDir, ".sourcevision", "CONTEXT.md"));
-      const contextSource = {
-        assemble: async () => ({ text: "Zones: billing.", sources: ["CONTEXT.md"] }),
-      };
-      const isolated = await startRouteTestServer((req, res) =>
-        handleSourcevisionAskRoute(req, res, { ...ctx, svDir: join(tmpDir, "gone") }, contextSource),
-      );
-      try {
-        const res = await fetch(`http://127.0.0.1:${isolated.port}/api/sourcevision/ask`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: "Anything." }),
-        });
-        const body = await res.json() as { ok: boolean; answer: string };
-        expect(res.status).toBe(200);
-        expect(body.answer).toBe("The billing zone owns invoice generation.");
-      } finally {
-        await closeRouteTestServer(isolated.server);
-      }
-    });
-
-    it("writes nothing for a request that never reached the model", async () => {
-      await ask({});
-      await ask({ prompt: "   " });
-
-      expect(await readAskUsage(join(tmpDir, ".sourcevision"))).toEqual([]);
-    });
-  });
-
-  // ── Degraded modes ────────────────────────────────────────────────────────
-
-  /**
-   * Each way the panel can be unusable carries its own diagnosis, so the client
-   * can name the mode and offer the action that fits it. `error` is still a
-   * one-line string for callers that only want text.
-   */
-  describe("failure payloads", () => {
-    it("tells a caller with no analysis to run one, and how", async () => {
-      await rm(join(tmpDir, ".sourcevision", "CONTEXT.md"));
-
-      const { status, body } = await ask({ prompt: "Anything." });
-
-      expect(status).toBe(409);
-      expect(body.failure).toMatchObject({ code: "no_analysis", retryable: false });
-      expect(body.failure.remediation.join(" ")).toContain("analyze");
-      expect(body.error).toMatch(/analy/i);
-    });
-
-    it("uses the project's own command name in that advice", async () => {
-      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ cli: { name: "mydx" } }), "utf-8");
-      await rm(join(tmpDir, ".sourcevision", "CONTEXT.md"));
-
-      const { body } = await ask({ prompt: "Anything." });
-
-      expect(body.failure.remediation.join(" ")).toContain("mydx analyze");
-    });
-
-    it("returns the canonical auth guidance, not its own wording", async () => {
-      completeMock.mockRejectedValue(new ClaudeClientError("401", "auth", false));
-
-      const { status, body } = await ask({ prompt: "Anything." });
-
-      expect(status).toBe(401);
-      expect(body.failure.code).toBe("auth");
-      expect(body.failure.remediation.at(-1)).toBe("Verify credentials: ndx auth");
-      expect(body.failure.retryable).toBe(false);
-    });
-
-    it("names a timeout and a rate limit as themselves, both retryable", async () => {
-      completeMock.mockRejectedValue(new ClaudeClientError("timed out", "timeout", true));
-      const timeout = await ask({ prompt: "Anything." });
-      expect(timeout.status).toBe(504);
-      expect(timeout.body.failure).toMatchObject({ code: "timeout", retryable: true });
-
-      completeMock.mockRejectedValue(new ClaudeClientError("slow down", "rate-limit", true));
-      const rateLimited = await ask({ prompt: "Anything." });
-      expect(rateLimited.status).toBe(429);
-      expect(rateLimited.body.failure).toMatchObject({ code: "rate_limit", retryable: true });
-
-      // Two modes, two diagnoses — not one shared "request failed".
-      expect(timeout.body.failure.summary).not.toBe(rateLimited.body.failure.summary);
-    });
-
-    it("gives every classified failure a summary and something to do", async () => {
-      for (const reason of ["auth", "rate-limit", "timeout", "not-found", "cli"] as const) {
-        completeMock.mockRejectedValue(new ClaudeClientError("detail", reason, false));
-
-        const { body } = await ask({ prompt: "Anything." });
-
-        expect(body.failure, reason).toBeDefined();
-        expect(body.failure.summary.length, reason).toBeGreaterThan(15);
-        expect(body.failure.remediation.length, reason).toBeGreaterThan(0);
-      }
-    });
-  });
-
-  // ── Routing ───────────────────────────────────────────────────────────────
-
-  it("ignores unrelated paths", async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/api/other`, { method: "POST" });
-    expect(res.status).toBe(404);
-  });
-
-  it("rejects GET on the ask path with 405", async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/api/sourcevision/ask`);
-    expect(res.status).toBe(405);
   });
 });

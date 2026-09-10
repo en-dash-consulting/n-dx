@@ -294,17 +294,28 @@ describe("iso map escaping", () => {
  * class is easy to lose.
  */
 describe("unverified seam rendering", () => {
-  const CORROBORATED = { fromZone: "core", toZone: "api", callbacks: ["broadcast"], verified: true };
+  const CORROBORATED = {
+    fromZone: "core", toZone: "api", callbacks: ["broadcast"],
+    verification: {
+      status: "verified" as const,
+      corroborated: [{ callback: "broadcast", file: "src/api/a.ts", expression: "broadcast" }],
+      missing: [],
+    },
+  };
   const STALE = {
     fromZone: "core", toZone: "db", callbacks: ["onDone", "onFail"],
-    verified: false, unsupported: ["onFail"],
+    verification: {
+      status: "unverified" as const,
+      corroborated: [],
+      missing: ["onDone", "onFail"],
+    },
   };
 
   it("marks the unverified seam and not the corroborated one", () => {
     const dom = mount(makeInput({ seams: [CORROBORATED, STALE] }));
     const doc = dom.window.document;
     expect(doc.querySelectorAll("#iso .wire.seam").length).toBe(2);
-    const unverified = doc.querySelectorAll("#iso .wire.seam.unverified");
+    const unverified = doc.querySelectorAll("#iso .wire.seam.unver");
     expect(unverified.length).toBe(1);
     // Distinct stroke pattern, so the two do not read identically.
     expect(unverified[0].getAttribute("stroke-dasharray")).toBe("1 8");
@@ -317,7 +328,7 @@ describe("unverified seam rendering", () => {
     // Selecting a zone triggers the redraw that rebuilds every edge class.
     const node = doc.querySelector("#iso .node[role=button]")!;
     realClick(dom.window, node);
-    expect(doc.querySelectorAll("#iso .wire.seam.unverified").length).toBe(1);
+    expect(doc.querySelectorAll("#iso .wire.seam.unver").length).toBe(1);
     dom.window.close();
   });
 
@@ -332,7 +343,8 @@ describe("unverified seam rendering", () => {
     const panel = doc.querySelector("#dossier")!.textContent ?? "";
     expect(panel).toContain("unverified");
     expect(panel).toContain("onFail");
-    expect(panel).toContain("no supporting call");
+    // Per-callback evidence line for a callback the call graph never saw.
+    expect(panel).toContain("not called anywhere in");
     dom.window.close();
   });
 
@@ -340,7 +352,7 @@ describe("unverified seam rendering", () => {
     const dom = mount(makeInput({ seams: [{ fromZone: "core", toZone: "api", callbacks: ["broadcast"] }] }));
     const doc = dom.window.document;
     expect(doc.querySelectorAll("#iso .wire.seam").length).toBe(1);
-    expect(doc.querySelectorAll("#iso .wire.seam.unverified").length).toBe(0);
+    expect(doc.querySelectorAll("#iso .wire.seam.unver").length).toBe(0);
     dom.window.close();
   });
 });

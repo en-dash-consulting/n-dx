@@ -20,7 +20,7 @@
  * `.hench/config.json` is deliberately NOT in that set. It is meant to be
  * committed, so an edit to it is genuine operator work and must still count.
  *
- * @see packages/hench/src/schema/v1.ts — HENCH_RUNTIME_ARTIFACTS
+ * @see packages/hench/src/store/artifacts.ts — HENCH_RUNTIME_GITIGNORE_ENTRIES
  * @see packages/hench/src/agent/lifecycle/shared.ts — the gate
  */
 
@@ -29,11 +29,11 @@ import { execSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { performPreRunCommitGateIfNeeded } from "../../../src/agent/lifecycle/shared.js";
 import {
-  performPreRunCommitGateIfNeeded,
   excludeHenchRuntimeArtifacts,
-} from "../../../src/agent/lifecycle/shared.js";
-import { HENCH_RUNTIME_ARTIFACTS } from "../../../src/schema/index.js";
+  HENCH_RUNTIME_GITIGNORE_ENTRIES,
+} from "../../../src/store/artifacts.js";
 
 /** Porcelain lines as `git status --porcelain` would emit them. */
 const OWN_STATE = [
@@ -73,7 +73,7 @@ async function runGate(dirty: string[]) {
 
 describe("the pre-run gate ignores hench's own runtime state", () => {
   it("declares the artifact set", () => {
-    expect(HENCH_RUNTIME_ARTIFACTS).toEqual(
+    expect(HENCH_RUNTIME_GITIGNORE_ENTRIES).toEqual(
       expect.arrayContaining([
         ".hench/locks/",
         ".hench/runs/",
@@ -85,8 +85,8 @@ describe("the pre-run gate ignores hench's own runtime state", () => {
 
   it("does not treat .hench/config.json as runtime state", () => {
     // It is meant to be committed; an edit to it is real operator work.
-    expect(HENCH_RUNTIME_ARTIFACTS).not.toContain(".hench/config.json");
-    expect(HENCH_RUNTIME_ARTIFACTS.some((p) => p === ".hench/" || p === ".hench")).toBe(false);
+    expect(HENCH_RUNTIME_GITIGNORE_ENTRIES).not.toContain(".hench/config.json");
+    expect(HENCH_RUNTIME_GITIGNORE_ENTRIES.some((p) => p === ".hench/" || p === ".hench")).toBe(false);
   });
 
   it.each(OWN_STATE)("proceeds when the only dirty path is %s", async (path) => {

@@ -24,9 +24,21 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { CLI_PATH, DEFAULT_TIMEOUT } from "./e2e-helpers.js";
+
+/**
+ * `claude` resolves the project key through realpath, so these tests compare on
+ * the last segment rather than the raw temp path (/var vs /private/var on
+ * macOS). Use `basename`, not a `split("/")`: on Windows the config key comes
+ * back with forward slashes while `mkdtemp` returns backslashes, so splitting on
+ * "/" alone reduced one side to its last segment and left the other as a full
+ * `C:\...` path, and the two could never match. `basename` splits on both
+ * separators on win32 and on "/" alone on POSIX — where a backslash is a legal
+ * filename character — which is the platform-correct rule in each case.
+ */
+const base = (p) => basename(p);
 
 /** Is the real claude CLI installed? */
 function claudeAvailable() {
@@ -50,19 +62,6 @@ afterEach(async () => {
     await rm(d, { recursive: true, force: true });
   }
 });
-
-/**
- * Final path segment, for either separator.
- *
- * `claude` resolves the project key through realpath and writes it
- * forward-slash normalised, while `mkdtemp` hands back a native path — on
- * Windows that is backslash-separated. Splitting on `/` alone left the
- * Windows side unreduced, so every comparison against a config key failed
- * while the product was registering correctly. Comparing on the final segment
- * (rather than the whole path) is also what dodges macOS's /var vs
- * /private/var symlink.
- */
-const base = (p) => p.split(/[\\/]/).pop();
 
 /** Every mcpServers map in a claude config, keyed by the project it belongs to. */
 async function readRegistrations() {

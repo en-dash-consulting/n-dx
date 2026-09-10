@@ -15,11 +15,11 @@ blockedBy:
   - "74c3fee8-3281-4b30-8157-8794ea68aea5"
   - "900c5196-8073-467e-9d43-90919bb781fe"
 source: "ndx-capture"
-startedAt: "2026-09-09T19:07:22.714Z"
-completedAt: "2026-09-09T19:23:46.651Z"
-endedAt: "2026-09-09T19:23:46.651Z"
+startedAt: "2026-09-04T19:29:10.491Z"
+completedAt: "2026-09-04T20:07:22.499Z"
+endedAt: "2026-09-04T20:07:22.499Z"
 resolutionType: "code-change"
-resolutionDetail: "Answers can carry structured PRD mutations; each renders as a per-field before/after diff accepted or rejected individually; accepted ones write through resolveStore inside withTransaction with staleness re-checked under the lock, a 409 naming the holder on contention, and a rex:prd-changed broadcast so views refresh. 60 tests including an integration suite against a real on-disk store. Commit 6b7cc883."
+resolutionDetail: "Refine mode on the Ask panel: mode:\"refine\" adds the PRD to the ask context and returns proposed mutations with server-built before/after diffs; POST /api/rex/apply-refinements applies only accepted proposals inside store.withTransaction, refusing stale ones and surfacing a held lock as a 409 naming the holder PID."
 acceptanceCriteria:
   - "The answer can carry a set of proposed mutations to existing PRD items (description, acceptance criteria, priority, parent, merge of a duplicate sibling) alongside its prose"
   - "Each proposal renders as a before/after diff of exactly the fields it changes, and is accepted or rejected individually"
@@ -30,6 +30,6 @@ acceptanceCriteria:
   - "An applied refinement is reflected in the PRD views without a server restart"
   - "Integration coverage asserts the accept path writes through the lock and the reject path writes nothing"
 description: "Let the exchange act on the user's feedback and recommendations about the PRD itself, not only capture new items. The user says what is wrong or missing in an existing item; the answer proposes concrete mutations -- rewrite a description, add or replace acceptance criteria, change priority, reparent, or merge an obvious duplicate sibling -- and the user reviews each one before anything is written.\n\nTwo constraints make this safe rather than dangerous:\n\nReview before write. An edit can destroy existing content in a way a capture cannot: an LLM rewriting acceptance criteria unreviewed is how a PRD quietly loses its history. Every proposal is rendered as a before/after diff of the affected fields, accepted or rejected individually, with nothing written on a bare \"looks good\".\n\nWrite under the lock. This makes the web server another PRD writer alongside ndx work and the MCP tools. Accepted mutations must go through the gateway's store path (rex-gateway.ts resolveStore) inside withTransaction, so a concurrent writer causes a loud failure naming the holder PID rather than a silent clobber -- exactly the guarantee described in the concurrency contract in CLAUDE.md."
-lastModified: "2026-09-09T19:23:46.677Z"
+lastModified: "2026-09-04T20:07:22.525Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

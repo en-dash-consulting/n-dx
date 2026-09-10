@@ -3,8 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import {
   clipboardFailureMessage,
+  clipboardSuccessMessage,
   copyTextToClipboard,
-  type ClipboardFailureKind,
+  type ClipboardFailureReason,
 } from "../utils/clipboard.js";
 
 interface PRMarkdownResponse {
@@ -39,7 +40,10 @@ const PR_MARKDOWN_MODE_STORAGE_KEY = "sv:pr-markdown:view-mode";
 type PRMarkdownViewMode = "preview" | "raw";
 
 type CopyState = "idle" | "success" | "error";
-type CopyErrorKind = ClipboardFailureKind | null;
+type CopyErrorKind = ClipboardFailureReason | null;
+
+/** What the manual-copy guidance tells the user to select. */
+const COPY_SUBJECT = "markdown";
 
 function parseStoredViewMode(value: string | null): PRMarkdownViewMode {
   return value === "raw" ? "raw" : "preview";
@@ -290,8 +294,13 @@ export function PRMarkdownView() {
   const handleCopyRawMarkdown = useCallback(async () => {
     if (!markdown) return;
     const result = await copyTextToClipboard(markdown);
-    setCopyErrorKind(result.ok ? null : result.kind);
-    setCopyFeedback(result.ok ? "success" : "error");
+    if (result.ok) {
+      setCopyErrorKind(null);
+      setCopyFeedback("success");
+      return;
+    }
+    setCopyErrorKind(result.reason);
+    setCopyFeedback("error");
   }, [markdown, setCopyFeedback]);
 
   const handleModeChange = useCallback((mode: PRMarkdownViewMode) => {
@@ -314,9 +323,9 @@ export function PRMarkdownView() {
   }, [markdown]);
 
   const copyFeedbackMessage = copyState === "success"
-    ? "Copied markdown to clipboard."
+    ? clipboardSuccessMessage(COPY_SUBJECT)
     : copyState === "error"
-      ? clipboardFailureMessage(copyErrorKind ?? "generic", "markdown")
+      ? clipboardFailureMessage(copyErrorKind ?? "generic", COPY_SUBJECT)
       : "";
   const fallbackTitle = availability === "unsupported"
     ? "Git is unavailable"

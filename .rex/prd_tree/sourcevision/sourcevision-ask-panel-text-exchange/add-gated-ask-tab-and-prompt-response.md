@@ -9,11 +9,11 @@ tags:
   - "viewer"
   - "sourcevision"
 source: "ndx-capture"
-startedAt: "2026-09-09T12:40:31.154Z"
-completedAt: "2026-09-09T13:08:12.930Z"
-endedAt: "2026-09-09T13:08:12.930Z"
+startedAt: "2026-09-04T13:57:22.027Z"
+completedAt: "2026-09-04T14:12:51.243Z"
+endedAt: "2026-09-04T14:12:51.243Z"
 resolutionType: "code-change"
-resolutionDetail: "Added the gated Ask tab (featureGate sourcevision.ask, default off) and the AskView shell in packages/web/src/viewer/views/ask.ts, registered across view-id.ts, view-routing.ts, view-registry.ts, the domain-sourcevision barrel, breadcrumb and favicon maps, plus the sourcevision.ask entry in the server feature registry and the sidebar gate map. 19 unit tests in tests/unit/viewer/ask-view.test.ts cover the four state transitions, the blank-prompt no-op on both the button and keyboard paths, deep-linkability, and the gate-off/gate-on cases against the real Sidebar. All 6 suites green."
+resolutionDetail: "Added the gated \"ask\" tab to SOURCEVISION_TABS, the AskView shell under packages/web/src/viewer/views/ask.ts, and registration in view-id.ts / view-routing.ts / view-registry.ts. 19 new unit tests cover the four state transitions, the empty-prompt no-op, and the gate-off hidden case."
 acceptanceCriteria:
   - "SOURCEVISION_TABS gains an \"ask\" entry with featureGate \"sourcevision.ask\"; the tab is hidden when the gate is off"
   - "The view is registered in view-id.ts, view-routing.ts, and view-registry.ts, and a direct URL to the Ask tab restores it on reload"
@@ -21,6 +21,6 @@ acceptanceCriteria:
   - "Submitting an empty or whitespace-only prompt is a no-op that does not issue a request"
   - "A unit test covers the state transitions and the gate-off hidden case"
 description: "Add the \"Ask\" tab to the SourceVision tab registry and the view shell behind it. Mirrors the existing pr-markdown tab: an entry in SOURCEVISION_TABS with an icon, label, minPass, and featureGate of \"sourcevision.ask\", a new view module under packages/web/src/viewer/views/, and registration in view-id.ts / view-routing.ts / view-registry.ts so the tab is deep-linkable like its siblings.\n\nThe shell owns the prompt textarea, the submit control, and the four display states (idle, submitting, answered, error). It does not call the LLM itself -- it consumes the endpoint from the sibling task."
-lastModified: "2026-09-09T13:08:12.954Z"
+lastModified: "2026-09-04T14:12:51.271Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---

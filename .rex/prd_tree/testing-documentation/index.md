@@ -4,13 +4,13 @@ level: "epic"
 title: "Testing & Documentation"
 status: "completed"
 startedAt: "2026-05-06T13:27:57.504Z"
-completedAt: "2026-09-08T19:06:14.267Z"
-endedAt: "2026-09-08T19:06:14.267Z"
+completedAt: "2026-09-08T19:04:31.905Z"
+endedAt: "2026-09-08T19:04:31.905Z"
 resolutionType: "acknowledgment"
 resolutionDetail: "Fixed final architecture policy test failure (PRD storage invariant violations). All child tasks completed. Test suite passes (1628 tests). Epic infrastructure and documentation goals met."
 description: "Local testing infrastructure (gauntlet config validation), platform/prerequisite documentation, and ongoing documentation refresh for PRD-related changes."
-lastModified: "2026-09-08T19:06:14.294Z"
-lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+lastModified: "2026-09-08T19:04:31.928Z"
+lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -32,6 +32,8 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Fix observation in web-server (1 finding)](./fix-observation-in-web-server-1-finding/index.md) | completed |
 | [Fix observation in web-unit (1 finding)](./fix-observation-in-web-unit-1-finding/index.md) | completed |
 | [Fix suggestion in web-server (1 finding)](./fix-suggestion-in-web-server-1-finding/index.md) | completed |
+| [Gauntlet Test Cleanup and Suite Consolidation](./gauntlet-test-cleanup-and-suite/index.md) | completed |
+| [Gauntlet Test Suite Audit and Cross-OS Validity Review](./gauntlet-test-suite-audit-and-cross-os/index.md) | completed |
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-in-main/index.md) | completed |
 | [macOS Local Docker Test Suite](./macos-local-docker-test-suite/index.md) | completed |
 | [Make test results independent of ambient environment and machine load](./make-test-results-independent-of/index.md) | completed |

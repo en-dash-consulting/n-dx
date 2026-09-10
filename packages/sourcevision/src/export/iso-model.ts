@@ -93,6 +93,34 @@ export interface IsoNode {
   outbound: IsoNodeLink[];
 }
 
+/**
+ * What the call graph has to say about a declared seam.
+ *
+ * A seam is a claim somebody wrote down, and a refactor can leave the claim
+ * behind: the map would go on asserting a relationship nothing invokes any
+ * more, which is worse than showing nothing. Where a call graph exists it is
+ * the available cross-check — a declared callback that is called on the
+ * receiving side is corroborated, one that is called nowhere is stale or wrong.
+ *
+ * Absent (rather than `unverified`) when there was no call graph to check
+ * against, or no callbacks named to look for. "Not checked" and "checked and
+ * unsupported" are different claims and the map must not conflate them.
+ */
+export interface IsoSeamVerification {
+  /** `verified` when at least one declared callback is corroborated. */
+  status: "verified" | "unverified";
+  /** Declared callbacks the call graph shows being invoked on the receiving side. */
+  corroborated: Array<{
+    callback: string;
+    /** File on the receiving side that calls it. */
+    file: string;
+    /** How the call reads in the source, e.g. `options.broadcast`. */
+    expression: string;
+  }>;
+  /** Declared callbacks nothing on the receiving side calls. */
+  missing: string[];
+}
+
 export interface IsoEdge {
   from: string;
   to: string;
@@ -106,14 +134,7 @@ export interface IsoEdge {
    * Set when this relationship was declared rather than inferred: a callback or
    * event seam whose runtime direction the import graph cannot see.
    */
-  seam?: {
-    callbacks: string[];
-    note?: string;
-    /** Call-graph verdict on the callbacks; undefined when unchecked. */
-    verified?: boolean;
-    /** Declared callbacks with no supporting call in the target zone. */
-    unsupported?: string[];
-  };
+  seam?: { callbacks: string[]; note?: string; verification?: IsoSeamVerification };
   /** Set when the edge connects a zone to declared runtime infrastructure. */
   infra?: boolean;
   /** Orthogonal route in grid units, precomputed so the renderer stays dumb. */
@@ -191,14 +212,8 @@ export interface IsoModelInput {
     toZone: string;
     callbacks?: string[];
     note?: string;
-    /**
-     * Whether the call graph corroborates the declared callbacks. Undefined
-     * when there was no call graph to check against, which is not the same as
-     * refuted.
-     */
-    verified?: boolean;
-    /** Declared callbacks with no supporting call in the target zone. */
-    unsupported?: string[];
+    /** Set when a call graph was available to check the declaration against. */
+    verification?: IsoSeamVerification;
   }>;
   /** Runtime infrastructure, declared or discovered from IaC. */
   infrastructure?: Array<{
@@ -616,12 +631,7 @@ export function buildIsoModel(input: IsoModelInput, options: IsoModelOptions = {
       weight: 0,
       calls: 0,
       back: b.col <= a.col,
-      seam: {
-        callbacks: seam.callbacks ?? [],
-        note: seam.note,
-        verified: seam.verified,
-        unsupported: seam.unsupported?.length ? seam.unsupported : undefined,
-      },
+      seam: { callbacks: seam.callbacks ?? [], note: seam.note, verification: seam.verification },
       points: routeEdge(a, b, bounds, lanes, rawEdges.length + i),
     });
   });
@@ -1017,11 +1027,11 @@ function describeGaps(input: IsoModelInput): string[] {
   const infraCount = (input.infrastructure ?? []).length;
   if (infraCount > 0) {
     gaps.push(
-      "Runtime infrastructure is shown from declarations, not detection: entries in .n-dx.json and resources found in Terraform. A queue nobody declared is still invisible, and a zone is attributed to a resource by naming it in source, which is weaker evidence than an import.",
+      "Runtime infrastructure is shown from declarations, not detection: entries in .n-dx.json and resources found in Terraform or CloudFormation. A queue nobody declared is still invisible, and a zone is attributed to a resource by naming it in source, which is weaker evidence than an import.",
     );
   } else {
     gaps.push(
-      "Runtime infrastructure — queues, caches, buckets, databases, cron — has no static signature and is absent. Declare it under sourcevision.isoMap.infrastructure in .n-dx.json, or add Terraform, and it will be drawn.",
+      "Runtime infrastructure — queues, caches, buckets, databases, cron — has no static signature and is absent. Declare it under sourcevision.isoMap.infrastructure in .n-dx.json, or add Terraform or CloudFormation, and it will be drawn.",
     );
   }
 

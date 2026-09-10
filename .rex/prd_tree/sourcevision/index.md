@@ -4,10 +4,10 @@ level: "epic"
 title: "SourceVision"
 status: "completed"
 startedAt: "2026-04-13T18:35:49.604Z"
-completedAt: "2026-09-09T19:23:56.691Z"
-endedAt: "2026-09-09T19:23:56.691Z"
+completedAt: "2026-09-04T20:07:26.116Z"
+endedAt: "2026-09-04T20:07:26.116Z"
 description: "Static analysis engine: file inventory, import graph, zone detection (Louvain community detection), React component catalog, PR markdown generation. Produces .sourcevision/CONTEXT.md and llms.txt for AI consumption.\n\n---\n\nBuild an evaluation harness in tests/gauntlet/ that captures sourcevision's current LLM-driven analysis output (zone enrichment, file classification) as golden fixtures and scores future runs against them. Once the harness exists, optimization PRs (Haiku swap, heuristic-first classifier, payload reduction, raised concurrency, skip-trivial-zones short-circuit, --full pass signature dedup, cached LLM replay, semantic zone-name scoring) become measured changes with eval-score deltas rather than vibes-based judgment. Motivation: sourcevision analyze burns substantial tokens and wall-clock time; multiple optimization paths exist but each carries silent quality regression risk."
-lastModified: "2026-09-09T19:23:56.716Z"
+lastModified: "2026-09-04T20:07:26.138Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -53,6 +53,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Web UI Memory Management and Crash Resolution](./web-ui-memory-management-and-crash/index.md) | completed |
 | [Zone Detection Validation for Go Projects](./zone-detection-validation-for-go/index.md) | completed |
 | [Allowlist workspace.ts in the child_process architecture policy (PR #354 CI fix)](./allowlist-workspace-ts-in-the-child.md) | completed |
-| [Fix conditional hook order in the Problems and Suggestions views](./fix-conditional-hook-order-in-the.md) | completed |
 | [Optional 3D isometric architecture map generator](./optional-3d-isometric-architecture-map.md) | completed |
 | [sv analyze: skip git worktree checkouts in sub-analysis discovery](./sv-analyze-skip-git-worktree-checkouts.md) | completed |

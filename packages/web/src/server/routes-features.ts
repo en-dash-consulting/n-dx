@@ -81,8 +81,8 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
   {
     key: "sourcevision.ask",
     label: "Ask Panel",
-    description: "Show the SourceVision Ask page — a prompt/response exchange answered from the existing analysis.",
-    impact: "Each question is a live model call against your configured vendor, so it spends token budget. Hidden from the sidebar when disabled.",
+    description: "Show the SourceVision Ask page: a prompt/response exchange that answers questions about this project from the existing analysis.",
+    impact: "Each question spends tokens on an LLM call. When disabled, Ask stays hidden from the SourceVision sidebar.",
     package: "sourcevision",
     stability: "experimental",
     defaultValue: false,
@@ -232,6 +232,29 @@ function buildToggles(projectDir: string): FeatureToggle[] {
       defaultValue: def.defaultValue,
     };
   });
+}
+
+/**
+ * Read one feature toggle's effective value for a project.
+ *
+ * For routes that must not act when their feature is off. Reads `.n-dx.json`
+ * per call rather than caching: toggles are edited from the dashboard while the
+ * server runs, and a route that answers from a cached value would keep serving
+ * a feature the user just turned off.
+ *
+ * Fails closed in every ambiguous case — unreadable config, malformed config,
+ * or a key that is not in the registry all yield the registry default, and an
+ * unknown key yields `false`. A gate that opens when it cannot tell is not a
+ * gate.
+ */
+export function isFeatureEnabled(projectDir: string, key: string): boolean {
+  const def = FEATURE_REGISTRY.find((d) => d.key === key);
+  if (!def) return false;
+
+  const config = readNdxConfig(projectDir);
+  const features = (config.features ?? {}) as Record<string, unknown>;
+  const stored = getByPath(features, key);
+  return typeof stored === "boolean" ? stored : def.defaultValue;
 }
 
 // ---------------------------------------------------------------------------

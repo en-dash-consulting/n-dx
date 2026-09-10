@@ -10,12 +10,12 @@
  * - Hench run files (`.hench/runs/*.json`) — tracked via directory mtime + file count
  * - Rex execution log (`.rex/execution-log.jsonl`) — tracked via mtime + size
  * - Sourcevision manifest (`.sourcevision/manifest.json`) — tracked via mtime + size
- * - Dashboard Ask log (`.sourcevision/ask-usage.jsonl`) — tracked via mtime + size
+ * - Dashboard spend ledger (`.n-dx-web-usage.jsonl`) — tracked via mtime + size
  *
- * A source that feeds the aggregation but not this fingerprint is worse than an
- * uncached one: its writes land on disk and stay invisible until something else
- * happens to change. The Ask log is written by this same server process, so it
- * is the one most likely to be read back a second later.
+ * The ledger is fingerprinted for the same reason as the others, and it is the
+ * only source this process writes itself: an ask appends to it mid-session, so
+ * without it the answer's own cost would stay hidden until some unrelated
+ * source changed.
  *
  * On each cache access, the current filesystem state is compared against the
  * last-known fingerprint. If any source has changed, all cached results are
@@ -32,14 +32,14 @@
 
 import { join } from "node:path";
 import { stat, readdir } from "node:fs/promises";
-import { ASK_USAGE_FILE } from "./ask-usage-log.js";
+import { dashboardUsagePath } from "./dashboard-usage.js";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 /**
- * Filesystem metadata snapshot for the three token usage data sources.
+ * Filesystem metadata snapshot for the four token usage data sources.
  * Used to detect when source data has changed and cached results need
  * to be invalidated.
  */
@@ -56,10 +56,10 @@ export interface SourceFingerprint {
   svManifestMtimeMs: number;
   /** Sourcevision manifest size in bytes. */
   svManifestSize: number;
-  /** Dashboard Ask usage log modification time. */
-  askLogMtimeMs: number;
-  /** Dashboard Ask usage log size in bytes. */
-  askLogSize: number;
+  /** Dashboard spend ledger modification time. */
+  dashboardUsageMtimeMs: number;
+  /** Dashboard spend ledger size in bytes. */
+  dashboardUsageSize: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,10 +79,9 @@ export async function takeFingerprint(
   const henchRunsDir = join(projectDir, ".hench", "runs");
   const rexLogPath = join(rexDir, "execution-log.jsonl");
   const svManifestPath = join(projectDir, ".sourcevision", "manifest.json");
-  const askLogPath = join(projectDir, ".sourcevision", ASK_USAGE_FILE);
 
   // Run all stat operations in parallel for performance
-  const [henchDirResult, henchFilesResult, rexLogResult, svManifestResult, askLogResult] =
+  const [henchDirResult, henchFilesResult, rexLogResult, svManifestResult, dashboardUsageResult] =
     await Promise.all([
       stat(henchRunsDir).catch(() => null),
       readdir(henchRunsDir)
@@ -90,7 +89,7 @@ export async function takeFingerprint(
         .catch(() => [] as string[]),
       stat(rexLogPath).catch(() => null),
       stat(svManifestPath).catch(() => null),
-      stat(askLogPath).catch(() => null),
+      stat(dashboardUsagePath(projectDir)).catch(() => null),
     ]);
 
   return {
@@ -100,8 +99,8 @@ export async function takeFingerprint(
     rexLogSize: rexLogResult?.size ?? 0,
     svManifestMtimeMs: svManifestResult?.mtimeMs ?? 0,
     svManifestSize: svManifestResult?.size ?? 0,
-    askLogMtimeMs: askLogResult?.mtimeMs ?? 0,
-    askLogSize: askLogResult?.size ?? 0,
+    dashboardUsageMtimeMs: dashboardUsageResult?.mtimeMs ?? 0,
+    dashboardUsageSize: dashboardUsageResult?.size ?? 0,
   };
 }
 
@@ -117,8 +116,8 @@ export function fingerprintsMatch(
     a.rexLogSize === b.rexLogSize &&
     a.svManifestMtimeMs === b.svManifestMtimeMs &&
     a.svManifestSize === b.svManifestSize &&
-    a.askLogMtimeMs === b.askLogMtimeMs &&
-    a.askLogSize === b.askLogSize
+    a.dashboardUsageMtimeMs === b.dashboardUsageMtimeMs &&
+    a.dashboardUsageSize === b.dashboardUsageSize
   );
 }
 

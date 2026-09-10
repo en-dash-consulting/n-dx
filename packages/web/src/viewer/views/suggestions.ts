@@ -5,13 +5,13 @@ import type { Finding } from "../external.js";
 import { FindingsList } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
-import { useFeatureToggle } from "../hooks/index.js";
-import { explainFinding } from "../ask-seed.js";
+import { findingAskSeed } from "./finding-seed.js";
 
 interface SuggestionsProps {
   data: LoadedData;
-  /** Absent in contexts with nowhere to navigate; Explain is then not offered. */
   navigateTo?: NavigateTo;
+  /** State of the `sourcevision.ask` toggle — see the note in problems.ts. */
+  askEnabled?: boolean;
 }
 
 function RefreshRecommendationsButton() {
@@ -82,7 +82,7 @@ function RefreshRecommendationsButton() {
   );
 }
 
-export function SuggestionsView({ data, navigateTo }: SuggestionsProps) {
+export function SuggestionsView({ data, navigateTo, askEnabled = false }: SuggestionsProps) {
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
@@ -92,15 +92,6 @@ export function SuggestionsView({ data, navigateTo }: SuggestionsProps) {
   // finishes with the dashboard open. A hook called after the gate is therefore
   // called on some renders and not others, and Preact matches hooks by
   // position — so the slots shift under whatever state is already there.
-  const askEnabled = useFeatureToggle("sourcevision.ask", false);
-  const handleExplain = useCallback(
-    (finding: Finding) => { if (navigateTo) explainFinding(finding, navigateTo); },
-    [navigateTo],
-  );
-
-  // Memoized on the source array, not recomputed per render: the count below
-  // keys its own memo on this, and a fresh array each time made that memo a
-  // no-op that recomputed on every render anyway.
   const findings = useMemo(
     () => (zones?.findings ?? []).filter((f: Finding) => f.type === "suggestion"),
     [zones?.findings],
@@ -166,8 +157,11 @@ export function SuggestionsView({ data, navigateTo }: SuggestionsProps) {
       legacyInsights,
       groupBy: "severity",
       searchable: true,
-      // Only when the panel it leads to is actually reachable.
-      ...(askEnabled && navigateTo ? { onExplain: handleExplain } : {}),
+      // Omitted without a navigation target, or with Ask toggled off — see the
+      // note in problems.ts.
+      ...(navigateTo && askEnabled
+        ? { onExplain: (f: Finding) => navigateTo("ask", { askSeed: findingAskSeed(f) }) }
+        : {}),
     })
   );
 }

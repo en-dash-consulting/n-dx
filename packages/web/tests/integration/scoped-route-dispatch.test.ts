@@ -194,15 +194,16 @@ describe("scoped route dispatch", () => {
   }, 90_000);
 
   it("still dispatches the ask route when sourcevision IS in scope", async () => {
-    // The guard must not over-block. 409 is the route declining to answer
-    // because the fixture has no analysis — which means it was reached and
-    // owned the response, rather than falling through to the 404.
+    // The guard must not over-block. 403 is the route's own server-side
+    // feature gate declining the request (`sourcevision.ask` is default-off
+    // in the fixture) — which means the route was reached and owned the
+    // response, rather than falling through to the 404.
     const result = await runDriver("sourcevision", "/api/sourcevision/ask");
 
     expect(
       result.status,
       "In-scope POST fell through to the 404, so the route was not dispatched.",
-    ).toBe(409);
+    ).toBe(403);
     expect(result.exitCode).toBe(0);
   }, 90_000);
 

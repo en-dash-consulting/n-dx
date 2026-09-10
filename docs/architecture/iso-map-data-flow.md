@@ -108,7 +108,7 @@ runtime one.
       "injectionSeams": [
         {
           "from": "packages/web/src/server/start.ts",
-          "to": "packages/web/src/server/task-usage/register-scheduler.ts",
+          "to": "packages/web/src/server/task-usage.ts",
           "callbacks": ["broadcast", "loadPRD"],
           "note": "why this seam exists"
         }
@@ -124,29 +124,30 @@ import — in a distinct colour and dot pattern, and its panel says plainly that
 it was declared rather than inferred.
 
 **Checked against the call graph.** A declaration is a claim, and a refactor can
-leave it behind — the seam above once named `server/register-scheduler.ts`, which
-had moved, and the map went on asserting it. Where a call graph exists (a deep
-analyze), each declared callback is looked for among the calls made inside the
-seam's **target zone**. A seam whose callbacks are all accounted for is marked
-corroborated; one with callbacks nothing calls is drawn in a fainter, sparser
-pattern, labelled unverified in its panel, and named in the footer along with the
-specific callbacks that did not resolve.
+leave the claim behind, so where `callgraph.json` exists `verifySeamCallbacks()`
+looks for calls to each named callback on the receiving side:
 
-Evidence is zone-scoped rather than file-scoped on purpose: a file handed a
-callback frequently forwards it instead of calling it — `register-scheduler.ts`
-passes all four of its callbacks onward — so a file-scoped check reports real
-seams as stale. A call from the *injecting* side is not evidence, since the
-injector naming its own callback says nothing about whether the target still
-uses it.
+| Outcome | Meaning | On the page |
+|---------|---------|-------------|
+| corroborated | at least one named callback is called in the receiving zone | drawn as before; the panel names the file and expression that matched each callback |
+| unverified | a call graph was read and supports none of the named callbacks | drawn thinner, fainter and with a sparser dash; labelled *Unverified runtime seam*; the panel says the declaration is likely stale |
+| unchecked | no call graph (scan mode), or no callbacks named | drawn as before, and the footer says the callbacks were taken on trust |
 
-This is corroboration, not proof. A generic name like `broadcast` is called all
-over a large zone, so agreement is weak; disagreement is the strong signal.
-Without a call graph, seams carry no verdict at all rather than a negative one.
+Evidence is searched across the whole receiving *zone*, not only the file the
+declaration names, because a receiving module routinely hands the callbacks on
+to a neighbour — n-dx's own scheduler seam names `task-usage.ts`, which passes
+all four callbacks down to `usage-cleanup-scheduler.ts`, where they are actually
+invoked. A qualified callee counts (`options.broadcast()` is a call to the
+injected `broadcast`), which admits the odd coincidence — hence *corroborated*
+rather than *proved*, with the matched file and expression shown so a reader can
+judge. Callbacks nothing calls are also listed in the page footer, so a stale
+declaration is visible without clicking every connector.
 
-**Still open:** only seams somebody wrote down are drawn. An undeclared one
-still points the wrong way. A declaration that cannot be drawn — both ends in
-one zone, or a file no zone owns — is reported in the page footer rather than
-silently dropped, naming which endpoint failed to resolve.
+**Still open:** only seams somebody wrote down are drawn — an undeclared one
+still points the wrong way. Verification is one-directional: it can find a
+declaration the code no longer supports, but not a seam nobody declared. A
+declaration that cannot be drawn — both ends in one zone, or a file no zone owns
+— is reported in the page footer rather than silently dropped.
 
 ### 3. Runtime infrastructure is invisible
 
@@ -160,26 +161,21 @@ two SQS queues and a dead-letter queue; none of those could be derived here.
 and is drawn as its own trailing column:
 
 1. **Infrastructure-as-code.** `.tf` files are scanned for
-   `resource "type" "name"` blocks, and `.yaml`/`.yml` files that prove
-   themselves CloudFormation templates — by an `AWSTemplateFormatVersion`
-   header or a `Type: AWS::…` line — are scanned for logical-id/`Type:` pairs.
-   Unrelated YAML (CI workflows, Kubernetes manifests, lockfiles) is rejected
-   by that check rather than parsed.
-
-   Both formats share one classification table. Types are normalised —
-   `::`, `-` and `.` folded to `_`, so `AWS::S3::Bucket` and `aws_s3_bucket`
-   reduce to the same shape — then classified by substring into buckets,
-   queues, topics, databases, caches, streams, schedulers, secrets and compute;
-   anything with no architectural meaning (an IAM role, a security group) is
-   skipped. A resource is attributed to the zones whose source names it — a
-   string match on the resource's own name literals, with names shorter than
-   five characters or too generic (`main`, `default`, `data`) refused outright.
-
-   Both parsers are deliberately shallow line/block scanners rather than real
-   HCL and YAML parses: they find what a reader would see scanning the files,
-   and they keep this module on `node:` builtins so it still bundles into the
-   standalone skill script. Terraform state and modules, and CloudFormation
-   nested stacks, `!Ref` intrinsics and multi-document files, are out of scope.
+   `resource "type" "name"` blocks; `.yaml`/`.yml` files are scanned for
+   CloudFormation and SAM templates, recognised by a top-level `Resources:`
+   block plus a namespaced `Type:` — a signal deliberately strict enough that a
+   CI workflow or a k8s manifest is not mistaken for infrastructure.
+   Types are classified by substring into buckets, queues, topics, databases,
+   caches, streams, schedulers, secrets and compute; anything with no
+   architectural meaning (an IAM role, a security group) is skipped. **One
+   classification table serves both dialects**: `AWS::SQS::Queue` is normalised
+   to `aws_sqs_queue` before matching, so a resource means the same thing
+   whichever dialect declared it and there is no second table to drift. A
+   resource is attributed to the zones whose source names it — a string match on
+   the resource's own name literals (Terraform `name`-ish attributes,
+   CloudFormation `BucketName`/`QueueName`/… properties, but never a `!Ref` or
+   `!Sub`, which is not a name), with names shorter than five characters or too
+   generic (`main`, `default`, `data`) refused outright.
 2. **`.n-dx.json`**, under `sourcevision.isoMap.infrastructure`, for anything
    IaC does not cover — a managed service, another team's queue, a database that
    predates the repo:
@@ -191,10 +187,12 @@ and is drawn as its own trailing column:
 
 **Still open:** a string match is weaker evidence than an import, and the panel
 says so. Infrastructure nothing on the map references is not drawn at all, since
-a floating block asserts a relationship the map cannot support. Terraform and
-CloudFormation are parsed; Pulumi and CDK are not, since both express
-infrastructure as general-purpose code rather than a declarative file a shallow
-scan can read.
+a floating block asserts a relationship the map cannot support. Both parsers are
+line scans, not full parsers, so a Terraform module, a nested stack, a YAML
+anchor or anything behind `Fn::` indirection is out of reach. Pulumi and CDK are
+not covered at all: their resources are expressed in a general-purpose language,
+where a resource type is a constructor call rather than a declaration, and no
+line scan finds those reliably.
 
 ### 4. Entry points are approximate
 

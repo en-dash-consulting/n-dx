@@ -1,0 +1,26 @@
+---
+id: "30852ba4-b890-4da7-8784-822f9a1c7075"
+level: "task"
+title: "Remove stale gauntlet tests and repurpose niche tests into broader assertions"
+status: "completed"
+priority: "medium"
+tags:
+  - "testing"
+  - "gauntlet"
+  - "cleanup"
+source: "smart-add"
+startedAt: "2026-09-03T13:11:34.029Z"
+completedAt: "2026-09-03T13:33:42.667Z"
+endedAt: "2026-09-03T13:33:42.667Z"
+resolutionType: "code-change"
+resolutionDetail: "Acted on the audit's classification inventory. 1 stale case repaired rather than deleted (test-base-commands.sh case 2: retired model ID claude-3-5-sonnet-20241022 -> claude-sonnet-5, hoisted to INIT_MODEL, and the case now greps captured output for \"Unknown model\" instead of discarding both streams, so catalog drift reddens it). 1 niche case deleted (SMOKE_CASES typo-suggestion) with a cross-reference comment in the receiving suite tests/e2e/cli-hints.test.js, which asserts the same three things on ubuntu+macOS+Windows - one platform more than the collector. 1 niche case generalised (score.test.js empty-on-both-sides -> a degenerate-inputs block covering both scorers across 6 empty/non-overlapping combinations). Audit defects D1-D4 fixed; D1 confirmed by mutation (stripping both ?? null operators left the old case green, now fails 2 replacement cases). D3 added 4 projectForScoring cases. No (b) weak-signal case touched, per the task's guardrail. Found and corrected a substantive audit error: a Windows separator regression does NOT drop both eval scores to 0 - archetypeAccuracy returns a perfect 1.0 on an empty intersection, so only the zone scorer catches it; pinned and documented, hardening tracked as audit follow-up 6. .local_testing harness defects H1-H7 left unactioned as audit follow-up 7 (documented developer workflow, human decision). Verified on Windows 11: gauntlet 9->24 cases, evals 4/4, smoke-parity unit 29/29, root suite 112 files/2262 passed, all 5 packages validate, typecheck + obfuscation + pr-check clean, live 7-case collector baseline green and compare clean."
+acceptanceCriteria:
+  - "All stale gauntlet tests are removed and the removal is noted in the commit message with a one-line rationale per removed test"
+  - "Niche tests that can be generalised are rewritten as broader assertions that cover the same concern across more inputs or platforms"
+  - "Niche tests that have equivalent unit/integration coverage are deleted with a cross-reference comment in the receiving suite"
+  - "The gauntlet suite still passes after cleanup on both Linux and Windows runners"
+  - "Test file count and line count after cleanup is documented in the PR description as before/after"
+description: "Using the classification inventory from the audit, delete test cases marked stale and convert niche cases into more general assertions where the underlying concern is worth preserving. For any niche test that cannot be generalised, evaluate whether the behaviour it exercises is better covered by an existing unit or integration test, and if so, delete the gauntlet case and add a pointer comment in the relevant unit suite. Do not delete tests whose concern is valid but whose implementation is just narrow."
+lastModified: "2026-09-03T13:33:42.690Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---

@@ -16,7 +16,6 @@ import { handleSourcevisionRoute } from "./routes-sourcevision.js";
 import { handleSourcevisionAskRoute } from "./routes-sourcevision-ask.js";
 import { handleIsoMapRoute } from "./routes-iso-map.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
-import { handleApplyRefinementsRoute } from "./routes-rex-refinements.js";
 import { handleValidationRoute } from "./routes-validation.js";
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
@@ -640,9 +639,10 @@ async function handleApiRoutes(
       reregisterProjectWatchers(ctx, watcher, ws, watcherHandles);
     },
   }))) return true;
-  if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
-  // Async, unlike its sibling above: it awaits a model call.
+  // Ask must be dispatched before the general sourcevision route so
+  // `/api/sourcevision/ask` is not swallowed by the broader prefix match.
   if (await handleScopedRoute(isInScope(ctx.scope, "sourcevision"), () => handleSourcevisionAskRoute(req, res, ctx))) return true;
+  if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, ws.broadcast))) return true;
@@ -650,7 +650,6 @@ async function handleApiRoutes(
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleWorkflowRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleAdaptiveRoute(req, res, ctx))) return true;
   if (isInScope(ctx.scope, "rex") && handleValidationRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleApplyRefinementsRoute(req, res, ctx, ws.broadcast))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleTokenUsageRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleMergeGraphRoute(req, res, ctx))) return true;
   if (handleDataRoute(req, res, ctx, watcher)) return true;

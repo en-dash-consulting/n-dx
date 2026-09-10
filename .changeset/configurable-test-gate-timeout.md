@@ -5,9 +5,9 @@
 
 Make the full-suite gate's timeout configurable via `hench.fullTestTimeoutMs`.
 
-It was hardcoded at 5 minutes. A monorepo that runs every package can
-legitimately exceed that — this repo's own suite measures ~235s, leaving about
-a minute of headroom on a machine an agent is also using — and overrunning
+It was hardcoded (5 minutes originally, raised to a measured 15 in the same
+release this ships in). However generous the constant, a suite an operator
+cannot re-budget will eventually exceed it — and overrunning
 aborts a task whose work was already done and committed. Set the key in
 `.hench/config.json` or `.n-dx.json` (the latter wins, as with every other
 hench key); 0 disables the limit. `ndx config` documents it under a new

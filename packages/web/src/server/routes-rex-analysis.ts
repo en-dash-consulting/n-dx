@@ -212,8 +212,8 @@ export function routeProposals(
     return handleCaptureNextSteps(req, res, ctx, broadcast);
   }
 
-  // POST /api/rex/capture-ask — capture one Ask answer as a PRD item
-  // (SourceVision Ask panel action)
+  // POST /api/rex/capture-ask — capture a SourceVision Ask exchange as a PRD
+  // task (Ask panel action)
   if (path === "capture-ask" && method === "POST") {
     return handleCaptureAsk(req, res, ctx, broadcast);
   }
@@ -342,38 +342,62 @@ async function handleCaptureNextSteps(
 }
 
 // ---------------------------------------------------------------------------
-// Ask-answer capture
+// Ask-exchange capture
 // ---------------------------------------------------------------------------
 
-/** Title of the epic that collects answers captured from the Ask panel. */
+/** Title of the epic that collects captured Ask exchanges. */
 const ASK_CAPTURE_EPIC_TITLE = "SourceVision Ask";
 
-/** Longest title derived from a question before it is elided. */
-const ASK_TITLE_MAX = 120;
+/** Longest title written from a question before it is elided. */
+const ASK_TITLE_MAX_CHARS = 120;
 
 /**
- * Use the question as the item's title, elided if it is long.
+ * Derive an item title from the question that produced the answer.
  *
- * A question is what makes the captured answer findable later, so it becomes
- * the title rather than a generated summary — the answer itself is the body,
- * where its full length costs nothing.
+ * The question is used verbatim rather than prefixed with "Ask:" — provenance
+ * already lives in `source`, the tags, and the parent epic, and a prefix would
+ * follow the item into commit messages and `rex status` output forever. Newlines
+ * collapse because a PRD title is one line, and over-long questions are elided
+ * rather than rejected: the full text is preserved in the description either way.
  */
 export function askCaptureTitle(question: string): string {
-  const single = question.trim().replace(/\s+/g, " ");
-  if (single.length <= ASK_TITLE_MAX) return single;
-  return `${single.slice(0, ASK_TITLE_MAX - 1).trimEnd()}…`;
+  const single = question.replace(/\s+/g, " ").trim();
+  if (single.length <= ASK_TITLE_MAX_CHARS) return single;
+  return `${single.slice(0, ASK_TITLE_MAX_CHARS - 1).trimEnd()}…`;
+}
+
+/** Body of the captured item: the exchange, in the order it happened. */
+export function askCaptureDescription(question: string, answer: string): string {
+  return [
+    "Captured from the SourceVision Ask panel.",
+    "",
+    "**Question**",
+    "",
+    question.trim(),
+    "",
+    "**Answer**",
+    "",
+    answer.trim(),
+  ].join("\n");
 }
 
 /**
- * Handle POST /api/rex/capture-ask — file one Ask exchange as a PRD item.
+ * Handle POST /api/rex/capture-ask — file one Ask exchange as a PRD task.
  *
- * Unlike next-step capture this does not deduplicate by title: asking the same
- * question again after the code has moved is a legitimate reason to capture a
- * second, different answer, and silently dropping it would lose the newer one.
+ * A task, not a feature: what the user is capturing is a thing to do that came
+ * out of an answer, and `LEVEL_HIERARCHY` accepts a task directly under an
+ * epic, so no filler feature has to be invented to hold it.
  *
- * The response names the created item and the epic it landed under, because
- * the panel reports where the capture went and cannot know the epic otherwise
- * (it is created on first capture).
+ * Deliberately no title deduplication, unlike `capture-next-steps`. There the
+ * same recommendation recurs on every analysis and skipping it is a kindness;
+ * here the user pressed Confirm on this specific answer, and silently
+ * discarding the write because they once asked something similar would be a
+ * capture that reports success and files nothing. Repeat presses are guarded on
+ * the client by the confirm step plus an in-flight ref.
+ *
+ * The response names the created item AND its parent, including whether the
+ * epic had to be created, so the panel can tell the user where the item landed
+ * rather than only that something was written.
  */
 async function handleCaptureAsk(
   req: IncomingMessage,
@@ -383,7 +407,11 @@ async function handleCaptureAsk(
 ): Promise<boolean> {
   try {
     const body = await readBody(req);
-    const input = JSON.parse(body) as { question?: string; answer?: string };
+    const input = JSON.parse(body || "{}") as {
+      question?: unknown;
+      answer?: unknown;
+      priority?: unknown;
+    };
 
     const question = typeof input.question === "string" ? input.question.trim() : "";
     const answer = typeof input.answer === "string" ? input.answer.trim() : "";
@@ -399,49 +427,65 @@ async function handleCaptureAsk(
     const store = await resolveStore(ctx.rexDir);
     const doc = await store.loadDocument();
 
-    let epicId = doc.items.find(
+    const existingEpic = doc.items.find(
       (i) => i.level === "epic" && i.title === ASK_CAPTURE_EPIC_TITLE,
-    )?.id;
-    if (!epicId) {
+    );
+    let epicId = existingEpic?.id;
+    const epicCreated = epicId === undefined;
+    if (epicId === undefined) {
       epicId = randomUUID();
-      await store.addItem({
+      const epicItem: PRDItem = {
         id: epicId,
         title: ASK_CAPTURE_EPIC_TITLE,
         level: "epic",
         status: "pending",
         source: "sv-ask",
-        description: "Answers captured from the SourceVision Ask panel.",
+        description: "Questions and answers captured from the SourceVision Ask panel.",
         tags: ["sourcevision", "ask"],
-      });
+      };
+      await store.addItem(epicItem);
     }
 
     const item: PRDItem = {
       id: randomUUID(),
       title: askCaptureTitle(question),
-      level: "feature",
+      level: "task",
       status: "pending",
       source: "sv-ask",
-      description: answer,
+      description: askCaptureDescription(question, answer),
       tags: ["sourcevision", "ask"],
     };
+    if (typeof input.priority === "string" && isPriority(input.priority)) {
+      item.priority = input.priority;
+    }
     await store.addItem(item, epicId);
 
+    // Refresh the cache from the store so the dashboard sees the new item
+    // immediately (same pattern as capture-next-steps and proposal acceptance).
     refreshPRDCache(ctx.rexDir, await store.loadDocument());
 
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
       event: "sv_ask_capture",
-      detail: `Captured an Ask answer to PRD as "${item.title}" via web`,
+      detail: `Captured an Ask answer as task "${item.title}" under "${ASK_CAPTURE_EPIC_TITLE}" via web`,
     });
 
     if (broadcast) {
-      broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+      broadcast({
+        type: "rex:prd-changed",
+        timestamp: new Date().toISOString(),
+      });
     }
 
     jsonResponse(res, 200, {
       ok: true,
       item: { id: item.id, title: item.title, level: item.level },
-      parent: { id: epicId, title: ASK_CAPTURE_EPIC_TITLE, level: "epic" },
+      parent: {
+        id: epicId,
+        title: ASK_CAPTURE_EPIC_TITLE,
+        level: "epic",
+        created: epicCreated,
+      },
     });
   } catch (err) {
     errorResponse(res, 400, String(err));

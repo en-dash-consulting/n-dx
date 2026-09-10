@@ -16,7 +16,13 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join, basename, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
-import type { IsoFileInput, IsoKind, IsoModelInput, IsoZoneInput } from "./iso-model.js";
+import type {
+  IsoFileInput,
+  IsoKind,
+  IsoModelInput,
+  IsoSeamVerification,
+  IsoZoneInput,
+} from "./iso-model.js";
 import { asKind } from "./iso-model.js";
 import { scanProject } from "./iso-scan.js";
 import { loadDeclaredArchitecture } from "./iso-declared.js";
@@ -166,6 +172,75 @@ export function aggregateCallEdges(
   );
 }
 
+/**
+ * Index the callee names invoked from each of `files`.
+ *
+ * Restricted to the files that matter, because a whole-project index is tens of
+ * megabytes of strings in service of a handful of declarations.
+ *
+ * Unlike `aggregateCallEdges`, edges with no resolvable `calleeFile` are kept.
+ * An injected callback arrives as a parameter, so where it points is exactly
+ * what static resolution cannot follow — discarding those edges would throw
+ * away the only evidence a seam ever has.
+ */
+export function indexCalleesByFile(
+  callGraph: CallGraph,
+  files: Set<string>,
+): Map<string, Set<string>> {
+  const index = new Map<string, Set<string>>();
+  if (files.size === 0) return index;
+  for (const edge of callGraph.edges) {
+    if (!files.has(edge.callerFile)) continue;
+    const existing = index.get(edge.callerFile);
+    if (existing) existing.add(edge.callee);
+    else index.set(edge.callerFile, new Set([edge.callee]));
+  }
+  return index;
+}
+
+/**
+ * Check declared callbacks against the calls made on the receiving side.
+ *
+ * Evidence is looked for across the whole receiving zone rather than only the
+ * file the declaration names, because a receiving module routinely hands the
+ * callbacks on to a neighbour — n-dx's own scheduler seam names
+ * `register-scheduler.ts`, which passes all four callbacks to
+ * `usage-cleanup-scheduler.ts`, where they are actually invoked. The map draws
+ * zones, so corroborating at zone granularity is both looser and honest about
+ * what is being claimed.
+ *
+ * A qualified callee counts: `options.broadcast()` is a call to the injected
+ * `broadcast`. That admits the odd coincidence — an unrelated `x.broadcast()`
+ * in the same zone — so the panel names the file and expression it matched
+ * instead of asserting proof.
+ */
+export function verifySeamCallbacks(
+  callbacks: string[],
+  receivingFiles: string[],
+  index: Map<string, Set<string>>,
+): IsoSeamVerification {
+  const files = [...receivingFiles].sort();
+  const corroborated: IsoSeamVerification["corroborated"] = [];
+  const missing: string[] = [];
+
+  for (const callback of callbacks) {
+    let hit: IsoSeamVerification["corroborated"][number] | undefined;
+    for (const file of files) {
+      const callees = [...(index.get(file) ?? [])].sort();
+      const expression =
+        callees.find((c) => c === callback) ?? callees.find((c) => c.endsWith(`.${callback}`));
+      if (expression) {
+        hit = { callback, file, expression };
+        break;
+      }
+    }
+    if (hit) corroborated.push(hit);
+    else missing.push(callback);
+  }
+
+  return { status: corroborated.length > 0 ? "verified" : "unverified", corroborated, missing };
+}
+
 // ── Resolving declarations onto zones ───────────────────────────────────────
 
 /**
@@ -186,144 +261,99 @@ function toZoneId(ref: string, zoneIds: Set<string>, zoneOfFile: Map<string, str
   return null;
 }
 
-// ── Verifying declarations against the call graph ───────────────────────────
-
-/**
- * Which zones contain a call to each name, keyed by the bare callee name.
- *
- * This is the evidence a declared seam is checked against. Built once and
- * shared across seams so a project with many declarations still walks the call
- * graph a single time.
- */
-export interface SeamEvidence {
-  zonesCalling: Map<string, Set<string>>;
-}
-
-/**
- * The bare name a call refers to.
- *
- * A callback invoked through the object it arrived on shows up as
- * `opts.loadPRD`, which is the same evidence as a direct `loadPRD()`.
- */
-function bareCallee(callee: string): string {
-  const parts = callee.split(".");
-  return parts[parts.length - 1];
-}
-
-export function buildSeamEvidence(
-  callGraph: CallGraph,
-  zoneOfFile: Map<string, string>,
-): SeamEvidence {
-  const zonesCalling = new Map<string, Set<string>>();
-  for (const edge of callGraph.edges) {
-    const zone = zoneOfFile.get(edge.callerFile);
-    if (!zone) continue;
-    const name = bareCallee(edge.callee);
-    let zones = zonesCalling.get(name);
-    if (!zones) zonesCalling.set(name, (zones = new Set()));
-    zones.add(zone);
-  }
-  return { zonesCalling };
-}
-
-/**
- * Which of a seam's declared callbacks the call graph cannot account for.
- *
- * Evidence is scoped to the **target zone**, not the target file, for two
- * reasons. A file handed a callback often forwards it rather than calling it
- * — the scheduler seam in this repository passes all four of its callbacks
- * onward — so a file-scoped check reports real seams as stale. And the map
- * draws seams between zones, so zone granularity is the claim being made.
- *
- * A call from the *injecting* side is deliberately not evidence: the injector
- * naming its own callback proves nothing about whether the target still uses
- * it, and accepting it would corroborate every seam that compiles.
- *
- * This is corroboration, not proof. A generic name like `broadcast` is called
- * all over a large zone, so agreement is weak evidence; disagreement is the
- * strong signal, and it is what gets reported.
- */
-function unsupportedCallbacks(
-  callbacks: string[],
-  toZone: string,
-  evidence: SeamEvidence,
-): string[] {
-  return callbacks.filter((cb) => !evidence.zonesCalling.get(cb)?.has(toZone)).sort();
-}
-
-export interface SeamResolution {
+interface SeamResolution {
   seams: NonNullable<IsoModelInput["seams"]>;
   /** Declarations that resolved to a single zone — nothing to draw between. */
   internal: string[];
-  /** Declarations naming something no zone owns, with the offending endpoint. */
-  unresolved: Array<{ label: string; missing: string[] }>;
-  /** Drawn seams whose callbacks the call graph cannot account for. */
-  unverified: Array<{ label: string; callbacks: string[] }>;
+  /** Declarations naming something no zone owns. */
+  unresolved: string[];
+  /** Declarations whose named callbacks the call graph could not find. */
+  stale: string[];
+  /** Drawn seams that name callbacks but had no call graph to check against. */
+  unchecked: number;
+}
+
+/** Files belonging to each zone, for looking up a zone's receiving side. */
+function groupFilesByZone(zoneOfFile: Map<string, string>): Map<string, string[]> {
+  const byZone = new Map<string, string[]>();
+  for (const [file, zone] of zoneOfFile) {
+    const existing = byZone.get(zone);
+    if (existing) existing.push(file);
+    else byZone.set(zone, [file]);
+  }
+  return byZone;
 }
 
 /**
- * Resolve declared seams onto zone pairs, checking them where possible.
+ * Resolve declared seams onto zone pairs, and check them where possible.
  *
  * A declaration that cannot be drawn is reported rather than dropped: somebody
  * wrote it expecting to see it, and "both ends are in the same zone" or "that
  * file is in no zone" is useful feedback, where silence is not.
  *
- * `evidence` is optional because it comes from the call graph, which only a
- * `--deep` analysis produces. Without it seams carry no verification verdict
- * at all rather than a negative one.
+ * When a call graph is available the drawn seams are also checked against it,
+ * so a declaration left behind by a refactor is marked rather than presented
+ * with the same confidence as a corroborated one.
  */
-export function resolveSeams(
+function resolveSeams(
   seams: DeclaredSeam[],
   zoneIds: Set<string>,
   zoneOfFile: Map<string, string>,
-  evidence?: SeamEvidence,
+  callGraph?: CallGraph | null,
 ): SeamResolution {
   const resolved: NonNullable<IsoModelInput["seams"]> = [];
   const internal: string[] = [];
-  const unresolved: Array<{ label: string; missing: string[] }> = [];
-  const unverified: Array<{ label: string; callbacks: string[] }> = [];
+  const unresolved: string[] = [];
+  const stale: string[] = [];
 
   for (const seam of seams) {
     const label = `${seam.from} → ${seam.to}`;
     const fromZone = toZoneId(seam.from, zoneIds, zoneOfFile);
     const toZone = toZoneId(seam.to, zoneIds, zoneOfFile);
     if (!fromZone || !toZone) {
-      const missing: string[] = [];
-      if (!fromZone) missing.push(seam.from);
-      if (!toZone) missing.push(seam.to);
-      unresolved.push({ label, missing });
+      unresolved.push(label);
       continue;
     }
     if (fromZone === toZone) {
       internal.push(label);
       continue;
     }
-
-    const callbacks = seam.callbacks ?? [];
-    // Nothing declared means nothing to check — an unverifiable claim, not a
-    // refuted one.
-    if (!evidence || callbacks.length === 0) {
-      resolved.push({ fromZone, toZone, callbacks: seam.callbacks, note: seam.note });
-      continue;
-    }
-
-    const unsupported = unsupportedCallbacks(callbacks, toZone, evidence);
-    if (unsupported.length > 0) unverified.push({ label, callbacks: unsupported });
-    resolved.push({
-      fromZone,
-      toZone,
-      callbacks: seam.callbacks,
-      note: seam.note,
-      verified: unsupported.length === 0,
-      unsupported,
-    });
+    resolved.push({ fromZone, toZone, callbacks: seam.callbacks, note: seam.note });
   }
 
-  return { seams: resolved, internal, unresolved, unverified };
+  // Verification is a second pass so the call graph is walked once for every
+  // seam rather than once per seam.
+  const checkable = resolved.filter((s) => (s.callbacks ?? []).length > 0);
+  if (callGraph && checkable.length > 0) {
+    const filesByZone = groupFilesByZone(zoneOfFile);
+    const receiving = new Set<string>();
+    for (const seam of checkable) {
+      for (const file of filesByZone.get(seam.toZone) ?? []) receiving.add(file);
+    }
+    const index = indexCalleesByFile(callGraph, receiving);
+    for (const seam of checkable) {
+      seam.verification = verifySeamCallbacks(
+        seam.callbacks ?? [],
+        filesByZone.get(seam.toZone) ?? [],
+        index,
+      );
+      if (seam.verification.missing.length > 0) {
+        stale.push(`${seam.fromZone} → ${seam.toZone} (${seam.verification.missing.join(", ")})`);
+      }
+    }
+  }
+
+  return {
+    seams: resolved,
+    internal,
+    unresolved,
+    stale,
+    unchecked: callGraph ? 0 : checkable.length,
+  };
 }
 
-/** Turn undrawable and unverified declarations into caveats the page states. */
-export function seamGaps(resolution: SeamResolution): string[] {
+/** Turn undrawable and unsupported declarations into caveats the page states. */
+function seamGaps(resolution: SeamResolution): string[] {
   const gaps: string[] = [];
   if (resolution.internal.length > 0) {
     gaps.push(
@@ -331,21 +361,18 @@ export function seamGaps(resolution: SeamResolution): string[] {
     );
   }
   if (resolution.unresolved.length > 0) {
-    // Naming the endpoint matters: the usual cause is a file that moved, and
-    // the reader needs to know which end of the declaration went stale.
-    const detail = resolution.unresolved
-      .map((u) => `${u.label} (no zone owns ${u.missing.join(" or ")})`)
-      .join(", ");
     gaps.push(
-      `${resolution.unresolved.length} declared seam${resolution.unresolved.length === 1 ? "" : "s"} could not be placed — the named file or zone is not in the map: ${detail}.`,
+      `${resolution.unresolved.length} declared seam${resolution.unresolved.length === 1 ? "" : "s"} could not be placed — the named file or zone is not in the map: ${resolution.unresolved.join(", ")}.`,
     );
   }
-  if (resolution.unverified.length > 0) {
-    const detail = resolution.unverified
-      .map((u) => `${u.label} (${u.callbacks.join(", ")})`)
-      .join(", ");
+  if (resolution.stale.length > 0) {
     gaps.push(
-      `${resolution.unverified.length} declared seam${resolution.unverified.length === 1 ? " names" : "s name"} callbacks with no supporting call in the target zone, so the declaration may be stale: ${detail}.`,
+      `The call graph shows no call to some declared callbacks, so those declarations may be stale — nothing on the receiving side invokes them: ${resolution.stale.join("; ")}.`,
+    );
+  }
+  if (resolution.unchecked > 0) {
+    gaps.push(
+      `${resolution.unchecked} declared seam${resolution.unchecked === 1 ? "" : "s"} could not be checked against the code: there is no call graph in this view, so the injected callbacks are taken on trust. Run a full analyze for a map that verifies them.`,
     );
   }
   return gaps;
@@ -464,18 +491,8 @@ export function loadFromSourcevision(root: string, options: LoadOptions = {}): I
 
   const zoneIds = new Set(zones.map((z) => z.id));
   const declared = loadDeclaredArchitecture(root, [...files.keys()]);
-  const seamResolution = resolveSeams(
-    declared.seams,
-    zoneIds,
-    zoneOfFile,
-    callGraph ? buildSeamEvidence(callGraph, zoneOfFile) : undefined,
-  );
+  const seamResolution = resolveSeams(declared.seams, zoneIds, zoneOfFile, callGraph);
   extraGaps.push(...seamGaps(seamResolution));
-  if (!callGraph && declared.seams.length > 0) {
-    extraGaps.push(
-      "Declared seams are drawn on trust — no call graph is available to check their callbacks against. Run a deep analyze to have them verified.",
-    );
-  }
 
   return {
     zones,

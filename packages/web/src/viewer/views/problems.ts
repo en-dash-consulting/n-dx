@@ -1,20 +1,26 @@
 import { h, Fragment } from "preact";
-import { useCallback, useMemo } from "preact/hooks";
+import { useMemo } from "preact/hooks";
 import type { LoadedData, NavigateTo } from "../types.js";
 import type { Finding } from "../external.js";
 import { FindingsList, BarChart } from "../visualization/index.js";
 import { ENRICHMENT_THRESHOLDS } from "./enrichment-thresholds.js";
 import { BrandedHeader, EnrichmentGate } from "../components/index.js";
-import { useFeatureToggle } from "../hooks/index.js";
-import { explainFinding } from "../ask-seed.js";
+import { findingAskSeed } from "./finding-seed.js";
 
 interface ProblemsProps {
   data: LoadedData;
-  /** Absent in contexts with nowhere to navigate; Explain is then not offered. */
   navigateTo?: NavigateTo;
+  /**
+   * State of the `sourcevision.ask` toggle, supplied by the caller.
+   *
+   * Defaults to `false` so a caller that forgets it gets no Explain action
+   * rather than an ungated one — Ask is experimental, default-off, and spends
+   * tokens per question.
+   */
+  askEnabled?: boolean;
 }
 
-export function ProblemsView({ data, navigateTo }: ProblemsProps) {
+export function ProblemsView({ data, navigateTo, askEnabled = false }: ProblemsProps) {
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
@@ -24,15 +30,6 @@ export function ProblemsView({ data, navigateTo }: ProblemsProps) {
   // finishes with the dashboard open. A hook called after the gate is therefore
   // called on some renders and not others, and Preact matches hooks by
   // position — so the slots shift under whatever state is already there.
-  const askEnabled = useFeatureToggle("sourcevision.ask", false);
-  const handleExplain = useCallback(
-    (finding: Finding) => { if (navigateTo) explainFinding(finding, navigateTo); },
-    [navigateTo],
-  );
-
-  // Memoized on the source array, not recomputed per render: the chart below
-  // keys its own memo on this, and a fresh array each time made that memo a
-  // no-op that recomputed on every render anyway.
   const findings = useMemo(
     () => (zones?.findings ?? []).filter((f: Finding) => f.type === "anti-pattern"),
     [zones?.findings],
@@ -116,8 +113,19 @@ export function ProblemsView({ data, navigateTo }: ProblemsProps) {
       legacyInsights,
       groupBy: "severity",
       searchable: true,
-      // Only when the panel it leads to is actually reachable.
-      ...(askEnabled && navigateTo ? { onExplain: handleExplain } : {}),
+      // No navigation target, no Explain action: the view renders standalone in
+      // tests and in the exported dashboard, and a button that goes nowhere is
+      // worse than an absent one. The same applies when `sourcevision.ask` is
+      // off — Explain is a second entry point into Ask, and leaving it live
+      // would make a default-off feature reachable through a side door whose
+      // only off switch lives in the sidebar the toggle already hid.
+      //
+      // `askEnabled` arrives as a prop rather than from useFeatureToggle here
+      // because the enrichment gate above returns before this component's hooks
+      // run; another hook below it would widen that conditional-hook hazard.
+      ...(navigateTo && askEnabled
+        ? { onExplain: (f: Finding) => navigateTo("ask", { askSeed: findingAskSeed(f) }) }
+        : {}),
     })
   );
 }
