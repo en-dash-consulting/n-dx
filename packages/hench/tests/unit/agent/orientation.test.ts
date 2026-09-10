@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -18,7 +18,13 @@ import {
   buildOrientationSystemPrompt,
   ensureWarmParent,
 } from "../../../src/agent/lifecycle/orientation.js";
-import { writeSessionCache, readSessionCache } from "../../../src/agent/lifecycle/session-cache.js";
+import {
+  writeSessionCache,
+  readSessionCache,
+  sourcevisionFingerprint,
+} from "../../../src/agent/lifecycle/session-cache.js";
+
+const PRIMER = "src/ holds production code. Build with `pnpm build`, test with `pnpm test`.";
 
 const POLICY = {
   sandbox: "workspace-write",
@@ -57,10 +63,35 @@ describe("orientation prompts", () => {
     // Determinism is the whole cache-read mechanic: a prompt that varied per
     // task (or per clock tick) would give each fork a different prefix.
     expect(buildOrientationPrompt()).toBe(buildOrientationPrompt());
+    expect(buildOrientationPrompt(PRIMER)).toBe(buildOrientationPrompt(PRIMER));
     expect(buildOrientationSystemPrompt()).toBe(buildOrientationSystemPrompt());
 
     const prompt = buildOrientationPrompt().toLowerCase();
     expect(prompt).not.toMatch(/\btask id\b|acceptance criteria/);
+    expect(buildOrientationPrompt(PRIMER).toLowerCase()).not.toMatch(
+      /\btask id\b|acceptance criteria/,
+    );
+  });
+
+  it("carries the primer verbatim when one is supplied", () => {
+    expect(buildOrientationPrompt(PRIMER)).toContain(PRIMER);
+  });
+
+  it("asks the session to confirm the primer rather than rediscover the repo", () => {
+    const prompt = buildOrientationPrompt(PRIMER).toLowerCase();
+
+    expect(prompt).toMatch(/confirm/);
+    // The four questions must survive: a primer can be wrong or partial, and
+    // the summary orientation leaves behind still has to answer all of them.
+    expect(prompt).toContain("layout");
+    expect(prompt).toMatch(/build/);
+    expect(prompt).toMatch(/convention/);
+    expect(prompt).toMatch(/do not (modify|change|edit|write)/);
+  });
+
+  it("falls back to the exploration prompt when there is no primer", () => {
+    expect(buildOrientationPrompt()).not.toContain("Existing primer");
+    expect(buildOrientationPrompt(undefined)).toBe(buildOrientationPrompt());
   });
 });
 
@@ -94,9 +125,6 @@ describe("ensureWarmParent", () => {
     const spawn = vi.fn();
     // Seed a cache entry whose fingerprint matches this project (no
     // .sourcevision here, so the fingerprint is the absent-manifest sentinel).
-    const { sourcevisionFingerprint } = await import(
-      "../../../src/agent/lifecycle/session-cache.js"
-    );
     await writeSessionCache(henchDir, {
       parentId: "cached-parent",
       svFingerprint: await sourcevisionFingerprint(projectDir),
@@ -121,9 +149,6 @@ describe("ensureWarmParent", () => {
   });
 
   it("re-orients when --fresh is requested, replacing the cached parent", async () => {
-    const { sourcevisionFingerprint } = await import(
-      "../../../src/agent/lifecycle/session-cache.js"
-    );
     await writeSessionCache(henchDir, {
       parentId: "stale-parent",
       svFingerprint: await sourcevisionFingerprint(projectDir),
@@ -182,9 +207,6 @@ describe("ensureWarmParent", () => {
   });
 
   it("records the sourcevision fingerprint so a re-analysis invalidates the parent", async () => {
-    const { sourcevisionFingerprint } = await import(
-      "../../../src/agent/lifecycle/session-cache.js"
-    );
     const spawn = vi.fn().mockResolvedValue({ sessionId: "p" });
 
     await ensureWarmParent(baseArgs({ spawn }));
@@ -192,6 +214,58 @@ describe("ensureWarmParent", () => {
     expect((await readSessionCache(henchDir))?.svFingerprint).toBe(
       await sourcevisionFingerprint(projectDir),
     );
+  });
+
+  describe("primer seeding", () => {
+    async function writePrimer(fingerprint: string): Promise<void> {
+      await mkdir(join(projectDir, ".sourcevision"), { recursive: true });
+      await writeFile(
+        join(projectDir, ".sourcevision", "PRIMER.md"),
+        `<!-- sourcevision-primer fingerprint: ${fingerprint} -->\n\n${PRIMER}\n`,
+        "utf-8",
+      );
+    }
+
+    /** The brief text the orientation spawn was built from. */
+    function briefFrom(buildSpawnConfig: ReturnType<typeof vi.fn>): string {
+      const envelope = buildSpawnConfig.mock.calls[0][0] as {
+        sections: Array<{ name: string; content: string }>;
+      };
+      return envelope.sections.find((s) => s.name === "brief")?.content ?? "";
+    }
+
+    it("seeds the orientation prompt with a primer built from the current analysis", async () => {
+      await writePrimer(await sourcevisionFingerprint(projectDir));
+      const buildSpawnConfig = vi.fn(() => ({ binary: "claude", args: [], env: {}, stdin: "" }));
+      const spawn = vi.fn().mockResolvedValue({ sessionId: "p" });
+
+      await ensureWarmParent(baseArgs({ adapter: makeAdapter({ buildSpawnConfig }), spawn }));
+
+      expect(briefFrom(buildSpawnConfig)).toContain(PRIMER);
+    });
+
+    it("explores from scratch when the primer is stamped against an older analysis", async () => {
+      // The expensive failure is the stale hit: this transcript is inherited by
+      // every fork, so an out-of-date primer would misinform the whole loop.
+      await writePrimer("0000000000000000");
+      const buildSpawnConfig = vi.fn(() => ({ binary: "claude", args: [], env: {}, stdin: "" }));
+      const spawn = vi.fn().mockResolvedValue({ sessionId: "p" });
+
+      await ensureWarmParent(baseArgs({ adapter: makeAdapter({ buildSpawnConfig }), spawn }));
+
+      const brief = briefFrom(buildSpawnConfig);
+      expect(brief).not.toContain(PRIMER);
+      expect(brief).toBe(buildOrientationPrompt());
+    });
+
+    it("explores from scratch when no primer was written", async () => {
+      const buildSpawnConfig = vi.fn(() => ({ binary: "claude", args: [], env: {}, stdin: "" }));
+      const spawn = vi.fn().mockResolvedValue({ sessionId: "p" });
+
+      await ensureWarmParent(baseArgs({ adapter: makeAdapter({ buildSpawnConfig }), spawn }));
+
+      expect(briefFrom(buildSpawnConfig)).toBe(buildOrientationPrompt());
+    });
   });
 
   it("leaves a readable cache file behind", async () => {

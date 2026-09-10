@@ -2,15 +2,14 @@
 id: "738f6000-aa94-41a0-86da-1d505e2674dd"
 level: "epic"
 title: "Testing & Documentation"
-status: "completed"
+status: "pending"
 startedAt: "2026-05-06T13:27:57.504Z"
-completedAt: "2026-09-08T19:04:31.905Z"
 endedAt: "2026-09-08T19:04:31.905Z"
 resolutionType: "acknowledgment"
 resolutionDetail: "Fixed final architecture policy test failure (PRD storage invariant violations). All child tasks completed. Test suite passes (1628 tests). Epic infrastructure and documentation goals met."
 description: "Local testing infrastructure (gauntlet config validation), platform/prerequisite documentation, and ongoing documentation refresh for PRD-related changes."
-lastModified: "2026-09-08T19:04:31.928Z"
-lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
+lastModified: "2026-09-09T20:16:05.448Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -36,7 +35,7 @@ lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
 | [Gauntlet Test Suite Audit and Cross-OS Validity Review](./gauntlet-test-suite-audit-and-cross-os/index.md) | completed |
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-in-main/index.md) | completed |
 | [macOS Local Docker Test Suite](./macos-local-docker-test-suite/index.md) | completed |
-| [Make test results independent of ambient environment and machine load](./make-test-results-independent-of/index.md) | completed |
+| [Make test results independent of ambient environment and machine load](./make-test-results-independent-of/index.md) | pending |
 | [Narrow jsonResponse utility scope](./narrow-jsonresponse-utility-scope/index.md) | completed |
 | [Open Source Scope Documentation Audit and Cross-Reference](./open-source-scope-documentation-audit/index.md) | completed |
 | [Project-aware Navigation and Context](./project-aware-navigation-and-context/index.md) | completed |

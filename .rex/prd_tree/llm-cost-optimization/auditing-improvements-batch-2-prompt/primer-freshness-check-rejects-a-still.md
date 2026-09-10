@@ -1,0 +1,25 @@
+---
+id: "2fd46372-9d6d-45b3-b8d4-443ea4d4887d"
+level: "task"
+title: "Primer freshness check rejects a still-valid primer after any analysis that made no LLM call"
+status: "pending"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "sourcevision"
+  - "hench"
+  - "core"
+  - "primer"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "Two consecutive `sourcevision analyze --lite` runs on an unchanged fixture tree produce the same primer fingerprint (integration test on a temp fixture)"
+  - "After an analysis with zero LLM calls on an unchanged tree, a primer stamped by the previous analysis is still returned by `readContextMd` with `source: \"primer\"` and by `readFreshPrimer`"
+  - "Changing a source file and re-analysing changes the fingerprint, and the stale primer is rejected until re-distilled"
+  - "`isPrimerFresh` returns true for the cached primer on an unchanged re-analysis, so no `context.distill` call is made"
+  - "tests/integration/primer-fingerprint-contract.test.js is updated to the new contract and still proves sourcevision, core and hench agree"
+  - "The warm-parent session cache is not invalidated by an unchanged re-analysis"
+description: "Severity: medium. Verdict: should-fix. Found by the adversarial review of PR #353.\n\n## Failure scenario\nEvery `sourcevision analyze` rewrites `manifest.analyzedAt` (verified on a scratch fixture: two consecutive `--lite` runs produced two timestamps), so the fingerprint that PRIMER.md is stamped with changes on every run. `writePrimerIfPossible` (packages/sourcevision/src/cli/commands/analyze.ts:371) only re-distils and re-stamps when `ctx.tokenUsage.calls > 0`. When an analysis makes no LLM call (no vendor reachable, a CI runner, `ndx ci` per the function's own comment, or a provider outage) the existing primer keeps its previous stamp, and both readers added by PR #353 (`readContextMd` in packages/core/pair-programming.js and `readFreshPrimer` in packages/hench/src/agent/lifecycle/primer.ts) reject it: `ndx work` falls back to CONTEXT.md and orientation re-explores. All of this is silent. Before the PR, `ndx work` read any existing primer.\n\nA related pre-existing cost: because the fingerprint moves every run, `isPrimerFresh` is never true at analysis time, so every LLM-enabled analyze pays a fresh `context.distill` standard-tier call, and the warm-parent session cache (keyed on the same fingerprint) is invalidated by every re-analysis of an unchanged tree.\n\n## Reachability\nAny project where an analysis runs without LLM calls between full analyses. Contract test tests/integration/primer-fingerprint-contract.test.js pins the three hash copies but not this property.\n\n## Solution options\n1. (Recommended) Make the fingerprint a content fingerprint that sourcevision writes into manifest.json (e.g. `analysisFingerprint`: sha256 over gitSha plus the stable analysis artifacts the primer distils from, excluding timestamps). Readers in core and hench then read the field from the manifest instead of recomputing a hash, which also removes the three-way hash duplication that the contract test exists to police. Fall back to the legacy `analyzedAt + gitSha` hash when the field is absent, for one release. An unchanged tree re-analysed with zero LLM calls keeps a matching stamp; a changed tree invalidates it until the next distillation. Cost: moderate, touches three packages plus the contract test. Risk: choosing inputs that are stable across identical analyses; prove it with the two-run fixture test.\n2. In `writePrimerIfPossible`, when `calls === 0` and a cached primer exists, re-stamp it with the new fingerprint if CONTEXT.md is byte-identical to the previous run. Cheaper, but keeps the duplicated hash and still re-distils on every LLM-enabled run.\n\nOption 1 fixes the defect, the recurring distillation cost, and the warm-parent invalidation together."
+lastModified: "2026-09-07T20:28:43.609Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

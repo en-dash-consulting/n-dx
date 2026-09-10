@@ -39,7 +39,7 @@ import { discoverChangedFiles } from "../analysis/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
-import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS } from "../../tools/test-runner.js";
+import { runPostTaskTests, runTestGate, OUTPUT_TAIL_LINES, DEFAULT_TEST_GATE_TIMEOUT_MS } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines } from "../../types/output.js";
@@ -586,9 +586,16 @@ async function promptTestGateFailure(
   const packageCount = testGate.packages.length;
   const failCount = packageCount - testGate.packages.filter((p) => p.passed).length;
 
-  info(`\n${failCount}/${packageCount} package(s) failed testing`);
+  if (packageCount === 0) {
+    info(`\nTest gate failed — no per-package results were parsed`);
+  } else {
+    info(`\n${failCount}/${packageCount} package(s) failed testing`);
+    detail(`Failed packages: ${failedPackages}`);
+  }
   detail(`Command: ${testGate.command}`);
-  detail(`Failed packages: ${failedPackages}`);
+  if (testGate.error) {
+    detail(`Reason: ${testGate.error}`);
+  }
 
   const question =
     "[r]erun tests, [a]bort (revert & skip commit), or [s]kip gate (continue to commit)? [a] ";
@@ -2048,6 +2055,11 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       testGateAttempt++;
       subsection(`Full Test Suite Gate${testGateAttempt > 1 ? ` (attempt ${testGateAttempt})` : ""}`);
 
+      // The timeout itself is announced once above, and only when it differs
+      // from the default; this line names the command each attempt runs.
+      const gateCommand = resolvedTestCommand || "pnpm test --reporter=json";
+      detail(`Running ${gateCommand}`);
+
       const testGate = await runTestGate({
         projectDir,
         filesChanged: run.structuredSummary.filesChanged,
@@ -2057,9 +2069,29 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
 
       run.testGate = testGate;
 
+      // Persist the gate's own output tail (last 200 lines of combined
+      // stdout/stderr) to the run log and to run.diagnostics, so a timeout,
+      // spawn failure, or unparseable run can be diagnosed after the fact —
+      // not just reported as an empty failure. Only set when the gate did
+      // not pass and actually produced output (see runTestGate).
+      if (testGate.outputTail) {
+        detail(`Test gate output (last ${OUTPUT_TAIL_LINES} lines):`);
+        detail(testGate.outputTail);
+
+        if (!run.diagnostics) {
+          run.diagnostics = { tokenDiagnosticStatus: "unavailable", parseMode: "unknown", notes: [] };
+        }
+        run.diagnostics.testGateOutputTail = testGate.outputTail;
+      }
+
       if (testGate.ran) {
         const packageCount = testGate.packages.length;
         const passCount = testGate.packages.filter((p) => p.passed).length;
+        // No per-package breakdown parsed at all — distinct from a real 0-of-0
+        // (which can't happen: runTestGate always returns at least one entry
+        // once it has run) but kept as a defensive fallback for callers that
+        // hand back an empty array directly (tests, future runners).
+        const noPackagesParsed = packageCount === 0;
 
         if (testGate.passed) {
           stream("Test Gate", `✓ All ${packageCount} package(s) passed`);
@@ -2070,7 +2102,12 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         } else {
           // Gate failed — prompt for action
           const failedPackages = testGate.packages.filter((p) => !p.passed).map((p) => p.name);
-          stream("Test Gate", `✗ ${packageCount - passCount}/${packageCount} package(s) failed`);
+          stream(
+            "Test Gate",
+            noPackagesParsed
+              ? "✗ Test gate failed — no per-package results were parsed"
+              : `✗ ${packageCount - passCount}/${packageCount} package(s) failed`,
+          );
 
           // Show failure details from first failed package
           const firstFailure = testGate.packages.find((p) => p.failureOutput);
@@ -2103,8 +2140,11 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
               testGate.error ??
               (failedPackages.length > 0
                 ? failedPackages.join(", ")
-                : "no package results were reported");
-            run.error = `Test gate failed: ${reason}`;
+                : "no per-package results were parsed");
+            // Name the command too — the reason alone ("timed out after 5m0s")
+            // is meaningless without knowing which command hung.
+            const commandNote = testGate.command ? ` [command: ${testGate.command}]` : "";
+            run.error = `Test gate failed${commandNote}: ${reason}`;
             gateComplete = true;
           }
         }

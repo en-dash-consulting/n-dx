@@ -14,6 +14,7 @@ tags:
   - "web-viewer"
 source: "smart-add"
 startedAt: "2026-08-03T13:56:28.806Z"
+completedAt: "2026-09-09T16:11:17.434Z"
 acceptanceCriteria:
   - "All body and label text in both light and dark themes passes 4.5:1 contrast ratio against its background"
   - "All large text (≥18px regular or ≥14px bold) passes 3:1 contrast ratio"

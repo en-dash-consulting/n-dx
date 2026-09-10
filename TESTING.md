@@ -262,6 +262,14 @@ flushed when a DOM query first succeeded.
 
 **Rules:**
 
+Every clock-decided assertion in the repo is registered in
+[`tests/wall-clock-assertion-inventory.md`](tests/wall-clock-assertion-inventory.md),
+with what was decided about it — converted, justified, or open. A file that
+bounds a clock reading and is not named there fails
+`tests/e2e/wall-clock-inventory-policy.test.js`. Add a row when you add such an
+assertion; read the register before adding one, because the site you are about
+to write may already be recorded as open.
+
 Almost every wall-clock assertion in this repo is standing in for a *complexity*
 claim — "this must not go quadratic" — not a latency SLA. Three techniques can
 carry that claim. Prefer them in this order; each is strictly more load-immune
@@ -282,6 +290,27 @@ than the one below it.
   reads on the input does not, because the copy makes the reads linear again while
   the algorithm stays quadratic.
 
+  Where the data structure *is* the algorithm, the input is the primitive and the
+  distinction collapses. The viewer's tree functions are the worked example:
+  `tree-work-count.ts` swaps each fixture `children` array for a counting getter,
+  so a traversal's step count is exact — reads per node held to three significant
+  figures across an 8× size range, unchanged with every core saturated, while an
+  injected O(n²) read 197.8 per node against a clean 1.18. Instrument only the
+  nodes that hold the array: defining an enumerable getter on a leaf makes
+  `"children" in item` newly true and changes what the code under test sees, which
+  is the one thing an instrument must not do. The copy-then-quadratic blind spot
+  above still applies and is recorded in that helper's header rather than papered
+  over.
+
+  For a rendered component the framework already exposes the counter. Preact's
+  `options.diffed` addon hook — the seam `preact/devtools` attaches to — counts
+  vnodes diffed, and a `MutationObserver` counts what reached the DOM. Both are
+  needed and neither is redundant: a broken `shouldComponentUpdate` re-renders
+  every row while emitting almost no DOM change (7 805 diffs, 442 mutations,
+  against a clean 1 033 / 1), whereas churning row keys tears down real nodes
+  while *lowering* the diff count, because fresh ids reset the expanded set
+  (263 diffs, 512 mutations).
+
 - **2. When you must use a clock, assert GROWTH between two sizes** rather than
   elapsed milliseconds against a constant. Measure two fixture sizes back-to-back
   in the same process and bound the ratio: ambient load inflates both readings
@@ -294,6 +323,19 @@ than the one below it.
   linear-scaling check measured 43× against a 30× ceiling. That flake was a bound
   picked without measurement, not a fault in the technique — which is what the
   next rule exists to prevent.
+
+  **A ratio only cancels load when both readings face the same preemption risk,
+  which cheap work cannot guarantee.** Load cancels because it inflates both
+  sides — but min-of-N filters the two sides differently when their timed blocks
+  differ in length. Measured on the viewer's tree functions: `diffItems` across an
+  8× size step read 7.7× (linear) on an idle machine and 46.5× on a loaded one,
+  with the code unchanged. A min-of-7-batches block at n=502 takes ~4ms and
+  reliably lands inside a clean scheduler slice; the same block at n=4002 takes
+  ~30ms and usually does not, so only the numerator carries the load. This does
+  not affect the I/O-bound examples above, whose phases are hundreds of
+  milliseconds at every size. Before trusting a ratio on sub-millisecond work,
+  either equalise the block durations or go to rule 1 — those functions are now
+  counted, not timed.
 
   **A ratio still fails when the thing you time is mostly not the thing you
   guard.** `add-auto-reshape.test.ts` was the worked example here until it was

@@ -27,6 +27,7 @@ import type {
   BudgetConfig,
   TokenUsageLogEntry,
 } from "../../../src/core/token-usage.js";
+import type { BillableTokens } from "@n-dx/llm-client";
 
 // ---------------------------------------------------------------------------
 // extractRexTokenUsage
@@ -296,6 +297,96 @@ describe("extractHenchTokenUsage", () => {
     const usage = await extractHenchTokenUsage(tmp);
 
     expect(usage.calls).toBe(1);
+  });
+
+  describe("model attribution", () => {
+    it("prices a real Opus run at Opus rates, not Sonnet's", async () => {
+      // End-to-end over the path that produced the reported 40% understatement:
+      // a hench run record on disk, through extraction, to a dollar figure.
+      const turns = { input: 1_000_000, output: 1_000_000, cacheCreationInput: 0, cacheReadInput: 0 };
+      writeRun("run-opus", {
+        id: "run-opus",
+        startedAt: "2026-01-15T10:00:00.000Z",
+        model: "claude-opus-5",
+        tokenUsage: { input: 1_000_000, output: 1_000_000 },
+        turnTokenUsage: [{ turn: 1, ...turns, vendor: "claude", model: "claude-opus-5" }],
+      });
+
+      const usage = await extractHenchTokenUsage(tmp);
+      const cost = estimateCost({
+        packages: {
+          rex: { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 },
+          hench: usage,
+          sv: { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 },
+        },
+        totalInputTokens: usage.inputTokens,
+        totalOutputTokens: usage.outputTokens,
+        totalCacheCreationTokens: usage.cacheCreationTokens,
+        totalCacheReadTokens: usage.cacheReadTokens,
+        totalCalls: usage.calls,
+        byModel: usage.byModel,
+      });
+
+      // Opus: $5 + $25 = $30. The old flat-Sonnet answer was $18.
+      expect(cost.total).toBe("$30.00");
+      expect(cost.totalRaw).not.toBe(18);
+      expect(cost.fullyAttributed).toBe(true);
+    });
+
+    it("splits a run that switched models mid-flight", async () => {
+      // Light-tier routing, retry escalation and vendor failover all move a
+      // single run between models, so run.model alone cannot price it.
+      writeRun("run-mixed", {
+        id: "run-mixed",
+        startedAt: "2026-01-15T10:00:00.000Z",
+        model: "claude-opus-5",
+        tokenUsage: { input: 300, output: 30 },
+        turnTokenUsage: [
+          { turn: 1, input: 100, output: 10, model: "claude-opus-5" },
+          { turn: 2, input: 200, output: 20, model: "claude-haiku-4-5" },
+        ],
+      });
+
+      const usage = await extractHenchTokenUsage(tmp);
+
+      expect(usage.byModel).toEqual({
+        "claude-opus-5": {
+          inputTokens: 100, outputTokens: 10,
+          cacheCreationTokens: 0, cacheReadTokens: 0,
+        },
+        "claude-haiku-4-5": {
+          inputTokens: 200, outputTokens: 20,
+          cacheCreationTokens: 0, cacheReadTokens: 0,
+        },
+      });
+      // Flat totals keep coming from the run-level record.
+      expect(usage.inputTokens).toBe(300);
+      expect(usage.calls).toBe(1);
+    });
+
+    it("falls back to the run-level model when turns carry none", async () => {
+      writeRun("run-turnless", {
+        id: "run-turnless",
+        startedAt: "2026-01-15T10:00:00.000Z",
+        model: "claude-opus-5",
+        tokenUsage: { input: 100, output: 10 },
+      });
+
+      const usage = await extractHenchTokenUsage(tmp);
+      expect(Object.keys(usage.byModel ?? {})).toEqual(["claude-opus-5"]);
+    });
+
+    it("leaves a run with no model unattributed rather than inventing a bucket", async () => {
+      writeRun("run-modelless", {
+        id: "run-modelless",
+        startedAt: "2026-01-15T10:00:00.000Z",
+        tokenUsage: { input: 100, output: 10 },
+      });
+
+      const usage = await extractHenchTokenUsage(tmp);
+      expect(usage.byModel).toEqual({});
+      expect(usage.inputTokens).toBe(100);
+    });
   });
 
   describe("time filtering", () => {
@@ -754,7 +845,7 @@ totalCacheCreationTokens: 0,
 describe("estimateCost", () => {
   const EMPTY_PKG = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, calls: 0 };
 
-  it("estimates cost with default Sonnet pricing", () => {
+  it("prices tokens that carry no model at the fallback rate", () => {
     const usage: AggregateTokenUsage = {
       packages: {
         rex: { ...EMPTY_PKG },
@@ -843,6 +934,153 @@ totalCacheCreationTokens: 0,
     // $3 * 500/1M = $0.0015, $15 * 100/1M = $0.0015
     expect(cost.total).toBe("$0.00");
     expect(cost.totalRaw).toBeCloseTo(0.003, 4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// estimateCost — per-model pricing
+// ---------------------------------------------------------------------------
+
+describe("estimateCost prices each model at its own rates", () => {
+  const EMPTY_PKG = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    calls: 0,
+  };
+
+  /**
+   * Build an aggregate whose totals are exactly the sum of its per-model
+   * buckets — the fully-attributed case. Tests that need a residual perturb
+   * the totals afterwards.
+   */
+  function usageForModels(
+    byModel: Record<string, BillableTokens>,
+  ): AggregateTokenUsage {
+    const totals = { ...EMPTY_PKG };
+    for (const counts of Object.values(byModel)) {
+      totals.inputTokens += counts.inputTokens;
+      totals.outputTokens += counts.outputTokens;
+      totals.cacheCreationTokens += counts.cacheCreationTokens;
+      totals.cacheReadTokens += counts.cacheReadTokens;
+      totals.calls += 1;
+    }
+    return {
+      packages: { rex: { ...EMPTY_PKG }, hench: { ...EMPTY_PKG }, sv: { ...EMPTY_PKG } },
+      totalInputTokens: totals.inputTokens,
+      totalOutputTokens: totals.outputTokens,
+      totalCacheCreationTokens: totals.cacheCreationTokens,
+      totalCacheReadTokens: totals.cacheReadTokens,
+      totalCalls: totals.calls,
+      byModel: structuredClone(byModel),
+    };
+  }
+
+  const ONE_MILLION_EACH: BillableTokens = {
+    inputTokens: 1_000_000,
+    outputTokens: 1_000_000,
+    cacheCreationTokens: 1_000_000,
+    cacheReadTokens: 1_000_000,
+  };
+
+  it("prices an Opus run above the Sonnet-rate total for the same tokens", () => {
+    // The regression this whole change exists for: `.n-dx.json` sets
+    // llm.model=claude-opus-5, and every run was still quoted at Sonnet rates.
+    const opus = estimateCost(usageForModels({ "claude-opus-5": ONE_MILLION_EACH }));
+    const sonnet = estimateCost(usageForModels({ "claude-sonnet-5": ONE_MILLION_EACH }));
+
+    expect(opus.totalRaw).toBeGreaterThan(sonnet.totalRaw);
+    // Opus: 5 + 25 + 6.25 + 0.50 = $36.75. Sonnet: 3 + 15 + 3.75 + 0.30 = $22.05.
+    expect(opus.total).toBe("$36.75");
+    expect(sonnet.total).toBe("$22.05");
+    expect(opus.byModel).toHaveLength(1);
+    expect(opus.byModel[0]).toMatchObject({ model: "claude-opus-5", known: true });
+    expect(opus.fullyAttributed).toBe(true);
+  });
+
+  it("prices a mixed-model history as the sum of its per-model parts", () => {
+    const mixed = estimateCost(
+      usageForModels({
+        "claude-opus-5": ONE_MILLION_EACH,
+        "claude-haiku-4-5": ONE_MILLION_EACH,
+      }),
+    );
+    const opusOnly = estimateCost(usageForModels({ "claude-opus-5": ONE_MILLION_EACH }));
+    const haikuOnly = estimateCost(usageForModels({ "claude-haiku-4-5": ONE_MILLION_EACH }));
+
+    expect(mixed.totalRaw).toBeCloseTo(opusOnly.totalRaw + haikuOnly.totalRaw, 10);
+    // Not the single-rate answer for either model.
+    expect(mixed.totalRaw).not.toBeCloseTo(opusOnly.totalRaw * 2, 10);
+    expect(mixed.byModel.map((l) => l.model)).toEqual(["claude-opus-5", "claude-haiku-4-5"]);
+  });
+
+  it("sorts the per-model lines most expensive first", () => {
+    const cost = estimateCost(
+      usageForModels({
+        "claude-haiku-4-5": ONE_MILLION_EACH,
+        "claude-opus-5": ONE_MILLION_EACH,
+        "claude-sonnet-5": ONE_MILLION_EACH,
+      }),
+    );
+    const totals = cost.byModel.map((l) => l.totalRaw);
+    expect(totals).toEqual([...totals].sort((a, b) => b - a));
+  });
+
+  it("prices an unknown model id at a labelled fallback rather than zero", () => {
+    const cost = estimateCost(usageForModels({ "some-unreleased-model": ONE_MILLION_EACH }));
+
+    expect(cost.totalRaw).toBeGreaterThan(0);
+    expect(cost.byModel).toHaveLength(1);
+    expect(cost.byModel[0]).toMatchObject({
+      model: "some-unreleased-model",
+      pricedAs: "claude-sonnet-5",
+      known: false,
+    });
+    // A guessed rate must never read as a measured one.
+    expect(cost.fullyAttributed).toBe(false);
+  });
+
+  it("reports tokens with no model as a separate unattributed line", () => {
+    // Sourcevision records no model, so its tokens reach the totals without
+    // reaching any bucket. They must still be priced, and still be labelled.
+    const usage = usageForModels({ "claude-opus-5": ONE_MILLION_EACH });
+    usage.totalInputTokens += 1_000_000;
+
+    const cost = estimateCost(usage);
+    const residual = cost.byModel.find((l) => l.unattributed);
+
+    expect(residual).toBeDefined();
+    expect(residual!.tokens).toBe(1_000_000);
+    expect(residual!.pricedAs).toBe("claude-sonnet-5");
+    expect(residual!.totalRaw).toBeCloseTo(3, 10); // 1M input at Sonnet's $3
+    expect(cost.fullyAttributed).toBe(false);
+  });
+
+  it("does not refund tokens when per-turn records overshoot the run total", () => {
+    // Turn records can sum above the run-level total. A negative residual
+    // would subtract cost for tokens that were genuinely billed.
+    const usage = usageForModels({ "claude-opus-5": ONE_MILLION_EACH });
+    usage.totalInputTokens = 0;
+
+    const cost = estimateCost(usage);
+    expect(cost.byModel.some((l) => l.unattributed)).toBe(false);
+    expect(cost.totalRaw).toBeGreaterThan(0);
+  });
+
+  it("still honours an explicit single-rate override", () => {
+    // The escape hatch for what-if comparisons: one rate over everything,
+    // regardless of which models actually spent the tokens.
+    const usage = usageForModels({ "claude-opus-5": ONE_MILLION_EACH });
+    const cost = estimateCost(usage, {
+      inputPerMillion: 1,
+      outputPerMillion: 1,
+      cacheWritePerMillion: 1,
+      cacheReadPerMillion: 1,
+    });
+
+    expect(cost.totalRaw).toBe(4);
+    expect(cost.byModel).toEqual([]);
   });
 });
 

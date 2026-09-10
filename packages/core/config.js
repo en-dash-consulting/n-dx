@@ -1618,6 +1618,13 @@ Hench settings (.hench/config.json):
                                      and fallbacks — so the allowances add up rather than
                                      multiplying. Hitting it fails the task with the breakdown
                                      instead of continuing to spend.
+  hench.fullTestCommand    string    Full test suite command for the mandatory pre-commit gate
+                                     (default: auto-detected from package.json, or prompted).
+  hench.fullTestTimeoutMs  number    Timeout for the full test suite gate, in ms (default: 900000
+                                     — 15 minutes). The gate is a hang guardrail, not a latency
+                                     SLA — raise it if your suite runs long under load (e.g.
+                                     multiple 'ndx work' runs or CI contending for cores); a tight
+                                     budget fails a passing suite instead of a stuck one.
 
 Hench test-gate settings (mandatory full-suite gate before commit):
   hench.fullTestCommand    string    Command that runs the whole suite. Resolved from this key,

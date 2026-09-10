@@ -22,6 +22,7 @@
         "id": "run-1",
         "startedAt": "2026-02-02T12:00:00.000Z",
         "status": "completed",
+        "model": "claude-opus-5",
         "tokenUsage": {
           "input": 900,
           "output": 300
@@ -31,6 +32,7 @@
         "id": "run-2",
         "startedAt": "2026-02-05T12:00:00.000Z",
         "status": "completed",
+        "model": "claude-haiku-4-5",
         "tokenUsage": {
           "input": 1200,
           "output": 400
@@ -52,21 +54,37 @@
           "outputTokens": 700,
           "calls": 5,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {}
         },
         "hench": {
           "inputTokens": 2100,
           "outputTokens": 700,
           "calls": 2,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {
+            "claude-opus-5": {
+              "inputTokens": 900,
+              "outputTokens": 300,
+              "cacheCreationTokens": 0,
+              "cacheReadTokens": 0
+            },
+            "claude-haiku-4-5": {
+              "inputTokens": 1200,
+              "outputTokens": 400,
+              "cacheCreationTokens": 0,
+              "cacheReadTokens": 0
+            }
+          }
         },
         "sv": {
           "inputTokens": 600,
           "outputTokens": 150,
           "calls": 2,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {}
         }
       },
       "totals": {
@@ -106,21 +124,31 @@
           "outputTokens": 500,
           "calls": 3,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {}
         },
         "hench": {
           "inputTokens": 900,
           "outputTokens": 300,
           "calls": 1,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {
+            "claude-opus-5": {
+              "inputTokens": 900,
+              "outputTokens": 300,
+              "cacheCreationTokens": 0,
+              "cacheReadTokens": 0
+            }
+          }
         },
         "sv": {
           "inputTokens": 600,
           "outputTokens": 150,
           "calls": 2,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 0
+          "cacheReadTokens": 0,
+          "byModel": {}
         }
       },
       "totals": {

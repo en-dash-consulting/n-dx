@@ -305,25 +305,31 @@ Satellite zones that survive the merge (because they have strong internal cohesi
 
 The `.rex/` directory is a **shared mutable data zone** — readable by rex, hench, and web without creating import-graph coupling. This is an intentional design: packages share state via filesystem rather than runtime imports. However, concurrent write safety depends on the following protocol.
 
-**Markdown-primary PRD invariant.** `.rex/prd.md` is the canonical PRD document, and `.rex/prd.json` is a derived sync artifact dual-written on every save. There are no branch-scoped or multi-file writers in the current layout — every reader and writer (rex CLI, hench, MCP, web dashboard) observes the same pair of files. `FileStore.saveDocument()` writes `prd.json` first (atomic JSON) and then `prd.md` (atomic markdown via the rex/v1 serializer); `FileStore.loadDocument()` prefers `prd.md` when it exists and falls back to migrating `prd.json` on first read. A one-time on-load migration also consolidates any legacy `prd_{branch}_{date}.json` files into `prd.json` and renames the sources to `<name>.backup.<timestamp>`; no user action is required, and a manual migration is available via `rex migrate-to-md` if you need to generate `prd.md` ahead of the first read. `rex add` / `ndx add` therefore target the canonical pair unconditionally — any documentation or tooling that still references branch-scoped PRD targeting, or that treats `prd.json` as authoritative for edits, is stale and should be updated to point at `prd.md`.
+**Folder-tree PRD invariant.** `.rex/prd_tree/` is the canonical PRD store: one slug-named directory per epic/feature/task, each holding an `index.md` whose YAML frontmatter carries the item's fields. Subtasks are sections inside their parent task's `index.md`, not directories of their own. Every reader and writer — rex CLI, hench, MCP, the web dashboard — observes that one tree.
+
+`.rex/prd.md` and `.rex/prd.json` are **legacy migration sources only**. A project predating the folder tree is migrated by `rex migrate-to-folder-tree` (or on first load), after which neither file exists and nothing writes to them. Branch-scoped `prd_{branch}_{date}.md` files are likewise gone. Any documentation or tooling that still treats `prd.md` or `prd.json` as authoritative for edits is stale.
+
+`.rex/.cache/prd.json` is an **ephemeral derived artifact**, generated only while `ndx start` is running and refreshed by the server's tree watcher. It is not PRD state: no code outside the web server may read it, and nothing may write it as a way of mutating the PRD.
+
+See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the naming convention, field schema, and serializer/parser contracts.
 
 ### Write ownership
 
-| File | Owner (writer) | Readers | Write pattern |
+| Path | Owner (writer) | Readers | Write pattern |
 |---|---|---|---|
-| `prd.md` | **rex** (FileStore) | hench, web | Atomic read-modify-write via `saveDocument()` (primary, dual-written alongside `prd.json`) |
-| `prd.json` | **rex** (FileStore) | hench, web | Atomic read-modify-write via `saveDocument()` (derived sync artifact) |
+| `prd_tree/**/index.md` | **rex** (FolderTreeStore) | hench, web | Atomic read-modify-write under the PRD file lock (`saveDocument()`, or `withTransaction()` to hold it across the whole read-modify-write) |
 | `config.json` | **rex** (FileStore) | hench, web | Written at init; updated via `rex config` |
-| `execution-log.jsonl` | **rex** (FileStore) | web | Append-only via `appendLog()` |
+| `execution-log.jsonl` | **rex** (FileStore) | web | Append-only via `appendLog()`; rotates to `.1.jsonl` at 1 MB |
 | `workflow.md` | **rex** (FileStore) | web | Overwritten on status transitions |
 | `pending-proposals.json` | **rex** (analyze) | web | Overwritten on each `rex analyze` run |
 | `acknowledged-findings.json` | **rex** (analyze) | — | Overwritten on acknowledge |
-| `archive.json` | **rex** (prune) | — | Overwritten on prune |
+| `archive.json` | **rex** (prune, reshape) | — | Appended per batch, trimmed to the last 100 |
+| `.cache/prd.json` | **web** (server) | web | Ephemeral; rebuilt from the tree, removed on shutdown |
 
 ### Rules
 
-1. **Single writer per file** — only the owning package writes to each file. Hench and web read `.rex/` files but never write to them; they modify PRD state by invoking rex APIs (CLI or library). In particular, no consumer may write `prd.md` or `prd.json` directly — both flow through `FileStore.saveDocument()` so the dual-write stays in lockstep.
-2. **No file locking** — the current design assumes sequential access (one `ndx work` process at a time). The hench concurrency limiter enforces this at the process level.
+1. **Single writer per file** — only the owning package writes to each file. Hench and web read `.rex/` but never write PRD state directly; they mutate it by invoking rex (CLI or library). No consumer writes `index.md` files by hand — every mutation flows through the store so index files and parent rollups stay consistent.
+2. **Writes are locked, but not merged** — `saveDocument()` always takes the PRD file lock, so writes cannot interleave, and a writer that cannot acquire it within its timeout fails loudly naming the holder's PID rather than proceeding. The MCP write tools and the bulk restructurers (`reorganize`, `prune`, `reshape`) go further and hold the lock across the whole read-modify-write via `store.withTransaction()`, so a concurrent writer's item is not silently dropped. Other CLI write paths (`analyze`/`plan` imports, `update`, `move`, `remove`, `fix`) still do their own load→mutate→save: the lock serializes them, but the last full-document writer still wins. Do not run two PRD writers concurrently — see the concurrency contract in `CLAUDE.md`.
 3. **Append-only logs** — `execution-log.jsonl` uses `appendFile()`, which is atomic for small writes on local filesystems. Rotation is numeric-suffix-based (`.1.jsonl`).
-4. **Graceful degradation** — readers (web, hench) treat missing or malformed `.rex/` files as non-fatal. The web cleanup scheduler skips its cycle if the PRD is unavailable; readers that still consume JSON directly should accept either `prd.md`-derived or `prd.json` sources and must not assume one without the other.
-5. **Never write from the agent** — the hench agent prompt explicitly forbids direct modification of `.rex/` files. All PRD mutations go through rex's store layer, which guarantees the `prd.md` + `prd.json` dual-write.
+4. **Graceful degradation** — readers (web, hench) treat missing or malformed `.rex/` files as non-fatal. The web cleanup scheduler skips its cycle if the PRD is unavailable.
+5. **Never write from the agent** — the hench agent prompt explicitly forbids direct modification of `.rex/` files. All PRD mutations go through rex's store layer.

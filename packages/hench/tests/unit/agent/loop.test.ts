@@ -146,6 +146,97 @@ describe("agentLoop", () => {
     }
   });
 
+  it("sends cache breakpoints and records cache tokens across turns", async () => {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../../src/store/config.js");
+
+    const config = await loadConfig(henchDir);
+    const store = createStore("file", join(projectDir, ".rex"));
+
+    const usage = {
+      input_tokens: 120,
+      output_tokens: 40,
+      cache_creation_input_tokens: 900,
+      cache_read_input_tokens: 800,
+    };
+    // Turn 1 truncates, so the loop appends a continuation message and re-sends
+    // without executing any tools; turn 2 ends the run.
+    const responses = [
+      {
+        id: "msg_1", type: "message", role: "assistant", model: "claude-sonnet-4-6",
+        content: [{ type: "text", text: "Reading the files." }],
+        stop_reason: "max_tokens", stop_sequence: null, usage,
+      },
+      {
+        id: "msg_2", type: "message", role: "assistant", model: "claude-sonnet-4-6",
+        content: [{ type: "text", text: "Done." }],
+        stop_reason: "end_turn", stop_sequence: null, usage,
+      },
+    ];
+
+    const messagesProto = Object.getPrototypeOf(new Anthropic({ apiKey: "test" }).messages);
+    let call = 0;
+    const spy = vi
+      .spyOn(messagesProto, "create")
+      .mockImplementation(async () => responses[call++]);
+
+    const origKey = process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_API_KEY = "test-key-12345";
+
+    try {
+      const result = await agentLoop({
+        // Plan-only re-prompting would add a third turn; this test is about the
+        // request body, not completion policy.
+        config: { ...config, planOnlyMaxRetries: 0 },
+        store,
+        projectDir,
+        henchDir,
+        maxTurns: 3,
+      });
+
+      expect(spy).toHaveBeenCalledTimes(2);
+      const [first] = spy.mock.calls[0] as [any];
+      const [second] = spy.mock.calls[1] as [any];
+
+      // Stable prefix: the system block carries an ephemeral breakpoint, which
+      // covers the tool definitions because tools precede system in the prompt.
+      expect(first.system).toEqual([
+        { type: "text", text: expect.any(String), cache_control: { type: "ephemeral" } },
+      ]);
+      expect(first.tools.length).toBeGreaterThan(0);
+
+      // Trailing boundary: the last block of the last message is marked.
+      const firstTail = first.messages.at(-1).content;
+      expect(firstTail.at(-1).cache_control).toEqual({ type: "ephemeral" });
+
+      // The second turn repeats the first turn's prefix verbatim.
+      expect(JSON.stringify(second.system)).toBe(JSON.stringify(first.system));
+      expect(JSON.stringify(second.tools)).toBe(JSON.stringify(first.tools));
+      const strip = (v: unknown) =>
+        JSON.stringify(v, (k, val) => (k === "cache_control" ? undefined : val));
+      expect(strip(second.messages.slice(0, first.messages.length))).toBe(
+        strip(first.messages),
+      );
+      const secondTail = second.messages.at(-1).content;
+      expect(secondTail.at(-1).cache_control).toEqual({ type: "ephemeral" });
+
+      // Cache tokens reach the run record, which is what `ndx usage` reads.
+      expect(result.run.tokenUsage.cacheCreationInput).toBe(1800);
+      expect(result.run.tokenUsage.cacheReadInput).toBe(1600);
+      expect(result.run.turnTokenUsage?.[0].cacheCreationInput).toBe(900);
+      expect(result.run.turnTokenUsage?.[0].cacheReadInput).toBe(800);
+    } finally {
+      spy.mockRestore();
+      if (origKey) {
+        process.env.ANTHROPIC_API_KEY = origKey;
+      } else {
+        delete process.env.ANTHROPIC_API_KEY;
+      }
+    }
+  });
+
   it("resets task to pending on cancellation", async () => {
     // Test that when a run is cancelled (SIGINT), the task is reset from in_progress to pending
     const { finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");
