@@ -88,6 +88,31 @@ describe("buildBundle", () => {
     (bundle.items[0].children as PRDItem[])[0].title = "mutated";
     expect((doc.items[0].children as PRDItem[])[0].title).toBe("Feature One");
   });
+
+  it("strips remote-sync bookkeeping but keeps content attribution", () => {
+    const doc = makeDoc();
+    const sourceTask = (doc.items[0].children as PRDItem[])[0].children![0];
+    sourceTask.lastSyncedAt = "2026-02-01T00:00:00.000Z";
+    sourceTask.remoteId = "notion-page-123";
+
+    const bundle = buildBundle(doc);
+    const exported = (bundle.items[0].children as PRDItem[])[0].children![0];
+
+    // Another project's remote pointers must not travel: a carried
+    // lastSyncedAt >= lastModified would make the item read as unchanged in
+    // the destination, whose first pull then overwrites it in silence.
+    expect(exported.lastSyncedAt).toBeUndefined();
+    expect(exported.remoteId).toBeUndefined();
+    expect(isModifiedSinceSync(exported)).toBe(true);
+
+    // Attribution is content and stays.
+    expect(exported.lastModified).toBe("2026-01-01T00:00:00.000Z");
+    expect(exported.lastModifiedBy).toBe("someone <someone@example.com>");
+
+    // The strip happens on the clone — the source document keeps its state.
+    expect(sourceTask.lastSyncedAt).toBe("2026-02-01T00:00:00.000Z");
+    expect(sourceTask.remoteId).toBe("notion-page-123");
+  });
 });
 
 describe("parseBundle", () => {
@@ -95,6 +120,21 @@ describe("parseBundle", () => {
     const bundle = buildBundle(makeDoc());
     const parsed = parseBundle(JSON.parse(JSON.stringify(bundle)));
     expect(parsed).toEqual(bundle);
+  });
+
+  it("strips remote-sync bookkeeping from bundles rex did not write", () => {
+    // rex export never emits these, but an older rex or a hand-authored
+    // bundle can — the no-foreign-remote-pointers guarantee holds here too.
+    const raw = JSON.parse(JSON.stringify(buildBundle(makeDoc()))) as {
+      items: PRDItem[];
+    };
+    raw.items[0].lastSyncedAt = "2026-02-01T00:00:00.000Z";
+    raw.items[0].remoteId = "foreign-page-1";
+
+    const parsed = parseBundle(raw);
+
+    expect(parsed.items[0].lastSyncedAt).toBeUndefined();
+    expect(parsed.items[0].remoteId).toBeUndefined();
   });
 
   it("rejects a payload that is not a rex bundle", () => {

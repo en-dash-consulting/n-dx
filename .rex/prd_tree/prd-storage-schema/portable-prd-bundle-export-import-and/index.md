@@ -29,7 +29,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [buildBundle stamps the exporter's SCHEMA_VERSION instead of the document's schema](./buildbundle-stamps-the-exporter-s.md) | pending |
 | [Bundle import skips validateDAG and LEVEL_HIERARCHY — cycles and illegal placement reach the tree](./bundle-import-skips-validatedag-and.md) | pending |
 | [Bundle-imported item with `lastModifiedBy` but no `lastModified` is never pushed by remote sync](./bundle-imported-item-with.md) | completed |
-| [Bundles transport the source project's lastSyncedAt/remoteId, corrupting the destination's remote sync](./bundles-transport-the-source-project-s.md) | pending |
+| [Bundles transport the source project's lastSyncedAt/remoteId, corrupting the destination's remote sync](./bundles-transport-the-source-project-s.md) | in_progress |
 | [Business-owner narrative Markdown PRD export](./business-owner-narrative-markdown-prd.md) | completed |
 | [Export in-tree guard stops one directory short of the legacy PRD backend paths](./export-in-tree-guard-stops-one.md) | completed |
 | [`import-bundle --replace` rewrites the tree with no snapshot, no archive batch](./import-bundle-replace-rewrites-the.md) | completed |

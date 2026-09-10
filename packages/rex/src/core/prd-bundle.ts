@@ -84,15 +84,46 @@ export interface BuildBundleOptions {
 }
 
 /**
+ * Remote-sync bookkeeping that must not travel in a bundle.
+ *
+ * `lastSyncedAt` and `remoteId` bind an item to the *source project's* remote:
+ * its sync watermark and its page in that project's Notion/Jira/Asana
+ * workspace. Imported elsewhere they are actively harmful — a `lastSyncedAt`
+ * at or after `lastModified` makes `isModifiedSinceSync` read the item as
+ * unchanged, so the destination's first bidirectional sync lets its remote
+ * overwrite the freshly imported content in silence, and the stale `remoteId`
+ * points the destination's sync at another project's remote records.
+ *
+ * `lastModified` / `lastModifiedBy` stay: they are content attribution, not
+ * remote pointers, and the import path depends on them (see
+ * {@link defaultTimestampFromExport}). Whole-bundle provenance belongs in
+ * `exportedFrom`, not in per-item remote pointers.
+ */
+const BUNDLE_STRIPPED_FIELDS = ["lastSyncedAt", "remoteId"] as const;
+
+/** Remove per-item remote-sync pointers, in place, across a whole tree. */
+function stripSyncBookkeeping(items: PRDItem[]): void {
+  for (const item of items) {
+    for (const field of BUNDLE_STRIPPED_FIELDS) delete item[field];
+    if (item.children?.length) stripSyncBookkeeping(item.children);
+  }
+}
+
+/**
  * Snapshot a loaded PRD document into a bundle.
  *
  * The items are deep-cloned: a bundle is a value, and a caller that mutates
- * one must not reach back into the document it came from.
+ * one must not reach back into the document it came from. The clone is also
+ * where remote-sync bookkeeping is stripped — see
+ * {@link BUNDLE_STRIPPED_FIELDS}.
  */
 export function buildBundle(doc: PRDDocument, options: BuildBundleOptions = {}): PRDBundle {
   const provenance: BundleProvenance = {};
   if (options.branch) provenance.branch = options.branch;
   if (options.commit) provenance.commit = options.commit;
+
+  const items = structuredClone(doc.items);
+  stripSyncBookkeeping(items);
 
   return {
     bundle: BUNDLE_KIND,
@@ -101,7 +132,7 @@ export function buildBundle(doc: PRDDocument, options: BuildBundleOptions = {}):
     title: doc.title,
     exportedAt: options.exportedAt ?? new Date().toISOString(),
     ...(Object.keys(provenance).length > 0 ? { exportedFrom: provenance } : {}),
-    items: structuredClone(doc.items),
+    items,
   };
 }
 
@@ -380,6 +411,11 @@ export function parseBundle(raw: unknown): PRDBundle {
   // serializer is positional and loses nothing), where every id-keyed
   // operation — findItem, update, remove — resolves them ambiguously.
   assertUniqueIds(candidate.items as PRDItem[]);
+
+  // `rex export` strips these, but a bundle from an older rex or another tool
+  // may still carry them — the guarantee that imported items arrive without
+  // another project's remote pointers has to hold at this boundary too.
+  stripSyncBookkeeping(candidate.items as PRDItem[]);
 
   const parsed: PRDBundle = {
     bundle: BUNDLE_KIND,
