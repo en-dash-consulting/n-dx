@@ -26,7 +26,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Bundle-imported item with `lastModifiedBy` but no `lastModified` is never pushed by remote sync](./bundle-imported-item-with.md) | pending |
+| [Bundle-imported item with `lastModifiedBy` but no `lastModified` is never pushed by remote sync](./bundle-imported-item-with.md) | completed |
 | [Business-owner narrative Markdown PRD export](./business-owner-narrative-markdown-prd.md) | completed |
 | [Narrative export of an empty PRD claims "everything on the plan is finished"](./narrative-export-of-an-empty-prd.md) | pending |
 | [`ndx prd` dispatch has no functional test coverage](./ndx-prd-dispatch-has-no-functional.md) | pending |
