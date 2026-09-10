@@ -8,6 +8,7 @@ import {
   BundleError,
 } from "../../../src/core/prd-bundle.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
+import { isModifiedSinceSync } from "../../../src/core/sync.js";
 import type { PRDDocument, PRDItem } from "../../../src/schema/index.js";
 
 function makeItem(overrides: Partial<PRDItem> & { id: string; title: string }): PRDItem {
@@ -245,5 +246,69 @@ describe("mergeBundle", () => {
     const outcome = mergeBundle([], bundle, "merge");
     outcome.items[0].title = "mutated";
     expect(bundle.items[0].title).toBe("Epic One");
+  });
+
+  /**
+   * An item that arrives with attribution but no timestamp would otherwise be
+   * invisible to sync forever: the store keeps the partial stamp as-is
+   * (deliberately — re-stamping overwrote the original author), and
+   * isModifiedSinceSync treats a missing lastModified as "never modified".
+   * The bundle's exportedAt is the honest default: the content is at least
+   * that old.
+   */
+  describe("timestamp defaulting for attribution-only items", () => {
+    function attributionOnlyBundle(mode?: { exportedAt?: string }) {
+      const doc = makeDoc();
+      const epicTwo = doc.items[1];
+      (epicTwo.children as PRDItem[])[0].lastModifiedBy = "someone <someone@example.com>";
+      return buildBundle(doc, { exportedAt: mode?.exportedAt ?? "2026-02-02T00:00:00.000Z" });
+    }
+
+    it("defaults lastModified to the bundle's exportedAt in merge mode, keeping the author", () => {
+      const bundle = attributionOnlyBundle();
+      const outcome = mergeBundle([], bundle, "merge");
+
+      const t2 = outcome.items[1].children?.[0] as PRDItem;
+      expect(t2.lastModified).toBe("2026-02-02T00:00:00.000Z");
+      expect(t2.lastModifiedBy).toBe("someone <someone@example.com>");
+    });
+
+    it("defaults the same way in replace mode", () => {
+      const bundle = attributionOnlyBundle();
+      const outcome = mergeBundle(
+        [makeItem({ id: "local", title: "Local only", level: "epic" })],
+        bundle,
+        "replace",
+      );
+
+      const t2 = outcome.items[1].children?.[0] as PRDItem;
+      expect(t2.lastModified).toBe("2026-02-02T00:00:00.000Z");
+      expect(t2.lastModifiedBy).toBe("someone <someone@example.com>");
+    });
+
+    it("makes the defaulted item visible to sync as never-synced local work", () => {
+      const outcome = mergeBundle([], attributionOnlyBundle(), "merge");
+      expect(isModifiedSinceSync(outcome.items[1].children?.[0] as PRDItem)).toBe(true);
+    });
+
+    it("never overwrites a timestamp the item brought with it", () => {
+      const bundle = attributionOnlyBundle();
+      const outcome = mergeBundle([], bundle, "merge");
+
+      // t1 carries its own full stamp in the fixture.
+      const t1 = (outcome.items[0].children as PRDItem[])[0].children?.[0] as PRDItem;
+      expect(t1.lastModified).toBe("2026-01-01T00:00:00.000Z");
+    });
+
+    it("leaves an item with neither field unstamped, for the store to stamp on write", () => {
+      const bundle = attributionOnlyBundle();
+      const outcome = mergeBundle([], bundle, "merge");
+
+      // e2 has no stamp at all in the fixture; inventing one here would hide
+      // it from the transaction's own stamping.
+      const e2 = outcome.items[1];
+      expect(e2.lastModified).toBeUndefined();
+      expect(e2.lastModifiedBy).toBeUndefined();
+    });
   });
 });

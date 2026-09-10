@@ -639,6 +639,25 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
       expect(after.get(TASK_TWO)?.fields.blockedBy).toEqual([TASK_ONE]);
     });
 
+    it("gives an attribution-only item a sync-visible timestamp without losing its author", () => {
+      // TASK_ONE arrives from the fixture with lastModifiedBy but no
+      // lastModified. Left that way it would be invisible to remote sync
+      // forever (isModifiedSinceSync treats a missing timestamp as "never
+      // modified"), so import defaults it to the bundle's exportedAt.
+      const findTask = (items: PRDItem[]): PRDItem | undefined => {
+        for (const item of items) {
+          if (item.id === TASK_ONE) return item;
+          const hit = item.children && findTask(item.children);
+          if (hit) return hit;
+        }
+        return undefined;
+      };
+
+      const seeded = findTask(readPRD(sourceDir).items);
+      expect(seeded?.lastModifiedBy).toBe(ATTRIBUTION);
+      expect(seeded?.lastModified).toBe("2026-01-01T00:00:00.000Z");
+    });
+
     it("preserves attribution metadata rather than re-stamping it", () => {
       run(["export", `--out=${bundlePath}`, sourceDir]);
       run(["init", targetDir]);

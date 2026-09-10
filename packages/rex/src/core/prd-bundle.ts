@@ -463,6 +463,27 @@ function stableKey(item: PRDItem): string {
 }
 
 /**
+ * Give an attribution-only item the bundle's export time as its timestamp.
+ *
+ * An item carrying `lastModifiedBy` without `lastModified` is a trap: the
+ * store deliberately keeps a partial stamp as-is (re-stamping overwrote the
+ * original author), but `isModifiedSinceSync` reads a missing timestamp as
+ * "never modified" — so the item would land on disk permanently invisible to
+ * remote sync push, and a later pull could overwrite it in silence. The
+ * bundle's `exportedAt` is the honest default: the content is at least that
+ * old, and the author it names really did write it by then.
+ *
+ * An item with *neither* field is left alone on purpose — the import
+ * transaction stamps it with the importing actor and the current time, which
+ * is the established rule for unstamped new items.
+ */
+function defaultTimestampFromExport(item: PRDItem, exportedAt: string): void {
+  if (item.lastModifiedBy !== undefined && item.lastModified === undefined) {
+    item.lastModified = exportedAt;
+  }
+}
+
+/**
  * Apply a bundle to an existing tree.
  *
  * `merge` (default) is additive and never destructive: every local item keeps
@@ -480,8 +501,16 @@ export function mergeBundle(
   mode: ImportMode,
 ): MergeOutcome {
   if (mode === "replace") {
+    const replacement = structuredClone(bundle.items);
+    const walk = (siblings: PRDItem[]): void => {
+      for (const item of siblings) {
+        defaultTimestampFromExport(item, bundle.exportedAt);
+        if (item.children?.length) walk(item.children);
+      }
+    };
+    walk(replacement);
     return {
-      items: structuredClone(bundle.items),
+      items: replacement,
       collisions: [],
       added: countItems(bundle.items),
       replaced: countItems(existing),
@@ -519,6 +548,7 @@ export function mergeBundle(
 
       const node = structuredClone(incoming);
       delete node.children;
+      defaultTimestampFromExport(node, bundle.exportedAt);
       target.push(node);
       added += 1;
 
