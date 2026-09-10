@@ -22,6 +22,8 @@ import { mkdir } from "node:fs/promises";
 import {
   resolveStore,
   PRD_TREE_DIRNAME,
+  prdLockPath,
+  withLock,
   resolveGitBranch,
   slugifyTitle,
   resolveSiblingSlugs,
@@ -183,7 +185,16 @@ export async function cmdExport(dir: string, flags: Record<string, string>): Pro
   );
 
   const store = await resolveStore(join(dir, REX_DIR));
-  const doc = await store.loadDocument();
+
+  // Loaded under the PRD lock. The tree is written file-by-file, so an
+  // unlocked read racing a writer can capture a mixed state — and unlike a
+  // status line, a bundle is durable: torn once, it stays torn through every
+  // later import. Read-only span, so this must never be withTransaction,
+  // which rewrites the tree on the way out. The lock file lives in rexDir,
+  // which may not exist on a project that was never initialised.
+  const rexDir = join(dir, REX_DIR);
+  await mkdir(rexDir, { recursive: true });
+  const doc = await withLock(prdLockPath(rexDir), () => store.loadDocument());
 
   // Resolution happens before any write, so an unknown --item leaves no file
   // behind — an operator who mistyped a slug must not be left holding a
