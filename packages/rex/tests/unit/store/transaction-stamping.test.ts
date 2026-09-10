@@ -25,6 +25,7 @@ import { FileStore } from "../../../src/store/file-adapter.js";
 import { SCHEMA_VERSION } from "../../../src/schema/index.js";
 import { toCanonicalJSON } from "../../../src/core/canonical.js";
 import { findItem, removeFromTree, updateInTree, insertChild } from "../../../src/core/tree.js";
+import { isModifiedSinceSync } from "../../../src/core/sync.js";
 import type { PRDStore } from "../../../src/store/contracts.js";
 import type { PRDItem } from "../../../src/schema/index.js";
 
@@ -171,11 +172,23 @@ describe.each(STORES)("$name withTransaction stamping", ({ create }) => {
     expect(item!.lastModifiedBy).toBe("Someone Else <someone@example.com>");
   });
 
-  it("treats attribution alone as a stamp the caller already set", async () => {
+  it("keeps the author of an attribution-only item but fills its missing timestamp", async () => {
+    // Two requirements pull in opposite directions on the same item, and the
+    // fix has to satisfy both.
+    //
     // A bundle import carries `lastModifiedBy` for items whose source project
     // never recorded a `lastModified`. Keying "carries its own stamp" on the
     // timestamp alone rewrote the original author to the importer on exactly
     // those items — the provenance a transport artifact exists to preserve.
+    //
+    // But treating the author as a whole stamp and skipping the item left it
+    // with no `lastModified` at all, and `isModifiedSinceSync` opens with
+    // `if (!meta.lastModified) return false`. The item was then invisible to
+    // sync forever, because `snapshotItemContent` holds it from the next
+    // transaction on: never pushed, and overwritten by the remote's value on
+    // the next pull, in silence.
+    //
+    // So the absent half is filled and the present half is left alone.
     await store.withTransaction(async (doc) => {
       insertChild(doc.items, "epic-1", {
         id: "task-e",
@@ -188,6 +201,29 @@ describe.each(STORES)("$name withTransaction stamping", ({ create }) => {
 
     const item = await store.getItem("task-e");
     expect(item!.lastModifiedBy).toBe("Someone Else <someone@example.com>");
+    expect(item!.lastModified as string).toMatch(ISO_TIMESTAMP);
+    // The consequence that matters: the item can now be pushed.
+    expect(isModifiedSinceSync(item!)).toBe(true);
+  });
+
+  it("invents no author for an item that carries a timestamp but no attribution", async () => {
+    // The mirror case. This item is already visible to sync, so there is
+    // nothing to repair, and the actor running the transaction did not write
+    // it — recording them as the author would be a fabricated attribution.
+    const carried = "2020-01-01T00:00:00.000Z";
+    await store.withTransaction(async (doc) => {
+      insertChild(doc.items, "epic-1", {
+        id: "task-f",
+        title: "Task F",
+        level: "task",
+        status: "pending",
+        lastModified: carried,
+      } as PRDItem);
+    });
+
+    const item = await store.getItem("task-f");
+    expect(item!.lastModified).toBe(carried);
+    expect(item!.lastModifiedBy).toBeUndefined();
   });
 
   it("advances an existing stamp rather than only setting an absent one", async () => {

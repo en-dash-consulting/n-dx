@@ -312,16 +312,25 @@ export function snapshotItemContent(items: PRDItem[]): Map<string, string> {
  * is written to disk looking untouched: never pushed to the remote, then
  * overwritten by the remote's value on the next pull, in silence.
  *
- * Two rules, both deliberate:
+ * Three rules, all deliberate:
  *
  * - **Changed, not merely present.** An empty transaction is a real pattern
  *   here (`migrate-slugs` and `reshape` each open one purely to force a
  *   rewrite). Stamping unconditionally would mark every item in the PRD
  *   modified and queue the whole tree for push.
- * - **A stamp the item arrived with is kept.** `analyze.ts` stamps its accepted
- *   items before opening the transaction, deliberately and with a comment
- *   saying so. Only an item that is new to the tree *and* carries no stamp of
- *   its own gets one here.
+ * - **An author the item arrived with is kept.** `analyze.ts` stamps its
+ *   accepted items before opening the transaction, deliberately and with a
+ *   comment saying so, and a bundle import carries the original author of
+ *   items whose source project never recorded a timestamp.
+ * - **A new item always leaves here with a timestamp.** Attribution alone is
+ *   not a stamp: {@link isModifiedSinceSync} returns false without a
+ *   `lastModified`, and the item cannot acquire one later because the next
+ *   transaction's snapshot records it as pre-existing and unchanged. So the
+ *   two halves are filled independently — the timestamp because sync needs
+ *   it, the author only when the item brought none.
+ *
+ * An item that arrives with a timestamp but no author keeps that shape: it is
+ * already visible to sync, and this transaction's actor did not write it.
  *
  * @returns the ids stamped, in tree order.
  */
@@ -333,17 +342,43 @@ export function stampChangedItems(
   const stamped: string[] = [];
   for (const { item } of walkTree(items)) {
     const previous = before.get(item.id);
-    // `lastModifiedBy` counts as a stamp of its own just as `lastModified`
-    // does. A bundle import carries attribution for items whose source
-    // project never recorded a timestamp; checking only `lastModified` would
-    // overwrite the original author with the importer on exactly those items.
-    const changed = previous === undefined
-      ? item.lastModified === undefined && item.lastModifiedBy === undefined
-      : previous !== itemSignature(item);
-    if (!changed) continue;
-    // walkTree yields live references into the tree, so assigning here is the
-    // write — no re-lookup needed.
-    Object.assign(item, stamp);
+
+    // Already in the tree: stamp it only if its content actually moved.
+    if (previous !== undefined) {
+      if (previous === itemSignature(item)) continue;
+      // walkTree yields live references into the tree, so assigning here is
+      // the write — no re-lookup needed.
+      Object.assign(item, stamp);
+      stamped.push(item.id);
+      continue;
+    }
+
+    // New to the tree. Fill only the halves the item did not bring, because
+    // the two halves are owed to different parties.
+    //
+    // `lastModifiedBy` is the caller's to set: a bundle import carries the
+    // original author for items whose source project never recorded a
+    // timestamp, and `analyze.ts` stamps its accepted items before opening
+    // the transaction. Overwriting it would destroy exactly the provenance a
+    // transport artifact exists to preserve.
+    //
+    // `lastModified` is owed to sync. `isModifiedSinceSync` opens with
+    // `if (!meta.lastModified) return false`, so an item with no timestamp is
+    // never considered modified — and it will not acquire one later either,
+    // since from the next transaction on `snapshotItemContent` records it as
+    // pre-existing and unchanged. Leaving it absent means the item is never
+    // pushed and is overwritten by the remote's value on the next pull, in
+    // silence. Treating attribution alone as a complete stamp bought the
+    // author's survival at that price.
+    //
+    // The item is left entirely alone when it already has a timestamp: it is
+    // visible to sync, so there is nothing to repair, and the actor running
+    // this transaction did not write it — recording them as its author would
+    // be a fabrication rather than a default.
+    if (item.lastModified !== undefined) continue;
+
+    item.lastModified = stamp.lastModified;
+    if (item.lastModifiedBy === undefined) item.lastModifiedBy = stamp.lastModifiedBy;
     stamped.push(item.id);
   }
   return stamped;
