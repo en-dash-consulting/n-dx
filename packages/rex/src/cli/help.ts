@@ -478,7 +478,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "carried to another machine and imported with 'rex import-bundle'. Item\n" +
       "ids, hierarchy, status, acceptance criteria, tags, dependencies and\n" +
       "attribution metadata are all preserved. The bundle is a transport\n" +
-      "artifact, not PRD storage: it must be written outside .rex/prd_tree/,\n" +
+      "artifact, not PRD storage: it must be written outside .rex/ entirely,\n" +
       "and nothing in rex ever reads it as a backend.\n" +
       "\n" +
       "--item=<id-or-slug> scopes the bundle to one epic, feature or task. The\n" +

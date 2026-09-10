@@ -204,7 +204,7 @@ rex import-bundle --in=./prd-bundle.json --replace --yes other
 
 The bundle preserves item ids, hierarchy, level, status, priority, description, acceptance criteria, tags, `blockedBy` edges, source, and attribution metadata, and carries the PRD `SCHEMA_VERSION` so a bundle written by a newer rex is refused rather than imported partially.
 
-It is a transport artifact, not storage: it must be written outside `.rex/prd_tree/`, and nothing in rex reads it as a PRD backend. Import rebuilds the folder tree through the normal store write path inside `store.withTransaction`, so it holds the PRD lock and cannot interleave with another writer.
+It is a transport artifact, not storage: it must be written outside `.rex/` entirely, and nothing in rex reads it as a PRD backend. Import rebuilds the folder tree through the normal store write path inside `store.withTransaction`, so it holds the PRD lock and cannot interleave with another writer.
 
 `--merge` (the default) is additive — local items keep their content and placement, new bundle items are grafted on, and ids that already exist with differing content are reported rather than overwritten. `--replace` discards the local tree and requires confirmation, or `--yes` when not attached to a terminal.
 

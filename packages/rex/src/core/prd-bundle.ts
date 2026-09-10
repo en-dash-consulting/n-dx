@@ -5,7 +5,7 @@
  *
  * The PRD invariant is that `.rex/prd_tree/` is the sole writable PRD surface
  * and no mutation writes JSON. A bundle does not violate it: it is a
- * *transport artifact* written to a user-chosen path outside the tree, never
+ * *transport artifact* written to a user-chosen path outside `.rex/`, never
  * read as a backend and never a write target for a PRD mutation. Import
  * reconstructs the folder tree through the normal store write path, under the
  * store transaction lock.

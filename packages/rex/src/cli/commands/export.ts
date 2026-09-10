@@ -7,7 +7,7 @@
  * both renderings scope with through the same resolver:
  *
  * - **bundle** (default) — the portable JSON transport artifact. It goes to an
- *   operator-chosen path outside `.rex/prd_tree/` and nothing in rex ever
+ *   operator-chosen path outside `.rex/` and nothing in rex ever
  *   reads it as storage. See `../../core/prd-bundle.ts` for the format, the
  *   carve-out rationale, and what `--item` scoping pulls in.
  * - **narrative** (`--format=narrative`) — prose Markdown for a stakeholder,
@@ -21,7 +21,6 @@ import { join, resolve, dirname, relative, isAbsolute } from "node:path";
 import { mkdir } from "node:fs/promises";
 import {
   resolveStore,
-  PRD_TREE_DIRNAME,
   prdLockPath,
   withLock,
   resolveGitBranch,
@@ -137,22 +136,27 @@ export function resolveItemRef(items: PRDItem[], ref: string): ItemRefMatch[] {
 }
 
 /**
- * Reject an output path inside the folder tree.
+ * Reject an output path anywhere inside `.rex/`.
  *
- * An export written into `.rex/prd_tree/` would sit in the one directory the
- * PRD invariant reserves for PRD markdown, where the next tree write would
- * treat it as junk (or, worse, a future reader would treat it as storage).
- * The hazard is sharper for a narrative document than for a bundle: it *is*
- * markdown, so a stray `index.md` there could be parsed as an item.
+ * The folder tree is the obvious hazard — an export there would sit in the
+ * one directory the PRD invariant reserves for PRD markdown, where a stray
+ * `index.md` could be parsed as an item. But the guard covers all of `.rex/`
+ * because the store still falls back to legacy backends when the tree is
+ * absent: `FileStore.loadDocument` prefers `.rex/prd.md`, then `.rex/prd.json`.
+ * A bundle written to `.rex/prd.json` carries schema, title and items, so it
+ * passes document validation and silently *becomes* the PRD backend on a
+ * checkout without the tree; a narrative document at `.rex/prd.md` is prose at
+ * the preferred legacy path, and the markdown parser throwing on it blocks
+ * every rex command. Nothing is ever legitimately exported into `.rex/`.
  */
-function assertOutsideTree(outPath: string, dir: string, noun: string, example: string): void {
-  const treeRoot = join(dir, REX_DIR, PRD_TREE_DIRNAME);
-  const rel = relative(treeRoot, outPath);
+function assertOutsideRexDir(outPath: string, dir: string, noun: string, example: string): void {
+  const rexRoot = join(dir, REX_DIR);
+  const rel = relative(rexRoot, outPath);
   const inside = rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
   if (inside) {
     throw new CLIError(
-      `Refusing to write a ${noun} inside ${REX_DIR}/${PRD_TREE_DIRNAME}/.`,
-      `The ${noun} is not PRD storage — pick a path outside the PRD tree, e.g. --out=${example}`,
+      `Refusing to write a ${noun} inside ${REX_DIR}/.`,
+      `${REX_DIR}/ is PRD storage — pick a path outside it, e.g. --out=${example}`,
     );
   }
 }
@@ -177,7 +181,7 @@ export async function cmdExport(dir: string, flags: Record<string, string>): Pro
   // Resolved against the caller's cwd, not the project dir: an operator typing
   // `--out=bundle.json` means "here", the same as every other CLI.
   const outPath = resolve(out);
-  assertOutsideTree(
+  assertOutsideRexDir(
     outPath,
     dir,
     narrative ? "narrative document" : "bundle",

@@ -280,6 +280,14 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
       expect(existsSync(inside)).toBe(false);
     });
 
+    it("refuses the legacy backend path .rex/prd.json — the store would read it as the PRD", () => {
+      const legacy = join(sourceDir, ".rex", "prd.json");
+      const output = run(["export", `--out=${legacy}`, sourceDir], true);
+
+      expect(output).toMatch(/Refusing to write a bundle inside/);
+      expect(existsSync(legacy)).toBe(false);
+    });
+
     it("requires --out", () => {
       expect(run(["export", sourceDir], true)).toMatch(/Missing --out path/);
     });
@@ -596,6 +604,16 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
         true,
       );
       expect(output).toMatch(/Refusing to write a narrative document inside/);
+    });
+
+    it("refuses the legacy backend path .rex/prd.md — prose there would wedge the markdown parser", () => {
+      const legacy = join(sourceDir, ".rex", "prd.md");
+      const output = run(
+        ["export", "--format=narrative", `--out=${legacy}`, sourceDir],
+        true,
+      );
+      expect(output).toMatch(/Refusing to write a narrative document inside/);
+      expect(existsSync(legacy)).toBe(false);
     });
 
     it("tells the operator the output is one-way", () => {
