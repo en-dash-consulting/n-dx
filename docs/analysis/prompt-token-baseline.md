@@ -11,7 +11,7 @@ epic's overall reduction should be measured against. Use `--compare` for the del
 since whatever is recorded here now.
 
 - **Recorded at** — 2026-09-10T18:50:58.513Z
-- **Commit** — `unknown`
+- **Commit** — `6b4bd6d42a79`
 - **Content hash** — `fe1ceb35c4ce1562` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 36

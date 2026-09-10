@@ -670,7 +670,7 @@
       "pkg": "sourcevision",
       "file": "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
       "builder": "buildSingleZoneFirstPassEnvelope",
-      "purpose": "Per-zone enrichment, first pass — names and describes one zone.",
+      "purpose": "Per-zone enrichment, first pass \u2014 names and describes one zone.",
       "inline": false,
       "literals": 25,
       "constants": {
@@ -684,7 +684,7 @@
       "pkg": "sourcevision",
       "file": "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
       "builder": "buildSingleZoneLaterPassEnvelope",
-      "purpose": "Per-zone enrichment, later pass — adds only what pass 1 missed.",
+      "purpose": "Per-zone enrichment, later pass \u2014 adds only what pass 1 missed.",
       "inline": false,
       "literals": 27,
       "constants": {
@@ -723,7 +723,7 @@
       "pkg": "hench",
       "file": "packages/hench/src/agent/planning/prompt.ts",
       "builder": "buildSystemPrompt",
-      "purpose": "The agent's system prompt — role, rules, workflow, error handling.",
+      "purpose": "The agent's system prompt \u2014 role, rules, workflow, error handling.",
       "inline": false,
       "literals": 62,
       "constants": {},
@@ -747,7 +747,7 @@
       "pkg": "hench",
       "file": "packages/hench/src/agent/planning/brief.ts",
       "builder": "formatTaskBrief",
-      "purpose": "Render the task brief section — task, parent chain, requirements.",
+      "purpose": "Render the task brief section \u2014 task, parent chain, requirements.",
       "inline": false,
       "literals": 42,
       "constants": {},
@@ -771,7 +771,7 @@
       "pkg": "hench",
       "file": "packages/hench/src/agent/analysis/adversarial-review.ts",
       "builder": "buildReviewBrief",
-      "purpose": "Brief handed to the reviewer — what to attack and where to report.",
+      "purpose": "Brief handed to the reviewer \u2014 what to attack and where to report.",
       "inline": false,
       "literals": 129,
       "constants": {},
@@ -795,7 +795,7 @@
       "pkg": "hench",
       "file": "packages/hench/src/agent/lifecycle/orientation.ts",
       "builder": "buildOrientationPrompt",
-      "purpose": "Orientation task prompt — what to establish about the repo.",
+      "purpose": "Orientation task prompt \u2014 what to establish about the repo.",
       "inline": false,
       "literals": 36,
       "constants": {},
@@ -966,7 +966,7 @@
       {
         "file": "packages/hench/src/agent/analysis/review.ts",
         "builder": "promptReview",
-        "reason": "Interactive review gate — asks the operator, not a model."
+        "reason": "Interactive review gate \u2014 asks the operator, not a model."
       },
       {
         "file": "packages/hench/src/agent/lifecycle/prompt-diagnostics.ts",
@@ -987,6 +987,6 @@
   },
   "contentHash": "fe1ceb35c4ce1562",
   "recordedAt": "2026-09-10T18:50:58.513Z",
-  "commit": "unknown",
+  "commit": "6b4bd6d42a79",
   "dirty": false
 }
