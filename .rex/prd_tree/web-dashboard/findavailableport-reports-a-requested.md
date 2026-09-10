@@ -1,0 +1,22 @@
+---
+id: "80ef4daf-9b80-4119-bb5b-6729b50fbdfd"
+level: "task"
+title: "findAvailablePort reports a requested port of 0 as \"in use\""
+status: "pending"
+priority: "low"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:low"
+  - "web"
+  - "server"
+  - "correctness"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "Starting the server with a requested port of 0 prints no \"Port 0 is in use\" message; either no fallback notice at all, or one that states an ephemeral port was allocated as requested"
+  - "A requested port that genuinely is occupied still prints the existing fallback notice naming the real requested port"
+  - "The bound port and the value written to .n-dx-web.port remain the real ephemeral port, unchanged by this fix"
+  - "A test covers the port-0 path end to end at the reporting layer, not only findAvailablePort's return shape"
+description: "Severity: low (cosmetic — the bound port and the port file are both correct). Verdict: should-fix, one line.\n\n## The defect\n\nThe port-0 fix in 33d58b90 is correct and its reasoning is sound; only the *reported* outcome is a false statement, on the path that commit adds.\n\n`packages/web/src/server/port.ts:196` returns `{ port, isOriginal: false, requestedPort: 0 }` for a requested port of 0. `packages/web/src/server/start.ts:777-781` treats `!isOriginal` as \"the port you asked for was occupied\":\n\n    if (!allocation.isOriginal) {\n      console.log(`Port ${allocation.requestedPort} is in use — using port ${actualPort} instead.`);\n    }\n\nso the operator sees `Port 0 is in use — using port 54321 instead.` Port 0 was never in use — it is the OS convention for \"give me any free port\", the allocator did exactly that, and the request was honoured rather than falling back.\n\n## Reachability (Pass 2)\n\nReachable, but not through `ndx start`: `packages/core/web.js:363` rejects `parsed < 1` with \"Invalid port: 0\". The live paths are:\n\n- `node packages/web/dist/cli/index.js serve --port=0 .` — `packages/web/src/cli/index.js:26` parses `--port` with no bounds check\n- any programmatic `startServer({ port: 0 })`, which is how a parallel test harness asks for an ephemeral port\n\nNot covered: `packages/web/tests/unit/server/port.test.ts` asserts `isOriginal: false` for the 0 case, so the test currently pins the behaviour that produces the message rather than catching it.\n\n## Solution options\n\n1. **Special-case the log site in `start.ts` (recommended).** `if (!allocation.isOriginal && allocation.requestedPort !== 0)`. One line, no risk, no API change, and the existing port.ts test keeps passing unmodified.\n\n2. **Return `isOriginal: true` for the 0 case.** Defensible on the reading that the request (\"any port\") *was* honoured, and it fixes every current and future consumer of the flag at once rather than one log site. But `isOriginal` is documented as \"Whether this is the originally requested port (true) or a fallback (false)\", and the bound port is literally not the number requested — so this makes the flag mean two different things depending on input. It also requires changing the new assertion in port.test.ts, and `findAvailablePort` is exported from `packages/web/src/public.ts`, so external consumers could be relying on the documented meaning.\n\nRecommendation: option 1. Option 2 is the better shape only if the team first decides `isOriginal` means \"the request was satisfied\" rather than \"the number matched\" — that is a semantics decision, and it should be made deliberately rather than as a side effect of silencing a log line.\n"
+lastModified: "2026-09-10T17:07:58.066Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---
