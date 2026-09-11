@@ -24,7 +24,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Bind-unavailable runs report four passing no-op tests in cli-start-two-projects](./bind-unavailable-runs-report-four.md) | pending |
+| [Bind-unavailable runs report four passing no-op tests in cli-start-two-projects](./bind-unavailable-runs-report-four.md) | completed |
 | [classifyPortOccupant compares paths lexically, so a symlinked project path starts a second dashboard on the same PRD tree](./classifyportoccupant-compares-paths.md) | completed |
 | [E2E test: two project directories start dashboards concurrently without killing each other](./e2e-test-two-project-directories-start.md) | completed |
 | [killPortOccupant SIGKILLs any process holding a socket on the port, not just the listener](./killportoccupant-sigkills-any-process.md) | completed |

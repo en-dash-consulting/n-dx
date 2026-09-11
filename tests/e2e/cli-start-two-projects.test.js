@@ -262,8 +262,11 @@ describe("two projects start dashboards concurrently", { timeout: 120_000 }, () 
     if (dirB) await removeTmpDir(dirB);
   });
 
-  it("leaves the first project's dashboard running", async () => {
-    if (!canBindPorts) return;
+  it("leaves the first project's dashboard running", async (ctx) => {
+    if (!canBindPorts) {
+      ctx.skip();
+      return;
+    }
     expect(pidA).toBeTypeOf("number");
     expect(isProcessAlive(pidA)).toBe(true);
 
@@ -271,8 +274,11 @@ describe("two projects start dashboards concurrently", { timeout: 120_000 }, () 
     expect(canonical(status.projectDir)).toBe(canonical(dirA));
   });
 
-  it("starts the second project near the requested port, not inside 3117–3200", async () => {
-    if (!canBindPorts) return;
+  it("starts the second project near the requested port, not inside 3117–3200", async (ctx) => {
+    if (!canBindPorts) {
+      ctx.skip();
+      return;
+    }
     expect(portB).toBeTypeOf("number");
     expect(portB).not.toBe(requestedPort);
     // requestedPort is an OS-assigned ephemeral port, far outside 3117–3200.
@@ -285,16 +291,22 @@ describe("two projects start dashboards concurrently", { timeout: 120_000 }, () 
     expect(canonical(status.projectDir)).toBe(canonical(dirB));
   });
 
-  it("names the peer and the fallback port on stdout", () => {
-    if (!canBindPorts) return;
+  it("names the peer and the fallback port on stdout", (ctx) => {
+    if (!canBindPorts) {
+      ctx.skip();
+      return;
+    }
     expect(startB.stdout).toContain(canonical(dirA));
     expect(startB.stdout).toContain(`already on :${requestedPort}`);
     expect(startB.stdout).toContain(`starting this one on :${portB}`);
   });
 
   // Ordered last on purpose: it tears down what the assertions above observe.
-  it("stops only the server for the directory it is given", async () => {
-    if (!canBindPorts) return;
+  it("stops only the server for the directory it is given", async (ctx) => {
+    if (!canBindPorts) {
+      ctx.skip();
+      return;
+    }
 
     const stopA = runStart(["stop", dirA]);
     expect(stopA.code, stopA.stderr).toBe(0);
