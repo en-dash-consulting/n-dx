@@ -18,3 +18,4 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Adversarial security review 2026-09-11 — findings](./adversarial-security-review-2026-09-11/index.md) | pending |
+| [`/api/hench/adaptive/override` and `/apply` write arbitrary keys into `.hench/config.json`](./api-hench-adaptive-override-and-apply.md) | pending |
