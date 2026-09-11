@@ -127,6 +127,34 @@ describe("file-lock", () => {
     expect(order).toEqual([1, 2, 3]);
   });
 
+  it("does not steal a lock file that exists but is empty (mid-creation race)", async () => {
+    // `tryAcquire` creates the lock with O_EXCL and then writes its JSON, so a
+    // concurrent process can momentarily read an empty lock file. That window
+    // must not be read as "stale" — doing so unlinked a live writer's lock and
+    // let two `rex import-bundle` processes interleave, which the stale-save
+    // guard then caught. An empty (or otherwise unparseable) lock is treated as
+    // held-by-someone: this acquirer waits and times out rather than stealing.
+    const lockPath = await makeLockPath();
+    await writeFile(lockPath, ""); // the transient state, frozen
+
+    await expect(
+      acquireLock(lockPath, { acquireTimeoutMs: 200, retryDelayMs: 20 }),
+    ).rejects.toThrow(/Could not acquire PRD lock/);
+
+    // The empty lock was left in place, not stolen or unlinked.
+    await expect(stat(lockPath)).resolves.toBeTruthy();
+  });
+
+  it("does not steal a lock file with garbage (unparseable) contents", async () => {
+    const lockPath = await makeLockPath();
+    await writeFile(lockPath, "not json at all");
+
+    await expect(
+      acquireLock(lockPath, { acquireTimeoutMs: 200, retryDelayMs: 20 }),
+    ).rejects.toThrow(/Could not acquire PRD lock/);
+    await expect(stat(lockPath)).resolves.toBeTruthy();
+  });
+
   it("does not steal a live same-process lock however long it is held", async () => {
     const lockPath = await makeLockPath();
     const order: string[] = [];
