@@ -33,7 +33,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Business-owner narrative Markdown PRD export](./business-owner-narrative-markdown-prd.md) | completed |
 | [`defaultTimestampFromExport` is now redundant and writes an unvalidated `exportedAt` to disk](./defaulttimestampfromexport-is-now.md) | completed |
 | [Export in-tree guard stops one directory short of the legacy PRD backend paths](./export-in-tree-guard-stops-one.md) | completed |
-| [`import-bundle --replace` clears the destination's own `remoteId` and `lastSyncedAt`](./import-bundle-replace-clears-the.md) | pending |
+| [`import-bundle --replace` clears the destination's own `remoteId` and `lastSyncedAt`](./import-bundle-replace-clears-the.md) | completed |
 | [`import-bundle --replace` rewrites the tree with no snapshot, no archive batch](./import-bundle-replace-rewrites-the.md) | completed |
 | [import-bundle writes no execution-log entry — the only PRD-mutating command that leaves no trace](./import-bundle-writes-no-execution-log.md) | completed |
 | [Narrative export of an empty PRD claims "everything on the plan is finished"](./narrative-export-of-an-empty-prd.md) | completed |

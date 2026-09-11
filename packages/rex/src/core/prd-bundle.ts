@@ -33,7 +33,7 @@
 import { SCHEMA_VERSION, LEVEL_HIERARCHY } from "../schema/index.js";
 import type { PRDDocument, PRDItem, ItemLevel } from "../schema/index.js";
 import { validateDocument } from "../schema/validate.js";
-import { findItem } from "./tree.js";
+import { findItem, walkTree } from "./tree.js";
 import { findDependencyCycles } from "./dag.js";
 import { ITEM_BOOKKEEPING_FIELDS } from "./sync.js";
 
@@ -612,6 +612,43 @@ function assertLegalPlacement(item: PRDItem, parentLevel: ItemLevel | null): voi
 }
 
 /**
+ * Give the replacement tree the *destination's* remote pointers.
+ *
+ * `remoteId` and `lastSyncedAt` describe this project's relationship with its
+ * own remote: which record an item maps to, and when it was last reconciled.
+ * A bundle cannot know either — {@link BUNDLE_STRIPPED_FIELDS} is removed on
+ * export precisely so one project's pointers never reach another — so their
+ * absence from a bundle is not an opinion about the destination. It is silence.
+ *
+ * Reading that silence as "clear them" is what `--replace` used to do, and it
+ * cost two things on the same-project export → edit → replace round trip the
+ * feature documents. Every item lost `lastSyncedAt`, so `isModifiedSinceSync`
+ * went true tree-wide and the next `rex sync` pushed everything and won every
+ * field conflict against remote edits made since. And `core/remove-feature.ts`
+ * keys its "this item is synced, warn before deleting" prompt on `remoteId`,
+ * so `rex remove` silently stopped offering to clean up the remote records.
+ *
+ * So `--replace` replaces content, not the sync relationship. An id the
+ * destination knows keeps its pointers; an id it does not know gets none,
+ * which also clears anything a hand-authored bundle tried to smuggle in —
+ * `parseBundle` strips those already, and this makes it true of `mergeBundle`
+ * on its own terms rather than by a caller's good behaviour.
+ */
+function applyDestinationSyncPointers(replacement: PRDItem[], existing: PRDItem[]): void {
+  const local = new Map<string, PRDItem>();
+  for (const { item } of walkTree(existing)) local.set(item.id, item);
+
+  for (const { item } of walkTree(replacement)) {
+    const match = local.get(item.id);
+    for (const field of BUNDLE_STRIPPED_FIELDS) {
+      const carried = match?.[field];
+      if (carried === undefined) delete item[field];
+      else item[field] = carried;
+    }
+  }
+}
+
+/**
  * Apply a bundle to an existing tree.
  *
  * `merge` (default) is additive and never destructive: every local item keeps
@@ -630,6 +667,7 @@ export function mergeBundle(
 ): MergeOutcome {
   if (mode === "replace") {
     const replacement = structuredClone(bundle.items);
+    applyDestinationSyncPointers(replacement, existing);
     return {
       items: replacement,
       collisions: [],

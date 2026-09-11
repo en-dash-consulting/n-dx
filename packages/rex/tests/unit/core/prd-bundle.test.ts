@@ -547,6 +547,76 @@ describe("mergeBundle", () => {
       expect(t2.lastModifiedBy).toBe("someone <someone@example.com>");
     });
 
+    // ── Remote pointers belong to the destination ────────────────────────
+    //
+    // `remoteId` and `lastSyncedAt` describe *this* project's relationship with
+    // *its* remote. A bundle cannot know them — export strips them precisely so
+    // one project's pointers never reach another — so their absence from a
+    // bundle is no opinion at all, and must not be read as "clear them".
+    // `--replace` replaces content, not the destination's sync relationship.
+
+    it("keeps the destination's remote pointers on an id that survives a replace", () => {
+      const bundle = buildBundle(makeDoc());
+      const existing = structuredClone(bundle.items);
+      existing[0].remoteId = "notion-123";
+      existing[0].lastSyncedAt = "2026-01-02T00:00:00.000Z";
+
+      const outcome = mergeBundle(existing, bundle, "replace");
+      const e1 = outcome.items.find((i) => i.id === "e1");
+
+      expect(e1?.remoteId).toBe("notion-123");
+      expect(e1?.lastSyncedAt).toBe("2026-01-02T00:00:00.000Z");
+    });
+
+    it("carries pointers across at every depth, not just the roots", () => {
+      const bundle = buildBundle(makeDoc());
+      const existing = structuredClone(bundle.items);
+      const nestedTask = (existing[0].children as PRDItem[])[0].children![0];
+      nestedTask.remoteId = "notion-deep";
+      nestedTask.lastSyncedAt = "2026-01-02T00:00:00.000Z";
+
+      const outcome = mergeBundle(existing, bundle, "replace");
+      const after = (outcome.items[0].children as PRDItem[])[0].children![0];
+
+      expect(after.remoteId).toBe("notion-deep");
+      expect(after.lastSyncedAt).toBe("2026-01-02T00:00:00.000Z");
+    });
+
+    it("gives a bundle-only item no remote pointers, since the destination has none", () => {
+      const bundle = buildBundle(makeDoc());
+
+      const outcome = mergeBundle([], bundle, "replace");
+
+      for (const item of outcome.items) {
+        expect(item.remoteId).toBeUndefined();
+        expect(item.lastSyncedAt).toBeUndefined();
+      }
+    });
+
+    it("does not let a bundle's own pointers reach the tree on replace", () => {
+      // parseBundle strips these, but mergeBundle is called directly by tests
+      // and could be by future callers — the destination's pointers are the
+      // only ones that may survive, whatever the bundle claims.
+      const bundle = buildBundle(makeDoc());
+      (bundle.items[0] as PRDItem).remoteId = "someone-elses-page";
+      (bundle.items[0] as PRDItem).lastSyncedAt = "2030-01-01T00:00:00.000Z";
+
+      const outcome = mergeBundle([], bundle, "replace");
+
+      expect(outcome.items[0].remoteId).toBeUndefined();
+      expect(outcome.items[0].lastSyncedAt).toBeUndefined();
+    });
+
+    it("leaves a merge-mode collision's local pointers alone", () => {
+      const bundle = buildBundle(makeDoc());
+      const existing = structuredClone(bundle.items);
+      existing[0].remoteId = "notion-123";
+
+      const outcome = mergeBundle(existing, bundle, "merge");
+
+      expect(outcome.items.find((i) => i.id === "e1")?.remoteId).toBe("notion-123");
+    });
+
     it("never lets the bundle's exportedAt become an item's timestamp", () => {
       // The injection this closes: `parseBundle` only checks that `exportedAt`
       // is a string, so "yesterday" or a future date used to land on disk and
