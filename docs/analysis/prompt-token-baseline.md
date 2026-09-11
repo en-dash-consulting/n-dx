@@ -10,8 +10,8 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-09-10T03:09:48.470Z
-- **Commit** — `9a5952332716`
+- **Recorded at** — 2026-09-11T12:15:04.131Z
+- **Commit** — `1ce09a26728b`
 - **Content hash** — `e10365e5d95f379b` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 36

@@ -1772,6 +1772,7 @@ Task routing (which model serves which kind of call):
                  prd.restructure (standard)
     sourcevision code.classify (light)         zone.enrich-scan (light)
                  zone.enrich-deep (standard)   zone.meta-eval (standard)
+    web          sourcevision.ask (standard)
   Setting a route for a class not listed here still works — it may be a glob, or a
   class a newer n-dx defines — but ndx says so, and suggests the closest match.
 
@@ -1814,10 +1815,14 @@ Feature toggles (.n-dx.json — managed via web UI or ndx config):
   features.hench.guardRails         boolean   Security guard rails (default: true)
   features.hench.adaptiveWorkflow   boolean   Adaptive workflow adjustment (default: false)
 
-Sourcevision zone overrides (.n-dx.json):
+Sourcevision settings (.n-dx.json):
   sourcevision.zones.pins  object    Override zone assignments: {"file/path.ts": "zone-id"}
   sourcevision.zones.mergeThreshold
                            number    Min zone size for small-zone merge (default: 3)
+  sourcevision.ask.timeoutMs
+                           number    Wall-clock budget for one dashboard Ask request,
+                                     in ms (default: 120000). A request that exceeds
+                                     it fails as a named timeout rather than hanging.
 
 CLI settings (.n-dx.json):
   cli.name                 string    The project's installed CLI command name.

@@ -53,6 +53,58 @@ describe("file-lock", () => {
     await release();
   });
 
+  it("never steals another live process's lock, however old it is", async () => {
+    // The lost-update this prevents was observed, not theorised: two concurrent
+    // `rex import-bundle` processes both entered the critical section under a
+    // loaded machine, and the second one's save was rejected by the stale-save
+    // guard for deleting an item the first had just written.
+    //
+    // Age used to be sufficient grounds to unlink a lock whose owner was still
+    // running, on the theory that the owner was hung. A hung process and a slow
+    // one are indistinguishable by age, and the whole suite takes long enough
+    // under load for a healthy import to hold the lock past any such threshold.
+    // So liveness decides, and a lock nobody can prove abandoned is never taken.
+    const lockPath = await makeLockPath();
+    // The parent process: definitely alive, and definitely not this process —
+    // a same-PID lock is orphan-by-definition, since the in-process mutex
+    // guarantees no live same-process holder can exist while we check.
+    const liveForeignPid = process.ppid;
+    await writeFile(
+      lockPath,
+      JSON.stringify({
+        pid: liveForeignPid,
+        token: "held-by-a-live-process",
+        timestamp: new Date(Date.now() - 10 * 60_000).toISOString(),
+      }),
+    );
+
+    await expect(
+      acquireLock(lockPath, { acquireTimeoutMs: 300, retryDelayMs: 20 }),
+    ).rejects.toThrow(/Could not acquire PRD lock/);
+
+    // And it says who is holding it, so the operator can act on the refusal.
+    await expect(
+      acquireLock(lockPath, { acquireTimeoutMs: 300, retryDelayMs: 20 }),
+    ).rejects.toThrow(new RegExp(`PID ${liveForeignPid}`));
+  });
+
+  it("still reclaims an ancient lock once its owner is gone", async () => {
+    // The other half: refusing to steal from the living must not turn a crashed
+    // writer's leftover lock into a permanent outage.
+    const lockPath = await makeLockPath();
+    await writeFile(
+      lockPath,
+      JSON.stringify({
+        pid: 999999999,
+        token: "owner-is-long-gone",
+        timestamp: new Date(Date.now() - 10 * 60_000).toISOString(),
+      }),
+    );
+
+    const release = await acquireLock(lockPath, { acquireTimeoutMs: 1_000 });
+    await release();
+  });
+
   it("serializes concurrent withLock calls", async () => {
     const lockPath = await makeLockPath();
     const order: number[] = [];
@@ -75,13 +127,14 @@ describe("file-lock", () => {
     expect(order).toEqual([1, 2, 3]);
   });
 
-  it("does not steal a live same-process lock held longer than staleMs", async () => {
+  it("does not steal a live same-process lock however long it is held", async () => {
     const lockPath = await makeLockPath();
     const order: string[] = [];
 
-    // Holder's critical section outlives the staleness threshold. A waiter
-    // must still queue behind it instead of unlinking the live lock and
-    // entering concurrently (the root cause of folder-tree corruption).
+    // A waiter must queue behind a live holder rather than unlinking its lock
+    // and entering concurrently (the root cause of folder-tree corruption).
+    // In-process this is guaranteed by the mutex; across processes it is the
+    // liveness check in isLockStale.
     const p1 = withLock(
       lockPath,
       async () => {
@@ -89,7 +142,6 @@ describe("file-lock", () => {
         await new Promise((r) => setTimeout(r, 300));
         order.push("h-end");
       },
-      { staleMs: 100 },
     );
 
     await new Promise((r) => setTimeout(r, 5));
@@ -99,7 +151,6 @@ describe("file-lock", () => {
       async () => {
         order.push("w-start");
       },
-      { staleMs: 100 },
     );
 
     await Promise.all([p1, p2]);

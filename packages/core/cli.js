@@ -2375,6 +2375,67 @@ async function handleNext(rest) {
   exitWithCleanup(0);
 }
 
+/**
+ * `ndx prd <export|import>` — the portable PRD bundle.
+ *
+ * A subcommand group rather than two top-level commands: `ndx export` already
+ * publishes the static dashboard, and a top-level `ndx import` would read as
+ * the analyze-from-a-spec import. Both subcommands spawn rex, per the
+ * spawn-only orchestration rule.
+ *
+ * `import` maps to rex's `import-bundle` because plain `rex import` is a
+ * long-standing alias for `rex analyze`.
+ */
+const PRD_SUBCOMMANDS = { export: "export", import: "import-bundle" };
+
+async function handlePrd(rest) {
+  const subIndex = rest.findIndex((a) => !a.startsWith("-"));
+  const sub = subIndex === -1 ? undefined : rest[subIndex];
+  // Own-property lookup only: a plain read would resolve "constructor" and
+  // friends to Object.prototype members and spawn them as rex commands.
+  const rexCommand =
+    sub && Object.hasOwn(PRD_SUBCOMMANDS, sub) ? PRD_SUBCOMMANDS[sub] : undefined;
+
+  if (!rexCommand) {
+    console.error(
+      sub
+        ? `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown 'ndx prd' subcommand: ${sub}`
+        : `Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Missing 'ndx prd' subcommand`,
+    );
+    console.error("Hint: Run 'ndx prd export --out=<path>' or 'ndx prd import --in=<path>'.");
+    exitWithCleanup(1);
+    return;
+  }
+
+  // Drop the subcommand token by position — a directory argument could
+  // legitimately be named "export".
+  const args = [...rest.slice(0, subIndex), ...rest.slice(subIndex + 1)];
+
+  // Value-carrying flags must be written --flag=value at this tier. The
+  // orchestrator keeps only `-`-prefixed tokens and reads the last bare token
+  // as the project directory, so in `--out bundle.json` the path would be
+  // dropped from the spawn — rex would receive `--out <dir>` and try to write
+  // the bundle over the project directory itself. rex's own parser accepts
+  // the space form; the garbling is purely this tier, so reject it here with
+  // the spelling that works.
+  const PRD_VALUE_FLAGS = ["--out", "--in", "--item", "--format"];
+  const bareFlag = args.find((a) => PRD_VALUE_FLAGS.includes(a));
+  if (bareFlag) {
+    console.error(`Error: [${CLI_ERROR_CODES.GENERIC}] ${bareFlag} needs a value.`);
+    console.error(
+      `Hint: Write it as ${bareFlag}=<value> — 'ndx prd' does not support the space-separated form.`,
+    );
+    exitWithCleanup(1);
+    return;
+  }
+
+  const dir = resolveDir(args);
+  requireInit(dir, [".rex"]);
+  const flags = extractFlags(args);
+  await runOrDie(tools.rex, [rexCommand, ...flags, dir]);
+  exitWithCleanup(0);
+}
+
 async function handleTree(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, [".rex"]);
@@ -2708,6 +2769,7 @@ const COMMAND_DISPATCH = new Map([
   ["prune",             handlePrune],
   ["next",              handleNext],
   ["tree",              handleTree],
+  ["prd",               handlePrd],
   // ── Delegated sourcevision commands ──
   ["reset",             handleReset],
   ["iso",               handleIso],
