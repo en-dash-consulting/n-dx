@@ -16,7 +16,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, statSync, rmSync } from "fs";
 import { createRequire } from "module";
-import { join, resolve, dirname, basename } from "path";
+import { join, resolve, dirname, basename, relative, isAbsolute } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 // execFileSyncCli, not execSync: execSync takes a command STRING, so every call
 // site here hand-quoted interpolated paths (tmpWorktree, dir). A project path
@@ -25,6 +25,8 @@ import { fileURLToPath, pathToFileURL } from "url";
 // quoteWindowsToken/ArgvQuote rules and also handles `rex` being a .cmd shim.
 import { execFileSyncCli } from "./win-spawn.js";
 import { buildCommitMessage } from "./commit-trailers.js";
+import { ensureGitignoreEntry } from "./gitignore.js";
+import { createInterface } from "node:readline/promises";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -45,11 +47,13 @@ function resolvePackagePath(pkgDir, npmName, filePath) {
 
 // ── Flag parsing ─────────────────────────────────────────────────────────────
 
-function parseExportArgs(args) {
+export function parseExportArgs(args) {
   let outDir = "./ndx-export";
   let basePath = null;
   let cname = null;
   let deploy = null;
+  let includeTranscripts = false;
+  let yes = false;
   let dir = process.cwd();
 
   for (let i = 0; i < args.length; i++) {
@@ -62,6 +66,10 @@ function parseExportArgs(args) {
       cname = arg.slice("--cname=".length);
     } else if (arg.startsWith("--deploy=")) {
       deploy = arg.slice("--deploy=".length);
+    } else if (arg === "--include-transcripts") {
+      includeTranscripts = true;
+    } else if (arg === "--yes" || arg === "-y") {
+      yes = true;
     } else if (!arg.startsWith("-")) {
       dir = arg;
     }
@@ -98,7 +106,7 @@ function parseExportArgs(args) {
   if (!basePath.startsWith("/")) basePath = "/" + basePath;
   if (!basePath.endsWith("/")) basePath += "/";
 
-  return { outDir: resolve(dir, outDir), basePath, cname, deploy, dir: resolve(dir) };
+  return { outDir: resolve(dir, outDir), basePath, cname, deploy, includeTranscripts, yes, dir: resolve(dir) };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -144,10 +152,140 @@ function getGitInfo(dir) {
   }
 }
 
+/**
+ * Remove transcript-bearing fields from a hench run record for export.
+ *
+ * A `.hench/runs/*.json` record carries the agent's raw activity — every
+ * `toolCalls[].input`/`output`, the `events` stream, `error` bodies, prompt
+ * section text, and the test-gate error. Any of these can contain whatever the
+ * agent read or printed: `.env` contents, a `process.env` dump, fixture data.
+ * The exported dashboard only needs the *summary* of a run (status, token
+ * usage, structured counts), so strip the rest by default and mark the record
+ * so the static Task Audit view can explain the absence.
+ *
+ * Pure: returns a new object, never mutates `run`. Pass
+ * `{ includeTranscripts: true }` to opt back into the full record.
+ *
+ * @param {Record<string, unknown>} run
+ * @param {{ includeTranscripts?: boolean }} [opts]
+ * @returns {Record<string, unknown>}
+ */
+export function sanitizeRunForExport(run, opts = {}) {
+  if (opts.includeTranscripts) return run;
+  const out = { ...run };
+  delete out.toolCalls;
+  delete out.events;
+  delete out.error;
+  if (out.diagnostics && typeof out.diagnostics === "object") {
+    out.diagnostics = { ...out.diagnostics };
+    delete out.diagnostics.promptSections;
+  }
+  if (out.testGate && typeof out.testGate === "object") {
+    out.testGate = { ...out.testGate };
+    delete out.testGate.error;
+  }
+  out.transcriptOmitted = true;
+  return out;
+}
+
+/** Count files matching `pred` anywhere under `root`. Missing root → 0. */
+function countFilesUnder(root, pred) {
+  if (!existsSync(root)) return 0;
+  let n = 0;
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    const full = join(root, entry.name);
+    if (entry.isDirectory()) n += countFilesUnder(full, pred);
+    else if (pred(entry.name)) n += 1;
+  }
+  return n;
+}
+
+/**
+ * Describe what a `--deploy=github` push would publish, so the operator can
+ * decide before it happens. Reads only — builds no output.
+ *
+ * @param {string} dir Project root.
+ * @param {{ includeTranscripts?: boolean }} [opts]
+ * @returns {{ remote: string|null, branch: string, runCount: number, itemCount: number, includeTranscripts: boolean }}
+ */
+export function buildDeployManifest(dir, opts = {}) {
+  let remote = null;
+  try {
+    remote = execFileSyncCli("git", ["remote", "get-url", "origin"], { cwd: dir, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).toString().trim() || null;
+  } catch { /* no remote / not a repo */ }
+  const runCount = countFilesUnder(join(dir, ".hench", "runs"), (f) => f.endsWith(".json"));
+  const itemCount = countFilesUnder(join(dir, ".rex", "prd_tree"), (f) => f.endsWith(".md"));
+  return { remote, branch: "n-dx-dashboard", runCount, itemCount, includeTranscripts: !!opts.includeTranscripts };
+}
+
+/**
+ * Render a deploy manifest as human-readable lines.
+ * @param {ReturnType<typeof buildDeployManifest>} m
+ * @returns {string[]}
+ */
+export function formatDeployManifest(m) {
+  return [
+    "This will force-push the exported dashboard to a remote branch:",
+    `  Remote:       ${m.remote ?? "(no origin remote configured)"}`,
+    `  Branch:       ${m.branch} (overwritten)`,
+    `  Publishes:    ${m.itemCount} PRD item file(s), ${m.runCount} hench run summary(ies), and SourceVision analysis data`,
+    `  Transcripts:  ${m.includeTranscripts ? "INCLUDED (tool inputs/outputs, events, errors)" : "excluded (tool inputs/outputs, events, errors are not published)"}`,
+    "  Anyone with access to the remote can read this, and it cannot be undone from here.",
+  ];
+}
+
+/**
+ * Gate a `--deploy=github` run behind the operator's informed consent.
+ *
+ * Prints a manifest of what would be published, then:
+ *  - `--yes` → proceed (the manifest is printed for the record).
+ *  - no TTY, no `--yes` → refuse: print the manifest and how to proceed to
+ *    stderr, return "refused" so the caller exits non-zero. Nothing is built.
+ *  - TTY → prompt; "declined" on anything but yes.
+ *
+ * @param {{ dir: string, includeTranscripts: boolean, yes: boolean, isTTY: boolean,
+ *           streams?: { stdout?: NodeJS.WritableStream, stderr?: NodeJS.WritableStream, stdin?: NodeJS.ReadableStream },
+ *           readlineFactory?: typeof createInterface }} args
+ * @returns {Promise<"proceed" | "refused" | "declined">}
+ */
+export async function confirmGithubDeploy({ dir, includeTranscripts, yes, isTTY, streams, readlineFactory }) {
+  const out = streams?.stdout ?? process.stdout;
+  const err = streams?.stderr ?? process.stderr;
+  const manifest = formatDeployManifest(buildDeployManifest(dir, { includeTranscripts }));
+
+  if (yes) {
+    out.write(manifest.join("\n") + "\n");
+    return "proceed";
+  }
+
+  if (!isTTY) {
+    err.write(
+      "ndx export --deploy=github requires confirmation before force-pushing,\n" +
+      "but stdin is not a TTY. Review what would be published, then re-run with --yes:\n\n" +
+      manifest.join("\n") + "\n\n" +
+      "  ndx export --deploy=github --yes\n",
+    );
+    return "refused";
+  }
+
+  out.write(manifest.join("\n") + "\n");
+  const factory = readlineFactory ?? createInterface;
+  const rl = factory({ input: streams?.stdin ?? process.stdin, output: out });
+  let answer = "";
+  try {
+    answer = await rl.question("Force-push the dashboard to the remote? [y/N] ");
+  } catch {
+    answer = "";
+  } finally {
+    rl.close();
+  }
+  return /^y(es)?$/i.test(answer.trim()) ? "proceed" : "declined";
+}
+
 // ── Main export logic ────────────────────────────────────────────────────────
 
 export async function runExport(args) {
-  const { outDir, basePath, cname, deploy, dir } = parseExportArgs(args);
+  const { outDir, basePath, cname, deploy, includeTranscripts, yes, dir } = parseExportArgs(args);
   const svDir = join(dir, ".sourcevision");
   const rexDir = join(dir, ".rex");
   const henchDir = join(dir, ".hench");
@@ -161,6 +299,28 @@ export async function runExport(args) {
     console.error(`Error: Missing ${missing.join(", ")} in ${dir}`);
     console.error("Hint: Run 'ndx init' and 'ndx plan' first.");
     return 1;
+  }
+
+  // The exported site carries PRD data and run summaries. When it is written
+  // inside the project, ignore it so a later `git add -A` cannot commit a
+  // second copy. Done before the deploy gate so even a declined deploy leaves
+  // the entry behind.
+  const outRel = relative(dir, outDir);
+  if (outRel && !outRel.startsWith("..") && !isAbsolute(outRel)) {
+    ensureGitignoreEntry(dir, outRel.split(/[\\/]/).join("/").replace(/\/?$/, "/"));
+  }
+
+  // ── Deploy confirmation gate ────────────────────────────────────────────
+  // `--deploy=github` force-pushes to origin/n-dx-dashboard, exposing the
+  // export to anyone with remote access. Confirm before doing any work.
+  if (deploy === "github") {
+    const gate = await confirmGithubDeploy({
+      dir,
+      includeTranscripts,
+      yes,
+      isTTY: Boolean(process.stdin && process.stdin.isTTY),
+    });
+    if (gate !== "proceed") return gate === "declined" ? 0 : 1;
   }
 
   console.log(`[export] generating static dashboard → ${outDir}`);
@@ -291,8 +451,8 @@ export async function runExport(args) {
         totalInput += usage.input || 0;
         totalOutput += usage.output || 0;
 
-        // Individual run (full detail for transcript viewing)
-        writeJSON(join(outDir, "api", "hench", "runs", `${run.id}.json`), run);
+        // Individual run — transcripts stripped unless --include-transcripts.
+        writeJSON(join(outDir, "api", "hench", "runs", `${run.id}.json`), sanitizeRunForExport(run, { includeTranscripts }));
 
         // Summary (strip heavy fields)
         runs.push({

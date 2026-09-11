@@ -23,6 +23,6 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [hench command guard passes newline-separated commands and `>` redirection](./hench-command-guard-passes-newline.md) | pending |
 | [hench `git` tool re-joins args into `sh -c` with no shell-operator check](./hench-git-tool-re-joins-args-into-sh-c.md) | pending |
 | [`.n-dx.json` receives API keys but `ndx init` never gitignores it](./n-dx-json-receives-api-keys-but-ndx.md) | completed |
-| [`ndx export` / `--deploy=github` publish full hench transcripts with no redaction or confirmation](./ndx-export-deploy-github-publish-full.md) | pending |
+| [`ndx export` / `--deploy=github` publish full hench transcripts with no redaction or confirmation](./ndx-export-deploy-github-publish-full.md) | completed |
 | [Web server `readBody` has no request-size cap](./web-server-readbody-has-no-request.md) | pending |
 | [WebSocket upgrade accepts any Origin — dashboard broadcasts readable cross-site](./websocket-upgrade-accepts-any-origin.md) | pending |

@@ -68,6 +68,8 @@ interface RunLog {
   }>;
   summary?: string;
   error?: string;
+  /** Set by `ndx export` when transcripts were stripped from the published record. */
+  transcriptOmitted?: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -323,6 +325,7 @@ function AuditTaskCard({
 
 /** Log viewer for a specific run. */
 function RunLogViewer({ runId }: { runId: string }) {
+  const cliName = useCliName();
   const [log, setLog] = useState<RunLog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -380,7 +383,10 @@ function RunLogViewer({ runId }: { runId: string }) {
     ),
     h("div", { class: "audit-log-entries" },
       toolCalls.length === 0
-        ? h("div", { class: "audit-log-empty" }, "No tool calls recorded yet.")
+        ? h("div", { class: "audit-log-empty" },
+            log.transcriptOmitted
+              ? `Transcript not included in this export. Re-run \`${cliName} export --include-transcripts\` (or view this run in the live dashboard) to see tool calls.`
+              : "No tool calls recorded yet.")
         : toolCalls.map((tc, i) =>
             h("div", { key: i, class: "audit-log-entry" },
               h("div", { class: "audit-log-entry-header" },

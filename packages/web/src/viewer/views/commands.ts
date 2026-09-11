@@ -166,6 +166,7 @@ function ExportPanel() {
   const [basePath, setBasePath] = useState("");
   const [cname, setCname] = useState("");
   const [confirmingDeploy, setConfirmingDeploy] = useState(false);
+  const [includeTranscripts, setIncludeTranscripts] = useState(false);
 
   /**
    * Generate the sourcevision PDF report. Reports the written path: the viewer
@@ -201,6 +202,11 @@ function ExportPanel() {
           basePath: deployGithub ? (basePath.trim() || undefined) : undefined,
           cname: deployGithub ? (cname.trim() || undefined) : undefined,
           deploy: deployGithub ? "github" : undefined,
+          // Reaching handleExport with deployGithub set means the user passed
+          // through the confirmation dialog below; carry that consent to the
+          // route, which refuses a deploy without it.
+          confirmDeploy: deployGithub ? true : undefined,
+          includeTranscripts: includeTranscripts || undefined,
         }),
       });
 
@@ -216,7 +222,7 @@ function ExportPanel() {
       setError(String(err));
       setState("error");
     }
-  }, [outDir, basePath, cname, deployGithub]);
+  }, [outDir, basePath, cname, deployGithub, includeTranscripts]);
 
   const handleExportClick = useCallback(() => {
     if (deployGithub) {
@@ -257,6 +263,15 @@ function ExportPanel() {
         ` Deploy to GitHub Pages (push to the n-dx-dashboard branch). Equivalent to `,
         h("code", null, `${cliName} export --deploy=github`), ".",
       ),
+      h("label", { class: "overview-deep-toggle" },
+        h("input", {
+          type: "checkbox",
+          checked: includeTranscripts,
+          disabled: state === "running",
+          onChange: (e: Event) => setIncludeTranscripts((e.target as HTMLInputElement).checked),
+        }),
+        " Include agent transcripts (tool inputs/outputs and event streams). Off by default — these can contain secrets or file contents the agent read.",
+      ),
       deployGithub
         ? h(Fragment, null,
             h("label", { class: "cmd-panel-label" }, "Base path (optional \u2014 auto-detected from git remote)"),
@@ -288,6 +303,11 @@ function ExportPanel() {
             h("strong", null, "This force-pushes to a remote branch."),
             h("p", null,
               "Exporting will overwrite the n-dx-dashboard branch on this repo's git remote (origin) with the freshly generated dashboard. This is visible to anyone with access to the remote and cannot be undone by this dashboard.",
+            ),
+            h("p", null,
+              includeTranscripts
+                ? "Agent transcripts (tool inputs/outputs and event streams) WILL be published — these can contain secrets or file contents the agent read. Uncheck “Include agent transcripts” above to publish only run summaries."
+                : "Published: PRD items, analysis data, and hench run summaries. Agent transcripts are excluded.",
             ),
             h("div", { class: "cmd-panel-actions" },
               h("button", {

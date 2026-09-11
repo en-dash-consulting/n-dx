@@ -46,6 +46,9 @@
 # Run logs
 .run-logs/
 
+# `ndx export` output (default out-dir; carries PRD data and run summaries)
+ndx-export/
+
 # Local config overrides — machine paths (*.cli_path) and API keys (*.api_key)
 # are written here by `ndx config`, never to the shared .n-dx.json.
 .n-dx.local.json
