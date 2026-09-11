@@ -988,6 +988,13 @@ export interface RunRecord {
    * v1 additive field.
    */
   spawnBreakdown?: Record<string, number>;
+  /**
+   * How many times the in-memory conversation window was condensed during
+   * the run (tool-output digests and LLM summarization passes both count).
+   * Set by the local (LM Studio) tool loop; absent for vendors that manage
+   * their own context. v1 additive field.
+   */
+  contextCondensations?: number;
   retryAttempts?: number;
   /** Structured metadata derived from tool calls at run finalization. */
   structuredSummary?: RunSummaryData;

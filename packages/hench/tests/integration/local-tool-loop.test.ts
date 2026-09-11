@@ -39,6 +39,8 @@ interface ScriptedTurn {
     function: { name: string; arguments: string };
   }>;
   finish_reason?: string;
+  /** Reported prompt size — drives the loop's context-pressure measurement. */
+  prompt_tokens?: number;
 }
 
 function chatResponse(turn: ScriptedTurn): Record<string, unknown> {
@@ -54,7 +56,7 @@ function chatResponse(turn: ScriptedTurn): Record<string, unknown> {
         finish_reason: turn.finish_reason ?? "stop",
       },
     ],
-    usage: { prompt_tokens: 100, completion_tokens: 20 },
+    usage: { prompt_tokens: turn.prompt_tokens ?? 100, completion_tokens: 20 },
   };
 }
 
@@ -108,12 +110,18 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  /** Stub global fetch to answer chat/completions from a script, in order. */
+  /**
+   * Stub global fetch to answer chat/completions from a script, in order.
+   * Requests WITHOUT a `tools` field are the condenser's summarization calls —
+   * they get a fixed summary and do not consume the script.
+   */
   function stubChatEndpoint(turns: ScriptedTurn[]): void {
     let call = 0;
-    fetchMock = vi.fn(async () => {
-      const turn = turns[Math.min(call, turns.length - 1)]!;
-      call += 1;
+    fetchMock = vi.fn(async (_url: string, init?: { body?: string }) => {
+      const body = init?.body ? JSON.parse(init.body) : {};
+      const turn: ScriptedTurn = !("tools" in body)
+        ? { content: "Summary: earlier files were read; remaining work: finish the output file." }
+        : turns[Math.min(call++, turns.length - 1)]!;
       return {
         ok: true,
         status: 200,
@@ -180,6 +188,76 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     expect(result.run.turns).toBe(2);
     expect(result.run.toolCalls.length).toBeGreaterThanOrEqual(1);
     expect(result.run.toolCalls[0].tool).toBe("write_file");
+  });
+
+  it("condenses the window under measured context pressure and records the count", async () => {
+    mockLocalProvider();
+
+    // A window small enough (relative to the scripted prompt_tokens) that the
+    // loop crosses 70% (digest) and then 90% (summarize).
+    await writeFile(
+      join(projectDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: { vendor: "local", local: { host: "localhost", port: 1234, maxContextTokens: 100_000 } },
+      }),
+      "utf-8",
+    );
+    // A file large enough that its read_file output is worth digesting.
+    await writeFile(join(projectDir, "big-notes.txt"), "x".repeat(1_200), "utf-8");
+
+    const readTurn = (id: string, promptTokens: number): ScriptedTurn => ({
+      content: null,
+      tool_calls: [{
+        id,
+        type: "function",
+        function: { name: "read_file", arguments: JSON.stringify({ path: "big-notes.txt" }) },
+      }],
+      prompt_tokens: promptTokens,
+    });
+
+    stubChatEndpoint([
+      // Turns 1-5: build up history well under the window.
+      readTurn("c1", 10_000),
+      readTurn("c2", 10_000),
+      readTurn("c3", 10_000),
+      readTurn("c4", 10_000),
+      readTurn("c5", 10_000),
+      // Turn 6: 71% — digest stage fires on the old tool outputs.
+      readTurn("c6", 71_000),
+      // Turn 7: 95% — summarization stage replaces the middle of the history.
+      readTurn("c7", 95_000),
+      // Turn 8: real work so the completion claim is valid.
+      {
+        content: null,
+        tool_calls: [{
+          id: "c8",
+          type: "function",
+          function: {
+            name: "write_file",
+            arguments: JSON.stringify({ path: "final-output.txt", content: "done" }),
+          },
+        }],
+        prompt_tokens: 10_000,
+      },
+      // Turn 9: completion claim.
+      { content: "Done.", prompt_tokens: 10_000 },
+    ]);
+
+    const { result } = await runLoop();
+
+    expect(result.run.status).toBe("completed");
+    // Both stages fired: at least one digest event and one summarize event.
+    expect(result.run.contextCondensations).toBeGreaterThanOrEqual(2);
+
+    // The digested tool outputs and the summary actually reached the model:
+    // inspect the tool-call requests sent AFTER each condensation.
+    const toolRequestBodies = fetchMock.mock.calls
+      .map((c) => JSON.parse((c[1] as { body: string }).body))
+      .filter((b) => "tools" in b);
+    const allSentText = JSON.stringify(toolRequestBodies.at(-1)!.messages);
+    expect(allSentText).toContain("[Earlier context condensed]");
+    const postDigestText = JSON.stringify(toolRequestBodies.at(-3)!.messages);
+    expect(postDigestText).toContain("[tool output condensed]");
   });
 
   it("re-prompts a no-change completion claim, then fails the run — same standard as the CLI loop", async () => {

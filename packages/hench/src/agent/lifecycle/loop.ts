@@ -886,6 +886,119 @@ async function executeLocalToolCalls(
 }
 
 // ---------------------------------------------------------------------------
+// Context condensation (local loop)
+// ---------------------------------------------------------------------------
+
+/** Context-pressure thresholds against llm.local.maxContextTokens. */
+const CONTEXT_WARN_RATIO = 0.7;
+const CONTEXT_CRITICAL_RATIO = 0.9;
+/** Recent messages exempt from condensation — the model's working set. */
+const CONDENSE_TAIL_MESSAGES = 8;
+/** Characters kept when an old tool output is digested in place. */
+const DIGEST_KEEP_CHARS = 200;
+
+/**
+ * Split the conversation for condensation: prefix | middle | tail.
+ *
+ * Prefix = the optional system message + the task brief; never condensed.
+ * Tail = the most recent messages (the model's working set), extended
+ * backwards so it never begins with orphaned `tool` results — their owning
+ * assistant `tool_calls` message must travel with them or OpenAI-format
+ * servers reject the history.
+ */
+function splitLocalHistory(messages: OpenAiMessage[]): { prefixEnd: number; tailStart: number } {
+  const prefixEnd = (messages[0]?.role === "system" ? 1 : 0) + 1;
+  let tailStart = Math.max(prefixEnd, messages.length - CONDENSE_TAIL_MESSAGES);
+  while (tailStart > prefixEnd && messages[tailStart]?.role === "tool") {
+    tailStart--;
+  }
+  return { prefixEnd, tailStart };
+}
+
+/**
+ * Stage 1 — deterministic digest: shrink old tool outputs in place, keeping
+ * the narrative (assistant text, tool names) intact. Costs no model call.
+ * Returns the number of characters removed (0 = nothing left to digest).
+ */
+function digestLocalToolOutputs(
+  messages: OpenAiMessage[],
+  prefixEnd: number,
+  tailStart: number,
+): number {
+  let saved = 0;
+  for (let i = prefixEnd; i < tailStart; i++) {
+    const m = messages[i];
+    if (m.role === "tool" && typeof m.content === "string" && m.content.length > DIGEST_KEEP_CHARS + 40) {
+      saved += m.content.length - DIGEST_KEEP_CHARS;
+      m.content = `${m.content.slice(0, DIGEST_KEEP_CHARS)}… [tool output condensed]`;
+    }
+  }
+  return saved;
+}
+
+/**
+ * Stage 2 — LLM summarization: one extra chat/completions call (no tools)
+ * that compresses the middle of the conversation into a progress summary.
+ *
+ * Best-effort by contract: any failure returns null and the run continues on
+ * the digested history — a condensation problem must never kill a run. The
+ * caller replaces the middle with the summary, which invalidates the server's
+ * prompt-prefix cache once; that is why this fires only at the critical
+ * threshold rather than every turn.
+ */
+async function summarizeLocalHistory(args: {
+  baseUrl: string;
+  model: string;
+  middle: OpenAiMessage[];
+  timeoutMs: number;
+}): Promise<{ summary: string; usage: { input: number; output: number } } | null> {
+  const transcript = args.middle
+    .map((m) => {
+      const body = m.tool_calls?.length
+        ? m.tool_calls.map((tc) => `${tc.function.name}(${tc.function.arguments.slice(0, 120)})`).join("; ")
+        : (m.content ?? "");
+      return `${m.role}: ${body}`;
+    })
+    .join("\n");
+
+  const reqBody: Record<string, unknown> = {
+    model: args.model || undefined,
+    messages: [
+      {
+        role: "system",
+        content: "You compress agent work transcripts. Reply with only the summary — no preamble.",
+      },
+      {
+        role: "user",
+        content:
+          "Summarize this agent transcript so the agent can continue the task without it: " +
+          "files read/changed, key findings, decisions made, and remaining work. Max 300 words.\n\n" +
+          transcript,
+      },
+    ],
+  };
+  if (!args.model) delete reqBody["model"];
+
+  try {
+    const response = await fetch(`${args.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reqBody),
+      ...(args.timeoutMs > 0 ? { signal: AbortSignal.timeout(args.timeoutMs) } : {}),
+    });
+    if (!response.ok) return null;
+    const data = await response.json() as Record<string, unknown>;
+    const choices = (data["choices"] as Array<Record<string, unknown>> | undefined) ?? [];
+    const message = (choices[0]?.["message"] as Record<string, unknown> | undefined) ?? {};
+    const summary = typeof message["content"] === "string" ? message["content"].trim() : "";
+    if (!summary) return null;
+    return { summary, usage: parseLocalUsage(data["usage"]) };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Verifier
 // ---------------------------------------------------------------------------
 
@@ -1027,6 +1140,13 @@ async function runLocalToolLoop(params: {
   let verifierCycleCount = 0;
   let noWorkRetryCount = 0;
 
+  // Context-window pressure, measured (not estimated): each response's
+  // prompt_tokens is the actual size of the request just sent, ratioed
+  // against llm.local.maxContextTokens. Drives the warn/critical text tint
+  // and token-triggered condensation. Stays 0 when no window is configured.
+  let contextRatio = 0;
+  let condensations = 0;
+
   // Compile OpenAI-format tool definitions once
   const openAiTools = toOpenAiToolDefs([...TOOL_DEFINITIONS_NEUTRAL]);
 
@@ -1068,6 +1188,13 @@ async function runLocalToolLoop(params: {
   }
   messages.push({ role: "user", content: briefText });
 
+  if (!maxContextTokens) {
+    detail(
+      "Context tracking off — set llm.local.maxContextTokens (ndx config llm.local.maxContextTokens <n>) " +
+      "to enable window monitoring and condensation.",
+    );
+  }
+
   // Pre-send token check: if maxContextTokens is configured, estimate whether the initial
   // brief fits before the first request. A rough heuristic (1 token ≈ 3.5 chars) is used
   // — exact tokenization requires the model's tokenizer. Fails fast with actionable guidance.
@@ -1098,13 +1225,22 @@ async function runLocalToolLoop(params: {
       run.turns = turn + 1;
       subsection(`Turn ${turn + 1}/${maxTurns}`);
 
-      // Prune history to stay within context limits
-      const maxKeep = 1 + MAX_CONTEXT_PAIRS * 2;
-      if (messages.length > maxKeep + 1) {
-        const toRemove = messages.length - maxKeep - 1;
-        const systemEnd = messages[0].role === "system" ? 1 : 0;
-        messages.splice(systemEnd, toRemove);
-        detail(`Pruned ${toRemove} messages to stay within context limit`);
+      // Fallback count-based prune — only when no context window is
+      // configured. With llm.local.maxContextTokens set, the token-triggered
+      // condensation at the bottom of the loop replaces this: it preserves a
+      // summary of dropped turns instead of discarding them outright.
+      if (!maxContextTokens) {
+        const maxKeep = 1 + MAX_CONTEXT_PAIRS * 2;
+        if (messages.length > maxKeep + 1) {
+          const toRemove = messages.length - maxKeep - 1;
+          // Keep the system message AND the task brief (first user message).
+          const prefixEnd = (messages[0].role === "system" ? 1 : 0) + 1;
+          // Never let the kept history begin with orphaned tool results.
+          let removeEnd = prefixEnd + toRemove;
+          while (messages[removeEnd]?.role === "tool") removeEnd++;
+          messages.splice(prefixEnd, removeEnd - prefixEnd);
+          detail(`Pruned ${removeEnd - prefixEnd} messages to stay within context limit`);
+        }
       }
 
       const reqBody: Record<string, unknown> = {
@@ -1161,10 +1297,22 @@ async function runLocalToolLoop(params: {
       const usage = parseLocalUsage(data["usage"]);
       recordTurnTokenUsageNormalized(run, usage, turn + 1, "local", model);
 
-      // Emit tok/s metric for the dashboard
+      // Measure context pressure from the request just sent.
+      if (maxContextTokens && usage.input > 0) {
+        contextRatio = usage.input / maxContextTokens;
+      }
+      const contextTone: "warn" | "critical" | undefined =
+        contextRatio >= CONTEXT_CRITICAL_RATIO ? "critical"
+        : contextRatio >= CONTEXT_WARN_RATIO ? "warn"
+        : undefined;
+
+      // Emit tok/s metric for the dashboard (+ context fill when known)
       if (usage.output > 0 && latencyMs > 0) {
         const tokPerSec = Math.round((usage.output / latencyMs) * 1000 * 10) / 10;
-        detail(`⚡ ${tokPerSec} tok/s (${latencyMs}ms, ${usage.output} out)`);
+        const ctx = maxContextTokens && usage.input > 0
+          ? ` · ctx ${Math.round(contextRatio * 100)}% (${usage.input.toLocaleString()}/${maxContextTokens.toLocaleString()})`
+          : "";
+        detail(`⚡ ${tokPerSec} tok/s (${latencyMs}ms, ${usage.output} out)${ctx}`);
       }
 
       const budgetCheck = checkTokenBudget(run.tokenUsage, tokenBudget);
@@ -1183,12 +1331,14 @@ async function runLocalToolLoop(params: {
       }
       messages.push(assistantMsg);
 
+      // Context pressure tints ONLY the model's own text — yellow at ≥70%,
+      // red at ≥90% — leaving tool lines and metrics in their normal colors.
       if (assistantContent) {
-        stream(formatModelLabel(model), assistantContent);
+        stream(formatModelLabel(model), assistantContent, contextTone && { tone: contextTone });
       } else if (reasoningText) {
         // A thinking model with an empty `content` otherwise renders as a
         // blank turn that visibly burns tokens — show what it was doing.
-        stream(`${formatModelLabel(model)} (thinking)`, reasoningText);
+        stream(`${formatModelLabel(model)} (thinking)`, reasoningText, contextTone && { tone: contextTone });
       }
 
       // The model is done only when it stops calling tools. `finish_reason` is
@@ -1259,6 +1409,50 @@ async function runLocalToolLoop(params: {
       // Dispatch tool calls and feed responses back
       const toolResults = await executeLocalToolCalls(rawToolCalls, toolCtx, turn + 1, run);
       messages.push(...toolResults);
+
+      // Token-triggered condensation, so the NEXT request stays inside the
+      // window. At ≥70%: digest old tool outputs in place (free). At ≥90%:
+      // additionally summarize the middle of the conversation via one extra
+      // model call and replace it with the summary. Fires only on measured
+      // pressure, and rarely — every rewrite of earlier messages invalidates
+      // the server's prompt-prefix cache once.
+      if (maxContextTokens && contextRatio >= CONTEXT_WARN_RATIO) {
+        const { prefixEnd, tailStart } = splitLocalHistory(messages);
+        let condensedThisTurn = false;
+
+        const savedChars = digestLocalToolOutputs(messages, prefixEnd, tailStart);
+        if (savedChars > 0) condensedThisTurn = true;
+
+        if (contextRatio >= CONTEXT_CRITICAL_RATIO && tailStart > prefixEnd) {
+          const middle = messages.slice(prefixEnd, tailStart);
+          const summarized = await summarizeLocalHistory({
+            baseUrl, model, middle, timeoutMs: requestTimeoutMs,
+          });
+          if (summarized) {
+            // The summary call spends real tokens — attribute them to the run.
+            recordTurnTokenUsageNormalized(run, summarized.usage, turn + 1, "local", model);
+            messages.splice(prefixEnd, tailStart - prefixEnd, {
+              role: "user",
+              content:
+                `[Earlier context condensed]\nSummary of progress so far:\n${summarized.summary}\n\n` +
+                "Treat this summary as authoritative context for the earlier work and continue the task.",
+            });
+            condensedThisTurn = true;
+          }
+        }
+
+        if (condensedThisTurn) {
+          condensations++;
+          run.contextCondensations = condensations;
+          stream(
+            "Context",
+            `window at ${Math.round(contextRatio * 100)}% — condensed (#${condensations} this run)`,
+          );
+          if (savedChars > 0) {
+            detail(`Tool outputs digested: ~${savedChars.toLocaleString()} chars removed`);
+          }
+        }
+      }
 
       run.lastActivityAt = new Date().toISOString();
       await saveRun(henchDir, run);

@@ -843,6 +843,13 @@ async function runOne(
     info(`Memory: ${peakMB} MB peak RSS (system: ${availGB} / ${totalGB} GB available)`);
   }
 
+  // Context-window churn — set only by the local (LM Studio) loop, so the
+  // line appears for local runs only. Says how many times the conversation
+  // window was condensed (digested or summarized) during the run.
+  if (run.contextCondensations) {
+    info(`Context window: condensed ${run.contextCondensations} time(s) during the run`);
+  }
+
   // Post-task test results
   const postTests = run.structuredSummary?.postRunTests;
   if (postTests?.ran) {
