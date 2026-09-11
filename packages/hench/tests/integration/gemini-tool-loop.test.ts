@@ -195,7 +195,8 @@ describe("Gemini agentic tool-use loop", () => {
       model: "gemini-2.5-pro", yes: true, autonomous: true,
     });
 
-    expect(result.run.turns).toBe(1);
+    // Initial claim + 2 execution re-prompts = 3 turns before the loop gives up.
+    expect(result.run.turns).toBe(3);
     expect(result.run.toolCalls.length).toBe(0);
     expect(result.run.status).toBe("failed");
     expect(result.run.error).toContain("No changes detected");

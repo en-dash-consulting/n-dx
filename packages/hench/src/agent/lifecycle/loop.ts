@@ -8,6 +8,7 @@ import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
 import { section, subsection, stream, detail, info, withHeartbeat } from "../../types/output.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import {
   loadClaudeConfig,
@@ -62,6 +63,13 @@ const BASE_DELAY_MS = 1000;
 const MAX_CONTEXT_PAIRS = 20;
 const MAX_SUMMARY_LENGTH = 500;
 const MAX_TOOL_OUTPUT_STORED = 2000;
+/**
+ * How many times an API tool loop re-prompts a model that claims completion
+ * while the run has changed nothing. The counterpart of the Claude API loop's
+ * plan-only reminder: small local models in particular tend to acknowledge the
+ * task and stop after a bookkeeping tool call.
+ */
+const MAX_NO_WORK_RETRIES = 2;
 
 // ---------------------------------------------------------------------------
 // Extracted helpers — each handles one focused concern within the turn loop
@@ -658,6 +666,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       const contents: GeminiContent[] = [
         { role: "user", parts: [{ text: briefText }] },
       ];
+      let geminiNoWorkRetryCount = 0;
 
       for (let turn = 0; turn < maxTurns; turn++) {
         if (cancelled) {
@@ -697,8 +706,32 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
           stream(formatModelLabel(model), result.text);
         }
 
-        // No function calls → the model is done.
+        // No function calls → the model claims it is done.
         if (result.functionCalls.length === 0) {
+          // Same second chance the local loop gives: a completion claim with
+          // no changes gets an execution reminder before it stands.
+          if (geminiNoWorkRetryCount < MAX_NO_WORK_RETRIES) {
+            const changed = await discoverChangedFiles({ projectDir, startingHead, baselineUntracked });
+            if ((changed ?? []).length === 0) {
+              geminiNoWorkRetryCount++;
+              stream(
+                "Warning",
+                `Completion claimed with no changes. Re-prompting to execute (attempt ${geminiNoWorkRetryCount}/${MAX_NO_WORK_RETRIES})...`,
+              );
+              contents.push({
+                role: "user",
+                parts: [{
+                  text:
+                    "You have not changed any files, so the task cannot be complete. " +
+                    "Use the available tools to implement the task now — read the relevant files, " +
+                    "make the required edits, and verify them. Do not describe a plan; execute it.",
+                }],
+              });
+              run.lastActivityAt = new Date().toISOString();
+              await saveRun(henchDir, run);
+              continue;
+            }
+          }
           run.status = "completed";
           run.summary = result.text ? result.text.slice(0, MAX_SUMMARY_LENGTH) : undefined;
           break;
@@ -992,6 +1025,7 @@ async function runLocalToolLoop(params: {
   const maxVerifierCycles = typeof verifierCfg?.["maxCycles"] === "number"
     ? (verifierCfg["maxCycles"] as number) : 2;
   let verifierCycleCount = 0;
+  let noWorkRetryCount = 0;
 
   // Compile OpenAI-format tool definitions once
   const openAiTools = toOpenAiToolDefs([...TOOL_DEFINITIONS_NEUTRAL]);
@@ -1114,6 +1148,14 @@ async function runLocalToolLoop(params: {
       const finishReason = choice["finish_reason"] as string | undefined;
       const assistantContent = typeof message["content"] === "string" ? message["content"] : null;
       const rawToolCalls = (message["tool_calls"] as OpenAiToolCall[] | undefined) ?? [];
+      // Reasoning models (qwen thinking, deepseek-r1, …) return their chain of
+      // thought in a separate field — LM Studio uses `reasoning_content`, some
+      // servers use `reasoning`. Display-only: it is never fed back into the
+      // conversation (the server's chat template re-derives it).
+      const reasoningText =
+        typeof message["reasoning_content"] === "string" ? message["reasoning_content"]
+        : typeof message["reasoning"] === "string" ? message["reasoning"]
+        : null;
 
       // Track token usage
       const usage = parseLocalUsage(data["usage"]);
@@ -1143,10 +1185,41 @@ async function runLocalToolLoop(params: {
 
       if (assistantContent) {
         stream(formatModelLabel(model), assistantContent);
+      } else if (reasoningText) {
+        // A thinking model with an empty `content` otherwise renders as a
+        // blank turn that visibly burns tokens — show what it was doing.
+        stream(`${formatModelLabel(model)} (thinking)`, reasoningText);
       }
 
-      // No tool calls → model is done; run verifier if configured
-      if (rawToolCalls.length === 0 || finishReason === "stop" || finishReason === "end_turn") {
+      // The model is done only when it stops calling tools. `finish_reason` is
+      // deliberately NOT part of this check: LM Studio reports "stop" for some
+      // models even when `tool_calls` is populated, and treating that as
+      // completion silently discarded the calls the model had just made.
+      if (rawToolCalls.length === 0) {
+        // Completion is a claim, and validateCompletion will reject it if
+        // nothing changed — but first give the model the same second chance
+        // the Claude loop gives plan-only turns: tell it to execute.
+        if (noWorkRetryCount < MAX_NO_WORK_RETRIES) {
+          const changed = await discoverChangedFiles({ projectDir, startingHead, baselineUntracked });
+          if ((changed ?? []).length === 0) {
+            noWorkRetryCount++;
+            stream(
+              "Warning",
+              `Completion claimed with no changes. Re-prompting to execute (attempt ${noWorkRetryCount}/${MAX_NO_WORK_RETRIES})...`,
+            );
+            messages.push({
+              role: "user",
+              content:
+                "You have not changed any files, so the task cannot be complete. " +
+                "Use the available tools to implement the task now — read the relevant files, " +
+                "make the required edits, and verify them. Do not describe a plan; execute it.",
+            });
+            run.lastActivityAt = new Date().toISOString();
+            await saveRun(henchDir, run);
+            continue;
+          }
+        }
+
         if (verifierCfg && verifierCycleCount < maxVerifierCycles) {
           const vHost = typeof verifierCfg["host"] === "string" && verifierCfg["host"]
             ? verifierCfg["host"] : "localhost";
