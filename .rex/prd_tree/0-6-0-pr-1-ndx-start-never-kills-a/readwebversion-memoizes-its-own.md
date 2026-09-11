@@ -13,16 +13,8 @@ source: "code review of PR #359, 2026-09-11"
 startedAt: "2026-09-11T13:10:46.676Z"
 completedAt: "2026-09-11T13:21:03.252Z"
 endedAt: "2026-09-11T13:21:03.252Z"
-resolutionType: code-change
-resolutionDetail: >-
-  readWebVersion() in packages/web/src/server/routes-status.ts no longer
-  memoizes "unknown" on a failed read — only a successfully parsed version
-  string populates cachedVersion, so a transient read failure (EMFILE, a
-  not-yet-ready mount) is retried on the next call instead of pinned for the
-  life of the process. A successful read is still memoized (single read).
-  Added packages/web/tests/unit/server/routes-status-version-cache.test.ts
-  covering fail-then-succeed, succeed-then-fail, and single-read
-  memoization via a mocked node:fs.readFileSync.
+resolutionType: "code-change"
+resolutionDetail: "readWebVersion() in packages/web/src/server/routes-status.ts no longer memoizes \"unknown\" on a failed read — only a successfully parsed version string populates cachedVersion, so a transient read failure (EMFILE, a not-yet-ready mount) is retried on the next call instead of pinned for the life of the process. A successful read is still memoized (single read). Added packages/web/tests/unit/server/routes-status-version-cache.test.ts covering fail-then-succeed, succeed-then-fail, and single-read memoization via a mocked node:fs.readFileSync."
 acceptanceCriteria:
   - "A transient read failure does not populate the cache: a later call that succeeds returns the real version."
   - "A successful read is still memoized — the file is read once, not on every request (assert with a spy or a call counter)."
