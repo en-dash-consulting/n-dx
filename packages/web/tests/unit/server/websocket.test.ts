@@ -495,4 +495,89 @@ describe("WebSocket manager", () => {
     c2.socket.destroy();
     c4.socket.destroy();
   });
+  // ── Origin gate (cross-site read protection) ───────────────────────────
+  //
+  // A WebSocket handshake is not subject to CORS, so the HTTP-side origin guard
+  // never sees it. Without the check in handleUpgrade, any page open in the
+  // user's browser could open ws://localhost:<port> and read every broadcast.
+  describe("origin gate", () => {
+    /**
+     * Attempt an upgrade with an optional Origin header. Resolves with the
+     * first HTTP response line so 101 (upgraded) and 403 (refused) are
+     * distinguishable, plus the raw bytes seen.
+     */
+    function attemptUpgrade(origin?: string): Promise<{ statusLine: string; raw: string }> {
+      return new Promise((resolve, reject) => {
+        const socket = connect({ host: TEST_HOST, port }, () => {
+          const keyBytes = Buffer.alloc(16);
+          for (let i = 0; i < 16; i++) keyBytes[i] = Math.floor(Math.random() * 256);
+          const key = keyBytes.toString("base64");
+          socket.write(
+            `GET / HTTP/1.1\r\n` +
+            `Host: ${TEST_HOST}:${port}\r\n` +
+            `Upgrade: websocket\r\n` +
+            `Connection: Upgrade\r\n` +
+            (origin ? `Origin: ${origin}\r\n` : "") +
+            `Sec-WebSocket-Key: ${key}\r\n` +
+            `Sec-WebSocket-Version: 13\r\n` +
+            `\r\n`,
+          );
+        });
+        let buf = Buffer.alloc(0);
+        socket.on("data", (chunk: Buffer) => {
+          buf = Buffer.concat([buf, chunk]);
+          const str = buf.toString("utf-8");
+          if (str.includes("\r\n\r\n")) {
+            socket.destroy();
+            resolve({ statusLine: str.split("\r\n")[0], raw: str });
+          }
+        });
+        // A refused upgrade may be destroyed with no bytes on some stacks; treat
+        // a clean close with nothing read as a refusal, not a hang.
+        socket.on("close", () => resolve({ statusLine: buf.toString("utf-8").split("\r\n")[0], raw: buf.toString("utf-8") }));
+        socket.on("error", reject);
+        setTimeout(() => reject(new Error("Upgrade timeout")), 3000);
+      });
+    }
+
+    it("refuses an upgrade from a cross-site Origin (403, no client, no frame)", async () => {
+      const { statusLine, raw } = await attemptUpgrade("http://evil.example");
+      expect(statusLine).toContain("403");
+      expect(raw).not.toContain("101");
+      expect(raw).not.toContain("connected");
+      expect(ws.clientCount()).toBe(0);
+    });
+
+    it("accepts an upgrade from the dashboard's own loopback Origin", async () => {
+      const { statusLine } = await attemptUpgrade(`http://localhost:${port}`);
+      expect(statusLine).toContain("101");
+      expect(ws.clientCount()).toBe(1);
+    });
+
+    it("accepts 127.0.0.1 on the server's own port", async () => {
+      const { statusLine } = await attemptUpgrade(`http://127.0.0.1:${port}`);
+      expect(statusLine).toContain("101");
+      expect(ws.clientCount()).toBe(1);
+    });
+
+    it("accepts an upgrade with no Origin header (CLI/MCP client)", async () => {
+      const { statusLine } = await attemptUpgrade(undefined);
+      expect(statusLine).toContain("101");
+      expect(ws.clientCount()).toBe(1);
+    });
+
+    it("refuses a loopback Origin on a different port", async () => {
+      const otherPort = port === 65000 ? 64999 : 65000;
+      const { statusLine, raw } = await attemptUpgrade(`http://localhost:${otherPort}`);
+      expect(statusLine).toContain("403");
+      expect(raw).not.toContain("101");
+      expect(ws.clientCount()).toBe(0);
+    });
+
+    it("refuses an https Origin even on a matching port (dashboard is http)", async () => {
+      const { statusLine } = await attemptUpgrade(`https://localhost:${port}`);
+      expect(statusLine).toContain("403");
+      expect(ws.clientCount()).toBe(0);
+    });
+  });
 });

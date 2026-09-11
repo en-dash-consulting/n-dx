@@ -16,8 +16,13 @@ function effectivePort(url: URL): number {
  * Only the dashboard itself may make browser CORS requests. Comparing against
  * the socket's local port, rather than the attacker-controlled Host header,
  * also prevents a DNS-rebinding origin from presenting a matching Host value.
+ *
+ * Exported so the WebSocket upgrade path can apply the same check — browsers do
+ * not send a CORS preflight for a WebSocket handshake, so without this any page
+ * open in the user's browser could open `ws://localhost:<port>` and read every
+ * broadcast.
  */
-function isTrustedBrowserOrigin(origin: string, req: IncomingMessage): boolean {
+export function isTrustedBrowserOrigin(origin: string, req: IncomingMessage): boolean {
   try {
     const url = new URL(origin);
     return url.protocol === "http:"

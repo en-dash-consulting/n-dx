@@ -2,7 +2,7 @@
 id: "04a04154-6d21-4387-afba-75dfc8d41202"
 level: "task"
 title: "WebSocket upgrade accepts any Origin — dashboard broadcasts readable cross-site"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -10,6 +10,11 @@ tags:
   - "severity:medium"
   - "web"
 source: "ndx-adversarial-review"
+startedAt: "2026-09-11T19:32:31.040Z"
+completedAt: "2026-09-11T19:34:28.097Z"
+endedAt: "2026-09-11T19:34:28.097Z"
+resolutionType: "code-change"
+resolutionDetail: "handleUpgrade now rejects a present-but-untrusted Origin (403 + socket destroy) using the exported isTrustedBrowserOrigin (loopback + socket-localPort, DNS-rebinding safe); missing Origin stays allowed for CLI/MCP. Six-case websocket.test.ts coverage against the real handler; verified the cross-site case fails without the fix. web typecheck + ws/request-security suites green."
 acceptanceCriteria:
   - "A WebSocket upgrade with `Origin: http://evil.example` is refused (403 / socket destroyed) and no `connected` frame is sent"
   - "A WebSocket upgrade with `Origin: http://localhost:<serverPort>` succeeds"
@@ -17,6 +22,6 @@ acceptanceCriteria:
   - "An `Origin` on a loopback host but a different port is refused"
   - "Unit/integration test covers the four cases above against the real `handleUpgrade`"
 description: "**Severity:** medium · **Verdict:** must-fix\n\n**Failure scenario.** `ndx start` is running. The user has any other website open. That page runs `new WebSocket(\"ws://localhost:3117\")`. Browsers do not apply CORS to WebSocket handshakes, and `handleRequestSecurity` (Origin + Sec-Fetch-Site guard) is wired only to the `request` event (`start.ts:674-675`); the `upgrade` handler (`start.ts:683` → `websocket.ts:475`) checks only that `Sec-WebSocket-Key` is present. The page now receives every broadcast: `rex:prd-changed`, `rex:item-updated`, `hench:task-execution-progress` (whose `state.lastOutput` is the last stdout line the agent printed), `hench:run-changed`, `rex:execution-progress`, `commands:self-heal-*`, memory/concurrency status. Inbound frames are limited to close/ping/pong (`websocket.ts:541-600`), so this is a passive leak, not a CSRF vector — but it is the only cross-origin hole in an otherwise well-guarded server.\n\n**Evidence.** `packages/web/src/server/websocket.ts:475-487` (no Origin check), `packages/web/src/server/start.ts:674-675, 683`, `packages/web/src/server/request-security.ts:20-30` (`isTrustedBrowserOrigin` exists but is module-private and unused on upgrade).\n\n**Reachability.** Any browser tab while the dashboard runs. No user action required beyond visiting a page.\n\n**Solution options.**\n1. *(Recommended)* Export `isTrustedBrowserOrigin` from `request-security.ts`; in `handleUpgrade`, if an `Origin` header is present and not trusted, write `HTTP/1.1 403` and destroy the socket. Requests with no `Origin` (non-browser clients) stay allowed, matching the HTTP guard's contract. ~5 lines + a test in `request-security.test.ts` or a new `websocket-origin.test.ts`.\n2. Additionally require a per-server random token in the WS URL that the viewer HTML embeds. Stronger (also blocks non-browser local processes) but changes the viewer contract; not needed for this finding."
-lastModified: "2026-09-11T17:37:40.209Z"
+lastModified: "2026-09-11T19:34:28.111Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
