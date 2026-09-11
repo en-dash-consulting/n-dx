@@ -30,6 +30,8 @@ import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
 import { isSpinningRun } from "../analysis/spin.js";
+import { createLivelockDetector } from "../analysis/livelock.js";
+import type { LivelockDetection, LivelockDetector } from "../analysis/livelock.js";
 import {
   buildReviewSystemPrompt,
   buildReviewBrief,
@@ -146,10 +148,11 @@ export interface CliLoopResult {
 
 /**
  * Intermediate result shape used during the spawn–parse–accumulate cycle.
- * Equivalent to the deprecated CliRunResult but kept as a private type
- * since the production path uses it internally.
+ * Equivalent to the deprecated CliRunResult. Exported only because
+ * {@link spawnWithAdapter} is — it is not part of hench's public surface and
+ * carries no stability guarantee.
  */
-interface SpawnResult {
+export interface SpawnResult {
   turns: number;
   toolCalls: ToolCallRecord[];
   tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
@@ -166,6 +169,13 @@ interface SpawnResult {
    */
   planModeIntercept?: { planText: string };
   /**
+   * Set when the spawn was terminated early because the agent was repeating
+   * the same tool call instead of making progress (GH #362). The outer loop
+   * fails the run with this message rather than retrying: a livelock is not a
+   * transient error, and a retry re-enters the same loop.
+   */
+  livelock?: LivelockDetection;
+  /**
    * Vendor session identifier reported by the CLI, when it reports one.
    *
    * Claude's `--output-format stream-json` stamps `session_id` on every line,
@@ -181,7 +191,7 @@ interface SpawnResult {
   sessionId?: string;
 }
 
-interface SpawnTokenMetadata {
+export interface SpawnTokenMetadata {
   vendor: LLMVendor;
   model: string;
 }
@@ -579,7 +589,7 @@ function addTokenUsage(
 
 // ── Generic adapter-based spawn ───────────────────────────────────────────
 
-interface SpawnWithAdapterOptions {
+export interface SpawnWithAdapterOptions {
   adapter: VendorAdapter;
   spawnConfig: SpawnConfig;
   cliBinary: string;
@@ -590,6 +600,41 @@ interface SpawnWithAdapterOptions {
   useEventPipeline?: boolean;
   /** Caller-provided accumulator — events are pushed here when useEventPipeline is true. */
   accumulator?: EventAccumulator;
+  /**
+   * Livelock detector fed by this spawn's `tool_use` events. When it fires,
+   * the child is terminated and {@link SpawnResult.livelock} is set.
+   * Omitted (e.g. by the orientation spawn) means no detection.
+   */
+  livelock?: LivelockDetector;
+  /**
+   * Counters updated in place as the spawn produces output, so the heartbeat
+   * can persist a truthful record mid-spawn instead of the zeros the record
+   * carries until the process closes (GH #362).
+   */
+  liveProgress?: LiveSpawnProgress;
+}
+
+/** Mid-spawn counters. Mutated in place; read by the heartbeat. */
+export interface LiveSpawnProgress {
+  turns: number;
+  tokenUsage: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
+}
+
+export function createLiveSpawnProgress(): LiveSpawnProgress {
+  return { turns: 0, tokenUsage: { input: 0, output: 0 } };
+}
+
+/**
+ * Zero the counters.
+ *
+ * Called once a spawn's numbers have been folded into the cross-attempt
+ * accumulator, so the two cannot be added together twice — a plan-mode prompt
+ * can sit between a spawn and the next one for minutes, and every heartbeat in
+ * that gap would otherwise double-count the attempt that just ended.
+ */
+export function resetLiveSpawnProgress(progress: LiveSpawnProgress): void {
+  progress.turns = 0;
+  progress.tokenUsage = { input: 0, output: 0 };
 }
 
 /**
@@ -619,11 +664,14 @@ interface SpawnWithAdapterOptions {
  * `EventAccumulator`. On process close, `SpawnResult` is derived from
  * `accumulator.toCliRunResult()` instead of inline mutation. This produces
  * equivalent run records while operating entirely on the RuntimeEvent stream.
+ *
+ * @internal Exported for testing — the livelock and plan-mode intercepts kill a
+ *   live child process, which only a real spawn can exercise.
  */
-function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
+export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
   const {
     adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
-    useEventPipeline, accumulator,
+    useEventPipeline, accumulator, livelock, liveProgress,
   } = opts;
 
   return new Promise((resolve, reject) => {
@@ -912,6 +960,16 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         }
       }
 
+      // A livelock is why this child died, so it owns the error text. Set here
+      // rather than at detection time because the event-pipeline close path
+      // assigns `result.error` wholesale from the accumulator, and set before
+      // the exit-code synthesis below because the non-zero code is our own
+      // SIGTERM — "claude exited with code 143" reads as transient and would
+      // buy the livelock a retry.
+      if (result.livelock) {
+        result.error = result.livelock.message;
+      }
+
       // Don't synthesize an error when we deliberately killed the spawn to
       // intercept plan mode — the outer loop owns that flow and will either
       // re-spawn with permissionMode=acceptEdits or surface a cancelled status.
@@ -970,6 +1028,29 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         }
       }
 
+      // Livelock intercept: the agent is repeating a call that changes nothing.
+      // Terminated the same way plan mode is, for the same reason — the outer
+      // loop cannot act on something the child will never stop doing.
+      //
+      // Only invocations are visible here: Claude's stream-json reports tool
+      // results as `user` messages the adapter does not map, so the detector
+      // sees no output on this path and falls back to name+arguments identity.
+      if (livelock && event?.type === "tool_use" && event.toolCall && !result.livelock) {
+        const detection = livelock.record({
+          tool: event.toolCall.tool,
+          input: event.toolCall.input,
+        });
+        if (detection) {
+          result.livelock = detection;
+          info(`\n${detection.message}`);
+          try {
+            proc.kill("SIGTERM");
+          } catch {
+            // Process may already be exiting; the close handler will resolve.
+          }
+        }
+      }
+
       if (useEventPipeline && accumulator) {
         // ── Event pipeline: push to accumulator + emit UI ──
         if (event) {
@@ -977,6 +1058,7 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
           accumulator.push(event);
           emitStreamOutput(event, vendorLabel);
           if (event.type === "assistant") turnCounter.value++;
+          if (liveProgress) liveProgress.turns = turnCounter.value;
         }
 
         // Step 2: Extract token usage → RuntimeEvent → accumulator
@@ -985,7 +1067,15 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
             const rawJson = JSON.parse(line);
             captureSessionId(rawJson);
             const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata);
-            if (tokenEvent) accumulator.push(tokenEvent);
+            if (tokenEvent) {
+              accumulator.push(tokenEvent);
+              // Mirror the accumulator's own arithmetic (a plain sum over token
+              // events) rather than reading its derived getter, which rebuilds
+              // from the whole event list and would make this O(n²) per spawn.
+              if (liveProgress && tokenEvent.tokenUsage) {
+                liveProgress.tokenUsage = addTokenUsage(liveProgress.tokenUsage, tokenEvent.tokenUsage);
+              }
+            }
 
             // Extract completion metadata (num_turns, cost_usd) from raw JSON
             const type = rawJson.type as string | undefined;
@@ -1041,6 +1131,14 @@ function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
               info(line);
             }
           }
+        }
+
+        // The legacy path mutates `result` line by line, so live counters are a
+        // copy of it rather than a parallel tally. Taken after token extraction
+        // so a line's usage is included in the same beat as its turn.
+        if (liveProgress) {
+          liveProgress.turns = result.turns || turnCounter.value;
+          liveProgress.tokenUsage = { ...result.tokenUsage };
         }
       }
     }
@@ -1499,6 +1597,19 @@ interface ErrorContext {
 async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
   const { run, result, accumulated, attempt, store, taskId, retryConfig, vendor } = ctx;
 
+  // A livelock is terminal by construction: the spawn was killed because the
+  // agent was repeating itself, and a retry re-enters the same loop with the
+  // same brief. Checked before the transient classifier rather than relying on
+  // the message not matching one of its patterns.
+  if (result.livelock) {
+    syncRunFromAccumulated(run, accumulated, attempt);
+    run.status = "failed";
+    run.summary = result.summary;
+    run.error = result.livelock.message;
+    await handleRunFailure(store, taskId, "deferred", "livelock_detected", run.error);
+    return "break";
+  }
+
   // Authentication / session loss is never transient: retrying just burns
   // turns and cascades the same failure. Detect it first — before the
   // transient check that would otherwise treat a bare "claude exited with
@@ -1673,9 +1784,22 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // cross-retry accumulator so it sees total token usage across all retries.
   const runAccumulator = useEventPipeline ? new EventAccumulator() : undefined;
 
+  // Livelock detection spans the whole task, not one spawn: a retry re-enters
+  // the same brief, so a repetition that straddles two attempts is the same
+  // repetition. The detector clears itself whenever the agent writes a file.
+  const livelock = createLivelockDetector({ threshold: config.livelockThreshold });
+
+  // Counters for the in-flight spawn, folded onto the record by the heartbeat.
+  const liveProgress = createLiveSpawnProgress();
+
   // Start heartbeat — writes lastActivityAt to disk periodically so the CLI
-  // subprocess doesn't appear stale to the web dashboard during long tool calls.
-  const heartbeat = startHeartbeat(henchDir, run);
+  // subprocess doesn't appear stale to the web dashboard during long tool calls,
+  // and carries the in-flight spawn's turns and tokens so the dashboard does not
+  // read a busy run as an idle one (GH #362).
+  const heartbeat = startHeartbeat(henchDir, run, undefined, () => {
+    run.turns = accumulated.turns + liveProgress.turns;
+    run.tokenUsage = addTokenUsage(accumulated.tokenUsage, liveProgress.tokenUsage);
+  });
 
   // Start the commit-message watcher. If the agent writes `.hench-commit-msg.txt`
   // and the run terminates before the normal commit-prompt flow can process it
@@ -1916,6 +2040,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         recordSpawn(spawnLedger, nextSpawnReason);
 
         // Generic adapter-based spawn — replaces dispatchVendorSpawn
+        resetLiveSpawnProgress(liveProgress);
         result = await withHeartbeat(
           `waiting on ${vendor} CLI`,
           spawnWithAdapter({
@@ -1927,8 +2052,13 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             tokenMetadata,
             useEventPipeline,
             accumulator: attemptAccumulator,
+            livelock,
+            liveProgress,
           }),
         );
+        // This attempt's numbers are about to be added to `accumulated`; the
+        // live counters must stop claiming them or the two would be summed.
+        resetLiveSpawnProgress(liveProgress);
 
         // Merge per-attempt events into the cross-retry accumulator. Includes
         // events from spawns terminated by plan-mode interception so token
@@ -1941,7 +2071,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // a parent the vendor CLI no longer has. Drop it, stop forking, and
         // re-spawn cold — without charging this to the retry budget, since
         // nothing was learned about the task itself.
-        if (result.error && warmParentId && !forkFallbackUsed) {
+        // A livelock is excluded: its error is our own SIGTERM, not a fork that
+        // failed, and re-spawning cold would restart the loop we just stopped.
+        if (result.error && !result.livelock && warmParentId && !forkFallbackUsed) {
           forkFallbackUsed = true;
           nextSpawnReason = "fork-fallback";
           warmParentId = undefined;

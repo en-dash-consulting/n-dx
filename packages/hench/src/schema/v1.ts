@@ -218,6 +218,15 @@ export interface HenchConfig {
    */
   maxSpawnsPerTask?: number;
   /**
+   * Identical tool calls, inside a sliding window and with no file written in
+   * between, before a run is stopped as livelocked (default: 6; 0 disables).
+   *
+   * The escape hatch exists because the threshold is a judgement call about
+   * other people's workloads — see `agent/analysis/livelock.ts` for how it was
+   * picked and what "identical" means.
+   */
+  livelockThreshold?: number;
+  /**
    * When true, skip the mandatory full test suite gate before commit.
    * Default: false (gate is mandatory). The --skip-test-gate CLI flag sets this.
    * Test gate failure blocks commit unless this flag is set or user selects skip.

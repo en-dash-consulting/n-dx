@@ -76,6 +76,10 @@ export const HenchConfigSchema = z.object({
   tasksPerSession: z.number().int().positive().optional().default(4),
   parentMaxAgeHours: z.number().positive().optional().default(24),
   maxSpawnsPerTask: z.number().int().positive().optional().default(8),
+  // 0 disables livelock detection — see the field docs on HenchConfig. Mirrors
+  // DEFAULT_LIVELOCK_THRESHOLD in agent/analysis/livelock.ts (schema cannot
+  // import from agent without inverting the layering).
+  livelockThreshold: z.number().int().nonnegative().optional().default(6),
   fullTestCommand: z.string().optional(),
   // 0 means "no limit" — see the field docs on HenchConfig. Mirrors
   // DEFAULT_TEST_GATE_TIMEOUT_MS in tools/test-runner.ts (schema cannot import

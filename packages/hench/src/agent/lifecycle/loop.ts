@@ -26,6 +26,8 @@ import { checkTokenBudget } from "./token-budget.js";
 import { parseTokenUsage } from "./token-usage.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD } from "../analysis/spin.js";
+import { createLivelockDetector } from "../analysis/livelock.js";
+import type { LivelockDetector } from "../analysis/livelock.js";
 import {
   prepareBrief,
   executeDryRun,
@@ -311,6 +313,42 @@ function recordTurnTokenUsage(
 }
 
 /**
+ * Record a dispatched tool call on the run and show it to the livelock detector.
+ *
+ * The API loops dispatch tools themselves, so unlike the CLI loop they can see
+ * each result — which lets the detector tell a poll that is returning new
+ * output from one that is returning the same bytes forever (GH #362).
+ */
+function recordToolCall(
+  run: RunRecord,
+  detector: LivelockDetector,
+  record: RunRecord["toolCalls"][number],
+): void {
+  run.toolCalls.push(record);
+  detector.record({ tool: record.tool, input: record.input, output: record.output });
+}
+
+/**
+ * Fail the run when the detector has seen a livelock. Returns true if it did,
+ * so callers read as `if (await failOnLivelock(...)) break;` — the same shape
+ * as the spin-detection gate above it.
+ */
+async function failOnLivelock(
+  detector: LivelockDetector,
+  run: RunRecord,
+  store: PRDStore,
+  taskId: string,
+): Promise<boolean> {
+  const detection = detector.detected;
+  if (!detection) return false;
+  run.status = "failed";
+  run.error = detection.message;
+  stream("Warning", run.error);
+  await handleRunFailure(store, taskId, "deferred", "livelock_detected", run.error);
+  return true;
+}
+
+/**
  * Dispatch all tool_use blocks in the assistant response, record results
  * in the run, and return the tool result messages for the next turn.
  */
@@ -319,6 +357,7 @@ async function executeToolCalls(
   toolCtx: ToolContext,
   turn: number,
   run: RunRecord,
+  detector: LivelockDetector,
 ): Promise<Anthropic.ToolResultBlockParam[]> {
   const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
@@ -340,7 +379,7 @@ async function executeToolCalls(
 
     const durationMs = Date.now() - startMs;
 
-    run.toolCalls.push({
+    recordToolCall(run, detector, {
       turn,
       tool: block.name,
       input: block.input as Record<string, unknown>,
@@ -472,6 +511,7 @@ async function executeGeminiFunctionCalls(
   toolCtx: ToolContext,
   turn: number,
   run: RunRecord,
+  detector: LivelockDetector,
 ): Promise<GeminiPart[]> {
   const responses: GeminiPart[] = [];
 
@@ -486,7 +526,7 @@ async function executeGeminiFunctionCalls(
 
     const durationMs = Date.now() - startMs;
 
-    run.toolCalls.push({
+    recordToolCall(run, detector, {
       turn,
       tool: fc.name,
       input: fc.args,
@@ -582,6 +622,11 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       : `Agent Run (${model})`,
   );
 
+  // Livelock detection: stop a run that keeps making the same call rather than
+  // letting it spend until a human notices (GH #362). Unlike the CLI loop this
+  // one sees tool results, so identical results are part of "the same call".
+  const livelock = createLivelockDetector({ threshold: config.livelockThreshold });
+
   const heartbeat = startHeartbeat(henchDir, run);
 
   // Register SIGINT handler for graceful cancellation (mirrors Claude loop).
@@ -660,8 +705,9 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
 
         // Dispatch tools and feed the responses back as the next user turn.
         const responses = await executeGeminiFunctionCalls(
-          result.functionCalls, toolCtx, turn + 1, run,
+          result.functionCalls, toolCtx, turn + 1, run, livelock,
         );
+        if (await failOnLivelock(livelock, run, store, taskId)) break;
         contents.push({ role: "user", parts: responses });
 
         run.lastActivityAt = new Date().toISOString();
@@ -762,6 +808,7 @@ async function executeLocalToolCalls(
   toolCtx: ToolContext,
   turn: number,
   run: RunRecord,
+  detector: LivelockDetector,
 ): Promise<OpenAiMessage[]> {
   const results: OpenAiMessage[] = [];
 
@@ -779,7 +826,7 @@ async function executeLocalToolCalls(
     const output = await dispatchTool(toolCtx, tc.function.name, input, rexToolHandlers);
     const durationMs = Date.now() - startMs;
 
-    run.toolCalls.push({
+    recordToolCall(run, detector, {
       turn,
       tool: tc.function.name,
       input,
@@ -954,6 +1001,11 @@ async function runLocalToolLoop(params: {
       : `Agent Run (${model})`,
   );
 
+  // Livelock detection: stop a run that keeps making the same call rather than
+  // letting it spend until a human notices (GH #362). Unlike the CLI loop this
+  // one sees tool results, so identical results are part of "the same call".
+  const livelock = createLivelockDetector({ threshold: config.livelockThreshold });
+
   const heartbeat = startHeartbeat(henchDir, run);
 
   let cancelled = false;
@@ -1119,7 +1171,8 @@ async function runLocalToolLoop(params: {
       }
 
       // Dispatch tool calls and feed responses back
-      const toolResults = await executeLocalToolCalls(rawToolCalls, toolCtx, turn + 1, run);
+      const toolResults = await executeLocalToolCalls(rawToolCalls, toolCtx, turn + 1, run, livelock);
+      if (await failOnLivelock(livelock, run, store, taskId)) break;
       messages.push(...toolResults);
 
       run.lastActivityAt = new Date().toISOString();
@@ -1313,8 +1366,14 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       : `Agent Run (${model})`,
   );
 
+  // Livelock detection: stop a run that keeps making the same call rather than
+  // letting it spend until a human notices (GH #362). Unlike the CLI loop this
+  // one sees tool results, so identical results are part of "the same call".
+  const livelock = createLivelockDetector({ threshold: config.livelockThreshold });
+
   // Start heartbeat — writes lastActivityAt to disk periodically so long-running
-  // tool calls don't make the run appear stale to the web dashboard.
+  // tool calls don't make the run appear stale to the web dashboard. The API
+  // loop already sets run.turns per turn, so it needs no counter hook.
   const heartbeat = startHeartbeat(henchDir, run);
 
   // API-specific: turn-based execution loop
@@ -1479,7 +1538,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       }
 
       // Process tool calls
-      const toolResults = await executeToolCalls(assistantContent, toolCtx, turn + 1, run);
+      const toolResults = await executeToolCalls(assistantContent, toolCtx, turn + 1, run, livelock);
+      if (await failOnLivelock(livelock, run, store, taskId)) break;
       messages.push({ role: "user", content: toolResults });
 
       // Save progress periodically
