@@ -98,7 +98,7 @@ export function isHenchRuntimeArtifact(path: string, repoPrefix = ""): boolean {
  *   unavailable — `execStdout` resolves empty rather than throwing, and the
  *   pre-nesting behaviour is the right thing to fall back to.
  */
-async function repoRelativePrefix(projectDir: string): Promise<string> {
+export async function repoRelativePrefix(projectDir: string): Promise<string> {
   const root = (
     await execStdout("git", ["rev-parse", "--show-toplevel"], {
       cwd: projectDir,

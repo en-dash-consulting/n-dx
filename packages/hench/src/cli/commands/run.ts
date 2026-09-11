@@ -12,6 +12,7 @@ import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { performPreRunCommitGateIfNeeded } from "../../agent/lifecycle/shared.js";
+import { findUncommittedWork, formatLoopRefusal } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
@@ -1458,6 +1459,41 @@ export async function cmdRun(
 }
 
 // ---------------------------------------------------------------------------
+// Between-task working-tree guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Refuse to start another task while the previous one's output is still in the
+ * working tree (#363).
+ *
+ * The pre-run commit gate runs once per invocation, so in a multi-task run
+ * nothing checked the tree again between tasks. When one task leaked its
+ * files, the next started on top of them: its diff, its review and its commit
+ * all covered work it never wrote, and three tasks' output ended up tangled
+ * together in one session.
+ *
+ * Nothing is discounted here beyond hench's own runtime artifacts — not even
+ * the PRD paths. Uncommitted `.rex/prd_tree/` between tasks means the previous
+ * task's status write never landed either, which is the same defect.
+ *
+ * Attended runs are left alone: a user who declined the commit prompt made
+ * that choice deliberately and is watching.
+ *
+ * @returns true when the caller should stop the loop.
+ */
+async function shouldStopForUncommittedWork(
+  projectDir: string,
+  autonomous: boolean | undefined,
+): Promise<boolean> {
+  if (!autonomous) return false;
+  const leftover = await findUncommittedWork({ projectDir });
+  if (leftover.clean) return false;
+  info(`\n${colorWarn(formatLoopRefusal(leftover.paths))}`);
+  process.exitCode = 1;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // Fixed iteration mode (existing behaviour)
 // ---------------------------------------------------------------------------
 
@@ -1494,6 +1530,7 @@ async function runIterations(
     // Not emitted before the first iteration (i === 0).
     if (i > 0) {
       info(`\n${formatIterationBanner(i + 1, iterations)}`);
+      if (await shouldStopForUncommittedWork(dir, autonomous)) break;
     }
 
     // For autoselected iterations, skip stuck tasks
@@ -1637,6 +1674,7 @@ async function runLoop(
       // Banner between iterations: not emitted before the first iteration.
       if (completed > 1) {
         info(`\n${formatIterationBanner(completed)}`);
+        if (await shouldStopForUncommittedWork(dir, autonomous)) break;
       }
 
       // Show queue status if there are pending tasks

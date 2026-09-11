@@ -49,6 +49,12 @@ import type { Heartbeat } from "./heartbeat.js";
 import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
+import {
+  PRD_COMMIT_PATHS,
+  findUncommittedWork,
+  formatUncommittedWorkRefusal,
+  listDirtyPaths,
+} from "./uncommitted-work-gate.js";
 import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
 
 // ---------------------------------------------------------------------------
@@ -856,37 +862,6 @@ export interface FinalizeRunOptions {
 
 /** Run statuses that indicate the run ended in failure. */
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
-
-/**
- * Return the list of entries reported by `git status --porcelain`.
- * Each non-blank line represents a modified, staged, or untracked path.
- * Returns an empty array when the working tree is clean or git is unavailable.
- *
- * Hench's own runtime artifacts are discounted by the callers via
- * {@link excludeHenchRuntimeArtifacts} rather than in here, because that is a
- * policy about what counts as operator work, not a detail of how the paths
- * were obtained — and this function is an injectable seam, so a filter hidden
- * inside the default implementation would silently not apply wherever a
- * caller supplied its own.
- *
- * `--untracked-files=all` matters twice over. By default git collapses a
- * wholly-untracked directory to a single entry — a fresh project reports
- * `?? .hench/`, never `?? .hench/locks/` — so
- * {@link excludeHenchRuntimeArtifacts} could not see what was inside and the
- * run blocked on its own lock file anyway. It also makes the count honest: a
- * directory of forty new files was being reported as "1 uncommitted file(s)".
- */
-async function listDirtyPaths(projectDir: string): Promise<string[]> {
-  try {
-    const output = await execStdout("git", ["status", "--porcelain", "--untracked-files=all"], {
-      cwd: projectDir,
-      timeout: 15_000,
-    });
-    return output.trim().split("\n").filter(Boolean);
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Run an interactive y/n readline prompt with the outer SIGINT handlers
@@ -1880,6 +1855,44 @@ async function resetInProgressTaskIfFailed(
   info(`\nTask reset to pending: [${run.taskId}] ${run.taskTitle ?? "unknown"}`);
 }
 
+/**
+ * Withdraw a completion claim the run is no longer entitled to make.
+ *
+ * {@link resetInProgressTaskIfFailed} is not enough on its own: the agent is
+ * instructed to call `rex_update_status` itself, so by the time the
+ * uncommitted-work gate fires the PRD may *already* say `completed` — which is
+ * the half of #363 where the status field reports the opposite of the truth.
+ * That path resets only `in_progress`, deliberately, so it cannot undo a
+ * completion. This one is written for exactly that case.
+ *
+ * Best-effort: a PRD write failure is reported and recorded on the run, never
+ * thrown. The run has already failed; losing the reason would be worse.
+ */
+async function withdrawCompletionClaim(
+  store: PRDStore,
+  run: RunRecord,
+  reason: string,
+): Promise<void> {
+  if (!run.taskId) return;
+  try {
+    const item = await store.getItem(run.taskId);
+    if (!item || (item.status !== "completed" && item.status !== "in_progress")) return;
+
+    await toolRexUpdateStatus(store, run.taskId, { status: "pending" });
+    await toolRexAppendLog(store, run.taskId, {
+      event: "completion_withdrawn",
+      detail: reason,
+    });
+    info(`\nTask reset to pending: [${run.taskId}] ${run.taskTitle ?? "unknown"}`);
+  } catch (err) {
+    const msg = (err as Error).message;
+    detail(`Warning: could not withdraw the completion claim: ${msg}`);
+    if (run.diagnostics) {
+      run.diagnostics.notes.push(`cascade_failure: ${msg}`);
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Token diagnostic helpers
 // ---------------------------------------------------------------------------
@@ -2142,6 +2155,38 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     }
   }
 
+  // Uncommitted-work gate (#363). "completed" is a claim that the work landed,
+  // so it is checked before it is written — not after, when the PRD already
+  // says the opposite of the truth.
+  //
+  // What is still allowed to be dirty here is exactly what a later step of this
+  // same run commits: the PRD paths (always), the review repairs on the
+  // autoCommit path, and the staged index wherever the commit prompt still
+  // follows. Anything else is finished work with no owner.
+  let uncommittedWorkRefused = false;
+  if (run.status === "completed") {
+    const autoCommit = opts.autoCommit === true;
+    // Only commitReviewRepairsIfNeeded (autoCommit path) commits these, and
+    // only when the review pass produced a usable report.
+    const review = run.review;
+    const pendingRepairs =
+      autoCommit && review && review.failed === undefined ? review.repairedFiles ?? [] : [];
+    const leaked = await findUncommittedWork({
+      projectDir,
+      stagedCommitFollows: !autoCommit,
+      discountPaths: [...PRD_COMMIT_PATHS, ...pendingRepairs],
+    });
+    if (!leaked.clean) {
+      uncommittedWorkRefused = true;
+      run.status = "failed";
+      run.error = formatUncommittedWorkRefusal(leaked.paths);
+      info(`\n${run.error}`);
+      if (opts.store) {
+        await withdrawCompletionClaim(opts.store, run, run.error);
+      }
+    }
+  }
+
   // Update PRD status to "completed" immediately after test gate passes.
   // This ensures status is persisted to disk before the next iteration's
   // task selection, preventing re-selection of just-completed tasks.
@@ -2198,7 +2243,11 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // Rollback uncommitted changes when the run failed (unless suppressed).
   // Runs after test gates so the working tree reflects the agent's final state.
   // Skips silently when nothing is dirty (no-op for already-clean trees).
-  if (opts.rollbackOnFailure !== false && FAILURE_STATUSES.has(run.status)) {
+  //
+  // Never after an uncommitted-work refusal: that failure *is* "there is
+  // finished work here that nobody committed", so offering to revert it would
+  // put the very files the gate just saved one keystroke from deletion.
+  if (!uncommittedWorkRefused && opts.rollbackOnFailure !== false && FAILURE_STATUSES.has(run.status)) {
     await performRollbackIfNeeded(projectDir, {
       yes: opts.yes,
       autonomous: opts.autonomous,
