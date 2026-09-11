@@ -21,10 +21,13 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { getMcpServers, renderCodexConfigToml } from "../../packages/core/assistant-assets.js";
 import { setupCodexIntegration } from "../../packages/core/codex-integration.js";
+
+const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 
 // ── Imports from compiled dist/ artifacts ──────────────────────────────────
 
@@ -514,6 +517,32 @@ describe("Codex config validation gauntlet", () => {
       } finally {
         rmSync(tmpDir, { recursive: true, force: true });
       }
+    });
+
+    it("regenerating .codex/config.toml is idempotent — re-running init twice produces byte-identical output", () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), "ndx-codex-config-validation-"));
+      try {
+        setupCodexIntegration(tmpDir);
+        const first = readFileSync(join(tmpDir, ".codex", "config.toml"), "utf-8");
+        setupCodexIntegration(tmpDir);
+        const second = readFileSync(join(tmpDir, ".codex", "config.toml"), "utf-8");
+        expect(second).toBe(first);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("the recommended gitignore snippet does not list .mcp.json — it is meant to be tracked", () => {
+      // .codex/config.toml itself is an optional gitignore entry (commit only
+      // if the team uses Codex), but .mcp.json is Claude's *tracked* config —
+      // Codex setup must not cause it to be recommended for exclusion either.
+      const template = readFileSync(
+        resolve(REPO_ROOT, "packages/core/assistant-assets/ndx.gitignore"),
+        "utf-8",
+      );
+      expect(template).not.toContain(".mcp.json");
+      const repoGitignore = readFileSync(resolve(REPO_ROOT, ".gitignore"), "utf-8");
+      expect(repoGitignore).not.toContain(".mcp.json");
     });
   });
 
