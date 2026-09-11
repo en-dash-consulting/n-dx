@@ -70,6 +70,38 @@ describe("Status API routes", () => {
     expect(data.projectDir).toBe(tmpDir);
   });
 
+  describe("server info", () => {
+    it("includes a server object with projectDir, version, cliPath, pid, port, startedAt", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+      const data = await res.json();
+
+      expect(data.server).toBeTruthy();
+      expect(data.server.projectDir).toBe(tmpDir);
+      expect(typeof data.server.version).toBe("string");
+      expect(data.server.version.length).toBeGreaterThan(0);
+      expect(typeof data.server.cliPath).toBe("string");
+      expect(data.server.pid).toBe(process.pid);
+      // This test's ctx (built above, not via startServer) never sets
+      // port/startedAt — buildServerInfo must fall back to null rather than throw.
+      expect(data.server.port).toBeNull();
+      expect(data.server.startedAt).toBeNull();
+    });
+
+    it("reports the actual port and startedAt when set on ctx", async () => {
+      clearStatusCache();
+      const scopedCtx: ServerContext = { ...ctx, port: 5555, startedAt: "2026-02-02T00:00:00.000Z" };
+      const { server: scopedServer, port: scopedPort } = await startTestServer(scopedCtx);
+      try {
+        const res = await fetch(`http://127.0.0.1:${scopedPort}/api/status`);
+        const data = await res.json();
+        expect(data.server.port).toBe(5555);
+        expect(data.server.startedAt).toBe("2026-02-02T00:00:00.000Z");
+      } finally {
+        await closeRouteTestServer(scopedServer);
+      }
+    });
+  });
+
   it("returns 404 for non-status routes", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/other`);
     expect(res.status).toBe(404);

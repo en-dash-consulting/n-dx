@@ -9,7 +9,8 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
@@ -87,6 +88,33 @@ export interface ProjectStatus {
   sv: SourceVisionStatus;
   rex: RexStatus;
   hench: HenchStatus;
+  /** Server process metadata — see {@link ServerInfo}. */
+  server: ServerInfo;
+}
+
+/**
+ * Server process metadata — identifies the running dashboard process itself
+ * (as opposed to the project it serves). Shared by GET /api/status and
+ * GET /api/config so the viewer footer (PR 7) can read pid/version/cliPath
+ * without the heavier status call.
+ */
+export interface ServerInfo {
+  /** Absolute path to the project directory this server serves. */
+  projectDir: string;
+  /** `@n-dx/web` package version. */
+  version: string;
+  /**
+   * Best-effort path to the CLI that launched this server: `NDX_CLI_PATH` or
+   * `N_DX_CLI_PATH` (set by `packages/core/cli.js` to its own path), falling
+   * back to `process.argv[1]` when neither is set.
+   */
+  cliPath: string;
+  /** OS process id of this server. */
+  pid: number;
+  /** Port this server is bound to. */
+  port: number | null;
+  /** ISO timestamp this server started listening, or null if unknown. */
+  startedAt: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -277,12 +305,48 @@ function extractHenchStatus(ctx: ServerContext): HenchStatus {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Server info
+// ---------------------------------------------------------------------------
+
+/** Cached `@n-dx/web` package version — read from disk once per process. */
+let cachedVersion: string | null = null;
+
+function readWebVersion(): string {
+  if (cachedVersion) return cachedVersion;
+  try {
+    const thisDir = dirname(fileURLToPath(import.meta.url));
+    // Mirrors the packageRoot resolution in routes-static.ts: this file lives
+    // at <pkg>/src/server/ (dev) or <pkg>/dist/server/ (built) — two levels
+    // up from either reaches packages/web/package.json.
+    const pkgPath = resolve(thisDir, "../..", "package.json");
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: unknown };
+    cachedVersion = typeof pkg.version === "string" ? pkg.version : "unknown";
+  } catch {
+    cachedVersion = "unknown";
+  }
+  return cachedVersion;
+}
+
+/** Build server process metadata shared by GET /api/status and GET /api/config. */
+export function buildServerInfo(ctx: ServerContext): ServerInfo {
+  return {
+    projectDir: ctx.projectDir,
+    version: readWebVersion(),
+    cliPath: process.env["NDX_CLI_PATH"] ?? process.env["N_DX_CLI_PATH"] ?? process.argv[1] ?? "",
+    pid: process.pid,
+    port: ctx.port ?? null,
+    startedAt: ctx.startedAt ?? null,
+  };
+}
+
 function buildProjectStatus(ctx: ServerContext): ProjectStatus {
   return {
     projectDir: ctx.projectDir,
     sv: extractSvStatus(ctx),
     rex: extractRexStatus(ctx),
     hench: extractHenchStatus(ctx),
+    server: buildServerInfo(ctx),
   };
 }
 
