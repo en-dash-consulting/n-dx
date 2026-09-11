@@ -40,7 +40,7 @@ describe("findAutoCompletions", () => {
     ]);
   });
 
-  it("auto-completes parent when children are mix of completed and deferred", () => {
+  it("does not auto-complete when a sibling is deferred (GH #364)", () => {
     const items: PRDItem[] = [
       makeItem({
         id: "f1",
@@ -55,7 +55,28 @@ describe("findAutoCompletions", () => {
       }),
     ];
     const result = findAutoCompletions(items, "t3");
-    expect(result.completedIds).toEqual(["f1"]);
+    expect(result.completedIds).toEqual([]);
+  });
+
+  it("does not auto-complete a parent when the just-changed item itself is deferred", () => {
+    // A caller may invoke findAutoCompletions after ANY terminal-ish status
+    // change (completed or deferred). If the triggering item landed on
+    // "deferred" rather than "completed", it must not be treated as done —
+    // even though every OTHER sibling is completed.
+    const items: PRDItem[] = [
+      makeItem({
+        id: "f1",
+        title: "Feature 1",
+        level: "feature",
+        status: "in_progress",
+        children: [
+          makeItem({ id: "t1", title: "Task 1", status: "completed" }),
+          makeItem({ id: "t2", title: "Task 2", status: "deferred" }),
+        ],
+      }),
+    ];
+    const result = findAutoCompletions(items, "t2");
+    expect(result.completedIds).toEqual([]);
   });
 
   it("does not auto-complete when some children are still pending", () => {
@@ -346,7 +367,7 @@ describe("reconcileAutoCompletions", () => {
     ]);
   });
 
-  it("treats deferred children as terminal", () => {
+  it("does not treat deferred children as done (GH #364)", () => {
     const items = [
       makeItem({
         id: "f1",
@@ -360,7 +381,41 @@ describe("reconcileAutoCompletions", () => {
       }),
     ];
     const result = reconcileAutoCompletions(items);
-    expect(result.completedIds).toEqual(["f1"]);
+    expect(result.completedIds).toEqual([]);
+  });
+
+  it("does not treat blocked children as done", () => {
+    const items = [
+      makeItem({
+        id: "f1",
+        title: "Feature 1",
+        level: "feature",
+        status: "in_progress",
+        children: [
+          makeItem({ id: "t1", title: "Task 1", status: "completed" }),
+          makeItem({ id: "t2", title: "Task 2", status: "blocked" }),
+        ],
+      }),
+    ];
+    const result = reconcileAutoCompletions(items);
+    expect(result.completedIds).toEqual([]);
+  });
+
+  it("does not treat failing children as done", () => {
+    const items = [
+      makeItem({
+        id: "f1",
+        title: "Feature 1",
+        level: "feature",
+        status: "in_progress",
+        children: [
+          makeItem({ id: "t1", title: "Task 1", status: "completed" }),
+          makeItem({ id: "t2", title: "Task 2", status: "failing" }),
+        ],
+      }),
+    ];
+    const result = reconcileAutoCompletions(items);
+    expect(result.completedIds).toEqual([]);
   });
 
   it("does not return a feature with a pending child", () => {

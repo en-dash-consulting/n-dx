@@ -177,7 +177,10 @@ export async function handleUpdateTaskStatus(
       detail: `${existing.status} → ${status}${force ? " (forced)" : ""}`,
     });
 
-    // Auto-complete parent items when a child is completed or deferred
+    // Re-check parent auto-completion after this status change. A deferred
+    // status can never itself make a parent auto-completable (only a fully
+    // `completed` child set can — see parent-completion.ts), but re-checking
+    // here is harmless and keeps this in sync with mcp-tools' other trigger.
     const autoCompleted: Array<{ id: string; title: string; level: string }> = [];
     if (status === "completed" || status === "deferred") {
       const doc = await store.loadDocument();

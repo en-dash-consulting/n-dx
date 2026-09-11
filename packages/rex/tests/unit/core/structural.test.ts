@@ -607,7 +607,7 @@ describe("validateStructure", () => {
       expect(result.warnings.filter((w) => w.includes("e1") && w.includes("non-terminal"))).toEqual([]);
     });
 
-    it("does not warn when completed parent has all deferred children", () => {
+    it("warns when completed parent has a deferred child (GH #364)", () => {
       const items: PRDItem[] = [
         makeItem({
           id: "e1",
@@ -622,7 +622,43 @@ describe("validateStructure", () => {
         }),
       ];
       const result = validateStructure(items);
-      expect(result.warnings.filter((w) => w.includes("e1") && w.includes("non-terminal"))).toEqual([]);
+      expect(result.warnings.some((w) => w.includes("e1") && w.includes("non-terminal"))).toBe(true);
+    });
+
+    it("warns when completed parent has a blocked child", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Completed epic",
+          level: "epic",
+          status: "completed",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-10T00:00:00.000Z",
+          children: [
+            makeItem({ id: "t1", title: "Blocked task", level: "task", status: "blocked" }),
+          ],
+        }),
+      ];
+      const result = validateStructure(items);
+      expect(result.warnings.some((w) => w.includes("e1") && w.includes("non-terminal"))).toBe(true);
+    });
+
+    it("warns when completed parent has a failing child", () => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Completed epic",
+          level: "epic",
+          status: "completed",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          completedAt: "2026-01-10T00:00:00.000Z",
+          children: [
+            makeItem({ id: "t1", title: "Failing task", level: "task", status: "failing" }),
+          ],
+        }),
+      ];
+      const result = validateStructure(items);
+      expect(result.warnings.some((w) => w.includes("e1") && w.includes("non-terminal"))).toBe(true);
     });
 
     it("does not warn when non-completed parent has pending children", () => {
