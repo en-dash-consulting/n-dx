@@ -37,6 +37,12 @@ import {
 const LOOPBACK_HOST = "127.0.0.1";
 const PID_FILE = ".n-dx-web.pid";
 const PORT_FILE = ".n-dx-web.port";
+// Mirrors packages/core/web.js's PORT_RANGE_START/END and the near window's
+// width (PORT_RANGE_END - PORT_RANGE_START). See the relocation assertion
+// below for why the window's exact width matters here.
+const PORT_RANGE_START = 3117;
+const PORT_RANGE_END = 3200;
+const NEAR_WINDOW_SIZE = PORT_RANGE_END - PORT_RANGE_START;
 
 /** Servers started by this file, reaped in afterAll whether or not the test passed. */
 const startedPids = new Set();
@@ -280,12 +286,22 @@ describe("two projects start dashboards concurrently", { timeout: 120_000 }, () 
       return;
     }
     expect(portB).toBeTypeOf("number");
-    expect(portB).not.toBe(requestedPort);
     // requestedPort is an OS-assigned ephemeral port, far outside 3117–3200.
     // Relocation must land in its own neighbourhood (requestedPort + 1
     // upward) rather than jumping into the default fallback range — that is
     // the contract this suite exists to pin down.
-    expect(portB).toBe(requestedPort + 1);
+    //
+    // Asserting portB === requestedPort + 1 exactly is stronger than the
+    // contract findRelocationPort actually promises ("the first free port at
+    // or above requestedPort + 1, within the near window") and is
+    // environment-fragile: ephemeral ports are handed out from a small, busy
+    // range, so requestedPort + 1 is often already held by an unrelated
+    // process, which correctly pushes relocation to +2 and fails this test
+    // for a reason unrelated to the behaviour under test. Do not tighten this
+    // back to an exact-port equality — assert the neighbourhood instead.
+    expect(portB).toBeGreaterThan(requestedPort);
+    expect(portB).toBeLessThanOrEqual(requestedPort + NEAR_WINDOW_SIZE);
+    expect(portB < PORT_RANGE_START || portB > PORT_RANGE_END).toBe(true);
 
     const status = await waitForStatus(portB);
     expect(canonical(status.projectDir)).toBe(canonical(dirB));
