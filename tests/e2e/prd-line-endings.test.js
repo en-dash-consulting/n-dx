@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { closeSync, openSync, readdirSync, readFileSync, readSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { GITATTRIBUTES_EOL_RULES } from "../../packages/core/gitattributes-pins.js";
 
@@ -72,14 +72,23 @@ describe("PRD serialized files are pinned to LF (issue #283)", () => {
         .map((line) => line.slice(3).trim()),
     );
 
+    // It must also still be present on disk, not merely tracked and clean: a
+    // PRD restructure (rex reslugs whole directories) leaves the old paths
+    // tracked-but-deleted in the working tree until the change is committed,
+    // and such a path used to blow this test up with ENOENT rather than
+    // testing anything. The dirty set catches most of those, but the guard is
+    // cheap and does not depend on parsing porcelain output correctly.
     const tracked = execFileSync("git", ["ls-files", "--", ".rex/prd_tree/"], {
       encoding: "utf8",
       cwd: REPO_ROOT,
     })
       .split("\n")
       .filter((p) => p.endsWith(".md"))
-      .find((p) => !dirty.has(p));
-    expect(tracked, "expected a clean tracked PRD markdown file").toBeTruthy();
+      .find((p) => !dirty.has(p) && existsSync(join(REPO_ROOT, p)));
+    expect(
+      tracked,
+      "expected a clean tracked PRD markdown file present on disk",
+    ).toBeTruthy();
 
     const abs = join(REPO_ROOT, tracked);
     const original = readFileSync(abs);

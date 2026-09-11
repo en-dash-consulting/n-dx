@@ -1,0 +1,28 @@
+---
+id: "56651b0f-9a11-4a77-9d8c-78ffb772729d"
+level: "subtask"
+title: "Retain each suite's output from `pnpm test` so an intermittent failure is diagnosable"
+status: "completed"
+priority: "medium"
+tags:
+  - "flaky-test"
+  - "ci-reliability"
+  - "tooling"
+source: "ndx-work"
+startedAt: "2026-09-11T11:24:56.987Z"
+completedAt: "2026-09-11T11:35:20.837Z"
+endedAt: "2026-09-11T11:35:20.837Z"
+resolutionType: "code-change"
+resolutionDetail: "run-all-tests.mjs now streams each suite's output to the terminal and to .test-logs/<suite>.log at once, naming the file on a failing suite's summary line. Switched from execFileSyncCli/inherit to spawnCli with piped streams so capture does not cost live output; spawn errors are now an explicit failure rather than a throw. Used .test-logs/ rather than hench's .run-logs/. Verified the green path, a non-zero suite exit, and a spawn ENOENT before trusting it, since CI depends on this script's exit code. It caught the rex flake on its first full run — fifth sighting, first surviving assertion — and that capture is recorded on the parent task."
+acceptanceCriteria:
+  - "Every suite's combined stdout and stderr is written to a per-suite file under a gitignored directory, on success as well as failure"
+  - "Output still streams to the terminal as it arrives, so a long suite does not appear hung"
+  - "The runner still executes every suite, never short-circuits, and exits non-zero if any suite failed"
+  - "A failing suite's summary line tells the operator where its output was retained"
+  - "A spawn error is reported as a failed suite rather than silently skipped"
+  - "Windows spawning still routes through the existing cmd.exe-safe helper"
+  - "The log directory is gitignored and does not collide with `.run-logs/`"
+description: "Split out of the parent flake task, whose own conclusion is that the blocker is capture rather than hypothesis: the failing assertion has never been seen across four sightings, every one lost because the failing `pnpm test` was not redirected to a file. Every deliberate reproduction attempt has been on a quiet machine and come back green.\n\n`scripts/run-all-tests.mjs` runs each suite with `stdio: \"inherit\"`, so output goes to the terminal and nowhere else. When a suite fails intermittently, the detail is gone the moment the scrollback is lost or the terminal is cleared, and only the `FAIL @n-dx/rex` summary line survives.\n\nRelying on the operator to remember `> run.log 2>&1` has now failed four times. The runner should retain it unconditionally.\n\nThis does not fix the flake and does not satisfy the parent's acceptance criteria — it is what makes the parent diagnosable the next time it happens, to any suite, not just rex.\n\nConstraints that make this more than a one-liner:\n- Live output must be preserved. Suites take 25s+; buffering until exit makes the run look hung, so the child's streams have to be piped *through* to the terminal as they arrive rather than collected and printed at the end.\n- Exit codes must stay honest. The runner's contract is that it never short-circuits and exits non-zero if any suite failed; CI depends on it (`run-all-tests.mjs packages` runs in the ubuntu validate and smoke-windows jobs).\n- Windows must keep working. `packages/core/win-spawn.js` already exports `spawnCli`, a Windows-safe async spawn that routes through cmd.exe, so the platform handling does not need reinventing.\n- A spawn error (e.g. ENOENT) must count as a failure, not an absent result — `execFileSync` currently signals that by throwing.\n\n`.run-logs/` is already taken by hench's per-run agent logs, so this needs its own gitignored directory."
+lastModified: "2026-09-11T11:35:20.843Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---

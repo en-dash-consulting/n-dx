@@ -212,9 +212,16 @@ const COMMAND_REGISTRY = [
   {
     name: "export",
     category: "Orchestration",
-    summary: "Export static deployable dashboard",
+    summary: "Export static deployable dashboard (not the PRD — see 'ndx prd export')",
     keywords: ["export", "static", "deploy", "dashboard", "GitHub Pages", "Netlify", "S3"],
-    related: ["start", "status"],
+    related: ["start", "status", "prd"],
+  },
+  {
+    name: "prd",
+    category: "Orchestration",
+    summary: "Export or import the PRD as a portable bundle",
+    keywords: ["prd", "bundle", "export", "import", "portable", "transport", "move", "machine", "backup"],
+    related: ["export", "sync", "status"],
   },
   {
     name: "self-heal",
@@ -398,6 +405,8 @@ const SUBCOMMAND_REGISTRY = {
     { name: "verify", parent: "rex", category: "Rex", summary: "Run tests for acceptance criteria", keywords: ["test", "acceptance", "criteria", "coverage"], related: ["status"] },
     { name: "recommend", parent: "rex", category: "Rex", summary: "Get SourceVision-based recommendations", keywords: ["recommendations", "suggestions", "sourcevision"], related: ["analyze"] },
     { name: "analyze", parent: "rex", category: "Rex", summary: "Build PRD from project analysis", keywords: ["scan", "codebase", "proposals", "LLM", "import"], related: ["add", "recommend"] },
+    { name: "export", parent: "rex", category: "Rex", summary: "Write the PRD to a portable JSON bundle", keywords: ["bundle", "portable", "transport", "backup", "move"], related: ["import-bundle", "sync"] },
+    { name: "import-bundle", parent: "rex", category: "Rex", summary: "Rebuild the PRD tree from a portable JSON bundle", keywords: ["bundle", "portable", "restore", "merge", "replace"], related: ["export", "sync"] },
     { name: "adapter", parent: "rex", category: "Rex", summary: "Manage store adapters (list, add, remove, show)", keywords: ["Notion", "remote", "configure"], related: ["sync"] },
     { name: "mcp", parent: "rex", category: "Rex", summary: "Start MCP server for AI tool integration", keywords: ["MCP", "Claude", "AI", "tools"], related: [] },
   ],
@@ -730,6 +739,68 @@ export function formatToolHelp(tool) {
 
 /** @type {Record<string, OrchestratorHelpDef>} */
 const ORCHESTRATOR_HELP_DEFS = {
+  prd: {
+    summary: "export or import the PRD — as a portable bundle or a prose document",
+    description:
+      "Carries a PRD between machines as a single JSON file, without sharing the\n" +
+      "repo or configuring a remote adapter (see 'ndx sync' for that).\n" +
+      "\n" +
+      "  ndx prd export   spawns 'rex export'         — write the bundle\n" +
+      "  ndx prd import   spawns 'rex import-bundle'  — rebuild the tree from it\n" +
+      "\n" +
+      "The bundle preserves item ids, hierarchy, status, acceptance criteria,\n" +
+      "tags, dependencies and attribution, and carries the PRD schema version so\n" +
+      "a bundle from a newer rex is refused rather than imported partially.\n" +
+      "\n" +
+      "It is a transport artifact, not PRD storage: it must be written outside\n" +
+      ".rex/prd_tree/, and nothing reads it as a backend. Import rebuilds the\n" +
+      "folder tree through the normal store write path, under the PRD lock.\n" +
+      "\n" +
+      "--item=<id-or-slug> scopes the export to one epic, feature or task. The\n" +
+      "scope is a closure: the item arrives with every descendant, with the\n" +
+      "transitive blockedBy closure so nothing imports with a dangling\n" +
+      "dependency, and with the ancestor containers that place it at its\n" +
+      "original depth. The summary counts the requested subtree and the\n" +
+      "closure's contribution separately.\n" +
+      "\n" +
+      "'ndx prd export --format=narrative' renders something different: prose\n" +
+      "Markdown for a stakeholder, with no ids, folder slugs or status codes.\n" +
+      "Epics become sections with a goal and a rationale, features become\n" +
+      "described capabilities, and acceptance criteria become sentences under\n" +
+      "\"How we'll know it's done\". Scope it to one initiative with\n" +
+      "--item=<id-or-slug>.\n" +
+      "\n" +
+      "Narrative output is ONE-WAY — 'ndx prd import' cannot read it. Export the\n" +
+      "JSON bundle whenever the PRD has to make a round trip.\n" +
+      "\n" +
+      "Not to be confused with 'ndx export', which publishes the static\n" +
+      "dashboard.",
+    usage: [
+      "ndx prd export --out=<path.json> [dir]",
+      "ndx prd export --item=<id-or-slug> --out=<path.json> [dir]",
+      "ndx prd export --format=narrative --out=<path.md> [dir]",
+      "ndx prd import --in=<path.json> [options] [dir]",
+    ],
+    options: [
+      { flag: "--out=<path>", description: "Output path (export; required)" },
+      { flag: "--in=<path>", description: "Bundle input path (import; required)" },
+      { flag: "--format=narrative", description: "Export: render prose Markdown instead of the bundle (one-way)" },
+      { flag: "--item=<id-or-slug>", description: "Export: scope to one item — its subtree, blockers and ancestors" },
+      { flag: "--include-completed", description: "Export: narrative only — keep finished work, for a retrospective" },
+      { flag: "--replace", description: "Import: overwrite the tree instead of merging into it" },
+      { flag: "--yes, -y", description: "Import: skip the --replace confirmation prompt" },
+      { flag: "--format=json", description: "Machine-readable summary" },
+    ],
+    examples: [
+      { command: "ndx prd export --out=./prd-bundle.json .", description: "Write the whole PRD to a bundle" },
+      { command: "ndx prd export --item=checkout-overhaul --out=./checkout.json .", description: "Carry one epic to another machine" },
+      { command: "ndx prd export --format=narrative --out=./prd.md .", description: "Write a stakeholder document" },
+      { command: "ndx prd export --format=narrative --item=checkout-overhaul --out=./checkout.md .", description: "Document one epic" },
+      { command: "ndx prd import --in=./prd-bundle.json .", description: "Merge a bundle into the local PRD" },
+      { command: "ndx prd import --in=./prd-bundle.json --replace --yes .", description: "Replace the local PRD outright" },
+    ],
+    related: ["export", "sync", "status"],
+  },
   init: {
     summary: "initialize all tools",
     description: "Sets up .sourcevision/, .rex/, and .hench/ in the target directory.\nRuns sourcevision init → rex init → hench init in sequence.\nPrompts for an LLM vendor (claude, codex, google, or local) unless --provider is given.\nProvisions assistant surfaces for both Claude and Codex unless limited\nby --no-claude, --no-codex, --claude-only, --codex-only, or --assistants=.\n\nThe init summary reports each assistant surface separately, listing the\nspecific artifacts (instruction files, skills, permissions, MCP servers)\nthat were provisioned for the repo.",
