@@ -115,17 +115,16 @@ async function capturePid(dir) {
  * with a JSON body.
  *
  * Raw `http.get` with `agent: false`, and an explicit `req.destroy()` once the
- * body is in, rather than `fetch`. Both are load-bearing. `killPortOccupant`
- * picks its victim from `lsof -ti tcp:<port>`, which lists every process holding
- * a socket on that port — CLIENTS included, not just the listener. A poller that
- * leaves a pooled keep-alive socket (fetch) or an undestroyed CLOSE_WAIT socket
- * (observed: 50 ms was enough) puts THIS process at the top of that list, so any
- * run that reaches the kill path SIGKILLs the vitest worker and the suite reports
- * a dead worker instead of the assertion that would have named the regression.
+ * body is in, rather than `fetch`. This poll used to be load-bearing:
+ * `killPortOccupant` picked its victim from `lsof -ti tcp:<port>`, which lists
+ * every process holding a socket on the port — CLIENTS included — so a poller
+ * leaving a pooled keep-alive socket (fetch) or an undestroyed CLOSE_WAIT socket
+ * (observed: 50 ms was enough) put THIS process in line to be SIGKILLed, and the
+ * suite reported a dead worker instead of the assertion that named the regression.
  *
- * That lsof query is too broad — it should be `-sTCP:LISTEN` — but the bug is in
- * the product, not here, and is tracked separately. This poll stays hygienic
- * regardless so a red run stays legible.
+ * The query is now restricted to listeners (`listenerPidsOnPort` in
+ * packages/core/web.js), so a client socket is no longer a candidate victim.
+ * The hygiene stays: it costs nothing and keeps a red run legible.
  */
 function getStatus(port, timeoutMs = 2_000) {
   return new Promise((res) => {

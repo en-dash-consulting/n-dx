@@ -17,6 +17,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { createServer } from "node:http";
+import { spawn } from "node:child_process";
 import { mkdtemp, rm, symlink } from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import { tmpdir, platform } from "node:os";
@@ -27,6 +28,8 @@ import {
   probeStatusEndpoint,
   findFreePortInRange,
   killPortOccupant,
+  listenerPidsOnPort,
+  selectKillTarget,
   runWeb,
 } from "../../packages/core/web.js";
 
@@ -75,6 +78,118 @@ afterEach(async () => {
     servers.splice(0).map((s) => new Promise((res) => s.close(() => res()))),
   );
 });
+
+// ── Out-of-process socket holders ────────────────────────────────────────────
+// Whom-to-kill cannot be tested with in-process sockets: every pid the query
+// returns would be this process, and the self-preservation guard short-circuits
+// before the selection is exercised. These helpers put the listener and the
+// client in separate processes so the query has a real choice to get wrong.
+
+/** Child processes started by a test, reaped in afterEach. */
+const children = [];
+
+/** Self-exit fuse for every helper child, so a crashed test leaks nothing. */
+const CHILD_LIFETIME_MS = 30_000;
+
+afterEach(() => {
+  for (const child of children.splice(0)) {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  }
+});
+
+/** Resolve with the child's first line of stdout. */
+function firstLine(child) {
+  return new Promise((res, rej) => {
+    let buf = "";
+    child.stdout.setEncoding("utf-8");
+    child.stdout.on("data", (chunk) => {
+      buf += chunk;
+      if (buf.includes("\n")) res(buf.slice(0, buf.indexOf("\n")));
+    });
+    child.once("exit", (code) => rej(new Error(`helper child exited (${code}) before reporting`)));
+  });
+}
+
+/** Spawn a node child running `source`, tracked for teardown. */
+function spawnHelper(source) {
+  const child = spawn(process.execPath, ["-e", source], { stdio: ["pipe", "pipe", "ignore"] });
+  children.push(child);
+  return child;
+}
+
+/**
+ * Spawn a child that connects to the port given on its stdin and holds the
+ * socket open.
+ *
+ * It takes the port over stdin rather than in its source because it is spawned
+ * before the listener exists — see {@link startListenerWithClient} — and it
+ * retries because the listener may not have bound yet when the port arrives.
+ */
+function startClientProcess() {
+  return spawnHelper(`
+    const net = require("node:net");
+    let buf = "";
+    process.stdin.setEncoding("utf-8");
+    process.stdin.on("data", (chunk) => {
+      buf += chunk;
+      if (!buf.includes("\\n")) return;
+      const port = Number(buf.trim());
+      buf = "";
+      process.stdin.removeAllListeners("data");
+      const timer = setInterval(() => {
+        const socket = net.connect(port, "127.0.0.1");
+        socket.once("connect", () => { clearInterval(timer); console.log("connected"); });
+        socket.once("error", () => socket.destroy());
+      }, 50);
+    });
+    setTimeout(() => process.exit(0), ${CHILD_LIFETIME_MS});
+  `);
+}
+
+/**
+ * Spawn a child listening on an ephemeral loopback port.
+ * Resolves with the child and the port it bound.
+ */
+async function startListenerProcess() {
+  const child = spawnHelper(`
+    const net = require("node:net");
+    const server = net.createServer(() => {});
+    server.listen(0, "127.0.0.1", () => console.log(server.address().port));
+    setTimeout(() => process.exit(0), ${CHILD_LIFETIME_MS});
+  `);
+  const port = Number(await firstLine(child));
+  return { child, port };
+}
+
+/**
+ * A listener and a separate client, both out of process, both holding a socket
+ * on the same port.
+ *
+ * The client is spawned FIRST on purpose. `lsof -ti tcp:<port>` prints pids in
+ * ascending order, so the earlier-spawned client lands above the listener — the
+ * exact ordering under which taking the first pid kills the wrong process. The
+ * listener still picks its own ephemeral port, so nothing here races another
+ * suite for a port number reserved in advance.
+ */
+async function startListenerWithClient() {
+  const client = startClientProcess();
+  const { child: listener, port } = await startListenerProcess();
+  client.stdin.write(`${port}\n`);
+  // Piped stdout starts paused, so the client's line is still there to read
+  // even if it was written before this listener attached.
+  await firstLine(client);
+  return { port, listener, client };
+}
+
+/** Wait up to `timeoutMs` for a child to exit. Returns true if it did. */
+async function waitForExit(child, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null || child.signalCode !== null) return true;
+    await new Promise((res) => setTimeout(res, 50));
+  }
+  return false;
+}
 
 describe("classifyPortOccupant", () => {
   const dir = "/tmp/project-a";
@@ -261,7 +376,70 @@ describe("the probe decision, end to end", () => {
   });
 });
 
+describe("listenerPidsOnPort", () => {
+  it("names the listener and never a client connected to the same port", async (ctx) => {
+    // The defect this guards: `lsof -ti tcp:<port>` lists every process holding
+    // a socket on the port, clients included, and the caller took the first pid.
+    // A browser tab, a curl, or a polling test worker was therefore a candidate
+    // victim — and being spawned earlier put it first in line.
+    const { port, listener, client } = await startListenerWithClient();
+
+    const pids = listenerPidsOnPort(port);
+
+    if (pids.length === 0) {
+      // No usable lsof/netstat here. The query degrades to "nobody", which makes
+      // killPortOccupant refuse rather than guess, so there is no whom-to-kill
+      // decision left to assert.
+      ctx.skip();
+      return;
+    }
+    expect(pids).toContain(listener.pid);
+    expect(pids).not.toContain(client.pid);
+    expect(pids).toEqual([listener.pid]);
+  }, 20_000);
+});
+
+describe("selectKillTarget", () => {
+  it("names the sole listener", () => {
+    expect(selectKillTarget([4242], 99)).toEqual({ pid: 4242 });
+  });
+
+  it("refuses when the query found nobody", () => {
+    expect(selectKillTarget([], 99)).toEqual({ refuse: "none" });
+  });
+
+  it("refuses when this process is the listener", () => {
+    expect(selectKillTarget([99], 99)).toEqual({ refuse: "self" });
+  });
+
+  it("refuses when this process is one of several listeners", () => {
+    // Self-preservation outranks ambiguity: whichever pid we picked, sending a
+    // signal here risks SIGKILLing the process making the decision.
+    expect(selectKillTarget([4242, 99], 99)).toEqual({ refuse: "self" });
+  });
+
+  it("refuses to guess between two listeners", () => {
+    // SO_REUSEPORT and pre-fork servers both produce several listening pids.
+    // Killing the first is the arbitrary choice that caused this bug; a loud
+    // failure leaves the operator a port flag instead of a dead process.
+    expect(selectKillTarget([4242, 4243], 99)).toEqual({
+      refuse: "ambiguous",
+      pids: [4242, 4243],
+    });
+  });
+});
+
 describe("killPortOccupant", () => {
+  it("kills the listener and leaves a client connected to the port alive", async () => {
+    const { port, listener, client } = await startListenerWithClient();
+
+    expect(await killPortOccupant(port)).toBe(true);
+
+    expect(await waitForExit(listener)).toBe(true);
+    expect(client.exitCode).toBeNull();
+    expect(client.signalCode).toBeNull();
+  }, 30_000);
+
   it("refuses to signal this process", async () => {
     // lsof/netstat name whoever owns the listening socket. Every in-process
     // test of the peer path binds its fake dashboard HERE, so that owner is

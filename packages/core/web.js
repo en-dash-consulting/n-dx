@@ -243,41 +243,102 @@ export function classifyPortOccupant(payload, absDir) {
 }
 
 /**
- * Find and kill whichever process is listening on `port`.
- * Returns true if the port was freed, false if kill failed.
+ * Pids of the processes *listening* on `port`, in the order the platform query
+ * reports them. Returns [] when nothing is listening, or when no usable query
+ * tool is present — the caller treats both as "do not kill".
  *
- * Callers must first rule out a peer dashboard via {@link probeStatusEndpoint}
- * plus {@link classifyPortOccupant}: this SIGKILLs whatever it finds, and the
- * occupant of 3117 is frequently another project's `ndx start`.
+ * Listening sockets only, which is the whole point. A bare `lsof -ti tcp:<port>`
+ * also lists every CLIENT holding a socket on that port, so a browser tab, a
+ * curl, or a poller with a CLOSE_WAIT socket to the dashboard ranked as a
+ * candidate victim — above the listener, whenever it was the older process.
  *
- * Refuses to signal this process. lsof/netstat name whoever owns the listening
- * socket, which is this process whenever the listener was opened in-process —
- * the shape every in-process test of the peer path has. Without the guard a
- * regression in the peer branch does not fail an assertion, it SIGKILLs the
- * test runner, and CI reports a dead worker instead of a broken feature.
+ * @param {number} port
+ * @returns {number[]} Distinct listener pids.
  */
-export async function killPortOccupant(port) {
+export function listenerPidsOnPort(port) {
+  const pids = new Set();
   try {
-    let pid = null;
     if (process.platform === "win32") {
       // netstat -ano lists TCP listeners; grep for ":PORT " at the local address
       const out = execFileSyncCli("netstat", ["-ano"], { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
       for (const line of out.split("\n")) {
         // Look for lines like "  TCP    127.0.0.1:3117    0.0.0.0:0    LISTENING    12345"
         const m = line.match(/TCP\s+[\d.]+:(\d+)\s+[\d.:]+\s+LISTENING\s+(\d+)/i);
-        if (m && parseInt(m[1], 10) === port) {
-          pid = parseInt(m[2], 10);
-          break;
-        }
+        if (m && parseInt(m[1], 10) === port) pids.add(parseInt(m[2], 10));
       }
     } else {
-      // lsof is available on macOS and most Linux distros
-      const out = execFileSyncCli("lsof", ["-ti", `tcp:${port}`], { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] }).trim();
-      if (out) pid = parseInt(out.split("\n")[0], 10);
+      // lsof is available on macOS and most Linux distros. -sTCP:LISTEN drops
+      // the clients. An lsof too old to support it errors out, which lands in
+      // the catch below and reads as "nobody" — a refusal to kill, not a guess.
+      const out = execFileSyncCli(
+        "lsof",
+        ["-t", "-sTCP:LISTEN", "-i", `tcp:${port}`],
+        { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] },
+      ).trim();
+      for (const line of out.split("\n")) {
+        const pid = parseInt(line.trim(), 10);
+        if (!isNaN(pid)) pids.add(pid);
+      }
     }
-    if (!pid) return false;
-    // Self-preservation, before any signal is sent — see the note above.
-    if (pid === process.pid) return false;
+  } catch {
+    // No listener (lsof exits non-zero on no match), or no query tool at all.
+    return [];
+  }
+  return [...pids];
+}
+
+/**
+ * Decide which of `pids` to SIGKILL, or why not to.
+ *
+ * Pure, so the whom-to-kill decision is assertable without a process holding a
+ * real socket. Every refusal is a case where killing would be a guess:
+ *
+ *   none      → the query named nobody; there is nothing to signal
+ *   self      → this process is among the listeners (in-process test servers
+ *               have exactly this shape). Without the guard, a regression in
+ *               the peer branch does not fail an assertion — it SIGKILLs the
+ *               test runner, and CI reports a dead worker instead of a bug.
+ *   ambiguous → several listeners (SO_REUSEPORT, a pre-fork server). Picking
+ *               the first is the arbitrary choice that made this function
+ *               dangerous; failing loudly leaves the operator `--port=N`.
+ *
+ * @param {number[]} pids     Listener pids, from {@link listenerPidsOnPort}.
+ * @param {number} [selfPid]  This process's pid.
+ * @returns {{pid: number} | {refuse: "none" | "self"} | {refuse: "ambiguous", pids: number[]}}
+ */
+export function selectKillTarget(pids, selfPid = process.pid) {
+  if (pids.length === 0) return { refuse: "none" };
+  // Self-preservation outranks ambiguity: whichever pid we picked, signalling
+  // from a list that includes us risks killing the decider.
+  if (pids.includes(selfPid)) return { refuse: "self" };
+  if (pids.length > 1) return { refuse: "ambiguous", pids };
+  return { pid: pids[0] };
+}
+
+/**
+ * Find and kill whichever process is listening on `port`.
+ * Returns true if the port was freed, false if it was not.
+ *
+ * Callers must first rule out a peer dashboard via {@link probeStatusEndpoint}
+ * plus {@link classifyPortOccupant}: this SIGKILLs whatever it finds, and the
+ * occupant of 3117 is frequently another project's `ndx start`. The probe
+ * decides *whether* to kill; {@link selectKillTarget} decides *whom*, and it
+ * refuses rather than guess — the caller reports the port as uncleared.
+ */
+export async function killPortOccupant(port) {
+  try {
+    const target = selectKillTarget(listenerPidsOnPort(port));
+    if (target.refuse) {
+      if (target.refuse === "ambiguous") {
+        // Loud, because the alternative is killing one of them at random.
+        console.error(
+          `Port ${port} has ${target.pids.length} listening processes (PIDs ${target.pids.join(", ")}); ` +
+          "refusing to guess which to stop.",
+        );
+      }
+      return false;
+    }
+    const pid = target.pid;
 
     if (process.platform === "win32") {
       execFileSyncCli("taskkill", ["/F", "/PID", String(pid)], { stdio: "ignore" });
