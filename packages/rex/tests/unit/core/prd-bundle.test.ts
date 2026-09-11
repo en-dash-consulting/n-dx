@@ -519,16 +519,22 @@ describe("mergeBundle", () => {
       return buildBundle(doc, { exportedAt: mode?.exportedAt ?? "2026-02-02T00:00:00.000Z" });
     }
 
-    it("defaults lastModified to the bundle's exportedAt in merge mode, keeping the author", () => {
+    // `mergeBundle` stamps nothing. Filling a missing timestamp is the store
+    // transaction's job and only its job, so there is one place to look and
+    // one value to trust. The bundle's `exportedAt` used to be written here
+    // instead, which meant an unvalidated field from an untrusted bundle
+    // reached `lastModified` on disk — and it won, because it ran first and
+    // the transaction leaves an item that already has a timestamp alone.
+    it("leaves an attribution-only item unstamped in merge mode, keeping its author", () => {
       const bundle = attributionOnlyBundle();
       const outcome = mergeBundle([], bundle, "merge");
 
       const t2 = outcome.items[1].children?.[0] as PRDItem;
-      expect(t2.lastModified).toBe("2026-02-02T00:00:00.000Z");
+      expect(t2.lastModified).toBeUndefined();
       expect(t2.lastModifiedBy).toBe("someone <someone@example.com>");
     });
 
-    it("defaults the same way in replace mode", () => {
+    it("leaves it unstamped in replace mode too", () => {
       const bundle = attributionOnlyBundle();
       const outcome = mergeBundle(
         [makeItem({ id: "local", title: "Local only", level: "epic" })],
@@ -537,13 +543,19 @@ describe("mergeBundle", () => {
       );
 
       const t2 = outcome.items[1].children?.[0] as PRDItem;
-      expect(t2.lastModified).toBe("2026-02-02T00:00:00.000Z");
+      expect(t2.lastModified).toBeUndefined();
       expect(t2.lastModifiedBy).toBe("someone <someone@example.com>");
     });
 
-    it("makes the defaulted item visible to sync as never-synced local work", () => {
-      const outcome = mergeBundle([], attributionOnlyBundle(), "merge");
-      expect(isModifiedSinceSync(outcome.items[1].children?.[0] as PRDItem)).toBe(true);
+    it("never lets the bundle's exportedAt become an item's timestamp", () => {
+      // The injection this closes: `parseBundle` only checks that `exportedAt`
+      // is a string, so "yesterday" or a future date used to land on disk and
+      // then sort above every genuine ISO stamp in last-write-wins forever.
+      const bundle = attributionOnlyBundle({ exportedAt: "yesterday" });
+      const outcome = mergeBundle([], bundle, "merge");
+
+      const stamps = JSON.stringify(outcome.items);
+      expect(stamps).not.toContain("yesterday");
     });
 
     it("never overwrites a timestamp the item brought with it", () => {

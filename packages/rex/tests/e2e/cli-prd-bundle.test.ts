@@ -666,7 +666,12 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
       // TASK_ONE arrives from the fixture with lastModifiedBy but no
       // lastModified. Left that way it would be invisible to remote sync
       // forever (isModifiedSinceSync treats a missing timestamp as "never
-      // modified"), so import defaults it to the bundle's exportedAt.
+      // modified"), so the store transaction stamps it on write.
+      //
+      // The value is the transaction's own time, deliberately not the bundle's
+      // `exportedAt`: that field is unvalidated, and the only items needing
+      // this repair come from foreign or hand-authored bundles — the same
+      // untrusted source. So the shape is asserted, not a fixed value.
       const findTask = (items: PRDItem[]): PRDItem | undefined => {
         for (const item of items) {
           if (item.id === TASK_ONE) return item;
@@ -678,7 +683,9 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
 
       const seeded = findTask(readPRD(sourceDir).items);
       expect(seeded?.lastModifiedBy).toBe(ATTRIBUTION);
-      expect(seeded?.lastModified).toBe("2026-01-01T00:00:00.000Z");
+      expect(seeded?.lastModified as string).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      // Not the bundle's exportedAt, which is what used to land here.
+      expect(seeded?.lastModified).not.toBe("2026-01-01T00:00:00.000Z");
     });
 
     it("preserves attribution metadata rather than re-stamping it", () => {
@@ -694,10 +701,10 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
       // `rex export` never emits a null, so this is a hand-authored or
       // third-party bundle. It has to be driven through the real CLI rather
       // than asserted against the stamping function, because the defect needed
-      // three separate checks to all agree it was fine: PRDItemSchema is a
-      // passthrough and never declares the field, so the null validates;
-      // defaultTimestampFromExport tests `=== undefined` and skips it; the
-      // stamping guard tested `!== undefined` and skipped it too. The emitter
+      // two separate checks to agree it was fine: PRDItemSchema is a
+      // passthrough and never declares the field, so the null validates, and
+      // the stamping guard tested `!== undefined` and skipped it. (A third,
+      // the import-side `exportedAt` default, has since been deleted.) The emitter
       // then drops the null, so the item lands with no timestamp line at all
       // and is invisible to remote sync from that moment on.
       await writeFile(

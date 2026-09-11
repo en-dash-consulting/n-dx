@@ -96,10 +96,10 @@ export interface BuildBundleOptions {
  * overwrite the freshly imported content in silence, and the stale `remoteId`
  * points the destination's sync at another project's remote records.
  *
- * `lastModified` / `lastModifiedBy` stay: they are content attribution, not
- * remote pointers, and the import path depends on them (see
- * {@link defaultTimestampFromExport}). Whole-bundle provenance belongs in
- * `exportedFrom`, not in per-item remote pointers.
+ * `lastModified` / `lastModifiedBy` stay: they are content attribution rather
+ * than remote pointers, and they describe the item wherever it lives.
+ * Whole-bundle provenance belongs in `exportedFrom`, not in per-item remote
+ * pointers.
  */
 const BUNDLE_STRIPPED_FIELDS = ["lastSyncedAt", "remoteId"] as const;
 
@@ -532,27 +532,6 @@ function stableKey(item: PRDItem): string {
 }
 
 /**
- * Give an attribution-only item the bundle's export time as its timestamp.
- *
- * An item carrying `lastModifiedBy` without `lastModified` is a trap: the
- * store deliberately keeps a partial stamp as-is (re-stamping overwrote the
- * original author), but `isModifiedSinceSync` reads a missing timestamp as
- * "never modified" — so the item would land on disk permanently invisible to
- * remote sync push, and a later pull could overwrite it in silence. The
- * bundle's `exportedAt` is the honest default: the content is at least that
- * old, and the author it names really did write it by then.
- *
- * An item with *neither* field is left alone on purpose — the import
- * transaction stamps it with the importing actor and the current time, which
- * is the established rule for unstamped new items.
- */
-function defaultTimestampFromExport(item: PRDItem, exportedAt: string): void {
-  if (item.lastModifiedBy !== undefined && item.lastModified === undefined) {
-    item.lastModified = exportedAt;
-  }
-}
-
-/**
  * Reject a bundle whose `blockedBy` edges close a loop.
  *
  * A cycle is not a field fault, so `validateDocument` cannot see it, and it is
@@ -651,13 +630,6 @@ export function mergeBundle(
 ): MergeOutcome {
   if (mode === "replace") {
     const replacement = structuredClone(bundle.items);
-    const walk = (siblings: PRDItem[]): void => {
-      for (const item of siblings) {
-        defaultTimestampFromExport(item, bundle.exportedAt);
-        if (item.children?.length) walk(item.children);
-      }
-    };
-    walk(replacement);
     return {
       items: replacement,
       collisions: [],
@@ -707,7 +679,6 @@ export function mergeBundle(
 
       const node = structuredClone(incoming);
       delete node.children;
-      defaultTimestampFromExport(node, bundle.exportedAt);
       target.push(node);
       added += 1;
 

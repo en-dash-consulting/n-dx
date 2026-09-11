@@ -31,7 +31,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Bundle-imported item with `lastModifiedBy` but no `lastModified` is never pushed by remote sync](./bundle-imported-item-with.md) | completed |
 | [Bundles transport the source project's lastSyncedAt/remoteId, corrupting the destination's remote sync](./bundles-transport-the-source-project-s.md) | completed |
 | [Business-owner narrative Markdown PRD export](./business-owner-narrative-markdown-prd.md) | completed |
-| [`defaultTimestampFromExport` is now redundant and writes an unvalidated `exportedAt` to disk](./defaulttimestampfromexport-is-now.md) | pending |
+| [`defaultTimestampFromExport` is now redundant and writes an unvalidated `exportedAt` to disk](./defaulttimestampfromexport-is-now.md) | completed |
 | [Export in-tree guard stops one directory short of the legacy PRD backend paths](./export-in-tree-guard-stops-one.md) | completed |
 | [`import-bundle --replace` clears the destination's own `remoteId` and `lastSyncedAt`](./import-bundle-replace-clears-the.md) | pending |
 | [`import-bundle --replace` rewrites the tree with no snapshot, no archive batch](./import-bundle-replace-rewrites-the.md) | completed |
