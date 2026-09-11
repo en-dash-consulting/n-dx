@@ -28,6 +28,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Codex .codex/config.toml uses the same cwd-relative MCP commands](./codex-codex-config-toml-uses-the-same.md) | completed |
 | [Docs: rewrite the MCP registration section; mark HTTP registration as single-project](./docs-rewrite-the-mcp-registration.md) | pending |
-| [ndx init stops writing local-scope MCP registrations by default and never removes user-scope entries](./ndx-init-stops-writing-local-scope-mcp.md) | pending |
+| [ndx init stops writing local-scope MCP registrations by default and never removes user-scope entries](./ndx-init-stops-writing-local-scope-mcp.md) | completed |
 | [ndx init writes a tracked .mcp.json with cwd-relative stdio commands for rex and sourcevision](./ndx-init-writes-a-tracked-mcp-json.md) | completed |
 | [Tests: init writes .mcp.json; generated MCP configs contain no absolute paths](./tests-init-writes-mcp-json-generated.md) | pending |
