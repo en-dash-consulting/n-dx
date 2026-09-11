@@ -314,6 +314,42 @@ describe("shared lifecycle", () => {
       expect(savedRun.branch).toBe("gate-test");
       expect(savedRun.startHead).toBe(run.startHead);
     });
+
+    // Several checkouts run concurrently; without these two a token report
+    // cannot say which build produced a run.
+    it("stamps the n-dx version and the launching CLI path", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+      const { readFile } = await import("node:fs/promises");
+
+      const previous = process.env["NDX_CLI_PATH"];
+      process.env["NDX_CLI_PATH"] = "/launcher/cli.js";
+      try {
+        const { run } = await initRunRecord({
+          taskId: "task-1",
+          taskTitle: "Test task",
+          model: "claude-sonnet-4-6",
+          henchDir,
+          projectDir,
+        });
+
+        // Read from this package's own manifest rather than restating a literal
+        // the release process would leave stale.
+        const { version } = JSON.parse(
+          await readFile(new URL("../../../package.json", import.meta.url), "utf-8"),
+        );
+        expect(run.ndxVersion).toBe(version);
+        expect(run.cliPath).toBe("/launcher/cli.js");
+
+        const savedRun = JSON.parse(
+          await readFile(join(henchDir, "runs", `${run.id}.json`), "utf-8"),
+        );
+        expect(savedRun.ndxVersion).toBe(version);
+        expect(savedRun.cliPath).toBe("/launcher/cli.js");
+      } finally {
+        if (previous === undefined) delete process.env["NDX_CLI_PATH"];
+        else process.env["NDX_CLI_PATH"] = previous;
+      }
+    });
   });
 
   describe("handleRunFailure", () => {

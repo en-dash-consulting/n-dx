@@ -2,16 +2,19 @@
 id: "b623224f-02ef-455a-99ca-6cc886cdb580"
 level: "task"
 title: "Run record carries the n-dx version and CLI path that produced it"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "pr-02"
   - "hench"
 source: "parallel-development roadmap, 2026-09-10 discovery session"
+startedAt: "2026-09-11T12:11:53.186Z"
+completedAt: "2026-09-11T12:19:54.351Z"
+endedAt: "2026-09-11T12:19:54.351Z"
 acceptanceCriteria:
   - "New run records include ndxVersion and cliPath; legacy records without them still load."
   - "The run detail panel renders both when present."
 description: "Add optional ndxVersion and cliPath to RunRecord (packages/hench/src/schema/v1.ts) and populate them in saveRun / run creation: version from @n-dx/hench package.json (or NDX_VERSION if the orchestrator exports one), cliPath from process.env.NDX_CLI_PATH ?? N_DX_CLI_PATH ?? process.argv[1]. Additive; the dashboard's run detail (packages/web/src/viewer/views/hench-runs.ts) shows them in the metadata block when present. This is what lets several active checkouts be told apart in token and outcome reports."
-lastModified: "2026-09-10T20:11:39.063Z"
+lastModified: "2026-09-11T12:19:54.360Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

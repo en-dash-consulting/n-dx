@@ -26,5 +26,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add getWorktreeRoot(cwd) to llm-client exec helpers and re-export it through the hench gateway](./add-getworktreeroot-cwd-to-llm-client.md) | completed |
 | [Capture worktreeRoot and branch at run start and refuse automatic commits when they no longer match](./capture-worktreeroot-and-branch-at-run.md) | completed |
-| [Run record carries the n-dx version and CLI path that produced it](./run-record-carries-the-n-dx-version.md) | pending |
+| [Run record carries the n-dx version and CLI path that produced it](./run-record-carries-the-n-dx-version.md) | completed |
 | [Unit tests: matching branch commits; mismatched branch, detached HEAD and worktree-root mismatch are refused](./unit-tests-matching-branch-commits.md) | pending |

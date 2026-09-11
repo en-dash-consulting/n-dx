@@ -25,6 +25,7 @@ import { getCurrentHead, execStdout } from "../../process/exec.js";
 import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
+import { resolveCliPath, resolveNdxVersion } from "../../process/toolchain-identity.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
@@ -410,6 +411,8 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     weight: opts.weight ?? "standard",
     actor: await resolveActor(opts.projectDir ?? "."),
     host: resolveHost(),
+    ndxVersion: resolveNdxVersion(),
+    cliPath: resolveCliPath(),
     ...gitOrigin,
   };
 

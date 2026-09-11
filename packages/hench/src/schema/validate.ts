@@ -241,6 +241,8 @@ export const RunRecordSchema = z.object({
   worktreeRoot: z.string().optional(),
   branch: z.string().optional(),
   startHead: z.string().optional(),
+  ndxVersion: z.string().optional(),
+  cliPath: z.string().optional(),
   assisted: z.boolean().optional(),
   retryAttempts: z.number().int().nonnegative().optional(),
   spawnCount: z.number().int().nonnegative().optional(),
