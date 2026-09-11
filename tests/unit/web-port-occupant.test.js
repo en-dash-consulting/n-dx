@@ -32,6 +32,7 @@ import {
   killPortOccupant,
   listenerPidsOnPort,
   selectKillTarget,
+  isPortInUse,
   runWeb,
 } from "../../packages/core/web.js";
 
@@ -569,23 +570,52 @@ describe("findRelocationPort", () => {
   const PORT_RANGE_END = 3200;
   const NEAR_WINDOW_SIZE = PORT_RANGE_END - PORT_RANGE_START;
 
-  it("scans upward from an explicit port outside the default range", async () => {
-    // An OS-assigned ephemeral port lands far outside 3117–3200.
-    const { port } = await startServer(() => {});
+  /**
+   * Bind a port whose immediate successor is verifiably free, so the
+   * relocation target is deterministic.
+   *
+   * Do NOT use an OS-assigned ephemeral port here. On Windows the ephemeral
+   * band (49152+) is where Hyper-V/WinNAT reserve large contiguous blocks, and
+   * on the CI runner every port in an 83-wide window above one read as in use
+   * — so relocation correctly fell back to 3117 and an assertion about the
+   * near window failed for a platform reason, not a behavioural one. Binding
+   * in a quiet band and checking the successor with the product's OWN
+   * predicate makes the expectation exact and platform-independent.
+   *
+   * Returns null when no such pair exists, which is a real answer on a host
+   * whose port space is that contended — the caller skips rather than fails.
+   */
+  async function bindPortWithFreeSuccessor() {
+    for (let candidate = 34001; candidate < 34200; candidate += 2) {
+      if (await isPortInUse(candidate + 1)) continue;
+      const server = createServer(() => {});
+      servers.push(server);
+      const bound = await new Promise((res) => {
+        server.once("error", () => res(false));
+        server.listen(candidate, "127.0.0.1", () => res(true));
+      });
+      if (!bound) continue;
+      // Re-check after binding: something may have taken the successor since.
+      if (await isPortInUse(candidate + 1)) continue;
+      return candidate;
+    }
+    return null;
+  }
+
+  it("scans upward from an explicit port outside the default range", async (ctx) => {
+    const port = await bindPortWithFreeSuccessor();
+    if (port === null) {
+      // No bindable port with a free successor on this host. Nothing to assert
+      // about the near window; see bindPortWithFreeSuccessor for why.
+      ctx.skip();
+      return;
+    }
     expect(port < PORT_RANGE_START || port > PORT_RANGE_END).toBe(true);
 
-    // Assert the neighbourhood, not an exact port. findRelocationPort promises
-    // the first FREE port at or above requestedPort + 1 within the near window
-    // — not requestedPort + 1 itself. Anything else on the machine may already
-    // hold that port, which correctly pushes the result upward; the Windows
-    // runner hit exactly that and failed an exact-equality assertion for a
-    // reason unrelated to the behaviour under test. This mirrors the same
-    // correction already made to tests/e2e/cli-start-two-projects.test.js —
-    // the two were tightened together and must stay loosened together.
+    // Exact, because the successor was just verified free with the same
+    // predicate findFreePortInRange uses.
     const relocated = await findRelocationPort(port);
-    expect(relocated).not.toBeNull();
-    expect(relocated).toBeGreaterThan(port);
-    expect(relocated).toBeLessThanOrEqual(port + NEAR_WINDOW_SIZE);
+    expect(relocated).toBe(port + 1);
     // The whole point of the near window: it must not jump to the default range.
     expect(relocated < PORT_RANGE_START || relocated > PORT_RANGE_END).toBe(true);
   });
