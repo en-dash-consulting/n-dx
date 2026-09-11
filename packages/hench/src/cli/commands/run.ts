@@ -742,6 +742,7 @@ async function runOne(
   autonomous?: boolean,
   runNumber?: number,
   permissionMode?: PermissionMode,
+  skipTestGate?: boolean,
 ): Promise<{ status: string; taskTitle: string; selectedTaskId?: string }> {
   const config = await loadConfig(henchDir);
   const store = await resolveStore(rexDir);
@@ -750,10 +751,13 @@ async function runOne(
   // Load run history for prior attempt display if not provided
   const runs = runHistory ?? await listRuns(henchDir);
 
-  // Apply CLI token budget override to config for CLI provider
-  const effectiveConfig = tokenBudget != null
-    ? { ...config, provider, tokenBudget }
-    : { ...config, provider };
+  // Apply CLI overrides (--token-budget, --skip-test-gate) to config
+  const effectiveConfig = {
+    ...config,
+    provider,
+    ...(tokenBudget != null ? { tokenBudget } : {}),
+    ...(skipTestGate ? { skipFullTestGate: true } : {}),
+  };
 
   const result = provider === "cli"
     ? await cliLoop({
@@ -1075,6 +1079,10 @@ export async function cmdRun(
   const loop = flags.loop === "true";
   const selfHeal = flags["self-heal"] === "true";
   const skipDeps = flags["skip-deps"] === "true";
+  // --skip-test-gate: skip the mandatory full test suite gate before commit
+  // for this invocation only. The persistent equivalent is the
+  // hench.skipFullTestGate config field; the flag wins for the current run.
+  const skipTestGate = flags["skip-test-gate"] === "true";
 
   // --permission-mode: validate against the four supported Claude CLI modes.
   // Resolution order (flag > config > runtime default) is computed below
@@ -1434,7 +1442,7 @@ export async function cmdRun(
     }
 
     if (epicByEpic) {
-      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode);
+      await runEpicByEpic(dir, henchDir, rexDir, provider, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
       return;
     }
 
@@ -1448,9 +1456,9 @@ export async function cmdRun(
     // If --auto, --loop, or non-TTY, taskId stays undefined → assembleTaskBrief autoselects
 
     if (loop) {
-      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode);
+      await runLoop(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, pauseMs, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, queue, priorityOverride, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
     } else {
-      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode);
+      await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode, skipTestGate);
     }
   } finally {
     await limiter.release();
@@ -1482,6 +1490,7 @@ async function runIterations(
   extraContext?: string,
   autonomous?: boolean,
   permissionMode?: PermissionMode,
+  skipTestGate?: boolean,
 ): Promise<void> {
   // Track attempt counts per task ID within this run invocation
   const attemptTracker = createAttemptTracker();
@@ -1524,6 +1533,7 @@ async function runIterations(
       autonomous,
       undefined,
       permissionMode,
+      skipTestGate,
     );
 
     // Track attempt count for the selected task
@@ -1588,6 +1598,7 @@ async function runLoop(
   extraContext?: string,
   autonomous?: boolean,
   permissionMode?: PermissionMode,
+  skipTestGate?: boolean,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -1684,6 +1695,7 @@ async function runLoop(
             autonomous,
             completed,
             permissionMode,
+            skipTestGate,
           );
           status = result.status;
 
@@ -1847,6 +1859,7 @@ async function runEpicByEpic(
   extraContext?: string,
   autonomous?: boolean,
   permissionMode?: PermissionMode,
+  skipTestGate?: boolean,
 ): Promise<void> {
   // Graceful shutdown via SIGINT (Ctrl-C)
   const ac = new AbortController();
@@ -1985,6 +1998,7 @@ async function runEpicByEpic(
               autonomous,
               undefined,
               permissionMode,
+              skipTestGate,
             );
             status = result.status;
           } finally {

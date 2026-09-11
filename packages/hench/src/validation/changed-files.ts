@@ -24,12 +24,32 @@
  * untracked files that were already present when the run started: those are
  * the user's, not this run's.
  *
- * @module hench/agent/analysis/changed-files
+ * @module hench/validation/changed-files
  */
 
-import { exec } from "../../process/exec.js";
+import { exec } from "../process/exec.js";
 
 const GIT_TIMEOUT = 10_000;
+
+/**
+ * Paths that are never the run's work product, excluded from the result.
+ *
+ * `.rex/` is bookkeeping hench itself writes on every run — the task-status
+ * update dirties the task's `index.md` before the agent has done anything —
+ * and `.hench/` holds run records and review reports. The agent's own prompt
+ * forbids modifying either directly, and the reviewer's repaired-files set
+ * already filters them (see cli-loop.ts). Left in, they make every run look
+ * like it changed files, so the full-suite gate fires for runs that produced
+ * no code at all — and a pre-existing failure anywhere in the workspace then
+ * fails the run and resets a task that was never the cause.
+ *
+ * Git emits forward-slash paths on every platform, so prefix matching is safe.
+ */
+const BOOKKEEPING_PREFIXES = [".rex/", ".hench/"];
+
+function isBookkeepingPath(path: string): boolean {
+  return BOOKKEEPING_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
 
 /**
  * List untracked files individually.
@@ -100,7 +120,11 @@ export async function discoverChangedFiles(
   if (!diff || diff.exitCode !== 0) return undefined;
 
   const changed = new Set(
-    diff.stdout.split("\n").map((line) => line.trim()).filter(Boolean),
+    diff.stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((path) => !isBookkeepingPath(path)),
   );
 
   // Untracked files never appear in a diff, so add them explicitly. A failure
@@ -111,6 +135,7 @@ export async function discoverChangedFiles(
     // records), so exclude by prefix as well as by exact match.
     const excluded = baselineUntracked ?? [];
     for (const path of untracked) {
+      if (isBookkeepingPath(path)) continue;
       const wasPresent = excluded.some(
         (base) => base === path || (base.endsWith("/") && path.startsWith(base)),
       );

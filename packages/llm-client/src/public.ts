@@ -236,6 +236,7 @@ export {
 export {
   createLocalApiProvider,
   parseLmStudioError,
+  resolveLocalTimeoutMs,
 } from "./local-api-provider.js";
 export type { LocalApiProviderOptions } from "./local-api-provider.js";
 export type {

@@ -34,7 +34,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Gauntlet Test Suite Audit and Cross-OS Validity Review](./gauntlet-test-suite-audit-and-cross-os/index.md) | completed |
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-in-main/index.md) | completed |
 | [macOS Local Docker Test Suite](./macos-local-docker-test-suite/index.md) | completed |
-| [Make test results independent of ambient environment and machine load](./make-test-results-independent-of/index.md) | completed |
+| [Make test results independent of ambient environment and machine load](./make-test-results-independent-of/index.md) | pending |
 | [`@n-dx/rex` fails intermittently under `pnpm test` but passes standalone](./n-dx-rex-fails-intermittently-under/index.md) | in_progress |
 | [Narrow jsonResponse utility scope](./narrow-jsonresponse-utility-scope/index.md) | completed |
 | [Open Source Scope Documentation Audit and Cross-Reference](./open-source-scope-documentation-audit/index.md) | completed |

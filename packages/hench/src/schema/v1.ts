@@ -173,12 +173,21 @@ export interface HenchConfig {
   rollbackOnFailure?: boolean;
   /**
    * When true, the agent performs `git commit` itself at the end of the run
-   * (legacy behavior — Claude CLI does this by default when the prompt tells
+   * (legacy behavior �?" Claude CLI does this by default when the prompt tells
    * it to commit). When false (default), the agent stages changes and writes
    * its proposed commit message to `.hench-commit-msg.txt`; n-dx then prompts
    * the user to approve the commit before running `git commit -F <file>`.
    */
   autoCommit?: boolean;
+  /**
+   * When true, runs are in autonomous mode (non-interactive). In this mode:
+   * - Test gate failures preserve error context rather than failing the run
+   * - Commit prompts are bypassed, agent commits itself directly
+   * - Rollback on failure is disabled (no non-interactive revert prompt)
+   *
+   * CLI flags (--auto, --loop, --epic-by-epic) always take precedence.
+   */
+  autonomous?: boolean;
   /**
    * How task spawns relate to vendor sessions.
    *

@@ -35,7 +35,7 @@ import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
-import { discoverChangedFiles } from "../analysis/changed-files.js";
+import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
@@ -558,6 +558,12 @@ export async function runReviewGate(
 // Test suite gate failure handler (mandatory full test validation)
 // ---------------------------------------------------------------------------
 
+/**
+ * Test gate failure actions.
+ * - "rerun": Re-run the test command (retry)
+ * - "abort": Mark run as failed and revert changes (roll back)
+ * - "skip": Continue to commit without test gate (user override)
+ */
 export type TestGateFailureAction = "rerun" | "abort" | "skip";
 
 /**
@@ -574,7 +580,10 @@ async function promptTestGateFailure(
   yes?: boolean,
   autonomous?: boolean,
 ): Promise<TestGateFailureAction> {
-  // In non-interactive mode (CI, --yes, --auto), default to abort
+  // In non-interactive mode (CI, --yes, --auto), default to abort. A gate that
+  // could not launch never reaches this handler (it reports as inconclusive),
+  // so by the time we are here the suite genuinely ran and genuinely failed —
+  // completing and committing anyway would record a false success in the PRD.
   if (!process.stdin.isTTY || yes || autonomous) {
     return "abort";
   }
@@ -636,6 +645,7 @@ async function promptTestGateFailure(
         return "rerun";
       case "s":
         return "skip";
+      case "c": // context mode for autonomous
       default:
         return "abort";
     }
@@ -2000,6 +2010,12 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   let testGateSkipped = false;
   let resolvedTestCommand: string | undefined;
 
+  if (run.status === "completed" && skipFullTestGate) {
+    // Say so explicitly — a silently absent gate looks identical to a gate
+    // that never should have run, which hides misconfiguration.
+    stream("Test Gate", "Skipped (--skip-test-gate / hench.skipFullTestGate)");
+  }
+
   if (run.status === "completed" && !skipFullTestGate && run.structuredSummary) {
     // Resolve test command first (before attempting gate)
     // This will prompt the user if no command is configured
@@ -2135,7 +2151,9 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       }
     }
 
-    if (testGateAttempt >= 5) {
+    // Only a gate that never completed exhausts the attempt cap — a pass (or
+    // skip/context resolution) on the final attempt is still a success.
+    if (!gateComplete && testGateAttempt >= 5) {
       info("\nTest gate max attempts reached");
       run.status = "failed";
       run.error = "Test gate max retry attempts exceeded";

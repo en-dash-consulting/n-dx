@@ -185,11 +185,13 @@ describe("validateCompletion", () => {
 
     await validateCompletion("/project");
 
-    // Should use git diff HEAD to catch both staged and unstaged changes
+    // Change discovery diffs against HEAD to catch both staged and unstaged
+    // changes; the --stat pass (summary only) uses the same baseline.
     const callArgs = mockSpawn.mock.calls[0]!;
     expect(callArgs[0]).toBe("git");
-    expect(callArgs[1]).toContain("--stat");
     expect(callArgs[1]).toContain("HEAD");
+    const statCall = mockSpawn.mock.calls.find((c) => (c[1] as string[]).includes("--stat"))!;
+    expect(statCall[1]).toContain("HEAD");
   });
 
   it("diffs against startingHead when provided", async () => {
@@ -201,9 +203,11 @@ describe("validateCompletion", () => {
 
     const callArgs = mockSpawn.mock.calls[0]!;
     expect(callArgs[0]).toBe("git");
-    expect(callArgs[1]).toContain("--stat");
     expect(callArgs[1]).toContain("abc123");
     expect(callArgs[1]).not.toContain("HEAD");
+    const statCall = mockSpawn.mock.calls.find((c) => (c[1] as string[]).includes("--stat"))!;
+    expect(statCall[1]).toContain("abc123");
+    expect(statCall[1]).not.toContain("HEAD");
   });
 
   it("passes when changes are committed (startingHead differs from current HEAD)", async () => {
@@ -263,7 +267,9 @@ describe("validateCompletion", () => {
       timeout: 60_000,
     });
 
-    expect(mockSpawn.mock.calls).toHaveLength(2);
+    // Four spawns: change discovery (diff --name-only + status --porcelain),
+    // the --stat summary pass, then the test command.
+    expect(mockSpawn.mock.calls).toHaveLength(4);
     // The timeout is no longer observable at this boundary: exec keeps the timer
     // itself so a timeout can kill the command's whole tree. Propagation is
     // asserted in tests/unit/validation/completion-timeout.test.ts, which mocks
@@ -290,8 +296,12 @@ describe("validateCompletion", () => {
       testCommand: "npm test",
     });
 
-    // Should only call git diff, not the test command
-    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    // Only the change-discovery git calls run (diff --name-only + status);
+    // with no changes there is no --stat pass and no test command.
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+    for (const call of mockSpawn.mock.calls) {
+      expect(call[0]).toBe("git");
+    }
     expect(result.valid).toBe(false);
     expect(result.hasChanges).toBe(false);
     expect(result.testsRan).toBeUndefined();
@@ -320,8 +330,9 @@ describe("validateCompletion", () => {
     // exists, cmd.exe on a Windows box without one — see buildShellInvocation),
     // so asserting the binary by name made this pass from Git Bash and fail
     // from PowerShell. The invariant worth pinning is that the command reached
-    // a shell at all.
-    const [testCmd, testArgv] = mockSpawn.mock.calls[1] as [string, string[]];
+    // a shell at all. It is the LAST spawn — after the discovery and summary
+    // git calls.
+    const [testCmd, testArgv] = mockSpawn.mock.calls.at(-1) as [string, string[]];
     expect(["sh", "cmd.exe"]).toContain(testCmd);
     expect(testArgv.join(" ")).toContain("pnpm test");
 
@@ -329,6 +340,38 @@ describe("validateCompletion", () => {
     expect(result.hasChanges).toBe(true);
     expect(result.testsRan).toBe(true);
     expect(result.testsPassed).toBe(true);
+  });
+
+  it("rejects when only .rex/.hench bookkeeping changed", async () => {
+    const { validateCompletion } = await import("../../../src/agent/completion.js");
+
+    // hench dirties the task's PRD file on every run the moment it marks the
+    // task in-progress — that must not count as the run's work product.
+    mockExecFileResult(".rex/prd_tree/some-epic/some-task/index.md\n.hench/runs/run-1.json\n");
+
+    const result = await validateCompletion("/project");
+
+    expect(result.valid).toBe(false);
+    expect(result.hasChanges).toBe(false);
+    expect(result.reason).toContain("No changes detected");
+  });
+
+  it("counts a new untracked file as a change", async () => {
+    const { validateCompletion } = await import("../../../src/agent/completion.js");
+
+    // A purely-additive task never appears in `git diff` — the file is
+    // untracked. Discovery reads it from `git status` instead.
+    mockExecFileSequence(
+      { stdout: "", stderr: "", code: 0 },                     // diff --name-only
+      { stdout: "?? new-module.ts\n", stderr: "", code: 0 },   // status --porcelain
+      { stdout: "", stderr: "", code: 0 },                     // diff --stat (summary)
+    );
+
+    const result = await validateCompletion("/project");
+
+    expect(result.valid).toBe(true);
+    expect(result.hasChanges).toBe(true);
+    expect(result.diffSummary).toContain("new-module.ts (new)");
   });
 
   it("sets diffSummary to undefined when no changes", async () => {

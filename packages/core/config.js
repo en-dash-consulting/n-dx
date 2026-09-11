@@ -960,6 +960,15 @@ const LLM_VALIDATORS = {
       throw new Error(`Invalid local.maxContextTokens "${v}". Expected a positive integer (e.g. 32768).`);
     }
   },
+  "local.timeoutMs": (v) => {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0) {
+      throw new Error(
+        `Invalid local.timeoutMs "${v}". Expected a non-negative integer in milliseconds ` +
+        `(e.g. 7200000 for 2 hours), or 0 for no timeout.`,
+      );
+    }
+  },
   "local.verifier.host": (v) => {
     if (typeof v !== "string" || !v.trim()) {
       throw new Error(`Invalid local.verifier.host "${v}". Expected a non-empty hostname.`);
@@ -1726,6 +1735,12 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     When set, hench checks the assembled brief fits before
                                     sending it — failing fast instead of a cryptic HTTP 400.
                                     Match your local server's "Context Length" setting.
+  llm.local.timeoutMs      number    Per-request timeout in ms for local completions
+                                    (default: 300000 = 5 min; 0 = no timeout)
+                                    Raise this when the model is slow to generate or load,
+                                    e.g. 7200000 for 2 hours. This is separate from
+                                    cli.timeoutMs / the "CLI Timeouts" settings page, which
+                                    bound the whole command rather than one HTTP request.
   llm.local.verifier.host  string    Hostname of a second local server used to review the
                                     primary model's output before finalizing a run (optional)
   llm.local.verifier.port  number    Port of the verifier server (optional)
@@ -1963,6 +1978,7 @@ Examples:
   n-dx config llm.local.host 192.168.1.10      Set local server host (default: localhost)
   n-dx config llm.local.port 1234              Set local server port (default: 1234)
   n-dx config llm.local.model qwen2.5-14b      Set local model ID (optional)
+  n-dx config llm.local.timeoutMs 7200000      Allow 2 hours per local request (0 = no limit)
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
   n-dx config llm.claude.model claude-opus-5   Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex
