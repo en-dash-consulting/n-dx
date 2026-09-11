@@ -31,7 +31,9 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Bundle-imported item with `lastModifiedBy` but no `lastModified` is never pushed by remote sync](./bundle-imported-item-with.md) | completed |
 | [Bundles transport the source project's lastSyncedAt/remoteId, corrupting the destination's remote sync](./bundles-transport-the-source-project-s.md) | completed |
 | [Business-owner narrative Markdown PRD export](./business-owner-narrative-markdown-prd.md) | completed |
+| [`defaultTimestampFromExport` is now redundant and writes an unvalidated `exportedAt` to disk](./defaulttimestampfromexport-is-now.md) | pending |
 | [Export in-tree guard stops one directory short of the legacy PRD backend paths](./export-in-tree-guard-stops-one.md) | completed |
+| [`import-bundle --replace` clears the destination's own `remoteId` and `lastSyncedAt`](./import-bundle-replace-clears-the.md) | pending |
 | [`import-bundle --replace` rewrites the tree with no snapshot, no archive batch](./import-bundle-replace-rewrites-the.md) | completed |
 | [import-bundle writes no execution-log entry — the only PRD-mutating command that leaves no trace](./import-bundle-writes-no-execution-log.md) | completed |
 | [Narrative export of an empty PRD claims "everything on the plan is finished"](./narrative-export-of-an-empty-prd.md) | completed |
@@ -44,4 +46,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Scoped bundle export by item — subtree and dependency closure](./scoped-bundle-export-by-item-subtree.md) | completed |
 | [stableKey collision comparison counts sync bookkeeping as content, steering operators toward --replace](./stablekey-collision-comparison-counts.md) | completed |
 | [`stampChangedItems` attribution-only widening changes the rule for every `withTransaction` caller](./stampchangeditems-attribution-only.md) | completed |
+| [`stampChangedItems` tests `!== undefined` but its consumer tests truthiness, so `lastModified: null` defeats the repair](./stampchangeditems-tests-undefined-but.md) | pending |
 | [The folder tree persists no schema marker, so a newer-minor writer leaves no trace](./the-folder-tree-persists-no-schema.md) | pending |

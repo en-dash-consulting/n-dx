@@ -1,0 +1,25 @@
+---
+id: "8755e71a-3df0-4d1b-b356-a2a5a0be9447"
+level: "task"
+title: "`import-bundle --replace` clears the destination's own `remoteId` and `lastSyncedAt`"
+status: "pending"
+priority: "high"
+tags:
+  - "pr-review"
+  - "reviewer:ryrykeith"
+  - "severity:high"
+  - "sync"
+  - "merge-blocker"
+source: "ndx-capture"
+acceptanceCriteria:
+  - "A `--replace` import preserves the destination's `remoteId` and `lastSyncedAt` for item ids that exist locally both before and after the replace"
+  - "A bundle still cannot introduce another project's `remoteId` or `lastSyncedAt` — the export-side guarantee is unchanged"
+  - "An item present only in the bundle arrives with no remote pointers, since the destination has none for it"
+  - "After an export -> edit -> `--replace` round trip on a synced project, `isModifiedSinceSync` is true only for items whose content actually changed, not tree-wide"
+  - "`rex remove` still warns about remote cleanup for items that were synced before the replace"
+  - "The decision about what an absent bookkeeping field means on import is stated in a comment where the import applies it, so the next reader does not have to re-derive it"
+  - "Tests cover a synced local item surviving a replace with its pointers, and a bundle-only item arriving without any"
+description: "Found by code review at 9191f0b2, reproduced against a freshly built dist. Flagged as fix-before-merge.\n\nStripping `lastSyncedAt` and `remoteId` on **export** is correct — a bundle must not carry one project's remote pointers into another. But `parseBundle` strips them again on the **import** side (`stripSyncBookkeeping(candidate.items)`), so `--replace` installs items that have neither, while the local items that did have them are discarded wholesale. Both are real persisted state: `folder-tree-index-generator.ts` emits them and `folder-tree-parser.ts` reads them back.\n\nReproduced: a local item carrying `remoteId: \"notion-123\"` and `lastSyncedAt: \"2026-01-02T00:00:00.000Z\"` comes out of `import-bundle --replace --yes` with both fields gone.\n\nTwo consequences on the same-project export -> edit -> `--replace` round trip the feature documents:\n\n1. Every item loses `lastSyncedAt`, so `isModifiedSinceSync` is true tree-wide. The next `rex sync` pushes everything and wins every field conflict against remote edits made since.\n2. `core/remove-feature.ts` keys its \"this item is synced, warn before deleting\" prompt on `meta.remoteId`, so a later `rex remove` silently stops offering to clean up the remote records.\n\nInert on projects with no remote adapter configured, since the fields are never set there — but silent corruption of the sync relationship for anyone using Notion, Jira or Asana.\n\nThe reviewer frames this as the one finding of the three that needs a real decision rather than a mechanical fix: what does an absent bookkeeping field mean on import — \"no opinion\", or \"clear it\"? Import currently reads it as the second. Reading it as the first, and preserving the destination's bookkeeping for ids that survive the replace, settles it and also resolves the re-attribution question on the same path.\n\nNote the interaction with the sibling findings: the export-side strip and this import-side strip landed in the same commit, so the fix must keep the export guarantee (bundles carry no foreign pointers) while stopping the import from destroying local ones."
+lastModified: "2026-09-11T02:57:06.433Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---
