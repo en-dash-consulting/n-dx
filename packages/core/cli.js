@@ -581,6 +581,21 @@ function stripInitVendorModelFlags(args) {
 }
 
 /**
+ * Extract `--mcp-scope=local` from CLI args.
+ *
+ * `ndx init` defaults to the tracked, cwd-relative `.mcp.json` for MCP
+ * registration. Passing `--mcp-scope=local` restores the legacy behaviour
+ * of registering via `claude mcp add --scope local` — for people who
+ * cannot rely on `.mcp.json` being picked up.
+ *
+ * @param {string[]} args
+ * @returns {"local" | undefined}
+ */
+function extractInitMcpScope(args) {
+  return args.includes("--mcp-scope=local") ? "local" : undefined;
+}
+
+/**
  * Extract `--assistants=<list>` flag value from CLI args.
  * Returns undefined when the flag is absent, or a Set of vendor names
  * when present (e.g. `--assistants=claude` → Set{"claude"}).
@@ -1498,7 +1513,7 @@ async function handleInit(rest) {
     // Non-fatal — README generation is a best-effort convenience.
   }
 
-  const assistantResults = setupAssistantIntegrations(dir, assistantEnabled);
+  const assistantResults = setupAssistantIntegrations(dir, assistantEnabled, { mcpScope: extractInitMcpScope(flags) });
 
   // Warn if a generated assistant's skill directory is gitignored — its
   // ndx-* skills won't be committed, so cloned checkouts silently lack them

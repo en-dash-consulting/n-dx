@@ -70,10 +70,15 @@ export function getSupportedAssistants() {
  * @param {Record<string, boolean>} [enabled]
  *   Map of vendor names to enabled flags.  Vendors not present default
  *   to `true` (enabled).  Pass `{ claude: false }` to skip Claude, etc.
+ * @param {{ mcpScope?: "local" }} [opts]
+ *   Vendor-neutral setup options. Currently only consumed by the Claude
+ *   integration: `{ mcpScope: "local" }` registers MCP servers via
+ *   `claude mcp add --scope local` instead of relying on the tracked
+ *   `.mcp.json` (the default).
  * @returns {Record<string, { summary: string, detail?: object }>}
  *   Per-vendor result keyed by vendor name.
  */
-export function setupAssistantIntegrations(dir, enabled = {}) {
+export function setupAssistantIntegrations(dir, enabled = {}, opts = {}) {
   const results = {};
 
   for (const [vendor, entry] of Object.entries(VENDOR_REGISTRY)) {
@@ -89,7 +94,7 @@ export function setupAssistantIntegrations(dir, enabled = {}) {
     }
 
     try {
-      const detail = entry.setup(dir);
+      const detail = entry.setup(dir, opts);
       results[vendor] = {
         summary: entry.summarize(detail),
         label: entry.label,
@@ -184,13 +189,15 @@ function formatVendorArtifacts(vendor, detail) {
       lines.push(`.claude/settings — ${detail.settings.added} new permission${detail.settings.added === 1 ? "" : "s"} (${detail.settings.total} total)`);
     }
     if (detail.mcp) {
-      if (!detail.mcp.registered) {
+      if (detail.mcp.mode === "tracked") {
+        lines.push(`MCP servers — tracked via .mcp.json (pass --mcp-scope=local for local scope instead)`);
+      } else if (!detail.mcp.registered) {
         lines.push(`MCP servers — skipped (${detail.mcp.reason})`);
       } else if (detail.mcp.servers) {
         const ok = detail.mcp.servers.filter((s) => s.ok);
         const failed = detail.mcp.servers.filter((s) => !s.ok);
         if (ok.length > 0) {
-          lines.push(`MCP servers — ${ok.map((s) => s.name).join(", ")} (${ok[0].transport})`);
+          lines.push(`MCP servers — ${ok.map((s) => s.name).join(", ")} (local scope, ${ok[0].transport})`);
         }
         if (failed.length > 0) {
           const failDetail = failed
