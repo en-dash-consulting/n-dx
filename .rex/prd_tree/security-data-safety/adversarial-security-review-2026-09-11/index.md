@@ -18,7 +18,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [`/api/workflow/apply-suggestion` writes arbitrary dotted keys into `.hench/config.json`](./api-workflow-apply-suggestion-writes.md) | pending |
+| [`/api/workflow/apply-suggestion` writes arbitrary dotted keys into `.hench/config.json`](./api-workflow-apply-suggestion-writes.md) | completed |
 | [Gemini provider sends the API key in the URL query string](./gemini-provider-sends-the-api-key-in.md) | pending |
 | [hench command guard passes newline-separated commands and `>` redirection](./hench-command-guard-passes-newline.md) | completed |
 | [hench `git` tool re-joins args into `sh -c` with no shell-operator check](./hench-git-tool-re-joins-args-into-sh-c.md) | completed |
