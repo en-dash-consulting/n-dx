@@ -6,6 +6,8 @@
  *   - Background/daemon mode (--background)
  *   - PID file management (.n-dx-web.pid)
  *   - Graceful stop (ndx start stop / ndx web stop)
+ *   - Peer detection on a busy port: another project's dashboard is left alone
+ *     and this one relocates within 3117–3200, rather than being killed
  *
  * Used by both `ndx start` (unified: dashboard + MCP) and `ndx web` (alias).
  *
@@ -18,8 +20,10 @@
  */
 
 import { spawn } from "child_process";
+import { get as httpGet } from "http";
 import { createConnection } from "net";
 import { readFile, writeFile, unlink, access } from "fs/promises";
+import { realpathSync } from "fs";
 import { join, resolve } from "path";
 import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
@@ -27,6 +31,18 @@ import { execFileSyncCli } from "./win-spawn.js";
 const DEFAULT_PORT = 3117;
 const PID_FILE = ".n-dx-web.pid";
 const PORT_FILE = ".n-dx-web.port";
+
+// Mirrors the server's own fallback allocator (PORT_RANGE_START / PORT_RANGE_END
+// in packages/web/src/server/port.ts). Duplicated rather than imported: this is
+// the orchestration tier, which spawns packages instead of importing them.
+const PORT_RANGE_START = 3117;
+const PORT_RANGE_END = 3200;
+
+/** Ceiling on the port probe: a dashboard answers /api/status in single-digit ms. */
+const PROBE_TIMEOUT_MS = 1_500;
+
+/** Cap on the probe response we will buffer — the real payload is a few KB. */
+const PROBE_MAX_BYTES = 256 * 1024;
 
 // ── Output helpers ───────────────────────────────────────────────────────────
 // Orchestration files avoid importing from packages (they spawn CLIs instead).
@@ -84,36 +100,252 @@ function isPortInUse(port) {
 }
 
 /**
- * Find and kill whichever process is listening on `port`.
- * Returns true if the port was freed, false if kill failed.
+ * Find the first free port in [start, end], skipping `exclude`.
+ * Returns the port, or null when every port in the range is taken.
  */
-async function killPortOccupant(port) {
+export async function findFreePortInRange(exclude, start = PORT_RANGE_START, end = PORT_RANGE_END) {
+  for (let p = start; p <= end; p++) {
+    if (p === exclude) continue;
+    if (!(await isPortInUse(p))) return p;
+  }
+  return null;
+}
+
+/**
+ * GET http://127.0.0.1:<port>/api/status and return the parsed JSON body.
+ *
+ * Returns null for anything that is not a parseable 200 — no listener, a
+ * connection reset, a non-JSON body, a timeout, an oversized response. The
+ * caller treats null as "cannot identify the occupant", which keeps the
+ * pre-existing kill path in charge whenever the probe is inconclusive.
+ *
+ * Plain node:http on purpose: this is the orchestration tier, which must not
+ * import from packages.
+ *
+ * @param {number} port
+ * @param {number} [timeoutMs]
+ * @returns {Promise<unknown>} Parsed body, or null.
+ */
+export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS) {
+  return new Promise((res) => {
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      res(value);
+    };
+
+    const req = httpGet(
+      { host: "127.0.0.1", port, path: "/api/status", timeout: timeoutMs },
+      (response) => {
+        if (response.statusCode !== 200) {
+          response.resume();
+          req.destroy();
+          done(null);
+          return;
+        }
+        let body = "";
+        response.setEncoding("utf-8");
+        response.on("data", (chunk) => {
+          body += chunk;
+          if (body.length > PROBE_MAX_BYTES) {
+            req.destroy();
+            done(null);
+          }
+        });
+        response.on("end", () => {
+          try {
+            done(JSON.parse(body));
+          } catch {
+            done(null);
+          }
+        });
+        response.on("error", () => done(null));
+      },
+    );
+
+    // `timeout` above only arms the socket timer; it does not abort the request.
+    req.on("timeout", () => {
+      req.destroy();
+      done(null);
+    });
+    req.on("error", () => done(null));
+  });
+}
+
+/**
+ * Who is on the port, according to its /api/status response.
+ *
+ * @typedef {{ kind: "peer", projectDir: string }
+ *          | { kind: "self", projectDir: string }
+ *          | { kind: "unknown" }} PortOccupant
+ */
+
+/**
+ * Canonicalize a path for self/peer comparison.
+ *
+ * `resolve()` alone normalises separators and `..` segments but does not
+ * resolve symlinks and does not case-fold, so the same directory reached
+ * through a symlink (or, on win32, a different drive-letter/path casing)
+ * compares unequal to itself. `realpathSync.native` fixes both — it also
+ * returns the on-disk canonical casing on win32 — but requires the path to
+ * exist. When it does not (deleted out from under the caller, or a payload
+ * describing a directory this process cannot stat), fall back to the plain
+ * `resolve()` form rather than throwing.
+ *
+ * @param {string} pathLike
+ * @returns {string}
+ */
+function canonicalizePath(pathLike) {
+  const resolved = resolve(pathLike);
   try {
-    let pid = null;
+    return realpathSync.native(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
+/**
+ * Decide what a probed /api/status payload says about the port's occupant.
+ *
+ *   peer     — an n-dx dashboard serving a DIFFERENT directory. Must not be
+ *              killed; the caller relocates to another port instead.
+ *   self     — an n-dx dashboard serving THIS directory with no live PID file
+ *              (deleted, or started from another checkout of the same tree).
+ *              Restarting it is the documented idempotent behaviour of
+ *              `ndx start`, so the caller keeps the existing kill path.
+ *   unknown  — not an n-dx dashboard, or one too old to report `projectDir`.
+ *              Attribution is impossible, so the caller keeps the existing
+ *              kill path rather than guessing.
+ *
+ * @param {unknown} payload  Parsed /api/status body, or null.
+ * @param {string} absDir    Absolute project directory this invocation serves.
+ * @returns {PortOccupant}
+ */
+export function classifyPortOccupant(payload, absDir) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return { kind: "unknown" };
+  }
+  // Shape check against the dashboard status payload — see ProjectStatus in
+  // packages/web/src/server/routes-status.ts. A bare `projectDir` on some
+  // unrelated service's JSON must not read as an n-dx server.
+  for (const key of ["sv", "rex", "hench"]) {
+    const section = payload[key];
+    if (!section || typeof section !== "object") return { kind: "unknown" };
+  }
+  const served = payload.projectDir;
+  if (typeof served !== "string" || served.length === 0) return { kind: "unknown" };
+
+  const resolved = canonicalizePath(served);
+  return resolved === canonicalizePath(absDir)
+    ? { kind: "self", projectDir: resolved }
+    : { kind: "peer", projectDir: resolved };
+}
+
+/**
+ * Pids of the processes *listening* on `port`, in the order the platform query
+ * reports them. Returns [] when nothing is listening, or when no usable query
+ * tool is present — the caller treats both as "do not kill".
+ *
+ * Listening sockets only, which is the whole point. A bare `lsof -ti tcp:<port>`
+ * also lists every CLIENT holding a socket on that port, so a browser tab, a
+ * curl, or a poller with a CLOSE_WAIT socket to the dashboard ranked as a
+ * candidate victim — above the listener, whenever it was the older process.
+ *
+ * @param {number} port
+ * @returns {number[]} Distinct listener pids.
+ */
+export function listenerPidsOnPort(port) {
+  const pids = new Set();
+  try {
     if (process.platform === "win32") {
       // netstat -ano lists TCP listeners; grep for ":PORT " at the local address
       const out = execFileSyncCli("netstat", ["-ano"], { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
       for (const line of out.split("\n")) {
         // Look for lines like "  TCP    127.0.0.1:3117    0.0.0.0:0    LISTENING    12345"
         const m = line.match(/TCP\s+[\d.]+:(\d+)\s+[\d.:]+\s+LISTENING\s+(\d+)/i);
-        if (m && parseInt(m[1], 10) === port) {
-          pid = parseInt(m[2], 10);
-          break;
-        }
-      }
-      if (pid) {
-        execFileSyncCli("taskkill", ["/F", "/PID", String(pid)], { stdio: "ignore" });
+        if (m && parseInt(m[1], 10) === port) pids.add(parseInt(m[2], 10));
       }
     } else {
-      // lsof is available on macOS and most Linux distros
-      const out = execFileSyncCli("lsof", ["-ti", `tcp:${port}`], { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] }).trim();
-      if (out) {
-        pid = parseInt(out.split("\n")[0], 10);
-        // SIGKILL direct, rather than spawning /bin/kill for a number we already have.
-        process.kill(pid, "SIGKILL");
+      // lsof is available on macOS and most Linux distros. -sTCP:LISTEN drops
+      // the clients. An lsof too old to support it errors out, which lands in
+      // the catch below and reads as "nobody" — a refusal to kill, not a guess.
+      const out = execFileSyncCli(
+        "lsof",
+        ["-t", "-sTCP:LISTEN", "-i", `tcp:${port}`],
+        { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] },
+      ).trim();
+      for (const line of out.split("\n")) {
+        const pid = parseInt(line.trim(), 10);
+        if (!isNaN(pid)) pids.add(pid);
       }
     }
-    if (!pid) return false;
+  } catch {
+    // No listener (lsof exits non-zero on no match), or no query tool at all.
+    return [];
+  }
+  return [...pids];
+}
+
+/**
+ * Decide which of `pids` to SIGKILL, or why not to.
+ *
+ * Pure, so the whom-to-kill decision is assertable without a process holding a
+ * real socket. Every refusal is a case where killing would be a guess:
+ *
+ *   none      → the query named nobody; there is nothing to signal
+ *   self      → this process is among the listeners (in-process test servers
+ *               have exactly this shape). Without the guard, a regression in
+ *               the peer branch does not fail an assertion — it SIGKILLs the
+ *               test runner, and CI reports a dead worker instead of a bug.
+ *   ambiguous → several listeners (SO_REUSEPORT, a pre-fork server). Picking
+ *               the first is the arbitrary choice that made this function
+ *               dangerous; failing loudly leaves the operator `--port=N`.
+ *
+ * @param {number[]} pids     Listener pids, from {@link listenerPidsOnPort}.
+ * @param {number} [selfPid]  This process's pid.
+ * @returns {{pid: number} | {refuse: "none" | "self"} | {refuse: "ambiguous", pids: number[]}}
+ */
+export function selectKillTarget(pids, selfPid = process.pid) {
+  if (pids.length === 0) return { refuse: "none" };
+  // Self-preservation outranks ambiguity: whichever pid we picked, signalling
+  // from a list that includes us risks killing the decider.
+  if (pids.includes(selfPid)) return { refuse: "self" };
+  if (pids.length > 1) return { refuse: "ambiguous", pids };
+  return { pid: pids[0] };
+}
+
+/**
+ * Find and kill whichever process is listening on `port`.
+ * Returns true if the port was freed, false if it was not.
+ *
+ * Callers must first rule out a peer dashboard via {@link probeStatusEndpoint}
+ * plus {@link classifyPortOccupant}: this SIGKILLs whatever it finds, and the
+ * occupant of 3117 is frequently another project's `ndx start`. The probe
+ * decides *whether* to kill; {@link selectKillTarget} decides *whom*, and it
+ * refuses rather than guess — the caller reports the port as uncleared.
+ */
+export async function killPortOccupant(port) {
+  try {
+    const target = selectKillTarget(listenerPidsOnPort(port));
+    if (target.refuse) {
+      if (target.refuse === "ambiguous") {
+        // Loud, because the alternative is killing one of them at random.
+        console.error(
+          `Port ${port} has ${target.pids.length} listening processes (PIDs ${target.pids.join(", ")}); ` +
+          "refusing to guess which to stop.",
+        );
+      }
+      return false;
+    }
+    const pid = target.pid;
+
+    if (process.platform === "win32") {
+      execFileSyncCli("taskkill", ["/F", "/PID", String(pid)], { stdio: "ignore" });
+    } else {
+      // SIGKILL direct, rather than spawning /bin/kill for a number we already have.
+      process.kill(pid, "SIGKILL");
+    }
     // Wait for the port to free up
     for (let i = 0; i < 15; i++) {
       await new Promise((r) => setTimeout(r, 200));
@@ -416,12 +648,32 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       if (!(await isPortInUse(port))) { portFree = true; break; }
     }
     if (!portFree) {
-      // Something else is holding the port — kill it
-      log(`Port ${port} is in use by another process — clearing it…`);
-      const freed = await killPortOccupant(port);
-      if (!freed) {
-        console.error(`Port ${port} is occupied and could not be cleared. Choose a different port with --port=N or set web.port in .n-dx.json`);
-        return 1;
+      // Ask the occupant who it is before killing it. The PID file above only
+      // knows about servers started for THIS directory, so a second project or
+      // worktree used to look like a stranger squatting on 3117 and got
+      // SIGKILLed — taking a working dashboard down with it.
+      const occupant = classifyPortOccupant(await probeStatusEndpoint(port), absDir);
+
+      if (occupant.kind === "peer") {
+        const next = await findFreePortInRange(port);
+        if (next === null) {
+          console.error(
+            `n-dx dashboard for ${occupant.projectDir} is already on :${port}, and no port in ` +
+            `${PORT_RANGE_START}–${PORT_RANGE_END} is free. Choose one with --port=N or set web.port in .n-dx.json`,
+          );
+          return 1;
+        }
+        log(`n-dx dashboard for ${occupant.projectDir} is already on :${port}; starting this one on :${next}`);
+        port = next;
+      } else {
+        // Not identifiable as a peer — either a stranger, or this directory's
+        // own untracked server, which `ndx start` restarts by contract.
+        log(`Port ${port} is in use by another process — clearing it…`);
+        const freed = await killPortOccupant(port);
+        if (!freed) {
+          console.error(`Port ${port} is occupied and could not be cleared. Choose a different port with --port=N or set web.port in .n-dx.json`);
+          return 1;
+        }
       }
     }
   }

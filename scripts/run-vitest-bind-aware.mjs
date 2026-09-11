@@ -26,6 +26,7 @@ function excludesForProfile(profile) {
     case "root":
       return [
         "tests/e2e/cli-start.test.js",
+        "tests/e2e/cli-start-two-projects.test.js",
         "tests/e2e/cli-web.test.js",
         "tests/e2e/mcp-transport.test.js",
       ];

@@ -1,0 +1,25 @@
+---
+id: "651e7993-8e8f-44fe-9fd6-9653a8baf359"
+level: "task"
+title: "classifyPortOccupant compares paths lexically, so a symlinked project path starts a second dashboard on the same PRD tree"
+status: "completed"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "pr-01"
+  - "core"
+source: "ndx-adversarial-review"
+startedAt: "2026-09-11T01:32:19.311Z"
+completedAt: "2026-09-11T01:37:49.547Z"
+endedAt: "2026-09-11T01:37:49.547Z"
+acceptanceCriteria:
+  - "classifyPortOccupant returns kind:\"self\" when the probed payload's projectDir is the realpath of a directory that absDir reaches through a symlink (fails today: returns kind:\"peer\")."
+  - "A unit test in tests/unit/web-port-occupant.test.js creates a real symlink to a temp directory and asserts the self classification through both spellings."
+  - "classifyPortOccupant still returns kind:\"peer\" for two genuinely different directories, and kind:\"unknown\" for a non-n-dx payload — existing cases unchanged."
+  - "When realpath fails (the reported projectDir no longer exists), classification falls back to the lexical resolve() comparison instead of throwing, covered by a test that points projectDir at a deleted path."
+  - "On win32 the comparison is insensitive to drive-letter and path casing, covered by a test that is skipped on POSIX."
+description: "Severity: medium. Verdict: should-fix (introduced by the port-occupant probe in commit 5781a47b; not a pre-existing defect).\n\nFAILURE SCENARIO\n`classifyPortOccupant` (packages/core/web.js:200-218) decides self-vs-peer with `resolve(served) === resolve(absDir)`. `resolve()` normalises separators and `..` segments but does NOT resolve symlinks and does NOT case-fold. The server's side of the comparison is `ctx.projectDir = resolve(targetDir)` (packages/web/src/server/start.ts:766, 817) — also un-realpathed.\n\nSo the same directory reached by two different spellings reads as a PEER:\n  1. `ndx start /Users/x/proj` (foreground) — dashboard reports projectDir=/Users/x/proj on :3117.\n  2. `ndx start ~/work` where ~/work is a symlink to /Users/x/proj.\n  3. absDir=/Users/x/work != /Users/x/proj -> kind:\"peer\" -> runWeb relocates instead of restarting.\n  4. Result: TWO dashboards serving the same .rex/prd_tree/, each with its own file watcher and PRD write path, on :3117 and :3118.\n\nReproduced directly: with payload.projectDir set to a realpath'd temp dir and absDir set to a symlink pointing at it, classifyPortOccupant returns {kind:\"peer\"}. The same shape occurs on Windows via case-insensitive paths (C:\\Proj vs c:\\proj).\n\nWHY THE PID FILE DOES NOT SAVE IT\nThe obvious guard — `readPidFile(absDir)` finding the running server first — does not apply. FOREGROUND `ndx start` never writes a PID file (runWeb only calls writePidFile in the --background branch, packages/core/web.js:627/634). Since foreground is the default, the probe's self/peer decision is the ONLY thing preserving idempotent restart for a foreground-started dashboard, which makes the path comparison load-bearing rather than a fallback. (Through a symlink the PID file would be the same inode and would be found — but in the foreground case there is no PID file to find.)\n\nBLAST RADIUS\nNot corruption: rex's `saveDocument` always takes the PRD file lock, so concurrent writes from two dashboards serialise or fail loudly rather than interleaving. But two dashboards on one PRD tree contradicts the concurrency contract in CLAUDE.md, doubles the watcher/cache load, and gives the user two URLs showing the same project with independently-stale caches. Note this is a behaviour CHANGE: before commit 5781a47b the occupant would have been SIGKILLed and exactly one dashboard would exist.\n\nSOLUTION OPTIONS\n(A) RECOMMENDED — realpath both sides before comparing, in classifyPortOccupant only. Use `realpathSync.native` inside try/catch, falling back to `resolve()` when the path does not exist or is unreadable (the server's directory may have been deleted out from under it). ~6 lines, no new dependency, keeps the orchestration tier spawn-only. Cost: one extra stat per side. Risk: low; a realpath failure degrades to today's lexical comparison.\n(B) Have the server realpath `ctx.projectDir` at startup and have runWeb realpath `absDir`, so both sides are canonical everywhere. More correct globally, but changes what /api/status reports and what the dashboard displays as the project path — wider blast radius, and it touches the web package for a core-tier bug.\n(C) Case-fold as well as realpath on win32. Only needed if (A) proves insufficient on Windows; `realpathSync.native` already returns the canonical on-disk casing on Windows, so (A) likely subsumes this.\n\nRelated but NOT a duplicate: 3ef3366c-7d84-4f33-a0e0-3f9c3f368e61 (0.7.0 PR 10) introduces realpath-based repo identity for hub registration. It may eventually supersede this code path, but it does not fix the 0.6.0 self/peer comparison and is two releases out."
+lastModified: "2026-09-11T01:37:49.554Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
