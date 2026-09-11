@@ -20,8 +20,8 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 |-------|--------|
 | [`/api/workflow/apply-suggestion` writes arbitrary dotted keys into `.hench/config.json`](./api-workflow-apply-suggestion-writes.md) | pending |
 | [Gemini provider sends the API key in the URL query string](./gemini-provider-sends-the-api-key-in.md) | pending |
-| [hench command guard passes newline-separated commands and `>` redirection](./hench-command-guard-passes-newline.md) | pending |
-| [hench `git` tool re-joins args into `sh -c` with no shell-operator check](./hench-git-tool-re-joins-args-into-sh-c.md) | pending |
+| [hench command guard passes newline-separated commands and `>` redirection](./hench-command-guard-passes-newline.md) | completed |
+| [hench `git` tool re-joins args into `sh -c` with no shell-operator check](./hench-git-tool-re-joins-args-into-sh-c.md) | completed |
 | [`.n-dx.json` receives API keys but `ndx init` never gitignores it](./n-dx-json-receives-api-keys-but-ndx.md) | completed |
 | [`ndx export` / `--deploy=github` publish full hench transcripts with no redaction or confirmation](./ndx-export-deploy-github-publish-full.md) | completed |
 | [Web server `readBody` has no request-size cap](./web-server-readbody-has-no-request.md) | pending |
