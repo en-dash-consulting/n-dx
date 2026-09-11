@@ -2,11 +2,12 @@
 id: "e4095b61-f0b8-4aa2-b233-47ebfde64dba"
 level: "epic"
 title: "Product Usability, Reliability, and Work Tracking"
-status: "pending"
+status: "completed"
 startedAt: "2026-07-10T17:43:51.320Z"
-endedAt: "2026-07-24T16:29:57.787Z"
+completedAt: "2026-09-11T23:31:08.413Z"
+endedAt: "2026-09-11T23:31:08.413Z"
 description: "Improve N-DX install/setup reliability, cross-platform CLI execution, Codex workflow support, authentication resilience, SourceVision classification accuracy, and add work-tracking integrations (Notion, Jira, GitHub Projects, Asana) with a PRD-to-work-item linkage model. Sourced from the July backlog draft (ndx_july_rex.txt)."
-lastModified: "2026-09-10T01:51:49.283Z"
+lastModified: "2026-09-11T23:31:08.441Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -20,7 +21,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Front-End Action Fixes](./front-end-action-fixes.md) | completed |
 | [GitHub Projects Work Tracking Integration](./github-projects-work-tracking.md) | completed |
 | [Jira Work Tracking Integration](./jira-work-tracking-integration.md) | completed |
-| [ndx status: show a log of the last work cycle (completed / failed / skipped)](./ndx-status-show-a-log-of-the-last-work.md) | pending |
+| [ndx status: show a log of the last work cycle (completed / failed / skipped)](./ndx-status-show-a-log-of-the-last-work.md) | completed |
 | [Notion Work Tracking Integration MVP](./notion-work-tracking-integration-mvp.md) | completed |
 | [PRD-to-Work-Item Linkage Model](./prd-to-work-item-linkage-model.md) | completed |
 | [Recommended Install Path Validation](./recommended-install-path-validation.md) | completed |

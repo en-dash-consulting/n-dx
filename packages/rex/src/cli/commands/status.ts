@@ -14,6 +14,7 @@ import { groupByFacet, getFacetValue } from "../../core/facets.js";
 import { walkTree } from "../../core/tree.js";
 import { green, yellow, createSpinner } from "@n-dx/llm-client";
 import { filterDeleted } from "./status-shared.js";
+import { renderWorkCycleSection } from "./status-work-cycle.js";
 import {
   buildCoverageMap,
   renderJsonOutput,
@@ -239,4 +240,9 @@ export async function cmdStatus(
   renderAutoCompletableHints(doc.items);
   renderWhatNextHints(doc.items);
   renderStaleWarnings(doc.items);
+
+  // What the most recent `ndx work` cycle did — completed / failed / skipped.
+  // Human tree view only: the JSON, quiet, ascii-tree and grouped paths above
+  // return earlier and keep their existing output contracts.
+  await renderWorkCycleSection(dir);
 }
