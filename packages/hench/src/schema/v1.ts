@@ -953,6 +953,25 @@ export interface RunRecord {
    */
   vendor?: string;
   /**
+   * Realpath-resolved root of the git worktree this run started in.
+   *
+   * Captured at run start and re-checked before every automatic commit: a run
+   * whose worktree or branch has moved refuses to commit rather than writing
+   * to whatever HEAD now points at. Absent outside a git repository.
+   * v1 additive field — old records without this field load normally.
+   */
+  worktreeRoot?: string;
+  /**
+   * Branch checked out when this run started. Absent when HEAD was detached
+   * (then {@link startHead} is what identifies the checkout) or outside a git
+   * repository. v1 additive field.
+   */
+  branch?: string;
+  /**
+   * Commit HEAD pointed at when this run started. v1 additive field.
+   */
+  startHead?: string;
+  /**
    * Task weight / tier selected for this run ("light" | "standard").
    * Used for task-weight tiering to select cheaper models for simple tasks.
    * Defaults to "standard" if not specified.

@@ -572,6 +572,11 @@ export function getCurrentHead(cwd: string): string | undefined {
     return execFileSync("git", ["rev-parse", "HEAD"], {
       cwd,
       encoding: "utf-8",
+      // Captured, not inherited — same reason as gitRevParsePath: asking a
+      // directory that may not be a repository is a normal probe, and letting
+      // git print `fatal: not a git repository` onto the user's terminal reads
+      // as a failure when nothing failed.
+      stdio: ["ignore", "pipe", "pipe"],
     }).trim();
   } catch {
     return undefined;
@@ -581,13 +586,18 @@ export function getCurrentHead(cwd: string): string | undefined {
 /**
  * Synchronous git helper — get the current branch name.
  *
- * Returns undefined if git fails (e.g. not a git repo or detached HEAD).
+ * Returns undefined if git fails (e.g. not a git repo). Note that a detached
+ * HEAD is *not* a failure: `rev-parse --abbrev-ref` reports the literal string
+ * "HEAD", which callers that care about detachment must recognise themselves.
  */
 export function getCurrentBranch(cwd: string): string | undefined {
   try {
     const branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
       cwd,
       encoding: "utf-8",
+      // See getCurrentHead — the probe is expected to fail outside a repo, so
+      // git's stderr is captured rather than printed.
+      stdio: ["ignore", "pipe", "pipe"],
     }).trim();
     return branch || undefined;
   } catch {

@@ -1682,7 +1682,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // (timeout, crash), the timer fires and auto-commits the staged changes.
   // The watcher is cancelled before finalizeRun so the two paths cannot race.
   const commitMsgTimeoutMs = config.commitMsgTimeoutMs ?? 300_000;
-  const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher({ projectDir, timeoutMs: commitMsgTimeoutMs });
+  const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher({
+    projectDir,
+    timeoutMs: commitMsgTimeoutMs,
+    // RunRecord carries worktreeRoot/branch/startHead under those exact names.
+    origin: run,
+  });
 
   // Prompt section diagnostics — captured on first attempt, stored on run record.
   let promptSectionDiagnostics: PromptSectionDiagnostic[] | undefined;
