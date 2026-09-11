@@ -692,8 +692,13 @@ async function runGoogleApiPreflight(llmConfig) {
 
   // Lightweight live call: list models (pageSize=1 minimises response size)
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}&pageSize=1`;
-    const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    // Send the key in the x-goog-api-key header, not the URL query string, so it
+    // is not captured by proxies or egress logs. Matches google-api-provider.ts.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?pageSize=1`;
+    const resp = await fetch(url, {
+      headers: { "x-goog-api-key": apiKey },
+      signal: AbortSignal.timeout(15000),
+    });
     if (resp.ok) {
       return { ok: true, vendor: LLM_VENDOR.GOOGLE };
     }
