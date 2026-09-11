@@ -32,6 +32,8 @@ export function usage(): void {
           { name: "recommend [dir]", description: "Get SourceVision recommendations" },
           { name: "analyze [dir]", description: "Build PRD from project analysis" },
           { name: "import [dir]", description: "Alias for analyze (file import shorthand)" },
+          { name: "export --out=<path>", description: "Write the PRD to a portable JSON bundle (transport, not the dashboard)" },
+          { name: "import-bundle --in=<path>", description: "Rebuild the PRD tree from a portable JSON bundle" },
           { name: "reorganize [dir]", description: "Detect and fix structural issues in the PRD" },
           { name: "health [dir]", description: "Show structure health score (depth, balance, completeness)" },
           { name: "sync [dir]", description: "Sync local PRD with remote adapter" },

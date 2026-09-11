@@ -21,7 +21,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm, symlink } from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import { tmpdir, platform } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import {
   classifyPortOccupant,
@@ -34,6 +34,24 @@ import {
   selectKillTarget,
   runWeb,
 } from "../../packages/core/web.js";
+
+/**
+ * Absolute, platform-native fixture directories.
+ *
+ * classifyPortOccupant canonicalizes both sides before comparing, so it returns
+ * a resolved path — never the literal it was handed. A bare POSIX literal like
+ * "/tmp/…-a" is only equal to its own resolution on POSIX: on Windows
+ * resolve() qualifies it with the current drive ("D:\\tmp\\project-a"), which is
+ * what CI saw when these assertions compared against the literal. Resolving the
+ * fixtures here keeps every assertion in the same form the code under test
+ * produces, on every OS.
+ *
+ * The names are namespaced so the directories cannot plausibly exist: if they
+ * did, canonicalizePath's realpathSync step would resolve them further (on
+ * macOS /tmp is a symlink to /private/tmp) and diverge from resolve() again.
+ */
+const PROJECT_A = resolve("/tmp/ndx-port-occupant-fixture-a");
+const PROJECT_B = resolve("/tmp/ndx-port-occupant-fixture-b");
 
 /** A minimal but shape-valid /api/status payload for `projectDir`. */
 function statusPayload(projectDir) {
@@ -194,12 +212,12 @@ async function waitForExit(child, timeoutMs = 5_000) {
 }
 
 describe("classifyPortOccupant", () => {
-  const dir = "/tmp/project-a";
+  const dir = PROJECT_A;
 
   it("reports a dashboard for another directory as a peer", () => {
-    expect(classifyPortOccupant(statusPayload("/tmp/project-b"), dir)).toEqual({
+    expect(classifyPortOccupant(statusPayload(PROJECT_B), dir)).toEqual({
       kind: "peer",
-      projectDir: "/tmp/project-b",
+      projectDir: PROJECT_B,
     });
   });
 
@@ -221,14 +239,14 @@ describe("classifyPortOccupant", () => {
     expect(classifyPortOccupant(null, dir)).toEqual({ kind: "unknown" });
     expect(classifyPortOccupant(undefined, dir)).toEqual({ kind: "unknown" });
     expect(classifyPortOccupant("not json", dir)).toEqual({ kind: "unknown" });
-    expect(classifyPortOccupant([statusPayload("/tmp/project-b")], dir)).toEqual({ kind: "unknown" });
+    expect(classifyPortOccupant([statusPayload(PROJECT_B)], dir)).toEqual({ kind: "unknown" });
   });
 
   it("treats a non-n-dx service as unknown even when it reports a projectDir", () => {
     // Shape check, not just field presence: some other dev server answering
     // /api/status with a projectDir must not be mistaken for a dashboard.
-    expect(classifyPortOccupant({ projectDir: "/tmp/project-b" }, dir)).toEqual({ kind: "unknown" });
-    const missingHench = statusPayload("/tmp/project-b");
+    expect(classifyPortOccupant({ projectDir: PROJECT_B }, dir)).toEqual({ kind: "unknown" });
+    const missingHench = statusPayload(PROJECT_B);
     delete missingHench.hench;
     expect(classifyPortOccupant(missingHench, dir)).toEqual({ kind: "unknown" });
   });
@@ -236,7 +254,7 @@ describe("classifyPortOccupant", () => {
   it("treats a dashboard that does not report projectDir as unknown", () => {
     // A server predating the projectDir field cannot be attributed, so the
     // legacy kill path stays in charge rather than guessing.
-    const older = statusPayload("/tmp/project-b");
+    const older = statusPayload(PROJECT_B);
     delete older.projectDir;
     expect(classifyPortOccupant(older, dir)).toEqual({ kind: "unknown" });
 
@@ -316,9 +334,9 @@ describe("classifyPortOccupant", () => {
 
 describe("probeStatusEndpoint", () => {
   it("parses a dashboard's status payload", async () => {
-    const { port } = await startFakeDashboard("/tmp/project-b");
+    const { port } = await startFakeDashboard(PROJECT_B);
     const payload = await probeStatusEndpoint(port);
-    expect(payload.projectDir).toBe("/tmp/project-b");
+    expect(payload.projectDir).toBe(PROJECT_B);
   });
 
   it("returns null when nothing is listening", async () => {
@@ -357,14 +375,14 @@ describe("probeStatusEndpoint", () => {
 
 describe("the probe decision, end to end", () => {
   it("classifies a live dashboard for another directory as a peer", async () => {
-    const { port } = await startFakeDashboard("/tmp/project-b");
-    const occupant = classifyPortOccupant(await probeStatusEndpoint(port), "/tmp/project-a");
-    expect(occupant).toEqual({ kind: "peer", projectDir: "/tmp/project-b" });
+    const { port } = await startFakeDashboard(PROJECT_B);
+    const occupant = classifyPortOccupant(await probeStatusEndpoint(port), PROJECT_A);
+    expect(occupant).toEqual({ kind: "peer", projectDir: PROJECT_B });
   });
 
   it("classifies a live dashboard for this directory as self", async () => {
-    const { port } = await startFakeDashboard("/tmp/project-a");
-    const occupant = classifyPortOccupant(await probeStatusEndpoint(port), "/tmp/project-a");
+    const { port } = await startFakeDashboard(PROJECT_A);
+    const occupant = classifyPortOccupant(await probeStatusEndpoint(port), PROJECT_A);
     expect(occupant.kind).toBe("self");
   });
 
@@ -373,7 +391,7 @@ describe("the probe decision, end to end", () => {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ status: "ok" }));
     });
-    const occupant = classifyPortOccupant(await probeStatusEndpoint(port), "/tmp/project-a");
+    const occupant = classifyPortOccupant(await probeStatusEndpoint(port), PROJECT_A);
     expect(occupant).toEqual({ kind: "unknown" });
   });
 });

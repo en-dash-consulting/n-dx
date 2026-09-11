@@ -98,6 +98,8 @@ const VALUE_KEYS = new Set([
   "adapter",
   "direction",
   "output",
+  "out",
+  "in",
   "host",
   "port",
   "group-by",
@@ -486,6 +488,17 @@ async function dispatchCommand(
       await postWriteHealthWarning(resolveDir(positional), flags.format === "json");
       break;
     }
+    case "export": {
+      const { cmdExport } = await import("./commands/export.js");
+      await cmdExport(resolveDir(positional), flags);
+      break;
+    }
+    case "import-bundle": {
+      const { cmdImportBundle } = await import("./commands/import-bundle.js");
+      await cmdImportBundle(resolveDir(positional), flags);
+      await postWriteHealthWarning(resolveDir(positional), flags.format === "json");
+      break;
+    }
     case "adapter": {
       const dir = resolveDir(positional);
       const { cmdAdapter } = await import("./commands/adapter.js");
@@ -553,7 +566,6 @@ async function dispatchCommand(
         ci: "ndx ci",
         dev: "ndx dev",
         refresh: "ndx refresh",
-        export: "ndx export",
         config: "ndx config",
       };
       if (command in NDX_ONLY_COMMANDS) {
@@ -565,7 +577,8 @@ async function dispatchCommand(
       const REX_COMMANDS = [
         "init", "status", "tree", "next", "add", "update", "move", "remove", "reshape",
         "prune", "restore", "validate", "fix", "sync", "usage", "report", "verify",
-        "recommend", "analyze", "import", "adapter", "reorganize", "health", "mcp",
+        "recommend", "analyze", "import", "export", "import-bundle", "adapter",
+        "reorganize", "health", "mcp",
         "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "parse-md",
         "backfill-commit-attribution",
       ];

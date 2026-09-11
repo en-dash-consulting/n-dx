@@ -7,10 +7,12 @@
  *      so a live in-process holder can never be misjudged as stale no matter
  *      how long its critical section runs.
  *   2. An exclusive lock file with PID + ownership token + timestamp guarding
- *      against other processes. Stale locks (crashed or hung processes) are
- *      detected via PID liveness checks and a max-age timeout. Release is
- *      compare-and-delete on the ownership token, so a holder whose lock was
- *      taken over can never unlink the new holder's lock.
+ *      against other processes. A lock is reclaimed only when its owning
+ *      process is gone — never merely because it is old, since a slow writer
+ *      and a hung one are indistinguishable from the outside and unlinking a
+ *      running writer's lock admits a second writer rather than fencing the
+ *      first. Release is compare-and-delete on the ownership token, so a holder
+ *      whose lock was taken over can never unlink the new holder's lock.
  *
  * @module store/file-lock
  */
@@ -18,9 +20,6 @@
 import {writeFile, readFile, unlink} from "node:fs/promises";
 import {randomUUID} from "node:crypto";
 // ── Constants ────────────────────────────────────────────────────────
-
-/** Maximum age of a lock file before it's considered stale (30 seconds). */
-const STALE_LOCK_MS = 30_000;
 
 /** Delay between lock acquisition retries. */
 const RETRY_DELAY_MS = 50;
@@ -32,8 +31,6 @@ const ACQUIRE_TIMEOUT_MS = 10_000;
 
 /** Timing overrides — production callers use the defaults; tests inject small values. */
 export interface LockOptions {
-  /** Age after which another process's lock file is considered stale. */
-  staleMs?: number;
   /** Maximum time to wait for the lock before throwing. */
   acquireTimeoutMs?: number;
   /** Delay between file-lock acquisition retries. */
@@ -124,10 +121,10 @@ function acquireInProcess(lockPath: string, timeoutMs: number): Promise<() => vo
  * Same-PID lock files are always stale: the in-process mutex guarantees no
  * other live holder exists in this process while we are checking, so such a
  * file is an orphan (failed unlink, or a recycled PID from a dead process).
- * Other processes' locks are stale when the owner is dead or the lock is
- * older than `staleMs` (process presumed hung).
+ * Another process's lock is stale only when that process is gone. Age is
+ * deliberately not grounds: see the note at the liveness check below.
  */
-async function isLockStale(lockPath: string, staleMs: number): Promise<boolean> {
+async function isLockStale(lockPath: string): Promise<boolean> {
   try {
     const content = await readFile(lockPath, "utf-8");
     const info = decodeLock(content);
@@ -136,12 +133,25 @@ async function isLockStale(lockPath: string, staleMs: number): Promise<boolean> 
     // Orphaned same-process lock (see doc comment)
     if (info.pid === process.pid) return true;
 
-    // Owner process is dead
+    // Owner process is dead — the only grounds for taking someone else's lock.
+    //
+    // Age used to be sufficient as well, on the theory that a lock older than
+    // `staleMs` belonged to a hung process. But a hung process and a merely
+    // slow one look identical from the outside, and unlinking the lock of a
+    // running writer does not fence it off — it just lets a second writer into
+    // the critical section alongside it. That is a lost update, and it was
+    // observed rather than theorised: two concurrent `rex import-bundle`
+    // processes on a loaded machine, the second one's save rejected by the
+    // stale-save guard for deleting an item the first had written moments
+    // earlier. A 30-second threshold is nowhere near the runtime of a healthy
+    // import when the whole test suite is competing for the disk.
+    //
+    // The cost of this is a lock whose owner died and whose PID has since been
+    // recycled by an unrelated live process: nothing will reclaim it, and every
+    // writer fails after `ACQUIRE_TIMEOUT_MS` with an error naming the holding
+    // PID and the path to delete. That is loud, bounded and recoverable, which
+    // a silently interleaved write is not.
     if (!isProcessAlive(info.pid)) return true;
-
-    // Lock is too old (process may be hung)
-    const lockTime = new Date(info.timestamp).getTime();
-    if (Date.now() - lockTime > staleMs) return true;
 
     return false;
   } catch {
@@ -199,7 +209,6 @@ function sleep(ms: number): Promise<void> {
  * @throws If the lock cannot be acquired within the timeout
  */
 export async function acquireLock(lockPath: string, options?: LockOptions): Promise<() => Promise<void>> {
-  const staleMs = options?.staleMs ?? STALE_LOCK_MS;
   const acquireTimeoutMs = options?.acquireTimeoutMs ?? ACQUIRE_TIMEOUT_MS;
   const retryDelayMs = options?.retryDelayMs ?? RETRY_DELAY_MS;
 
@@ -222,7 +231,7 @@ export async function acquireLock(lockPath: string, options?: LockOptions): Prom
       }
 
       // Lock exists — held by another process (or orphaned). Check staleness.
-      if (await isLockStale(lockPath, staleMs)) {
+      if (await isLockStale(lockPath)) {
         try {
           await unlink(lockPath);
         } catch {

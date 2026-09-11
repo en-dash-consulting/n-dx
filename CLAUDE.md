@@ -77,7 +77,7 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 | hench | `src/prd/rex-gateway.ts` | rex | 19 functions + 6 types (schema, store, tree, task selection, timestamps, auto-completion, requirements, level helpers, finding acknowledgment) |
 | hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | 30 functions + 10 types (config, constants, JSON, output, help, errors, process execution, token parsing, model resolution) |
 | web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants, tree utilities |
-| web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory |
+| web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory, next-step derivation, archetype override, iso-map builder, analysis artifact schema types |
 | web | `src/viewer/external.ts` | `src/viewer/messaging/`, `src/shared/`, `src/schema/` | Schema types (V1), data-file constants, RequestDedup — viewer↔server boundary gateway |
 | web | `src/viewer/api.ts` | `src/viewer/types.ts`, `src/viewer/route-state.ts` | Viewer types (LoadedData, NavigateTo, DetailItem), route-state functions — inbound API contract for sibling zones (crash, route, performance) |
 
@@ -129,6 +129,10 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 **What remains operator discipline:** other CLI write paths (`analyze`/`plan` imports, `update`, `move`, `remove`, `fix`, and similar) still do their own load→mutate→save — the lock serializes their write but does not merge concurrent changes, so for those commands the last full-document writer still wins. Do not run them concurrently with other PRD writers, and prefer waiting for a background PRD-writing command to finish before making MCP writes: a restructure computed on a stale snapshot can turn individual proposals into no-ops (reported, not silent).
 
 **PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/prd_tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
+
+**Bundle carve-out.** `ndx prd export` (`rex export`) writes the PRD to a single JSON file, and this does not breach the invariant above: the bundle is a *transport artifact*, written only to an operator-chosen path outside `.rex/`, never read as a PRD backend and never a write target for a PRD mutation. `ndx prd import` (`rex import-bundle`) rebuilds the folder tree through the normal store write path, inside `store.withTransaction`. Refusing an output path anywhere inside `.rex/` is enforced in code — the tree is the obvious hazard, but the legacy backend paths `.rex/prd.md` and `.rex/prd.json` would be *read as the PRD* on a checkout without the tree. Note that `ndx export` is a different command — it publishes the static dashboard.
+
+**Narrative carve-out.** `ndx prd export --format=narrative` writes prose Markdown to an operator-chosen path outside `.rex/`, under the same refusal. It is a *report*, not a transport artifact: deliberately lossy and one-way, with ids, folder slugs and status/priority values omitted by construction. Nothing imports it — the JSON bundle is the only round-trip surface. Do not add a narrative parser.
 
 HTTP-request concurrency notes for the web server live in `packages/web/CLAUDE.md`.
 
