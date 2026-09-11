@@ -356,7 +356,7 @@ describe("FolderTreeStore.saveDocument locking", () => {
       );
 
       await expect(
-        acquireLock(lockPath, { acquireTimeoutMs: 400, retryDelayMs: 50, staleMs: 60_000 }),
+        acquireLock(lockPath, { acquireTimeoutMs: 400, retryDelayMs: 50 }),
       ).rejects.toThrow(new RegExp(`Held by PID ${child.pid}`));
     } finally {
       child.kill();
