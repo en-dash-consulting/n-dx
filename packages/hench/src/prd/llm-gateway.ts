@@ -174,11 +174,26 @@ export {
   ALL_FAILURE_CATEGORIES,
   createPromptEnvelope,
   assemblePrompt,
+  assemblePromptText,
   mapErrorReasonToFailureCategory,
   mapRunFailureToCategory,
   classifyVendorError,
   failureCategoryLabel,
 } from "@n-dx/llm-client";
+
+// ---- Prompt section measurement ---------------------------------------------
+// The extractor lives in the foundation tier so rex and sourcevision — which
+// sit below hench and cannot import from it — use the same implementation
+// rather than a copy. hench keeps only the CLI rendering, in
+// agent/lifecycle/prompt-diagnostics.ts.
+export {
+  extractPromptSectionDiagnostics,
+  promptSectionCosts,
+  dominantPromptSections,
+  formatPromptSectionCosts,
+} from "@n-dx/llm-client";
+
+export type { PromptSectionCost } from "@n-dx/llm-client";
 
 // ---- Codex policy compilation -----------------------------------------------
 export {

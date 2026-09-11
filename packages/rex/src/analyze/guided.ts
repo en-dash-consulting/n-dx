@@ -14,6 +14,8 @@ import {
 } from "./reason.js";
 import type { ReasonResult } from "./reason.js";
 import { info } from "../cli/output.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import { section, rexPromptEnvelope, rexPrompt } from "./prompt-envelope.js";
 
 // ── Types ──
 
@@ -48,47 +50,70 @@ export function promptLine(question: string): Promise<string> {
 
 // ── Clarification round ──
 
+/**
+ * Prompt asking whether enough is known to write a spec, and what to ask next.
+ *
+ * Exported so the section costs of the guided flow's two prompts are visible
+ * alongside every other rex surface; it was module-private and unmeasurable.
+ */
+export function buildClarifyEnvelope(
+  context: GuidedContext,
+  projectContext: string,
+): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "You are a product specification assistant helping a user define their project requirements.",
+    ),
+    section(
+      "input",
+      "The user is building a new project and has provided the following description:\n" +
+        `<description>${context.description}</description>`,
+    ),
+    section(
+      "input-rules",
+      context.exchanges.length > 0
+        ? [
+          "Previous clarifications:",
+          ...context.exchanges.map((ex) => `Q: ${ex.question}\nA: ${ex.answer}`),
+        ].join("\n")
+        : "",
+    ),
+    section("project-context", projectContext ? `Project context:\n${projectContext}` : ""),
+    section(
+      "structure",
+      [
+        "Your task: Evaluate whether you have enough information to generate a comprehensive product spec (epics, features, and tasks).",
+        "",
+        "Key areas to probe (only ask about what's missing):",
+        "- Target users and their primary use cases",
+        "- Core features vs nice-to-haves (priorities)",
+        "- Technical constraints or preferences (language, framework, infra)",
+        '- Success criteria (what does "done" look like?)',
+        "- Integrations, data models, or workflows that need defining",
+      ].join("\n"),
+    ),
+    section(
+      "output",
+      [
+        "If you need more information, respond with:",
+        '{ "status": "clarifying", "questions": ["question1", "question2", ...] }',
+        "Ask 2-4 focused, specific questions. Don't repeat questions already answered. Avoid generic questions — each should unlock concrete requirements.",
+        "",
+        "If you have enough information, respond with:",
+        '{ "status": "ready", "summary": "Brief summary of what you understand the project to be" }',
+        "",
+        "Respond with ONLY the JSON object. No markdown fences, no explanation.",
+      ].join("\n"),
+    ),
+  ]);
+}
+
 function buildClarifyPrompt(
   context: GuidedContext,
   projectContext: string,
 ): string {
-  let prompt = `You are a product specification assistant helping a user define their project requirements.
-
-The user is building a new project and has provided the following description:
-<description>${context.description}</description>
-`;
-
-  if (context.exchanges.length > 0) {
-    prompt += "\nPrevious clarifications:\n";
-    for (const ex of context.exchanges) {
-      prompt += `Q: ${ex.question}\nA: ${ex.answer}\n`;
-    }
-  }
-
-  if (projectContext) {
-    prompt += `\nProject context:\n${projectContext}\n`;
-  }
-
-  prompt += `
-Your task: Evaluate whether you have enough information to generate a comprehensive product spec (epics, features, and tasks).
-
-Key areas to probe (only ask about what's missing):
-- Target users and their primary use cases
-- Core features vs nice-to-haves (priorities)
-- Technical constraints or preferences (language, framework, infra)
-- Success criteria (what does "done" look like?)
-- Integrations, data models, or workflows that need defining
-
-If you need more information, respond with:
-{ "status": "clarifying", "questions": ["question1", "question2", ...] }
-Ask 2-4 focused, specific questions. Don't repeat questions already answered. Avoid generic questions — each should unlock concrete requirements.
-
-If you have enough information, respond with:
-{ "status": "ready", "summary": "Brief summary of what you understand the project to be" }
-
-Respond with ONLY the JSON object. No markdown fences, no explanation.`;
-
-  return prompt;
+  return rexPrompt(buildClarifyEnvelope(context, projectContext));
 }
 
 export async function clarify(
@@ -122,41 +147,48 @@ export async function clarify(
 
 // ── Spec generation ──
 
+/** Prompt turning the guided conversation into a full PRD proposal set. */
+export function buildSpecEnvelope(
+  context: GuidedContext,
+  projectContext: string,
+): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "You are a product requirements analyst. Create a comprehensive PRD breakdown as a JSON array from the following project specification.",
+    ),
+    section("schema", PRD_SCHEMA),
+    section("example", FEW_SHOT_EXAMPLE),
+    section(
+      "structure",
+      [
+        "Structuring guidelines:",
+        "- Create a complete initial PRD covering ALL aspects discussed — do not leave gaps.",
+        "- Group related work into epics, break epics into features, features into tasks.",
+        "- Assign priority: critical for blocking/foundational, high for core features, medium for enhancements, low for nice-to-haves.",
+      ].join("\n"),
+    ),
+    section("quality", TASK_QUALITY_RULES),
+    section("input", `Project description:\n${context.description}`),
+    section(
+      "input-rules",
+      context.exchanges.length > 0
+        ? [
+          "Clarifications:",
+          ...context.exchanges.map((ex) => `Q: ${ex.question}\nA: ${ex.answer}`),
+        ].join("\n")
+        : "",
+    ),
+    section("project-context", projectContext ? `Project context:\n${projectContext}` : ""),
+    section("output", OUTPUT_INSTRUCTION),
+  ]);
+}
+
 function buildSpecPrompt(
   context: GuidedContext,
   projectContext: string,
 ): string {
-  let prompt = `You are a product requirements analyst. Create a comprehensive PRD breakdown as a JSON array from the following project specification.
-
-${PRD_SCHEMA}
-
-${FEW_SHOT_EXAMPLE}
-
-Structuring guidelines:
-- Create a complete initial PRD covering ALL aspects discussed — do not leave gaps.
-- Group related work into epics, break epics into features, features into tasks.
-- Assign priority: critical for blocking/foundational, high for core features, medium for enhancements, low for nice-to-haves.
-
-${TASK_QUALITY_RULES}
-
-Project description:
-${context.description}
-`;
-
-  if (context.exchanges.length > 0) {
-    prompt += "\nClarifications:\n";
-    for (const ex of context.exchanges) {
-      prompt += `Q: ${ex.question}\nA: ${ex.answer}\n`;
-    }
-  }
-
-  if (projectContext) {
-    prompt += `\nProject context:\n${projectContext}\n`;
-  }
-
-  prompt += `\n${OUTPUT_INSTRUCTION}`;
-
-  return prompt;
+  return rexPrompt(buildSpecEnvelope(context, projectContext));
 }
 
 export async function generateSpecFromContext(

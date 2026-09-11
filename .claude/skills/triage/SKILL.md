@@ -119,3 +119,12 @@ After the user reviews and confirms:
 - **Explain your reasoning.** For each recommendation, briefly state which strategic goal(s) drove the decision. This helps the user calibrate the goals matrix for next time.
 - **Flag goal gaps.** If you notice a cluster of issues that don't match any strategic goal well, suggest a new goal theme the user might want to add to goals.json.
 - **The matrix is advisory.** The user's judgment overrides the computed score. If they disagree with a recommendation, that's signal to adjust goals.json weights or keywords, not to argue.
+
+## Done when
+
+The triage report is delivered — or, where the user named specific changes to
+apply, those changes are applied and confirmed. Nothing else. This skill does
+not fix the issues it triages, does not edit `goals.json` on its own initiative,
+and writes nothing to GitHub without an explicit, specific instruction. A run
+that ends in a report with no writes is the normal outcome, not an incomplete
+one.

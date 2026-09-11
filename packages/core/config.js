@@ -1628,6 +1628,18 @@ Hench settings (.hench/config.json):
                                      multiplying. Hitting it fails the task with the breakdown
                                      instead of continuing to spend.
 
+Hench test-gate settings (mandatory full-suite gate before commit):
+  hench.fullTestCommand    string    Command that runs the whole suite. Resolved from this key,
+                                     then .n-dx.json hench.fullTestCommand, then auto-detected
+                                     from the project (Makefile validate target, package.json
+                                     test:all/test, swift/cargo/go/pytest), then prompted for.
+  hench.fullTestTimeoutMs  number    How long that command may run before it is killed and the
+                                     run fails (default: 900000 — 15 minutes; 0 means no limit).
+                                     Raise it for a large monorepo: the gate runs while an agent
+                                     is also using the machine, and a timeout aborts a task whose
+                                     work is already done. Prefer raising this over skipping the
+                                     gate.
+
 Hench git-safety settings (pre-run commit gate):
   hench.git.checkpointThreshold  number    Lines-changed threshold at/above which the pre-run
                                            commit gate escalates: the interactive prompt warns
@@ -1775,6 +1787,7 @@ Task routing (which model serves which kind of call):
                  prd.restructure (standard)
     sourcevision code.classify (light)         zone.enrich-scan (light)
                  zone.enrich-deep (standard)   zone.meta-eval (standard)
+    web          sourcevision.ask (standard)
   Setting a route for a class not listed here still works — it may be a glob, or a
   class a newer n-dx defines — but ndx says so, and suggests the closest match.
 
@@ -1817,10 +1830,14 @@ Feature toggles (.n-dx.json — managed via web UI or ndx config):
   features.hench.guardRails         boolean   Security guard rails (default: true)
   features.hench.adaptiveWorkflow   boolean   Adaptive workflow adjustment (default: false)
 
-Sourcevision zone overrides (.n-dx.json):
+Sourcevision settings (.n-dx.json):
   sourcevision.zones.pins  object    Override zone assignments: {"file/path.ts": "zone-id"}
   sourcevision.zones.mergeThreshold
                            number    Min zone size for small-zone merge (default: 3)
+  sourcevision.ask.timeoutMs
+                           number    Wall-clock budget for one dashboard Ask request,
+                                     in ms (default: 120000). A request that exceeds
+                                     it fails as a named timeout rather than hanging.
 
 CLI settings (.n-dx.json):
   cli.name                 string    The project's installed CLI command name.

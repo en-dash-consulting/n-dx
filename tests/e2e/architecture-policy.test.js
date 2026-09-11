@@ -58,6 +58,11 @@ const ALLOWED = new Set([
   "packages/web/dev.js",
   "scripts/cli-smoke-parity.mjs",
   "scripts/run-vitest-bind-aware.mjs",
+  // Needs `git status --porcelain` to refuse recording a prompt-token baseline
+  // from a dirty tree. Establishing that from `.git/` alone would mean
+  // reimplementing git's index and object store, and the mtime shortcut can
+  // report clean after a `touch` — a false clean being the exact bug it fixes.
+  "scripts/prompt-census.mjs",
   // Process monitoring — needs raw execFile for system commands (vm_stat, sysctl)
   "packages/hench/src/process/memory-monitor.ts",
   // Git operations — need execFileSync/execFile for git CLI calls
@@ -1032,8 +1037,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 157,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; Windows-safe CLI spawn surface — quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation + SpawnCliOptions/CliInvocationDiagnosis types added for the GH #37/#68/#69 spawn hardening so cli-loop can route .cmd shims through cmd.exe; diagnoseCliNotFound added so cli-loop's close/non-zero-exit path surfaces the Windows 'not recognized' missing-CLI diagnosis; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries; parseLmStudioError added so the local-LLM provider can classify LM Studio server errors; LLM_VENDOR/LLMVendor helpers added so hench uses the canonical vendor literal set through the approved gateway; resolveReviewModel + REVIEW_MODELS added so the adversarial review pass resolves its own model tier through the gateway instead of hardcoding a model in cli-loop; resolveTaskModel added so hench resolves the agent loop and the pre-run commit message by task class — agent.execute and git.commit-message — through the class→tier→model registry rather than calling resolveVendorModel with a hardcoded weight; resolveLocalTimeoutMs added so hench's local tool loop and its verifier honour llm.local.timeoutMs instead of hardcoding their own 5 min / 60 s request bounds)",
+    maxExports: 162,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; Windows-safe CLI spawn surface — quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation + SpawnCliOptions/CliInvocationDiagnosis types added for the GH #37/#68/#69 spawn hardening so cli-loop can route .cmd shims through cmd.exe; diagnoseCliNotFound added so cli-loop's close/non-zero-exit path surfaces the Windows 'not recognized' missing-CLI diagnosis; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries; parseLmStudioError added so the local-LLM provider can classify LM Studio server errors; LLM_VENDOR/LLMVendor helpers added so hench uses the canonical vendor literal set through the approved gateway; resolveReviewModel + REVIEW_MODELS added so the adversarial review pass resolves its own model tier through the gateway instead of hardcoding a model in cli-loop; resolveTaskModel added so hench resolves the agent loop and the pre-run commit message by task class — agent.execute and git.commit-message — through the class→tier→model registry rather than calling resolveVendorModel with a hardcoded weight; assemblePromptText + the prompt section-measurement surface — extractPromptSectionDiagnostics, promptSectionCosts, dominantPromptSections, formatPromptSectionCosts and the PromptSectionCost type — added when the envelope was extended to rex and sourcevision: those packages sit below hench and cannot import from it, so the extractor moved down to the foundation tier and hench now reaches its own diagnostics through the gateway rather than owning the implementation)",
   },
 ];
 
@@ -1278,6 +1283,7 @@ const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   ["packages/rex/src/cli/index.ts", "CLI command dispatch — lazy-loads command handlers"],
   ["packages/rex/src/cli/commands/analyze.ts", "Chunked-review lazy import — loaded only during interactive proposal review"],
   ["packages/rex/src/cli/commands/migrate-to-folder-tree.ts", "Lazy-loads node:readline only for the interactive legacy-file cleanup prompt"],
+  ["packages/rex/src/cli/commands/import-bundle.ts", "Lazy-loads node:readline only for the interactive --replace confirmation prompt — skipped entirely with --yes or off a TTY"],
   ["packages/rex/src/cli/commands/prune.ts", "Lazy-loads LLM client for smart prune proposals"],
   ["packages/rex/src/cli/commands/remove.ts", "Lazy-loads LLM client for smart remove analysis"],
   ["packages/rex/src/cli/commands/reorganize.ts", "Lazy-loads LLM client for reorganization proposals"],

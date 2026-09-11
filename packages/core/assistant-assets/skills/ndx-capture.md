@@ -43,3 +43,10 @@ ndx hench record --task=<id> --status=completed --startedAt=<the time you noted>
 Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. `<id>` is the id of the item you just created, so the cost of capturing it lands on that item in the PRD rollup.
 
 Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.
+
+## Done when
+
+The item exists in the PRD, the change is committed, and the run is recorded.
+Capturing is the whole job: do not start implementing what was captured, and do
+not restructure the surrounding tree to make room for it. Working the item is a
+separate run, and reshaping the hierarchy is `/ndx-reshape`.

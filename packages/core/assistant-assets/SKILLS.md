@@ -45,18 +45,30 @@ Reference for skill authors: every skill is classified by mutation footprint. Fi
    ````
    Run `git status --porcelain` against the project root. If empty, print
    "Working tree clean — nothing to commit." and stop. Otherwise stage all
-   changes with `git add -A` and commit via a HEREDOC:
+   changes with `git add -A`, then build the message with your file-writing
+   tool — never with shell quoting — and commit it from that file.
 
-   ```sh
-   git commit -m "$(cat <<'EOF'
+   Write exactly this to a scratch file such as `.git/NDX_COMMIT_MSG`:
+
+   ```
    <skill-name>: <concise description of what changed>
 
    N-DX: skill/<skill-name>
    Co-Authored-By: En Dash's n-dx <n-dx@endash.us>
-   EOF
-   )"
    ```
+
+   Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
    ````
+
+   **Do not build the message with a heredoc or `$(...)`.** Both are POSIX-only.
+   Git Bash is not part of Windows — it arrives with Git for Windows, whose
+   `usr/bin` is not on `PATH` outside Git Bash itself — so a heredoc commit step
+   fails on a stock PowerShell or `cmd.exe` at the *last* step of the skill,
+   after all the real work is done. Worse, an assistant improvising around the
+   parse error tends to fall back to repeated `-m` flags, which insert blank
+   lines that split the trailer block so git stops parsing it.
+   `tests/e2e/skill-portability.test.js` rejects both constructions, in the
+   skills and in this file.
 
    Both trailer lines are required and must appear verbatim. `Co-Authored-By` is
    what routes the commit to the n-dx identity — `packages/web/src/server/merge-history.ts`

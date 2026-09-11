@@ -6,9 +6,11 @@ status: "completed"
 priority: "high"
 source: "sourcevision"
 startedAt: "2026-04-19T03:24:10.418Z"
-completedAt: "2026-08-25T19:38:32.128Z"
-endedAt: "2026-08-25T19:38:32.128Z"
+completedAt: "2026-09-10T17:10:34.022Z"
+endedAt: "2026-09-10T17:10:34.022Z"
 description: "Automated recommendations from SourceVision analysis. 26 zone+category groups covering 33 total findings.\n\n---\n\nAutomated recommendations from SourceVision analysis. 10 zone+category groups covering 11 total findings.\n\n---\n\nAutomated recommendations from SourceVision analysis. 14 zone+category groups covering 14 total findings.\n\n---\n\nAutomated recommendations from SourceVision analysis. 24 zone+category groups covering 43 total findings.\n\n---\n\nAutomated recommendations from SourceVision analysis. 4 zone+category groups covering 5 total findings."
+lastModified: "2026-09-10T17:10:34.029Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 recommendationMeta: "[object Object]"
 ---
 
@@ -96,4 +98,5 @@ recommendationMeta: "[object Object]"
 | [Timer Performance Optimization and Re-render Reduction](./timer-performance-optimization-and-re/index.md) | completed |
 | [Token Usage Aggregation Performance Optimization](./token-usage-aggregation-performance/index.md) | completed |
 | [Immersive Init Experience with Dinosaur Theme & Branding](./immersive-init-experience-with.md) | completed |
+| [No changeset bumps @n-dx/llm-client, though this branch adds public API that rex, sourcevision and hench import](./no-changeset-bumps-n-dx-llm-client.md) | completed |
 | [Stale node_modules makes `pnpm typecheck` report type errors that CI does not have](./stale-node-modules-makes-pnpm.md) | completed |

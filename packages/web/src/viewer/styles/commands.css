@@ -418,7 +418,7 @@ a.cmd-btn {
 .cmd-inline-progress {
   font-size: var(--font-sm);
   color: var(--text-muted);
-  font-family: var(--mono);
+  font-family: var(--font-mono);
 }
 
 .cmd-phase-list {
@@ -431,7 +431,7 @@ a.cmd-btn {
 
 .cmd-phase-item {
   padding: 2px 0;
-  font-family: var(--mono);
+  font-family: var(--font-mono);
 }
 
 /* ── Adaptive optimization view ────────────────────────────────────── */

@@ -356,8 +356,20 @@ export function formatTaskBrief(brief: TaskBrief): string {
     sections.push(`Tags: ${brief.task.tags.join(", ")}`);
   }
   if (brief.task.failureReason) {
-    sections.push("\n## PREVIOUS FAILURE");
+    // A bare heading over the prior failure text leaves the model to infer
+    // what to do with it, and the most available continuation is the approach
+    // it just watched fail. Name the retry, then ask for a different route
+    // before any code is written — the instruction has to arrive with the
+    // evidence, not be inferred from it.
+    sections.push("\n## Previous attempt failed — do not repeat it");
+    sections.push("A prior run of this same task failed. What went wrong:");
     sections.push(brief.task.failureReason);
+    sections.push(
+      "Diagnose why that happened before you change anything, and take a " +
+        "different approach. If you conclude the previous approach was right " +
+        "and only its execution was wrong, say so explicitly and explain what " +
+        "you are doing differently this time.",
+    );
   }
 
   // Parent chain
@@ -411,15 +423,16 @@ export function formatTaskBrief(brief: TaskBrief): string {
   }
 
   // Project
-  sections.push("\n## Project");
-  sections.push(`Name: ${brief.project.name}`);
-  sections.push(`CLI: \`${brief.project.cliName ?? DEFAULT_CLI_NAME}\``);
-  if (brief.project.validateCommand) {
-    sections.push(`Validate: \`${brief.project.validateCommand}\``);
-  }
-  if (brief.project.testCommand) {
-    sections.push(`Test: \`${brief.project.testCommand}\``);
-  }
+  // No project block here. `buildSystemPrompt` emits the same four facts under
+  // `## Project Info`, and both halves reach the model in one call, so this was
+  // billed twice on every autonomous run. The system prompt keeps them: it also
+  // carries the instruction to use the CLI name when referring to the project,
+  // and it is the stable half of the pair while the brief changes per task.
+  //
+  // One caller sends the brief without that system prompt — `callVerifier` in
+  // lifecycle/loop.ts pairs it with a reviewer prompt of its own. It is asking
+  // whether a solution satisfies the task's acceptance criteria, which the
+  // project's name and command list do not bear on.
 
   // Workflow — trimmed at a line boundary. This file states rules, so a
   // mid-line cut would leave a truncated rule reading as a complete one.

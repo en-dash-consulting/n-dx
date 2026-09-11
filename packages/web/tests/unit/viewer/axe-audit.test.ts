@@ -663,15 +663,43 @@ describe.skipIf(!axeRun)("[a11y] PRMarkdownView — axe audit", () => {
 // ── [a11y] AskView ───────────────────────────────────────────────────────────
 
 describe.skipIf(!axeRun)("[a11y] AskView — axe audit", () => {
+  // The Ask panel is stateful in a way its sibling views are not: the answer
+  // arrives after an indeterminate delay, so idle, submitting, answered, and
+  // error are four different DOM shapes, and an ARIA regression in one is
+  // invisible from the others. Each state is audited in both themes.
+  // Behavioural a11y (live regions, focus, keyboard) is pinned separately in
+  // ask-view-a11y.test.ts.
   let root: HTMLElement;
   let cleanup: () => void;
   let originalFetch: typeof globalThis.fetch;
+  let askResponse: () => Promise<Response>;
 
-  beforeEach(() => {
+  function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  beforeEach(async () => {
+    const { clearProjectMetadataCache } = await import(
+      "../../../src/viewer/hooks/use-project-metadata.js"
+    );
+    clearProjectMetadataCache();
+    const { ASK_ENDPOINT } = await import("../../../src/viewer/views/ask.js");
     originalFetch = globalThis.fetch;
-    // No vendor call: the panel issues nothing until a question is submitted,
-    // and the project-metadata fetch is left pending.
-    globalThis.fetch = vi.fn().mockReturnValue(new Promise(() => { /* never resolves */ }));
+    askResponse = () => new Promise(() => { /* never resolves */ });
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === ASK_ENDPOINT) return askResponse();
+      if (url === "/api/project") {
+        return jsonResponse({
+          name: "n-dx", description: null, version: null, git: null,
+          nameSource: "directory", cliName: "n-dx",
+        });
+      }
+      return jsonResponse({}, 404);
+    }) as typeof globalThis.fetch;
   });
 
   afterEach(() => {
@@ -681,25 +709,63 @@ describe.skipIf(!axeRun)("[a11y] AskView — axe audit", () => {
     root.remove();
     cleanup?.();
     globalThis.fetch = originalFetch;
+    delete window.__NDX_DEPLOYED__;
   });
 
-  it("has zero critical/serious violations (light theme, idle state)", async () => {
-    cleanup = setTheme("light");
+  type AskAuditState = "idle" | "submitting" | "answered" | "error";
+
+  /** Mount the panel and drive it into `state` through its own form. */
+  async function renderAskAt(state: AskAuditState): Promise<void> {
     const { AskView } = await import("../../../src/viewer/views/ask.js");
     root = renderToDiv(h(AskView, {}));
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    const violations = await runAxe(root);
-    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
-  });
+    if (state === "idle") return;
 
-  it("has zero critical/serious violations (dark theme, idle state)", async () => {
-    cleanup = setTheme("dark");
-    const { AskView } = await import("../../../src/viewer/views/ask.js");
-    root = renderToDiv(h(AskView, {}));
-    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
-    const violations = await runAxe(root);
-    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
-  });
+    if (state === "answered") {
+      askResponse = async () =>
+        jsonResponse({ answer: "web-viewer is the hub zone.", vendor: "claude", model: "m" });
+    } else if (state === "error") {
+      askResponse = async () =>
+        jsonResponse({ error: "The vendor CLI exited 1.", kind: "llm_error" }, 502);
+    } // "submitting" keeps the never-resolving default.
+
+    const textarea = root.querySelector<HTMLTextAreaElement>("textarea.sv-ask-textarea");
+    const form = root.querySelector<HTMLFormElement>("form.sv-ask-form");
+    if (!textarea || !form) throw new Error("Ask panel did not render its form");
+    await act(async () => {
+      textarea.value = "Which zones are most coupled?";
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await new Promise<void>((r) => setTimeout(r, 0));
+      await new Promise<void>((r) => setTimeout(r, 0));
+    });
+
+    // Guard that the audit really sees the state it claims to — an audit of
+    // the wrong DOM passes vacuously.
+    if (state === "answered" && !root.querySelector(".sv-ask-answer")) {
+      throw new Error("Ask panel did not reach the answered state");
+    }
+    if (state === "error" && !root.querySelector(".sv-ask-error")) {
+      throw new Error("Ask panel did not reach the error state");
+    }
+  }
+
+  const STATES: AskAuditState[] = ["idle", "submitting", "answered", "error"];
+  for (const theme of ["light", "dark"] as const) {
+    for (const state of STATES) {
+      it(`has zero critical/serious violations (${theme} theme, ${state} state)`, async () => {
+        cleanup = setTheme(theme);
+        await renderAskAt(state);
+        const violations = await runAxe(root);
+        expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+      });
+    }
+  }
 
   it("has zero violations in the deployed-mode unavailable state", async () => {
     cleanup = setTheme("light");

@@ -14,15 +14,7 @@
  */
 
 import { h } from "preact";
-import { useState, useCallback, useEffect } from "preact/hooks";
-
-interface SvAnalyzeStatusData {
-  running: boolean;
-  startedAt: string | null;
-  finishedAt: string | null;
-  recentOutput: string;
-  error: string | null;
-}
+import { useSvAnalyze } from "../hooks/index.js";
 
 export interface EnrichmentGateProps {
   /** View name shown as the heading, e.g. "Architecture". */
@@ -36,65 +28,9 @@ export interface EnrichmentGateProps {
 }
 
 export function EnrichmentGate({ title, requiredPass, currentPass, pollIntervalMs = 3000 }: EnrichmentGateProps) {
-  const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
-  const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<string | null>(null);
-
-  // Poll analysis status while running (mirrors AnalyzeControls on Overview)
-  useEffect(() => {
-    if (state !== "running") return;
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/commands/sv-analyze/status");
-        if (!res.ok) return;
-        const data = await res.json() as SvAnalyzeStatusData;
-        const lastLine = data.recentOutput.split("\n").filter(Boolean).pop();
-        if (lastLine) setProgress(lastLine.slice(0, 120));
-        if (!data.running && data.finishedAt) {
-          clearInterval(interval);
-          if (data.error) {
-            setError(data.error);
-            setState("error");
-          } else {
-            setProgress(null);
-            setState("done");
-          }
-        }
-      } catch {
-        // Ignore transient fetch errors
-      }
-    }, pollIntervalMs);
-
-    return () => clearInterval(interval);
-  }, [state, pollIntervalMs]);
-
-  const start = useCallback(async (body: { full?: boolean; targetPass?: number }) => {
-    setState("running");
-    setError(null);
-    setProgress(null);
-    try {
-      const res = await fetch("/api/commands/sv-analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (res.status === 409) {
-        // Already running — the polling loop will track it
-        return;
-      }
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: "Analysis failed to start" })) as { error?: string };
-        throw new Error(d.error || `HTTP ${res.status}`);
-      }
-      // 202 accepted — polling loop handles the rest
-    } catch (err) {
-      setError(String(err instanceof Error ? err.message : err));
-      setState("error");
-    }
-  }, []);
-
-  const busy = state === "running";
+  // The start-and-poll flow lives in the hook, shared with the Ask panel's
+  // no-analysis state, so both surfaces offer the same action.
+  const { state, progress, error, busy, start } = useSvAnalyze(pollIntervalMs);
 
   return h("div", { class: "locked-view enrichment-gate" },
     h("div", { class: "locked-icon", "aria-hidden": "true" }, "\u{1F512}"),

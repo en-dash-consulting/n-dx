@@ -243,6 +243,27 @@ export interface HenchConfig {
    */
   fullTestCommand?: string;
   /**
+   * Milliseconds the full test suite gate may take before it is killed and the
+   * run fails. Default: 900000 (15 min), mirroring
+   * `DEFAULT_TEST_GATE_TIMEOUT_MS` in `tools/test-runner.ts` — see its docblock
+   * for the measurement the number comes from.
+   *
+   * The default is roughly 3x this repo's own measured suite duration. A large
+   * monorepo running every package can still legitimately exceed it — and
+   * because the gate runs while an agent is also competing for CPU, headroom
+   * matters:
+   * a timeout aborts a task whose work was already done and committed. Raise
+   * this rather than reaching for `skipFullTestGate`, which gives up the check
+   * entirely.
+   *
+   * Set to 0 for no limit. That trades a hung suite blocking the run forever
+   * against never being cut off mid-suite; prefer a generous number over 0.
+   *
+   * Resolution: `.hench/config.json` is merged with `.n-dx.json`'s
+   * `hench.fullTestTimeoutMs`, which wins (see `loadConfig`).
+   */
+  fullTestTimeoutMs?: number;
+  /**
    * Maximum number of times to re-prompt the agent when it produces a plan
    * without executing code modifications (default: 2).
    * Set to 0 to disable plan-only detection and allow completion with plans only.

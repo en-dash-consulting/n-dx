@@ -7,7 +7,7 @@
  * Contract guarantees:
  *   - `loadDocument` parses the on-disk folder tree and returns a PRDDocument.
  *   - `saveDocument` serializes the document items to the folder tree and
- *     persists the document title to `tree-meta.json`.
+ *     persists the document title and schema version to `tree-meta.json`.
  *   - Unknown item fields survive round-trip via frontmatter passthrough;
  *     nested-object values are coerced to strings (supportsPassthrough: false).
  *   - All writes use atomic (temp + rename) operations for crash-safety.
@@ -26,6 +26,7 @@ import { findItem, insertChild, updateInTree, removeFromTree } from "../core/tre
 import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
+import { parseTreeMeta, treeMetaContents } from "./tree-meta.js";
 import { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 import {
@@ -43,7 +44,8 @@ import { resolveActor } from "../core/identity.js";
 
 /**
  * PRDStore implementation that uses `.rex/prd_tree/` as the primary PRD backend.
- * Document title is persisted in `tree-meta.json` in the same directory.
+ * Document title and schema version are persisted in `tree-meta.json` in the
+ * same directory — see that module for why the schema has to be recorded.
  */
 export class FolderTreeStore implements PRDStore {
   private rexDir: string;
@@ -72,10 +74,14 @@ export class FolderTreeStore implements PRDStore {
     // parse registers as newer than the load and the guard flags it.
     this.loadedAt = Date.now();
     let title = "PRD";
+    // The version the tree was *written* at, not the one reading it. Absent on
+    // any tree older than the marker, which then reads as the running version.
+    let schema = SCHEMA_VERSION;
     try {
       const raw = await readFile(this.path("tree-meta.json"), "utf-8");
-      const meta = JSON.parse(raw) as Record<string, unknown>;
-      if (typeof meta["title"] === "string") title = meta["title"];
+      const meta = parseTreeMeta(raw);
+      if (meta.title !== undefined) title = meta.title;
+      if (meta.schema !== undefined) schema = meta.schema;
     } catch (err) {
       if (!isMissingFileError(err)) {
         throw err;
@@ -83,13 +89,13 @@ export class FolderTreeStore implements PRDStore {
     }
 
     const { items } = await parseFolderTree(this.treeRoot);
-    return { schema: SCHEMA_VERSION, title, items };
+    return { schema, title, items };
   }
 
   /** Serialize the document to disk. Callers must hold the PRD lock. */
   private async writeTree(doc: PRDDocument): Promise<void> {
     await mkdir(this.treeRoot, { recursive: true });
-    await writeFile(this.path("tree-meta.json"), JSON.stringify({ title: doc.title }), "utf-8");
+    await writeFile(this.path("tree-meta.json"), JSON.stringify(treeMetaContents(doc)), "utf-8");
     await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
     // A completed save makes this instance's view of the tree current again:
     // its own writes must not read as "another writer's work" on the next save.
