@@ -152,6 +152,8 @@ interface StubClient {
   requests: CompletionRequest[];
   /** Vendors the factory was asked for, in order. */
   vendors: string[];
+  /** `cwd` the factory was called with, in order — should mirror `ctx.projectDir`. */
+  cwds: string[];
   options: HandleSourcevisionAskOptions;
 }
 
@@ -166,11 +168,13 @@ function stubClient(respond: () => Promise<CompletionResult>): StubClient {
   const stub: StubClient = {
     requests: [],
     vendors: [],
+    cwds: [],
     options: {},
   };
   stub.options = {
-    createClient: ({ vendor }) => {
+    createClient: ({ vendor, cwd }) => {
       stub.vendors.push(vendor);
+      stub.cwds.push(cwd);
       const client: LLMClient = {
         mode: "api",
         complete: (request) => {
@@ -282,6 +286,15 @@ describe("POST /api/sourcevision/ask", () => {
       "components.json",
       "CONTEXT.md",
     ]);
+  });
+
+  it("creates the LLM client with cwd = ctx.projectDir", async () => {
+    const stub = stubClient(answering("ok"));
+    routeOptions = stub.options;
+
+    await ask({ prompt: "Where is the architectural risk?" });
+
+    expect(stub.cwds).toEqual([tmpDir]);
   });
 
   it("reports zeroed tokens rather than omitting them when the provider counts none", async () => {
