@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readdir } from "node:fs/promises";
+import { mkdtemp, rm, readdir, utimes, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { serializeFolderTree } from "../../../src/store/folder-tree-serializer.js";
@@ -122,6 +122,50 @@ describe("stale-save guard", () => {
     });
     const entries = await readdir(treeRoot);
     expect(entries.some((e) => e.includes("beta"))).toBe(false);
+  });
+
+  it("allows a same-writer leaf-to-folder promotion even when clocks say the leaf is newer", async () => {
+    // Observed live as the flaky web-route 400s: a handler adds an epic
+    // (written as a bare `<slug>.md` leaf) and then its first child in
+    // back-to-back transactions. The promotion to `<slug>/index.md` removes
+    // the leaf file the same writer created milliseconds earlier, and under
+    // Windows timestamp granularity the leaf's mtime can postdate the second
+    // transaction's load. The item's id is in the document being saved, so
+    // nothing is deleted — the guard must not fire on a relocation.
+    await serializeFolderTree([epic("a", "Alpha")], treeRoot);
+    const leafPath = join(treeRoot, "alpha.md");
+    const loadedAt = Date.now();
+    // Freeze the pathological clock: the leaf reads as written AFTER the load.
+    const future = new Date(Date.now() + 5_000);
+    await utimes(leafPath, future, future);
+
+    await serializeFolderTree(
+      [epic("a", "Alpha", [task("a1", "First Child")])],
+      treeRoot,
+      { loadedAt },
+    );
+
+    // Promoted: the leaf is gone, the folder form exists, the child landed.
+    await expect(stat(leafPath)).rejects.toThrow();
+    const entries = await readdir(join(treeRoot, "alpha"));
+    expect(entries).toContain("index.md");
+    expect(entries.some((e) => e.includes("first-child"))).toBe(true);
+  });
+
+  it("still refuses a newer entry whose item is absent from the save", async () => {
+    // The relocation exemption is keyed on item id, not mtime — an item the
+    // saved document does not carry keeps the guard's full protection even
+    // under the same pathological clock.
+    await serializeFolderTree([epic("a", "Alpha"), epic("c", "Concurrent Item")], treeRoot);
+    const loadedAt = Date.now();
+    const future = new Date(Date.now() + 5_000);
+    const entries = await readdir(treeRoot);
+    const cFile = entries.find((e) => e.includes("concurrent-item"))!;
+    await utimes(join(treeRoot, cFile), future, future);
+
+    await expect(
+      serializeFolderTree([epic("a", "Alpha")], treeRoot, { loadedAt }),
+    ).rejects.toThrow(/Concurrent Item/);
   });
 
   it("guards the store write path end to end", async () => {
