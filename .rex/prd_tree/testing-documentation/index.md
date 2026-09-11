@@ -2,13 +2,15 @@
 id: "738f6000-aa94-41a0-86da-1d505e2674dd"
 level: "epic"
 title: "Testing & Documentation"
-status: "pending"
+status: "completed"
 startedAt: "2026-05-06T13:27:57.504Z"
+completedAt: "2026-09-11T22:55:47.465Z"
+endedAt: "2026-09-11T22:55:47.465Z"
 resolutionType: "acknowledgment"
 resolutionDetail: "Fixed final architecture policy test failure (PRD storage invariant violations). All child tasks completed. Test suite passes (1628 tests). Epic infrastructure and documentation goals met."
 description: "Local testing infrastructure (gauntlet config validation), platform/prerequisite documentation, and ongoing documentation refresh for PRD-related changes."
-lastModified: "2026-09-11T11:35:48.190Z"
-lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+lastModified: "2026-09-11T22:55:47.490Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
 ## Children
@@ -34,7 +36,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Gauntlet Test Suite Audit and Cross-OS Validity Review](./gauntlet-test-suite-audit-and-cross-os/index.md) | completed |
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-in-main/index.md) | completed |
 | [macOS Local Docker Test Suite](./macos-local-docker-test-suite/index.md) | completed |
-| [Make test results independent of ambient environment and machine load](./make-test-results-independent-of/index.md) | pending |
+| [Make test results independent of ambient environment and machine load](./make-test-results-independent-of/index.md) | completed |
 | [`@n-dx/rex` fails intermittently under `pnpm test` but passes standalone](./n-dx-rex-fails-intermittently-under/index.md) | completed |
 | [Narrow jsonResponse utility scope](./narrow-jsonresponse-utility-scope/index.md) | completed |
 | [Open Source Scope Documentation Audit and Cross-Reference](./open-source-scope-documentation-audit/index.md) | completed |

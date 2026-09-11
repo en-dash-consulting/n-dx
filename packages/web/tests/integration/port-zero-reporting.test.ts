@@ -31,13 +31,14 @@
  * @see packages/web/tests/integration/scoped-route-dispatch.test.ts — same driver pattern
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { execFile } from "node:child_process";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { assertFreshServerBuild } from "../helpers/built-server-guard.js";
 
 const WEB_PKG = resolve(fileURLToPath(import.meta.url), "../../..");
 const SERVER_ENTRY = join(WEB_PKG, "dist/server/start.js");
@@ -132,6 +133,13 @@ async function occupyPort(): Promise<{ port: number; release: () => Promise<void
 }
 
 describe("what the server reports about the port it bound", () => {
+  // This suite asserts on a behaviour change that shipped in the same commit
+  // as the test, so a missing or stale build presents as "the fix doesn't
+  // work" — fail as a build problem instead.
+  beforeAll(() => {
+    assertFreshServerBuild();
+  });
+
   it("says nothing about a fallback when port 0 was requested", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ndx-port-zero-"));
     try {
