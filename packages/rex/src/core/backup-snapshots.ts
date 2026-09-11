@@ -86,6 +86,55 @@ export function isValidSnapshotId(id: string): boolean {
  * @returns Backup snapshot info, or null if tree doesn't exist
  * @throws If the backup operation fails
  */
+/** How many clock re-reads before a colliding snapshot gives up. */
+const CLAIM_ATTEMPTS = 20;
+
+/** Pause between claim attempts — long enough for the millisecond to tick over. */
+const CLAIM_RETRY_MS = 2;
+
+/**
+ * Exclusively claim a snapshot directory, retrying on a name already taken.
+ *
+ * Returns the claimed directory, which the caller then owns and can copy into.
+ * The id format is unchanged — `encodeSnapshotId`'s colon-free ISO-8601 — so
+ * `isValidSnapshotId`, `rex restore --id=`, the display in `formatSnapshotId`,
+ * and the lexicographic-equals-chronological ordering `getAvailableBackups`
+ * depends on all keep working. Uniqueness comes from re-reading the clock, not
+ * from decorating the name.
+ *
+ * @throws If a free name cannot be claimed, or the claim fails for any reason
+ *   other than the name being taken.
+ */
+async function claimBackupDir(
+  backupsDir: string,
+): Promise<{ timestamp: string; id: string; backupPath: string }> {
+  for (let attempt = 0; attempt < CLAIM_ATTEMPTS; attempt += 1) {
+    const timestamp = new Date().toISOString();
+    const id = encodeSnapshotId(timestamp);
+    const backupPath = join(backupsDir, `prd_tree_${id}`);
+
+    try {
+      // Not recursive: this must fail when the directory already exists, which
+      // is precisely the signal that another writer claimed this millisecond.
+      await mkdir(backupPath);
+      return { timestamp, id, backupPath };
+    } catch (err) {
+      const code = err && typeof err === "object" && "code" in err
+        ? (err as { code?: string }).code
+        : undefined;
+      if (code !== "EEXIST") {
+        throw new Error(`Failed to create snapshot directory ${backupPath}: ${String(err)}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, CLAIM_RETRY_MS));
+    }
+  }
+
+  throw new Error(
+    `Could not claim a snapshot directory in ${backupsDir} after ${CLAIM_ATTEMPTS} attempts. ` +
+      `Another process appears to be snapshotting continuously.`,
+  );
+}
+
 export async function snapshotPRDTree(rexDir: string): Promise<BackupSnapshot | null> {
   const treeRoot = join(rexDir, "prd_tree");
   const backupsDir = join(rexDir, ".backups");
@@ -109,13 +158,27 @@ export async function snapshotPRDTree(rexDir: string): Promise<BackupSnapshot | 
     throw new Error(`Failed to create backups directory: ${String(err)}`);
   }
 
-  // Create timestamped backup directory. The id is colon-free so the mkdir
+  // Claim a timestamped backup directory. The id is colon-free so the mkdir
   // succeeds on Windows — see encodeSnapshotId.
-  const timestamp = new Date().toISOString();
-  const id = encodeSnapshotId(timestamp);
-  const backupPath = join(backupsDir, `prd_tree_${id}`);
+  //
+  // The claim is an exclusive `mkdir` rather than letting `cp` create the
+  // destination, because the name is only as unique as the clock behind it.
+  // `toISOString()` is millisecond-resolution, and this runs *before* the PRD
+  // lock is taken — deliberately, so a declined `--replace` confirmation does
+  // not burn a retention slot — so nothing serialises two writers here. Two
+  // `rex import-bundle` processes starting in the same millisecond derived the
+  // same directory name, raced inside `cp`'s own mkdir, and the loser failed
+  // the whole command with `EEXIST: file already exists`. Observed as an
+  // intermittent suite failure.
+  //
+  // A non-recursive `mkdir` fails atomically when the name is taken, the same
+  // way the PRD lock claims its file with the `wx` flag, so the loser learns it
+  // lost and re-reads the clock instead of colliding. The pause is there so the
+  // millisecond can actually advance — retrying against the same clock reading
+  // would just lose again.
+  const { timestamp, id, backupPath } = await claimBackupDir(backupsDir);
 
-  // Copy tree to backup location
+  // Copy tree into the directory we now exclusively own.
   try {
     await cp(treeRoot, backupPath, { recursive: true });
   } catch (err) {

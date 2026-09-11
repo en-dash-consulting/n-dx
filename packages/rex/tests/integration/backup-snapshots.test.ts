@@ -182,6 +182,33 @@ describe("backup-snapshots", () => {
     expect(restored).toBe("Test content");
   });
 
+  it("gives every concurrent snapshot its own directory", async () => {
+    // The snapshot is taken *before* the PRD lock — deliberately, so a declined
+    // `--replace` confirmation does not burn a retention slot — so nothing
+    // serialises two writers here. The directory name came from
+    // `new Date().toISOString()`, which is only millisecond-resolution: two
+    // `rex import-bundle` processes starting in the same millisecond derived
+    // the same name and the loser's `cp` died with
+    // `EEXIST: file already exists, mkdir`, failing a command that had done
+    // nothing wrong. Seen in the wild as an intermittent suite failure.
+    const epicDir = join(treeRoot, "epic_test");
+    await mkdir(epicDir, { recursive: true });
+    await writeFile(join(epicDir, "index.md"), "Test");
+
+    const snapshots = await Promise.all(
+      Array.from({ length: 8 }, () => snapshotPRDTree(rexDir)),
+    );
+
+    const ids = snapshots.map((s) => s!.id);
+    expect(new Set(ids).size, `ids collided: ${ids.join(", ")}`).toBe(ids.length);
+    expect((await getAvailableBackups(rexDir)).length).toBe(ids.length);
+
+    // Every one is a real snapshot, not just a uniquely-named empty directory.
+    for (const snapshot of snapshots) {
+      expect(await readFile(join(snapshot!.backupPath, "epic_test", "index.md"), "utf-8")).toBe("Test");
+    }
+  });
+
   it("should be idempotent when creating snapshots of the same tree state", async () => {
     // Create tree
     const epicDir = join(treeRoot, "epic_test");
