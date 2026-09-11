@@ -567,13 +567,27 @@ describe("findRelocationPort", () => {
   // orchestration tier avoids exposing more surface than callers need.
   const PORT_RANGE_START = 3117;
   const PORT_RANGE_END = 3200;
+  const NEAR_WINDOW_SIZE = PORT_RANGE_END - PORT_RANGE_START;
 
   it("scans upward from an explicit port outside the default range", async () => {
     // An OS-assigned ephemeral port lands far outside 3117–3200.
     const { port } = await startServer(() => {});
     expect(port < PORT_RANGE_START || port > PORT_RANGE_END).toBe(true);
 
-    expect(await findRelocationPort(port)).toBe(port + 1);
+    // Assert the neighbourhood, not an exact port. findRelocationPort promises
+    // the first FREE port at or above requestedPort + 1 within the near window
+    // — not requestedPort + 1 itself. Anything else on the machine may already
+    // hold that port, which correctly pushes the result upward; the Windows
+    // runner hit exactly that and failed an exact-equality assertion for a
+    // reason unrelated to the behaviour under test. This mirrors the same
+    // correction already made to tests/e2e/cli-start-two-projects.test.js —
+    // the two were tightened together and must stay loosened together.
+    const relocated = await findRelocationPort(port);
+    expect(relocated).not.toBeNull();
+    expect(relocated).toBeGreaterThan(port);
+    expect(relocated).toBeLessThanOrEqual(port + NEAR_WINDOW_SIZE);
+    // The whole point of the near window: it must not jump to the default range.
+    expect(relocated < PORT_RANGE_START || relocated > PORT_RANGE_END).toBe(true);
   });
 
   it("keeps today's behaviour for the default port: 3118, 3119, … within 3117–3200", async () => {
