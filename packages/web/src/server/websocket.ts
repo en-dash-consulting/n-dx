@@ -15,6 +15,7 @@
 import { createHash } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
+import { isTrustedBrowserOrigin } from "./request-security.js";
 
 // ── Health tracking types ──────────────────────────────────────────────────
 
@@ -477,6 +478,23 @@ export function createWebSocketManager(opts?: WebSocketManagerOptions): {
     if (!key) {
       socket.destroy();
       return;
+    }
+
+    // Browser-origin gate. A WebSocket handshake carries no CORS preflight, so
+    // the HTTP `handleRequestSecurity` guard never sees it — a page open in the
+    // user's browser could otherwise open `ws://localhost:<port>` and read every
+    // broadcast (PRD changes, agent stdout, execution state). A present `Origin`
+    // must be this loopback server's own; a missing one is a non-browser client
+    // (CLI/MCP), which stays allowed to match the HTTP guard's contract. A
+    // duplicate/array Origin header is treated as untrusted.
+    const originHeader = req.headers.origin;
+    if (originHeader !== undefined) {
+      const origin = typeof originHeader === "string" ? originHeader : null;
+      if (origin === null || !isTrustedBrowserOrigin(origin, req)) {
+        socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+        socket.destroy();
+        return;
+      }
     }
 
     // Enable TCP-level keepalive for OS-level dead-peer detection.

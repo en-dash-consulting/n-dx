@@ -1126,16 +1126,37 @@ const ORCHESTRATOR_HELP_DEFS = {
     summary: "export static deployable dashboard",
     description: "Generates a self-contained static directory from the current\nSourceVision and Rex data. Deployable to GitHub Pages, Netlify, S3,\nor any static host. All read-only views work; mutation UI is hidden.",
     usage: "ndx export [options] [dir]",
+    sections: [
+      {
+        title: "What is published",
+        content:
+          "Published:     PRD items (titles, descriptions, acceptance criteria,\n" +
+          "               status), SourceVision analysis data (file inventory,\n" +
+          "               import graph, zones), and hench run summaries (status,\n" +
+          "               token usage, files changed).\n" +
+          "Not published: agent transcripts — tool-call inputs and outputs, event\n" +
+          "               streams, and error bodies. These can contain anything the\n" +
+          "               agent read or printed (.env contents, fixture data).\n" +
+          "               Pass --include-transcripts to publish them deliberately.\n" +
+          "\n" +
+          "--deploy=github force-pushes the export to origin/n-dx-dashboard. It\n" +
+          "prints what will be published and asks first; unattended runs (no TTY)\n" +
+          "must pass --yes or the command stops before writing or pushing.",
+      },
+    ],
     options: [
-      { flag: "--out-dir=<path>", description: "Output directory (default: ./ndx-export)" },
+      { flag: "--out-dir=<path>", description: "Output directory (default: ./ndx-export, gitignored on first run)" },
       { flag: "--base-path=<path>", description: "Base URL path for deployment (default: /)" },
-      { flag: "--deploy=github", description: "Push to n-dx-dashboard branch for GitHub Pages" },
+      { flag: "--deploy=github", description: "Push to the n-dx-dashboard branch for GitHub Pages (asks first)" },
+      { flag: "--yes", description: "Skip the deploy confirmation (required when stdin is not a TTY)" },
+      { flag: "--include-transcripts", description: "Publish hench tool-call transcripts, events and error bodies" },
     ],
     examples: [
       { command: "ndx export", description: "Export to ./ndx-export" },
       { command: "ndx export --out-dir=dist .", description: "Export to ./dist" },
       { command: "ndx export --base-path=/my-project/ .", description: "Export with subpath" },
-      { command: "ndx export --deploy=github .", description: "Export and deploy to GitHub Pages" },
+      { command: "ndx export --deploy=github .", description: "Export and deploy to GitHub Pages (confirms first)" },
+      { command: "ndx export --deploy=github --yes .", description: "Deploy unattended, e.g. from CI" },
     ],
     related: ["start", "status"],
   },

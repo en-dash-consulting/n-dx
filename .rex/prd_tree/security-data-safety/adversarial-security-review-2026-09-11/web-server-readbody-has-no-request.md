@@ -1,0 +1,25 @@
+---
+id: "f80187ac-090f-4f50-b7d6-c869cdc4abca"
+level: "task"
+title: "Web server `readBody` has no request-size cap"
+status: "completed"
+priority: "low"
+tags:
+  - "ndx-adversarial-review"
+  - "security"
+  - "severity:low"
+  - "web"
+source: "ndx-adversarial-review"
+startedAt: "2026-09-11T21:37:27.254Z"
+completedAt: "2026-09-11T21:40:06.953Z"
+endedAt: "2026-09-11T21:40:06.953Z"
+resolutionType: "code-change"
+resolutionDetail: "MAX_REQUEST_BODY_BYTES (10MB) enforced by handleRequestSecurity (413 + destroy on over-cap Content-Length, before buffering) and by readBody's streamed cap (reject + destroy for chunked bodies); jsonResponse no-ops once committed. Unit + raw-TCP integration tests (413 + connection closed); web typecheck clean, 25 size-limit tests + 1110 server unit pass."
+acceptanceCriteria:
+  - "`readBody` rejects (and the route responds 413) when the body exceeds the configured cap"
+  - "The cap is a named constant with a comment stating the largest legitimate payload it must admit"
+  - "Unit test posts a body one byte over the cap and asserts 413 and that the connection is closed"
+description: "**Severity:** low · **Verdict:** should-fix\n\n**Failure scenario.** `readBody` concatenates every `data` chunk with no limit (`response-utils.ts:30-37`). Any local process — or a same-origin page — can POST a multi-gigabyte body to any JSON route and drive the dashboard server out of memory. Cross-origin POSTs are rejected by the Origin guard before the route runs, but the body may still be buffered by Node before `res.end()` closes the socket, depending on timing. Loopback-only, so this is availability of the local dashboard, not data.\n\n**Evidence.** `packages/web/src/server/response-utils.ts:30-37`.\n\n**Reachability.** Local processes and same-origin pages only.\n\n**Solution.** Cap at a constant (e.g. 10 MB — the largest legitimate body is a PRD bundle import), destroy the request and respond 413 when exceeded. Trivial."
+lastModified: "2026-09-11T21:40:06.959Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---

@@ -48,18 +48,29 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
   : "File permissions set to 0600 (owner-only) for security.";
 
 /**
- * Keys that are machine-specific and should be written to .n-dx.local.json
- * instead of .n-dx.json. These are settings that contain absolute paths or
- * other values that differ per developer machine.
+ * Settings that are written to .n-dx.local.json instead of .n-dx.json.
  *
- * Format: "section.dotted.path" — the section is the top-level key
- * (e.g., "claude") and the dotted path is the setting within it.
+ * Two kinds live here, for two different reasons:
+ *
+ * - **Machine-specific paths** (`*.cli_path`) differ per developer machine, so
+ *   sharing them through git would break a teammate's checkout.
+ * - **Secrets** (`*.api_key`). `.n-dx.json` is meant to be committed — it
+ *   carries zone pins, the vendor, the dashboard port — and `ndx init` never
+ *   gitignores it. A key written there is one `git add -A` away from the
+ *   remote. `.n-dx.local.json` is gitignored by init and by the shipped
+ *   template, and every reader already merges it over the shared file.
+ *
+ * Keyed by section, then by the setting path within that section. `llm`
+ * entries are matched by suffix so `llm.claude.api_key`, `llm.codex.api_key`
+ * and `llm.google.api_key` all route without listing each vendor.
  */
-const MACHINE_LOCAL_KEYS = new Set([
-  "claude.cli_path",
-  "llm.claude.cli_path",
-  "llm.codex.cli_path",
-]);
+const LOCAL_ONLY_SETTINGS = {
+  claude: new Set(["cli_path", "api_key"]),
+  llm: { suffixes: [".cli_path", ".api_key"] },
+};
+
+/** Setting-path leaf that marks a secret, for the shared-file scan. */
+const SECRET_SETTING_LEAF = "api_key";
 
 const PACKAGES = {
   rex: { dir: ".rex", file: "config.json" },
@@ -261,9 +272,55 @@ export async function repairProjectConfig(dir) {
 }
 
 function isLocalProjectSetting(pkg, settingPath) {
-  if (pkg === "claude") return settingPath === "cli_path";
-  if (pkg === "llm") return settingPath.endsWith(".cli_path");
-  return false;
+  const rule = LOCAL_ONLY_SETTINGS[pkg];
+  if (!rule) return false;
+  if (rule instanceof Set) return rule.has(settingPath);
+  return rule.suffixes.some((suffix) => settingPath.endsWith(suffix));
+}
+
+/**
+ * Find API keys stored in the shared `.n-dx.json`.
+ *
+ * Returns dotted keys in the same `section.path` form `ndx config` accepts
+ * (e.g. `llm.claude.api_key`), so the warning can tell the user exactly what
+ * to re-run. Only the shared file is scanned — that is the one that gets
+ * committed. Missing or unparseable file yields an empty list.
+ *
+ * @param {string} dir Project root.
+ * @returns {Promise<string[]>}
+ */
+export async function findSharedSecrets(dir) {
+  const shared = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
+  const found = [];
+  const walk = (node, path) => {
+    if (!node || typeof node !== "object" || Array.isArray(node)) return;
+    for (const [key, value] of Object.entries(node)) {
+      const here = path ? `${path}.${key}` : key;
+      if (key === SECRET_SETTING_LEAF && typeof value === "string" && value.length > 0) {
+        found.push(here);
+      } else {
+        walk(value, here);
+      }
+    }
+  };
+  walk(shared, "");
+  return found;
+}
+
+/**
+ * Format the stderr warning for keys that `findSharedSecrets` found.
+ *
+ * @param {string[]} keys
+ * @returns {string[]} Lines, empty when there is nothing to warn about.
+ */
+export function formatSharedSecretsWarning(keys) {
+  if (keys.length === 0) return [];
+  return [
+    `Warning: ${PROJECT_CONFIG_FILE} contains ${keys.length === 1 ? "an API key" : "API keys"} (${keys.join(", ")}).`,
+    `  That file is meant to be committed. Keys belong in ${LOCAL_CONFIG_FILE}, which is gitignored.`,
+    `  Fix: re-run \`ndx config <key> <value>\` for each key above — it is written to ${LOCAL_CONFIG_FILE}`,
+    `  and removed from ${PROJECT_CONFIG_FILE}. If ${PROJECT_CONFIG_FILE} was ever committed, rotate the key.`,
+  ];
 }
 
 /**
@@ -635,8 +692,13 @@ async function runGoogleApiPreflight(llmConfig) {
 
   // Lightweight live call: list models (pageSize=1 minimises response size)
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}&pageSize=1`;
-    const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    // Send the key in the x-goog-api-key header, not the URL query string, so it
+    // is not captured by proxies or egress logs. Matches google-api-provider.ts.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?pageSize=1`;
+    const resp = await fetch(url, {
+      headers: { "x-goog-api-key": apiKey },
+      signal: AbortSignal.timeout(15000),
+    });
     if (resp.ok) {
       return { ok: true, vendor: LLM_VENDOR.GOOGLE };
     }
@@ -1665,7 +1727,8 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     from the ANTHROPIC_API_KEY environment variable.
                                     Validated: must start with "sk-ant-". Use --force
                                     to skip validation.
-                                    Note: stored in .n-dx.json — add to .gitignore.
+                                    Stored in .n-dx.local.json (gitignored), never in
+                                    the shared .n-dx.json.
                                     ${API_KEY_PERMISSION_NOTE}
   claude.api_endpoint      string    Anthropic API base URL (optional)
                                     Override the default API endpoint for proxies or
@@ -1687,6 +1750,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.claude.cli_path      string    Claude CLI path (optional; validated executable)
                                     Stored in .n-dx.local.json.
   llm.claude.api_key       string    Claude API key (optional)
+                                    Stored in .n-dx.local.json.
   llm.claude.api_endpoint  string    Claude API endpoint (optional; validated URL)
   llm.claude.model         string    Claude default model (optional)
   llm.claude.lightModel    string    Claude model for light-weight tasks (optional)
@@ -1696,6 +1760,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.codex.cli_path       string    Codex CLI path (optional; validated executable)
                                     Stored in .n-dx.local.json.
   llm.codex.api_key        string    Codex API key (optional)
+                                    Stored in .n-dx.local.json.
   llm.codex.api_endpoint   string    Codex API endpoint (optional; validated URL)
   llm.codex.model          string    Codex default model (optional)
   llm.codex.lightModel     string    Codex model for light-weight tasks (optional)
@@ -1703,6 +1768,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     light tier use this model.
                                     Falls back to gpt-5.6-luna if not set.
   llm.google.api_key       string    Google Gemini API key (optional; validated format)
+                                    Stored in .n-dx.local.json.
                                     Preflight validates the key against the Gemini API.
                                     Set GEMINI_API_KEY env var as an alternative.
                                     Get a key at: https://aistudio.google.com/apikey
@@ -2251,6 +2317,52 @@ async function runLLMVendorPreflight(coerced, configs, soft = false) {
 }
 
 /** Handle SET mode for a project-level section (claude, llm, web, features). */
+/**
+ * Delete `[section, settingPath]` entries from the shared `.n-dx.json`.
+ *
+ * Returns the dotted keys that were actually present and removed. Emptied
+ * objects are pruned so the file does not accumulate `{}`. The file is only
+ * rewritten when something was removed.
+ *
+ * @param {string} dir
+ * @param {Array<[string, string]>} entries
+ * @returns {Promise<string[]>}
+ */
+async function removeFromSharedConfig(dir, entries) {
+  const sharedPath = join(dir, PROJECT_CONFIG_FILE);
+  if (!(await fileExists(sharedPath))) return [];
+  const shared = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
+  const removed = [];
+  for (const [section, settingPath] of entries) {
+    const container = shared[section];
+    if (!container || typeof container !== "object") continue;
+    const keys = splitSettingPath(settingPath, section);
+    let node = container;
+    for (const key of keys.slice(0, -1)) {
+      node = node?.[key];
+      if (!node || typeof node !== "object") break;
+    }
+    const leaf = keys[keys.length - 1];
+    if (node && typeof node === "object" && leaf in node) {
+      delete node[leaf];
+      removed.push(`${section}.${settingPath}`);
+    }
+    pruneEmpty(shared, section);
+  }
+  if (removed.length > 0) {
+    await saveProjectJSON(sharedPath, shared);
+  }
+  return removed;
+}
+
+/** Remove `obj[key]` when it is an object with no remaining keys, recursively. */
+function pruneEmpty(obj, key) {
+  const value = obj[key];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return;
+  for (const child of Object.keys(value)) pruneEmpty(value, child);
+  if (Object.keys(value).length === 0) delete obj[key];
+}
+
 async function handleSetProjectSection(
   dir,
   pkg,
@@ -2353,6 +2465,22 @@ async function handleSetProjectSection(
   // Write back to the appropriate file (local or project)
   await saveProjectJSON(configPath, current);
   console.log(`${keyArg} = ${formatValue(coerced)}`);
+
+  // A local-only setting that already exists in the shared file was written
+  // before this routing existed. Setting it again is the documented migration:
+  // the value now lives in the local file, so the shared copy is stale at best
+  // and a committed secret at worst. Remove it, and the legacy `claude.*`
+  // mirror of an `llm.claude.*` key along with it.
+  if (targetFile === LOCAL_CONFIG_FILE) {
+    const sharedPaths = [[pkg, settingPath]];
+    if (pkg === "llm" && settingPath.startsWith("claude.")) {
+      sharedPaths.push(["claude", settingPath.slice("claude.".length)]);
+    }
+    const removed = await removeFromSharedConfig(dir, sharedPaths);
+    if (removed.length > 0) {
+      console.log(`  → moved ${removed.join(", ")} out of ${PROJECT_CONFIG_FILE} into ${LOCAL_CONFIG_FILE}`);
+    }
+  }
 
   // Print warnings for cleared models
   for (const warning of warningMessages) {
@@ -2581,6 +2709,12 @@ export async function runConfig(args) {
 
   const { dir, keyArg, valueArg } = await resolvePositionalArgs(positional);
   const { configs, rawConfigs } = await loadAllConfigs(dir);
+
+  // Every config invocation checks the shared file for keys that predate
+  // local-only routing. stderr, so `--json` output stays parseable.
+  for (const line of formatSharedSecretsWarning(await findSharedSecrets(dir))) {
+    console.error(line);
+  }
 
   const keyTargetsProjectSection = (() => {
     if (!keyArg) return false;

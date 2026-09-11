@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import {
   run as runBase,
@@ -145,6 +146,62 @@ describe("n-dx ci", () => {
       const output = run(["--format=json", "--quiet", tmpDir], { stdio: "pipe" });
       const report = JSON.parse(output);
       expect(report.ok).toBe(true);
+    });
+  });
+
+  // ── Config secrets ─────────────────────────────────────────────────────────
+
+  describe("config-secrets step", () => {
+    /** Turn tmpDir into a git repo with .n-dx.json tracked, as a teammate's clone would have it. */
+    function gitTrack(file) {
+      const opts = { cwd: tmpDir, stdio: "pipe" };
+      execFileSync("git", ["init", "-q"], opts);
+      execFileSync("git", ["-c", "user.email=ci@test", "-c", "user.name=ci", "add", file], opts);
+      execFileSync(
+        "git",
+        ["-c", "user.email=ci@test", "-c", "user.name=ci", "commit", "-q", "-m", "track"],
+        opts,
+      );
+    }
+
+    it("passes when .n-dx.json holds no api_key", async () => {
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }) + "\n");
+      gitTrack(".n-dx.json");
+
+      const report = JSON.parse(run(["--format=json", "--quiet", tmpDir], { stdio: "pipe" }));
+      const step = report.steps.find((s) => s.name === "config-secrets");
+      expect(step).toBeDefined();
+      expect(step.ok).toBe(true);
+    });
+
+    it("fails when a git-tracked .n-dx.json holds an api_key", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "claude", claude: { api_key: "sk-ant-leaked" } } }) + "\n",
+      );
+      gitTrack(".n-dx.json");
+
+      const result = runResult(["--format=json", "--quiet", tmpDir]);
+      expect(result.code).toBe(1);
+      const report = JSON.parse(result.stdout);
+      const step = report.steps.find((s) => s.name === "config-secrets");
+      expect(step.ok).toBe(false);
+      expect(step.secrets).toEqual(["llm.claude.api_key"]);
+      expect(report.ok).toBe(false);
+    });
+
+    it("warns but passes when an untracked .n-dx.json holds an api_key", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ claude: { api_key: "sk-ant-local-only" } }) + "\n",
+      );
+      execFileSync("git", ["init", "-q"], { cwd: tmpDir, stdio: "pipe" });
+
+      const report = JSON.parse(run(["--format=json", "--quiet", tmpDir], { stdio: "pipe" }));
+      const step = report.steps.find((s) => s.name === "config-secrets");
+      expect(step.ok).toBe(true);
+      expect(step.secrets).toEqual(["claude.api_key"]);
+      expect(step.detail).toContain(".n-dx.local.json");
     });
   });
 

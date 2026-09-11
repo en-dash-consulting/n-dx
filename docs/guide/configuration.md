@@ -124,6 +124,10 @@ ndx config llm.claude.model claude-opus-5 .
 ndx config llm.claude.cli_path /path/to/claude .
 ```
 
+::: warning Where keys are stored
+`*.api_key` and `*.cli_path` values are written to `.n-dx.local.json`, which `ndx init` gitignores — never to the shared `.n-dx.json`. Every reader merges the local file over the shared one, so nothing else changes. If a project configured before this routing still has a key in `.n-dx.json`, `ndx config` warns on every run and `ndx ci` fails when that file is git-tracked; re-run `ndx config <key> <value>` to move it (and rotate the key if it was ever committed).
+:::
+
 ## Codex Configuration
 
 ```sh

@@ -128,7 +128,19 @@ async function isLockStale(lockPath: string): Promise<boolean> {
   try {
     const content = await readFile(lockPath, "utf-8");
     const info = decodeLock(content);
-    if (!info) return true; // Malformed = stale
+    if (!info) {
+      // Unparseable content is NOT proof the owner is gone, and treating it as
+      // stale caused the concurrent-import lost update the stale-save guard kept
+      // catching. `tryAcquire` creates the lock file with O_EXCL and *then*
+      // writes its JSON, so between those two steps the file exists but is
+      // empty. A second process that hits EEXIST and reads it in that window
+      // gets "" here — and if that counted as stale, it would unlink the live
+      // writer's lock and enter the critical section alongside it. Wait instead:
+      // a lock mid-creation becomes readable within a retry or two, and a
+      // genuinely corrupt one keeps failing to parse so this writer times out
+      // loudly (naming the file to delete) rather than interleaving silently.
+      return false;
+    }
 
     // Orphaned same-process lock (see doc comment)
     if (info.pid === process.pid) return true;

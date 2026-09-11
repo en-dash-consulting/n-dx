@@ -100,6 +100,7 @@ import {
   dim,
 } from "./cli-brand.js";
 import { runExport } from "./export.js";
+import { ensureGitignoreEntry } from "./gitignore.js";
 import {
   resolveInitLLMSelection,
   promptLLMSelection,
@@ -942,23 +943,6 @@ async function signalLiveReload(dir) {
 }
 
 /**
- * Append an entry to .gitignore if not already present.
- * Creates .gitignore if it doesn't exist. Uses sync I/O (matches cli.js patterns).
- */
-function ensureGitignoreEntry(dir, entry) {
-  const gitignorePath = join(dir, ".gitignore");
-  let content = "";
-  try {
-    content = readFileSync(gitignorePath, "utf-8");
-  } catch {
-    // No .gitignore yet
-  }
-  if (content.includes(entry)) return;
-  const suffix = (content.length > 0 && !content.endsWith("\n") ? "\n" : "") + entry + "\n";
-  writeFileSync(gitignorePath, content + suffix, "utf-8");
-}
-
-/**
  * Register the rex-prd merge driver in the repository's git config, so the
  * `.rex/prd_tree/** merge=rex-prd` attribute (pinned by
  * `ensureGitattributesRules`) resolves to `rex merge-driver` — the three-way,
@@ -1416,6 +1400,10 @@ async function handleInit(rest) {
   const rexExists = existsSync(join(dir, ".rex"));
   const henchExists = existsSync(join(dir, ".hench"));
   ensureGitignoreEntry(dir, ".n-dx.local.json");
+  // `ndx export` writes ./ndx-export inside the project by default; the site
+  // it produces carries PRD data and run summaries, so it must not be
+  // committable by accident.
+  ensureGitignoreEntry(dir, "ndx-export/");
   ensureGitattributesRules(dir);
   ensureMergeDriverRegistered(dir);
 

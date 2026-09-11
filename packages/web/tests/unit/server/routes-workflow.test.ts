@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleWorkflowRoute } from "../../../src/server/routes-workflow.js";
+import { handleWorkflowRoute, APPLYABLE_SUGGESTION_KEYS } from "../../../src/server/routes-workflow.js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal hench config for testing. */
@@ -310,6 +312,90 @@ describe("Workflow Optimization API routes", () => {
       body: JSON.stringify({ changes: {} }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it("rejects a change whose key is not an applyable suggestion setting", async () => {
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        changes: { "guard.allowedCommands": ["sh", "curl"], permissionMode: "bypassPermissions" },
+      }),
+    });
+    expect(res.status).toBe(400);
+    // Config file untouched, byte-for-byte.
+    expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+  });
+
+  it("rejects a key with a prototype-poisoning segment", async () => {
+    for (const key of ["__proto__.polluted", "constructor.prototype.x", "prototype"]) {
+      const before = await readFile(join(henchDir, "config.json"), "utf-8");
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ changes: { [key]: 1 } }),
+      });
+      expect(res.status, key).toBe(400);
+      expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+    }
+    // The global Object prototype was not polluted.
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it("rejects an allowlisted key with a wrong-typed value", async () => {
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+    for (const bad of ["eighty", 12.5, -1, true, null] as unknown[]) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ changes: { maxTurns: bad } }),
+      });
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+    }
+    expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+  });
+
+  it("applies a valid allowlisted change (happy path still works)", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes: { tokenBudget: 120000 } }),
+    });
+    expect(res.status).toBe(200);
+    const config = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
+    expect(config.tokenBudget).toBe(120000);
+  });
+
+  it("allowlist matches every key the suggestion generator emits (no drift)", () => {
+    // Source-scan guard: a new suggestion whose `configChanges` names a key not
+    // in APPLYABLE_SUGGESTION_KEYS would silently be unappliable (rejected 400)
+    // — or, worse, someone would widen the allowlist without noticing. Pin the
+    // two together by reading the emitted keys straight from the route source.
+    const src = readFileSync(
+      fileURLToPath(new URL("../../../src/server/routes-workflow.ts", import.meta.url)),
+      "utf-8",
+    );
+    const emitted = new Set<string>();
+    // Each `configChanges: <value>` runs up to the sibling `autoApplicable`.
+    const re = /configChanges:\s*([\s\S]*?)autoApplicable:/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src)) !== null) {
+      const keyRe = /[{,]\s*(?:"([\w.]+)"|([A-Za-z_]\w*))\s*:/g;
+      let k: RegExpExecArray | null;
+      while ((k = keyRe.exec(m[1])) !== null) {
+        emitted.add(k[1] ?? k[2]);
+      }
+    }
+    // Sanity: the scan actually found the known keys (guards against a regex
+    // that silently matches nothing and passes vacuously).
+    expect(emitted.has("maxTurns")).toBe(true);
+    expect(emitted.has("retry.maxRetries")).toBe(true);
+    expect(emitted.has("tokenBudget")).toBe(true);
+    for (const key of emitted) {
+      expect(APPLYABLE_SUGGESTION_KEYS, `generator emits "${key}" but it is not allowlisted`)
+        .toHaveProperty([key]);
+    }
   });
 
   // ── GET /api/hench/workflow/history ───────────────────────────────

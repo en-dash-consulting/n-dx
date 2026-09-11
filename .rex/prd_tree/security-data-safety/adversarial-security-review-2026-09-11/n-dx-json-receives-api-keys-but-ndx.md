@@ -1,0 +1,28 @@
+---
+id: "76c5c57a-4cae-441d-8a19-def9337751f8"
+level: "task"
+title: "`.n-dx.json` receives API keys but `ndx init` never gitignores it"
+status: "completed"
+priority: "critical"
+tags:
+  - "ndx-adversarial-review"
+  - "security"
+  - "severity:critical"
+  - "core"
+source: "ndx-adversarial-review"
+startedAt: "2026-09-11T17:46:37.923Z"
+completedAt: "2026-09-11T17:53:27.750Z"
+endedAt: "2026-09-11T17:53:27.750Z"
+resolutionType: "code-change"
+resolutionDetail: "*.api_key now written to gitignored .n-dx.local.json (LOCAL_ONLY_SETTINGS in core/config.js); re-set migrates and removes the shared copy; `ndx config` warns on legacy placement; `ndx ci` gains a config-secrets step that fails on a tracked .n-dx.json with a key; dashboard auth detection merges the local layer. 10 new tests, 5 flipped; all suites green."
+acceptanceCriteria:
+  - "`ndx config claude.api_key <key>` (and `llm.claude.api_key`, `llm.codex.api_key`, `llm.google.api_key`) writes the value to `.n-dx.local.json`, and `.n-dx.json` contains no `api_key` field afterwards"
+  - "Loading config still resolves the key (local file merged over shared), verified by an existing `resolveApiKey` path test"
+  - "On load, a shared `.n-dx.json` that already contains an `api_key` produces a stderr warning naming the file and the fix"
+  - "`ndx ci` (or git-preflight) fails with a clear message when a git-tracked `.n-dx.json` contains an `api_key`"
+  - "Unit test: setting each of the four api_key paths routes to the local file; setting `claude.model` still routes to `.n-dx.json`"
+  - "`ndx config --help` no longer says api keys are stored in `.n-dx.json`"
+description: "**Severity:** critical · **Verdict:** must-fix\n\n**Failure scenario.** User runs `ndx config claude.api_key sk-ant-…` (or `llm.claude.api_key`, `llm.codex.api_key`, `llm.google.api_key`). The value is written to `.n-dx.json`. `ndx init` gitignores only `.n-dx.local.json` (`packages/core/cli.js:1403`), and CLAUDE.md describes `.n-dx.json` as committed project config. A routine `git add -A && git push` puts the key on the remote. The 0600 chmod in `saveProjectJSON` (`packages/core/config.js:127-147`) protects against other local users only, not against git. The help text itself admits it: \"Note: stored in .n-dx.json — add to .gitignore\" (`config.js` ~line 1668).\n\n**Evidence.** `packages/core/config.js:58-62` — `MACHINE_LOCAL_KEYS` contains only `claude.cli_path`, `llm.claude.cli_path`, `llm.codex.cli_path`; `isMachineLocalKey()` (`config.js:299`) is the sole router to `.n-dx.local.json`. `packages/core/cli.js:1403` — `ensureGitignoreEntry(dir, \".n-dx.local.json\")` is the only gitignore entry init adds at the root. The n-dx repo's own `.gitignore` ignores `.n-dx.json`; user repos do not get that line.\n\n**Reachability.** Every user who stores a key via `ndx config` and commits with `-A`. Also `routes-features.ts`, `routes-project-settings.ts`, `routes-config.ts:161` rewrite `.n-dx.json` wholesale, preserving the key in the same file.\n\n**Solution options.**\n1. *(Recommended)* Extend the local-file key set (rename `MACHINE_LOCAL_KEYS` → e.g. `LOCAL_ONLY_KEYS`) with the four `*.api_key` paths so they are written to `.n-dx.local.json`, which is already gitignored and already merged on load (`config.js:286`). On load, if a shared `.n-dx.json` contains an `api_key`, warn on stderr and offer/perform migration to the local file. Cost: small. Risk: none legitimate — no one wants a key committed.\n2. Add `.n-dx.json` to the init gitignore list. Cheaper, but breaks the documented \"commit your project config\" story (zone pins, web.port, llm.vendor are meant to be shared). Not recommended alone.\n3. Add a guard to `git-preflight.js` / `ndx ci`: fail when a *tracked* `.n-dx.json` contains any `api_key`. Cheap; catches repos that already committed one. Recommended in addition to 1."
+lastModified: "2026-09-11T17:53:27.757Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---
