@@ -32,8 +32,10 @@
 
 import { execFile, execFileSync, spawn } from "node:child_process";
 import type { ChildProcess, StdioOptions } from "node:child_process";
-import { existsSync } from "node:fs";
-import { isAbsolute } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+// Aliased: `resolve` is the conventional name for a Promise executor argument
+// throughout this file, and the import would be shadowed inside every one.
+import { isAbsolute, resolve as resolvePath } from "node:path";
 import { logCliInvocation } from "./cli-log.js";
 import { forwardsInterrupts, processInterruptForwarder } from "./interrupt-forwarding.js";
 import { terminateProcessTree, treeKillSpawnOptions } from "./process-tree.js";
@@ -591,6 +593,87 @@ export function getCurrentBranch(cwd: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Run `git rev-parse <flag>` and return its output as a resolved absolute path.
+ *
+ * Returns null when git fails — outside a repository, or when git is not
+ * installed. Callers treat null as "no worktree here", which is the same
+ * answer either way.
+ *
+ * `rev-parse` emits some paths relative to cwd (`--git-common-dir` reports a
+ * bare `.git` in a main checkout), so the output is resolved against cwd
+ * before being realpath'd. Realpath matters because the comparison these paths
+ * exist for — is this still the worktree the run started in? — is a string
+ * equality check, and one side reaching the worktree through a symlink (macOS
+ * `/tmp` → `/private/tmp`, a symlinked project directory) would otherwise
+ * produce a spurious mismatch.
+ *
+ * Shared by {@link getWorktreeRoot} and {@link getGitCommonDir}.
+ */
+function gitRevParsePath(cwd: string, flag: string): string | null {
+  let output: string;
+  try {
+    output = execFileSync("git", ["rev-parse", flag], {
+      cwd,
+      encoding: "utf-8",
+      // Capture stderr rather than inheriting it. Asking "is this a git
+      // worktree?" about a directory that isn't one is a normal, expected
+      // probe, and letting git print `fatal: not a git repository` onto the
+      // user's terminal every time reads as a failure when nothing failed.
+      // The message stays reachable on the thrown error for a caller that
+      // wants it; the null return is what this function promises.
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  } catch {
+    return null;
+  }
+  if (!output) return null;
+
+  const absolute = isAbsolute(output) ? output : resolvePath(cwd, output);
+  try {
+    return realpathSync(absolute);
+  } catch {
+    // git reported this path, so it existed a moment ago; a race or a
+    // permission boundary on an intermediate segment is the only way to get
+    // here. The unresolved absolute path is still the correct answer, just
+    // without symlink normalisation — better than discarding it.
+    return absolute;
+  }
+}
+
+/**
+ * Synchronous git helper — get the root of the worktree containing `cwd`.
+ *
+ * Returns the realpath-resolved absolute path, or null outside a git
+ * repository. In a linked worktree (`git worktree add`) this is that
+ * worktree's own root, not the main checkout's — which is the point: it
+ * identifies *where* a run is executing.
+ *
+ * Note the null rather than the undefined its `getCurrentHead` /
+ * `getCurrentBranch` siblings return. These two answer "which path", where
+ * null states plainly that there is no such path; undefined reads as an
+ * absent value.
+ */
+export function getWorktreeRoot(cwd: string): string | null {
+  return gitRevParsePath(cwd, "--show-toplevel");
+}
+
+/**
+ * Synchronous git helper — get the repository's common git directory.
+ *
+ * This is the *shared* `.git` directory: identical for the main checkout and
+ * every linked worktree of the same repository, whereas `--git-dir` points at
+ * the per-worktree `.git/worktrees/<name>` subdirectory. That makes it the
+ * identity of the repository itself, so two worktrees of one repo can be told
+ * apart from two unrelated clones.
+ *
+ * Returns the realpath-resolved absolute path, or null outside a git
+ * repository.
+ */
+export function getGitCommonDir(cwd: string): string | null {
+  return gitRevParsePath(cwd, "--git-common-dir");
 }
 
 /**

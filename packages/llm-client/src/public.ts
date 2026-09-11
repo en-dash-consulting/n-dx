@@ -271,6 +271,8 @@ export {
   execShellCmd,
   getCurrentHead,
   getCurrentBranch,
+  getWorktreeRoot,
+  getGitCommonDir,
   sanitizeBranchName,
   isExecutableOnPath,
   spawnTool,
