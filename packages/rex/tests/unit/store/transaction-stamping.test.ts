@@ -206,6 +206,69 @@ describe.each(STORES)("$name withTransaction stamping", ({ create }) => {
     expect(isModifiedSinceSync(item!)).toBe(true);
   });
 
+  // ── Falsy is absent, because that is what the reader thinks ──────────────
+  //
+  // `isModifiedSinceSync` opens with `if (!meta.lastModified) return false`, so
+  // null and "" are "no timestamp" to the only consumer that matters. A guard
+  // here testing `!== undefined` disagreed with it, and skipped exactly the
+  // items the repair exists for — the frontmatter emitter then drops the null,
+  // so from the next load the item reads as pre-existing and can never acquire
+  // a stamp at all.
+
+  it("fills a null lastModified, which its consumer already reads as absent", async () => {
+    await store.withTransaction(async (doc) => {
+      insertChild(doc.items, "epic-1", {
+        id: "task-null",
+        title: "Task Null",
+        level: "task",
+        status: "pending",
+        lastModified: null,
+        lastModifiedBy: "Someone Else <someone@example.com>",
+      } as unknown as PRDItem);
+    });
+
+    const item = await store.getItem("task-null");
+    expect(item!.lastModified as string).toMatch(ISO_TIMESTAMP);
+    expect(item!.lastModifiedBy).toBe("Someone Else <someone@example.com>");
+    expect(isModifiedSinceSync(item!)).toBe(true);
+  });
+
+  it("fills an empty-string lastModified for the same reason", async () => {
+    await store.withTransaction(async (doc) => {
+      insertChild(doc.items, "epic-1", {
+        id: "task-empty",
+        title: "Task Empty",
+        level: "task",
+        status: "pending",
+        lastModified: "",
+        lastModifiedBy: "Someone Else <someone@example.com>",
+      } as unknown as PRDItem);
+    });
+
+    const item = await store.getItem("task-empty");
+    expect(item!.lastModified as string).toMatch(ISO_TIMESTAMP);
+    expect(item!.lastModifiedBy).toBe("Someone Else <someone@example.com>");
+  });
+
+  it("fills a null author rather than treating it as attribution already set", async () => {
+    // The same split on the other half of the stamp. Milder — a dropped author
+    // costs provenance, not sync visibility — but it is the same disagreement
+    // and the same one-character rule.
+    await store.withTransaction(async (doc) => {
+      insertChild(doc.items, "epic-1", {
+        id: "task-null-author",
+        title: "Task Null Author",
+        level: "task",
+        status: "pending",
+        lastModifiedBy: null,
+      } as unknown as PRDItem);
+    });
+
+    const item = await store.getItem("task-null-author");
+    expect(item!.lastModified as string).toMatch(ISO_TIMESTAMP);
+    expect(item!.lastModifiedBy).toBeTruthy();
+  });
+
   it("invents no author for an item that carries a timestamp but no attribution", async () => {
     // The mirror case. This item is already visible to sync, so there is
     // nothing to repair, and the actor running the transaction did not write

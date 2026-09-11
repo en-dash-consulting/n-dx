@@ -690,6 +690,48 @@ describe("rex export / import-bundle", { timeout: 120_000 }, () => {
       expect(after.get(TASK_ONE)?.fields.lastModifiedBy).toBe(ATTRIBUTION);
     });
 
+    it("gives a null lastModified a real timestamp, not a missing one", async () => {
+      // `rex export` never emits a null, so this is a hand-authored or
+      // third-party bundle. It has to be driven through the real CLI rather
+      // than asserted against the stamping function, because the defect needed
+      // three separate checks to all agree it was fine: PRDItemSchema is a
+      // passthrough and never declares the field, so the null validates;
+      // defaultTimestampFromExport tests `=== undefined` and skips it; the
+      // stamping guard tested `!== undefined` and skipped it too. The emitter
+      // then drops the null, so the item lands with no timestamp line at all
+      // and is invisible to remote sync from that moment on.
+      await writeFile(
+        bundlePath,
+        JSON.stringify({
+          bundle: "rex/prd-bundle",
+          bundleVersion: 1,
+          schema: SCHEMA_VERSION,
+          title: "Null Stamp",
+          exportedAt: "2026-01-01T00:00:00.000Z",
+          items: [
+            {
+              id: EPIC_ONE,
+              title: "Epic With Null Stamp",
+              level: "epic",
+              status: "pending",
+              acceptanceCriteria: [],
+              lastModified: null,
+              lastModifiedBy: ATTRIBUTION,
+            },
+          ],
+        }),
+        "utf-8",
+      );
+      run(["init", targetDir]);
+      run(["import-bundle", `--in=${bundlePath}`, targetDir]);
+
+      // Read the item directly: `flatten` projects only FIDELITY_FIELDS, which
+      // deliberately omits `lastModified` because it is not round-trip content.
+      const imported = readPRD(targetDir).items.find((i) => i.id === EPIC_ONE);
+      expect(imported?.lastModified as string).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(imported?.lastModifiedBy).toBe(ATTRIBUTION);
+    });
+
     it("records the exporting branch and commit as provenance", async () => {
       run(["export", `--out=${bundlePath}`, sourceDir]);
       const bundle = await readBundle();

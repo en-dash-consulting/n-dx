@@ -390,10 +390,22 @@ export function stampChangedItems(
     // visible to sync, so there is nothing to repair, and the actor running
     // this transaction did not write it — recording them as its author would
     // be a fabrication rather than a default.
-    if (item.lastModified !== undefined) continue;
+    //
+    // "Has a timestamp" is decided by truthiness, not by `!== undefined`,
+    // because {@link isModifiedSinceSync} opens with `if (!meta.lastModified)
+    // return false`. A `null` or `""` is therefore "no timestamp" to the only
+    // consumer that matters, and a guard disagreeing with it skipped exactly
+    // the items this repair exists for. The frontmatter emitter then drops the
+    // null, so from the next load the item reads as pre-existing and unchanged
+    // and can never acquire a stamp — permanently invisible to sync, which is
+    // the failure this function was written to prevent, reached by another
+    // door. A hand-authored or third-party bundle is enough to hit it; the
+    // document schema is a passthrough and never declares the field, so the
+    // null validates cleanly on the way in.
+    if (item.lastModified) continue;
 
     item.lastModified = stamp.lastModified;
-    if (item.lastModifiedBy === undefined) item.lastModifiedBy = stamp.lastModifiedBy;
+    if (!item.lastModifiedBy) item.lastModifiedBy = stamp.lastModifiedBy;
     stamped.push(item.id);
   }
   return stamped;
