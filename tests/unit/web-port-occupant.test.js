@@ -28,6 +28,7 @@ import {
   probeStatusEndpoint,
   findFreePortInRange,
   findRelocationPort,
+  isPortInUse,
   killPortOccupant,
   listenerPidsOnPort,
   selectKillTarget,
@@ -576,5 +577,41 @@ describe("findRelocationPort", () => {
     expect(relocated).not.toBeNull();
     expect(relocated).toBeGreaterThanOrEqual(PORT_RANGE_START);
     expect(relocated).toBeLessThanOrEqual(PORT_RANGE_END);
+  });
+
+  it("clamps the near window at 65535 instead of scanning past it", async () => {
+    // requestedPort + 1 (65536) is already out of range, so the near window
+    // is empty and this must fall straight through to the 3117–3200 fallback
+    // instead of throwing ERR_SOCKET_BAD_PORT.
+    const relocated = await findRelocationPort(65535);
+    expect(relocated).not.toBeNull();
+    expect(relocated).toBeGreaterThanOrEqual(PORT_RANGE_START);
+    expect(relocated).toBeLessThanOrEqual(PORT_RANGE_END);
+  });
+
+  it("scans up to but never past 65535 for a near-boundary port", async () => {
+    // The near window would naturally extend to 65500 + 83 = 65583; it must
+    // be clamped so no candidate above 65535 is ever probed.
+    const relocated = await findRelocationPort(65500);
+    expect(relocated).not.toBeNull();
+    expect(relocated).toBeGreaterThanOrEqual(65501);
+    expect(relocated).toBeLessThanOrEqual(65535);
+  });
+});
+
+describe("isPortInUse", () => {
+  it("treats an out-of-range port as in use instead of throwing", async () => {
+    // net.createConnection throws ERR_SOCKET_BAD_PORT synchronously for a
+    // port outside 0–65535; the guard must intercept it before that call.
+    await expect(isPortInUse(65536)).resolves.toBe(true);
+    await expect(isPortInUse(70000)).resolves.toBe(true);
+    await expect(isPortInUse(-1)).resolves.toBe(true);
+    await expect(isPortInUse(3117.5)).resolves.toBe(true);
+  });
+
+  it("still probes a valid port normally", async () => {
+    const { server, port } = await startServer(() => {});
+    await expect(isPortInUse(port)).resolves.toBe(true);
+    await new Promise((res) => server.close(() => res()));
   });
 });

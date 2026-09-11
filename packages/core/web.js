@@ -39,6 +39,9 @@ const PORT_FILE = ".n-dx-web.port";
 const PORT_RANGE_START = 3117;
 const PORT_RANGE_END = 3200;
 
+/** Highest valid TCP port — `net.createConnection` throws ERR_SOCKET_BAD_PORT above this. */
+const MAX_PORT = 65535;
+
 /** Ceiling on the port probe: a dashboard answers /api/status in single-digit ms. */
 const PROBE_TIMEOUT_MS = 1_500;
 
@@ -86,8 +89,17 @@ async function loadConfigPort(dir) {
 
 /**
  * Check if a port is in use by attempting a TCP connection.
+ *
+ * A port outside 0–65535 is treated as "in use" rather than probed: passing
+ * it to `net.createConnection` throws ERR_SOCKET_BAD_PORT synchronously
+ * (inside the Promise executor, so it becomes a rejection), which previously
+ * crashed callers like {@link findRelocationPort} instead of skipping the
+ * invalid candidate.
  */
-function isPortInUse(port) {
+export function isPortInUse(port) {
+  if (!Number.isInteger(port) || port < 0 || port > MAX_PORT) {
+    return Promise.resolve(true);
+  }
   return new Promise((res) => {
     const sock = createConnection({ port, host: "127.0.0.1" });
     sock.once("connect", () => {
@@ -131,6 +143,12 @@ const NEAR_PORT_WINDOW = PORT_RANGE_END - PORT_RANGE_START;
  * For the default port (3117) the near window already covers 3118–3200
  * exactly, so behaviour there is unchanged: it still walks 3118, 3119, … .
  *
+ * The window's upper bound is clamped to 65535, the highest valid TCP port —
+ * otherwise a requested port near the top of the range (e.g. 65535 itself)
+ * pushes the scan past 65535 and into candidates that crash the probe. When
+ * `requestedPort` is already 65535 the clamped window is empty and this
+ * falls straight through to the 3117–3200 fallback.
+ *
  * @param {number} requestedPort
  * @param {number} [nearWindowSize] Exposed for tests; production callers use the default.
  * @returns {Promise<number|null>} The chosen port, or null when neither window has one free.
@@ -139,7 +157,7 @@ export async function findRelocationPort(requestedPort, nearWindowSize = NEAR_PO
   const near = await findFreePortInRange(
     requestedPort,
     requestedPort + 1,
-    requestedPort + nearWindowSize,
+    Math.min(requestedPort + nearWindowSize, MAX_PORT),
   );
   if (near !== null) return near;
   return findFreePortInRange(requestedPort, PORT_RANGE_START, PORT_RANGE_END);
