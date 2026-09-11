@@ -65,6 +65,30 @@ export function detectCliName(dir) {
 }
 
 /**
+ * Resolve the CLI command name to use for a project: a manually configured
+ * (or previously recorded) `cli.name` in .n-dx.json always wins; otherwise
+ * falls back to bin-field auto-detection via {@link detectCliName}.
+ *
+ * This is the read-side counterpart to `recordCliName` — callers that need
+ * the resolved name without persisting anything (e.g. rendering a tracked
+ * `.mcp.json`) should use this instead of duplicating the .n-dx.json read.
+ *
+ * @param {string} dir  Project root directory.
+ * @returns {string} The resolved command name.
+ */
+export function getCliName(dir) {
+  const configPath = join(dir, ".n-dx.json");
+  if (existsSync(configPath)) {
+    try {
+      const data = JSON.parse(readFileSync(configPath, "utf-8"));
+      const name = data.cli?.name;
+      if (typeof name === "string" && name.length > 0) return name;
+    } catch { /* fall through to detection */ }
+  }
+  return detectCliName(dir);
+}
+
+/**
  * Persist the detected CLI name as `cli.name` in .n-dx.json.
  * Called at the end of `ndx init` alongside recordInitVersion.
  *

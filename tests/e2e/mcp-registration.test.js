@@ -1,15 +1,22 @@
 /**
  * MCP registration idempotency tests — verifies that `registerMcpServers()`
- * in claude-integration.js safely handles re-registration by removing existing
- * servers from all scopes before adding.
+ * in claude-integration.js safely handles re-registration.
+ *
+ * `ndx init` defaults to the tracked `.mcp.json` (no `claude mcp add` call
+ * at all — see mcp-json-tracked.test.js). Passing `{ mcpScope: "local" }`
+ * restores the legacy `claude mcp add --scope local` path. Either way, a
+ * stale local-scope entry from a prior run is removed first — but never
+ * "project" scope (that's `.mcp.json` itself, owned by `writeMcpJson()`) and
+ * never "user" scope (global — not safe to strip on someone else's behalf).
  *
  * Complements:
  *   - assistant-integration.test.js — orchestration-level idempotency
  *   - mcp-transport.test.js — HTTP transport protocol compliance
  *   - codex-mcp-contract.test.js — Codex stdio MCP contract
+ *   - mcp-json-tracked.test.js — the tracked .mcp.json default path
  *
  * This file focuses on the **registration lifecycle**:
- *   1. Source-level: removal-before-add pattern covers all three scopes
+ *   1. Source-level: local-only removal, never user/project scope
  *   2. Source-level: every manifest server gets the idempotent treatment
  *   3. Behavioral: MCP result shape contract (with and without claude CLI)
  *   4. Behavioral: running setupClaudeIntegration twice is safe
@@ -30,16 +37,24 @@ const serverNames = Object.keys(servers);
 // ── Source-level: idempotent removal pattern ─────────────────────────────────
 
 describe("registerMcpServers idempotent removal pattern (source)", () => {
-  it("removes from all three Claude scopes before adding", () => {
-    // The function must remove from local, project, and user scopes
-    expect(SRC).toContain('"local"');
-    expect(SRC).toContain('"project"');
-    expect(SRC).toContain('"user"');
+  it("never removes user-scope entries", () => {
+    // User scope is global — removing it would strip a registration that
+    // has nothing to do with the project being initialised.
+    expect(SRC).not.toMatch(/"mcp",\s*"remove",\s*"--scope",\s*"user"/);
+    expect(SRC).not.toMatch(/"mcp",\s*"remove",\s*"--scope",\s*scope/);
   });
 
-  it("iterates removal across scopes in a loop", () => {
-    // Should use a loop over scopes rather than three separate commands
-    expect(SRC).toMatch(/for\s*\(\s*const\s+\w+\s+of\s+\[.*"local".*"project".*"user".*\]/);
+  it("never removes project-scope entries via the CLI", () => {
+    // Project scope IS .mcp.json — owned directly by writeMcpJson(), not by
+    // shelling out to `claude mcp remove --scope project`.
+    expect(SRC).not.toMatch(/"mcp",\s*"remove",\s*"--scope",\s*"project"/);
+  });
+
+  it("only removes a local-scope entry that actually targets this project", () => {
+    expect(SRC).toContain("function localEntryTargetsProject");
+    const fnStart = SRC.indexOf("function registerMcpServers");
+    const fnBody = SRC.slice(fnStart, SRC.indexOf("\nfunction", fnStart + 1));
+    expect(fnBody).toContain("localEntryTargetsProject");
   });
 
   it("calls mcp remove with --scope flag", () => {

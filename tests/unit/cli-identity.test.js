@@ -6,6 +6,7 @@ import {
   resolveCliName,
   detectCliName,
   recordCliName,
+  getCliName,
   DEFAULT_CLI_NAME,
 } from "../../packages/core/cli-identity.js";
 
@@ -96,5 +97,49 @@ describe("detectCliName / recordCliName", () => {
   it("recordCliName is best-effort and does not throw on an unwritable dir", () => {
     expect(() => recordCliName(join(dir, "does-not-exist"))).not.toThrow();
     expect(existsSync(join(dir, "does-not-exist", ".n-dx.json"))).toBe(false);
+  });
+});
+
+describe("getCliName", () => {
+  let dir;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "cli-identity-get-"));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("returns a manually configured cli.name from .n-dx.json without touching package.json", () => {
+    writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ cli: { name: "myapp" } }));
+    expect(getCliName(dir)).toBe("myapp");
+  });
+
+  it("falls back to bin-field detection when .n-dx.json has no cli.name", () => {
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "x", bin: { myapp: "./cli.js" } }));
+    writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ web: { port: 4000 } }));
+    expect(getCliName(dir)).toBe("myapp");
+  });
+
+  it("falls back to bin-field detection when .n-dx.json is missing", () => {
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "x", bin: { myapp: "./cli.js" } }));
+    expect(getCliName(dir)).toBe("myapp");
+  });
+
+  it("falls back to DEFAULT_CLI_NAME when neither is configured", () => {
+    expect(getCliName(dir)).toBe(DEFAULT_CLI_NAME);
+  });
+
+  it("falls back to bin-field detection when .n-dx.json is malformed", () => {
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "x", bin: { myapp: "./cli.js" } }));
+    writeFileSync(join(dir, ".n-dx.json"), "{not json");
+    expect(getCliName(dir)).toBe("myapp");
+  });
+
+  it("ignores a non-string cli.name and falls back to detection", () => {
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "x", bin: { myapp: "./cli.js" } }));
+    writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ cli: { name: 42 } }));
+    expect(getCliName(dir)).toBe("myapp");
   });
 });

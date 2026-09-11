@@ -357,11 +357,12 @@ function InitApp({
       // that returns the summary lines from formatInitReport plus any error.
       setPhase("assistants", "active");
 
+      const mcpScope = flags.includes("--mcp-scope=local") ? "local" : undefined;
       const aiUrl = new URL("./assistant-integration.js", import.meta.url).href;
       const script = [
         `import{setupAssistantIntegrations,formatInitReport}from"${aiUrl}";`,
         `try{`,
-        `const r=setupAssistantIntegrations(${JSON.stringify(dir)},${JSON.stringify(assistantEnabled ?? {})});`,
+        `const r=setupAssistantIntegrations(${JSON.stringify(dir)},${JSON.stringify(assistantEnabled ?? {})},${JSON.stringify({ mcpScope })});`,
         `const lines=formatInitReport(r,{activeVendor:${JSON.stringify(provider || null)}});`,
         `process.stdout.write(JSON.stringify({lines,results:r}))`,
         `}catch(e){process.stdout.write(JSON.stringify({err:String(e&&e.message||e)}));process.exit(1)}`,
