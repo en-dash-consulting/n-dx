@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { MAX_REQUEST_BODY_BYTES } from "./response-utils.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
@@ -66,6 +67,19 @@ export function handleRequestSecurity(
   res: ServerResponse,
 ): boolean {
   const method = (req.method || "GET").toUpperCase();
+
+  // Refuse an over-large body before any route buffers it. A declared
+  // Content-Length past the cap is rejected here with 413; a chunked body with
+  // no length is bounded later by readBody's streamed cap. The server is
+  // loopback-only, so this guards its own availability, not data.
+  const contentLength = Number(singleHeader(req.headers["content-length"]));
+  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BODY_BYTES) {
+    res.writeHead(413, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(JSON.stringify({ error: `Request body exceeds the ${MAX_REQUEST_BODY_BYTES}-byte limit.` }));
+    req.destroy();
+    return true;
+  }
+
   const origin = singleHeader(req.headers.origin);
 
   if (origin) {
