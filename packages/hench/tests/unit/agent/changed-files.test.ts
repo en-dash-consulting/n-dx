@@ -132,6 +132,36 @@ describe("discoverChangedFiles", () => {
     expect(new Set(changed).size).toBe(changed.length);
   });
 
+  it("excludes .rex/ and .hench/ bookkeeping writes — they are not the run's work product", async () => {
+    // hench's own task-status update dirties the task's index.md on every
+    // run, and a PRD file dirty before the run started lands in the diff
+    // too. Neither must make the gate believe code changed.
+    await mkdir(join(repoDir, ".rex/prd_tree/some-epic"), { recursive: true });
+    await writeFile(join(repoDir, ".rex/prd_tree/some-epic/index.md"), "status: pending\n");
+    git(repoDir, "add", "-A");
+    git(repoDir, "commit", "-m", "track PRD tree");
+    startingHead = git(repoDir, "rev-parse", "HEAD").trim();
+
+    await writeFile(join(repoDir, ".rex/prd_tree/some-epic/index.md"), "status: in_progress\n");
+    await mkdir(join(repoDir, ".hench/runs"), { recursive: true });
+    await writeFile(join(repoDir, ".hench/runs/run-1.json"), "{}\n");
+
+    expect(await discoverChangedFiles({ projectDir: repoDir, startingHead })).toEqual([]);
+  });
+
+  it("still reports real work alongside excluded bookkeeping", async () => {
+    await mkdir(join(repoDir, ".rex/prd_tree/some-epic"), { recursive: true });
+    await writeFile(join(repoDir, ".rex/prd_tree/some-epic/index.md"), "status: pending\n");
+    git(repoDir, "add", "-A");
+    git(repoDir, "commit", "-m", "track PRD tree");
+    startingHead = git(repoDir, "rev-parse", "HEAD").trim();
+
+    await writeFile(join(repoDir, ".rex/prd_tree/some-epic/index.md"), "status: in_progress\n");
+    await writeFile(join(repoDir, "work.ts"), "export const work = 1;\n");
+
+    expect(await discoverChangedFiles({ projectDir: repoDir, startingHead })).toEqual(["work.ts"]);
+  });
+
   it("falls back to HEAD when no starting head was captured", async () => {
     await writeFile(join(repoDir, "base.ts"), "export const base = 2;\n");
 
