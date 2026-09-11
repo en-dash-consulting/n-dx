@@ -1,4 +1,5 @@
 import { exec, execShellCmd } from "../process/exec.js";
+import { discoverChangedFiles } from "./changed-files.js";
 
 /**
  * Result of completion validation.
@@ -25,15 +26,24 @@ export interface CompletionValidationOptions {
   startingHead?: string;
   /** When true, reject completions that only modify documentation files. */
   selfHeal?: boolean;
+  /** Untracked paths present before the run; not counted as the run's changes. */
+  baselineUntracked?: string[];
 }
 
 const DEFAULT_TIMEOUT = 30_000;
+
+/** Git pathspec excludes matching BOOKKEEPING_PREFIXES in validation/changed-files.ts. */
+const BOOKKEEPING_EXCLUDES = [":(exclude).rex", ":(exclude).hench"];
 
 /**
  * Validate that a task produced meaningful changes before completion.
  *
  * Checks:
- * 1. `git diff --stat HEAD` must be non-empty (staged + unstaged changes)
+ * 1. The run must have changed at least one file (committed during the run,
+ *    modified, or newly created — via {@link discoverChangedFiles}, so
+ *    `.rex/`/`.hench/` bookkeeping and pre-existing untracked files are not
+ *    counted; hench itself dirties the task's PRD file on every run, and
+ *    without the exclusion every run "has changes" and this check is vacuous)
  * 2. If a test command is provided, it must exit successfully
  */
 export async function validateCompletion(
@@ -41,19 +51,21 @@ export async function validateCompletion(
   options?: CompletionValidationOptions,
 ): Promise<CompletionValidationResult> {
   const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
-
-  // Check git diff (staged + unstaged vs starting HEAD or current HEAD)
   const diffRef = options?.startingHead ?? "HEAD";
-  const { stdout: diffOutput } = await exec(
-    "git",
-    ["diff", "--stat", diffRef],
-    { cwd: projectDir, timeout },
-  );
 
-  const hasChanges = diffOutput.trim().length > 0;
-  const diffSummary = hasChanges ? diffOutput.trim() : undefined;
+  // What did the run actually change? Shares the gate's discovery so the two
+  // checks cannot disagree about what counts. `undefined` means git could not
+  // answer (not a repo, unknown baseline) — completion cannot be validated
+  // without evidence, so it stays a rejection, as it always has been here.
+  const changed =
+    (await discoverChangedFiles({
+      projectDir,
+      startingHead: options?.startingHead,
+      baselineUntracked: options?.baselineUntracked,
+      timeout,
+    })) ?? [];
 
-  if (!hasChanges) {
+  if (changed.length === 0) {
     return {
       valid: false,
       hasChanges: false,
@@ -61,13 +73,23 @@ export async function validateCompletion(
     };
   }
 
+  // Human-readable summary: the diff stat for tracked changes, plus any new
+  // files a diff can never show. Decoration only — the verdict came from
+  // `changed` above.
+  const { stdout: diffOutput } = await exec(
+    "git",
+    ["diff", "--stat", diffRef, "--", ".", ...BOOKKEEPING_EXCLUDES],
+    { cwd: projectDir, timeout },
+  );
+  const stat = diffOutput.trim();
+  const newFiles = changed.filter((f) => !stat.includes(f));
+  const diffSummary =
+    [stat, ...newFiles.map((f) => ` ${f} (new)`)].filter(Boolean).join("\n") ||
+    changed.join(", ");
+
   // In self-heal mode, reject completions that only modify documentation files
-  if (options?.selfHeal && diffOutput) {
-    const changedFiles = diffOutput
-      .split("\n")
-      .map((line) => line.trim().split("|")[0]?.trim())
-      .filter((f) => f && !f.includes("changed") && !f.includes("insertion") && !f.includes("deletion"));
-    const allDocs = changedFiles.length > 0 && changedFiles.every(
+  if (options?.selfHeal) {
+    const allDocs = changed.every(
       (f) => /\.(md|adr\.\w+|txt)$/i.test(f) || f.startsWith("docs/"),
     );
     if (allDocs) {

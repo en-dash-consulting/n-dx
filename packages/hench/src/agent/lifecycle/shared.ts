@@ -35,7 +35,7 @@ import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
-import { discoverChangedFiles } from "../analysis/changed-files.js";
+import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";

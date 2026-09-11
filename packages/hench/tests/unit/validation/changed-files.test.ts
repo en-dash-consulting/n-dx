@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { initGitFixtureRepoSync } from "../../helpers/index.js";
-import { discoverChangedFiles } from "../../../src/agent/analysis/changed-files.js";
+import { discoverChangedFiles } from "../../../src/validation/changed-files.js";
 
 function git(dir: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd: dir, encoding: "utf-8" });

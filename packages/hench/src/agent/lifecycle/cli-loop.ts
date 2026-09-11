@@ -1411,6 +1411,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     testCommand: ctx.testCommand,
     startingHead: ctx.startingHead,
     selfHeal: ctx.selfHeal,
+    baselineUntracked: ctx.baselineUntracked,
   });
 
   syncRunFromAccumulated(run, accumulated, attempt);

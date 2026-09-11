@@ -6,7 +6,8 @@ import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, di
 import type { ToolContext } from "../../tools/contracts.js";
 import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
-import { section, subsection, stream, detail, withHeartbeat } from "../../types/output.js";
+import { section, subsection, stream, detail, info, withHeartbeat } from "../../types/output.js";
+import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import {
   loadClaudeConfig,
@@ -65,6 +66,51 @@ const MAX_TOOL_OUTPUT_STORED = 2000;
 // ---------------------------------------------------------------------------
 // Extracted helpers — each handles one focused concern within the turn loop
 // ---------------------------------------------------------------------------
+
+/**
+ * Post-loop completion validation for the API-provider loops — the same gate
+ * the CLI loop applies in processSuccessfulResult (cli-loop.ts).
+ *
+ * An API loop treats "the model stopped calling tools" as completion, but that
+ * is only a claim. Without this check a model that made zero changes — or only
+ * dirtied `.rex/` bookkeeping via its own status update — was recorded as
+ * completed, the task was marked done in the PRD, and completion metadata was
+ * committed. The CLI vendors (claude, codex) already rejected such runs, so
+ * local/google/claude-api runs completed tasks under a weaker standard.
+ *
+ * Rejection mirrors the CLI path exactly: the run fails with the validation
+ * reason and the task resets to "pending" (completion_rejected) so the next
+ * cycle can retry it. No-op unless the run currently claims "completed".
+ */
+async function rejectUnvalidatedCompletion(args: {
+  run: RunRecord;
+  store: PRDStore;
+  taskId: string;
+  projectDir: string;
+  startingHead?: string;
+  baselineUntracked?: string[];
+  testCommand?: string;
+  selfHeal?: boolean;
+}): Promise<void> {
+  const { run, store, taskId, projectDir } = args;
+  if (run.status !== "completed") return;
+
+  const validation = await validateCompletion(projectDir, {
+    testCommand: args.testCommand,
+    startingHead: args.startingHead,
+    selfHeal: args.selfHeal,
+    baselineUntracked: args.baselineUntracked,
+  });
+  if (validation.valid) return;
+
+  run.status = "failed";
+  run.error = validation.reason;
+  info(`\nCompletion rejected: ${validation.reason}`);
+  info(formatValidationResult(validation));
+  await handleRunFailure(
+    store, taskId, "pending", "completion_rejected", formatValidationResult(validation),
+  );
+}
 
 async function callWithRetry(
   client: Anthropic,
@@ -689,6 +735,12 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
 
   heartbeat.stop();
 
+  // Same completion standard as the CLI loop: a claim with no changes fails.
+  await rejectUnvalidatedCompletion({
+    run, store, taskId, projectDir, startingHead, baselineUntracked,
+    testCommand, selfHeal: config.selfHeal,
+  });
+
   if (opts.approveDiff && run.status === "completed") {
     await runReviewGate(projectDir, store, taskId, run, {
       rollbackOnFailure: opts.rollbackOnFailure,
@@ -1159,6 +1211,12 @@ async function runLocalToolLoop(params: {
 
   heartbeat.stop();
 
+  // Same completion standard as the CLI loop: a claim with no changes fails.
+  await rejectUnvalidatedCompletion({
+    run, store, taskId, projectDir, startingHead, baselineUntracked,
+    testCommand, selfHeal: config.selfHeal,
+  });
+
   if (opts.approveDiff && run.status === "completed") {
     await runReviewGate(projectDir, store, taskId, run, {
       rollbackOnFailure: opts.rollbackOnFailure,
@@ -1519,6 +1577,12 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   // Stop heartbeat before finalization
   heartbeat.stop();
+
+  // Same completion standard as the CLI loop: a claim with no changes fails.
+  await rejectUnvalidatedCompletion({
+    run, store, taskId, projectDir, startingHead, baselineUntracked,
+    testCommand: brief.project.testCommand, selfHeal: config.selfHeal,
+  });
 
   // Shared: review gate
   if (opts.approveDiff && run.status === "completed") {

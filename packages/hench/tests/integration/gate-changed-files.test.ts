@@ -18,7 +18,7 @@ import { initGitFixtureRepoSync } from "../helpers/index.js";
 // runTestGate spawns on every platform — so they are shell-dependent for real,
 // not shape-only. See tests/shell-spawn-inventory.md.
 import { itNeedsPosixShell } from "../helpers/posix-shell.js";
-import { discoverChangedFiles } from "../../src/agent/analysis/changed-files.js";
+import { discoverChangedFiles } from "../../src/validation/changed-files.js";
 import { runTestGate } from "../../src/tools/test-runner.js";
 
 function git(dir: string, ...args: string[]): string {

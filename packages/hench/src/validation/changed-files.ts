@@ -24,10 +24,10 @@
  * untracked files that were already present when the run started: those are
  * the user's, not this run's.
  *
- * @module hench/agent/analysis/changed-files
+ * @module hench/validation/changed-files
  */
 
-import { exec } from "../../process/exec.js";
+import { exec } from "../process/exec.js";
 
 const GIT_TIMEOUT = 10_000;
 
