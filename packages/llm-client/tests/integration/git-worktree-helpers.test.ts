@@ -51,7 +51,9 @@ let linked: string;
 let outside: string;
 
 beforeAll(() => {
-  tmpRoot = realpathSync(mkdtempSync(join(tmpdir(), "ndx-worktree-helpers-")));
+  // `.native`: on Windows os.tmpdir() hands back an 8.3 short name and only
+  // the OS realpath expands it, which is the form the helpers return.
+  tmpRoot = realpathSync.native(mkdtempSync(join(tmpdir(), "ndx-worktree-helpers-")));
 
   repo = join(tmpRoot, "main");
   mkdirSync(repo);

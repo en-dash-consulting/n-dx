@@ -643,7 +643,13 @@ function gitRevParsePath(cwd: string, flag: string): string | null {
 
   const absolute = isAbsolute(output) ? output : resolvePath(cwd, output);
   try {
-    return realpathSync(absolute);
+    // `.native` rather than the JS implementation: on Windows only the OS call
+    // expands an 8.3 short name (C:\Users\RUNNER~1\…) to its long form and
+    // returns the canonical on-disk casing. Without it, the same directory
+    // reached through a short path compares unequal to itself, which for the
+    // commit gate means a spurious "the run started in worktree X, but git now
+    // reports Y" refusal. Matches canonicalizePath in packages/core/web.js.
+    return realpathSync.native(absolute);
   } catch {
     // git reported this path, so it existed a moment ago; a race or a
     // permission boundary on an intermediate segment is the only way to get

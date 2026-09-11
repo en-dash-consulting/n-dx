@@ -302,8 +302,9 @@ describe("shared lifecycle", () => {
         projectDir,
       });
 
-      // getWorktreeRoot realpaths its answer; tmpdir() is a symlink on macOS.
-      expect(run.worktreeRoot).toBe(realpathSync(projectDir));
+      // getWorktreeRoot realpaths its answer: tmpdir() is a symlink on macOS and
+      // an 8.3 short name on Windows, so the expectation needs the OS realpath.
+      expect(run.worktreeRoot).toBe(realpathSync.native(projectDir));
       expect(run.branch).toBe("gate-test");
       expect(run.startHead).toMatch(/^[0-9a-f]{40}$/);
 
