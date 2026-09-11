@@ -24,7 +24,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [classifyPortOccupant compares paths lexically, so a symlinked project path starts a second dashboard on the same PRD tree](./classifyportoccupant-compares-paths.md) | pending |
+| [classifyPortOccupant compares paths lexically, so a symlinked project path starts a second dashboard on the same PRD tree](./classifyportoccupant-compares-paths.md) | completed |
 | [E2E test: two project directories start dashboards concurrently without killing each other](./e2e-test-two-project-directories-start.md) | pending |
 | [Probe the port occupant before killing it and fall back to a free port when it is another n-dx server](./probe-the-port-occupant-before-killing.md) | completed |
 | [server.version and server.cliPath assertions are tautological, so a silent "unknown" version ships green](./server-version-and-server-clipath.md) | pending |

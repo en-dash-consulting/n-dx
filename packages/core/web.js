@@ -23,6 +23,7 @@ import { spawn } from "child_process";
 import { get as httpGet } from "http";
 import { createConnection } from "net";
 import { readFile, writeFile, unlink, access } from "fs/promises";
+import { realpathSync } from "fs";
 import { join, resolve } from "path";
 import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
@@ -181,6 +182,30 @@ export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS) {
  */
 
 /**
+ * Canonicalize a path for self/peer comparison.
+ *
+ * `resolve()` alone normalises separators and `..` segments but does not
+ * resolve symlinks and does not case-fold, so the same directory reached
+ * through a symlink (or, on win32, a different drive-letter/path casing)
+ * compares unequal to itself. `realpathSync.native` fixes both — it also
+ * returns the on-disk canonical casing on win32 — but requires the path to
+ * exist. When it does not (deleted out from under the caller, or a payload
+ * describing a directory this process cannot stat), fall back to the plain
+ * `resolve()` form rather than throwing.
+ *
+ * @param {string} pathLike
+ * @returns {string}
+ */
+function canonicalizePath(pathLike) {
+  const resolved = resolve(pathLike);
+  try {
+    return realpathSync.native(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
+/**
  * Decide what a probed /api/status payload says about the port's occupant.
  *
  *   peer     — an n-dx dashboard serving a DIFFERENT directory. Must not be
@@ -211,8 +236,8 @@ export function classifyPortOccupant(payload, absDir) {
   const served = payload.projectDir;
   if (typeof served !== "string" || served.length === 0) return { kind: "unknown" };
 
-  const resolved = resolve(served);
-  return resolved === resolve(absDir)
+  const resolved = canonicalizePath(served);
+  return resolved === canonicalizePath(absDir)
     ? { kind: "self", projectDir: resolved }
     : { kind: "peer", projectDir: resolved };
 }

@@ -17,8 +17,9 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { createServer } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdtemp, rm, symlink } from "node:fs/promises";
+import { realpathSync } from "node:fs";
+import { tmpdir, platform } from "node:os";
 import { join } from "node:path";
 
 import {
@@ -124,6 +125,75 @@ describe("classifyPortOccupant", () => {
 
     const blank = statusPayload("");
     expect(classifyPortOccupant(blank, dir)).toEqual({ kind: "unknown" });
+  });
+
+  describe("symlinked project paths", () => {
+    let real;
+    let link;
+
+    afterEach(async () => {
+      if (real) await rm(real, { recursive: true, force: true });
+      if (link) await rm(link, { force: true });
+      real = null;
+      link = null;
+    });
+
+    it("reports a dashboard as self when the same directory is reached through a symlink", async () => {
+      // Without resolving symlinks, the server's realpath'd projectDir and
+      // this invocation's symlink-spelled absDir compare unequal and the
+      // caller relocates instead of restarting — starting a second dashboard
+      // on the same PRD tree.
+      real = await mkdtemp(join(tmpdir(), "ndx-port-occupant-real-"));
+      link = join(tmpdir(), `ndx-port-occupant-link-${process.pid}`);
+      await symlink(real, link);
+
+      // The server reports the realpath'd directory it was started with...
+      const payload = statusPayload(real);
+      // ...while this invocation was started via the symlink spelling.
+      expect(classifyPortOccupant(payload, link)).toEqual({
+        kind: "self",
+        // The temp dir itself may sit under a symlinked ancestor (e.g. macOS
+        // /var -> /private/var), so compare against the fully realpath'd
+        // form rather than the mkdtemp() spelling.
+        projectDir: realpathSync.native(real),
+      });
+    });
+
+    it("still reports two genuinely different directories as peers", async () => {
+      real = await mkdtemp(join(tmpdir(), "ndx-port-occupant-real-"));
+      const other = await mkdtemp(join(tmpdir(), "ndx-port-occupant-other-"));
+      try {
+        expect(classifyPortOccupant(statusPayload(other), real)).toEqual({
+          kind: "peer",
+          projectDir: realpathSync.native(other),
+        });
+      } finally {
+        await rm(other, { recursive: true, force: true });
+      }
+    });
+
+    it("falls back to a lexical comparison when the reported projectDir no longer exists", () => {
+      // realpath throws ENOENT for a path that has been deleted out from
+      // under the caller; classification must degrade to today's resolve()
+      // comparison instead of throwing.
+      const deleted = join(tmpdir(), "ndx-port-occupant-deleted-does-not-exist");
+      expect(classifyPortOccupant(statusPayload(deleted), deleted)).toEqual({
+        kind: "self",
+        projectDir: deleted,
+      });
+      expect(classifyPortOccupant(statusPayload(deleted), `${deleted}-other`).kind).toBe(
+        "peer",
+      );
+    });
+
+    it.skipIf(platform() !== "win32")(
+      "is insensitive to drive-letter and path casing on win32",
+      async () => {
+        real = await mkdtemp(join(tmpdir(), "ndx-port-occupant-real-"));
+        const upper = real.toUpperCase();
+        expect(classifyPortOccupant(statusPayload(upper), real).kind).toBe("self");
+      },
+    );
   });
 });
 
