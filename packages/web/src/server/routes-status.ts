@@ -321,11 +321,15 @@ function readWebVersion(): string {
     // up from either reaches packages/web/package.json.
     const pkgPath = resolve(thisDir, "../..", "package.json");
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: unknown };
-    cachedVersion = typeof pkg.version === "string" ? pkg.version : "unknown";
+    const version = typeof pkg.version === "string" ? pkg.version : "unknown";
+    // Only memoize a real version. Caching "unknown" would pin a transient
+    // failure (e.g. EMFILE, a not-yet-ready mount) for the life of the
+    // process — the next call should retry instead of repeating the failure.
+    if (version !== "unknown") cachedVersion = version;
+    return version;
   } catch {
-    cachedVersion = "unknown";
+    return "unknown";
   }
-  return cachedVersion;
 }
 
 /** Build server process metadata shared by GET /api/status and GET /api/config. */

@@ -30,6 +30,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [killPortOccupant SIGKILLs any process holding a socket on the port, not just the listener](./killportoccupant-sigkills-any-process.md) | completed |
 | [Peer relocation ignores an explicitly requested port outside 3117–3200](./peer-relocation-ignores-an-explicitly.md) | completed |
 | [Probe the port occupant before killing it and fall back to a free port when it is another n-dx server](./probe-the-port-occupant-before-killing.md) | completed |
-| [readWebVersion memoizes its own failure, pinning the reported version to "unknown"](./readwebversion-memoizes-its-own.md) | pending |
+| [readWebVersion memoizes its own failure, pinning the reported version to "unknown"](./readwebversion-memoizes-its-own.md) | completed |
 | [server.version and server.cliPath assertions are tautological, so a silent "unknown" version ships green](./server-version-and-server-clipath.md) | completed |
 | [Status route reports served projectDir, server version, CLI path, pid and port](./status-route-reports-served-projectdir.md) | completed |
