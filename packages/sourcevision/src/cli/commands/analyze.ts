@@ -16,6 +16,7 @@ import {resolve, join} from "node:path";import {
   formatTokenUsage,
   detectSubAnalyses,
   setLLMConfig,
+  setProjectDir,
   getAuthMode,
   getLLMVendor,
 } from "../sourcevision-core.js";
@@ -129,6 +130,7 @@ async function initAndLoadLLMConfig(absDir: string): Promise<{
 
   const llmConfig = await loadLLMConfig(absDir);
   setLLMConfig(llmConfig);
+  setProjectDir(absDir);
   const vendor = getLLMVendor();
   if (vendor) {
     printVendorModelHeader(vendor, llmConfig);
