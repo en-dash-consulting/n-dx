@@ -27,6 +27,7 @@ import {
   classifyPortOccupant,
   probeStatusEndpoint,
   findFreePortInRange,
+  findRelocationPort,
   killPortOccupant,
   listenerPidsOnPort,
   selectKillTarget,
@@ -504,12 +505,14 @@ describe("runWeb, on a busy port", () => {
     expect(code).toBe(0);
     // The peer is untouched…
     expect(peer.server.listening).toBe(true);
-    // …and this invocation was handed a different port inside the range the
-    // server's own allocator uses.
+    // …and this invocation was relocated to the peer's own neighbourhood
+    // (requested port + 1 upward), not dropped into 3117–3200 — the peer's
+    // port here is an OS-assigned ephemeral port, so it sits far outside that
+    // range, and an operator-chosen port outside 3117–3200 must be honoured
+    // the same way.
     const served = Number(serveArgs[1].replace("--port=", ""));
     expect(served).not.toBe(peer.port);
-    expect(served).toBeGreaterThanOrEqual(3117);
-    expect(served).toBeLessThanOrEqual(3200);
+    expect(served).toBe(peer.port + 1);
   }, 20_000);
 
   it("passes the requested port straight through when it is free", async () => {
@@ -537,5 +540,41 @@ describe("findFreePortInRange", () => {
   it("returns null when every port in the range is taken", async () => {
     const { port } = await startServer(() => {});
     expect(await findFreePortInRange(0, port, port)).toBeNull();
+  });
+});
+
+describe("findRelocationPort", () => {
+  // Mirrors the constants in packages/core/web.js — not exported, since the
+  // orchestration tier avoids exposing more surface than callers need.
+  const PORT_RANGE_START = 3117;
+  const PORT_RANGE_END = 3200;
+
+  it("scans upward from an explicit port outside the default range", async () => {
+    // An OS-assigned ephemeral port lands far outside 3117–3200.
+    const { port } = await startServer(() => {});
+    expect(port < PORT_RANGE_START || port > PORT_RANGE_END).toBe(true);
+
+    expect(await findRelocationPort(port)).toBe(port + 1);
+  });
+
+  it("keeps today's behaviour for the default port: 3118, 3119, … within 3117–3200", async () => {
+    // The near window for the default port (3118–3200) is exactly the
+    // default fallback range, so this must land inside it just as before
+    // this function existed.
+    const relocated = await findRelocationPort(PORT_RANGE_START);
+    expect(relocated).not.toBeNull();
+    expect(relocated).toBeGreaterThanOrEqual(PORT_RANGE_START + 1);
+    expect(relocated).toBeLessThanOrEqual(PORT_RANGE_END);
+  });
+
+  it("falls back to the default range once the near window is exhausted", async () => {
+    const { port } = await startServer(() => {});
+    // A zero-width near window (end < start) never finds anything, forcing
+    // the fallback deterministically — occupying dozens of real sockets to
+    // exhaust the real near window would be slow and flaky.
+    const relocated = await findRelocationPort(port, 0);
+    expect(relocated).not.toBeNull();
+    expect(relocated).toBeGreaterThanOrEqual(PORT_RANGE_START);
+    expect(relocated).toBeLessThanOrEqual(PORT_RANGE_END);
   });
 });

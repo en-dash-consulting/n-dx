@@ -2,7 +2,7 @@
 id: "38a30719-5244-452b-9931-916a04834398"
 level: "task"
 title: "Peer relocation ignores an explicitly requested port outside 3117–3200"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "parallel-dev"
@@ -10,6 +10,9 @@ tags:
   - "pr-01-followup"
   - "fixed-in-pr-02"
 source: "code review of PR #359, 2026-09-11"
+startedAt: "2026-09-11T12:35:54.863Z"
+completedAt: "2026-09-11T12:45:12.862Z"
+endedAt: "2026-09-11T12:45:12.862Z"
 acceptanceCriteria:
   - "With a peer on an explicitly requested port P outside 3117–3200, the relocation lands near P (P+1 upward) rather than inside 3117–3200."
   - "With a peer on the default 3117, behaviour is unchanged: the relocation walks 3118, 3119, … exactly as today."
@@ -17,6 +20,6 @@ acceptanceCriteria:
   - "tests/e2e/cli-start-two-projects.test.js is updated to assert the new contract (it currently encodes the old one via an ephemeral requestedPort), and still passes."
   - "Unit coverage in tests/unit/web-port-occupant.test.js for findFreePortInRange's window selection with an explicit port inside and outside the default range."
 description: "Severity: medium. Found by review of PR 1 (branch feat/pr-01-start-never-kills, commit 5781a47b). Fixed on the PR-2 branch because PR 1 was already open when it was found.\n\nFAILURE SCENARIO\nrunWeb's peer branch (packages/core/web.js, around the findFreePortInRange(port) call) relocates with `findFreePortInRange(port)`, whose defaults are PORT_RANGE_START=3117 and PORT_RANGE_END=3200. The requested port is used only as the value to skip. So an explicitly requested port outside that window is replaced by one inside it.\n\nConcretely: an operator whose environment blocks 3117 (corporate proxy, another service) sets `web.port: 9000` in .n-dx.json for every project, or passes --port=9000. Project A takes 9000. Project B probes, classifies A as a peer, and relocates to the first free port in 3117–3200 — typically 3117, the exact port the operator configured around. The --port flag and the web.port config are user instructions, and the relocation disregards both.\n\nMitigating: the chosen port is logged (\"starting this one on :N\"), so this is visible rather than silent, and no data is at risk. That is why review graded it medium rather than high.\n\nNOTE: tests/e2e/cli-start-two-projects.test.js currently asserts this behaviour — requestedPort is an ephemeral port (findAvailablePort binds :0) far outside 3117–3200, and the test asserts the fallback lands somewhere different. Whatever fix is chosen, that test must be updated to match the new contract rather than worked around.\n\nSOLUTION OPTIONS\n(A) RECOMMENDED — scan upward from the requested port first, then fall back to 3117–3200. `findFreePortInRange(port, port + 1, port + 84)` preserves the operator's neighbourhood; if that window is full, try the default range; if both are full, error as today. Keeps the default-port experience identical (3117 already scans 3118+).\n(B) Scan only from the requested port and never touch 3117–3200. Simplest and most predictable, but changes today's behaviour for the default port in no useful way.\n(C) Refuse to relocate when the requested port came from an explicit --port or web.port, and error with the peer's identity instead. Most respectful of an explicit instruction, but turns a working start into a failure, which is worse for the common case.\n\nPrefer (A): it honours the explicit port where it can and never has a worse outcome than today."
-lastModified: "2026-09-11T11:33:49.335Z"
+lastModified: "2026-09-11T12:45:12.872Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

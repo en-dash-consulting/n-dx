@@ -271,10 +271,15 @@ describe("two projects start dashboards concurrently", { timeout: 120_000 }, () 
     expect(canonical(status.projectDir)).toBe(canonical(dirA));
   });
 
-  it("starts the second project on a different port", async () => {
+  it("starts the second project near the requested port, not inside 3117–3200", async () => {
     if (!canBindPorts) return;
     expect(portB).toBeTypeOf("number");
     expect(portB).not.toBe(requestedPort);
+    // requestedPort is an OS-assigned ephemeral port, far outside 3117–3200.
+    // Relocation must land in its own neighbourhood (requestedPort + 1
+    // upward) rather than jumping into the default fallback range — that is
+    // the contract this suite exists to pin down.
+    expect(portB).toBe(requestedPort + 1);
 
     const status = await waitForStatus(portB);
     expect(canonical(status.projectDir)).toBe(canonical(dirB));

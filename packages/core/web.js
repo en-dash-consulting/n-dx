@@ -7,7 +7,8 @@
  *   - PID file management (.n-dx-web.pid)
  *   - Graceful stop (ndx start stop / ndx web stop)
  *   - Peer detection on a busy port: another project's dashboard is left alone
- *     and this one relocates within 3117–3200, rather than being killed
+ *     and this one relocates near the requested port (falling back to
+ *     3117–3200 only if that neighbourhood is full), rather than being killed
  *
  * Used by both `ndx start` (unified: dashboard + MCP) and `ndx web` (alias).
  *
@@ -109,6 +110,39 @@ export async function findFreePortInRange(exclude, start = PORT_RANGE_START, end
     if (!(await isPortInUse(p))) return p;
   }
   return null;
+}
+
+/**
+ * Width of the near-port scan window in {@link findRelocationPort}, matching
+ * the span of the default range (3117–3200 inclusive) so the two windows are
+ * the same size.
+ */
+const NEAR_PORT_WINDOW = PORT_RANGE_END - PORT_RANGE_START;
+
+/**
+ * Choose a port to relocate a peer's request to.
+ *
+ * Scans upward from `requestedPort` first — `requestedPort + 1` through
+ * `requestedPort + nearWindowSize` — so an operator's explicit `--port` or
+ * `web.port` survives relocation in its own neighbourhood instead of being
+ * silently replaced by a port inside 3117–3200. Falls back to the default
+ * range only when that neighbourhood is entirely taken.
+ *
+ * For the default port (3117) the near window already covers 3118–3200
+ * exactly, so behaviour there is unchanged: it still walks 3118, 3119, … .
+ *
+ * @param {number} requestedPort
+ * @param {number} [nearWindowSize] Exposed for tests; production callers use the default.
+ * @returns {Promise<number|null>} The chosen port, or null when neither window has one free.
+ */
+export async function findRelocationPort(requestedPort, nearWindowSize = NEAR_PORT_WINDOW) {
+  const near = await findFreePortInRange(
+    requestedPort,
+    requestedPort + 1,
+    requestedPort + nearWindowSize,
+  );
+  if (near !== null) return near;
+  return findFreePortInRange(requestedPort, PORT_RANGE_START, PORT_RANGE_END);
 }
 
 /**
@@ -655,10 +689,10 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       const occupant = classifyPortOccupant(await probeStatusEndpoint(port), absDir);
 
       if (occupant.kind === "peer") {
-        const next = await findFreePortInRange(port);
+        const next = await findRelocationPort(port);
         if (next === null) {
           console.error(
-            `n-dx dashboard for ${occupant.projectDir} is already on :${port}, and no port in ` +
+            `n-dx dashboard for ${occupant.projectDir} is already on :${port}, and no port near it or in ` +
             `${PORT_RANGE_START}–${PORT_RANGE_END} is free. Choose one with --port=N or set web.port in .n-dx.json`,
           );
           return 1;
