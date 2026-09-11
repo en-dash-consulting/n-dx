@@ -94,8 +94,13 @@ export function getAllSkillBodies() {
 /**
  * Return the MCP server descriptors from the manifest.
  *
+ * `cliCommand` is the `ndx <cliCommand>` subcommand that launches this
+ * server's stdio CLI (e.g. `rex`, `sv`) — distinct from the server's own
+ * manifest key, which is also used for tool-ID prefixing (`mcp__sourcevision__`).
+ *
  * @returns {Record<string, { package: string, npmName: string, entrypoint: string,
- *                            mcpCommand: string, tools: { read: string[], write: string[] } }>}
+ *                            cliCommand: string, mcpCommand: string,
+ *                            tools: { read: string[], write: string[] } }>}
  */
 export function getMcpServers() {
   return getManifest().mcpServers;
@@ -106,7 +111,8 @@ export function getMcpServers() {
  *
  * @param {string} name
  * @returns {{ package: string, npmName: string, entrypoint: string,
- *             mcpCommand: string, tools: { read: string[], write: string[] } }}
+ *             cliCommand: string, mcpCommand: string,
+ *             tools: { read: string[], write: string[] } }}
  */
 export function getMcpServer(name) {
   const servers = getMcpServers();

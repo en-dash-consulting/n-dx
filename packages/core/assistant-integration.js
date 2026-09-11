@@ -200,6 +200,9 @@ function formatVendorArtifacts(vendor, detail) {
         }
       }
     }
+    if (detail.mcpJson?.written) {
+      lines.push(`.mcp.json — ${detail.mcpJson.servers.join(", ")} (tracked, cwd-relative)`);
+    }
   }
 
   if (vendor === ASSISTANT_VENDOR.CODEX) {

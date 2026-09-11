@@ -35,6 +35,7 @@ import {
   writeVendorSkills,
   renderClaudeMd,
 } from "./assistant-assets.js";
+import { getCliName } from "./cli-identity.js";
 import { homedir } from "os";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -236,6 +237,77 @@ function registerMcpServers(dir) {
   return { registered: true, servers: results };
 }
 
+// ── Tracked .mcp.json ─────────────────────────────────────────────────────────
+
+/**
+ * Build the .mcp.json server entry map for the current manifest, using
+ * cwd-relative commands (`<cliName> <cliCommand> mcp .`) instead of the
+ * absolute paths `registerMcpServers` uses. Claude Code launches
+ * project-scope stdio servers with cwd at the checkout root, so a command
+ * like `ndx rex mcp .` resolves correctly from any worktree or teammate
+ * clone without embedding a machine-specific path.
+ *
+ * @param {string} cliName  Resolved CLI command name (see cli-identity.js)
+ * @returns {Record<string, { command: string, args: string[] }>}
+ */
+function buildTrackedMcpServers(cliName) {
+  const servers = getMcpServers();
+  const entries = {};
+  for (const [name, descriptor] of Object.entries(servers)) {
+    const subcommand = descriptor.cliCommand ?? name;
+    entries[name] = { command: cliName, args: [subcommand, descriptor.mcpCommand, "."] };
+  }
+  return entries;
+}
+
+/**
+ * Write (or merge into) `<dir>/.mcp.json` — a tracked, cwd-relative MCP
+ * server registration for Claude Code.
+ *
+ * Unlike `registerMcpServers()` (local scope, absolute paths, keyed by
+ * directory in `~/.claude.json`), this file is committed to the repo: every
+ * worktree and teammate gets the same two entries, resolved relative to
+ * whichever directory Claude Code launches the stdio server from — no
+ * absolute paths, so it survives the install moving or a dev-link toggle.
+ *
+ * Existing entries not defined in the n-dx manifest (a project's own MCP
+ * servers) are preserved untouched — only the manifest's own server names
+ * are (re)written each run, so re-running init is idempotent and merges
+ * safely instead of clobbering the file.
+ *
+ * @param {string} dir  Absolute project root directory
+ * @returns {{ written: boolean, path: string, servers: string[] }}
+ */
+function writeMcpJson(dir) {
+  const mcpJsonPath = join(dir, ".mcp.json");
+
+  let existing = {};
+  if (existsSync(mcpJsonPath)) {
+    try {
+      existing = JSON.parse(readFileSync(mcpJsonPath, "utf-8"));
+    } catch {
+      // Corrupted or unparseable — start fresh rather than fail init.
+      existing = {};
+    }
+  }
+  if (existing === null || typeof existing !== "object" || Array.isArray(existing)) {
+    existing = {};
+  }
+  if (!existing.mcpServers || typeof existing.mcpServers !== "object" || Array.isArray(existing.mcpServers)) {
+    existing.mcpServers = {};
+  }
+
+  const cliName = getCliName(dir);
+  const managed = buildTrackedMcpServers(cliName);
+  for (const [name, entry] of Object.entries(managed)) {
+    existing.mcpServers[name] = entry;
+  }
+
+  writeFileSync(mcpJsonPath, JSON.stringify(existing, null, 2) + "\n");
+
+  return { written: true, path: mcpJsonPath, servers: Object.keys(managed) };
+}
+
 /**
  * Read cli.claudePath from .n-dx.json in the given project root.
  * Returns undefined if not set.
@@ -402,7 +474,7 @@ export function formatClaudeCliNotFoundError(searched) {
  * Run the full Claude Code integration setup.
  *
  * @param {string} dir  Project root directory
- * @returns {{ settings: object, skills: object, mcp: object, instructions: object }}
+ * @returns {{ settings: object, skills: object, mcp: object, mcpJson: object, instructions: object }}
  */
 export function setupClaudeIntegration(dir) {
   const absDir = resolve(dir);
@@ -410,9 +482,10 @@ export function setupClaudeIntegration(dir) {
   const settings = mergeSettings(absDir);
   const skills = writeSkills(absDir);
   const mcp = registerMcpServers(absDir);
+  const mcpJson = writeMcpJson(absDir);
   const instructions = writeClaudeMd(absDir);
 
-  return { settings, skills, mcp, instructions };
+  return { settings, skills, mcp, mcpJson, instructions };
 }
 
 /**
@@ -458,5 +531,10 @@ export function printClaudeSetupSummary(result) {
         .join(", ");
       console.log(`  MCP servers: failed to register ${detail}`);
     }
+  }
+
+  // Tracked .mcp.json
+  if (result.mcpJson && result.mcpJson.written) {
+    console.log(`  .mcp.json: tracked, cwd-relative entries for ${result.mcpJson.servers.join(", ")}`);
   }
 }
