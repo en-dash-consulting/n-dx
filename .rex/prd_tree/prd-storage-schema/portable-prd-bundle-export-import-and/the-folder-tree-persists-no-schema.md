@@ -1,0 +1,22 @@
+---
+id: "ac6f568b-aba5-4120-bf9c-d0477b22f853"
+level: "task"
+title: "The folder tree persists no schema marker, so a newer-minor writer leaves no trace"
+status: "in_progress"
+priority: "low"
+tags:
+  - "pr-review"
+  - "follow-up"
+  - "schema"
+source: "ndx-capture"
+startedAt: "2026-09-11T12:16:38.677Z"
+acceptanceCriteria:
+  - "`tree-meta.json` carries a schema version alongside the title, written on every tree save"
+  - "The tree load path reads that marker into `doc.schema` instead of hardcoding `SCHEMA_VERSION`"
+  - "A tree with no marker (written before this change) still loads, falling back to `SCHEMA_VERSION`"
+  - "A tree whose marker reads `rex/v1.1` exports a bundle labelled `rex/v1.1`, which a `rex/v1` importer then refuses"
+  - "Round-trip test: save a document, reload it, and assert the schema survives rather than being replaced by the running constant"
+description: "Follow-up named as out of scope by the completed task \"buildBundle stamps the exporter's SCHEMA_VERSION instead of the document's schema\" (e3e84949). Captured so it is not lost; it is a storage-format change, not bundle work.\n\n`buildBundle` now stamps `doc.schema`, so a document loaded at a newer minor exports a bundle labelled with that minor and `parseBundle`'s gate can refuse it. That fix is only reachable for documents whose schema survives the load.\n\nFor the folder tree it does not. `FileStore.loadDocument` hardcodes `schema: SCHEMA_VERSION` on the tree path (packages/rex/src/store/file-adapter.ts, around the `rebuildOwnershipFromItems` call), and the tree persists no version marker of its own — `tree-meta.json` stores the title only. So `doc.schema` is always the running version for a tree-backed load, whatever wrote the tree.\n\nConsequence: if a future rex at `rex/v1.1` writes the tree with fields this version does not understand, `.passthrough()` carries them through the load, but the document reports `rex/v1` and an export of it is labelled `rex/v1`. The version gate on import then compares equal minors and admits the unrecognised fields unvalidated — the same hole the buildBundle fix closed, reached by a different route. Only the legacy backends (`prd.md`, `prd.json`) preserve a file's own schema string today.\n\nSuggested fix: persist a schema version in `tree-meta.json` on write, read it back in the tree load path, and fall back to `SCHEMA_VERSION` when the marker is absent so existing trees keep loading.\n\nLow priority: it requires a future rex to have shipped a newer minor before it can bite, and nothing in the repo writes one yet. It is a durability gap in the storage format rather than a live defect."
+lastModified: "2026-09-11T12:16:38.693Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---

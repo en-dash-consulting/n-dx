@@ -38,15 +38,36 @@ export interface SyncResult {
 }
 
 /**
- * Fields that are sync metadata and should not be compared for conflict detection.
+ * Per-item bookkeeping that is never content.
+ *
+ * The modification stamps record *that* an item changed and the remote
+ * pointers record where it was last sent; neither says anything about what the
+ * item is. Every "are these the same item?" comparison in the codebase has to
+ * exclude them or it answers its own writes: including `lastModified` makes a
+ * stamp look like a further modification and including `lastSyncedAt` makes
+ * recording a successful sync look like a local edit — each one a loop.
+ *
+ * Exported because `rex import-bundle` asks the same question of a bundle item
+ * and its local counterpart, and answered it differently: it compared the
+ * bookkeeping too, so a round-tripped item whose only delta was a stamp was
+ * reported as a content collision and the operator was pointed at `--replace`
+ * over nothing. One list, so the two cannot drift apart again.
+ *
+ * `children` is not here: it is excluded by these comparisons too, but for a
+ * structural reason rather than this one, and the bundle comparison excludes
+ * it on different terms — see `sameContent` in core/prd-bundle.ts.
  */
-const SYNC_META_FIELDS = new Set([
+export const ITEM_BOOKKEEPING_FIELDS: ReadonlySet<string> = new Set([
   "lastModified",
   "lastModifiedBy",
   "lastSyncedAt",
   "remoteId",
-  "children",
 ]);
+
+/**
+ * Fields that are sync metadata and should not be compared for conflict detection.
+ */
+const SYNC_META_FIELDS = new Set<string>([...ITEM_BOOKKEEPING_FIELDS, "children"]);
 
 /**
  * Fields considered structural and should not trigger conflict resolution.
@@ -264,13 +285,7 @@ export async function stampModified(
  * children it has without being compared on their contents; each child is
  * signed in its own right.
  */
-const SIGNATURE_IGNORED = new Set([
-  "lastModified",
-  "lastModifiedBy",
-  "lastSyncedAt",
-  "remoteId",
-  "children",
-]);
+const SIGNATURE_IGNORED = new Set<string>([...ITEM_BOOKKEEPING_FIELDS, "children"]);
 
 /** Content signature of one item, ignoring sync bookkeeping. */
 function itemSignature(item: PRDItem): string {
@@ -312,16 +327,25 @@ export function snapshotItemContent(items: PRDItem[]): Map<string, string> {
  * is written to disk looking untouched: never pushed to the remote, then
  * overwritten by the remote's value on the next pull, in silence.
  *
- * Two rules, both deliberate:
+ * Three rules, all deliberate:
  *
  * - **Changed, not merely present.** An empty transaction is a real pattern
  *   here (`migrate-slugs` and `reshape` each open one purely to force a
  *   rewrite). Stamping unconditionally would mark every item in the PRD
  *   modified and queue the whole tree for push.
- * - **A stamp the item arrived with is kept.** `analyze.ts` stamps its accepted
- *   items before opening the transaction, deliberately and with a comment
- *   saying so. Only an item that is new to the tree *and* carries no stamp of
- *   its own gets one here.
+ * - **An author the item arrived with is kept.** `analyze.ts` stamps its
+ *   accepted items before opening the transaction, deliberately and with a
+ *   comment saying so, and a bundle import carries the original author of
+ *   items whose source project never recorded a timestamp.
+ * - **A new item always leaves here with a timestamp.** Attribution alone is
+ *   not a stamp: {@link isModifiedSinceSync} returns false without a
+ *   `lastModified`, and the item cannot acquire one later because the next
+ *   transaction's snapshot records it as pre-existing and unchanged. So the
+ *   two halves are filled independently — the timestamp because sync needs
+ *   it, the author only when the item brought none.
+ *
+ * An item that arrives with a timestamp but no author keeps that shape: it is
+ * already visible to sync, and this transaction's actor did not write it.
  *
  * @returns the ids stamped, in tree order.
  */
@@ -333,13 +357,55 @@ export function stampChangedItems(
   const stamped: string[] = [];
   for (const { item } of walkTree(items)) {
     const previous = before.get(item.id);
-    const changed = previous === undefined
-      ? item.lastModified === undefined
-      : previous !== itemSignature(item);
-    if (!changed) continue;
-    // walkTree yields live references into the tree, so assigning here is the
-    // write — no re-lookup needed.
-    Object.assign(item, stamp);
+
+    // Already in the tree: stamp it only if its content actually moved.
+    if (previous !== undefined) {
+      if (previous === itemSignature(item)) continue;
+      // walkTree yields live references into the tree, so assigning here is
+      // the write — no re-lookup needed.
+      Object.assign(item, stamp);
+      stamped.push(item.id);
+      continue;
+    }
+
+    // New to the tree. Fill only the halves the item did not bring, because
+    // the two halves are owed to different parties.
+    //
+    // `lastModifiedBy` is the caller's to set: a bundle import carries the
+    // original author for items whose source project never recorded a
+    // timestamp, and `analyze.ts` stamps its accepted items before opening
+    // the transaction. Overwriting it would destroy exactly the provenance a
+    // transport artifact exists to preserve.
+    //
+    // `lastModified` is owed to sync. `isModifiedSinceSync` opens with
+    // `if (!meta.lastModified) return false`, so an item with no timestamp is
+    // never considered modified — and it will not acquire one later either,
+    // since from the next transaction on `snapshotItemContent` records it as
+    // pre-existing and unchanged. Leaving it absent means the item is never
+    // pushed and is overwritten by the remote's value on the next pull, in
+    // silence. Treating attribution alone as a complete stamp bought the
+    // author's survival at that price.
+    //
+    // The item is left entirely alone when it already has a timestamp: it is
+    // visible to sync, so there is nothing to repair, and the actor running
+    // this transaction did not write it — recording them as its author would
+    // be a fabrication rather than a default.
+    //
+    // "Has a timestamp" is decided by truthiness, not by `!== undefined`,
+    // because {@link isModifiedSinceSync} opens with `if (!meta.lastModified)
+    // return false`. A `null` or `""` is therefore "no timestamp" to the only
+    // consumer that matters, and a guard disagreeing with it skipped exactly
+    // the items this repair exists for. The frontmatter emitter then drops the
+    // null, so from the next load the item reads as pre-existing and unchanged
+    // and can never acquire a stamp — permanently invisible to sync, which is
+    // the failure this function was written to prevent, reached by another
+    // door. A hand-authored or third-party bundle is enough to hit it; the
+    // document schema is a passthrough and never declares the field, so the
+    // null validates cleanly on the way in.
+    if (item.lastModified) continue;
+
+    item.lastModified = stamp.lastModified;
+    if (!item.lastModifiedBy) item.lastModifiedBy = stamp.lastModifiedBy;
     stamped.push(item.id);
   }
   return stamped;
