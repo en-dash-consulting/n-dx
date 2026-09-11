@@ -1,0 +1,22 @@
+---
+id: "6f9f9555-058f-403c-9dff-d2fe770c74f0"
+level: "task"
+title: "hench command guard passes newline-separated commands and `>` redirection"
+status: "pending"
+priority: "high"
+tags:
+  - "ndx-adversarial-review"
+  - "security"
+  - "severity:high"
+  - "hench"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "`validateCommand(\"npm --version\nrm -rf ~/x\", defaults)` throws a GuardError"
+  - "`validateCommand(\"npm test > ~/.bashrc\", defaults)` throws a GuardError"
+  - "`validateCommand(\"npm test 2>&1\", defaults)` throws (redirection) — or, if option 1 is taken, the argv spawn passes `2>&1` as a literal arg and no file named `1` is created"
+  - "Unit tests in `packages/hench/tests/unit/guard/commands.test.ts` cover newline, carriage return, `<`, `>`, `(`, `)` bypasses"
+  - "Existing 99 guard tests still pass"
+description: "**Severity:** high · **Verdict:** must-fix\n\n**Failure scenario.** In API/local-model provider mode the model calls `run_command` with `\"npm --version\nrm -rf ~/x\"`. `validateCommand` checks `SHELL_OPERATORS = /[;&|`$]/` — newline is not in the set — takes `npm` as the executable (allowlisted), and none of `DANGEROUS_PATTERNS` match (`rm` pattern requires an absolute `/` path; `~` is not one). The string is handed to `sh -c`, which treats the newline as a command separator and runs both lines. Same for `\"npm test > ~/.bashrc\"` — `>` is not blocked, only `> /dev/…` is. Reproduced against `packages/hench/dist/guard/commands.js`: both strings PASS.\n\n**Evidence.** `packages/hench/src/guard/commands.ts:24` (operator set), `:28-37` (dangerous patterns), `:50-88` (validateCommand). Executed via `packages/hench/src/tools/exec-shell.ts:65` → `execShellCmd` (shell string).\n\n**Reachability.** `hench.provider` defaults to `\"cli\"` (`schema/v1.ts:373`), where Claude CLI enforces its own permissions and this guard is not the control. The guard *is* the control for `provider: \"api\"`, local OpenAI-compatible models, and the Google provider — opt-in but documented and the recommended path for local models. Attacker = prompt injection from repo content during `--auto` runs.\n\n**Solution options.**\n1. *(Recommended)* Stop building a shell string. Tokenize the command (respecting quotes), validate `argv[0]` against the allowlist, and spawn with `exec(argv[0], argv.slice(1))` — no shell, so operators, newlines, redirection, and `$()` all become literal arguments. Cost: moderate (argument splitting must match user expectations; `npm run x -- --flag` etc.). Risk: commands that legitimately relied on shell features (globs, env expansion) stop working — acceptable for a guard whose whole point is no shell.\n2. Cheaper patch: extend `SHELL_OPERATORS` to `/[;&|`$\\r\n<>(){}]/` and reject any non-space/tab whitespace. Keeps `sh -c`. Recommended as an immediate stopgap if option 1 is deferred.\n3. Document that the allowlist is advisory in API mode (`npx`, `node -e` are allowlisted and are arbitrary code anyway) — do this regardless, in the threat-model section."
+lastModified: "2026-09-11T17:37:13.324Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---

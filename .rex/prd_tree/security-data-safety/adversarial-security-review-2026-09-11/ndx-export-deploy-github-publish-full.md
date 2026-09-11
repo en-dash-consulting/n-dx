@@ -1,0 +1,24 @@
+---
+id: "208b963d-fd3b-4516-8ef6-6b071f3591b6"
+level: "task"
+title: "`ndx export` / `--deploy=github` publish full hench transcripts with no redaction or confirmation"
+status: "pending"
+priority: "critical"
+tags:
+  - "ndx-adversarial-review"
+  - "security"
+  - "severity:critical"
+  - "core"
+  - "web"
+source: "ndx-adversarial-review"
+acceptanceCriteria:
+  - "Exported `api/hench/runs/<id>.json` files contain no `toolCalls`, `events`, or `error` bodies unless `--include-transcripts` is passed"
+  - "`ndx export --deploy=github` without `--yes` in a non-TTY prints what would be published (remote, branch, run count, transcript inclusion) and exits non-zero without pushing"
+  - "`ndx init` adds `ndx-export/` to the project `.gitignore`; re-running init is idempotent"
+  - "Dashboard export trigger cannot pass deploy without the confirmation contract (either the route refuses `deployGithub`, or it forwards an explicit acknowledgement flag)"
+  - "Unit test: a fixture run file with a secret-looking string in `toolCalls[0].output` is absent from the default export output"
+  - "README / `ndx export --help` states what is and is not published"
+description: "**Severity:** critical · **Verdict:** must-fix\n\n**Failure scenario.** User runs `ndx export --deploy=github .` (or clicks Export in the dashboard, which spawns the same command via `POST /api/commands/export`, `routes-commands.ts:583-598`). `export.js` copies every `.hench/runs/*.json` verbatim into `api/hench/runs/<id>.json` — including `toolCalls[].input` and `toolCalls[].output` (up to `MAX_TOOL_OUTPUT_STORED` = 2000 chars each, `hench/src/agent/lifecycle/loop.ts:63,347,493`) and `events`. Anything the agent read or printed — `.env` contents, a `node -e \"console.log(process.env)\"` result, customer data in a fixture — is in there. The deploy path then `git push --force origin n-dx-dashboard` with no confirmation, no summary of what is included, and no redaction. If `origin` is public, the transcripts are public. Even without `--deploy`, the default out-dir `./ndx-export` lives inside the repo and is not gitignored by init (only this monorepo's own `.gitignore` has it), so `git add -A` commits it.\n\nThe project already knows: `docs/archive/collaborative-workflows-discovery.md:48` — \"No redaction: exported hench run records include full toolCalls inputs/outputs … Deploying to a public repo publishes complete agent transcripts. This is a blocker.\"\n\n**Evidence.** `packages/core/export.js:277-296` (run copy), `export.js:464-545` (`deployToGitHubPages`, force push at ~line 531), `export.js:10` (default `./ndx-export`), `packages/web/src/server/routes-commands.ts:583-598` (dashboard trigger with `deployGithub`).\n\n**Reachability.** Any user who exports; the dashboard makes it one click.\n\n**Solution options.**\n1. *(Recommended)* Strip `toolCalls`, `events`, and `error` bodies from the exported per-run detail by default; keep summaries/token usage. Add `--include-transcripts` to opt in, printed with a warning. Cost: small; the static viewer's transcript panel shows \"not exported\" for stripped runs.\n2. *(Recommended, with 1)* `--deploy=github` requires `--yes` in non-TTY or an interactive confirm that prints the remote URL, branch, and a manifest of what is being published (runs count, whether transcripts are included, PRD item count).\n3. *(Recommended, with 1)* `ensureGitignoreEntry(dir, \"ndx-export/\")` at `ndx init` and at export time.\n4. Optional belt-and-braces: scan the export tree for secret-shaped strings (`sk-ant-`, `ghp_`, `AKIA`, `-----BEGIN`) and refuse to deploy on a hit unless `--force`."
+lastModified: "2026-09-11T17:36:57.867Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---
