@@ -11,7 +11,7 @@ import { loadConfig } from "../../store/config.js";
 import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
-import { performPreRunCommitGateIfNeeded } from "../../agent/lifecycle/shared.js";
+import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
 import { findUncommittedWork, formatLoopRefusal } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
@@ -354,7 +354,7 @@ function countTasksByStatus(items: PRDItem[], statuses: string[]): number {
  * failed (e.g. after fixing LM Studio context window size). Returns the
  * number of tasks that were reset.
  */
-async function resetDeferredTasks(store: PRDStore): Promise<number> {
+export async function resetDeferredTasks(store: PRDStore): Promise<number> {
   const doc = await store.loadDocument();
   const toReset: Array<{ id: string; title: string }> = [];
 
@@ -1142,6 +1142,11 @@ export async function cmdRun(
     const resetCount = await resetDeferredTasks(store);
     if (resetCount === 0) {
       info("\nNo deferred or failing tasks to reset.");
+    } else if (!dryRun) {
+      // Commit the reset's own PRD-tree write immediately so the pre-run
+      // commit gate below sees a clean tree instead of refusing the very run
+      // --reset-deferred exists to resume (GitHub #365).
+      await commitResetDeferredChanges(dir, resetCount);
     }
   }
 
@@ -1422,6 +1427,10 @@ export async function cmdRun(
     });
     if (gate === "stop") {
       info("Stopped before running. Commit or discard your changes, then re-run.");
+      // A refusal to start is not success — without this the process exits 0
+      // and an unattended caller (a script, `--loop`, the dashboard) reads
+      // "no task ran" as "done" (GitHub #365).
+      process.exitCode = 1;
       return;
     }
 

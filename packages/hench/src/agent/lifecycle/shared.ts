@@ -1259,6 +1259,60 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
 }
 
 /**
+ * Stage `.rex/prd_tree/` and commit it if anything ends up staged.
+ *
+ * Shared by every caller that writes the PRD tree outside the normal
+ * task-commit flow and needs that write landed immediately, rather than left
+ * for a later gate to (wrongly) treat as leaked operator work:
+ * {@link commitCompletionMetadata} (autoCommit path) and
+ * {@link commitResetDeferredChanges} (`--reset-deferred`, GitHub #365).
+ *
+ * Skips silently, returning 0, when the tree doesn't exist, when the
+ * directory isn't a git repo, or when nothing ends up staged.
+ */
+async function commitPrdTreeIfStaged(projectDir: string, message: string): Promise<number> {
+  const { join } = await import("node:path");
+  const { existsSync } = await import("node:fs");
+  const prdTreePath = join(".rex", PRD_TREE_DIRNAME);
+
+  if (!existsSync(join(projectDir, prdTreePath))) {
+    return 0;
+  }
+
+  try {
+    await execStdout("git", ["add", prdTreePath], { cwd: projectDir, timeout: 10_000 });
+  } catch {
+    return 0; // not in a git repo
+  }
+
+  let staged = 0;
+  try {
+    const out = await execStdout(
+      "git", ["diff", "--cached", "--name-only", "--", ".rex/"],
+      { cwd: projectDir, timeout: 10_000 },
+    );
+    staged = out.trim().split("\n").filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+
+  if (staged === 0) {
+    return 0;
+  }
+
+  try {
+    await execStdout(
+      "git", ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine()],
+      { cwd: projectDir, timeout: 30_000 },
+    );
+    return staged;
+  } catch (err) {
+    detail(`Warning: could not commit PRD tree changes: ${(err as Error).message}`);
+    return 0;
+  }
+}
+
+/**
  * Commit any uncommitted .rex/prd_tree changes produced by the task-completion
  * status update. Called on the autoCommit path only, where
  * performCommitPromptIfNeeded is a no-op and would otherwise leave the
@@ -1270,47 +1324,45 @@ async function commitCompletionMetadata(
   projectDir: string,
   taskId: string,
 ): Promise<void> {
-  const { join } = await import("node:path");
-  const { existsSync } = await import("node:fs");
-  const prdTreePath = join(".rex", PRD_TREE_DIRNAME);
-
-  if (!existsSync(join(projectDir, prdTreePath))) {
-    return;
-  }
-
-  try {
-    await execStdout("git", ["add", prdTreePath], { cwd: projectDir, timeout: 10_000 });
-  } catch {
-    return; // not in a git repo
-  }
-
-  let staged = 0;
-  try {
-    const out = await execStdout(
-      "git", ["diff", "--cached", "--name-only", "--", ".rex/"],
-      { cwd: projectDir, timeout: 10_000 },
-    );
-    staged = out.trim().split("\n").filter(Boolean).length;
-  } catch {
-    return;
-  }
-
-  if (staged === 0) {
-    return;
-  }
-
   // Stages the whole `.rex/prd_tree/` (the completion write may touch the task
   // plus cascaded ancestors). Under the no-concurrent-PRD-writers contract this
   // is just this run's metadata; the message reflects it may span the tree.
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
-  try {
-    await execStdout(
-      "git", ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine()],
-      { cwd: projectDir, timeout: 30_000 },
-    );
+  const staged = await commitPrdTreeIfStaged(projectDir, message);
+  if (staged > 0) {
     detail(`Committed completion metadata (${staged} PRD file(s))`);
-  } catch (err) {
-    detail(`Warning: could not commit completion metadata: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Commit the `.rex/prd_tree/` writes made by `--reset-deferred` before the
+ * pre-run commit gate runs.
+ *
+ * WHY THIS EXISTS (GitHub #365). `--reset-deferred` resets deferred/failing
+ * tasks to pending by writing the PRD tree, and moments later the pre-run
+ * commit gate ({@link performPreRunCommitGateIfNeeded}) refuses an autonomous
+ * run against *any* dirty tree — including the dirt the reset itself just
+ * produced. That made the flag deadlock against itself on the exact case it
+ * exists for (resuming after an interruption), and the refusal exited 0, so
+ * an unattended caller read it as success and the tasks stayed deferred.
+ *
+ * Committing the reset immediately — the same pattern {@link
+ * commitCompletionMetadata} already uses for a task's own completion write —
+ * means the gate only ever sees a genuinely dirty tree: the user's own
+ * uncommitted work, which must still refuse.
+ *
+ * A no-op (returns without doing anything) when `resetCount` is 0 — nothing
+ * was reset, so there is nothing of this call's own to commit.
+ */
+export async function commitResetDeferredChanges(
+  projectDir: string,
+  resetCount: number,
+): Promise<void> {
+  if (resetCount <= 0) return;
+  const message = `chore(prd): reset ${resetCount} deferred/failing task(s) to pending (--reset-deferred)`;
+  const staged = await commitPrdTreeIfStaged(projectDir, message);
+  if (staged > 0) {
+    detail(`Committed --reset-deferred changes (${staged} PRD file(s))`);
   }
 }
 
