@@ -4,11 +4,10 @@ level: "epic"
 title: "Testing & Documentation"
 status: "pending"
 startedAt: "2026-05-06T13:27:57.504Z"
-endedAt: "2026-09-08T19:04:31.905Z"
 resolutionType: "acknowledgment"
 resolutionDetail: "Fixed final architecture policy test failure (PRD storage invariant violations). All child tasks completed. Test suite passes (1628 tests). Epic infrastructure and documentation goals met."
 description: "Local testing infrastructure (gauntlet config validation), platform/prerequisite documentation, and ongoing documentation refresh for PRD-related changes."
-lastModified: "2026-09-10T20:38:30.682Z"
+lastModified: "2026-09-11T11:35:48.190Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
 
@@ -36,6 +35,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Local Test Suite Documentation in Main README](./local-test-suite-documentation-in-main/index.md) | completed |
 | [macOS Local Docker Test Suite](./macos-local-docker-test-suite/index.md) | completed |
 | [Make test results independent of ambient environment and machine load](./make-test-results-independent-of/index.md) | completed |
+| [`@n-dx/rex` fails intermittently under `pnpm test` but passes standalone](./n-dx-rex-fails-intermittently-under/index.md) | pending |
 | [Narrow jsonResponse utility scope](./narrow-jsonresponse-utility-scope/index.md) | completed |
 | [Open Source Scope Documentation Audit and Cross-Reference](./open-source-scope-documentation-audit/index.md) | completed |
 | [Project-aware Navigation and Context](./project-aware-navigation-and-context/index.md) | completed |
@@ -48,7 +48,6 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Web Viewer Architecture: Package Extraction and Independent Viewers](./web-viewer-architecture-package/index.md) | completed |
 | [Auto Re-Init Detection for Stale Projects](./auto-re-init-detection-for-stale.md) | completed |
 | [Auto-Update Detection from npm Registry](./auto-update-detection-from-npm-registry.md) | completed |
-| [`@n-dx/rex` fails intermittently under `pnpm test` but passes standalone](./n-dx-rex-fails-intermittently-under.md) | pending |
 | [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-the.md) | completed |
 | [routes-commands ndx-ladder tests leak the ambient NDX_CLI_PATH env var](./routes-commands-ndx-ladder-tests-leak.md) | completed |
 | [Zone cohesion gate silently passes in CI instead of reporting it did not run](./zone-cohesion-gate-silently-passes-in.md) | completed |
