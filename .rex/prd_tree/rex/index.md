@@ -2,13 +2,12 @@
 id: "bf053fb2-509d-4acf-aa61-7243e66027e5"
 level: "epic"
 title: "Rex"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-24T20:09:27.774Z"
-completedAt: "2026-09-08T19:37:01.205Z"
 endedAt: "2026-09-08T19:37:01.205Z"
 description: "PRD management: hierarchical epics/features/tasks/subtasks, smart add from natural language, LLM-powered analysis and recommendations, validation, pruning, reshaping. Stores state in .rex/prd.json."
-lastModified: "2026-09-08T19:37:01.220Z"
-lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
+lastModified: "2026-09-12T09:10:25.446Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -31,7 +30,7 @@ lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
 | [PRD Management Enhancement](./prd-management-enhancement/index.md) | completed |
 | [PRD structure and lifecycle](./prd-structure-and-lifecycle/index.md) | completed |
 | [PRD Tree CLI Visualization Command](./prd-tree-cli-visualization-command/index.md) | completed |
-| [Proactive PRD structure health checks](./proactive-prd-structure-health-checks/index.md) | completed |
+| [Proactive PRD structure health checks](./proactive-prd-structure-health-checks/index.md) | pending |
 | [Replace Hash-Suffix Title Disambiguation with Rename-or-Merge Resolution](./replace-hash-suffix-title/index.md) | completed |
 | [Reshape Consolidation of Hash-Suffixed Same-Title Items Under Generated Parent](./reshape-consolidation-of-hash-suffixed/index.md) | completed |
 | [Reshape Same-Parent Duplicate Merge with Backup Audit Trail](./reshape-same-parent-duplicate-merge/index.md) | completed |
