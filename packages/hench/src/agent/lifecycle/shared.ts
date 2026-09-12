@@ -15,6 +15,8 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, findItem, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
@@ -1094,6 +1096,55 @@ async function performRollbackIfNeeded(
 /** Project-root sentinel where the agent writes its proposed commit message. */
 const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
 
+/**
+ * True when {@link performCommitPromptIfNeeded} will actually run a commit:
+ * the sentinel exists and has content. It returns early on a missing or
+ * empty file, so "the agent ran `git add`" is not the same as "a commit
+ * follows" — the uncommitted-work gate asks this before it discounts the
+ * staged index (#363: `git add -A` with no message file left every path
+ * staged, discounted, and never committed).
+ *
+ * A commit the watcher already made does not count either: the watcher
+ * deletes the sentinel, and whatever is still staged afterwards has no
+ * remaining owner.
+ */
+export function pendingCommitMessageExists(projectDir: string): boolean {
+  const msgPath = join(projectDir, PENDING_COMMIT_FILE);
+  if (!existsSync(msgPath)) return false;
+  try {
+    return readFileSync(msgPath, "utf-8").trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Stage the files the adversarial review pass changed so the commit prompt's
+ * `git commit -F` lands them with the executor's work — the promise the
+ * reviewer prompt makes ("your fixes are picked up by that commit"). Without
+ * this the repairs sat unstaged: on `hench.autoCommit=false` nothing else
+ * ever staged them, and the completion gate refused the run for the leak.
+ *
+ * Mirrors the file list {@link commitReviewRepairsIfNeeded} commits on the
+ * autoCommit path. Best-effort, like the PRD staging beside it: a repair
+ * that cannot be staged is reported, not fatal to the commit.
+ */
+async function stageReviewRepairs(projectDir: string, run: RunRecord): Promise<void> {
+  const review = run.review;
+  if (!review || review.failed !== undefined) return;
+  if (!review.repairedFiles || review.repairedFiles.length === 0) return;
+
+  try {
+    await execStdout("git", ["add", "--", ...review.repairedFiles], {
+      cwd: projectDir,
+      timeout: 10_000,
+    });
+    detail(`Staged ${review.repairedFiles.length} review repair(s)`);
+  } catch (err) {
+    detail(`Warning: could not stage review repairs: ${(err as Error).message}`);
+  }
+}
+
 async function promptCommitConfirm(fileCount: number): Promise<boolean> {
   // Uses the same SIGINT-suspension shim as the rollback prompt so a
   // Ctrl-C while the user is answering does not trigger the outer
@@ -1706,6 +1757,12 @@ export async function performCommitPromptIfNeeded(
     return;
   }
 
+  // Reviewer repairs ride the same commit as the executor's work; the
+  // completion gate already discounted them on that promise. Staged before
+  // the count below, so an index the executor left empty does not skip the
+  // commit and orphan the repairs the gate just waved through.
+  await stageReviewRepairs(projectDir, run);
+
   const stagedCount = await countStagedFiles(projectDir);
   if (stagedCount === 0) {
     info("\nPending commit message found but no staged changes — skipping commit.");
@@ -2299,20 +2356,27 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // says the opposite of the truth.
   //
   // What is still allowed to be dirty here is exactly what a later step of this
-  // same run commits: the PRD paths (always), the review repairs on the
-  // autoCommit path, and the staged index wherever the commit prompt still
-  // follows. Anything else is finished work with no owner.
+  // same run commits, and nothing more:
+  //
+  // - The PRD paths, on both paths: the commit prompt stages them, and
+  //   commitCompletionMetadata commits them on autoCommit.
+  // - The review repairs, on both paths, when the review produced a usable
+  //   report: commitReviewRepairsIfNeeded commits them on autoCommit, and the
+  //   commit prompt stages them (stageReviewRepairs) before `git commit -F`.
+  // - The staged index, only when the commit prompt will really run — which
+  //   takes a non-empty .hench-commit-msg.txt, not just `!autoCommit`. Staged
+  //   work with no message file is the #363 leak wearing an `A ` prefix.
+  //
+  // Anything else is finished work with no owner.
   let uncommittedWorkRefused = false;
   if (run.status === "completed") {
     const autoCommit = opts.autoCommit === true;
-    // Only commitReviewRepairsIfNeeded (autoCommit path) commits these, and
-    // only when the review pass produced a usable report.
     const review = run.review;
     const pendingRepairs =
-      autoCommit && review && review.failed === undefined ? review.repairedFiles ?? [] : [];
+      review && review.failed === undefined ? review.repairedFiles ?? [] : [];
     const leaked = await findUncommittedWork({
       projectDir,
-      stagedCommitFollows: !autoCommit,
+      stagedCommitFollows: !autoCommit && pendingCommitMessageExists(projectDir),
       discountPaths: [...PRD_COMMIT_PATHS, ...pendingRepairs],
     });
     if (!leaked.clean) {

@@ -62,20 +62,50 @@ describe("finalizeRun — uncommitted-work gate", () => {
     };
   }
 
-  async function runFinalize(run: RunRecord, store: ReturnType<typeof buildStore>): Promise<void> {
+  async function runFinalize(
+    run: RunRecord,
+    store: ReturnType<typeof buildStore>,
+    // The autoCommit path is where the defect was first observed: the executor
+    // is expected to have committed its own work already, so nothing downstream
+    // picks up whatever it left behind. The commit-prompt path (autoCommit
+    // false) has its own describe below.
+    autoCommit = true,
+  ): Promise<void> {
     const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
     await (finalizeRun as Function)({
       run,
       henchDir,
       projectDir,
-      // The autoCommit path is where the defect was observed: the executor is
-      // expected to have committed its own work already, so nothing downstream
-      // picks up whatever it left behind.
-      autoCommit: true,
+      autoCommit,
       skipFullTestGate: true,
       autonomous: true,
       store,
     });
+  }
+
+  /** A review record whose report is usable and which changed `repairedFiles`. */
+  function buildUsableReview(repairedFiles: string[]): RunRecord["review"] {
+    return {
+      model: "test-reviewer",
+      resumedSession: false,
+      findingCount: 1,
+      unresolvedCount: 0,
+      unrepairedMustFixCount: 0,
+      failedActionCount: 0,
+      fixesApplied: repairedFiles.length > 0,
+      reportPath: join(henchDir, "reviews", "report.json"),
+      repairedFiles,
+    };
+  }
+
+  async function porcelain(): Promise<string> {
+    const { stdout } = await execAsync("git status --porcelain", { cwd: projectDir });
+    return stdout;
+  }
+
+  async function headFiles(): Promise<string[]> {
+    const { stdout } = await execAsync("git show --name-only --format= HEAD", { cwd: projectDir });
+    return stdout.split("\n").filter(Boolean);
   }
 
   beforeEach(async () => {
@@ -170,5 +200,132 @@ describe("finalizeRun — uncommitted-work gate", () => {
 
     expect(run.status).toBe("completed");
     expect(statuses).toEqual(["completed"]);
+  });
+
+  /**
+   * The commit-prompt path (hench.autoCommit=false, the default). Here the
+   * gate may discount the staged index — but only when the commit prompt will
+   * really run, which takes a non-empty .hench-commit-msg.txt (PR #370 review,
+   * findings 4 and 5).
+   */
+  describe("with the commit prompt (autoCommit=false)", () => {
+    const message = "feat: the work\n\nBody of the proposed commit.\n";
+
+    async function writePendingMessage(content = message): Promise<void> {
+      await writeFile(join(projectDir, ".hench-commit-msg.txt"), content, "utf-8");
+    }
+
+    it("refuses staged work when no commit message was written, and leaves it staged", async () => {
+      // The agent ran `git add -A` but never wrote the message file. Before
+      // the fix every path read `A  …`, was discounted as "about to be
+      // committed", and then performCommitPromptIfNeeded returned early with
+      // nothing to commit — the #363 symptom with the index as the hiding place.
+      await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+      await execAsync("git add src.ts", { cwd: projectDir });
+
+      const run = buildCompletedRun();
+      await runFinalize(run, buildStore(), false);
+
+      expect(run.status).toBe("failed");
+      expect(run.error).toContain("src.ts");
+      expect(statuses).not.toContain("completed");
+      expect(await porcelain()).toContain("A  src.ts");
+    });
+
+    it("treats an empty message file the same as a missing one", async () => {
+      await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+      await execAsync("git add src.ts", { cwd: projectDir });
+      await writePendingMessage("   \n");
+
+      const run = buildCompletedRun();
+      await runFinalize(run, buildStore(), false);
+
+      expect(run.status).toBe("failed");
+      expect(run.error).toContain("src.ts");
+    });
+
+    it("completes staged work with a pending message, and the commit lands", async () => {
+      await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+      await execAsync("git add src.ts", { cwd: projectDir });
+      await writePendingMessage();
+
+      const run = buildCompletedRun();
+      await runFinalize(run, buildStore(), false);
+
+      expect(run.status).toBe("completed");
+      expect(statuses).toEqual(["completed"]);
+      const { stdout: subject } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+      expect(subject.trim()).toBe("feat: the work");
+      expect(await headFiles()).toContain("src.ts");
+      expect(await porcelain()).not.toContain("src.ts");
+    });
+
+    it("discounts reviewer repairs, stages them, and lands them in the executor's commit", async () => {
+      // The reviewer is told not to commit — "your fixes are picked up by that
+      // commit" — so its edits arrive unstaged (` M`). Before the fix they were
+      // only discounted on autoCommit, the gate refused the run, and the
+      // executor's staged work never landed either.
+      await writeFile(join(projectDir, "lib.ts"), "export const lib = 1;\n", "utf-8");
+      await execAsync("git add lib.ts", { cwd: projectDir });
+      await execAsync('git commit -m "chore: lib"', { cwd: projectDir });
+
+      await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+      await execAsync("git add src.ts", { cwd: projectDir });
+      await writeFile(join(projectDir, "lib.ts"), "export const lib = 2; // repaired\n", "utf-8");
+      await writePendingMessage();
+
+      const run = buildCompletedRun();
+      run.review = buildUsableReview(["lib.ts"]);
+      await runFinalize(run, buildStore(), false);
+
+      expect(run.status).toBe("completed");
+      const committed = await headFiles();
+      expect(committed).toContain("src.ts");
+      expect(committed).toContain("lib.ts");
+      expect(await porcelain()).not.toMatch(/(src|lib)\.ts/);
+    });
+
+    it("commits reviewer repairs even when the executor left the index empty", async () => {
+      // The executor committed its own work despite being told to stage it,
+      // so at finalize nothing is staged. The gate discounts the repairs on
+      // the promise the prompt stages them — so the prompt must stage them
+      // before it decides there is "nothing to commit" and skips.
+      await writeFile(join(projectDir, "lib.ts"), "export const lib = 1;\n", "utf-8");
+      await execAsync("git add lib.ts", { cwd: projectDir });
+      await execAsync('git commit -m "chore: lib"', { cwd: projectDir });
+      await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+      await execAsync("git add src.ts", { cwd: projectDir });
+      await execAsync('git commit -m "feat: executor committed itself"', { cwd: projectDir });
+
+      await writeFile(join(projectDir, "lib.ts"), "export const lib = 2; // repaired\n", "utf-8");
+      await writePendingMessage();
+
+      const run = buildCompletedRun();
+      run.review = buildUsableReview(["lib.ts"]);
+      await runFinalize(run, buildStore(), false);
+
+      expect(run.status).toBe("completed");
+      expect(await headFiles()).toContain("lib.ts");
+      expect(await porcelain()).not.toContain("lib.ts");
+    });
+
+    it("does not discount repairs when the review produced no usable report", async () => {
+      await writeFile(join(projectDir, "lib.ts"), "export const lib = 1;\n", "utf-8");
+      await execAsync("git add lib.ts", { cwd: projectDir });
+      await execAsync('git commit -m "chore: lib"', { cwd: projectDir });
+
+      await writeFile(join(projectDir, "src.ts"), "export const a = 1;\n", "utf-8");
+      await execAsync("git add src.ts", { cwd: projectDir });
+      await writeFile(join(projectDir, "lib.ts"), "export const lib = 2;\n", "utf-8");
+      await writePendingMessage();
+
+      const run = buildCompletedRun();
+      run.review = { failed: "reviewer_crashed", detail: "no report written" };
+      await runFinalize(run, buildStore(), false);
+
+      expect(run.status).toBe("failed");
+      expect(run.error).toContain("lib.ts");
+      expect(run.error).not.toContain("src.ts");
+    });
   });
 });
