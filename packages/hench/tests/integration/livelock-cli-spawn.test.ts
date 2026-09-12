@@ -111,6 +111,14 @@ describe("livelock intercept in spawnWithAdapter", () => {
     expect(() => process.kill(pid, 0)).toThrow();
   }
 
+  async function waitFor(condition: () => boolean, deadlineMs = 10_000): Promise<void> {
+    const start = Date.now();
+    while (!condition() && Date.now() - start < deadlineMs) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    expect(condition()).toBe(true);
+  }
+
   it("kills a child that keeps making the same call, and says which call", async () => {
     const result = await spawn("same", 4);
 
@@ -147,11 +155,17 @@ describe("livelock intercept in spawnWithAdapter", () => {
     // are the counters the heartbeat folds onto the record mid-spawn.
     const progress = createLiveSpawnProgress();
     const spawned = spawn("varied", 0, progress);
+    let completed = false;
+    void spawned.then(
+      () => { completed = true; },
+      () => { completed = true; },
+    );
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    const midFlight = progress.turns;
+    await waitFor(() => progress.turns > 0);
+    expect(completed).toBe(false);
 
-    await spawned;
-    expect(midFlight).toBeGreaterThan(0);
+    const result = await spawned;
+    expect(result.error).toBeUndefined();
+    expect(result.toolCalls.length).toBeGreaterThan(0);
   }, 20_000);
 });
