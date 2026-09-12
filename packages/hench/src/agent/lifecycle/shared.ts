@@ -1374,6 +1374,9 @@ async function prdPathsToStage(
  * `git add` on a missing path is an error, which would abort the staging of
  * the other.
  *
+ * The commit is scoped to those same paths, so it lands the PRD write and
+ * nothing else — work the operator had already staged stays staged.
+ *
  * Skips silently, returning 0, when no PRD path exists, when the directory
  * isn't a git repo, or when nothing ends up staged.
  */
@@ -1408,8 +1411,19 @@ async function commitPrdTreeIfStaged(projectDir: string, message: string): Promi
   }
 
   try {
+    // The pathspec is load-bearing. `git commit -m` with no pathspec commits
+    // the whole index, so anything the operator had staged before the run —
+    // a half-finished `git add -p`, say — landed under hench's own message
+    // with hench's trailer, unprompted, and before the pre-run gate could
+    // report it. With the pathspec, git commits only these paths and leaves
+    // every other index entry staged and untouched.
+    //
+    // It also makes this a *partial* commit, which git refuses mid-merge. The
+    // catch below reports that and leaves the PRD write in the tree for the
+    // gate to name, which is the right outcome: a run started mid-merge should
+    // not be quietly extending the merge commit.
     await execStdout(
-      "git", ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine()],
+      "git", ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine(), "--", ...prdPaths],
       { cwd: projectDir, timeout: 30_000 },
     );
     return staged;

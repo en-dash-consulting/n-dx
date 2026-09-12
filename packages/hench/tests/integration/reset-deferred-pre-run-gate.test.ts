@@ -220,6 +220,35 @@ describe("--reset-deferred vs the pre-run commit gate", () => {
       const { stdout: subject } = await execFile("git", ["log", "-1", "--format=%s"], { cwd: projectDir });
       expect(subject).toContain("reset-deferred");
     });
+
+    it("leaves the operator's already-staged work staged, not committed", async () => {
+      // `git commit -m` with no pathspec commits the whole index, so work the
+      // operator had staged before the run — `git add -p` half-done, then
+      // `ndx work --auto --reset-deferred` — landed under "reset N
+      // deferred/failing task(s)" with hench's trailer, unprompted. Dirt
+      // outside the PRD tree is invisible to the PRD precondition by design,
+      // so the commit itself has to be scoped.
+      await writeFile(join(projectDir, "README.md"), "# fixture\n\nstaged by the operator\n", "utf-8");
+      await execFile("git", ["add", "README.md"], { cwd: projectDir });
+
+      const resetCount = await resetDeferredAndCommit(buildStore() as never, projectDir);
+      expect(resetCount).toBe(1);
+
+      // The reset landed…
+      expect(await commitCount()).toBe(2);
+      const { stdout: committed } = await execFile(
+        "git", ["show", "--name-only", "--format=", "HEAD"], { cwd: projectDir },
+      );
+      expect(committed).toContain(`.rex/${PRD_TREE_DIRNAME}/task-slug/index.md`);
+
+      // …and took nothing else with it. README.md is still the operator's,
+      // still staged, still theirs to commit under a message of their own.
+      expect(committed).not.toContain("README.md");
+      const { stdout: staged } = await execFile(
+        "git", ["diff", "--cached", "--name-only"], { cwd: projectDir },
+      );
+      expect(staged.trim()).toBe("README.md");
+    });
   });
 
   it("--dry-run resets nothing and leaves git status clean", async () => {
