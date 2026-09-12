@@ -147,16 +147,25 @@ function normalize(path: string): string {
 
 /**
  * True when `path` (repository-relative, as git reports it) is covered by one
- * of the project-relative `discounts`.
+ * of the project-relative `patterns`. A trailing slash matches the directory
+ * and everything beneath it.
  *
  * `repoPrefix` is applied to the pattern rather than stripped from the path,
  * for the same reason {@link excludeHenchRuntimeArtifacts} does it that way:
  * a sibling project's `other/.rex/prd_tree/` is somebody else's uncommitted
  * work, not this run's.
+ *
+ * Used in both directions — {@link findUncommittedWork} drops the matches as
+ * discounted, {@link listUncommittedPrdPaths} keeps them — so the name says
+ * what it tests, not what either caller does with the answer.
  */
-function isDiscounted(path: string, discounts: readonly string[], repoPrefix: string): boolean {
+function matchesProjectPath(
+  path: string,
+  patterns: readonly string[],
+  repoPrefix: string,
+): boolean {
   const normalized = normalize(path);
-  return discounts.some((entry) => {
+  return patterns.some((entry) => {
     const target = repoPrefix + normalize(entry);
     if (target.endsWith("/")) {
       return (
@@ -196,9 +205,43 @@ export async function findUncommittedWork(
   const paths = operatorLines
     .filter((line) => !(stagedCommitFollows && isFullyStaged(line)))
     .map(parsePorcelainPath)
-    .filter((path) => !isDiscounted(path, discountPaths, repoPrefix));
+    .filter((path) => !matchesProjectPath(path, discountPaths, repoPrefix));
 
   return { clean: paths.length === 0, paths };
+}
+
+/**
+ * The PRD paths ({@link PRD_COMMIT_PATHS}) that are *already* dirty in
+ * `projectDir`'s working tree.
+ *
+ * The same match as the discount in {@link findUncommittedWork}, read the other
+ * way round: that asks "what is dirty that the PRD commit won't cover", this
+ * asks "what of the PRD is dirty right now".
+ *
+ * Exists for callers that are about to write the PRD tree and then commit it
+ * wholesale. `git add .rex/prd_tree` cannot tell their write from an operator
+ * edit that was already sitting there, so the only way to commit just their own
+ * work is to check first and decline when something else is in the way.
+ *
+ * Hench's runtime artifacts are deliberately not excluded: none of them live
+ * under a PRD path, so the filter would be a no-op that only obscured the
+ * question being asked.
+ *
+ * Returns repository-relative paths in git's order — empty when the PRD is
+ * clean, when the directory is not a repository, or when git is unavailable.
+ */
+export async function listUncommittedPrdPaths(
+  projectDir: string,
+  deps: { listDirty?: (dir: string) => Promise<string[]> } = {},
+): Promise<string[]> {
+  const listDirty = deps.listDirty ?? listDirtyPaths;
+  const lines = await listDirty(projectDir);
+  if (lines.length === 0) return [];
+
+  const repoPrefix = await repoRelativePrefix(projectDir);
+  return lines
+    .map(parsePorcelainPath)
+    .filter((path) => matchesProjectPath(path, PRD_COMMIT_PATHS, repoPrefix));
 }
 
 /** Render the path list of a refusal, truncated so it stays readable. */
@@ -235,5 +278,22 @@ export function formatLoopRefusal(paths: string[]): string {
     `⚠ Stopping the loop: ${paths.length} path(s) from the previous task are still uncommitted.\n` +
     `${renderPaths(paths)}\n` +
     `Starting another task would fold them into its commit. Commit or remove them, then re-run.`
+  );
+}
+
+/**
+ * The message printed when `--reset-deferred` resets tasks but declines to
+ * commit the reset, because the PRD tree was already carrying uncommitted
+ * changes that the commit could not have excluded.
+ *
+ * It names them because the consequence — the pre-run gate refusing the run a
+ * moment later — otherwise looks like `--reset-deferred` not working.
+ */
+export function formatResetDeferredCommitSkipped(paths: string[]): string {
+  return (
+    `⚠ Reset applied but not committed: ${paths.length} PRD path(s) were already uncommitted before it.\n` +
+    `${renderPaths(paths)}\n` +
+    `Committing would fold that work into hench's own "reset deferred/failing task(s)" commit. ` +
+    `Commit or stash these first; the pre-run gate will refuse the run until you do.`
   );
 }

@@ -1476,6 +1476,16 @@ async function commitCompletionMetadata(
  *
  * A no-op (returns without doing anything) when `resetCount` is 0 — nothing
  * was reset, so there is nothing of this call's own to commit.
+ *
+ * **PRECONDITION: the PRD tree must have been clean before the reset ran.**
+ * This stages `.rex/prd_tree/` and the sidecar wholesale and cannot tell the
+ * reset's write from an operator edit that was already sitting there, so
+ * calling it on an already-dirty tree commits that edit too, under a message
+ * that describes something else entirely. Checking the precondition is the
+ * caller's job, because only the caller can look *before* the reset writes:
+ * see `resetDeferredAndCommit` in `cli/commands/run.ts`, which snapshots
+ * `listUncommittedPrdPaths` (uncommitted-work-gate.ts) first and skips this
+ * call when it is non-empty.
  */
 export async function commitResetDeferredChanges(
   projectDir: string,

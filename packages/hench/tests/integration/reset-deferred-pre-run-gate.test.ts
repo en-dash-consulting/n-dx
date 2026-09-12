@@ -8,13 +8,22 @@
  *
  * The fix commits the reset's own PRD-tree write immediately
  * ({@link commitResetDeferredChanges}), the same pattern
- * `commitCompletionMetadata` already uses for a task's completion write. This
- * suite drives the real reset + real gate together against a real git
+ * `commitCompletionMetadata` already uses for a task's completion write.
+ *
+ * That commit stages `.rex/prd_tree/` wholesale, which is only safe when the
+ * PRD tree was clean beforehand — otherwise the operator's own half-finished
+ * PRD edit lands under "reset N deferred/failing task(s)" with hench's
+ * trailer, in a TTY, with no prompt (#370 review, finding 9).
+ * `resetDeferredAndCommit` owns that precondition.
+ *
+ * This suite drives the real reset + real gate together against a real git
  * repository to prove:
  *  - a clean tree resets and then proceeds, with no manual commit in between
  *  - a genuinely dirty tree (the operator's own uncommitted work) still stops
+ *  - an already-dirty PRD tree is never swept into the reset's commit
+ *  - a dry run writes nothing at all
  *
- * @see packages/hench/src/cli/commands/run.ts — resetDeferredTasks
+ * @see packages/hench/src/cli/commands/run.ts — resetDeferredTasks, resetDeferredAndCommit
  * @see packages/hench/src/agent/lifecycle/shared.ts — commitResetDeferredChanges, performPreRunCommitGateIfNeeded
  */
 
@@ -24,11 +33,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { execFile as execFileCb } from "node:child_process";
-import { resetDeferredTasks } from "../../src/cli/commands/run.js";
+import { resetDeferredTasks, resetDeferredAndCommit } from "../../src/cli/commands/run.js";
 import {
   commitResetDeferredChanges,
   performPreRunCommitGateIfNeeded,
 } from "../../src/agent/lifecycle/shared.js";
+import { listUncommittedPrdPaths } from "../../src/agent/lifecycle/uncommitted-work-gate.js";
 import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
 import { initGitFixtureRepo } from "../helpers/index.js";
 
@@ -38,6 +48,8 @@ describe("--reset-deferred vs the pre-run commit gate", () => {
   let projectDir: string;
   let henchDir: string;
   let taskIndexPath: string;
+  /** A second, tracked PRD file the reset never touches — the operator's. */
+  let epicIndexPath: string;
   const taskId = "task-deferred-1";
 
   beforeEach(async () => {
@@ -57,6 +69,11 @@ describe("--reset-deferred vs the pre-run commit gate", () => {
     await mkdir(taskDir, { recursive: true });
     taskIndexPath = join(taskDir, "index.md");
     await writeFile(taskIndexPath, "# Deferred task\nstatus: deferred\n", "utf-8");
+
+    const epicDir = join(rexDir, PRD_TREE_DIRNAME, "epic-x");
+    await mkdir(epicDir, { recursive: true });
+    epicIndexPath = join(epicDir, "index.md");
+    await writeFile(epicIndexPath, "# Epic X\nstatus: pending\n", "utf-8");
 
     await execFile("git", ["add", "."], { cwd: projectDir });
     await execFile("git", ["commit", "-m", "initial"], { cwd: projectDir });
@@ -152,5 +169,70 @@ describe("--reset-deferred vs the pre-run commit gate", () => {
 
     const { stdout: log } = await execFile("git", ["log", "--oneline"], { cwd: projectDir });
     expect(log.trim().split("\n")).toHaveLength(1); // only the initial commit
+  });
+
+  async function commitCount(): Promise<number> {
+    const { stdout } = await execFile("git", ["log", "--oneline"], { cwd: projectDir });
+    return stdout.trim().split("\n").filter(Boolean).length;
+  }
+
+  describe("the commit covers only the reset's own write", () => {
+    const operatorEdit = "# Epic X\nstatus: pending\n\nhalf-finished operator edit\n";
+
+    it("does not commit when the PRD tree was already dirty, and the gate then refuses", async () => {
+      await writeFile(epicIndexPath, operatorEdit, "utf-8");
+      expect(await listUncommittedPrdPaths(projectDir)).toContain(
+        `.rex/${PRD_TREE_DIRNAME}/epic-x/index.md`,
+      );
+
+      const resetCount = await resetDeferredAndCommit(buildStore() as never, projectDir);
+
+      // The reset itself still happens — that is what the flag is for.
+      expect(resetCount).toBe(1);
+      expect(await readFile(taskIndexPath, "utf-8")).toContain("status: pending");
+
+      // But nothing was committed: the operator's edit is untouched and still
+      // theirs to commit, under a message of their own choosing.
+      expect(await commitCount()).toBe(1);
+      expect(await readFile(epicIndexPath, "utf-8")).toBe(operatorEdit);
+
+      // The gate is what reports it — the pre-#370 behaviour. cmdRun maps this
+      // "stop" to exit 1.
+      const result = await performPreRunCommitGateIfNeeded({
+        projectDir,
+        henchDir,
+        autonomous: true,
+        deps: { isTTY: false },
+      });
+      expect(result).toBe("stop");
+    });
+
+    it("still commits when the dirt is outside the PRD tree", async () => {
+      // Only PRD paths can be swept in by `git add .rex/prd_tree` — an
+      // unrelated dirty file must not cost the reset its commit, or
+      // --reset-deferred would deadlock again on the case #365 fixed.
+      await writeFile(join(projectDir, "README.md"), "# fixture\n\nwork in progress\n", "utf-8");
+
+      const resetCount = await resetDeferredAndCommit(buildStore() as never, projectDir);
+
+      expect(resetCount).toBe(1);
+      expect(await commitCount()).toBe(2);
+      const { stdout: subject } = await execFile("git", ["log", "-1", "--format=%s"], { cwd: projectDir });
+      expect(subject).toContain("reset-deferred");
+    });
+  });
+
+  it("--dry-run resets nothing and leaves git status clean", async () => {
+    const store = buildStore();
+
+    const resetCount = await resetDeferredAndCommit(store as never, projectDir, { dryRun: true });
+
+    // It still reports what it would do…
+    expect(resetCount).toBe(1);
+    // …but wrote nothing, so no commit is needed and none is made.
+    expect(store.updateItem).not.toHaveBeenCalled();
+    expect(await readFile(taskIndexPath, "utf-8")).toContain("status: deferred");
+    expect((await gitStatus()).trim()).toBe("");
+    expect(await commitCount()).toBe(1);
   });
 });

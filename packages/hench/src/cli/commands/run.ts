@@ -12,7 +12,13 @@ import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
-import { PRD_COMMIT_PATHS, findUncommittedWork, formatLoopRefusal } from "../../agent/lifecycle/uncommitted-work-gate.js";
+import {
+  PRD_COMMIT_PATHS,
+  findUncommittedWork,
+  formatLoopRefusal,
+  formatResetDeferredCommitSkipped,
+  listUncommittedPrdPaths,
+} from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
@@ -348,14 +354,30 @@ function countTasksByStatus(items: PRDItem[], statuses: string[]): number {
   return count;
 }
 
+export interface ResetDeferredOptions {
+  /**
+   * List what would be reset and write nothing.
+   *
+   * A dry run must leave the working tree exactly as it found it. The commit
+   * that normally lands the reset is skipped on a dry run, so a reset that
+   * still wrote would leave `.rex/prd_tree/` dirty — and the next *real*
+   * autonomous run would then refuse to start against dirt that a
+   * `--dry-run` produced.
+   */
+  dryRun?: boolean;
+}
+
 /**
  * Reset all deferred and failing tasks to pending so they can be retried.
  *
  * Used by --reset-deferred to let the user restart a run where all tasks
  * failed (e.g. after fixing LM Studio context window size). Returns the
- * number of tasks that were reset.
+ * number of tasks that were reset (or, on a dry run, would be reset).
  */
-export async function resetDeferredTasks(store: PRDStore): Promise<number> {
+export async function resetDeferredTasks(
+  store: PRDStore,
+  opts: ResetDeferredOptions = {},
+): Promise<number> {
   const doc = await store.loadDocument();
   const toReset: Array<{ id: string; title: string }> = [];
 
@@ -369,16 +391,68 @@ export async function resetDeferredTasks(store: PRDStore): Promise<number> {
   };
   walk(doc.items);
 
-  for (const t of toReset) {
-    await store.updateItem(t.id, { status: "pending" });
+  if (!opts.dryRun) {
+    for (const t of toReset) {
+      await store.updateItem(t.id, { status: "pending" });
+    }
   }
 
   if (toReset.length > 0) {
-    info(`\nReset ${toReset.length} task(s) to pending:`);
+    const verb = opts.dryRun ? "Would reset" : "Reset";
+    info(`\n${verb} ${toReset.length} task(s) to pending:`);
     for (const t of toReset) info(`  ${colorStatus("pending", "○")} ${t.id}: ${t.title}`);
   }
 
   return toReset.length;
+}
+
+/**
+ * `--reset-deferred` end to end: reset the deferred/failing tasks and land
+ * that write, so the pre-run commit gate sees a tree this call left clean.
+ *
+ * The commit is conditional, and the condition is measured *before* the reset
+ * writes anything. {@link commitResetDeferredChanges} stages `.rex/prd_tree`
+ * wholesale — it cannot tell the reset's own write from an operator edit
+ * already sitting there — so on a tree that was already dirty it would commit
+ * the operator's half-finished work under "reset N deferred/failing task(s)",
+ * with hench's Co-Authored-By trailer, before the gate ever saw it. In a TTY,
+ * with no prompt.
+ *
+ * When that is the case the reset still happens (it is what the flag is for)
+ * but nothing is committed: the pre-run gate then reports the whole dirty tree
+ * and refuses, which is exactly what the operator got before #365.
+ *
+ * On a dry run nothing is written and nothing is committed.
+ *
+ * @returns the number of tasks reset, or that would be reset on a dry run
+ */
+export async function resetDeferredAndCommit(
+  store: PRDStore,
+  projectDir: string,
+  opts: ResetDeferredOptions = {},
+): Promise<number> {
+  const dryRun = Boolean(opts.dryRun);
+  // Before the reset, deliberately: afterwards the reset's own write is
+  // indistinguishable from anything that was already there.
+  const prdDirtyBeforeReset = dryRun ? [] : await listUncommittedPrdPaths(projectDir);
+
+  const resetCount = await resetDeferredTasks(store, { dryRun });
+  if (resetCount === 0) {
+    info("\nNo deferred or failing tasks to reset.");
+    return 0;
+  }
+  if (dryRun) return resetCount;
+
+  if (prdDirtyBeforeReset.length > 0) {
+    info(formatResetDeferredCommitSkipped(prdDirtyBeforeReset));
+    return resetCount;
+  }
+
+  // Commit the reset's own PRD-tree write immediately so the pre-run commit
+  // gate sees a clean tree instead of refusing the very run --reset-deferred
+  // exists to resume (GitHub #365).
+  await commitResetDeferredChanges(projectDir, resetCount);
+  return resetCount;
 }
 
 // ---------------------------------------------------------------------------
@@ -1140,15 +1214,7 @@ export async function cmdRun(
   // (e.g. context window overflow) without manually editing each task.
   if (flags["reset-deferred"] === "true") {
     const store = await resolveStore(rexDir);
-    const resetCount = await resetDeferredTasks(store);
-    if (resetCount === 0) {
-      info("\nNo deferred or failing tasks to reset.");
-    } else if (!dryRun) {
-      // Commit the reset's own PRD-tree write immediately so the pre-run
-      // commit gate below sees a clean tree instead of refusing the very run
-      // --reset-deferred exists to resume (GitHub #365).
-      await commitResetDeferredChanges(dir, resetCount);
-    }
+    await resetDeferredAndCommit(store, dir, { dryRun });
   }
 
   // Fail fast if CLI provider selected but vendor CLI binary not available.
