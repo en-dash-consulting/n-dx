@@ -36,6 +36,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Finalize gate must discount only what the commit prompt will actually commit: staged work only with a pending message, reviewer repairs on both paths](./finalize-gate-must-discount-only-what.md) | completed |
 | [Late-arrival child kill is proven only against a fake, and the e2e guard that would catch it only trips under load](./late-arrival-child-kill-is-proven-only.md) | pending |
 | [Livelock detector must see Codex file edits as progress](./livelock-detector-must-see-codex-file.md) | completed |
+| [Livelock intercept does not kill its child on Windows, failing CLI Smoke (Windows)](./livelock-intercept-does-not-kill-its.md) | pending |
 | [Lock file is readable while empty, so a second writer can reclaim a live lock](./lock-file-is-readable-while-empty-so-a.md) | pending |
 | [PRD tree snapshot must tolerate a concurrent writer's temp files](./prd-tree-snapshot-must-tolerate-a.md) | completed |
 | [Refuse to mark a task completed while its work is uncommitted](./refuse-to-mark-a-task-completed-while.md) | completed |
