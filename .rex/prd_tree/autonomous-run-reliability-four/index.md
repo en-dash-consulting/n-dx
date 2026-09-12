@@ -37,7 +37,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Late-arrival child kill is proven only against a fake, and the e2e guard that would catch it only trips under load](./late-arrival-child-kill-is-proven-only.md) | pending |
 | [Livelock detector must see Codex file edits as progress](./livelock-detector-must-see-codex-file.md) | completed |
 | [Livelock intercept does not kill its child on Windows, failing CLI Smoke (Windows)](./livelock-intercept-does-not-kill-its.md) | completed |
-| [Lock file is readable while empty, so a second writer can reclaim a live lock](./lock-file-is-readable-while-empty-so-a.md) | pending |
+| [Lock file is readable while empty, so a second writer can reclaim a live lock](./lock-file-is-readable-while-empty-so-a.md) | completed |
 | [PRD tree snapshot must tolerate a concurrent writer's temp files](./prd-tree-snapshot-must-tolerate-a.md) | completed |
 | [Refuse to mark a task completed while its work is uncommitted](./refuse-to-mark-a-task-completed-while.md) | completed |
 | [--reset-deferred must be able to start the run it enables, and a refusal must exit non-zero](./reset-deferred-must-be-able-to-start.md) | completed |
