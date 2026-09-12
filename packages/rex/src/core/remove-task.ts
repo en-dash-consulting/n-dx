@@ -1,14 +1,8 @@
-import type { PRDItem, ItemStatus } from "../schema/index.js";
+import type { PRDItem } from "../schema/index.js";
 import { getLevelLabel } from "../schema/index.js";
 import { findItem } from "./tree.js";
 import { deleteItem, cleanBlockedByRefs } from "./delete.js";
-import { allChildrenSuccessful } from "./parent-completion.js";
-
-/**
- * Statuses where a parent is eligible for auto-completion.
- * Already-completed, deferred, or blocked parents are left alone.
- */
-const AUTO_COMPLETABLE_STATUSES: Set<ItemStatus> = new Set(["pending", "in_progress"]);
+import { allChildrenSuccessful, AUTO_COMPLETABLE_STATUSES } from "./parent-completion.js";
 
 /**
  * Descriptor for a parent item that is eligible for auto-completion
@@ -121,7 +115,8 @@ export function removeTask(items: PRDItem[], taskId: string): RemoveTaskResult {
   for (let i = parents.length - 1; i >= 0; i--) {
     const parent = parents[i];
 
-    // Only auto-complete parents that are pending or in_progress
+    // Only auto-complete pending parents — an explicit in_progress is not
+    // ours to close (#368). Shared predicate, not a local copy.
     if (!AUTO_COMPLETABLE_STATUSES.has(parent.status)) break;
 
     if (!allChildrenSuccessful(parent, virtuallyCompleted)) break;

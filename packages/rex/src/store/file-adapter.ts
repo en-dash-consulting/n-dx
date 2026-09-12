@@ -587,14 +587,20 @@ export class FileStore implements PRDStore {
   async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
     const owner = await this.resolveOwnerFile(id);
     const attributedUpdates = this.applyWriteAttribution(updates, owner, options);
-    // Merge in lastModified/lastModifiedBy directly (rather than building a
-    // full merged item via `stampModified`) since `updateInTree` applies a
-    // partial `Object.assign` onto the existing item.
-    const stampedUpdates: Partial<PRDItem> = {
-      ...attributedUpdates,
-      ...(await stampModifiedFields()),
-    };
     await this.withFileTransaction(owner, async (doc) => {
+      // Merge in lastModified/lastModifiedBy directly (rather than building a
+      // full merged item via `stampModified`) since `updateInTree` applies a
+      // partial `Object.assign` onto the existing item. Resolved inside the
+      // transaction because `preserveModifiedBy` needs the item's current
+      // author (see WriteOptions).
+      const existing = findItem(doc.items, id);
+      const stampedUpdates: Partial<PRDItem> = {
+        ...attributedUpdates,
+        ...(await stampModifiedFields(
+          undefined,
+          options?.preserveModifiedBy ? existing?.item.lastModifiedBy : undefined,
+        )),
+      };
       if (!updateInTree(doc.items, id, stampedUpdates)) {
         throw new Error(`Item "${id}" not found`);
       }

@@ -14,9 +14,28 @@
  *   outstanding — half-migrated work read as finished).
  * - Propagation walks up the ancestor chain: if completing a parent makes its
  *   own parent fully done, that grandparent is completed too.
- * - Only items with `pending` or `in_progress` status are auto-completed
- *   (already-completed, deferred, and blocked parents are left alone).
+ * - Only `pending` parents are auto-completed. `in_progress` is a deliberate
+ *   human/agent claim that the parent has work of its own still running, so a
+ *   child transition must not close it (GitHub #368).
  * - Returns the list of item IDs that were auto-completed, bottom-up.
+ *
+ * ## Two independent predicates — do not merge them
+ *
+ * This module answers two separate questions and both guards are load-bearing:
+ *
+ * | Question | Predicate | Issue |
+ * |----------|-----------|-------|
+ * | Which CHILD statuses count as done? | {@link SUCCESSFUL_CHILD_STATUSES} | #364 |
+ * | May the PARENT be touched at all? | {@link AUTO_COMPLETABLE_STATUSES} + scope | #368 |
+ *
+ * #364 narrowed the child predicate from `{completed, deferred}` to
+ * `{completed}`. That does nothing for #368, where the child genuinely *is*
+ * completed: an `in_progress` task belonging to another user, with one
+ * completed subtask, was swept to `completed` — and its epic with it — by a
+ * run that had made zero tool calls and was operating in a different epic
+ * entirely. Narrowing the child predicate further would not have stopped it;
+ * refusing to touch the parent does. A future change that collapses the two
+ * sets into one reintroduces whichever bug it drops.
  *
  * @module core/parent-completion
  */
@@ -31,7 +50,48 @@ export interface AutoCompletionResult {
   completedItems: Array<{ id: string; title: string; level: string }>;
 }
 
-const AUTO_COMPLETABLE_STATUSES: Set<ItemStatus> = new Set(["pending", "in_progress"]);
+/**
+ * The only parent status a child transition may close automatically.
+ *
+ * `in_progress` used to be here and is deliberately gone (GitHub #368). It is
+ * an explicit claim — someone set it, and it means the parent has work of its
+ * own beyond its children. Auto-completing over it silently closes another
+ * person's open investigation and rewrites its authorship. Already-completed,
+ * deferred, blocked, and failing parents were never eligible.
+ *
+ * **On acceptance criteria.** #368 also asked whether a parent with unmet
+ * acceptance criteria of its own needs a *separate* guard. It does not, and a
+ * separate guard would do more harm than good: criteria are free prose, only
+ * the `automated:` subset is machine-checkable (see
+ * `validateAutomatedRequirements`), and nearly every epic in a real PRD
+ * carries some. Keying off their mere presence would strand every epic in
+ * `pending` forever, and the sole reliable signal that a parent has
+ * outstanding work of its own is precisely the `in_progress` marker this set
+ * now honours. So: subsumed by the status guard, by decision, not oversight.
+ *
+ * This is the single source of truth — `remove-task.ts` imports it rather than
+ * keeping its own copy. `cli/commands/status-sections.ts` deliberately does
+ * NOT use it; see the note there.
+ */
+export const AUTO_COMPLETABLE_STATUSES: Set<ItemStatus> = new Set(["pending"]);
+
+/** Options for {@link reconcileAutoCompletions}. */
+export interface ReconcileOptions {
+  /**
+   * Contain the sweep to the ancestors of this item.
+   *
+   * Without it the sweep is whole-tree: it heals every stuck parent in the
+   * PRD, including ones in epics the caller has never heard of. That is fine
+   * for an explicit `rex`-side reconciliation, and catastrophic for an agent
+   * run — GitHub #368, where a failing run completed a task and an epic in an
+   * unrelated part of the tree. Any caller acting on behalf of a single item
+   * must pass its id here, which bounds the blast radius to that item's
+   * ancestor chain no matter what the completion predicate decides.
+   *
+   * An unknown id contains the sweep to nothing: fail closed, never open.
+   */
+  ancestorsOf?: string;
+}
 
 /**
  * The only child status that counts as successfully done for the purpose of
@@ -68,14 +128,32 @@ export function allChildrenSuccessful(
  * Items are returned bottom-up: a feature appears before its epic so that
  * callers can apply updates in order without re-checking the tree.
  *
- * @param items - The full PRD item tree.
+ * Pass `options.ancestorsOf` whenever the sweep is being run on behalf of one
+ * item — it keeps the self-healing but confines it to that item's ancestor
+ * chain. See {@link ReconcileOptions.ancestorsOf}.
+ *
+ * @param items   - The full PRD item tree.
+ * @param options - Containment options; whole-tree when omitted.
  * @returns Items to auto-complete, ordered bottom-up. Empty when everything is consistent.
  */
-export function reconcileAutoCompletions(items: PRDItem[]): AutoCompletionResult {
+export function reconcileAutoCompletions(
+  items: PRDItem[],
+  options?: ReconcileOptions,
+): AutoCompletionResult {
   const result: AutoCompletionResult = {
     completedIds: [],
     completedItems: [],
   };
+
+  // Ids the sweep is allowed to complete. `null` means unrestricted.
+  let scope: Set<string> | null = null;
+  if (options?.ancestorsOf !== undefined) {
+    const anchor = findItem(items, options.ancestorsOf);
+    // A missing anchor scopes to the empty set rather than the whole tree:
+    // a caller that asked for containment must never silently get a
+    // whole-tree sweep because its id lookup failed.
+    scope = new Set(anchor ? anchor.parents.map((p) => p.id) : []);
+  }
 
   // Collect all items in post-order (children before parents)
   const postOrder: PRDItem[] = [];
@@ -103,7 +181,12 @@ export function reconcileAutoCompletions(items: PRDItem[]): AutoCompletionResult
       continue;
     }
 
-    // Only auto-complete pending / in_progress parents
+    // Containment (#368): outside the requested scope, an item is neither
+    // completed nor marked virtually complete, so it also keeps its own
+    // ancestors from completing on its behalf.
+    if (scope && !scope.has(item.id)) continue;
+
+    // Only auto-complete pending parents — never an explicit in_progress (#368)
     if (!AUTO_COMPLETABLE_STATUSES.has(item.status)) continue;
 
     // allChildrenSuccessful returns false when there are no children — leaf
@@ -129,6 +212,10 @@ export function reconcileAutoCompletions(items: PRDItem[]): AutoCompletionResult
  * Walks up the parent chain, simulating each completion so that
  * grandparents can see their child (which we just decided to complete)
  * as successfully done.
+ *
+ * Contained by construction: it only ever visits `itemId`'s own ancestors, so
+ * it cannot reach a sibling subtree. `reconcileAutoCompletions` gets the same
+ * guarantee only when given `ancestorsOf` (#368).
  *
  * @param items     - The full PRD item tree.
  * @param itemId    - The ID of the item that just completed.
@@ -163,7 +250,9 @@ export function findAutoCompletions(
   for (let i = parents.length - 1; i >= 0; i--) {
     const parent = parents[i];
 
-    // Only auto-complete parents that are pending or in_progress
+    // Only auto-complete pending parents. An in_progress parent stops the
+    // cascade dead (#368) — and because the walk breaks rather than skips,
+    // nothing above it completes either.
     if (!AUTO_COMPLETABLE_STATUSES.has(parent.status)) break;
 
     // Check if all children are successfully done (including virtually

@@ -143,19 +143,27 @@ export class FolderTreeStore implements PRDStore {
     });
   }
 
-  async updateItem(id: string, updates: Partial<PRDItem>, _options?: WriteOptions): Promise<void> {
-    await this.withTransaction(async (doc) => {
-      const entry = findItem(doc.items, id);
-      if (!entry) {
-        throw new Error(`Item "${id}" not found`);
-      }
-      // Merge updates onto the current item before stamping so `lastModified`
-      // always reflects this write, even when `updates` omits it.
-      const merged = await stampModified({ ...entry.item, ...updates } as PRDItem);
-      if (!updateInTree(doc.items, id, merged)) {
-        throw new Error(`Item "${id}" not found`);
-      }
-    });
+  async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
+    await this.runTransaction(
+      async (doc) => {
+        const entry = findItem(doc.items, id);
+        if (!entry) {
+          throw new Error(`Item "${id}" not found`);
+        }
+        // Merge updates onto the current item before stamping so `lastModified`
+        // always reflects this write, even when `updates` omits it.
+        // `preserveModifiedBy` keeps the existing author (see WriteOptions).
+        const merged = await stampModified(
+          { ...entry.item, ...updates } as PRDItem,
+          undefined,
+          options?.preserveModifiedBy ? entry.item.lastModifiedBy : undefined,
+        );
+        if (!updateInTree(doc.items, id, merged)) {
+          throw new Error(`Item "${id}" not found`);
+        }
+      },
+      options?.preserveModifiedBy ? new Set([id]) : undefined,
+    );
   }
 
   async removeItem(id: string): Promise<void> {
@@ -254,6 +262,22 @@ export class FolderTreeStore implements PRDStore {
   // ---- Transactions --------------------------------------------------------
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
+    return this.runTransaction(fn);
+  }
+
+  /**
+   * `withTransaction` plus the one knob the public contract has no place for.
+   *
+   * `preserveAuthorFor` is threaded to {@link stampChangedItems}: a status
+   * change moves an item's content signature, so the transaction-level stamp
+   * would otherwise overwrite the author that `updateItem` deliberately kept
+   * for a cascaded write (GitHub #368). The per-item stamp is not enough on
+   * its own — this is where it gets undone.
+   */
+  private async runTransaction<T>(
+    fn: (doc: PRDDocument) => Promise<T>,
+    preserveAuthorFor?: ReadonlySet<string>,
+  ): Promise<T> {
     // The lock file lives in rexDir, which may not exist on first write.
     await mkdir(this.rexDir, { recursive: true });
     const lockPath = prdLockPath(this.rexDir);
@@ -269,7 +293,7 @@ export class FolderTreeStore implements PRDStore {
       // mutated directly — callers that bypass updateItem still get one.
       const before = snapshotItemContent(doc.items);
       const result = await fn(doc);
-      stampChangedItems(doc.items, before, await stampModifiedFields(undefined, actor));
+      stampChangedItems(doc.items, before, await stampModifiedFields(undefined, actor), preserveAuthorFor);
       const check = validateDocument(doc);
       if (!check.ok) {
         throw new Error(`Invalid document after mutation: ${check.errors.message}`);

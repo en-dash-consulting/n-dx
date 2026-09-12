@@ -347,12 +347,20 @@ export function snapshotItemContent(items: PRDItem[]): Map<string, string> {
  * An item that arrives with a timestamp but no author keeps that shape: it is
  * already visible to sync, and this transaction's actor did not write it.
  *
+ * @param preserveAuthorFor - ids whose existing `lastModifiedBy` must survive
+ *   this stamp (`WriteOptions.preserveModifiedBy`, GitHub #368). They still
+ *   get the timestamp — sync must see the change — but not the actor: these
+ *   are writes made on the item's behalf, such as an auto-completion cascade,
+ *   and the authorship stays with whoever last edited it deliberately. Without
+ *   this the per-item stamp in a store's `updateItem` is silently undone here,
+ *   since a status change moves the content signature.
  * @returns the ids stamped, in tree order.
  */
 export function stampChangedItems(
   items: PRDItem[],
   before: Map<string, string>,
   stamp: ModifiedFields,
+  preserveAuthorFor?: ReadonlySet<string>,
 ): string[] {
   const stamped: string[] = [];
   for (const { item } of walkTree(items)) {
@@ -363,7 +371,8 @@ export function stampChangedItems(
       if (previous === itemSignature(item)) continue;
       // walkTree yields live references into the tree, so assigning here is
       // the write — no re-lookup needed.
-      Object.assign(item, stamp);
+      const keepAuthor = preserveAuthorFor?.has(item.id) && item.lastModifiedBy;
+      Object.assign(item, keepAuthor ? { lastModified: stamp.lastModified } : stamp);
       stamped.push(item.id);
       continue;
     }

@@ -184,7 +184,7 @@ export class NotionStore implements PRDStore {
     this.invalidateCache();
   }
 
-  async updateItem(id: string, updates: Partial<PRDItem>, _options?: WriteOptions): Promise<void> {
+  async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
     const notionId = await this.resolveNotionId(id);
     if (!notionId) {
       throw new Error(`Item "${id}" not found`);
@@ -198,7 +198,12 @@ export class NotionStore implements PRDStore {
     }
 
     const merged = { ...entry.item, ...updates } as PRDItem;
-    const stamped = await stampModified(merged);
+    // `preserveModifiedBy` keeps the existing author (see WriteOptions).
+    const stamped = await stampModified(
+      merged,
+      undefined,
+      options?.preserveModifiedBy ? entry.item.lastModifiedBy : undefined,
+    );
     const { properties } = mapItemToNotion(stamped);
 
     await this.client.updatePage(notionId, properties);

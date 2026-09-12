@@ -469,10 +469,10 @@ describe("cmdRemove", () => {
     it("auto-completes parent when last pending task is removed", async () => {
       const items = [
         {
-          id: "e1", title: "Epic", level: "epic", status: "in_progress",
+          id: "e1", title: "Epic", level: "epic", status: "pending",
           children: [
             {
-              id: "f1", title: "Feature", level: "feature", status: "in_progress",
+              id: "f1", title: "Feature", level: "feature", status: "pending",
               children: [
                 { id: "t1", title: "Last pending task", level: "task", status: "pending" },
                 { id: "t2", title: "Done task", level: "task", status: "completed" },
@@ -502,6 +502,41 @@ describe("cmdRemove", () => {
       const entries = logContent.trim().split("\n").map((l: string) => JSON.parse(l));
       const autoEntry = entries.find((e: { event: string }) => e.event === "auto_completed");
       expect(autoEntry).toBeDefined();
+    });
+
+    it("leaves an in_progress parent alone (GH #368)", async () => {
+      // Removal is the second cascade path into the same predicate. An
+      // in_progress parent has work of its own; removing the last outstanding
+      // child does not finish it.
+      const items = [
+        {
+          id: "e1", title: "Epic", level: "epic", status: "pending",
+          children: [
+            {
+              id: "f1", title: "Feature", level: "feature", status: "in_progress",
+              children: [
+                { id: "t1", title: "Last pending task", level: "task", status: "pending" },
+                { id: "t2", title: "Done task", level: "task", status: "completed" },
+              ],
+            },
+          ],
+        },
+      ];
+
+      writePRD(tmp, makePrd(items));
+
+      const logs: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => logs.push(args.join(" "));
+
+      try {
+        await cmdRemove(tmp, "t1", "task", { format: "json", yes: "true" });
+      } finally {
+        console.log = origLog;
+      }
+
+      // Neither the feature nor, consequently, the epic above it.
+      expect(JSON.parse(logs.join("")).autoCompleted).toEqual([]);
     });
   });
 

@@ -333,6 +333,18 @@ export interface PRDItem {
   commits?: CommitAttribution[];
   /** Links to downstream work-tracking items (Notion, Jira, GitHub, Asana, …). */
   links?: WorkItemLink[];
+  /**
+   * ISO timestamp of the last local write. Stamped by every store adapter on
+   * `addItem`/`updateItem` — see `stampModified` in core/sync.ts.
+   */
+  lastModified?: string;
+  /**
+   * Who last wrote the item, as resolved by core/identity.ts. Declared here
+   * rather than left to the index signature because the auto-completion
+   * cascade must read it back to preserve it (`WriteOptions.preserveModifiedBy`,
+   * GitHub #368), and `unknown` made that read a cast.
+   */
+  lastModifiedBy?: string;
   children?: PRDItem[];
   [key: string]: unknown;
 }

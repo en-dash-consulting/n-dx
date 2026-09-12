@@ -198,7 +198,9 @@ export async function handleUpdateTaskStatus(
         await store.updateItem(item.id, {
           status: "completed" as ItemStatus,
           ...parentTsUpdates,
-        }, { applyAttribution: true, projectDir });
+          // Cascaded close, not a deliberate edit of this ancestor — leave its
+          // authorship with whoever last touched it on purpose (#368).
+        }, { applyAttribution: true, preserveModifiedBy: true, projectDir });
         await store.appendLog({
           timestamp: new Date().toISOString(),
           event: "auto_completed",

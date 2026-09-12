@@ -126,10 +126,16 @@ export function findStaleItems(items: PRDItem[], now: Date = new Date()): PRDIte
 }
 
 /**
- * Find parent items whose children are all `completed`. Uses the same
- * predicate as parent-completion.ts's auto-completion checks — a deferred,
- * blocked, or failing child must keep the parent out of this list (GitHub
- * #364).
+ * Find parent items whose children are all `completed`. Uses the same CHILD
+ * predicate as parent-completion.ts — a deferred, blocked, or failing child
+ * must keep the parent out of this list (GitHub #364).
+ *
+ * It deliberately does NOT use `AUTO_COMPLETABLE_STATUSES` for the parent, and
+ * still lists `in_progress` parents. This is a hint printed for a human, not a
+ * mutation: since #368 stopped the cascade from closing an `in_progress`
+ * parent, a parent that really has finished would otherwise go unmentioned
+ * forever. Surfacing it here is the escape hatch — the human decides. Do not
+ * "align" this with the mutation predicate; the divergence is the point.
  */
 export function findAutoCompletable(items: PRDItem[]): Array<{ id: string; title: string }> {
   const results: Array<{ id: string; title: string }> = [];

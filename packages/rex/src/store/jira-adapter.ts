@@ -132,7 +132,7 @@ export class JiraStore implements PRDStore {
     );
   }
 
-  async updateItem(id: string, updates: Partial<PRDItem>, _options?: WriteOptions): Promise<void> {
+  async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
     const key = await this.resolveKey(id);
     if (!key) {
       throw new Error(`Item "${id}" not found`);
@@ -146,7 +146,12 @@ export class JiraStore implements PRDStore {
 
     const parentItem = entry.parents.length > 0 ? entry.parents[entry.parents.length - 1] : undefined;
     const merged = { ...entry.item, ...updates } as PRDItem;
-    const stamped = await stampModified(merged);
+    // `preserveModifiedBy` keeps the existing author (see WriteOptions).
+    const stamped = await stampModified(
+      merged,
+      undefined,
+      options?.preserveModifiedBy ? entry.item.lastModifiedBy : undefined,
+    );
     await this.client.updateIssue(key, mapItemToUpdate(stamped, this.syncLabels, parentItem?.id));
   }
 
