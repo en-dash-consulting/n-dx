@@ -30,7 +30,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Calibrate the uncommitted-work guards: discount hench's own PRD writes and the tree-meta sidecar, and cover --epic-by-epic](./calibrate-the-uncommitted-work-guards.md) | completed |
 | [CI child-cleanup fixtures are never reaped and accumulate across suite runs](./ci-child-cleanup-fixtures-are-never.md) | completed |
 | [Cleanup from the #370 review: dedupe the adapter stamping block, share the porcelain path matcher, align next-task wording](./cleanup-from-the-370-review-dedupe-the.md) | completed |
-| [Codex file_change event shape is unverified, so the livelock progress fix can silently not work](./codex-file-change-event-shape-is.md) | pending |
+| [Codex file_change event shape is unverified, so the livelock progress fix can silently not work](./codex-file-change-event-shape-is.md) | completed |
 | [Completion must not cascade over an explicit in_progress parent, or outside the run's subtree](./completion-must-not-cascade-over-an.md) | completed |
 | [Do not auto-complete an epic that still has deferred, blocked or failing children](./do-not-auto-complete-an-epic-that.md) | completed |
 | [Finalize gate must discount only what the commit prompt will actually commit: staged work only with a pending message, reviewer repairs on both paths](./finalize-gate-must-discount-only-what.md) | completed |
