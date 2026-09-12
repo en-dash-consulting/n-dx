@@ -23,8 +23,12 @@ import {
   unresolvedFindings,
   classifyUnresolved,
   formatUnresolvedWarning,
+  reviewNeverRan,
+  formatMissingReviewRefusal,
+  formatRunReviewStatus,
   REVIEW_REPORT_SUBDIR,
 } from "../../../src/agent/analysis/adversarial-review.js";
+import type { RunReviewRecord } from "../../../src/schema/index.js";
 import type {
   ReviewReport,
   ReviewFinding,
@@ -445,5 +449,74 @@ describe("formatReviewSummary", () => {
     ).join("\n");
 
     expect(rendered).toContain("captured as itm-42");
+  });
+});
+
+/**
+ * The classification the missing-review gate rests on.
+ *
+ * Only two of the four failure reasons mean nobody attacked the change. Widen
+ * this set and a lost report starts failing valid tasks; narrow it and a
+ * reviewer that returned 400 goes back to reading as a clean pass.
+ */
+describe("reviewNeverRan", () => {
+  const failed = (reason: string): RunReviewRecord => ({ failed: reason, detail: "d" });
+
+  const clean: RunReviewRecord = {
+    model: "claude-opus-5",
+    resumedSession: true,
+    findingCount: 0,
+    unresolvedCount: 0,
+    unrepairedMustFixCount: 0,
+    failedActionCount: 0,
+    fixesApplied: false,
+    reportPath: "/proj/.hench/reviews/run-1.json",
+  };
+
+  it("is true when the reviewer session never started", () => {
+    expect(reviewNeverRan(failed("spawn-failed"))).toBe(true);
+    expect(reviewNeverRan(failed("unsupported-vendor"))).toBe(true);
+  });
+
+  it("is false when a reviewer ran and only its report was lost", () => {
+    expect(reviewNeverRan(failed("no-report"))).toBe(false);
+    expect(reviewNeverRan(failed("malformed-report"))).toBe(false);
+  });
+
+  it("is false for a successful pass and for no pass at all", () => {
+    expect(reviewNeverRan(clean)).toBe(false);
+    expect(reviewNeverRan(undefined)).toBe(false);
+  });
+
+  it("names the missing review, the vendor's detail, and the way out", () => {
+    const text = formatMissingReviewRefusal({
+      failed: "spawn-failed",
+      detail: "API Error: 400 ... version 2.1.251 or newer is required",
+    });
+
+    expect(text).toContain("adversarial review never ran");
+    expect(text).toContain("spawn-failed");
+    expect(text).toContain("2.1.251");
+    expect(text).toContain("--review-optional");
+  });
+
+  it("renders an end-of-run line that cannot be read as a clean review", () => {
+    const missing = formatRunReviewStatus(failed("spawn-failed")).join("\n");
+    expect(missing).toContain("NEVER RAN");
+    expect(missing).toContain("NOT reviewed");
+
+    const lost = formatRunReviewStatus(failed("no-report")).join("\n");
+    expect(lost).toContain("PRODUCED NO REPORT");
+
+    // A clean pass says zero findings — the state the failure lines must never
+    // be confusable with.
+    expect(formatRunReviewStatus(clean)).toEqual(["Review: 0 finding(s) (claude-opus-5)"]);
+    expect(formatRunReviewStatus({ ...clean, findingCount: 3, unresolvedCount: 1 })).toEqual([
+      "Review: 3 finding(s), 1 unresolved (claude-opus-5)",
+    ]);
+  });
+
+  it("prints nothing when --review was not passed", () => {
+    expect(formatRunReviewStatus(undefined)).toEqual([]);
   });
 });

@@ -21,6 +21,7 @@ import {
 import {
   normalizeCodexResponse as originalNormalizeCodexResponse,
 } from "../../../src/agent/lifecycle/adapters/codex-cli-adapter.js";
+import { isProgressTool } from "../../../src/agent/analysis/livelock.js";
 import type { VendorAdapter, SpawnConfig } from "../../../src/agent/lifecycle/vendor-adapter.js";
 import {
   DEFAULT_EXECUTION_POLICY,
@@ -482,7 +483,7 @@ describe("CodexCliAdapter: parseEvent (structured JSONL)", () => {
       type: "item.completed",
       item: {
         type: "command_execution",
-        stdout: "tests passed",
+        aggregated_output: "tests passed",
       },
     });
 
@@ -492,6 +493,66 @@ describe("CodexCliAdapter: parseEvent (structured JSONL)", () => {
     expect(event!.type).toBe("tool_result");
     expect(event!.toolResult!.tool).toBe("shell");
     expect(event!.toolResult!.output).toBe("tests passed");
+  });
+
+  it("parses item.completed file_change events as a progress-crediting tool_use", () => {
+    const line = JSON.stringify({
+      type: "item.completed",
+      item: {
+        type: "file_change",
+        status: "completed",
+        changes: [{ path: "src/thing.ts", kind: "update" }],
+      },
+    });
+
+    const event = codexCliAdapter.parseEvent(line, 1, {});
+
+    expect(event).not.toBeNull();
+    expect(event!.type).toBe("tool_use");
+    // The name must land in the livelock detector's PROGRESS_TOOLS set — that
+    // is the whole point of mapping this item at all.
+    expect(isProgressTool(event!.toolCall!.tool)).toBe(true);
+    expect(event!.toolCall!.input).toEqual({
+      changes: [{ path: "src/thing.ts", kind: "update" }],
+    });
+  });
+
+  it("tolerates a file_change with no changes array", () => {
+    const line = JSON.stringify({
+      type: "item.completed",
+      item: { type: "file_change", status: "completed" },
+    });
+
+    const event = codexCliAdapter.parseEvent(line, 1, {});
+
+    expect(event!.type).toBe("tool_use");
+    expect(isProgressTool(event!.toolCall!.tool)).toBe(true);
+    expect(event!.toolCall!.input).toEqual({ changes: [] });
+  });
+
+  it("does not credit a failed file_change as progress", () => {
+    // An edit that errored changed nothing on disk, so it must not clear the
+    // detector's repeat history.
+    const line = JSON.stringify({
+      type: "item.completed",
+      item: {
+        type: "file_change",
+        status: "failed",
+        changes: [{ path: "src/thing.ts", kind: "update" }],
+      },
+    });
+
+    expect(codexCliAdapter.parseEvent(line, 1, {})).toBeNull();
+  });
+
+  it("does not credit a file_change that has only started", () => {
+    // The patch has not landed yet; only item.completed is progress.
+    const line = JSON.stringify({
+      type: "item.started",
+      item: { type: "file_change", changes: [{ path: "src/thing.ts", kind: "update" }] },
+    });
+
+    expect(codexCliAdapter.parseEvent(line, 1, {})).toBeNull();
   });
 
   it("parses turn.failed events as failures", () => {

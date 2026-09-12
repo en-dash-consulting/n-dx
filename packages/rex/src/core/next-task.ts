@@ -3,6 +3,10 @@ import type { TreeEntry } from "./tree.js";
 import { walkTree, findItem } from "./tree.js";
 import { extractKeywords, scoreMatch } from "./keywords.js";
 import { collectRequirements } from "./requirements.js";
+import { allChildrenSuccessful } from "./parent-completion.js";
+
+/** No item is being treated as completed-in-advance when explaining a choice. */
+const NO_VIRTUAL_COMPLETIONS: Set<string> = new Set();
 
 /** Safe ancestor priority: returns medium (2) when no parents exist. */
 function bestAncestorPriority(parents: PRDItem[]): number {
@@ -479,14 +483,11 @@ export function explainSelection(
   if (selected.item.status === "in_progress") {
     summaryParts.push(`"${selected.item.title}" is already in_progress`);
   } else {
-    // Check if this is a parent with all children done
-    const allChildrenDone =
-      selected.item.children &&
-      selected.item.children.length > 0 &&
-      selected.item.children.every(
-        (c) => c.status === "completed" || c.status === "deferred",
-      );
-    if (allChildrenDone) {
+    // Check if this is a parent with all children done. The shared predicate,
+    // not a local status set: the inline copy here still counted `deferred` as
+    // done after #364 narrowed the real rule to `completed`, so a parent with a
+    // deferred child was announced as "all children completed".
+    if (allChildrenSuccessful(selected.item, NO_VIRTUAL_COMPLETIONS)) {
       summaryParts.push(
         `"${selected.item.title}" — all children completed, ready to finalize`,
       );

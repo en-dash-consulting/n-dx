@@ -15,6 +15,7 @@
 
 import { readdir, stat, mkdir, cp, rm, rename } from "node:fs/promises";
 import { join } from "node:path";
+import { isAtomicWriteTempPath } from "../store/atomic-write.js";
 
 /**
  * Result of a backup snapshot operation.
@@ -91,6 +92,57 @@ const CLAIM_ATTEMPTS = 20;
 
 /** Pause between claim attempts — long enough for the millisecond to tick over. */
 const CLAIM_RETRY_MS = 2;
+
+/** How many times the tree copy is re-walked after an entry vanished under it. */
+const COPY_ATTEMPTS = 3;
+
+/** Pause before re-walking, so the writer that is mid-rename can finish. */
+const COPY_RETRY_MS = 5;
+
+/**
+ * Copy the live tree into an already-claimed snapshot directory.
+ *
+ * Two things make this more than a plain `cp`:
+ *
+ * **Temp files are filtered out.** The atomic writers in `store/` create
+ * `<file>.<pid>.<uuid>.tmp` beside their target and rename it into place. Those
+ * files are not PRD content and must not appear in a rollback point — and,
+ * because `cp` reads a directory and then `lstat`s each entry, one that is
+ * renamed away in between raises ENOENT and fails the whole command. Filtering
+ * removes the file from the walk before it can be stat'd. The predicate lives
+ * next to the writer (`isAtomicWriteTempPath`) so the two cannot drift.
+ *
+ * **A vanished entry is retried, not tolerated.** The filter closes the
+ * dominant window but not the only one: `serializeToFolderTree` deletes stale
+ * directories (`rm(entry.path, { recursive: true })`) as part of a normal save,
+ * and this snapshot runs *before* the PRD lock is taken, so any entry can
+ * disappear mid-walk. The alternative — skip the missing entry and keep going —
+ * was rejected: a snapshot silently missing content is exactly the "safety net
+ * that isn't there" `snapshot-guard` exists to avoid, and it would be
+ * indistinguishable from a complete one at restore time. Instead the copy is
+ * re-walked from scratch. `cp` overwrites by default, so a retry is idempotent,
+ * and the next walk simply does not see an entry that is genuinely gone.
+ * Retries are bounded; a persistent ENOENT still fails the command loudly.
+ */
+async function copyTree(treeRoot: string, backupPath: string): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await cp(treeRoot, backupPath, {
+        recursive: true,
+        filter: (src) => !isAtomicWriteTempPath(src),
+      });
+      return;
+    } catch (err) {
+      const code = err && typeof err === "object" && "code" in err
+        ? (err as { code?: string }).code
+        : undefined;
+      if (code !== "ENOENT" || attempt >= COPY_ATTEMPTS) {
+        throw new Error(`Failed to snapshot PRD tree to ${backupPath}: ${String(err)}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, COPY_RETRY_MS));
+    }
+  }
+}
 
 /**
  * Exclusively claim a snapshot directory, retrying on a name already taken.
@@ -178,12 +230,11 @@ export async function snapshotPRDTree(rexDir: string): Promise<BackupSnapshot | 
   // would just lose again.
   const { timestamp, id, backupPath } = await claimBackupDir(backupsDir);
 
-  // Copy tree into the directory we now exclusively own.
-  try {
-    await cp(treeRoot, backupPath, { recursive: true });
-  } catch (err) {
-    throw new Error(`Failed to snapshot PRD tree to ${backupPath}: ${String(err)}`);
-  }
+  // Copy tree into the directory we now exclusively own. This is the second
+  // race in this function: the claim above fixed two snapshots colliding on a
+  // directory name, and `copyTree` handles a concurrent *writer* mutating the
+  // tree while it is being read.
+  await copyTree(treeRoot, backupPath);
 
   return { timestamp, id, backupPath };
 }

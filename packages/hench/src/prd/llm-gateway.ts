@@ -128,6 +128,7 @@ export {
   quoteWindowsToken,
   buildWindowsCliCommandLine,
   spawnCli,
+  terminateProcessTree,
   diagnoseCliInvocation,
   diagnoseCliNotFound,
 } from "@n-dx/llm-client";

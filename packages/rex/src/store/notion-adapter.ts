@@ -23,6 +23,7 @@ import {findItem, walkTree} from "../core/tree.js";import {  mapItemToNotion,  m
 import type { NotionStatusGroup } from "./notion-map.js";
 import {
   stampModified,
+  stampUpdatedItem,
   stampSynced,
   stampActor,
   extractSyncMeta,
@@ -184,7 +185,7 @@ export class NotionStore implements PRDStore {
     this.invalidateCache();
   }
 
-  async updateItem(id: string, updates: Partial<PRDItem>, _options?: WriteOptions): Promise<void> {
+  async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
     const notionId = await this.resolveNotionId(id);
     if (!notionId) {
       throw new Error(`Item "${id}" not found`);
@@ -197,8 +198,7 @@ export class NotionStore implements PRDStore {
       throw new Error(`Item "${id}" not found`);
     }
 
-    const merged = { ...entry.item, ...updates } as PRDItem;
-    const stamped = await stampModified(merged);
+    const stamped = await stampUpdatedItem(entry.item, updates, options);
     const { properties } = mapItemToNotion(stamped);
 
     await this.client.updatePage(notionId, properties);

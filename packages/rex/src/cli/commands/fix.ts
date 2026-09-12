@@ -129,6 +129,7 @@ function kindIcon(kind: FixKind): string {
     case "missing_timestamp": return "🕐";
     case "orphan_blocked_by": return "🔗";
     case "parent_child_alignment": return "🔄";
+    case "stuck_parent": return "✅";
     default: return "•";
   }
 }
@@ -138,6 +139,7 @@ function kindLabel(kind: FixKind): string {
     case "missing_timestamp": return "timestamp fix(es)";
     case "orphan_blocked_by": return "orphan ref(s)";
     case "parent_child_alignment": return "parent alignment(s)";
+    case "stuck_parent": return "stuck parent(s)";
     default: return kind;
   }
 }

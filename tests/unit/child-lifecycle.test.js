@@ -496,6 +496,77 @@ describe("child process lifecycle tracker", () => {
     expect(tracker.size()).toBe(0);
   });
 
+  // WHY THIS CASE EXISTS. Killing the in-flight child is what UNBLOCKS whatever
+  // was awaiting it, so the caller's own loop promptly spawns the next one — and
+  // it lands after cleanup() has already taken its snapshot. `ndx ci` leaked one
+  // orphan per Ctrl-C exactly this way: the cleanup gate SIGKILLed `sourcevision
+  // analyze`, runCapture resolved, runCI marched on to `sourcevision validate`,
+  // and the parent exited leaving that child reparented to PID 1. A sweep found
+  // 31 of them, the oldest 11 hours old.
+  it("kills a child registered after cleanup has started rather than adopting it", async () => {
+    const tracker = createChildProcessTracker({ forceKillTimeoutMs: 50 });
+    let late;
+
+    const inFlight = tracker.register(new FakeChildProcess((signal, proc) => {
+      if (signal === "SIGKILL") proc.close(null, signal);
+    }));
+    // Stand in for the awaiting caller resuming the moment its child dies.
+    inFlight.once("close", () => {
+      late = tracker.register(new FakeChildProcess());
+    });
+
+    const cleanupPromise = tracker.cleanup();
+    await vi.advanceTimersByTimeAsync(50);
+    await vi.advanceTimersByTimeAsync(0);
+    await cleanupPromise;
+
+    expect(inFlight.killSignals).toEqual(["SIGTERM", "SIGKILL"]);
+    // Straight to SIGKILL: the graceful phase is over and the parent is on its
+    // way to process.exit(), so a SIGTERM grace period is just a window in which
+    // the parent dies first and the child is orphaned.
+    expect(late.killSignals).toEqual(["SIGKILL"]);
+    expect(tracker.size()).toBe(0);
+  });
+
+  it("group-kills a late child on POSIX so its grandchildren go too", async () => {
+    const killGroup = vi.fn();
+    const tracker = createChildProcessTracker({
+      forceKillTimeoutMs: 50,
+      treeKill: true,
+      platform: "linux",
+      killGroup,
+    });
+
+    await tracker.cleanup();
+
+    const late = new FakeChildProcess();
+    late.pid = 4242;
+    tracker.register(late);
+
+    expect(killGroup).toHaveBeenCalledWith(-4242, "SIGKILL");
+    expect(late.killSignals).toEqual([]);
+  });
+
+  it("falls back to a direct kill when the late child leads no group", async () => {
+    const killGroup = vi.fn(() => {
+      throw new Error("ESRCH");
+    });
+    const tracker = createChildProcessTracker({
+      forceKillTimeoutMs: 50,
+      treeKill: true,
+      platform: "linux",
+      killGroup,
+    });
+
+    await tracker.cleanup();
+
+    const late = new FakeChildProcess();
+    late.pid = 4242;
+    tracker.register(late);
+
+    expect(late.killSignals).toEqual(["SIGKILL"]);
+  });
+
   it("runs tracked cleanup before exiting on SIGTERM", async () => {
     const tracker = createChildProcessTracker({ forceKillTimeoutMs: 50 });
     const processRef = new FakeProcess();

@@ -48,7 +48,7 @@
 
 // ---- Store ------------------------------------------------------------------
 
-export { resolveStore, PRD_FILENAME, PRD_TREE_DIRNAME, SELF_HEAL_TAG } from "./store/index.js";
+export { resolveStore, PRD_FILENAME, PRD_TREE_DIRNAME, TREE_META_FILENAME, SELF_HEAL_TAG } from "./store/index.js";
 export type { PRDStore } from "./store/contracts.js";
 
 // ---- Markdown serializer / parser ------------------------------------------
@@ -257,6 +257,7 @@ export {
   detectTimestampIssues,
   detectOrphanBlockedBy,
   detectParentChildMisalignment,
+  detectStuckParents,
 } from "./fix/index.js";
 export type { FixKind, FixAction, FixResult } from "./fix/index.js";
 

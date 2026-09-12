@@ -31,6 +31,7 @@ export type {
   RunDiagnostics,
   PromptSectionDiagnostic,
   PersistedRuntimeEvent,
+  RunReviewRecord,
   RunRecord,
   TaskBrief,
   TaskBriefTask,

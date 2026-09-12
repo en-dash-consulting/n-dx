@@ -53,6 +53,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
+      { flag: "--review-optional", description: "Accept a best-effort review: warn instead of refusing the completion when the reviewer cannot start" },
       { flag: "--approve-diff", description: "Show proposed changes and prompt for approval (was --review before the review pass took that flag)" },
       { flag: "--max-turns=<n>", description: "Override max agent turns per task" },
       { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },
@@ -80,8 +81,19 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "The execution model is never inherited — pinning a cheap executor\n" +
           "must not silently downgrade the reviewer.\n" +
           "\n" +
-          "Requires the CLI provider. A review that cannot complete warns and\n" +
-          "leaves the task's own result alone; it never fails a valid task.",
+          "Requires the CLI provider.\n" +
+          "\n" +
+          "--review is a gate. If no reviewer ever starts — a spawn failure, a\n" +
+          "model the installed vendor CLI rejects, a vendor with no reviewer —\n" +
+          "the run is refused rather than reported completed, because \"could not\n" +
+          "review\" must not read as \"reviewed, found nothing\". The validated work\n" +
+          "is left in the tree, the task returns to pending rather than deferred,\n" +
+          "and the run does not count toward stuck-task detection: the usual cause\n" +
+          "is a config line, not a defect in the task. Pass --review-optional to\n" +
+          "downgrade that refusal to a warning.\n" +
+          "\n" +
+          "A reviewer that *did* run but lost its report only warns: the change\n" +
+          "was attacked, and the task's own result stands.",
       },
       {
         title: "Pre-run commit gate",

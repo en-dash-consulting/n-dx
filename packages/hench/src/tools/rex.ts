@@ -147,18 +147,23 @@ export async function toolRexUpdateStatus(
     }
   }
 
-  // Auto-complete parent items using a whole-tree reconciliation sweep.
-  // Using reconcileAutoCompletions (not findAutoCompletions) ensures that
-  // parents left stuck pending by a previously-missed cascade are also healed.
-  // This scans the full tree on every completed/deferred update and may cascade
-  // parents unrelated to this task — that is the intended self-healing. It relies
-  // on the no-concurrent-PRD-writers contract (see CLAUDE.md "Concurrency
-  // contract"): a writer landing between updateItem and loadDocument here could
-  // otherwise cross-contaminate the sweep.
+  // Auto-complete parent items using a reconciliation sweep contained to this
+  // task's own ancestors. reconcileAutoCompletions (not findAutoCompletions)
+  // still heals ancestors left stuck pending by a previously-missed cascade,
+  // but `ancestorsOf` bounds it to the chain above `taskId`.
+  //
+  // The sweep used to be whole-tree, on the theory that healing every stuck
+  // parent in the PRD was a free bonus. It was not (GitHub #368): a run that
+  // hit the session limit on turn 1 — zero tool calls, no agent work at all —
+  // deferred its own task here, and the sweep went on to complete an
+  // in_progress task and its epic in an unrelated part of the tree, rewriting
+  // their authorship on the way out. Containment is what bounds the blast
+  // radius of this call to the subtree the run is actually operating on,
+  // whatever the completion predicate decides.
   const autoCompleted: string[] = [];
   if (params.status === "completed" || params.status === "deferred") {
     const doc = await store.loadDocument();
-    const { completedItems } = reconcileAutoCompletions(doc.items);
+    const { completedItems } = reconcileAutoCompletions(doc.items, { ancestorsOf: taskId });
 
     for (const item of completedItems) {
       const parentItem = await store.getItem(item.id);
@@ -174,6 +179,9 @@ export async function toolRexUpdateStatus(
         ...parentTsUpdates,
       }, {
         applyAttribution: true,
+        // The user asked to update `taskId`, not this ancestor. Closing it is
+        // a consequence, so it must not also reassign its authorship (#368).
+        preserveModifiedBy: true,
         ...(options?.projectDir ? { projectDir: options.projectDir } : {}),
       });
       await store.appendLog({

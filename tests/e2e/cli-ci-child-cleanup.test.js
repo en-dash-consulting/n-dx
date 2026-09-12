@@ -11,6 +11,14 @@
  *   1. A ci subprocess that completes normally is reaped before the parent exits.
  *   2. A ci subprocess that is still running when SIGINT arrives is killed by
  *      the cleanup gate (SIGTERM → SIGKILL after timeout).
+ *   3. NO fixture child outlives the test file, whatever the assertions did —
+ *      see the teardown. This file used to leak one `hang`-mode double per
+ *      SIGINT run, because killing the in-flight step is what let `ndx ci`
+ *      advance to the NEXT step while the parent was already exiting. The
+ *      escalation the assertions check ran fine; the child it unblocked was the
+ *      one that escaped. The production side of that is fixed in
+ *      child-lifecycle.js (see createChildProcessTracker's register), and this
+ *      teardown is the backstop that makes a recurrence fail loudly.
  *
  * It uses the same preload-interception pattern as cli-child-cleanup.test.js:
  * a NODE_OPTIONS=--import preload patches child_process.spawn so that any
@@ -40,6 +48,9 @@ const CI_DOUBLE_PATH = join(
 const CHILD_FORCE_KILL_TIMEOUT_MS = 5_000;
 const SHUTDOWN_ASSERTION_BUFFER_MS = 1_500;
 
+/** How long teardown waits for an already-killed child to leave the process table. */
+const ORPHAN_REAP_GRACE_MS = 2_000;
+
 function isPidRunning(pid) {
   if (!Number.isInteger(pid)) return false;
   try {
@@ -60,6 +71,35 @@ async function waitForPidExit(pid, timeoutMs) {
   throw new Error(
     `CI child process ${pid} remained alive beyond ${timeoutMs}ms shutdown timeout.`,
   );
+}
+
+/**
+ * Every PID record written so far, or [] when the file does not exist yet.
+ *
+ * Used by teardown rather than by the assertions: the tests only care about the
+ * FIRST child, but every child the run spawned has to be accounted for or the
+ * ones the assertions never mention leak.
+ */
+async function readPidRecords(pidFile) {
+  let content;
+  try {
+    content = await readFile(pidFile, "utf8");
+  } catch {
+    return [];
+  }
+
+  return content
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line)];
+      } catch {
+        // Torn final line — the double appends, so a partial write is possible.
+        return [];
+      }
+    });
 }
 
 /**
@@ -128,6 +168,15 @@ async function setupCiProject(dir) {
   );
 }
 
+/**
+ * Runs started by the current test, so teardown can reap them whatever the
+ * assertions did. Tracked explicitly rather than relying on process-group
+ * semantics: the CLI spawns its children detached (they lead their OWN groups,
+ * by design, so the tracker can tree-kill them), which is exactly what stops a
+ * group kill aimed at the test's own child from reaching them.
+ */
+const activeRuns = [];
+
 function spawnCI(tmpDir, mode) {
   const pidFile = join(tmpDir, "ci-child-pids.jsonl");
   const child = spawn(process.execPath, [CLI_PATH, "ci", tmpDir], {
@@ -147,7 +196,7 @@ function spawnCI(tmpDir, mode) {
   child.stdout.on("data", (chunk) => stdout.push(chunk.toString()));
   child.stderr.on("data", (chunk) => stderr.push(chunk.toString()));
 
-  return {
+  const run = {
     child,
     pidFile,
     done: new Promise((resolve) => {
@@ -156,6 +205,9 @@ function spawnCI(tmpDir, mode) {
       });
     }),
   };
+
+  activeRuns.push(run);
+  return run;
 }
 
 // Runs on Windows as well as POSIX. Caveat for the SIGINT case: on Windows
@@ -172,12 +224,59 @@ describe("n-dx ci child-process cleanup regression coverage", () => {
   });
 
   afterEach(async () => {
+    // 1. The CLI parent. A case that failed an assertion or timed out never
+    //    awaited run.done, and a live parent goes on spawning pipeline steps.
+    for (const run of activeRuns) {
+      if (run.child.exitCode === null && run.child.signalCode === null) {
+        try {
+          run.child.kill("SIGKILL");
+        } catch {
+          // Already gone.
+        }
+      }
+    }
+
+    // 2. The fixture doubles, unconditionally and by PID. `hang` mode ignores
+    //    SIGTERM by design, so this goes straight to SIGKILL. Without it a
+    //    failing or timing-out case leaves a node process reparented to PID 1
+    //    on every single run — a sweep of one dev machine found 31 of them
+    //    holding 431 MB, the oldest alive for over 11 hours.
+    const survivors = [];
+    for (const run of activeRuns) {
+      for (const record of await readPidRecords(run.pidFile)) {
+        if (!isPidRunning(record.pid)) continue;
+
+        // Bounded grace before calling it a survivor: a child SIGKILLed moments
+        // before its parent exited can still answer signal 0 while it is a
+        // zombie awaiting reparenting, and signal 0 cannot tell the two apart.
+        try {
+          await waitForPidExit(record.pid, ORPHAN_REAP_GRACE_MS);
+          continue;
+        } catch {
+          // Genuinely still running.
+        }
+
+        survivors.push(`${record.pid} (${(record.argv ?? []).join(" ")})`);
+        try {
+          process.kill(record.pid, "SIGKILL");
+        } catch {
+          // Raced us to exit.
+        }
+      }
+    }
+    activeRuns.length = 0;
+
     // maxRetries/retryDelay: the CLI child is spawned with cwd: tmpDir, so on
     // Windows the directory can still be handle-locked when teardown runs and
     // rmdir fails with EBUSY. Under full-suite load this is the difference
     // between green and an intermittent red that has nothing to do with the
     // assertion under test.
     await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+
+    // Loud, not silent. The processes above have already been reaped, so this
+    // never leaks regardless — but a regression that reintroduces the leak has
+    // to fail a test rather than accumulate quietly across suite runs.
+    expect(survivors).toEqual([]);
   });
 
   it("terminates the ci subprocess after a successful run", async () => {

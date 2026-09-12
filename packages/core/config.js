@@ -1618,6 +1618,11 @@ Hench settings (.hench/config.json):
                                      and fallbacks — so the allowances add up rather than
                                      multiplying. Hitting it fails the task with the breakdown
                                      instead of continuing to spend.
+  hench.livelockThreshold  number    Identical tool calls — same name, same arguments, nothing
+                                     written to disk in between — before a run is stopped as
+                                     livelocked (default: 6). 0 disables the check. Raise it if a
+                                     legitimate workload repeats one read-only call many times
+                                     without editing anything.
 
 Hench test-gate settings (mandatory full-suite gate before commit):
   hench.fullTestCommand    string    Command that runs the whole suite. Resolved from this key,

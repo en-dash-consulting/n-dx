@@ -13,3 +13,17 @@ The policies below are directory policies and apply regardless of which zone IDs
 
 - **CLI-only content:** These directories must contain only CLI command handlers and their direct support modules. Domain logic belongs in `src/core/`.
 - **Subdirectory convention:** Satellite files should be grouped into subdirectories under `packages/rex/src/cli/commands/` to make boundaries visible in the file tree. `commands/` is still a flat directory of 40+ files, so this remains a target rather than a description — see `packages/rex/src/cli/commands/ZONE_BOUNDARY.md`.
+
+### Declared coupling: `src/fix/` → `src/core/parent-completion.ts`
+
+`src/fix/index.ts` imports `SUCCESSFUL_CHILD_STATUSES`, `AUTO_COMPLETABLE_STATUSES` and `allChildrenSuccessful` from `src/core/parent-completion.ts`. This is deliberate and load-bearing, not drift.
+
+The fix engine keeps its own structural `FixItem` tree shape — that part of the zone boundary stands. What it must **not** keep is its own copy of the *status predicates*. It did, and they drifted: a private `{completed, deferred, cancelled, deleted}` set survived #364 narrowing the real predicate to `{completed}`, so `rex validate` warned about a completed parent with a deferred child while `rex fix` proposed nothing for it — the checker and the repair tool disagreed about what "broken" meant.
+
+Consequences to respect when editing either side:
+
+- **Never fork these sets into `fix/`.** `remove-task.ts`, `structural.ts` and `status-sections.ts` all import them for the same reason. A change to what counts as a successful child must land once and move validate, fix and auto-completion together.
+- **`allChildrenSuccessful` takes a structural `ParentStatusNode`, not `PRDItem`.** That widening exists solely so `fix/` can share the predicate rather than fork it. Narrowing it back to `PRDItem` re-forks the sets by forcing a local copy.
+- **Cancelled and deleted children keep blocking a parent**, because they are not in `SUCCESSFUL_CHILD_STATUSES`. If that judgement is ever reversed, the exception belongs in that set — not in `fix/`.
+
+`rex fix`'s `stuck_parent` kind is the operator-facing home of the whole-tree reconciliation that agent runs stopped performing in #368 (every run-path caller now passes `reconcileAutoCompletions`' `ancestorsOf` scope). Do not restore an unscoped sweep on a run path to "bring self-healing back".

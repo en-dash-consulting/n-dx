@@ -27,10 +27,11 @@ import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
 import { parseTreeMeta, treeMetaContents } from "./tree-meta.js";
-import { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
+import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 import {
   stampModified,
+  stampUpdatedItem,
   stampActor,
   stampModifiedFields,
   snapshotItemContent,
@@ -78,7 +79,7 @@ export class FolderTreeStore implements PRDStore {
     // any tree older than the marker, which then reads as the running version.
     let schema = SCHEMA_VERSION;
     try {
-      const raw = await readFile(this.path("tree-meta.json"), "utf-8");
+      const raw = await readFile(this.path(TREE_META_FILENAME), "utf-8");
       const meta = parseTreeMeta(raw);
       if (meta.title !== undefined) title = meta.title;
       if (meta.schema !== undefined) schema = meta.schema;
@@ -95,7 +96,7 @@ export class FolderTreeStore implements PRDStore {
   /** Serialize the document to disk. Callers must hold the PRD lock. */
   private async writeTree(doc: PRDDocument): Promise<void> {
     await mkdir(this.treeRoot, { recursive: true });
-    await writeFile(this.path("tree-meta.json"), JSON.stringify(treeMetaContents(doc)), "utf-8");
+    await writeFile(this.path(TREE_META_FILENAME), JSON.stringify(treeMetaContents(doc)), "utf-8");
     await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
     // A completed save makes this instance's view of the tree current again:
     // its own writes must not read as "another writer's work" on the next save.
@@ -143,19 +144,20 @@ export class FolderTreeStore implements PRDStore {
     });
   }
 
-  async updateItem(id: string, updates: Partial<PRDItem>, _options?: WriteOptions): Promise<void> {
-    await this.withTransaction(async (doc) => {
-      const entry = findItem(doc.items, id);
-      if (!entry) {
-        throw new Error(`Item "${id}" not found`);
-      }
-      // Merge updates onto the current item before stamping so `lastModified`
-      // always reflects this write, even when `updates` omits it.
-      const merged = await stampModified({ ...entry.item, ...updates } as PRDItem);
-      if (!updateInTree(doc.items, id, merged)) {
-        throw new Error(`Item "${id}" not found`);
-      }
-    });
+  async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
+    await this.runTransaction(
+      async (doc) => {
+        const entry = findItem(doc.items, id);
+        if (!entry) {
+          throw new Error(`Item "${id}" not found`);
+        }
+        const merged = await stampUpdatedItem(entry.item, updates, options);
+        if (!updateInTree(doc.items, id, merged)) {
+          throw new Error(`Item "${id}" not found`);
+        }
+      },
+      options?.preserveModifiedBy ? new Set([id]) : undefined,
+    );
   }
 
   async removeItem(id: string): Promise<void> {
@@ -254,6 +256,22 @@ export class FolderTreeStore implements PRDStore {
   // ---- Transactions --------------------------------------------------------
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
+    return this.runTransaction(fn);
+  }
+
+  /**
+   * `withTransaction` plus the one knob the public contract has no place for.
+   *
+   * `preserveAuthorFor` is threaded to {@link stampChangedItems}: a status
+   * change moves an item's content signature, so the transaction-level stamp
+   * would otherwise overwrite the author that `updateItem` deliberately kept
+   * for a cascaded write (GitHub #368). The per-item stamp is not enough on
+   * its own — this is where it gets undone.
+   */
+  private async runTransaction<T>(
+    fn: (doc: PRDDocument) => Promise<T>,
+    preserveAuthorFor?: ReadonlySet<string>,
+  ): Promise<T> {
     // The lock file lives in rexDir, which may not exist on first write.
     await mkdir(this.rexDir, { recursive: true });
     const lockPath = prdLockPath(this.rexDir);
@@ -269,7 +287,7 @@ export class FolderTreeStore implements PRDStore {
       // mutated directly — callers that bypass updateItem still get one.
       const before = snapshotItemContent(doc.items);
       const result = await fn(doc);
-      stampChangedItems(doc.items, before, await stampModifiedFields(undefined, actor));
+      stampChangedItems(doc.items, before, await stampModifiedFields(undefined, actor), preserveAuthorFor);
       const check = validateDocument(doc);
       if (!check.ok) {
         throw new Error(`Invalid document after mutation: ${check.errors.message}`);

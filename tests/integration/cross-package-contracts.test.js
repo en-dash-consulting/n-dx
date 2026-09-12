@@ -167,6 +167,7 @@ describe("hench → rex gateway contract", () => {
     "explainSelection",
     "computeTimestampUpdates",
     "findAutoCompletions",
+    "findParentResets",
     "collectRequirements",
     "validateAutomatedRequirements",
     "formatRequirementsValidation",
@@ -177,7 +178,12 @@ describe("hench → rex gateway contract", () => {
     "acknowledgeFinding",
   ];
 
-  const GATEWAY_CONSTANTS = ["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "SELF_HEAL_TAG"];
+  const GATEWAY_CONSTANTS = [
+    "SCHEMA_VERSION",
+    "PRD_TREE_DIRNAME",
+    "TREE_META_FILENAME",
+    "SELF_HEAL_TAG",
+  ];
 
   for (const name of GATEWAY_FUNCTIONS) {
     it(`re-exports "${name}" as a function`, async () => {
@@ -277,6 +283,7 @@ describe("hench → llm-client gateway contract", () => {
     "quoteWindowsToken",
     "buildWindowsCliCommandLine",
     "spawnCli",
+    "terminateProcessTree",
     "diagnoseCliInvocation",
     "diagnoseCliNotFound",
   ];
@@ -583,10 +590,11 @@ describe("gateway export auto-detection", () => {
       ...["resolveStore", "isCompatibleSchema", "assertSchemaVersion",
         "findItem", "walkTree", "findNextTask", "findActionableTasks",
         "collectCompletedIds", "explainSelection", "computeTimestampUpdates",
-        "findAutoCompletions", "reconcileAutoCompletions", "collectRequirements", "validateAutomatedRequirements",
+        "findAutoCompletions", "reconcileAutoCompletions", "findParentResets",
+        "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding"],
-      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "SELF_HEAL_TAG"],
+      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "TREE_META_FILENAME", "SELF_HEAL_TAG"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));
@@ -639,7 +647,7 @@ describe("gateway export auto-detection", () => {
         "toOpenAiToolDef", "toOpenAiToolDefs", "toGeminiFunctionDeclaration",
         "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry",
         "classifyLLMError", "isAuthError", "parseLmStudioError", "getNextFailoverAttempt",
-        "quoteWindowsToken", "buildWindowsCliCommandLine", "spawnCli",
+        "quoteWindowsToken", "buildWindowsCliCommandLine", "spawnCli", "terminateProcessTree",
         "diagnoseCliInvocation", "diagnoseCliNotFound", "isLLMVendor"],
       ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "REVIEW_MODELS", "GOOGLE_MODELS",
         "VENDOR_CONTEXT_CHAR_LIMITS",

@@ -11,10 +11,18 @@ import { loadConfig } from "../../store/config.js";
 import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
-import { performPreRunCommitGateIfNeeded } from "../../agent/lifecycle/shared.js";
+import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
+import {
+  PRD_COMMIT_PATHS,
+  findUncommittedWork,
+  formatLoopRefusal,
+  formatResetDeferredCommitSkipped,
+  listUncommittedPrdPaths,
+} from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
+import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
@@ -69,6 +77,13 @@ export interface ReviewOptions {
   reviewPass: boolean;
   /** `--review-model` — override the model the reviewer runs on. */
   reviewModel?: string;
+  /**
+   * `--review-optional` — downgrade the missing-review gate to a warning.
+   *
+   * Off by default: `--review` is an opt-in gate, and a gate that silently
+   * no-ops when its reviewer cannot start is worse than no gate at all.
+   */
+  reviewOptional: boolean;
 }
 
 const MAX_TASK_ATTEMPTS = 3;
@@ -347,14 +362,30 @@ function countTasksByStatus(items: PRDItem[], statuses: string[]): number {
   return count;
 }
 
+export interface ResetDeferredOptions {
+  /**
+   * List what would be reset and write nothing.
+   *
+   * A dry run must leave the working tree exactly as it found it. The commit
+   * that normally lands the reset is skipped on a dry run, so a reset that
+   * still wrote would leave `.rex/prd_tree/` dirty — and the next *real*
+   * autonomous run would then refuse to start against dirt that a
+   * `--dry-run` produced.
+   */
+  dryRun?: boolean;
+}
+
 /**
  * Reset all deferred and failing tasks to pending so they can be retried.
  *
  * Used by --reset-deferred to let the user restart a run where all tasks
  * failed (e.g. after fixing LM Studio context window size). Returns the
- * number of tasks that were reset.
+ * number of tasks that were reset (or, on a dry run, would be reset).
  */
-async function resetDeferredTasks(store: PRDStore): Promise<number> {
+export async function resetDeferredTasks(
+  store: PRDStore,
+  opts: ResetDeferredOptions = {},
+): Promise<number> {
   const doc = await store.loadDocument();
   const toReset: Array<{ id: string; title: string }> = [];
 
@@ -368,16 +399,68 @@ async function resetDeferredTasks(store: PRDStore): Promise<number> {
   };
   walk(doc.items);
 
-  for (const t of toReset) {
-    await store.updateItem(t.id, { status: "pending" });
+  if (!opts.dryRun) {
+    for (const t of toReset) {
+      await store.updateItem(t.id, { status: "pending" });
+    }
   }
 
   if (toReset.length > 0) {
-    info(`\nReset ${toReset.length} task(s) to pending:`);
+    const verb = opts.dryRun ? "Would reset" : "Reset";
+    info(`\n${verb} ${toReset.length} task(s) to pending:`);
     for (const t of toReset) info(`  ${colorStatus("pending", "○")} ${t.id}: ${t.title}`);
   }
 
   return toReset.length;
+}
+
+/**
+ * `--reset-deferred` end to end: reset the deferred/failing tasks and land
+ * that write, so the pre-run commit gate sees a tree this call left clean.
+ *
+ * The commit is conditional, and the condition is measured *before* the reset
+ * writes anything. {@link commitResetDeferredChanges} stages `.rex/prd_tree`
+ * wholesale — it cannot tell the reset's own write from an operator edit
+ * already sitting there — so on a tree that was already dirty it would commit
+ * the operator's half-finished work under "reset N deferred/failing task(s)",
+ * with hench's Co-Authored-By trailer, before the gate ever saw it. In a TTY,
+ * with no prompt.
+ *
+ * When that is the case the reset still happens (it is what the flag is for)
+ * but nothing is committed: the pre-run gate then reports the whole dirty tree
+ * and refuses, which is exactly what the operator got before #365.
+ *
+ * On a dry run nothing is written and nothing is committed.
+ *
+ * @returns the number of tasks reset, or that would be reset on a dry run
+ */
+export async function resetDeferredAndCommit(
+  store: PRDStore,
+  projectDir: string,
+  opts: ResetDeferredOptions = {},
+): Promise<number> {
+  const dryRun = Boolean(opts.dryRun);
+  // Before the reset, deliberately: afterwards the reset's own write is
+  // indistinguishable from anything that was already there.
+  const prdDirtyBeforeReset = dryRun ? [] : await listUncommittedPrdPaths(projectDir);
+
+  const resetCount = await resetDeferredTasks(store, { dryRun });
+  if (resetCount === 0) {
+    info("\nNo deferred or failing tasks to reset.");
+    return 0;
+  }
+  if (dryRun) return resetCount;
+
+  if (prdDirtyBeforeReset.length > 0) {
+    info(formatResetDeferredCommitSkipped(prdDirtyBeforeReset));
+    return resetCount;
+  }
+
+  // Commit the reset's own PRD-tree write immediately so the pre-run commit
+  // gate sees a clean tree instead of refusing the very run --reset-deferred
+  // exists to resume (GitHub #365).
+  await commitResetDeferredChanges(projectDir, resetCount);
+  return resetCount;
 }
 
 // ---------------------------------------------------------------------------
@@ -769,6 +852,7 @@ async function runOne(
         approveDiff: reviewOpts.approveDiff,
         reviewPass: reviewOpts.reviewPass,
         reviewModel: reviewOpts.reviewModel,
+        reviewOptional: reviewOpts.reviewOptional,
         excludeTaskIds,
         epicId,
         tags,
@@ -849,6 +933,12 @@ async function runOne(
     const testResult = postTests.passed ? green("passed") : red("FAILED");
     info(`Post-task tests: ${testResult} (${scope}, ${postTests.durationMs ?? 0}ms)`);
   }
+
+  // Adversarial review outcome. Printed here as well as mid-run because the
+  // mid-run line is long gone behind the test gate and the commit prompt by
+  // the time anyone reads the result, and "completed" with no review line
+  // beneath it is precisely the ambiguity `--review` exists to remove.
+  for (const line of formatRunReviewStatus(run.review)) info(line);
 
   // Change classification
   info(formatChangeClassification(run.toolCalls));
@@ -1048,10 +1138,18 @@ export async function cmdRun(
       "The review model only applies to the adversarial review pass. Add --review, or drop --review-model.",
     );
   }
+  const reviewOptional = flags["review-optional"] === "true";
+  if (reviewOptional && !reviewPass) {
+    throw new CLIError(
+      "--review-optional was passed without --review.",
+      "It only relaxes the gate the review pass installs. Add --review, or drop --review-optional.",
+    );
+  }
   const reviewOpts: ReviewOptions = {
     approveDiff,
     reviewPass,
     reviewModel: reviewModelFlag?.trim() || undefined,
+    reviewOptional,
   };
   // --no-rollback always wins; otherwise read config (defaults to true).
   // Note: the failure rollback is prompt-only — it never runs without an
@@ -1139,10 +1237,7 @@ export async function cmdRun(
   // (e.g. context window overflow) without manually editing each task.
   if (flags["reset-deferred"] === "true") {
     const store = await resolveStore(rexDir);
-    const resetCount = await resetDeferredTasks(store);
-    if (resetCount === 0) {
-      info("\nNo deferred or failing tasks to reset.");
-    }
+    await resetDeferredAndCommit(store, dir, { dryRun });
   }
 
   // Fail fast if CLI provider selected but vendor CLI binary not available.
@@ -1429,6 +1524,10 @@ export async function cmdRun(
     });
     if (gate === "stop") {
       info("Stopped before running. Commit or discard your changes, then re-run.");
+      // A refusal to start is not success — without this the process exits 0
+      // and an unattended caller (a script, `--loop`, the dashboard) reads
+      // "no task ran" as "done" (GitHub #365).
+      process.exitCode = 1;
       return;
     }
 
@@ -1463,6 +1562,53 @@ export async function cmdRun(
   } finally {
     await limiter.release();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Between-task working-tree guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Refuse to start another task while the previous one's output is still in the
+ * working tree (#363).
+ *
+ * The pre-run commit gate runs once per invocation, so in a multi-task run
+ * nothing checked the tree again between tasks. When one task leaked its
+ * files, the next started on top of them: its diff, its review and its commit
+ * all covered work it never wrote, and three tasks' output ended up tangled
+ * together in one session.
+ *
+ * The PRD paths are discounted, along with hench's own runtime artifacts.
+ * An earlier revision discounted nothing but the artifacts, on the premise
+ * that uncommitted `.rex/prd_tree/` between tasks meant the previous task's
+ * status write never landed. That premise only holds for a *successful* task.
+ * Every failure path writes the PRD and commits nothing: `handleRunFailure`
+ * records `deferred`/`pending` on the task, while the two committers
+ * ({@link performCommitPromptIfNeeded}, `commitCompletionMetadata`) run only
+ * when the run completed, and the rollback never reverts unattended. So the
+ * first failed, deferred or timed-out task stopped the whole loop, and the
+ * consecutive-failure counter and stuck-task skipping below could never be
+ * reached. A PRD write with no code beside it is not leaked work — and the
+ * completion gate in `finalizeRun` still covers the case that is.
+ *
+ * Attended runs are left alone: a user who declined the commit prompt made
+ * that choice deliberately and is watching.
+ *
+ * @returns true when the caller should stop the loop.
+ */
+export async function shouldStopForUncommittedWork(
+  projectDir: string,
+  autonomous: boolean | undefined,
+): Promise<boolean> {
+  if (!autonomous) return false;
+  const leftover = await findUncommittedWork({
+    projectDir,
+    discountPaths: PRD_COMMIT_PATHS,
+  });
+  if (leftover.clean) return false;
+  info(`\n${colorWarn(formatLoopRefusal(leftover.paths))}`);
+  process.exitCode = 1;
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1502,6 +1648,7 @@ async function runIterations(
     // Not emitted before the first iteration (i === 0).
     if (i > 0) {
       info(`\n${formatIterationBanner(i + 1, iterations)}`);
+      if (await shouldStopForUncommittedWork(dir, autonomous)) break;
     }
 
     // For autoselected iterations, skip stuck tasks
@@ -1645,6 +1792,7 @@ async function runLoop(
       // Banner between iterations: not emitted before the first iteration.
       if (completed > 1) {
         info(`\n${formatIterationBanner(completed)}`);
+        if (await shouldStopForUncommittedWork(dir, autonomous)) break;
       }
 
       // Show queue status if there are pending tasks
@@ -1878,6 +2026,16 @@ async function runEpicByEpic(
   process.on("SIGTERM", onSignal);
 
   const summaries: EpicRunSummary[] = [];
+  /**
+   * Tasks started by this invocation, counted across every epic.
+   *
+   * The between-task guard runs before each task except the very first, and
+   * "first" has to mean first of the *invocation*, not first of the epic: the
+   * task that leaks its work is just as likely to be the last one of the
+   * previous epic. The pre-run commit gate has already vetted the tree for
+   * task one.
+   */
+  let tasksStarted = 0;
 
   try {
     const store = await resolveStore(rexDir);
@@ -1961,6 +2119,14 @@ async function runEpicByEpic(
       while (true) {
         if (stopping) break;
 
+        // Same between-task guard the fixed-iteration and loop modes run
+        // (#363). `stopping` ends the outer epic loop too, so the refusal
+        // stops the invocation rather than just this epic.
+        if (tasksStarted > 0 && await shouldStopForUncommittedWork(dir, autonomous)) {
+          stopping = true;
+          break;
+        }
+
         // Show queue status if there are pending tasks
         if (queue) logQueueStatus(queue);
 
@@ -1995,6 +2161,7 @@ async function runEpicByEpic(
               permissionMode,
             );
             status = result.status;
+            tasksStarted++;
           } finally {
             // Release the queue slot after the task completes
             if (queue) queue.release();

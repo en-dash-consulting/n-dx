@@ -15,8 +15,10 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
-import { explainSelection, collectCompletedIds, findItem, PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
+import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -37,6 +39,7 @@ import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
+import { formatMissingReviewRefusal, reviewNeverRan } from "../analysis/adversarial-review.js";
 import { discoverChangedFiles } from "../analysis/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
@@ -51,6 +54,12 @@ import type { Heartbeat } from "./heartbeat.js";
 import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
+import {
+  PRD_COMMIT_PATHS,
+  findUncommittedWork,
+  formatUncommittedWorkRefusal,
+  listDirtyPaths,
+} from "./uncommitted-work-gate.js";
 import type { CommitMsgWatcher } from "./commit-msg-watcher.js";
 
 // ---------------------------------------------------------------------------
@@ -117,6 +126,12 @@ export interface SharedLoopOptions {
    * recommended default in `REVIEW_MODELS`.
    */
   reviewModel?: string;
+  /**
+   * Accept a best-effort review pass (`--review-optional`): a reviewer that
+   * never started warns instead of refusing the completion. See
+   * {@link FinalizeRunOptions.reviewOptional}.
+   */
+  reviewOptional?: boolean;
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
   excludeTaskIds?: Set<string>;
   /** Restrict task selection to this epic (ID). */
@@ -859,6 +874,18 @@ export interface FinalizeRunOptions {
    * the gate would skip the very run it should be testing.
    */
   startingHead?: string;
+  /**
+   * Accept a best-effort adversarial review (`--review-optional`).
+   *
+   * Default (false) enforces the missing-review gate: a run whose reviewer
+   * never started is refused rather than reported completed. Set true when the
+   * operator wants the review attempted but not required — the warning is
+   * still printed and still recorded on the run.
+   *
+   * Only meaningful alongside `--review`; without a review pass there is no
+   * failure to be optional about.
+   */
+  reviewOptional?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -867,37 +894,6 @@ export interface FinalizeRunOptions {
 
 /** Run statuses that indicate the run ended in failure. */
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
-
-/**
- * Return the list of entries reported by `git status --porcelain`.
- * Each non-blank line represents a modified, staged, or untracked path.
- * Returns an empty array when the working tree is clean or git is unavailable.
- *
- * Hench's own runtime artifacts are discounted by the callers via
- * {@link excludeHenchRuntimeArtifacts} rather than in here, because that is a
- * policy about what counts as operator work, not a detail of how the paths
- * were obtained — and this function is an injectable seam, so a filter hidden
- * inside the default implementation would silently not apply wherever a
- * caller supplied its own.
- *
- * `--untracked-files=all` matters twice over. By default git collapses a
- * wholly-untracked directory to a single entry — a fresh project reports
- * `?? .hench/`, never `?? .hench/locks/` — so
- * {@link excludeHenchRuntimeArtifacts} could not see what was inside and the
- * run blocked on its own lock file anyway. It also makes the count honest: a
- * directory of forty new files was being reported as "1 uncommitted file(s)".
- */
-async function listDirtyPaths(projectDir: string): Promise<string[]> {
-  try {
-    const output = await execStdout("git", ["status", "--porcelain", "--untracked-files=all"], {
-      cwd: projectDir,
-      timeout: 15_000,
-    });
-    return output.trim().split("\n").filter(Boolean);
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Run an interactive y/n readline prompt with the outer SIGINT handlers
@@ -1119,6 +1115,55 @@ async function performRollbackIfNeeded(
 /** Project-root sentinel where the agent writes its proposed commit message. */
 const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
 
+/**
+ * True when {@link performCommitPromptIfNeeded} will actually run a commit:
+ * the sentinel exists and has content. It returns early on a missing or
+ * empty file, so "the agent ran `git add`" is not the same as "a commit
+ * follows" — the uncommitted-work gate asks this before it discounts the
+ * staged index (#363: `git add -A` with no message file left every path
+ * staged, discounted, and never committed).
+ *
+ * A commit the watcher already made does not count either: the watcher
+ * deletes the sentinel, and whatever is still staged afterwards has no
+ * remaining owner.
+ */
+export function pendingCommitMessageExists(projectDir: string): boolean {
+  const msgPath = join(projectDir, PENDING_COMMIT_FILE);
+  if (!existsSync(msgPath)) return false;
+  try {
+    return readFileSync(msgPath, "utf-8").trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Stage the files the adversarial review pass changed so the commit prompt's
+ * `git commit -F` lands them with the executor's work — the promise the
+ * reviewer prompt makes ("your fixes are picked up by that commit"). Without
+ * this the repairs sat unstaged: on `hench.autoCommit=false` nothing else
+ * ever staged them, and the completion gate refused the run for the leak.
+ *
+ * Mirrors the file list {@link commitReviewRepairsIfNeeded} commits on the
+ * autoCommit path. Best-effort, like the PRD staging beside it: a repair
+ * that cannot be staged is reported, not fatal to the commit.
+ */
+async function stageReviewRepairs(projectDir: string, run: RunRecord): Promise<void> {
+  const review = run.review;
+  if (!review || review.failed !== undefined) return;
+  if (!review.repairedFiles || review.repairedFiles.length === 0) return;
+
+  try {
+    await execStdout("git", ["add", "--", ...review.repairedFiles], {
+      cwd: projectDir,
+      timeout: 10_000,
+    });
+    detail(`Staged ${review.repairedFiles.length} review repair(s)`);
+  } catch (err) {
+    detail(`Warning: could not stage review repairs: ${(err as Error).message}`);
+  }
+}
+
 async function promptCommitConfirm(fileCount: number): Promise<boolean> {
   // Uses the same SIGINT-suspension shim as the rollback prompt so a
   // Ctrl-C while the user is answering does not trigger the outer
@@ -1128,9 +1173,24 @@ async function promptCommitConfirm(fileCount: number): Promise<boolean> {
   );
 }
 
-async function countStagedFiles(projectDir: string): Promise<number> {
+/**
+ * How many paths are in the index, optionally narrowed to `pathspec`.
+ *
+ * Returns 0 when the directory is not a git repository or git is unavailable —
+ * every caller treats "nothing staged" and "cannot tell" the same way: skip the
+ * commit.
+ *
+ * @param pathspec Project-relative paths to limit the count to; omitted counts
+ *   the whole index.
+ */
+async function countStagedFiles(
+  projectDir: string,
+  pathspec: readonly string[] = [],
+): Promise<number> {
+  const args = ["diff", "--cached", "--name-only"];
+  if (pathspec.length > 0) args.push("--", ...pathspec);
   try {
-    const output = await execStdout("git", ["diff", "--cached", "--name-only"], {
+    const output = await execStdout("git", args, {
       cwd: projectDir,
       timeout: 15_000,
     });
@@ -1298,6 +1358,105 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
   }
 }
 
+/** The legacy flat-markdown PRD. Read-only for years; still staged if present. */
+const PRD_MARKDOWN_FILENAME = "prd.md";
+
+/**
+ * The project-relative PRD paths that exist in `projectDir` and should be
+ * staged by a commit that lands a PRD write.
+ *
+ * One helper for both staging sites — {@link commitPrdTreeIfStaged} and the
+ * commit prompt — because the set they stage has to stay equal to what the
+ * uncommitted-work gate discounts ({@link PRD_COMMIT_PATHS}). When they
+ * disagreed, the sidecar `tree-meta.json` was discounted by nobody and staged
+ * by nobody, and every completion was refused.
+ *
+ * Each path is existence-checked: `git add` errors on a missing path, and in a
+ * fresh project the legacy markdown (and, before the first PRD write, the tree
+ * itself) is absent.
+ */
+async function prdPathsToStage(
+  projectDir: string,
+  opts: { includeLegacyMarkdown?: boolean } = {},
+): Promise<string[]> {
+  const { join } = await import("node:path");
+  const { existsSync } = await import("node:fs");
+  const candidates = [
+    PRD_TREE_DIRNAME,
+    TREE_META_FILENAME,
+    ...(opts.includeLegacyMarkdown ? [PRD_MARKDOWN_FILENAME] : []),
+  ];
+  return candidates
+    .filter((name) => existsSync(join(projectDir, ".rex", name)))
+    .map((name) => join(".rex", name));
+}
+
+/**
+ * Stage the PRD folder tree and its sidecar, and commit them if anything ends
+ * up staged.
+ *
+ * Shared by every caller that writes the PRD tree outside the normal
+ * task-commit flow and needs that write landed immediately, rather than left
+ * for a later gate to (wrongly) treat as leaked operator work:
+ * {@link commitCompletionMetadata} (autoCommit path) and
+ * {@link commitResetDeferredChanges} (`--reset-deferred`, GitHub #365).
+ *
+ * `tree-meta.json` is staged alongside the tree because every store save
+ * rewrites it: leaving it out is what made the gate's discount list and this
+ * commit disagree, so the sidecar stayed dirty after the commit that was
+ * supposed to land the whole PRD write. Each path is existence-checked first —
+ * `git add` on a missing path is an error, which would abort the staging of
+ * the other.
+ *
+ * The commit is scoped to those same paths, so it lands the PRD write and
+ * nothing else — work the operator had already staged stays staged.
+ *
+ * Skips silently, returning 0, when no PRD path exists, when the directory
+ * isn't a git repo, or when nothing ends up staged.
+ */
+async function commitPrdTreeIfStaged(projectDir: string, message: string): Promise<number> {
+  const prdPaths = await prdPathsToStage(projectDir);
+
+  if (prdPaths.length === 0) {
+    return 0;
+  }
+
+  try {
+    for (const prdPath of prdPaths) {
+      await execStdout("git", ["add", prdPath], { cwd: projectDir, timeout: 10_000 });
+    }
+  } catch {
+    return 0; // not in a git repo
+  }
+
+  const staged = await countStagedFiles(projectDir, [".rex/"]);
+  if (staged === 0) {
+    return 0;
+  }
+
+  try {
+    // The pathspec is load-bearing. `git commit -m` with no pathspec commits
+    // the whole index, so anything the operator had staged before the run —
+    // a half-finished `git add -p`, say — landed under hench's own message
+    // with hench's trailer, unprompted, and before the pre-run gate could
+    // report it. With the pathspec, git commits only these paths and leaves
+    // every other index entry staged and untouched.
+    //
+    // It also makes this a *partial* commit, which git refuses mid-merge. The
+    // catch below reports that and leaves the PRD write in the tree for the
+    // gate to name, which is the right outcome: a run started mid-merge should
+    // not be quietly extending the merge commit.
+    await execStdout(
+      "git", ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine(), "--", ...prdPaths],
+      { cwd: projectDir, timeout: 30_000 },
+    );
+    return staged;
+  } catch (err) {
+    detail(`Warning: could not commit PRD tree changes: ${(err as Error).message}`);
+    return 0;
+  }
+}
+
 /**
  * Commit any uncommitted .rex/prd_tree changes produced by the task-completion
  * status update. Called on the autoCommit path only, where
@@ -1311,17 +1470,12 @@ async function commitCompletionMetadata(
   taskId: string,
   origin?: RunGitOrigin,
 ): Promise<void> {
-  const { join } = await import("node:path");
-  const { existsSync } = await import("node:fs");
-  const prdTreePath = join(".rex", PRD_TREE_DIRNAME);
-
-  if (!existsSync(join(projectDir, prdTreePath))) {
-    return;
-  }
-
-  // Checked before anything is staged, so a moved checkout leaves the tree
-  // exactly as it was. Reported, never thrown — the metadata staying dirty is
-  // an inspection burden, not a broken run.
+  // #360's guard, kept ahead of the staging helper so a moved checkout leaves
+  // the tree exactly as it was. Reported, never thrown — the metadata staying
+  // dirty is an inspection burden, not a broken run. It lives here rather than
+  // inside commitPrdTreeIfStaged because the helper's other caller
+  // (commitResetDeferredChanges) runs before the run exists and so has no
+  // origin to check against.
   const drift = checkRunGitOrigin(projectDir, origin);
   if (drift) {
     info(
@@ -1331,39 +1485,55 @@ async function commitCompletionMetadata(
     return;
   }
 
-  try {
-    await execStdout("git", ["add", prdTreePath], { cwd: projectDir, timeout: 10_000 });
-  } catch {
-    return; // not in a git repo
-  }
-
-  let staged = 0;
-  try {
-    const out = await execStdout(
-      "git", ["diff", "--cached", "--name-only", "--", ".rex/"],
-      { cwd: projectDir, timeout: 10_000 },
-    );
-    staged = out.trim().split("\n").filter(Boolean).length;
-  } catch {
-    return;
-  }
-
-  if (staged === 0) {
-    return;
-  }
-
   // Stages the whole `.rex/prd_tree/` (the completion write may touch the task
   // plus cascaded ancestors). Under the no-concurrent-PRD-writers contract this
   // is just this run's metadata; the message reflects it may span the tree.
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
-  try {
-    await execStdout(
-      "git", ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine()],
-      { cwd: projectDir, timeout: 30_000 },
-    );
+  const staged = await commitPrdTreeIfStaged(projectDir, message);
+  if (staged > 0) {
     detail(`Committed completion metadata (${staged} PRD file(s))`);
-  } catch (err) {
-    detail(`Warning: could not commit completion metadata: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Commit the `.rex/prd_tree/` writes made by `--reset-deferred` before the
+ * pre-run commit gate runs.
+ *
+ * WHY THIS EXISTS (GitHub #365). `--reset-deferred` resets deferred/failing
+ * tasks to pending by writing the PRD tree, and moments later the pre-run
+ * commit gate ({@link performPreRunCommitGateIfNeeded}) refuses an autonomous
+ * run against *any* dirty tree — including the dirt the reset itself just
+ * produced. That made the flag deadlock against itself on the exact case it
+ * exists for (resuming after an interruption), and the refusal exited 0, so
+ * an unattended caller read it as success and the tasks stayed deferred.
+ *
+ * Committing the reset immediately — the same pattern {@link
+ * commitCompletionMetadata} already uses for a task's own completion write —
+ * means the gate only ever sees a genuinely dirty tree: the user's own
+ * uncommitted work, which must still refuse.
+ *
+ * A no-op (returns without doing anything) when `resetCount` is 0 — nothing
+ * was reset, so there is nothing of this call's own to commit.
+ *
+ * **PRECONDITION: the PRD tree must have been clean before the reset ran.**
+ * This stages `.rex/prd_tree/` and the sidecar wholesale and cannot tell the
+ * reset's write from an operator edit that was already sitting there, so
+ * calling it on an already-dirty tree commits that edit too, under a message
+ * that describes something else entirely. Checking the precondition is the
+ * caller's job, because only the caller can look *before* the reset writes:
+ * see `resetDeferredAndCommit` in `cli/commands/run.ts`, which snapshots
+ * `listUncommittedPrdPaths` (uncommitted-work-gate.ts) first and skips this
+ * call when it is non-empty.
+ */
+export async function commitResetDeferredChanges(
+  projectDir: string,
+  resetCount: number,
+): Promise<void> {
+  if (resetCount <= 0) return;
+  const message = `chore(prd): reset ${resetCount} deferred/failing task(s) to pending (--reset-deferred)`;
+  const staged = await commitPrdTreeIfStaged(projectDir, message);
+  if (staged > 0) {
+    detail(`Committed --reset-deferred changes (${staged} PRD file(s))`);
   }
 }
 
@@ -1635,6 +1805,12 @@ export async function performCommitPromptIfNeeded(
     return;
   }
 
+  // Reviewer repairs ride the same commit as the executor's work; the
+  // completion gate already discounted them on that promise. Staged before
+  // the count below, so an index the executor left empty does not skip the
+  // commit and orphan the repairs the gate just waved through.
+  await stageReviewRepairs(projectDir, run);
+
   const stagedCount = await countStagedFiles(projectDir);
   if (stagedCount === 0) {
     info("\nPending commit message found but no staged changes — skipping commit.");
@@ -1704,15 +1880,10 @@ export async function performCommitPromptIfNeeded(
       }
 
       // Stage the PRD store after the status update so code and task state
-      // land in the same commit. Prefer the current folder-tree store, with a
-      // legacy markdown fallback for older projects.
+      // land in the same commit: the folder tree, its sidecar, and the legacy
+      // markdown for older projects.
       try {
-        const rexDir = join(projectDir, ".rex");
-        const prdMarkdownFilename = "prd.md";
-        const prdPaths = [
-          existsSync(join(rexDir, PRD_TREE_DIRNAME)) ? join(".rex", PRD_TREE_DIRNAME) : undefined,
-          existsSync(join(rexDir, prdMarkdownFilename)) ? join(".rex", prdMarkdownFilename) : undefined,
-        ].filter((p): p is string => Boolean(p));
+        const prdPaths = await prdPathsToStage(projectDir, { includeLegacyMarkdown: true });
 
         for (const prdPath of prdPaths) {
           await execStdout("git", ["add", prdPath], {
@@ -1926,6 +2097,121 @@ async function resetInProgressTaskIfFailed(
 
   await toolRexUpdateStatus(store, run.taskId, { status: "pending" });
   info(`\nTask reset to pending: [${run.taskId}] ${run.taskTitle ?? "unknown"}`);
+}
+
+/**
+ * Reopen completed ancestors above a task that has just been reset to pending.
+ *
+ * The cascade in {@link toolRexUpdateStatus} runs on `completed` and `deferred`
+ * only, so resetting the task to `pending` unwinds nothing: the feature and
+ * epic its own cascade closed a moment earlier stay `completed` above a pending
+ * child. That is the parent/child inconsistency `rex validate` warns about, and
+ * no later run repairs it — the rerun completes the task, finds the feature
+ * already completed, and never re-verifies it.
+ *
+ * `findParentResets` is the same pure computation rex uses on the add path: it
+ * walks up from the parent and returns every *consecutive* completed ancestor,
+ * bottom-up. That deliberately includes an ancestor completed before this run
+ * rather than by its cascade — such an ancestor now has a pending descendant,
+ * so `completed` is a false statement about it whoever wrote it.
+ *
+ * Authorship is preserved (#368): the operator asked to update the task, and
+ * reopening its ancestors is a consequence, not an edit they made.
+ */
+async function reopenWithdrawnAncestors(store: PRDStore, taskId: string): Promise<void> {
+  const doc = await store.loadDocument();
+  const parentId = findItem(doc.items, taskId)?.parents.at(-1)?.id;
+  if (!parentId) return;
+
+  const { resetIds } = findParentResets(doc.items, parentId);
+  const reopened: string[] = [];
+
+  for (const id of resetIds) {
+    const ancestor = await store.getItem(id);
+    if (!ancestor) continue;
+
+    // Via computeTimestampUpdates rather than clearing `completedAt` by hand:
+    // entering `completed` sets `endedAt` as well, and clearing only the one
+    // leaves the ancestor `pending` with an "Ended:" line in its own index.md
+    // and a finished duration for work that is open again.
+    await store.updateItem(id, {
+      status: "pending",
+      ...computeTimestampUpdates(ancestor.status, "pending", ancestor),
+    }, { preserveModifiedBy: true });
+    // Best-effort, for the same reason toolRexUpdateStatus guards its own
+    // status_updated append: a failed log write must not abandon the rest of
+    // the chain. Aborting here would leave the epic completed above a pending
+    // feature — a half-repaired tree, from the one path whose job is repair.
+    try {
+      await store.appendLog({
+        timestamp: new Date().toISOString(),
+        event: "status_reset",
+        itemId: id,
+        detail: `Reset ${ancestor.level}: ${ancestor.title} from completed to pending (child completion withdrawn)`,
+      });
+    } catch (err) {
+      detail(`Warning: status_reset log append failed for ${id} (non-fatal): ${(err as Error).message}`);
+    }
+    reopened.push(`${ancestor.level}: ${ancestor.title}`);
+  }
+
+  if (reopened.length > 0) {
+    detail(`Reopened: ${reopened.join(", ")}`);
+  }
+}
+
+/**
+ * Withdraw a completion claim the run is no longer entitled to make.
+ *
+ * {@link resetInProgressTaskIfFailed} is not enough on its own: the agent is
+ * instructed to call `rex_update_status` itself, so by the time the
+ * uncommitted-work gate fires the PRD may *already* say `completed` — which is
+ * the half of #363 where the status field reports the opposite of the truth.
+ * That path resets only `in_progress`, deliberately, so it cannot undo a
+ * completion. This one is written for exactly that case.
+ *
+ * Best-effort: a PRD write failure is reported and recorded on the run, never
+ * thrown. The run has already failed; losing the reason would be worse.
+ */
+async function withdrawCompletionClaim(
+  store: PRDStore,
+  run: RunRecord,
+  reason: string,
+): Promise<void> {
+  if (!run.taskId) return;
+  try {
+    const item = await store.getItem(run.taskId);
+    if (!item || (item.status !== "completed" && item.status !== "in_progress")) return;
+
+    await toolRexUpdateStatus(store, run.taskId, { status: "pending" });
+    await toolRexAppendLog(store, run.taskId, {
+      event: "completion_withdrawn",
+      detail: reason,
+    });
+    info(`\nTask reset to pending: [${run.taskId}] ${run.taskTitle ?? "unknown"}`);
+  } catch (err) {
+    const msg = (err as Error).message;
+    detail(`Warning: could not withdraw the completion claim: ${msg}`);
+    if (run.diagnostics) {
+      run.diagnostics.notes.push(`cascade_failure: ${msg}`);
+    }
+    // The task's own status is the claim; without it there is nothing to
+    // unwind above, and a second failing write would only repeat the reason.
+    return;
+  }
+
+  // Separate best-effort span with its own reason: the task above is already
+  // pending by now, so reporting an ancestor failure as "could not withdraw the
+  // completion claim" would describe the wrong thing.
+  try {
+    await reopenWithdrawnAncestors(store, run.taskId);
+  } catch (err) {
+    const msg = (err as Error).message;
+    detail(`Warning: could not reopen the ancestors closed by this task: ${msg}`);
+    if (run.diagnostics) {
+      run.diagnostics.notes.push(`ancestor_reset_failure: ${msg}`);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2190,6 +2476,74 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     }
   }
 
+  // Missing-review gate. `--review` is sold as a gate, and an opt-in gate that
+  // silently no-ops is worse than no gate: a reviewer that returned 400 before
+  // it started leaves a run record indistinguishable from one whose reviewer
+  // read the diff and found nothing.
+  //
+  // Checked here rather than at the review call site so it shares the
+  // uncommitted-work gate's machinery, which it needs all of: the same
+  // pre-write position (before "completed" reaches the PRD), the same
+  // completion withdrawal (the agent may have marked the task completed
+  // itself), and the same rollback suppression — the work validated, and
+  // reverting it because a *reviewer* could not start would destroy exactly
+  // what the operator asked to have reviewed.
+  //
+  // Deliberately not a deferral and deliberately not evidence of a stuck task:
+  // the usual cause is a --review-model the installed vendor CLI does not
+  // know, which is a config fix and a re-run. `gated` carries that to
+  // stuck-task detection (agent/analysis/stuck.ts).
+  let reviewGateRefused = false;
+  if (run.status === "completed" && opts.reviewOptional !== true && reviewNeverRan(run.review)) {
+    reviewGateRefused = true;
+    run.status = "failed";
+    run.error = formatMissingReviewRefusal(run.review);
+    run.review.gated = true;
+    info(`\n${run.error}`);
+    if (opts.store) {
+      await withdrawCompletionClaim(opts.store, run, run.error);
+    }
+  }
+
+  // Uncommitted-work gate (#363). "completed" is a claim that the work landed,
+  // so it is checked before it is written — not after, when the PRD already
+  // says the opposite of the truth.
+  //
+  // What is still allowed to be dirty here is exactly what a later step of this
+  // same run commits, and nothing more:
+  //
+  // - The PRD paths, on both paths: the commit prompt stages them, and
+  //   commitCompletionMetadata commits them on autoCommit.
+  // - The review repairs, on both paths, when the review produced a usable
+  //   report: commitReviewRepairsIfNeeded commits them on autoCommit, and the
+  //   commit prompt stages them (stageReviewRepairs) before `git commit -F`.
+  // - The staged index, only when the commit prompt will really run — which
+  //   takes a non-empty .hench-commit-msg.txt, not just `!autoCommit`. Staged
+  //   work with no message file is the #363 leak wearing an `A ` prefix.
+  //
+  // Anything else is finished work with no owner.
+  let uncommittedWorkRefused = false;
+  if (run.status === "completed") {
+    const autoCommit = opts.autoCommit === true;
+    const review = run.review;
+    const pendingRepairs =
+      review && review.failed === undefined ? review.repairedFiles ?? [] : [];
+    const leaked = await findUncommittedWork({
+      projectDir,
+      stagedCommitFollows: !autoCommit && pendingCommitMessageExists(projectDir),
+      discountPaths: [...PRD_COMMIT_PATHS, ...pendingRepairs],
+    });
+    if (!leaked.clean) {
+      uncommittedWorkRefused = true;
+      run.status = "failed";
+      run.error = formatUncommittedWorkRefusal(leaked.paths);
+      info(`\n${run.error}`);
+      if (opts.store) {
+        await withdrawCompletionClaim(opts.store, run, run.error);
+      }
+    }
+  }
+
   // Update PRD status to "completed" immediately after test gate passes.
   // This ensures status is persisted to disk before the next iteration's
   // task selection, preventing re-selection of just-completed tasks.
@@ -2246,7 +2600,18 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // Rollback uncommitted changes when the run failed (unless suppressed).
   // Runs after test gates so the working tree reflects the agent's final state.
   // Skips silently when nothing is dirty (no-op for already-clean trees).
-  if (opts.rollbackOnFailure !== false && FAILURE_STATUSES.has(run.status)) {
+  //
+  // Never after an uncommitted-work refusal: that failure *is* "there is
+  // finished work here that nobody committed", so offering to revert it would
+  // put the very files the gate just saved one keystroke from deletion. Same
+  // for the missing-review refusal: the work passed its own validation and the
+  // only thing that failed was the reviewer's spawn.
+  if (
+    !uncommittedWorkRefused &&
+    !reviewGateRefused &&
+    opts.rollbackOnFailure !== false &&
+    FAILURE_STATUSES.has(run.status)
+  ) {
     await performRollbackIfNeeded(projectDir, {
       yes: opts.yes,
       autonomous: opts.autonomous,

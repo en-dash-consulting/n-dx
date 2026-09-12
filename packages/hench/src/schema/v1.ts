@@ -218,6 +218,15 @@ export interface HenchConfig {
    */
   maxSpawnsPerTask?: number;
   /**
+   * Identical tool calls, inside a sliding window and with no file written in
+   * between, before a run is stopped as livelocked (default: 6; 0 disables).
+   *
+   * The escape hatch exists because the threshold is a judgement call about
+   * other people's workloads — see `agent/analysis/livelock.ts` for how it was
+   * picked and what "identical" means.
+   */
+  livelockThreshold?: number;
+  /**
    * When true, skip the mandatory full test suite gate before commit.
    * Default: false (gate is mandatory). The --skip-test-gate CLI flag sets this.
    * Test gate failure blocks commit unless this flag is set or user selects skip.
@@ -916,6 +925,18 @@ export type RunReviewRecord =
       failed: string;
       /** Human-readable detail for the failure. */
       detail: string;
+      /**
+       * True when this failure *blocked* the run's completion — the operator
+       * asked for a review gate, no reviewer ever ran, and the run was refused
+       * rather than reported `completed`.
+       *
+       * Load-bearing beyond bookkeeping: a run failed for this reason says
+       * nothing about whether the *task* is stuck, so stuck-task detection
+       * skips it (see `agent/analysis/stuck.ts`) and the rollback gate leaves
+       * the validated work in the tree. Absent on a best-effort
+       * (`--review-optional`) failure, which does not block anything.
+       */
+      gated?: boolean;
     };
 
 export interface RunRecord {

@@ -165,7 +165,10 @@ export async function cmdUpdate(
     detail: `Updated: ${Object.keys(updates).join(", ")}`,
   });
 
-  // Auto-complete parent items when a child is completed or deferred
+  // Re-check parent auto-completion after this status change. A deferred
+  // status can never itself make a parent auto-completable (only a fully
+  // `completed` child set can — see parent-completion.ts), but re-checking
+  // here is harmless.
   const autoCompleted: Array<{ id: string; title: string; level: string }> = [];
   if (
     updates.status &&
@@ -186,7 +189,9 @@ export async function cmdUpdate(
       await store.updateItem(item.id, {
         status: "completed" as ItemStatus,
         ...parentTsUpdates,
-      }, { applyAttribution: true, projectDir: dir });
+        // Cascaded close, not a deliberate edit of this ancestor — leave its
+        // authorship with whoever last touched it on purpose (#368).
+      }, { applyAttribution: true, preserveModifiedBy: true, projectDir: dir });
       await store.appendLog({
         timestamp: new Date().toISOString(),
         event: "auto_completed",

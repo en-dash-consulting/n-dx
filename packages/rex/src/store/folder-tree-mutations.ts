@@ -13,8 +13,8 @@
 
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import type { PRDItem } from "../schema/index.js";
+import { atomicWriteTempPath } from "./atomic-write.js";
 import { renderItemIndexMd, resolveSiblingSlugs } from "./folder-tree-serializer.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ async function atomicWriteIfChanged(filePath: string, content: string): Promise<
     // File doesn't exist — proceed with write
   }
 
-  const tmpPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+  const tmpPath = atomicWriteTempPath(filePath);
   await writeFile(tmpPath, content, "utf-8");
   await rename(tmpPath, filePath);
 }
