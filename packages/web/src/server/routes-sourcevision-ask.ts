@@ -274,7 +274,7 @@ export interface HandleSourcevisionAskOptions {
    * Override the LLM client factory (test injection). Production passes
    * nothing and gets `createLLMClient` from the foundation tier.
    */
-  createClient?: (options: { vendor: LLMVendor; llmConfig: LLMConfig }) => LLMClient;
+  createClient?: (options: { vendor: LLMVendor; llmConfig: LLMConfig; cwd: string }) => LLMClient;
 }
 
 // ---------------------------------------------------------------------------
@@ -718,7 +718,7 @@ async function handleAsk(
 
   let client: LLMClient;
   try {
-    client = (opts.createClient ?? createLLMClient)({ vendor, llmConfig });
+    client = (opts.createClient ?? createLLMClient)({ vendor, llmConfig, cwd: ctx.projectDir });
   } catch (err) {
     // Deliberately unrecorded: no call was made, so there is no spend. The
     // ledger counts calls, not intentions.

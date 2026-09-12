@@ -65,6 +65,7 @@ export type { ZoneType } from "../analyzers/risk-scoring.js";
 export { emptyAnalyzeTokenUsage, formatTokenUsage } from "../analyzers/token-usage.js";
 export {
   setLLMConfig,
+  setProjectDir,
   getAuthMode,
   getLLMVendor,
   DEFAULT_MODEL,

@@ -150,12 +150,13 @@ export async function cmdPrune(
     let consolidateSpinner: ReturnType<typeof startSpinner> | null = null;
     if (!skipConsolidate && doc.items.length > 0) {
       try {
-        const { setLLMConfig, setClaudeConfig, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
+        const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
         const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
         const llmConfig = await loadLLMConfig(rexDir);
         setLLMConfig(llmConfig);
         const claudeConfig = await loadClaudeConfig(rexDir);
         setClaudeConfig(claudeConfig);
+        setProjectDir(dir);
 
         // Resolve model: explicit flag > light-tier resolution (consolidation
         // is a mechanical single-shot pass, so it runs on the light tier;
@@ -382,12 +383,13 @@ async function consolidateAfterPrune(
 
   try {
     // Load Claude config
-    const { setLLMConfig, setClaudeConfig, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
+    const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
     const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
     const llmConfig = await loadLLMConfig(rexDir);
     setLLMConfig(llmConfig);
     const claudeConfig = await loadClaudeConfig(rexDir);
     setClaudeConfig(claudeConfig);
+    setProjectDir(dir);
 
     // Resolve model: explicit flag > light-tier resolution (post-prune
     // consolidation is a mechanical single-shot pass, so it runs on the
@@ -550,12 +552,13 @@ async function smartPrune(
   }
 
   // Load Claude config
-  const { setLLMConfig, setClaudeConfig, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
+  const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
   const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
   const llmConfig = await loadLLMConfig(rexDir);
   setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexDir);
   setClaudeConfig(claudeConfig);
+  setProjectDir(dir);
 
   // Resolve model: explicit flag > vendor config > default
   const resolvedModel = resolveConfiguredModel(flags.model);

@@ -561,7 +561,7 @@ export async function handleReorganize(
     if (args.mode !== "fast") {
       try {
         const { reasonForReshape } = await import("../analyze/reshape-reason.js");
-        const { setLLMConfig, setClaudeConfig } = await import("../analyze/reason.js");
+        const { setLLMConfig, setClaudeConfig, setProjectDir } = await import("../analyze/reason.js");
         const { loadLLMConfig, loadClaudeConfig } = await import("../store/project-config.js");
         const { REX_DIR } = await import("./commands/constants.js");
         const { join } = await import("node:path");
@@ -571,6 +571,7 @@ export async function handleReorganize(
         setLLMConfig(llmConfig);
         const claudeConfig = await loadClaudeConfig(rexDir);
         setClaudeConfig(claudeConfig);
+        setProjectDir(dir);
 
         const { proposals } = await reasonForReshape(doc.items, { dir });
         llmProposals = proposals.map((p) => ({

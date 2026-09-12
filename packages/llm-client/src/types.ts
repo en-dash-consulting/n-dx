@@ -68,6 +68,15 @@ export interface ClaudeClientOptions {
   claudeConfig: ClaudeConfig;
   /** Environment variable name for API key fallback (default: "ANTHROPIC_API_KEY"). */
   apiKeyEnv?: string;
+  /**
+   * Working directory the CLI provider spawns the vendor binary in. When
+   * omitted the child inherits the current process's cwd (Node's default
+   * `child_process.spawn` behaviour). Callers that serve multiple projects
+   * from one process (e.g. the dashboard) must pass the project directory
+   * explicitly — otherwise the vendor CLI runs wherever the server itself
+   * was launched from. Ignored by the API provider (no child process).
+   */
+  cwd?: string;
 }
 
 /** Input to a Claude completion request. */
