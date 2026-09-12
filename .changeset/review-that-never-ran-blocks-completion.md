@@ -19,3 +19,8 @@ in the task. `--review-optional` downgrades the refusal to a warning.
 A reviewer that *did* run and only lost its report still warns, as before. Both the
 end-of-run summary and `hench show` now carry a review line, so a run that was never
 reviewed says so where the terminal output does not survive.
+
+Also fixes `run.review` being silently dropped whenever a run record was read back
+from disk: the run-record schema did not declare the field, and zod strips what it
+does not declare. `hench show` could not report whether a run was reviewed, and the
+stuck-task exemption above could not see its own marker.

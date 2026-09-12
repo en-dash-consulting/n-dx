@@ -94,15 +94,18 @@ describe("finalizeRun — missing-review gate", () => {
     run: RunRecord,
     store: ReturnType<typeof buildStore>,
     reviewOptional = false,
+    // autoCommit: the executor committed its own work before the review pass
+    // ran, which is the shape the defect was observed in. The rollback test
+    // below passes false to reach the commit-prompt path, where the work is
+    // still uncommitted when the gate fires.
+    autoCommit = true,
   ): Promise<void> {
     const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
     await (finalizeRun as Function)({
       run,
       henchDir,
       projectDir,
-      // autoCommit: the executor committed its own work before the review pass
-      // ran, which is the shape the defect was observed in.
-      autoCommit: true,
+      autoCommit,
       skipFullTestGate: true,
       autonomous: true,
       store,
@@ -163,13 +166,30 @@ describe("finalizeRun — missing-review gate", () => {
     expect(run.review).toMatchObject({ failed: "spawn-failed", gated: true });
   });
 
-  it("leaves the validated work in the tree rather than reverting it", async () => {
-    const run = buildCompletedRun(spawnFailedReview());
-    await runFinalize(run, buildStore());
+  it("never reaches the rollback path, so uncommitted work is not offered up for deletion", async () => {
+    // The commit-prompt path: the agent's work is still in the working tree
+    // when the gate fires. Without the suppression this run is `failed` with a
+    // dirty tree, which is exactly the shape performRollbackIfNeeded acts on —
+    // and on an interactive terminal it would offer to revert the very work
+    // the reviewer was supposed to read.
+    //
+    // Asserted through the rollback path's own output rather than by faking a
+    // TTY: the message below is printed only once performRollbackIfNeeded has
+    // been called *and* found dirty paths, so its absence proves the guard
+    // short-circuited before the call. Faking a TTY would make the
+    // unsuppressed case block on a readline prompt instead of failing.
+    await writeFile(join(projectDir, "uncommitted.ts"), "export const b = 2;\n", "utf-8");
 
-    // Committed by the executor, and still there: a reviewer that could not
-    // start is no reason to destroy what it was supposed to review.
-    expect(existsSync(join(projectDir, "src.ts"))).toBe(true);
+    const run = buildCompletedRun(spawnFailedReview());
+    await runFinalize(run, buildStore(), false, false);
+
+    const printed = (console.log as unknown as { mock: { calls: unknown[][] } }).mock.calls
+      .map((args) => args.join(" "))
+      .join("\n");
+
+    expect(run.status).toBe("failed");
+    expect(printed).not.toContain("a rollback only runs after an interactive confirmation");
+    expect(existsSync(join(projectDir, "uncommitted.ts"))).toBe(true);
   });
 
   it("returns the task to pending, not deferred", async () => {

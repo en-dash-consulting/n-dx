@@ -226,6 +226,32 @@ const PersistedRuntimeEventSchema = z.object({
   completionSummary: z.string().optional(),
 });
 
+/**
+ * The adversarial review outcome (`RunReviewRecord`) as it survives a load.
+ *
+ * Declared at all because zod strips unknown keys: without a `review` entry on
+ * {@link RunRecordSchema}, every `loadRun` returned a record with the field
+ * silently removed, so `hench show` could not report whether a run was
+ * reviewed and stuck-task detection could not see the `gated` marker that
+ * exempts a missing-review refusal from the retry budget. Both read the field
+ * off disk, and both were reading `undefined`.
+ *
+ * Passthrough, and every field optional, deliberately. The record is a
+ * two-shape union (success | failure) that has gained fields over time, and a
+ * precise schema would reject a run written before the newest one existed —
+ * which `listRuns` swallows, dropping the run from usage rollups entirely.
+ * Losing a whole run to a strict review schema is far worse than accepting a
+ * shape that is one field short. What is declared here is exactly what
+ * consumers branch on; the rest rides along untouched.
+ */
+const RunReviewRecordSchema = z
+  .object({
+    failed: z.string().optional(),
+    detail: z.string().optional(),
+    gated: z.boolean().optional(),
+  })
+  .passthrough();
+
 export const RunRecordSchema = z.object({
   id: z.string(),
   taskId: z.string(),
@@ -255,6 +281,7 @@ export const RunRecordSchema = z.object({
   memoryStats: RunMemoryStatsSchema.optional(),
   diagnostics: RunDiagnosticsSchema.optional(),
   events: z.array(PersistedRuntimeEventSchema).optional(),
+  review: RunReviewRecordSchema.optional(),
   actor: z.string().optional(),
   host: z.string().optional(),
 });
