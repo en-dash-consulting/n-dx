@@ -118,6 +118,8 @@ export {
   execShellCmd,
   getCurrentHead,
   getCurrentBranch,
+  getWorktreeRoot,
+  getGitCommonDir,
   isExecutableOnPath,
   spawnTool,
   spawnManaged,

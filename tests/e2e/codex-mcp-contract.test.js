@@ -7,11 +7,20 @@
  *   - mcp-transport.test.js — HTTP transport protocol compliance
  *
  * This file focuses on the **stdio transport contract** that Codex actually uses:
- *   1. Entrypoint paths from config.toml resolve to existing files on disk
- *   2. All paths are project-local (within monorepo, not global npm)
- *   3. Spawning servers with the exact config.toml commands produces working MCP servers
- *   4. Tool lists from running stdio servers match manifest declarations exactly
- *   5. Both rex and sourcevision servers respond to the full MCP lifecycle
+ *   1. config.toml commands are cwd-relative (bare command, no absolute paths)
+ *   2. Spawning the manifest's dist CLI with the exact config.toml args (cliCommand,
+ *      mcpCommand, ".") against a cwd of the project root produces working MCP servers
+ *      — the same invocation Codex performs once `<cliName>` resolves on PATH
+ *   3. Tool lists from running stdio servers match manifest declarations exactly
+ *   4. Both rex and sourcevision servers respond to the full MCP lifecycle
+ *
+ * Note on spawning: config.toml's `command` is now a bare name (e.g. "n-dx")
+ * resolved via PATH at Codex-launch time, not an absolute path to this
+ * checkout. Depending on a globally-linked `ndx` binary here would be
+ * environment-dependent (see cli-identity.js), so these lifecycle tests spawn
+ * `node <dist/cli/index.js> <mcpCommand> .` directly with `cwd: tmpDir` — the
+ * exact process `ndx <cliCommand> mcp .` delegates to (see cli.js's
+ * tool-delegation `run()`, which spawns without overriding cwd).
  *
  * Reuses the manifest as the source of truth (same as codex-artifact-validation.test.js)
  * rather than reimplementing transport-level protocol coverage (covered by mcp-transport.test.js).
@@ -20,7 +29,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, readFileSync } from "node:fs";
-import { join, resolve, isAbsolute, relative } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { getMcpServers } from "../../packages/core/assistant-assets.js";
 import { setupCodexIntegration } from "../../packages/core/codex-integration.js";
@@ -32,6 +41,11 @@ import {
 const ROOT = resolve(import.meta.dirname, "../..");
 const servers = getMcpServers();
 const serverNames = Object.keys(servers);
+
+/** Resolve a manifest server's compiled dist CLI entrypoint (test-only — no longer embedded in config.toml). */
+function distCliFor(name) {
+  return join(ROOT, servers[name].package, "dist/cli/index.js");
+}
 
 // ── Shared setup: generate config.toml and project fixtures ─────────────
 
@@ -90,17 +104,19 @@ function parseTomlServers(content) {
  * method response.  The server process is killed after the exchange.
  *
  * @param {string} command  Command to spawn (e.g. "node")
- * @param {string[]} args   Arguments (e.g. ["/path/to/cli.js", "mcp", "/project"])
+ * @param {string[]} args   Arguments (e.g. ["/path/to/cli.js", "mcp", "."])
  * @param {string} method   JSON-RPC method to call after initialization
  * @param {object} params   Parameters for the method call
  * @param {number} timeoutMs  Max wait time
+ * @param {string} [cwd]    Working directory for the spawned process (args may be cwd-relative)
  * @returns {Promise<object>} JSON-RPC response body
  */
-function stdioJsonRpc(command, args, method, params = {}, timeoutMs = 10000) {
+function stdioJsonRpc(command, args, method, params = {}, timeoutMs = 10000, cwd) {
   return new Promise((resolvePromise, reject) => {
     const proc = spawn(command, args, {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env },
+      ...(cwd ? { cwd } : {}),
     });
 
     let stdout = "";
@@ -234,89 +250,39 @@ afterAll(() => {
   if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
 });
 
-// ── Entrypoint existence ─────────────────────────────────────────────────
-
-describe("entrypoint existence", () => {
-  it("config.toml references entrypoints that exist on disk", () => {
-    for (const [name, config] of parsedServers) {
-      const entrypoint = config.args[0];
-      expect(existsSync(entrypoint), `${name} entrypoint does not exist: ${entrypoint}`).toBe(
-        true,
-      );
-    }
-  });
-
-  it("manifest entrypoints match config.toml entrypoints (same file)", () => {
-    for (const [name, descriptor] of Object.entries(servers)) {
-      const config = parsedServers.get(name);
-      expect(config, `${name} missing from parsed config.toml`).toBeDefined();
-
-      const entrypoint = config.args[0].replace(/\\/g, "/");
-      // Both should end with the same relative path
-      expect(entrypoint).toContain(descriptor.entrypoint);
-    }
-  });
-});
-
-// ── Path locality: project-local, not global npm ─────────────────────────
-
-describe("path locality", () => {
-  it("all entrypoint paths are absolute", () => {
-    for (const [name, config] of parsedServers) {
-      const entrypoint = config.args[0];
-      expect(isAbsolute(entrypoint), `${name} entrypoint is not absolute: ${entrypoint}`).toBe(
-        true,
-      );
-    }
-  });
-
-  it("all entrypoint paths are within the monorepo root", () => {
-    for (const [name, config] of parsedServers) {
-      const entrypoint = config.args[0];
-      const rel = relative(ROOT, entrypoint);
-      expect(
-        !rel.startsWith(".."),
-        `${name} entrypoint escapes monorepo: ${entrypoint} (relative: ${rel})`,
-      ).toBe(true);
-    }
-  });
-
-  it("no entrypoint references node_modules (prefers monorepo source)", () => {
-    for (const [name, config] of parsedServers) {
-      const entrypoint = config.args[0];
-      expect(
-        !entrypoint.includes("node_modules"),
-        `${name} entrypoint uses node_modules instead of monorepo: ${entrypoint}`,
-      ).toBe(true);
-    }
-  });
-
-  it("project directory argument matches the temp dir", () => {
-    for (const [name, config] of parsedServers) {
-      const projectDir = config.args[2];
-      expect(projectDir, `${name} project dir mismatch`).toBe(tmpDir);
-    }
-  });
-});
-
-// ── Command structure ────────────────────────────────────────────────────
+// ── Command structure: cwd-relative, no absolute paths ────────────────────
 
 describe("command structure", () => {
-  it("every server uses 'node' as the command", () => {
+  it("every server uses the same bare (non-path) command", () => {
+    const commands = new Set();
     for (const [name, config] of parsedServers) {
-      expect(config.command, `${name} command`).toBe("node");
+      expect(config.command, `${name} command looks like a path`).not.toMatch(/[/\\]/);
+      commands.add(config.command);
+    }
+    expect(commands.size).toBe(1);
+  });
+
+  it("every server has exactly 3 args: [cliCommand, mcpCommand, '.']", () => {
+    for (const [name, config] of parsedServers) {
+      expect(config.args.length, `${name} args count`).toBe(3);
     }
   });
 
-  it("every server has exactly 3 args: [entrypoint, mcpCommand, projectDir]", () => {
+  it("every server args[0] is the manifest cliCommand", () => {
     for (const [name, config] of parsedServers) {
-      expect(config.args.length, `${name} args count`).toBe(3);
+      expect(config.args[0], `${name} cliCommand`).toBe(servers[name].cliCommand ?? name);
     }
   });
 
   it("every server args[1] is the manifest mcpCommand", () => {
     for (const [name, config] of parsedServers) {
       expect(config.args[1], `${name} mcpCommand`).toBe(servers[name].mcpCommand);
+    }
+  });
+
+  it("every server args[2] is the cwd-relative '.'", () => {
+    for (const [name, config] of parsedServers) {
+      expect(config.args[2], `${name} directory arg`).toBe(".");
     }
   });
 
@@ -330,16 +296,41 @@ describe("command structure", () => {
     const tomlNames = [...parsedServers.keys()].sort();
     expect(tomlNames).toEqual([...serverNames].sort());
   });
+
+  it("contains no absolute paths anywhere (tmpDir never appears)", () => {
+    expect(tomlContent).not.toContain(tmpDir);
+  });
+
+  it("dist CLI entrypoints referenced by the manifest still exist on disk", () => {
+    // config.toml no longer embeds these paths, but the servers Codex would
+    // reach via `<cliName> <cliCommand> mcp .` still need to resolve.
+    for (const name of serverNames) {
+      const entrypoint = distCliFor(name);
+      expect(existsSync(entrypoint), `${name} dist entrypoint missing: ${entrypoint}`).toBe(true);
+    }
+  });
 });
 
 // ── Stdio MCP server lifecycle ───────────────────────────────────────────
 
 describe("stdio MCP server lifecycle", { timeout: 30000 }, () => {
-  it("rex: spawning with config.toml command/args starts a working MCP server", async () => {
+  it("rex: spawning the manifest's dist CLI with config.toml's args (cwd-relative) starts a working MCP server", async () => {
     const config = parsedServers.get("rex");
     expect(config).toBeDefined();
 
-    const response = await stdioJsonRpc(config.command, config.args, "tools/list");
+    // config.command ("n-dx") is resolved via PATH at Codex-launch time — see
+    // the file header note. Substitute `node <dist cli>` for the bare
+    // command, keep config's own [mcpCommand, "."] args, and spawn with
+    // cwd: tmpDir so "." resolves the same way it would under a real "ndx
+    // rex mcp ." invocation.
+    const response = await stdioJsonRpc(
+      process.execPath,
+      [distCliFor("rex"), config.args[1], config.args[2]],
+      "tools/list",
+      {},
+      10000,
+      tmpDir,
+    );
 
     expect(response.jsonrpc).toBe("2.0");
     expect(response.id).toBe(2);
@@ -348,11 +339,18 @@ describe("stdio MCP server lifecycle", { timeout: 30000 }, () => {
     expect(response.result.tools.length).toBeGreaterThan(0);
   });
 
-  it("sourcevision: spawning with config.toml command/args starts a working MCP server", async () => {
+  it("sourcevision: spawning the manifest's dist CLI with config.toml's args (cwd-relative) starts a working MCP server", async () => {
     const config = parsedServers.get("sourcevision");
     expect(config).toBeDefined();
 
-    const response = await stdioJsonRpc(config.command, config.args, "tools/list");
+    const response = await stdioJsonRpc(
+      process.execPath,
+      [distCliFor("sourcevision"), config.args[1], config.args[2]],
+      "tools/list",
+      {},
+      10000,
+      tmpDir,
+    );
 
     expect(response.jsonrpc).toBe("2.0");
     expect(response.id).toBe(2);
@@ -365,11 +363,22 @@ describe("stdio MCP server lifecycle", { timeout: 30000 }, () => {
 // ── Tool list parity: stdio servers vs. manifest ─────────────────────────
 
 describe("tool list parity with manifest", { timeout: 30000 }, () => {
-  it("rex stdio server registers exactly the tools declared in manifest", async () => {
-    const config = parsedServers.get("rex");
-    const response = await stdioJsonRpc(config.command, config.args, "tools/list");
+  async function listTools(name) {
+    const config = parsedServers.get(name);
+    const response = await stdioJsonRpc(
+      process.execPath,
+      [distCliFor(name), config.args[1], config.args[2]],
+      "tools/list",
+      {},
+      10000,
+      tmpDir,
+    );
+    return response.result.tools;
+  }
 
-    const registeredTools = response.result.tools.map((t) => t.name).sort();
+  it("rex stdio server registers exactly the tools declared in manifest", async () => {
+    const tools = await listTools("rex");
+    const registeredTools = tools.map((t) => t.name).sort();
     const manifestTools = [
       ...servers.rex.tools.read,
       ...servers.rex.tools.write,
@@ -379,10 +388,8 @@ describe("tool list parity with manifest", { timeout: 30000 }, () => {
   });
 
   it("sourcevision stdio server registers exactly the tools declared in manifest", async () => {
-    const config = parsedServers.get("sourcevision");
-    const response = await stdioJsonRpc(config.command, config.args, "tools/list");
-
-    const registeredTools = response.result.tools.map((t) => t.name).sort();
+    const tools = await listTools("sourcevision");
+    const registeredTools = tools.map((t) => t.name).sort();
     const manifestTools = [
       ...servers.sourcevision.tools.read,
       ...servers.sourcevision.tools.write,
@@ -392,10 +399,8 @@ describe("tool list parity with manifest", { timeout: 30000 }, () => {
   });
 
   it("rex stdio server uses bare tool names (no mcp__ prefix)", async () => {
-    const config = parsedServers.get("rex");
-    const response = await stdioJsonRpc(config.command, config.args, "tools/list");
-
-    for (const tool of response.result.tools) {
+    const tools = await listTools("rex");
+    for (const tool of tools) {
       expect(
         tool.name.startsWith("mcp__"),
         `Rex tool "${tool.name}" has unexpected mcp__ prefix`,
@@ -404,10 +409,8 @@ describe("tool list parity with manifest", { timeout: 30000 }, () => {
   });
 
   it("sourcevision stdio server uses bare tool names (no mcp__ prefix)", async () => {
-    const config = parsedServers.get("sourcevision");
-    const response = await stdioJsonRpc(config.command, config.args, "tools/list");
-
-    for (const tool of response.result.tools) {
+    const tools = await listTools("sourcevision");
+    for (const tool of tools) {
       expect(
         tool.name.startsWith("mcp__"),
         `Sourcevision tool "${tool.name}" has unexpected mcp__ prefix`,
@@ -416,46 +419,21 @@ describe("tool list parity with manifest", { timeout: 30000 }, () => {
   });
 });
 
-// ── Config.toml path stability across regeneration ───────────────────────
+// ── Config.toml stability across regeneration ─────────────────────────────
 
-describe("config.toml path stability", () => {
-  it("regenerating config.toml in same dir produces identical entrypoint paths", () => {
-    // First generation already happened in beforeAll.
-    // Regenerate and compare entrypoints.
+describe("config.toml stability", () => {
+  it("regenerating config.toml in a different dir produces identical content", () => {
+    // First generation already happened in beforeAll. Nothing in the
+    // cwd-relative shape embeds the target directory (for a fresh dir with
+    // no package.json, getCliName falls back to the same DEFAULT_CLI_NAME),
+    // so a second, unrelated tmp dir gets byte-identical output.
     const secondDir = mkdtempSync(join(tmpdir(), "ndx-codex-mcp-regen-"));
     try {
       setupCodexIntegration(secondDir);
       const secondToml = readFileSync(join(secondDir, ".codex", "config.toml"), "utf-8");
-      const secondParsed = parseTomlServers(secondToml);
-
-      for (const [name, config] of parsedServers) {
-        const secondConfig = secondParsed.get(name);
-        expect(secondConfig, `${name} missing after regeneration`).toBeDefined();
-
-        // Entrypoints should be identical (same monorepo paths)
-        expect(secondConfig.args[0], `${name} entrypoint changed`).toBe(config.args[0]);
-
-        // mcpCommand should be identical
-        expect(secondConfig.args[1], `${name} mcpCommand changed`).toBe(config.args[1]);
-
-        // Project dirs differ (different tmp dirs) — that's expected
-      }
+      expect(secondToml).toBe(tomlContent);
     } finally {
       rmSync(secondDir, { recursive: true, force: true });
-    }
-  });
-
-  it("entrypoint paths use forward slashes or platform-native separators consistently", () => {
-    for (const [name, config] of parsedServers) {
-      const entrypoint = config.args[0];
-      // On Unix, should use forward slashes only.
-      // On Windows, should use consistent separators (either all \ or all /).
-      if (process.platform !== "win32") {
-        expect(
-          !entrypoint.includes("\\"),
-          `${name} entrypoint has backslashes on Unix: ${entrypoint}`,
-        ).toBe(true);
-      }
     }
   });
 });

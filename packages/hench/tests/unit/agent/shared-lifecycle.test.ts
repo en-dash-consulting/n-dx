@@ -276,6 +276,81 @@ describe("shared lifecycle", () => {
       expect(savedRun.actor).toBe("Test Actor <test@example.com>");
       expect(savedRun.host).toBe("test-host");
     });
+
+    it("stamps the worktree root, branch and starting HEAD at run start", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+      const { readFile } = await import("node:fs/promises");
+      const { execFileSync } = await import("node:child_process");
+      const { realpathSync } = await import("node:fs");
+      const { initGitFixtureRepoSync } = await import("../../helpers/index.js");
+
+      // The suite's projectDir is a bare temp dir; make it a real repository so
+      // the capture has something to report. The branch is created after the
+      // first commit rather than via `git init --initial-branch`, which keeps
+      // the fixture independent of the host git version.
+      const git = (...args: string[]) =>
+        execFileSync("git", args, { cwd: projectDir, stdio: "ignore" });
+      initGitFixtureRepoSync(projectDir);
+      git("commit", "--allow-empty", "-m", "root");
+      git("checkout", "-b", "gate-test");
+
+      const { run } = await initRunRecord({
+        taskId: "task-1",
+        taskTitle: "Test task",
+        model: "claude-sonnet-4-6",
+        henchDir,
+        projectDir,
+      });
+
+      // getWorktreeRoot realpaths its answer: tmpdir() is a symlink on macOS and
+      // an 8.3 short name on Windows, so the expectation needs the OS realpath.
+      expect(run.worktreeRoot).toBe(realpathSync.native(projectDir));
+      expect(run.branch).toBe("gate-test");
+      expect(run.startHead).toMatch(/^[0-9a-f]{40}$/);
+
+      const savedRun = JSON.parse(
+        await readFile(join(henchDir, "runs", `${run.id}.json`), "utf-8"),
+      );
+      expect(savedRun.worktreeRoot).toBe(run.worktreeRoot);
+      expect(savedRun.branch).toBe("gate-test");
+      expect(savedRun.startHead).toBe(run.startHead);
+    });
+
+    // Several checkouts run concurrently; without these two a token report
+    // cannot say which build produced a run.
+    it("stamps the n-dx version and the launching CLI path", async () => {
+      const { initRunRecord } = await import("../../../src/agent/lifecycle/shared.js");
+      const { readFile } = await import("node:fs/promises");
+
+      const previous = process.env["NDX_CLI_PATH"];
+      process.env["NDX_CLI_PATH"] = "/launcher/cli.js";
+      try {
+        const { run } = await initRunRecord({
+          taskId: "task-1",
+          taskTitle: "Test task",
+          model: "claude-sonnet-4-6",
+          henchDir,
+          projectDir,
+        });
+
+        // Read from this package's own manifest rather than restating a literal
+        // the release process would leave stale.
+        const { version } = JSON.parse(
+          await readFile(new URL("../../../package.json", import.meta.url), "utf-8"),
+        );
+        expect(run.ndxVersion).toBe(version);
+        expect(run.cliPath).toBe("/launcher/cli.js");
+
+        const savedRun = JSON.parse(
+          await readFile(join(henchDir, "runs", `${run.id}.json`), "utf-8"),
+        );
+        expect(savedRun.ndxVersion).toBe(version);
+        expect(savedRun.cliPath).toBe("/launcher/cli.js");
+      } finally {
+        if (previous === undefined) delete process.env["NDX_CLI_PATH"];
+        else process.env["NDX_CLI_PATH"] = previous;
+      }
+    });
   });
 
   describe("handleRunFailure", () => {

@@ -27,9 +27,12 @@ import {
   classifyPortOccupant,
   probeStatusEndpoint,
   findFreePortInRange,
+  findRelocationPort,
+  isPortInUse,
   killPortOccupant,
   listenerPidsOnPort,
   selectKillTarget,
+  isPortInUse,
   runWeb,
 } from "../../packages/core/web.js";
 
@@ -522,12 +525,14 @@ describe("runWeb, on a busy port", () => {
     expect(code).toBe(0);
     // The peer is untouched…
     expect(peer.server.listening).toBe(true);
-    // …and this invocation was handed a different port inside the range the
-    // server's own allocator uses.
+    // …and this invocation was relocated to the peer's own neighbourhood
+    // (requested port + 1 upward), not dropped into 3117–3200 — the peer's
+    // port here is an OS-assigned ephemeral port, so it sits far outside that
+    // range, and an operator-chosen port outside 3117–3200 must be honoured
+    // the same way.
     const served = Number(serveArgs[1].replace("--port=", ""));
     expect(served).not.toBe(peer.port);
-    expect(served).toBeGreaterThanOrEqual(3117);
-    expect(served).toBeLessThanOrEqual(3200);
+    expect(served).toBe(peer.port + 1);
   }, 20_000);
 
   it("passes the requested port straight through when it is free", async () => {
@@ -555,5 +560,120 @@ describe("findFreePortInRange", () => {
   it("returns null when every port in the range is taken", async () => {
     const { port } = await startServer(() => {});
     expect(await findFreePortInRange(0, port, port)).toBeNull();
+  });
+});
+
+describe("findRelocationPort", () => {
+  // Mirrors the constants in packages/core/web.js — not exported, since the
+  // orchestration tier avoids exposing more surface than callers need.
+  const PORT_RANGE_START = 3117;
+  const PORT_RANGE_END = 3200;
+  const NEAR_WINDOW_SIZE = PORT_RANGE_END - PORT_RANGE_START;
+
+  /**
+   * Bind a port whose immediate successor is verifiably free, so the
+   * relocation target is deterministic.
+   *
+   * Do NOT use an OS-assigned ephemeral port here. On Windows the ephemeral
+   * band (49152+) is where Hyper-V/WinNAT reserve large contiguous blocks, and
+   * on the CI runner every port in an 83-wide window above one read as in use
+   * — so relocation correctly fell back to 3117 and an assertion about the
+   * near window failed for a platform reason, not a behavioural one. Binding
+   * in a quiet band and checking the successor with the product's OWN
+   * predicate makes the expectation exact and platform-independent.
+   *
+   * Returns null when no such pair exists, which is a real answer on a host
+   * whose port space is that contended — the caller skips rather than fails.
+   */
+  async function bindPortWithFreeSuccessor() {
+    for (let candidate = 34001; candidate < 34200; candidate += 2) {
+      if (await isPortInUse(candidate + 1)) continue;
+      const server = createServer(() => {});
+      servers.push(server);
+      const bound = await new Promise((res) => {
+        server.once("error", () => res(false));
+        server.listen(candidate, "127.0.0.1", () => res(true));
+      });
+      if (!bound) continue;
+      // Re-check after binding: something may have taken the successor since.
+      if (await isPortInUse(candidate + 1)) continue;
+      return candidate;
+    }
+    return null;
+  }
+
+  it("scans upward from an explicit port outside the default range", async (ctx) => {
+    const port = await bindPortWithFreeSuccessor();
+    if (port === null) {
+      // No bindable port with a free successor on this host. Nothing to assert
+      // about the near window; see bindPortWithFreeSuccessor for why.
+      ctx.skip();
+      return;
+    }
+    expect(port < PORT_RANGE_START || port > PORT_RANGE_END).toBe(true);
+
+    // Exact, because the successor was just verified free with the same
+    // predicate findFreePortInRange uses.
+    const relocated = await findRelocationPort(port);
+    expect(relocated).toBe(port + 1);
+    // The whole point of the near window: it must not jump to the default range.
+    expect(relocated < PORT_RANGE_START || relocated > PORT_RANGE_END).toBe(true);
+  });
+
+  it("keeps today's behaviour for the default port: 3118, 3119, … within 3117–3200", async () => {
+    // The near window for the default port (3118–3200) is exactly the
+    // default fallback range, so this must land inside it just as before
+    // this function existed.
+    const relocated = await findRelocationPort(PORT_RANGE_START);
+    expect(relocated).not.toBeNull();
+    expect(relocated).toBeGreaterThanOrEqual(PORT_RANGE_START + 1);
+    expect(relocated).toBeLessThanOrEqual(PORT_RANGE_END);
+  });
+
+  it("falls back to the default range once the near window is exhausted", async () => {
+    const { port } = await startServer(() => {});
+    // A zero-width near window (end < start) never finds anything, forcing
+    // the fallback deterministically — occupying dozens of real sockets to
+    // exhaust the real near window would be slow and flaky.
+    const relocated = await findRelocationPort(port, 0);
+    expect(relocated).not.toBeNull();
+    expect(relocated).toBeGreaterThanOrEqual(PORT_RANGE_START);
+    expect(relocated).toBeLessThanOrEqual(PORT_RANGE_END);
+  });
+
+  it("clamps the near window at 65535 instead of scanning past it", async () => {
+    // requestedPort + 1 (65536) is already out of range, so the near window
+    // is empty and this must fall straight through to the 3117–3200 fallback
+    // instead of throwing ERR_SOCKET_BAD_PORT.
+    const relocated = await findRelocationPort(65535);
+    expect(relocated).not.toBeNull();
+    expect(relocated).toBeGreaterThanOrEqual(PORT_RANGE_START);
+    expect(relocated).toBeLessThanOrEqual(PORT_RANGE_END);
+  });
+
+  it("scans up to but never past 65535 for a near-boundary port", async () => {
+    // The near window would naturally extend to 65500 + 83 = 65583; it must
+    // be clamped so no candidate above 65535 is ever probed.
+    const relocated = await findRelocationPort(65500);
+    expect(relocated).not.toBeNull();
+    expect(relocated).toBeGreaterThanOrEqual(65501);
+    expect(relocated).toBeLessThanOrEqual(65535);
+  });
+});
+
+describe("isPortInUse", () => {
+  it("treats an out-of-range port as in use instead of throwing", async () => {
+    // net.createConnection throws ERR_SOCKET_BAD_PORT synchronously for a
+    // port outside 0–65535; the guard must intercept it before that call.
+    await expect(isPortInUse(65536)).resolves.toBe(true);
+    await expect(isPortInUse(70000)).resolves.toBe(true);
+    await expect(isPortInUse(-1)).resolves.toBe(true);
+    await expect(isPortInUse(3117.5)).resolves.toBe(true);
+  });
+
+  it("still probes a valid port normally", async () => {
+    const { server, port } = await startServer(() => {});
+    await expect(isPortInUse(port)).resolves.toBe(true);
+    await new Promise((res) => server.close(() => res()));
   });
 });

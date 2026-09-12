@@ -13,6 +13,7 @@ import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
 import { findUncommittedWork, formatLoopRefusal } from "../../agent/lifecycle/uncommitted-work-gate.js";
+import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
@@ -1408,6 +1409,12 @@ export async function cmdRun(
       effectivePermissionMode = undefined;
     }
 
+    // The checkout this invocation belongs to. Captured before the gate can
+    // prompt, so the gate's commit is bound to the branch and worktree the
+    // operator started from. Each run then captures its own copy onto the run
+    // record, for the commits that happen later in the loop.
+    const invocationGitOrigin = captureRunGitOrigin(dir);
+
     // One-time pre-run commit gate: before the work loop begins, offer to
     // commit any pre-existing uncommitted changes so the user's in-progress
     // edits are not folded into hench's own commits. Runs once per invocation
@@ -1420,6 +1427,7 @@ export async function cmdRun(
       autonomous,
       allowDirty,
       dryRun,
+      origin: invocationGitOrigin,
       // Size-aware escalation config (hench.git.*); --allow-dirty above
       // takes precedence over both settings.
       checkpointThreshold: config.git?.checkpointThreshold,

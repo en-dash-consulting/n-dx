@@ -291,7 +291,26 @@ Both `n-dx` and `ndx` work identically. `sv` is an alias for `sourcevision`.
 
 Rex and SourceVision expose MCP servers for any MCP-compatible assistant (Claude Code, Codex, etc.).
 
-### HTTP transport (recommended)
+### stdio transport (default)
+
+`ndx init` writes a tracked `.mcp.json` at the project root with cwd-relative commands — no `claude mcp add` needed:
+
+```json
+{
+  "mcpServers": {
+    "rex": { "command": "ndx", "args": ["rex", "mcp", "."] },
+    "sourcevision": { "command": "ndx", "args": ["sv", "mcp", "."] }
+  }
+}
+```
+
+`.mcp.json` is committed to the repo, not gitignored: every worktree and teammate clone runs the same servers, resolved against whatever directory Claude Code launches them from. Claude Code shows a one-time approval prompt for a project's servers the first time it opens the checkout — approve once and it's remembered for that project.
+
+If `ndx` isn't on `PATH`, run the CLI through npx instead: `npx -y @n-dx/core rex mcp .` / `npx -y @n-dx/core sv mcp .`. Alternatively, `ndx init --mcp-scope=local` registers via the older `claude mcp add --scope local` path (per-machine, absolute paths) instead of writing `.mcp.json`.
+
+Codex reads `.codex/config.toml` automatically — no manual registration required.
+
+### HTTP transport — single project only
 
 ```sh
 ndx start .
@@ -300,18 +319,7 @@ claude mcp add --transport http rex http://localhost:3117/mcp/rex
 claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
 ```
 
-### stdio transport
-
-`ndx init` auto-registers stdio MCP servers for both Claude Code and Codex. After init, MCP works out of the box.
-
-Manual Claude registration:
-
-```sh
-claude mcp add rex -- rex mcp .
-claude mcp add sourcevision -- sv mcp .
-```
-
-Codex reads `.codex/config.toml` automatically — no manual registration required.
+`http://localhost:3117/mcp/rex` isn't scoped to a project — it points at whichever `ndx start` currently holds port 3117. Registering it is only safe when you have one n-dx project running at a time: a second `ndx start` on the same port redirects both registrations to the newer project. Prefer stdio (above) if you work across multiple n-dx projects; a multi-project hub landing in 0.7.0 will make HTTP registration safe to share.
 
 ### Tools
 

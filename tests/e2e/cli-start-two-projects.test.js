@@ -37,6 +37,12 @@ import {
 const LOOPBACK_HOST = "127.0.0.1";
 const PID_FILE = ".n-dx-web.pid";
 const PORT_FILE = ".n-dx-web.port";
+// Mirrors packages/core/web.js's PORT_RANGE_START/END and the near window's
+// width (PORT_RANGE_END - PORT_RANGE_START). See the relocation assertion
+// below for why the window's exact width matters here.
+const PORT_RANGE_START = 3117;
+const PORT_RANGE_END = 3200;
+const NEAR_WINDOW_SIZE = PORT_RANGE_END - PORT_RANGE_START;
 
 /** Servers started by this file, reaped in afterAll whether or not the test passed. */
 const startedPids = new Set();
@@ -262,8 +268,11 @@ describe("two projects start dashboards concurrently", { timeout: 120_000 }, () 
     if (dirB) await removeTmpDir(dirB);
   });
 
-  it("leaves the first project's dashboard running", async () => {
-    if (!canBindPorts) return;
+  it("leaves the first project's dashboard running", async (ctx) => {
+    if (!canBindPorts) {
+      ctx.skip();
+      return;
+    }
     expect(pidA).toBeTypeOf("number");
     expect(isProcessAlive(pidA)).toBe(true);
 
@@ -271,25 +280,49 @@ describe("two projects start dashboards concurrently", { timeout: 120_000 }, () 
     expect(canonical(status.projectDir)).toBe(canonical(dirA));
   });
 
-  it("starts the second project on a different port", async () => {
-    if (!canBindPorts) return;
+  it("starts the second project near the requested port, not inside 3117–3200", async (ctx) => {
+    if (!canBindPorts) {
+      ctx.skip();
+      return;
+    }
     expect(portB).toBeTypeOf("number");
-    expect(portB).not.toBe(requestedPort);
+    // requestedPort is an OS-assigned ephemeral port, far outside 3117–3200.
+    // Relocation must land in its own neighbourhood (requestedPort + 1
+    // upward) rather than jumping into the default fallback range — that is
+    // the contract this suite exists to pin down.
+    //
+    // Asserting portB === requestedPort + 1 exactly is stronger than the
+    // contract findRelocationPort actually promises ("the first free port at
+    // or above requestedPort + 1, within the near window") and is
+    // environment-fragile: ephemeral ports are handed out from a small, busy
+    // range, so requestedPort + 1 is often already held by an unrelated
+    // process, which correctly pushes relocation to +2 and fails this test
+    // for a reason unrelated to the behaviour under test. Do not tighten this
+    // back to an exact-port equality — assert the neighbourhood instead.
+    expect(portB).toBeGreaterThan(requestedPort);
+    expect(portB).toBeLessThanOrEqual(requestedPort + NEAR_WINDOW_SIZE);
+    expect(portB < PORT_RANGE_START || portB > PORT_RANGE_END).toBe(true);
 
     const status = await waitForStatus(portB);
     expect(canonical(status.projectDir)).toBe(canonical(dirB));
   });
 
-  it("names the peer and the fallback port on stdout", () => {
-    if (!canBindPorts) return;
+  it("names the peer and the fallback port on stdout", (ctx) => {
+    if (!canBindPorts) {
+      ctx.skip();
+      return;
+    }
     expect(startB.stdout).toContain(canonical(dirA));
     expect(startB.stdout).toContain(`already on :${requestedPort}`);
     expect(startB.stdout).toContain(`starting this one on :${portB}`);
   });
 
   // Ordered last on purpose: it tears down what the assertions above observe.
-  it("stops only the server for the directory it is given", async () => {
-    if (!canBindPorts) return;
+  it("stops only the server for the directory it is given", async (ctx) => {
+    if (!canBindPorts) {
+      ctx.skip();
+      return;
+    }
 
     const stopA = runStart(["stop", dirA]);
     expect(stopA.code, stopA.stderr).toBe(0);

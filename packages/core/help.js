@@ -817,6 +817,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--claude-only", description: "Provision only Claude Code surfaces (equivalent to --no-codex)" },
       { flag: "--codex-only", description: "Provision only Codex surfaces (equivalent to --no-claude)" },
       { flag: "--assistants=<list>", description: "Comma-separated list of assistants to provision (e.g. --assistants=claude,codex)" },
+      { flag: "--mcp-scope=local", description: "Register Claude MCP servers via 'claude mcp add --scope local' instead of the tracked .mcp.json default" },
     ],
     examples: [
       { command: "ndx init", description: "Initialize in current directory (prompts for vendor)" },
@@ -831,6 +832,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx init --codex-only .", description: "Initialize with Codex surfaces only" },
       { command: "ndx init --no-codex .", description: "Initialize without Codex integration" },
       { command: "ndx init --assistants=claude .", description: "Initialize with only Claude surfaces" },
+      { command: "ndx init --mcp-scope=local .", description: "Register Claude MCP servers via local scope instead of tracked .mcp.json" },
     ],
     related: ["plan", "status", "config"],
   },

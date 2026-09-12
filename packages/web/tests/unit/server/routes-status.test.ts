@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
@@ -9,6 +10,13 @@ import {
   clearStatusCache,
 } from "../../../src/server/routes-status.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
+
+/** Actual `@n-dx/web` package version — asserted against, not merely typeof-checked. */
+const webPackageVersion = (
+  JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf-8")) as {
+    version: string;
+  }
+).version;
 
 /** Start a test server that only runs status routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
@@ -77,14 +85,57 @@ describe("Status API routes", () => {
 
       expect(data.server).toBeTruthy();
       expect(data.server.projectDir).toBe(tmpDir);
-      expect(typeof data.server.version).toBe("string");
-      expect(data.server.version.length).toBeGreaterThan(0);
+      // Exact match, not just typeof — a readWebVersion() fallback to "unknown"
+      // must fail this assertion.
+      expect(data.server.version).toBe(webPackageVersion);
       expect(typeof data.server.cliPath).toBe("string");
       expect(data.server.pid).toBe(process.pid);
       // This test's ctx (built above, not via startServer) never sets
       // port/startedAt — buildServerInfo must fall back to null rather than throw.
       expect(data.server.port).toBeNull();
       expect(data.server.startedAt).toBeNull();
+    });
+
+    it("reports server.cliPath from NDX_CLI_PATH when set", async () => {
+      const original = {
+        NDX_CLI_PATH: process.env["NDX_CLI_PATH"],
+        N_DX_CLI_PATH: process.env["N_DX_CLI_PATH"],
+      };
+      process.env["NDX_CLI_PATH"] = "/custom/ndx/cli.js";
+      delete process.env["N_DX_CLI_PATH"];
+      clearStatusCache();
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+        const data = await res.json();
+        expect(data.server.cliPath).toBe("/custom/ndx/cli.js");
+      } finally {
+        if (original.NDX_CLI_PATH === undefined) delete process.env["NDX_CLI_PATH"];
+        else process.env["NDX_CLI_PATH"] = original.NDX_CLI_PATH;
+        if (original.N_DX_CLI_PATH === undefined) delete process.env["N_DX_CLI_PATH"];
+        else process.env["N_DX_CLI_PATH"] = original.N_DX_CLI_PATH;
+        clearStatusCache();
+      }
+    });
+
+    it("falls back to process.argv[1] for server.cliPath when no CLI path env vars are set", async () => {
+      const original = {
+        NDX_CLI_PATH: process.env["NDX_CLI_PATH"],
+        N_DX_CLI_PATH: process.env["N_DX_CLI_PATH"],
+      };
+      delete process.env["NDX_CLI_PATH"];
+      delete process.env["N_DX_CLI_PATH"];
+      clearStatusCache();
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/status`);
+        const data = await res.json();
+        expect(data.server.cliPath).toBe(process.argv[1]);
+      } finally {
+        if (original.NDX_CLI_PATH === undefined) delete process.env["NDX_CLI_PATH"];
+        else process.env["NDX_CLI_PATH"] = original.NDX_CLI_PATH;
+        if (original.N_DX_CLI_PATH === undefined) delete process.env["N_DX_CLI_PATH"];
+        else process.env["N_DX_CLI_PATH"] = original.N_DX_CLI_PATH;
+        clearStatusCache();
+      }
     });
 
     it("reports the actual port and startedAt when set on ctx", async () => {

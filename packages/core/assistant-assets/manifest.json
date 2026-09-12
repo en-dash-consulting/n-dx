@@ -48,6 +48,7 @@
       "package": "packages/rex",
       "npmName": "@n-dx/rex",
       "entrypoint": "dist/cli/index.js",
+      "cliCommand": "rex",
       "mcpCommand": "mcp",
       "tools": {
         "read": [
@@ -77,6 +78,7 @@
       "package": "packages/sourcevision",
       "npmName": "@n-dx/sourcevision",
       "entrypoint": "dist/cli/index.js",
+      "cliCommand": "sv",
       "mcpCommand": "mcp",
       "tools": {
         "read": [

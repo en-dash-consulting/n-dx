@@ -16,10 +16,8 @@
  * @module n-dx/codex-integration
  */
 
-import { existsSync, mkdirSync, writeFileSync } from "fs";
-import { createRequire } from "module";
-import { dirname, join, resolve } from "path";
-import { fileURLToPath } from "url";
+import { mkdirSync, writeFileSync } from "fs";
+import { join, resolve } from "path";
 import {
   getSkillNames,
   getMcpServers,
@@ -27,22 +25,7 @@ import {
   renderCodexConfigToml,
   renderAgentsMd,
 } from "./assistant-assets.js";
-
-const __dir = dirname(fileURLToPath(import.meta.url));
-const _require = createRequire(import.meta.url);
-
-/**
- * Resolve a sub-package CLI path — monorepo first, then node_modules.
- */
-function resolveSubPackageCli(pkgDir, npmName) {
-  const monoPath = resolve(__dir, pkgDir, "dist/cli/index.js");
-  if (existsSync(monoPath)) return monoPath;
-  try {
-    return _require.resolve(npmName + "/dist/cli/index.js");
-  } catch {
-    return monoPath; // fallback — will fail with a clear error
-  }
-}
+import { getCliName } from "./cli-identity.js";
 
 // ── Config generation ──────────────────────────────────────────────────────────
 
@@ -53,6 +36,10 @@ function resolveSubPackageCli(pkgDir, npmName) {
  * approval, or model configuration).  This matches the locked decision
  * in docs/process/codex-transport-artifact-decisions.md §5.
  *
+ * Commands are cwd-relative (`<cliName> <cliCommand> mcp .`) rather than
+ * absolute paths — see the dated update in
+ * docs/archive/codex-transport-artifact-decisions.md.
+ *
  * @param {string} dir  Absolute project root directory
  * @returns {{ written: boolean, path: string, serverCount: number }}
  */
@@ -61,7 +48,8 @@ function writeCodexConfig(dir) {
   mkdirSync(codexDir, { recursive: true });
 
   const configPath = join(codexDir, "config.toml");
-  const content = renderCodexConfigToml(dir, resolveSubPackageCli);
+  const cliName = getCliName(dir);
+  const content = renderCodexConfigToml(cliName);
   writeFileSync(configPath, content);
 
   return {
