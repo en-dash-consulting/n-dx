@@ -44,6 +44,16 @@ let _llmConfig: LLMConfig | undefined;
  */
 let _llmClient: ClaudeClient | undefined;
 
+/**
+ * Project directory the vendor CLI should be spawned in. Set once at CLI
+ * entry points via `setProjectDir()`, alongside `setClaudeConfig()`. Without
+ * it the vendor CLI inherits the calling process's cwd, which is wrong for
+ * `rex analyze <dir>` run from outside `<dir>` — the vendor CLI would then
+ * resolve its own project context (CLAUDE.md, .mcp.json) against the wrong
+ * directory.
+ */
+let _projectDir: string | undefined;
+
 function resolveVendor(): LLMVendor {
   return _llmConfig?.vendor ?? DEFAULT_LLM_VENDOR;
 }
@@ -100,6 +110,17 @@ export function setClaudeClient(client: ClaudeClient): void {
 }
 
 /**
+ * Set the project directory the vendor CLI should be spawned in. Call this
+ * at CLI entry points, alongside `setClaudeConfig()`, with the directory
+ * being analyzed — not `process.cwd()`. Resets the cached client so the
+ * next call spawns in the new directory.
+ */
+export function setProjectDir(dir: string): void {
+  _projectDir = dir;
+  _llmClient = undefined;
+}
+
+/**
  * Get the current authentication mode being used for LLM calls.
  * Returns "api" when using direct API key authentication, "cli" when
  * using the Claude Code CLI binary. Returns undefined if no config
@@ -131,6 +152,7 @@ function getClient(): ClaudeClient {
   _llmClient = createLLMClient({
     vendor: resolveVendor(),
     llmConfig,
+    cwd: _projectDir,
   });
   return _llmClient;
 }
@@ -171,6 +193,7 @@ export async function spawnClaude(
         ...(_llmConfig ?? {}),
         claude: claudeConfig,
       },
+      cwd: _projectDir,
     })
     : getClient();
 
