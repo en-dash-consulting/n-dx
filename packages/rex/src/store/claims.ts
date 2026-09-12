@@ -114,6 +114,44 @@ export interface ClaimsStore {
   release(taskId: string, identity?: ClaimIdentity): Promise<void>;
   /** Is a *different* process holding this task right now? */
   isClaimedByOther(taskId: string, identity?: ClaimIdentity): Promise<boolean>;
+  /**
+   * Live claims held by a *different worktree*, keyed by task id.
+   *
+   * This is the predicate task selection uses, and it is deliberately coarser
+   * than {@link ClaimsStore.isClaimedByOther}: it compares worktree roots only,
+   * so a second process in the worktree that already holds a claim can still
+   * pick the task up. That is the crash-retry case — the operator re-runs in the
+   * same checkout, and a claim their own worktree left behind must not lock them
+   * out of their own work. Across worktrees there is no such excuse, and the
+   * claim stands.
+   *
+   * A map rather than a set because the caller has to be able to say *which*
+   * worktree is holding the task: "skipped" with no explanation is the kind of
+   * silence that gets debugged as a bug in task selection.
+   */
+  claimedElsewhere(worktreeRoot?: string): Promise<Map<string, TaskClaim>>;
+}
+
+/** What task selection passed over because another worktree holds it. */
+export interface SkippedClaim {
+  taskId: string;
+  worktreeRoot: string;
+  claimedAt: string;
+}
+
+/**
+ * Render claims as the report a caller shows when it skipped them.
+ *
+ * Shared so `rex next --verbose`, `get_next_task` and the dashboard all name
+ * the holder the same way — a skip the operator cannot attribute is worse than
+ * no skip at all, because it looks like the task vanished.
+ */
+export function describeSkippedClaims(claims: Iterable<TaskClaim>): SkippedClaim[] {
+  return [...claims].map((c) => ({
+    taskId: c.taskId,
+    worktreeRoot: c.worktreeRoot,
+    claimedAt: c.claimedAt,
+  }));
 }
 
 // ── Liveness ─────────────────────────────────────────────────────────
@@ -218,6 +256,9 @@ const NOOP_STORE: ClaimsStore = {
   async isClaimedByOther() {
     return false;
   },
+  async claimedElsewhere() {
+    return new Map();
+  },
 };
 
 /**
@@ -312,6 +353,19 @@ export function openClaimsStore(projectDir: string): ClaimsStore {
       const now = Date.now();
       const claims = await readAll(claimsPath);
       return claims.some((c) => c.taskId === taskId && isLive(c, now) && !isOurs(c, pid, worktreeRoot));
+    },
+
+    async claimedElsewhere(worktreeRoot) {
+      const ours = worktreeRoot ?? defaultWorktreeRoot;
+      const now = Date.now();
+      const claims = await readAll(claimsPath);
+      const byTask = new Map<string, TaskClaim>();
+      for (const claim of claims) {
+        if (claim.worktreeRoot === ours) continue;
+        if (!isLive(claim, now)) continue;
+        byTask.set(claim.taskId, claim);
+      }
+      return byTask;
     },
   };
 }

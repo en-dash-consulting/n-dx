@@ -1,8 +1,8 @@
 export type { PRDStore, StoreCapabilities } from "./contracts.js";
 export { FileStore, ensureRexDir, PRD_FILENAME } from "./file-adapter.js";
 export { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
-export { openClaimsStore, CLAIMS_DIRNAME, CLAIMS_FILENAME, DEFAULT_CLAIM_TTL_MS } from "./claims.js";
-export type { ClaimsStore, TaskClaim, ClaimOptions, ClaimIdentity } from "./claims.js";
+export { openClaimsStore, describeSkippedClaims, CLAIMS_DIRNAME, CLAIMS_FILENAME, DEFAULT_CLAIM_TTL_MS } from "./claims.js";
+export type { ClaimsStore, TaskClaim, ClaimOptions, ClaimIdentity, SkippedClaim } from "./claims.js";
 export {
   sanitizeBranchName,
   resolveGitBranch,

@@ -198,6 +198,53 @@ describe("claims", () => {
       expect(await store.readClaims()).toEqual([]);
     });
 
+    describe("claimedElsewhere", () => {
+      it("reports live claims from other worktrees, keyed by task", async () => {
+        const repo = await makeRepo();
+        const store = openClaimsStore(repo);
+        await store.claim("task-1", { pid: LIVE_FOREIGN_PID, worktreeRoot: "/wt/other" });
+        await store.claim("task-2", { pid: LIVE_FOREIGN_PID, worktreeRoot: "/wt/another" });
+
+        const elsewhere = await store.claimedElsewhere();
+        expect([...elsewhere.keys()].sort()).toEqual(["task-1", "task-2"]);
+        expect(elsewhere.get("task-1")?.worktreeRoot).toBe("/wt/other");
+      });
+
+      it("does not report a claim held by our own worktree", async () => {
+        // The crash-retry case: the operator re-runs in the checkout that took
+        // the claim, and must not be locked out of their own work.
+        const repo = await makeRepo();
+        const store = openClaimsStore(repo);
+        await store.claim("task-1");
+
+        expect(await store.claimedElsewhere()).toEqual(new Map());
+      });
+
+      it("ignores our worktree even when a different process holds the claim", async () => {
+        // Worktree-scoped, not process-scoped — deliberately coarser than
+        // isClaimedByOther, which compares the pid too.
+        const repo = await makeRepo();
+        const store = openClaimsStore(repo);
+        const ours = "/wt/ours";
+        await store.claim("task-1", { pid: LIVE_FOREIGN_PID, worktreeRoot: ours });
+
+        expect(await store.claimedElsewhere(ours)).toEqual(new Map());
+        expect(await store.isClaimedByOther("task-1", { worktreeRoot: ours })).toBe(true);
+      });
+
+      it("omits dead and expired claims", async () => {
+        const repo = await makeRepo();
+        await writeClaimsFile(repo, [
+          { taskId: "dead", pid: DEAD_PID, worktreeRoot: "/a", claimedAt: "2020-01-01T00:00:00.000Z", expiresAt: new Date(Date.now() + DEFAULT_CLAIM_TTL_MS).toISOString() },
+          { taskId: "expired", pid: LIVE_FOREIGN_PID, worktreeRoot: "/b", claimedAt: "2020-01-01T00:00:00.000Z", expiresAt: "2020-01-01T04:00:00.000Z" },
+          { taskId: "live", pid: LIVE_FOREIGN_PID, worktreeRoot: "/c", claimedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + DEFAULT_CLAIM_TTL_MS).toISOString() },
+        ]);
+
+        const elsewhere = await openClaimsStore(repo).claimedElsewhere();
+        expect([...elsewhere.keys()]).toEqual(["live"]);
+      });
+    });
+
     it("treats a corrupt claims file as empty rather than throwing", async () => {
       const repo = await makeRepo();
       await mkdir(join(repo, ".git", "ndx"), { recursive: true });
@@ -219,6 +266,7 @@ describe("claims", () => {
       expect(await store.readClaims()).toEqual([]);
       expect(await store.claim("task-1")).toBe(true);
       expect(await store.isClaimedByOther("task-1")).toBe(false);
+      expect(await store.claimedElsewhere()).toEqual(new Map());
       await expect(store.release("task-1")).resolves.toBeUndefined();
       // And it writes nothing.
       expect(await store.readClaims()).toEqual([]);

@@ -26,6 +26,7 @@ import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../..
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 import { resolveCliPath, resolveNdxVersion } from "../../process/toolchain-identity.js";
+import { claimTask } from "../../prd/task-claims.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
@@ -197,6 +198,23 @@ export async function prepareBrief(
   extraContext?: string,
 ): Promise<PreparedBrief> {
   const { brief, taskId: resolvedTaskId } = await assembleTaskBrief(store, taskId, options);
+
+  // Claim the task the moment it is resolved — this is the narrowest window
+  // between "we know which task" and "we start working on it", and anything
+  // wider is a window in which a second worktree picks the same task. Selection
+  // already skipped tasks claimed elsewhere; this closes the gap between that
+  // read and the work itself. Losing the race means another worktree claimed it
+  // in between, and continuing would duplicate their run.
+  if (options?.projectDir) {
+    const holder = await claimTask(options.projectDir, resolvedTaskId);
+    if (holder) {
+      throw new Error(
+        `Task ${resolvedTaskId} was claimed by another worktree (${holder.worktreeRoot}) while it was being prepared. ` +
+        `Re-run to pick a different task.`,
+      );
+    }
+  }
+
   const briefText = formatTaskBrief(brief);
   const systemPrompt = buildSystemPrompt(brief.project, config);
   const envelope = buildPromptEnvelope(brief, config, extraContext);

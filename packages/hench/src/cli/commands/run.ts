@@ -3,6 +3,7 @@ import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION, SELF_HEAL_TAG } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
+import { claimTask, releaseAllTaskClaims } from "../../prd/task-claims.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
 import { classifyChangedFiles } from "../../store/file-classifier.js";
@@ -1304,6 +1305,8 @@ export async function cmdRun(
   const limiter = new ProcessLimiter(henchDir, config.guard.maxConcurrentProcesses);
   await limiter.acquire(flags.task);
 
+  const releaseClaimsOnSignal = installClaimReleaseOnSignal(dir);
+
   try {
     // Create execution queue for in-process concurrency control.
     // The queue limits concurrent task runs within this process
@@ -1409,6 +1412,23 @@ export async function cmdRun(
     // record, for the commits that happen later in the loop.
     const invocationGitOrigin = captureRunGitOrigin(dir);
 
+    // An explicitly named task is claimed here, before the gate rather than
+    // after it: the gate can sit on a prompt for as long as the operator takes
+    // to answer, and a task that is about to be worked on should not look free
+    // to another worktree for that whole window. Autoselected runs claim at the
+    // moment of selection instead — see prepareBrief — because until then there
+    // is nothing to claim.
+    if (flags.task && !dryRun) {
+      const holder = await claimTask(dir, flags.task);
+      if (holder) {
+        info(colorWarn(
+          `Task ${flags.task} is being worked on by another worktree: ${holder.worktreeRoot}`,
+        ));
+        info("Wait for that run to finish, or pick a different task.");
+        return;
+      }
+    }
+
     // One-time pre-run commit gate: before the work loop begins, offer to
     // commit any pre-existing uncommitted changes so the user's in-progress
     // edits are not folded into hench's own commits. Runs once per invocation
@@ -1461,8 +1481,52 @@ export async function cmdRun(
       await runIterations(dir, henchDir, rexDir, provider, taskId, dryRun, model, spawnModel, maxTurns, tokenBudget, iterations, config.maxFailedAttempts, reviewOpts, epicId, tagsFilter, rollbackOnFailure, yes, extraContext, autonomous, effectivePermissionMode);
     }
   } finally {
+    releaseClaimsOnSignal();
+    // Hand back every task this invocation claimed. One call covers normal
+    // completion, a thrown failure, and a loop unwound by Ctrl-C alike — the
+    // alternative is each of those paths remembering which task it was on, and
+    // the one that forgets blocks the task for every worktree until it expires.
+    await releaseAllTaskClaims(dir);
     await limiter.release();
   }
+}
+
+/**
+ * Release task claims if this process is interrupted before anything else is
+ * listening for the signal.
+ *
+ * `runLoop` and `runEpicByEpic` install their own graceful-shutdown handlers,
+ * which abort the loop and unwind into the `finally` above — that path already
+ * releases, and the hook stays out of its way. What it covers is the window
+ * *before* those handlers exist: a run spends its first seconds taking a claim
+ * and sitting on the pre-run commit gate, and a Ctrl-C there reaches a process
+ * with no `SIGINT` listener at all, which Node terminates on the spot. The
+ * claim then survives its run and blocks the task for every worktree in the
+ * repository until it expires.
+ *
+ * Registering a listener is what suppresses that immediate termination, so the
+ * hook also has to finish the job: release, then exit with the conventional
+ * signal status. Returns the function that removes it.
+ */
+function installClaimReleaseOnSignal(dir: string): () => void {
+  const SIGNAL_EXIT_CODES = { SIGINT: 130, SIGTERM: 143 } as const;
+  const signals = Object.keys(SIGNAL_EXIT_CODES) as Array<keyof typeof SIGNAL_EXIT_CODES>;
+
+  const handlers = signals.map((signal) => {
+    const handler = (): void => {
+      // Somebody else is handling this signal — theirs is the graceful path,
+      // and it releases on the way out. Releasing here would drop the claim
+      // while the loop is still finishing its current task.
+      if (process.listenerCount(signal) > 1) return;
+      void releaseAllTaskClaims(dir).finally(() => process.exit(SIGNAL_EXIT_CODES[signal]));
+    };
+    process.on(signal, handler);
+    return [signal, handler] as const;
+  });
+
+  return () => {
+    for (const [signal, handler] of handlers) process.removeListener(signal, handler);
+  };
 }
 
 // ---------------------------------------------------------------------------
