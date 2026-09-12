@@ -2,13 +2,12 @@
 id: "4fc05c48-48b0-4da3-8126-4fa237b924d9"
 level: "epic"
 title: "Hench"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-26T15:22:13.999Z"
-completedAt: "2026-09-10T17:19:14.641Z"
 endedAt: "2026-09-10T17:19:14.641Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
-lastModified: "2026-09-10T17:19:14.647Z"
-lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+lastModified: "2026-09-12T09:42:35.682Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -37,7 +36,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Mandatory Pre-Commit Full Test Suite Gate](./mandatory-pre-commit-full-test-suite/index.md) | completed |
 | [Reliable work loop](./reliable-work-loop/index.md) | completed |
 | [Rex Run Rolling Log Display and Persistent Log Files](./rex-run-rolling-log-display-and/index.md) | completed |
-| [Run Failure Recovery and Rollback](./run-failure-recovery-and-rollback/index.md) | completed |
+| [Run Failure Recovery and Rollback](./run-failure-recovery-and-rollback/index.md) | pending |
 | [Run Loop Cancellation and Iteration Visibility Refinements](./run-loop-cancellation-and-iteration/index.md) | completed |
 | [Sequential Epic Execution](./sequential-epic-execution/index.md) | completed |
 | [Strict Self-Heal Tag Scoping Enforcement](./strict-self-heal-tag-scoping-enforcement/index.md) | completed |
@@ -46,3 +45,4 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 | [Fix hench parent auto-completion cascade silently skipped + add reconciliation sweep (#293)](./fix-hench-parent-auto-completion.md) | completed |
 | [Fix hench task-completion commit gap + fullTestCommand schema drop (#302)](./fix-hench-task-completion-commit-gap.md) | completed |
 | [Pre-run commit gate: verify uncommitted changes before starting a work loop](./pre-run-commit-gate-verify-uncommitted.md) | completed |
+| [RunRecord fields testGate, dependencyAudit and cleanupTransformations are stripped by the run-record schema on load](./runrecord-fields-testgate.md) | pending |
