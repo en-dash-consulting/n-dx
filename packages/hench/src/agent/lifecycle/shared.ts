@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
-import { explainSelection, collectCompletedIds, findItem, findParentResets, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
+import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -2082,15 +2082,28 @@ async function reopenWithdrawnAncestors(store: PRDStore, taskId: string): Promis
     const ancestor = await store.getItem(id);
     if (!ancestor) continue;
 
-    await store.updateItem(id, { status: "pending", completedAt: undefined }, {
-      preserveModifiedBy: true,
-    });
-    await store.appendLog({
-      timestamp: new Date().toISOString(),
-      event: "status_reset",
-      itemId: id,
-      detail: `Reset ${ancestor.level}: ${ancestor.title} from completed to pending (child completion withdrawn)`,
-    });
+    // Via computeTimestampUpdates rather than clearing `completedAt` by hand:
+    // entering `completed` sets `endedAt` as well, and clearing only the one
+    // leaves the ancestor `pending` with an "Ended:" line in its own index.md
+    // and a finished duration for work that is open again.
+    await store.updateItem(id, {
+      status: "pending",
+      ...computeTimestampUpdates(ancestor.status, "pending", ancestor),
+    }, { preserveModifiedBy: true });
+    // Best-effort, for the same reason toolRexUpdateStatus guards its own
+    // status_updated append: a failed log write must not abandon the rest of
+    // the chain. Aborting here would leave the epic completed above a pending
+    // feature — a half-repaired tree, from the one path whose job is repair.
+    try {
+      await store.appendLog({
+        timestamp: new Date().toISOString(),
+        event: "status_reset",
+        itemId: id,
+        detail: `Reset ${ancestor.level}: ${ancestor.title} from completed to pending (child completion withdrawn)`,
+      });
+    } catch (err) {
+      detail(`Warning: status_reset log append failed for ${id} (non-fatal): ${(err as Error).message}`);
+    }
     reopened.push(`${ancestor.level}: ${ancestor.title}`);
   }
 

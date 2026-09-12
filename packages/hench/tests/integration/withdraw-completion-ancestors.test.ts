@@ -166,11 +166,21 @@ describe("withdrawCompletionClaim — ancestor reopening", () => {
       expect((await get("epic-1")).status).toBe("pending");
     });
 
-    it("clears the ancestors' completedAt so they do not read as finished", async () => {
+    /**
+     * `endedAt` matters as much as `completedAt` and is easier to forget.
+     * It is what `computeDuration` and the folder-tree index generator read:
+     * an ancestor left `pending` with a stale `endedAt` renders a literal
+     * "**Ended:** <date>" line in its own `index.md` and reports a finished
+     * duration for work that is open again.
+     */
+    it("clears the ancestors' completion timestamps so they do not read as finished", async () => {
       await finalizeWithLeakedWork();
 
-      expect((await get("feature-1")).completedAt).toBeUndefined();
-      expect((await get("epic-1")).completedAt).toBeUndefined();
+      for (const id of ["feature-1", "epic-1"]) {
+        const ancestor = await get(id);
+        expect(ancestor.completedAt, `${id}.completedAt`).toBeUndefined();
+        expect(ancestor.endedAt, `${id}.endedAt`).toBeUndefined();
+      }
     });
 
     it("preserves ancestor authorship — reopening is a consequence, not an edit (#368)", async () => {
@@ -178,6 +188,28 @@ describe("withdrawCompletionClaim — ancestor reopening", () => {
 
       expect((await get("feature-1")).lastModifiedBy).toBe(OTHER_AUTHOR);
       expect((await get("epic-1")).lastModifiedBy).toBe(OTHER_AUTHOR);
+    });
+
+    /**
+     * The log is bookkeeping; the statuses are the repair. A failed append on
+     * the first ancestor must not abandon the second — that would leave the
+     * epic completed above a pending feature, which is the very state this
+     * path exists to clear.
+     */
+    it("finishes the chain when the status_reset log append fails", async () => {
+      const realAppendLog = store.appendLog.bind(store);
+      let appended = 0;
+      store.appendLog = async (entry) => {
+        if (entry.event === "status_reset" && appended++ === 0) {
+          throw new Error("log rotation raced the append");
+        }
+        return realAppendLog(entry);
+      };
+
+      await finalizeWithLeakedWork();
+
+      expect((await get("feature-1")).status).toBe("pending");
+      expect((await get("epic-1")).status).toBe("pending");
     });
 
     it("logs the reset against the withdrawal, not 'new child added'", async () => {
