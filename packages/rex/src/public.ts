@@ -51,6 +51,11 @@
 export { resolveStore, PRD_FILENAME, PRD_TREE_DIRNAME, SELF_HEAL_TAG } from "./store/index.js";
 export type { PRDStore } from "./store/contracts.js";
 
+// ---- Cross-worktree task claims ---------------------------------------------
+
+export { openClaimsStore, CLAIMS_DIRNAME, CLAIMS_FILENAME, DEFAULT_CLAIM_TTL_MS } from "./store/claims.js";
+export type { ClaimsStore, TaskClaim, ClaimOptions, ClaimIdentity } from "./store/claims.js";
+
 // ---- Markdown serializer / parser ------------------------------------------
 
 export { serializeDocument } from "./store/markdown-serializer.js";
