@@ -30,7 +30,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Cleanup from the #370 review: dedupe the adapter stamping block, share the porcelain path matcher, align next-task wording](./cleanup-from-the-370-review-dedupe-the.md) | pending |
 | [Completion must not cascade over an explicit in_progress parent, or outside the run's subtree](./completion-must-not-cascade-over-an.md) | completed |
 | [Do not auto-complete an epic that still has deferred, blocked or failing children](./do-not-auto-complete-an-epic-that.md) | completed |
-| [Finalize gate must discount only what the commit prompt will actually commit: staged work only with a pending message, reviewer repairs on both paths](./finalize-gate-must-discount-only-what.md) | pending |
+| [Finalize gate must discount only what the commit prompt will actually commit: staged work only with a pending message, reviewer repairs on both paths](./finalize-gate-must-discount-only-what.md) | completed |
 | [Livelock detector must see Codex file edits as progress](./livelock-detector-must-see-codex-file.md) | pending |
 | [Refuse to mark a task completed while its work is uncommitted](./refuse-to-mark-a-task-completed-while.md) | completed |
 | [--reset-deferred must be able to start the run it enables, and a refusal must exit non-zero](./reset-deferred-must-be-able-to-start.md) | completed |
