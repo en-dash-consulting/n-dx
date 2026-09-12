@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnWithAdapter } from "../../src/agent/lifecycle/cli-loop.js";
@@ -28,13 +28,25 @@ import { createLiveSpawnProgress } from "../../src/agent/lifecycle/cli-loop.js";
  * a poll that is getting somewhere.
  */
 const FAKE_CLI = `
+import { writeFileSync } from "node:fs";
 const mode = process.argv[2];
+if (process.env.HENCH_TEST_CHILD_PID) {
+  writeFileSync(process.env.HENCH_TEST_CHILD_PID, String(process.pid));
+}
 let n = 0;
 const timer = setInterval(() => {
   if (mode === "varied" && n >= 30) {
     clearInterval(timer);
     process.stdout.write(JSON.stringify({ type: "result", result: "done", num_turns: 30 }) + "\\n");
     process.exit(0);
+  }
+  if (mode === "plan") {
+    process.stdout.write(JSON.stringify({
+      type: "assistant",
+      session_id: "session-1",
+      message: { content: [{ type: "tool_use", name: "ExitPlanMode", input: { plan: "Implement it." } }] },
+    }) + "\\n");
+    return;
   }
   const input = mode === "same" ? { bash_id: "b1" } : { bash_id: "b" + n };
   n++;
@@ -57,10 +69,12 @@ process.on("SIGTERM", () => { clearInterval(timer); process.exit(143); });
 describe("livelock intercept in spawnWithAdapter", () => {
   let dir: string;
   let script: string;
+  let pidFile: string;
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "hench-test-livelock-spawn-"));
     script = join(dir, "fake-cli.mjs");
+    pidFile = join(dir, "child.pid");
     await writeFile(script, FAKE_CLI, "utf-8");
   });
 
@@ -69,7 +83,7 @@ describe("livelock intercept in spawnWithAdapter", () => {
   });
 
   function spawn(
-    mode: "same" | "varied",
+    mode: "same" | "varied" | "plan",
     threshold: number,
     liveProgress = createLiveSpawnProgress(),
   ) {
@@ -78,16 +92,23 @@ describe("livelock intercept in spawnWithAdapter", () => {
       spawnConfig: {
         binary: process.execPath,
         args: [script, mode],
-        env: process.env,
+        env: { ...process.env, HENCH_TEST_CHILD_PID: pidFile },
         stdinContent: null,
         cwd: dir,
       },
       cliBinary: process.execPath,
+      cliEnv: { ...process.env, HENCH_TEST_CHILD_PID: pidFile },
       cwd: dir,
       tokenMetadata: { vendor: "claude", model: "sonnet" },
       livelock: createLivelockDetector({ threshold }),
       liveProgress,
     });
+  }
+
+  async function expectChildToBeGone(): Promise<void> {
+    const pid = Number(await readFile(pidFile, "utf-8"));
+    expect(Number.isInteger(pid)).toBe(true);
+    expect(() => process.kill(pid, 0)).toThrow();
   }
 
   it("kills a child that keeps making the same call, and says which call", async () => {
@@ -100,6 +121,14 @@ describe("livelock intercept in spawnWithAdapter", () => {
     // which would read as transient and buy the loop a retry.
     expect(result.error).toBe(result.livelock!.message);
     expect(result.error).toContain("BashOutput");
+    await expectChildToBeGone();
+  }, 20_000);
+
+  it("terminates the real child after intercepting plan mode", async () => {
+    const result = await spawn("plan", 4);
+
+    expect(result.planModeIntercept).toEqual({ planText: "Implement it." });
+    await expectChildToBeGone();
   }, 20_000);
 
   it("leaves a child alone while its calls keep differing", async () => {

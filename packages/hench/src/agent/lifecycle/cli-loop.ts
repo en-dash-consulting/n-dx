@@ -72,7 +72,7 @@ import {
   resolveVendorCliEnv,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
-import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError } from "../../prd/llm-gateway.js";
 import {
   createPromptEnvelope,
   DEFAULT_EXECUTION_POLICY,
@@ -1021,11 +1021,10 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
         const planInput = event.toolCall.input as { plan?: unknown } | undefined;
         const planText = typeof planInput?.plan === "string" ? planInput.plan : "";
         result.planModeIntercept = { planText };
-        try {
-          proc.kill("SIGTERM");
-        } catch {
-          // Process may already be exiting; the close handler will resolve.
-        }
+        // `spawnCli` is necessarily a cmd.exe parent on Windows. Killing that
+        // direct child leaves the vendor CLI running, so terminate the tree.
+        // This never rejects; its close event still resolves this spawn.
+        void terminateProcessTree(proc);
       }
 
       // Livelock intercept: the agent is repeating a call that changes nothing.
@@ -1043,11 +1042,9 @@ export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnRe
         if (detection) {
           result.livelock = detection;
           info(`\n${detection.message}`);
-          try {
-            proc.kill("SIGTERM");
-          } catch {
-            // Process may already be exiting; the close handler will resolve.
-          }
+          // See the plan-mode intercept above: on Windows the direct process is
+          // cmd.exe, so a direct signal does not reach the actual vendor CLI.
+          void terminateProcessTree(proc);
         }
       }
 
