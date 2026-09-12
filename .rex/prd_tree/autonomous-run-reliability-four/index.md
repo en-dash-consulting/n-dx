@@ -26,7 +26,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A review pass that could not run must not report a completed, reviewed task](./a-review-pass-that-could-not-run-must.md) | pending |
 | [Calibrate the uncommitted-work guards: discount hench's own PRD writes and the tree-meta sidecar, and cover --epic-by-epic](./calibrate-the-uncommitted-work-guards.md) | completed |
+| [CI child-cleanup fixtures are never reaped and accumulate across suite runs](./ci-child-cleanup-fixtures-are-never.md) | pending |
 | [Cleanup from the #370 review: dedupe the adapter stamping block, share the porcelain path matcher, align next-task wording](./cleanup-from-the-370-review-dedupe-the.md) | pending |
 | [Completion must not cascade over an explicit in_progress parent, or outside the run's subtree](./completion-must-not-cascade-over-an.md) | completed |
 | [Do not auto-complete an epic that still has deferred, blocked or failing children](./do-not-auto-complete-an-epic-that.md) | completed |
