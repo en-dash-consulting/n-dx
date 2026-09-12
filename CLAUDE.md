@@ -74,7 +74,7 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 
 | Package | Gateway file | Imports from | Re-exports |
 |---------|-------------|--------------|------------|
-| hench | `src/prd/rex-gateway.ts` | rex | 19 functions + 6 types (schema, store, tree, task selection, timestamps, auto-completion, requirements, level helpers, finding acknowledgment) |
+| hench | `src/prd/rex-gateway.ts` | rex | 21 functions + 4 constants + 7 types (schema, store, tree, task selection, timestamps, auto-completion, parent reset, requirements, level helpers, finding acknowledgment) |
 | hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | 30 functions + 10 types (config, constants, JSON, output, help, errors, process execution, token parsing, model resolution) |
 | web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants, tree utilities |
 | web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory, next-step derivation, archetype override, iso-map builder, analysis artifact schema types |

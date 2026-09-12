@@ -37,4 +37,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [--reset-deferred must commit only its own writes and must not write on --dry-run](./reset-deferred-must-commit-only-its.md) | pending |
 | [rex fix must reopen parents to pending (not in_progress) and run the whole-tree stuck-parent sweep](./rex-fix-must-reopen-parents-to-pending.md) | pending |
 | [Stop a run that repeats an identical tool call instead of letting it loop forever](./stop-a-run-that-repeats-an-identical.md) | completed |
-| [Withdrawing a completion must reopen the ancestors the agent's own cascade already closed](./withdrawing-a-completion-must-reopen.md) | pending |
+| [Withdrawing a completion must reopen the ancestors the agent's own cascade already closed](./withdrawing-a-completion-must-reopen.md) | completed |

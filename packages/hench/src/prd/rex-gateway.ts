@@ -58,6 +58,8 @@
  * - Task selection (findNextTask, findActionableTasks, collectCompletedIds)
  * - Timestamp computation (status change timestamps)
  * - Parent auto-completion (bubble-up completion when children finish)
+ * - Parent reset (reopen completed ancestors when a descendant reopens —
+ *   the inverse of auto-completion, and the repair for a withdrawn claim)
  * - Requirements validation (verify task acceptance criteria)
  * - Level helpers (isRootLevel, isWorkItem — classify items)
  * - Finding acknowledgment (load/save/acknowledge sourcevision findings)
@@ -107,6 +109,12 @@ export { computeTimestampUpdates } from "@n-dx/rex";
 
 // ---- Parent auto-completion -------------------------------------------------
 export { findAutoCompletions, reconcileAutoCompletions } from "@n-dx/rex";
+
+// ---- Parent reset -----------------------------------------------------------
+// The pure computation only. `cascadeParentReset` is deliberately not
+// re-exported: it applies the resets with rex's own "new child added" wording,
+// which is the wrong reason when hench withdraws a completion claim.
+export { findParentResets } from "@n-dx/rex";
 
 // ---- Requirements validation ------------------------------------------------
 export {

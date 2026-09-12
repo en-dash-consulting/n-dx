@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
-import { explainSelection, collectCompletedIds, findItem, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
+import { explainSelection, collectCompletedIds, findItem, findParentResets, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -2052,6 +2052,54 @@ async function resetInProgressTaskIfFailed(
 }
 
 /**
+ * Reopen completed ancestors above a task that has just been reset to pending.
+ *
+ * The cascade in {@link toolRexUpdateStatus} runs on `completed` and `deferred`
+ * only, so resetting the task to `pending` unwinds nothing: the feature and
+ * epic its own cascade closed a moment earlier stay `completed` above a pending
+ * child. That is the parent/child inconsistency `rex validate` warns about, and
+ * no later run repairs it — the rerun completes the task, finds the feature
+ * already completed, and never re-verifies it.
+ *
+ * `findParentResets` is the same pure computation rex uses on the add path: it
+ * walks up from the parent and returns every *consecutive* completed ancestor,
+ * bottom-up. That deliberately includes an ancestor completed before this run
+ * rather than by its cascade — such an ancestor now has a pending descendant,
+ * so `completed` is a false statement about it whoever wrote it.
+ *
+ * Authorship is preserved (#368): the operator asked to update the task, and
+ * reopening its ancestors is a consequence, not an edit they made.
+ */
+async function reopenWithdrawnAncestors(store: PRDStore, taskId: string): Promise<void> {
+  const doc = await store.loadDocument();
+  const parentId = findItem(doc.items, taskId)?.parents.at(-1)?.id;
+  if (!parentId) return;
+
+  const { resetIds } = findParentResets(doc.items, parentId);
+  const reopened: string[] = [];
+
+  for (const id of resetIds) {
+    const ancestor = await store.getItem(id);
+    if (!ancestor) continue;
+
+    await store.updateItem(id, { status: "pending", completedAt: undefined }, {
+      preserveModifiedBy: true,
+    });
+    await store.appendLog({
+      timestamp: new Date().toISOString(),
+      event: "status_reset",
+      itemId: id,
+      detail: `Reset ${ancestor.level}: ${ancestor.title} from completed to pending (child completion withdrawn)`,
+    });
+    reopened.push(`${ancestor.level}: ${ancestor.title}`);
+  }
+
+  if (reopened.length > 0) {
+    detail(`Reopened: ${reopened.join(", ")}`);
+  }
+}
+
+/**
  * Withdraw a completion claim the run is no longer entitled to make.
  *
  * {@link resetInProgressTaskIfFailed} is not enough on its own: the agent is
@@ -2085,6 +2133,22 @@ async function withdrawCompletionClaim(
     detail(`Warning: could not withdraw the completion claim: ${msg}`);
     if (run.diagnostics) {
       run.diagnostics.notes.push(`cascade_failure: ${msg}`);
+    }
+    // The task's own status is the claim; without it there is nothing to
+    // unwind above, and a second failing write would only repeat the reason.
+    return;
+  }
+
+  // Separate best-effort span with its own reason: the task above is already
+  // pending by now, so reporting an ancestor failure as "could not withdraw the
+  // completion claim" would describe the wrong thing.
+  try {
+    await reopenWithdrawnAncestors(store, run.taskId);
+  } catch (err) {
+    const msg = (err as Error).message;
+    detail(`Warning: could not reopen the ancestors closed by this task: ${msg}`);
+    if (run.diagnostics) {
+      run.diagnostics.notes.push(`ancestor_reset_failure: ${msg}`);
     }
   }
 }

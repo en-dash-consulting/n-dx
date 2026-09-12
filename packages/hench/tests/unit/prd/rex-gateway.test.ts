@@ -44,6 +44,8 @@ const EXPECTED_EXPORTS = [
   // Parent auto-completion
   "findAutoCompletions",
   "reconcileAutoCompletions",
+  // Parent reset
+  "findParentResets",
   // Requirements validation
   "collectRequirements",
   "validateAutomatedRequirements",

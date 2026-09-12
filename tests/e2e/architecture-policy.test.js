@@ -1032,8 +1032,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/rex-gateway.ts",
-    maxExports: 31,
-    description: "hench→rex gateway (schema, store, tree, task selection, timestamps). Raised from 30 to carry TREE_META_FILENAME: `.rex/tree-meta.json` is rewritten by every folder-tree save, so hench has to stage and discount it wherever it stages and discounts the tree, and hardcoding the name at those three sites is exactly the drift that left it in nobody's list and refused every task completion.",
+    maxExports: 32,
+    description: "hench→rex gateway (schema, store, tree, task selection, timestamps). Raised from 30 to carry TREE_META_FILENAME: `.rex/tree-meta.json` is rewritten by every folder-tree save, so hench has to stage and discount it wherever it stages and discounts the tree, and hardcoding the name at those three sites is exactly the drift that left it in nobody's list and refused every task completion. Raised from 31 to carry findParentResets: withdrawing a completion claim has to reopen the ancestors the same run's cascade closed, and rex already owns that computation — reimplementing the ancestor walk in hench would be a second definition of which parents are inconsistent, free to drift from the add path's.",
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
