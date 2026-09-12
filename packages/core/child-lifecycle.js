@@ -599,6 +599,20 @@ export function createChildProcessTracker({
     return child;
   }
 
+  /**
+   * Terminate every tracked child. Idempotent — repeat calls await the first.
+   *
+   * ONE-WAY: calling this retires the tracker. Afterwards {@link register} no
+   * longer adopts children, it SIGKILLs them on arrival, because a child adopted
+   * after the snapshot would never be drained again. Every caller today runs this
+   * on a path that ends in `process.exit()`, which is the only shape it supports.
+   *
+   * SO DO NOT USE IT AS "kill what is running and carry on" — a tracker that
+   * resumed spawning after a non-terminal cleanup would have every subsequent
+   * child killed the moment it started, silently. If that use ever becomes
+   * necessary, it needs a separate `drain()` that does not latch, not a relaxation
+   * of this one.
+   */
   async function cleanup() {
     if (!cleanupPromise) {
       cleanupPromise = Promise.allSettled(
