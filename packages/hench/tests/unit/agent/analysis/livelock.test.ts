@@ -25,15 +25,41 @@ describe("livelock detector", () => {
     // The observed livelock (GH #362) was a repeating *cycle*, not adjacent
     // identical calls: relaunch suite → sleep → poll dead task → re-read the
     // same diff. Adjacency would never have caught it.
+    //
+    // The detector stops at the first signature to reach the threshold — the
+    // cycle's opening call on its third pass — so what is asserted is that the
+    // cycle was caught, not which member of it got named. Keeping the first
+    // non-null return is what every caller does.
     const detector = createLivelockDetector({ threshold: 3 });
     let hit = null;
     for (let cycle = 0; cycle < 3; cycle++) {
-      detector.record({ tool: "Bash", input: { command: "pnpm test" } });
-      detector.record({ tool: "Bash", input: { command: "sleep 90" } });
-      hit = detector.record({ tool: "Bash", input: { command: "git diff" } });
+      for (const command of ["pnpm test", "sleep 90", "git diff"]) {
+        hit ??= detector.record({ tool: "Bash", input: { command } });
+      }
     }
     expect(hit).not.toBeNull();
-    expect(hit!.message).toContain("git diff");
+    expect(hit!.repeats).toBe(3);
+    expect(hit!.message).toContain("pnpm test");
+  });
+
+  it("reports one livelock per run, not one per repeated signature", () => {
+    // Firing is terminal: every caller stops the run on the first detection, so
+    // a second signature reaching the threshold afterwards has nobody to tell.
+    // This is what lets the detector hold a single `detection` field instead of
+    // a per-signature `reported` set plus a separate first-detection slot.
+    const detector = createLivelockDetector({ threshold: 2 });
+
+    detector.record({ tool: "Bash", input: { command: "a" } });
+    const first = detector.record({ tool: "Bash", input: { command: "a" } });
+    expect(first).not.toBeNull();
+
+    detector.record({ tool: "Bash", input: { command: "b" } });
+    expect(detector.record({ tool: "Bash", input: { command: "b" } })).toBeNull();
+    expect(detector.detected).toBe(first);
+
+    // A file write explains the repetition and re-arms the detector.
+    detector.record({ tool: "Edit", input: { file_path: "a.ts" } });
+    expect(detector.detected).toBeNull();
   });
 
   it("ignores argument key order", () => {

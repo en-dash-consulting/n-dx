@@ -275,6 +275,65 @@ export async function stampModified(
 }
 
 /**
+ * The stamping-relevant subset of the store layer's `WriteOptions`.
+ *
+ * Declared here rather than imported from `store/contracts.ts` so `core/` keeps
+ * its no-upward-imports property; the store's `WriteOptions` is structurally
+ * assignable to it.
+ */
+export interface StampUpdateOptions {
+  preserveModifiedBy?: boolean;
+}
+
+/**
+ * The actor an update should be stamped with: the item's existing author when
+ * `preserveModifiedBy` is set (a cascade must not claim authorship of somebody
+ * else's item — `WriteOptions.preserveModifiedBy`, GitHub #368), otherwise
+ * `undefined` so {@link stampModifiedFields} resolves the current one.
+ *
+ * `existing` is optional because one caller looks the item up inside the
+ * transaction and may not find it; an absent item has no author to preserve.
+ */
+function updateActor(existing: PRDItem | undefined, options?: StampUpdateOptions): string | undefined {
+  return options?.preserveModifiedBy ? existing?.lastModifiedBy : undefined;
+}
+
+/**
+ * Merge `updates` onto `existing` and stamp the result.
+ *
+ * The shape every `updateItem` implementation needs: merge first so
+ * `lastModified` reflects this write even when `updates` omits it, then stamp
+ * with the author {@link updateActor} selects. Six adapters had pasted copies
+ * of this and the `preserveModifiedBy` ternary; one of them can now be fixed
+ * without the other five drifting.
+ */
+export async function stampUpdatedItem(
+  existing: PRDItem,
+  updates: Partial<PRDItem>,
+  options?: StampUpdateOptions,
+): Promise<PRDItem> {
+  return stampModified({ ...existing, ...updates } as PRDItem, undefined, updateActor(existing, options));
+}
+
+/**
+ * {@link stampUpdatedItem} for adapters that apply a *partial* update.
+ *
+ * `FileStore.updateItem` hands `updateInTree` an `Object.assign`-style patch
+ * rather than a fully merged item, so it needs the stamped fields without the
+ * merge — but it must choose the author by the same rule.
+ */
+export async function stampUpdatedFields(
+  existing: PRDItem | undefined,
+  updates: Partial<PRDItem>,
+  options?: StampUpdateOptions,
+): Promise<Partial<PRDItem>> {
+  return {
+    ...updates,
+    ...(await stampModifiedFields(undefined, updateActor(existing, options))),
+  };
+}
+
+/**
  * Fields excluded from an item's content signature.
  *
  * The first four are sync bookkeeping rather than content: including

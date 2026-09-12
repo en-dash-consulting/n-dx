@@ -189,12 +189,13 @@ export interface LivelockDetectorOptions {
 export interface LivelockDetector {
   /**
    * Record a tool call. Returns a detection the first time the threshold is
-   * reached, and `null` otherwise — including on later calls of an
-   * already-reported signature, so one livelock is reported once.
+   * reached, and `null` otherwise — including on every call after that, so one
+   * livelock is reported once. A progress tool clears the detection along with
+   * the history.
    */
   record(observation: LivelockObservation): LivelockDetection | null;
   /**
-   * The first detection so far, or `null`.
+   * The detection so far, or `null`.
    *
    * Exists so a caller that dispatches tools in a helper (the API loop) can
    * check once per turn instead of threading a return value back out through
@@ -248,12 +249,17 @@ export function createLivelockDetector(opts: LivelockDetectorOptions = {}): Live
   const window = opts.window ?? DEFAULT_LIVELOCK_WINDOW;
 
   let recent: string[] = [];
-  const reported = new Set<string>();
-  let firstDetection: LivelockDetection | null = null;
+  // One field carries the whole "already fired" state. Firing is terminal —
+  // every caller stops the run on the first detection (the API loop breaks, the
+  // CLI loop kills the child and gates further `record` calls on
+  // `!result.livelock`) — so a per-signature `reported` set could never be
+  // consulted for a second signature, and a separate `firstDetection` could
+  // never differ from the latest.
+  let detection: LivelockDetection | null = null;
 
   return {
     get detected(): LivelockDetection | null {
-      return firstDetection;
+      return detection;
     },
 
     record(observation: LivelockObservation): LivelockDetection | null {
@@ -262,16 +268,15 @@ export function createLivelockDetector(opts: LivelockDetectorOptions = {}): Live
       if (isProgressTool(observation.tool)) {
         // Files changed — every earlier repetition is now explained.
         recent = [];
-        reported.clear();
-        firstDetection = null;
+        detection = null;
         return null;
       }
+
+      if (detection) return null;
 
       const signature = signatureOf(observation);
       recent.push(signature);
       if (recent.length > window) recent = recent.slice(recent.length - window);
-
-      if (reported.has(signature)) return null;
 
       let repeats = 0;
       for (const entry of recent) {
@@ -279,8 +284,7 @@ export function createLivelockDetector(opts: LivelockDetectorOptions = {}): Live
       }
       if (repeats < threshold) return null;
 
-      reported.add(signature);
-      const detection: LivelockDetection = {
+      detection = {
         tool: observation.tool,
         repeats,
         window,
@@ -291,14 +295,12 @@ export function createLivelockDetector(opts: LivelockDetectorOptions = {}): Live
           "background task whose process is gone, re-reading an unchanged diff, or retrying a " +
           "command that fails the same way every time.",
       };
-      firstDetection ??= detection;
       return detection;
     },
 
     reset() {
       recent = [];
-      reported.clear();
-      firstDetection = null;
+      detection = null;
     },
   };
 }

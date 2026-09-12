@@ -26,6 +26,7 @@ import { execStdout } from "../../process/exec.js";
 import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import {
   excludeHenchRuntimeArtifacts,
+  matchesProjectPath,
   parsePorcelainPath,
   repoRelativePrefix,
   splitPorcelainLines,
@@ -138,44 +139,6 @@ function isFullyStaged(line: string): boolean {
   const worktree = line[1] as string;
   if (index === "?" || index === "!") return false;
   return index !== " " && worktree === " ";
-}
-
-/** Normalize a path for comparison: forward slashes, no leading `./`. */
-function normalize(path: string): string {
-  return path.replace(/\\/g, "/").replace(/^\.\//, "");
-}
-
-/**
- * True when `path` (repository-relative, as git reports it) is covered by one
- * of the project-relative `patterns`. A trailing slash matches the directory
- * and everything beneath it.
- *
- * `repoPrefix` is applied to the pattern rather than stripped from the path,
- * for the same reason {@link excludeHenchRuntimeArtifacts} does it that way:
- * a sibling project's `other/.rex/prd_tree/` is somebody else's uncommitted
- * work, not this run's.
- *
- * Used in both directions — {@link findUncommittedWork} drops the matches as
- * discounted, {@link listUncommittedPrdPaths} keeps them — so the name says
- * what it tests, not what either caller does with the answer.
- */
-function matchesProjectPath(
-  path: string,
-  patterns: readonly string[],
-  repoPrefix: string,
-): boolean {
-  const normalized = normalize(path);
-  return patterns.some((entry) => {
-    const target = repoPrefix + normalize(entry);
-    if (target.endsWith("/")) {
-      return (
-        normalized === target ||
-        normalized === target.slice(0, -1) ||
-        normalized.startsWith(target)
-      );
-    }
-    return normalized === target;
-  });
 }
 
 /**

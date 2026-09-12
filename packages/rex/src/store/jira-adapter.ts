@@ -18,7 +18,7 @@ import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, walkTree } from "../core/tree.js";
-import { stampModified, stampActor } from "../core/sync.js";
+import { stampModified, stampUpdatedItem, stampActor } from "../core/sync.js";
 import {
   mapIssuesToDocument,
   mapItemToCreate,
@@ -145,13 +145,7 @@ export class JiraStore implements PRDStore {
     }
 
     const parentItem = entry.parents.length > 0 ? entry.parents[entry.parents.length - 1] : undefined;
-    const merged = { ...entry.item, ...updates } as PRDItem;
-    // `preserveModifiedBy` keeps the existing author (see WriteOptions).
-    const stamped = await stampModified(
-      merged,
-      undefined,
-      options?.preserveModifiedBy ? entry.item.lastModifiedBy : undefined,
-    );
+    const stamped = await stampUpdatedItem(entry.item, updates, options);
     await this.client.updateIssue(key, mapItemToUpdate(stamped, this.syncLabels, parentItem?.id));
   }
 

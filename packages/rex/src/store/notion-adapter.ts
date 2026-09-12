@@ -23,6 +23,7 @@ import {findItem, walkTree} from "../core/tree.js";import {  mapItemToNotion,  m
 import type { NotionStatusGroup } from "./notion-map.js";
 import {
   stampModified,
+  stampUpdatedItem,
   stampSynced,
   stampActor,
   extractSyncMeta,
@@ -197,13 +198,7 @@ export class NotionStore implements PRDStore {
       throw new Error(`Item "${id}" not found`);
     }
 
-    const merged = { ...entry.item, ...updates } as PRDItem;
-    // `preserveModifiedBy` keeps the existing author (see WriteOptions).
-    const stamped = await stampModified(
-      merged,
-      undefined,
-      options?.preserveModifiedBy ? entry.item.lastModifiedBy : undefined,
-    );
+    const stamped = await stampUpdatedItem(entry.item, updates, options);
     const { properties } = mapItemToNotion(stamped);
 
     await this.client.updatePage(notionId, properties);

@@ -31,6 +31,7 @@ import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 import {
   stampModified,
+  stampUpdatedItem,
   stampActor,
   stampModifiedFields,
   snapshotItemContent,
@@ -150,14 +151,7 @@ export class FolderTreeStore implements PRDStore {
         if (!entry) {
           throw new Error(`Item "${id}" not found`);
         }
-        // Merge updates onto the current item before stamping so `lastModified`
-        // always reflects this write, even when `updates` omits it.
-        // `preserveModifiedBy` keeps the existing author (see WriteOptions).
-        const merged = await stampModified(
-          { ...entry.item, ...updates } as PRDItem,
-          undefined,
-          options?.preserveModifiedBy ? entry.item.lastModifiedBy : undefined,
-        );
+        const merged = await stampUpdatedItem(entry.item, updates, options);
         if (!updateInTree(doc.items, id, merged)) {
           throw new Error(`Item "${id}" not found`);
         }

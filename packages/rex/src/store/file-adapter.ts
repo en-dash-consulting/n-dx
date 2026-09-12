@@ -8,6 +8,7 @@ import { findItem, walkTree, insertChild, updateInTree, removeFromTree } from ".
 import {
   stampModified,
   stampModifiedFields,
+  stampUpdatedFields,
   stampActor,
   snapshotItemContent,
   stampChangedItems,
@@ -588,19 +589,12 @@ export class FileStore implements PRDStore {
     const owner = await this.resolveOwnerFile(id);
     const attributedUpdates = this.applyWriteAttribution(updates, owner, options);
     await this.withFileTransaction(owner, async (doc) => {
-      // Merge in lastModified/lastModifiedBy directly (rather than building a
-      // full merged item via `stampModified`) since `updateInTree` applies a
-      // partial `Object.assign` onto the existing item. Resolved inside the
+      // A partial patch rather than a full merged item, since `updateInTree`
+      // applies an `Object.assign` onto the existing item. Resolved inside the
       // transaction because `preserveModifiedBy` needs the item's current
       // author (see WriteOptions).
       const existing = findItem(doc.items, id);
-      const stampedUpdates: Partial<PRDItem> = {
-        ...attributedUpdates,
-        ...(await stampModifiedFields(
-          undefined,
-          options?.preserveModifiedBy ? existing?.item.lastModifiedBy : undefined,
-        )),
-      };
+      const stampedUpdates = await stampUpdatedFields(existing?.item, attributedUpdates, options);
       if (!updateInTree(doc.items, id, stampedUpdates)) {
         throw new Error(`Item "${id}" not found`);
       }

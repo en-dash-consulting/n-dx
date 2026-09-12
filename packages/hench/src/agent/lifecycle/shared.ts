@@ -1173,9 +1173,24 @@ async function promptCommitConfirm(fileCount: number): Promise<boolean> {
   );
 }
 
-async function countStagedFiles(projectDir: string): Promise<number> {
+/**
+ * How many paths are in the index, optionally narrowed to `pathspec`.
+ *
+ * Returns 0 when the directory is not a git repository or git is unavailable —
+ * every caller treats "nothing staged" and "cannot tell" the same way: skip the
+ * commit.
+ *
+ * @param pathspec Project-relative paths to limit the count to; omitted counts
+ *   the whole index.
+ */
+async function countStagedFiles(
+  projectDir: string,
+  pathspec: readonly string[] = [],
+): Promise<number> {
+  const args = ["diff", "--cached", "--name-only"];
+  if (pathspec.length > 0) args.push("--", ...pathspec);
   try {
-    const output = await execStdout("git", ["diff", "--cached", "--name-only"], {
+    const output = await execStdout("git", args, {
       cwd: projectDir,
       timeout: 15_000,
     });
@@ -1414,17 +1429,7 @@ async function commitPrdTreeIfStaged(projectDir: string, message: string): Promi
     return 0; // not in a git repo
   }
 
-  let staged = 0;
-  try {
-    const out = await execStdout(
-      "git", ["diff", "--cached", "--name-only", "--", ".rex/"],
-      { cwd: projectDir, timeout: 10_000 },
-    );
-    staged = out.trim().split("\n").filter(Boolean).length;
-  } catch {
-    return 0;
-  }
-
+  const staged = await countStagedFiles(projectDir, [".rex/"]);
   if (staged === 0) {
     return 0;
   }
