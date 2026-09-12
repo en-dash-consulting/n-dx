@@ -2,7 +2,42 @@ import { describe, it, expect, afterEach } from "vitest";
 import { readFile, rm, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { atomicWrite, atomicWriteJSON } from "../../../src/store/atomic-write.js";
+import {
+  atomicWrite,
+  atomicWriteJSON,
+  atomicWriteTempPath,
+  isAtomicWriteTempPath,
+} from "../../../src/store/atomic-write.js";
+
+describe("atomicWriteTempPath / isAtomicWriteTempPath", () => {
+  // The matcher and the builder are the two halves of one contract: a reader
+  // walking the tree (snapshotPRDTree) skips what a writer is mid-rename. If
+  // they drift, the snapshot silently copies temp files again — or worse,
+  // aborts on one that vanished. This asserts they agree.
+  it("recognises the path the builder produces", () => {
+    expect(isAtomicWriteTempPath(atomicWriteTempPath("/tree/epic/index.md"))).toBe(true);
+  });
+
+  it("keeps the temp file a sibling of its target", () => {
+    const tmp = atomicWriteTempPath("/tree/epic/index.md");
+    expect(tmp.startsWith("/tree/epic/index.md.")).toBe(true);
+    expect(tmp.endsWith(".tmp")).toBe(true);
+  });
+
+  it("gives each call a distinct name", () => {
+    const a = atomicWriteTempPath("/tree/epic/index.md");
+    const b = atomicWriteTempPath("/tree/epic/index.md");
+    expect(a).not.toBe(b);
+  });
+
+  it("does not treat real PRD content as a temp file", () => {
+    expect(isAtomicWriteTempPath("/tree/epic/index.md")).toBe(false);
+    expect(isAtomicWriteTempPath("/tree/epic/.tree-meta.json")).toBe(false);
+    // A user-authored file that merely ends in .tmp is content, not in-flight.
+    expect(isAtomicWriteTempPath("/tree/epic/notes.tmp")).toBe(false);
+    expect(isAtomicWriteTempPath("/tree/epic/index.md.1234.tmp")).toBe(false);
+  });
+});
 
 describe("atomicWrite", () => {
   const tmpDir = join(tmpdir(), `rex-atomic-write-str-test-${process.pid}`);
