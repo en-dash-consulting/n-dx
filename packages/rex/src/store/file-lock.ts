@@ -17,7 +17,7 @@
  * @module store/file-lock
  */
 
-import {writeFile, readFile, unlink} from "node:fs/promises";
+import {link, writeFile, readFile, unlink} from "node:fs/promises";
 import {randomUUID} from "node:crypto";
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -160,20 +160,38 @@ async function isLockStale(lockPath: string): Promise<boolean> {
 }
 
 /**
- * Try to create a lock file exclusively. Returns true if the lock was acquired.
+ * Try to publish a lock file exclusively. Returns true if the lock was acquired.
  *
- * Uses O_EXCL via writeFile with the 'wx' flag — the write fails atomically
- * if the file already exists.
+ * The body is written under a unique sibling name before link() atomically
+ * publishes it at `lockPath`. Writing directly with the `wx` flag would create
+ * the public name before its body was written; a competing process could read
+ * that empty file as malformed, reclaim it, and enter the critical section
+ * alongside the still-live writer. link() fails with EEXIST when another lock
+ * is already published, retaining the same exclusive-creation semantics
+ * without exposing incomplete contents.
  */
 async function tryAcquire(lockPath: string, token: string): Promise<boolean> {
+  const temporaryPath = `${lockPath}.${token}.tmp`;
+  await writeFile(temporaryPath, encodeLock(token), { flag: "wx" });
+  let published = false;
+
   try {
-    await writeFile(lockPath, encodeLock(token), { flag: "wx" });
+    await link(temporaryPath, lockPath);
+    published = true;
     return true;
   } catch (err: unknown) {
     if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "EEXIST") {
       return false;
     }
     throw err; // Unexpected error (permissions, disk full, etc.)
+  } finally {
+    try {
+      await unlink(temporaryPath);
+    } catch (err) {
+      // Once the public lock exists, failure to remove its private source name
+      // must not turn a successful acquisition into an error and leak the lock.
+      if (!published) throw err;
+    }
   }
 }
 
