@@ -44,5 +44,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Web UI: Reorganize around SourceVision / Rex / Hench sections](./web-ui-reorganize-around-sourcevision/index.md) | completed |
 | [Fix hench parent auto-completion cascade silently skipped + add reconciliation sweep (#293)](./fix-hench-parent-auto-completion.md) | completed |
 | [Fix hench task-completion commit gap + fullTestCommand schema drop (#302)](./fix-hench-task-completion-commit-gap.md) | completed |
+| [Hench task display branches on rex prose, so a reworded selection summary silently blanks the finalize label](./hench-task-display-branches-on-rex.md) | pending |
 | [Pre-run commit gate: verify uncommitted changes before starting a work loop](./pre-run-commit-gate-verify-uncommitted.md) | completed |
 | [RunRecord fields testGate, dependencyAudit and cleanupTransformations are stripped by the run-record schema on load](./runrecord-fields-testgate.md) | pending |
