@@ -56,6 +56,16 @@
  * them as `user` messages the adapter does not map), so there the signature is
  * name plus arguments and the threshold carries the weight.
  *
+ * Note what "name plus arguments" degrades to on the Codex CLI, where the name
+ * carries no information: every command Codex runs arrives as one tool called
+ * `shell`, so the name is a constant and identity rests entirely on the
+ * arguments — `shell({"command":"pnpm test"})`. Repeats there are repeats of the
+ * same *command*, which is the reading we want; but it also means the progress
+ * signal cannot arrive as a differently-named edit tool the way it does on
+ * Claude. It arrives instead from Codex's `file_change` stream items, which
+ * `lifecycle/adapters/codex-cli-adapter.ts` maps to `apply_patch` for exactly
+ * this purpose.
+ *
  * **When repetition becomes a livelock.** Not adjacency: the observed loop
  * interleaved four different calls per cycle, so a consecutive-identical rule
  * would have seen nothing. Instead, repeats are counted inside a sliding window
@@ -64,6 +74,23 @@
  * file between two identical `pnpm test` runs is making progress by definition,
  * however many times it re-runs the suite. An agent that has changed nothing
  * and is on its sixth identical call within forty is not.
+ *
+ * ## What does not count as progress, and why no heuristic fixes it
+ *
+ * Only a tool call named in `PROGRESS_TOOLS` clears the history. An edit made by
+ * shelling out — `sed -i`, a heredoc, `git apply`, `python - <<EOF` — is
+ * invisible on **every** vendor, because it arrives as `Bash`/`shell` carrying a
+ * command string, and the only way to tell "wrote a file" from "read one" there
+ * is to parse that string.
+ *
+ * That heuristic is deliberately absent, and should stay absent. It would have
+ * to keep pace with every shell idiom that writes, across two vendors' quoting,
+ * and each miss is a killed run that *was* making progress. A false stop is the
+ * expensive failure here; a missed livelock is not, because
+ * `hench.maxSpawnsPerTask` and the token budget still bound it from the other
+ * side. The escape hatch for a workflow that genuinely edits through the shell
+ * is `hench.livelockThreshold`: raise it, or set it to 0 to disable detection
+ * for that project.
  *
  * Pure functions plus one small stateful detector; no I/O. Mirrors the
  * spin.ts / stuck.ts contract.
@@ -104,6 +131,11 @@ const MAX_MESSAGE_ARGS = 160;
  * A call to one of these is the progress signal: the agent has changed the
  * thing it is being asked to change, so whatever it repeated before that is no
  * longer evidence of being stuck.
+ *
+ * `apply_patch` is load-bearing beyond the Codex CLI's own tool of that name:
+ * the Codex adapter synthesises it from `file_change` stream items, which is the
+ * only progress signal that vendor produces. Renaming it silently disarms
+ * livelock detection for every Codex run.
  */
 const PROGRESS_TOOLS: ReadonlySet<string> = new Set([
   // Vendor CLI tools

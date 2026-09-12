@@ -306,6 +306,10 @@ export function normalizeCodexResponse(raw: unknown): NormalizedCodexResponse {
  * RuntimeEvent or null.
  *
  * Supported event types (Codex JSONL format):
+ * - `item.started` — `command_execution` → `shell` tool_use
+ * - `item.completed` — `agent_message` → assistant text; `command_execution` →
+ *   `shell` tool_result; `file_change` → `apply_patch` tool_use (the livelock
+ *   detector's progress signal on this vendor — see the branch's comment)
  * - `message` — assistant text + optional content blocks
  * - `function_call` — tool invocation
  * - `function_call_output` — tool result
@@ -393,6 +397,41 @@ function parseCodexJsonLine(
             tool: "shell",
             output: outputCandidate.slice(0, 2000),
             durationMs: 0,
+          },
+        };
+      }
+
+      // A patch Codex wrote to the working tree.
+      //
+      // The tool name is `apply_patch` because that name is already in
+      // PROGRESS_TOOLS in agent/analysis/livelock.ts, and this event exists to
+      // land in that set. Without it a Codex `file_change` is invisible to the
+      // detector: every command Codex runs arrives as one tool named `shell`,
+      // so a patch-then-retest loop reads as six identical
+      // `shell({"command":"pnpm test"})` calls with nothing written in between,
+      // and a run that was making progress every cycle is killed as a livelock
+      // (GH #370 review, finding 3).
+      //
+      // Only `item.completed`, and only when the patch did not fail — an edit
+      // that errored changed nothing, so it is not progress. `item.started` for
+      // a file_change stays unmapped for the same reason.
+      //
+      // No paired `tool_result` is emitted. EventAccumulator's look-ahead stops
+      // at the next `tool_use` and leaves `output` empty, which is the honest
+      // record for a change that produced no command output.
+      if (itemType === "file_change") {
+        const status = typeof item.status === "string" ? item.status.toLowerCase() : "";
+        if (status === "failed") return null;
+
+        const changes = Array.isArray(item.changes) ? item.changes : [];
+        return {
+          type: "tool_use" as RuntimeEventType,
+          vendor,
+          turn,
+          timestamp,
+          toolCall: {
+            tool: "apply_patch",
+            input: { changes },
           },
         };
       }
