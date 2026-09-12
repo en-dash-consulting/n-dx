@@ -34,6 +34,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Completion must not cascade over an explicit in_progress parent, or outside the run's subtree](./completion-must-not-cascade-over-an.md) | completed |
 | [Do not auto-complete an epic that still has deferred, blocked or failing children](./do-not-auto-complete-an-epic-that.md) | completed |
 | [Finalize gate must discount only what the commit prompt will actually commit: staged work only with a pending message, reviewer repairs on both paths](./finalize-gate-must-discount-only-what.md) | completed |
+| [Late-arrival child kill is proven only against a fake, and the e2e guard that would catch it only trips under load](./late-arrival-child-kill-is-proven-only.md) | pending |
 | [Livelock detector must see Codex file edits as progress](./livelock-detector-must-see-codex-file.md) | completed |
 | [Refuse to mark a task completed while its work is uncommitted](./refuse-to-mark-a-task-completed-while.md) | completed |
 | [--reset-deferred must be able to start the run it enables, and a refusal must exit non-zero](./reset-deferred-must-be-able-to-start.md) | completed |
