@@ -27,7 +27,7 @@ import { parseFolderTree } from "./folder-tree-parser.js";
 import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
-import { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
+import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
@@ -268,7 +268,7 @@ export class FileStore implements PRDStore {
       }
       await mkdir(this.treeRoot, { recursive: true });
       await atomicWrite(
-        this.path("tree-meta.json"),
+        this.path(TREE_META_FILENAME),
         JSON.stringify(treeMetaContents(doc)),
       );
       await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
@@ -428,7 +428,7 @@ export class FileStore implements PRDStore {
     let schema = SCHEMA_VERSION;
     let treeMetaPresent = false;
     try {
-      const raw = await readFile(this.path("tree-meta.json"), "utf-8");
+      const raw = await readFile(this.path(TREE_META_FILENAME), "utf-8");
       const meta = parseTreeMeta(raw);
       if (meta.title !== undefined) title = meta.title;
       if (meta.schema !== undefined) schema = meta.schema;
@@ -488,7 +488,7 @@ export class FileStore implements PRDStore {
   private async writeFolderTree(doc: PRDDocument): Promise<void> {
     await mkdir(this.treeRoot, { recursive: true });
     await atomicWrite(
-      this.path("tree-meta.json"),
+      this.path(TREE_META_FILENAME),
       JSON.stringify(treeMetaContents(doc)),
     );
     await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });

@@ -28,6 +28,7 @@ const EXPECTED_EXPORTS = [
   "resolveStore",
   // Folder-tree storage path
   "PRD_TREE_DIRNAME",
+  "TREE_META_FILENAME",
   // Self-heal tag scoping
   "SELF_HEAL_TAG",
   // Tree utilities
@@ -90,7 +91,12 @@ describe("rex-gateway compatibility", () => {
   });
 
   // Constants (non-function exports) — string constants
-  const CONSTANT_EXPORTS = new Set(["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "SELF_HEAL_TAG"]);
+  const CONSTANT_EXPORTS = new Set([
+    "SCHEMA_VERSION",
+    "PRD_TREE_DIRNAME",
+    "TREE_META_FILENAME",
+    "SELF_HEAL_TAG",
+  ]);
 
   // Verify each individual export to give clear diagnostics on failure
   for (const name of EXPECTED_EXPORTS) {

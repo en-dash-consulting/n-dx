@@ -27,7 +27,7 @@ import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { parseFolderTree } from "./folder-tree-parser.js";
 import { withLock } from "./file-lock.js";
 import { parseTreeMeta, treeMetaContents } from "./tree-meta.js";
-import { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
+import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 import {
   stampModified,
@@ -78,7 +78,7 @@ export class FolderTreeStore implements PRDStore {
     // any tree older than the marker, which then reads as the running version.
     let schema = SCHEMA_VERSION;
     try {
-      const raw = await readFile(this.path("tree-meta.json"), "utf-8");
+      const raw = await readFile(this.path(TREE_META_FILENAME), "utf-8");
       const meta = parseTreeMeta(raw);
       if (meta.title !== undefined) title = meta.title;
       if (meta.schema !== undefined) schema = meta.schema;
@@ -95,7 +95,7 @@ export class FolderTreeStore implements PRDStore {
   /** Serialize the document to disk. Callers must hold the PRD lock. */
   private async writeTree(doc: PRDDocument): Promise<void> {
     await mkdir(this.treeRoot, { recursive: true });
-    await writeFile(this.path("tree-meta.json"), JSON.stringify(treeMetaContents(doc)), "utf-8");
+    await writeFile(this.path(TREE_META_FILENAME), JSON.stringify(treeMetaContents(doc)), "utf-8");
     await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
     // A completed save makes this instance's view of the tree current again:
     // its own writes must not read as "another writer's work" on the next save.

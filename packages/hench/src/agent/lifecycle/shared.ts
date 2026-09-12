@@ -16,7 +16,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
-import { explainSelection, collectCompletedIds, findItem, PRD_TREE_DIRNAME } from "../../prd/rex-gateway.js";
+import { explainSelection, collectCompletedIds, findItem, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -1273,8 +1273,42 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
   }
 }
 
+/** The legacy flat-markdown PRD. Read-only for years; still staged if present. */
+const PRD_MARKDOWN_FILENAME = "prd.md";
+
 /**
- * Stage `.rex/prd_tree/` and commit it if anything ends up staged.
+ * The project-relative PRD paths that exist in `projectDir` and should be
+ * staged by a commit that lands a PRD write.
+ *
+ * One helper for both staging sites — {@link commitPrdTreeIfStaged} and the
+ * commit prompt — because the set they stage has to stay equal to what the
+ * uncommitted-work gate discounts ({@link PRD_COMMIT_PATHS}). When they
+ * disagreed, the sidecar `tree-meta.json` was discounted by nobody and staged
+ * by nobody, and every completion was refused.
+ *
+ * Each path is existence-checked: `git add` errors on a missing path, and in a
+ * fresh project the legacy markdown (and, before the first PRD write, the tree
+ * itself) is absent.
+ */
+async function prdPathsToStage(
+  projectDir: string,
+  opts: { includeLegacyMarkdown?: boolean } = {},
+): Promise<string[]> {
+  const { join } = await import("node:path");
+  const { existsSync } = await import("node:fs");
+  const candidates = [
+    PRD_TREE_DIRNAME,
+    TREE_META_FILENAME,
+    ...(opts.includeLegacyMarkdown ? [PRD_MARKDOWN_FILENAME] : []),
+  ];
+  return candidates
+    .filter((name) => existsSync(join(projectDir, ".rex", name)))
+    .map((name) => join(".rex", name));
+}
+
+/**
+ * Stage the PRD folder tree and its sidecar, and commit them if anything ends
+ * up staged.
  *
  * Shared by every caller that writes the PRD tree outside the normal
  * task-commit flow and needs that write landed immediately, rather than left
@@ -1282,20 +1316,27 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
  * {@link commitCompletionMetadata} (autoCommit path) and
  * {@link commitResetDeferredChanges} (`--reset-deferred`, GitHub #365).
  *
- * Skips silently, returning 0, when the tree doesn't exist, when the
- * directory isn't a git repo, or when nothing ends up staged.
+ * `tree-meta.json` is staged alongside the tree because every store save
+ * rewrites it: leaving it out is what made the gate's discount list and this
+ * commit disagree, so the sidecar stayed dirty after the commit that was
+ * supposed to land the whole PRD write. Each path is existence-checked first —
+ * `git add` on a missing path is an error, which would abort the staging of
+ * the other.
+ *
+ * Skips silently, returning 0, when no PRD path exists, when the directory
+ * isn't a git repo, or when nothing ends up staged.
  */
 async function commitPrdTreeIfStaged(projectDir: string, message: string): Promise<number> {
-  const { join } = await import("node:path");
-  const { existsSync } = await import("node:fs");
-  const prdTreePath = join(".rex", PRD_TREE_DIRNAME);
+  const prdPaths = await prdPathsToStage(projectDir);
 
-  if (!existsSync(join(projectDir, prdTreePath))) {
+  if (prdPaths.length === 0) {
     return 0;
   }
 
   try {
-    await execStdout("git", ["add", prdTreePath], { cwd: projectDir, timeout: 10_000 });
+    for (const prdPath of prdPaths) {
+      await execStdout("git", ["add", prdPath], { cwd: projectDir, timeout: 10_000 });
+    }
   } catch {
     return 0; // not in a git repo
   }
@@ -1734,15 +1775,10 @@ export async function performCommitPromptIfNeeded(
       }
 
       // Stage the PRD store after the status update so code and task state
-      // land in the same commit. Prefer the current folder-tree store, with a
-      // legacy markdown fallback for older projects.
+      // land in the same commit: the folder tree, its sidecar, and the legacy
+      // markdown for older projects.
       try {
-        const rexDir = join(projectDir, ".rex");
-        const prdMarkdownFilename = "prd.md";
-        const prdPaths = [
-          existsSync(join(rexDir, PRD_TREE_DIRNAME)) ? join(".rex", PRD_TREE_DIRNAME) : undefined,
-          existsSync(join(rexDir, prdMarkdownFilename)) ? join(".rex", prdMarkdownFilename) : undefined,
-        ].filter((p): p is string => Boolean(p));
+        const prdPaths = await prdPathsToStage(projectDir, { includeLegacyMarkdown: true });
 
         for (const prdPath of prdPaths) {
           await execStdout("git", ["add", prdPath], {

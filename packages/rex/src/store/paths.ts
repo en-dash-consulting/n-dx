@@ -13,6 +13,20 @@ import { join } from "node:path";
 export const PRD_TREE_DIRNAME = "prd_tree";
 
 /**
+ * Name of the folder tree's sidecar file inside `.rex/`.
+ *
+ * It sits *beside* `.rex/<PRD_TREE_DIRNAME>/`, not inside it, but it is part of
+ * the same backend: every store save rewrites it, and it is tracked in git like
+ * the tree is. Anything that stages, discounts or skips the tree has to account
+ * for this file too — hench's commit paths most of all, where forgetting it left
+ * ` M .rex/tree-meta.json` dirty after every PRD write and the completion gate
+ * refused every task.
+ *
+ * @see {@link file://./tree-meta.ts} for the contents.
+ */
+export const TREE_META_FILENAME = "tree-meta.json";
+
+/**
  * Name of the advisory lock file that guards `.rex/<PRD_TREE_DIRNAME>/`.
  *
  * One lock name for one resource. `FileStore` and `FolderTreeStore` both

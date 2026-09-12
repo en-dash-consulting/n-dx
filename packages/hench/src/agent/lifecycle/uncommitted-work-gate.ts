@@ -23,10 +23,12 @@
  */
 
 import { execStdout } from "../../process/exec.js";
+import { PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
 import {
   excludeHenchRuntimeArtifacts,
   parsePorcelainPath,
   repoRelativePrefix,
+  splitPorcelainLines,
 } from "../../store/artifacts.js";
 
 /**
@@ -38,11 +40,20 @@ import {
  * call, and hench's completion write, both land here. Counting them as leaked
  * work would refuse every completion.
  *
- * The folder tree is the whole list, because it is the only writable PRD
- * surface — no PRD mutation writes the legacy `.rex/prd.md`, so a run cannot
- * dirty it and there is nothing there to discount.
+ * Two entries, not one. `tree-meta.json` is a tracked sidecar that *every*
+ * store save rewrites, and in a project whose committed copy predates the
+ * schema marker the rewrite changes its bytes — so the first PRD write of any
+ * run produced ` M .rex/tree-meta.json`, which is neither a hench runtime
+ * artifact nor under the tree, and the completion gate refused every task
+ * forever. The same dirt defeated `--reset-deferred` (#365) one gate earlier.
+ *
+ * The legacy `.rex/prd.md` is deliberately absent: no PRD mutation writes it
+ * any more, so a run cannot dirty it and there is nothing there to discount.
  */
-export const PRD_COMMIT_PATHS: readonly string[] = [".rex/prd_tree/"];
+export const PRD_COMMIT_PATHS: readonly string[] = [
+  `.rex/${PRD_TREE_DIRNAME}/`,
+  `.rex/${TREE_META_FILENAME}`,
+];
 
 /** How many paths the refusal message lists before it truncates. */
 const MAX_REPORTED_PATHS = 20;
@@ -72,7 +83,7 @@ export async function listDirtyPaths(projectDir: string): Promise<string[]> {
       cwd: projectDir,
       timeout: 15_000,
     });
-    return output.trim().split("\n").filter(Boolean);
+    return splitPorcelainLines(output);
   } catch {
     return [];
   }

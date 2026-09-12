@@ -177,7 +177,12 @@ describe("hench → rex gateway contract", () => {
     "acknowledgeFinding",
   ];
 
-  const GATEWAY_CONSTANTS = ["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "SELF_HEAL_TAG"];
+  const GATEWAY_CONSTANTS = [
+    "SCHEMA_VERSION",
+    "PRD_TREE_DIRNAME",
+    "TREE_META_FILENAME",
+    "SELF_HEAL_TAG",
+  ];
 
   for (const name of GATEWAY_FUNCTIONS) {
     it(`re-exports "${name}" as a function`, async () => {
@@ -586,7 +591,7 @@ describe("gateway export auto-detection", () => {
         "findAutoCompletions", "reconcileAutoCompletions", "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding"],
-      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "SELF_HEAL_TAG"],
+      ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "TREE_META_FILENAME", "SELF_HEAL_TAG"],
     ]);
 
     const untested = sourceExports.filter((s) => !testedSymbols.has(s));

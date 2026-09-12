@@ -135,6 +135,26 @@ export async function repoRelativePrefix(projectDir: string): Promise<string> {
  * the status characters rather than applied unconditionally, so a filename
  * that merely contains " -> " is not truncated.
  */
+/**
+ * Split `git status --porcelain` output into lines without damaging them.
+ *
+ * **Never `trim()` porcelain output.** The XY status field is two columns wide
+ * and the first is blank for an unstaged-only change, so a leading space is
+ * part of the format: a trim eats it from the *first* line only, and every
+ * subsequent field shifts left by one. The path then parses one character
+ * short (`.rex/prd_tree/…` → `rex/prd_tree/…`, matching no discount rule) and
+ * `isFullyStaged` reads the worktree column as the index column, so ` M file`
+ * masquerades as staged and is discounted outright. Both failures apply to
+ * whichever entry git happened to report first, which is why they looked
+ * intermittent.
+ *
+ * Blank lines are dropped and a trailing `\r` is tolerated; nothing else about
+ * a line is altered.
+ */
+export function splitPorcelainLines(output: string): string[] {
+  return output.split(/\r?\n/).filter((line) => line.trim().length > 0);
+}
+
 export function parsePorcelainPath(line: string): string {
   const status = line.slice(0, 2);
   let path = line.length > 3 ? line.slice(3) : line.trim();

@@ -26,7 +26,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Calibrate the uncommitted-work guards: discount hench's own PRD writes and the tree-meta sidecar, and cover --epic-by-epic](./calibrate-the-uncommitted-work-guards.md) | pending |
+| [Calibrate the uncommitted-work guards: discount hench's own PRD writes and the tree-meta sidecar, and cover --epic-by-epic](./calibrate-the-uncommitted-work-guards.md) | completed |
 | [Cleanup from the #370 review: dedupe the adapter stamping block, share the porcelain path matcher, align next-task wording](./cleanup-from-the-370-review-dedupe-the.md) | pending |
 | [Completion must not cascade over an explicit in_progress parent, or outside the run's subtree](./completion-must-not-cascade-over-an.md) | completed |
 | [Do not auto-complete an epic that still has deferred, blocked or failing children](./do-not-auto-complete-an-epic-that.md) | completed |

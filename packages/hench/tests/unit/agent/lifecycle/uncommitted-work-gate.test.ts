@@ -64,6 +64,27 @@ describe("findUncommittedWork", () => {
     ).resolves.toEqual({ clean: true, paths: [] });
   });
 
+  it("does not count the tree-meta sidecar every PRD write rewrites", async () => {
+    // Every store save rewrites `.rex/tree-meta.json`, and where the committed
+    // copy predates the schema marker the rewrite changes its bytes. Left out
+    // of the discount list it refused every completion in this repo.
+    await expect(
+      findUncommittedWork(
+        withDirty([" M .rex/tree-meta.json"], { discountPaths: [...PRD_COMMIT_PATHS] }),
+      ),
+    ).resolves.toEqual({ clean: true, paths: [] });
+  });
+
+  it("does not treat the sidecar prefix as a directory", async () => {
+    // `.rex/tree-meta.json` is a file entry, so a sibling that merely starts
+    // with the same characters must still be reported.
+    const result = await findUncommittedWork(
+      withDirty([" M .rex/tree-meta.json.bak"], { discountPaths: [...PRD_COMMIT_PATHS] }),
+    );
+    expect(result.clean).toBe(false);
+    expect(result.paths).toEqual([".rex/tree-meta.json.bak"]);
+  });
+
   it("still refuses on operator .rex content outside the PRD tree", async () => {
     const result = await findUncommittedWork(
       withDirty([" M .rex/config.json"], { discountPaths: [...PRD_COMMIT_PATHS] }),

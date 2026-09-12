@@ -12,7 +12,7 @@ import { listRuns } from "../../store/runs.js";
 import { agentLoop } from "../../agent/lifecycle/loop.js";
 import { cliLoop } from "../../agent/lifecycle/cli-loop.js";
 import { performPreRunCommitGateIfNeeded, commitResetDeferredChanges } from "../../agent/lifecycle/shared.js";
-import { findUncommittedWork, formatLoopRefusal } from "../../agent/lifecycle/uncommitted-work-gate.js";
+import { PRD_COMMIT_PATHS, findUncommittedWork, formatLoopRefusal } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
@@ -1489,21 +1489,33 @@ export async function cmdRun(
  * all covered work it never wrote, and three tasks' output ended up tangled
  * together in one session.
  *
- * Nothing is discounted here beyond hench's own runtime artifacts — not even
- * the PRD paths. Uncommitted `.rex/prd_tree/` between tasks means the previous
- * task's status write never landed either, which is the same defect.
+ * The PRD paths are discounted, along with hench's own runtime artifacts.
+ * An earlier revision discounted nothing but the artifacts, on the premise
+ * that uncommitted `.rex/prd_tree/` between tasks meant the previous task's
+ * status write never landed. That premise only holds for a *successful* task.
+ * Every failure path writes the PRD and commits nothing: `handleRunFailure`
+ * records `deferred`/`pending` on the task, while the two committers
+ * ({@link performCommitPromptIfNeeded}, `commitCompletionMetadata`) run only
+ * when the run completed, and the rollback never reverts unattended. So the
+ * first failed, deferred or timed-out task stopped the whole loop, and the
+ * consecutive-failure counter and stuck-task skipping below could never be
+ * reached. A PRD write with no code beside it is not leaked work — and the
+ * completion gate in `finalizeRun` still covers the case that is.
  *
  * Attended runs are left alone: a user who declined the commit prompt made
  * that choice deliberately and is watching.
  *
  * @returns true when the caller should stop the loop.
  */
-async function shouldStopForUncommittedWork(
+export async function shouldStopForUncommittedWork(
   projectDir: string,
   autonomous: boolean | undefined,
 ): Promise<boolean> {
   if (!autonomous) return false;
-  const leftover = await findUncommittedWork({ projectDir });
+  const leftover = await findUncommittedWork({
+    projectDir,
+    discountPaths: PRD_COMMIT_PATHS,
+  });
   if (leftover.clean) return false;
   info(`\n${colorWarn(formatLoopRefusal(leftover.paths))}`);
   process.exitCode = 1;
@@ -1925,6 +1937,16 @@ async function runEpicByEpic(
   process.on("SIGTERM", onSignal);
 
   const summaries: EpicRunSummary[] = [];
+  /**
+   * Tasks started by this invocation, counted across every epic.
+   *
+   * The between-task guard runs before each task except the very first, and
+   * "first" has to mean first of the *invocation*, not first of the epic: the
+   * task that leaks its work is just as likely to be the last one of the
+   * previous epic. The pre-run commit gate has already vetted the tree for
+   * task one.
+   */
+  let tasksStarted = 0;
 
   try {
     const store = await resolveStore(rexDir);
@@ -2008,6 +2030,14 @@ async function runEpicByEpic(
       while (true) {
         if (stopping) break;
 
+        // Same between-task guard the fixed-iteration and loop modes run
+        // (#363). `stopping` ends the outer epic loop too, so the refusal
+        // stops the invocation rather than just this epic.
+        if (tasksStarted > 0 && await shouldStopForUncommittedWork(dir, autonomous)) {
+          stopping = true;
+          break;
+        }
+
         // Show queue status if there are pending tasks
         if (queue) logQueueStatus(queue);
 
@@ -2042,6 +2072,7 @@ async function runEpicByEpic(
               permissionMode,
             );
             status = result.status;
+            tasksStarted++;
           } finally {
             // Release the queue slot after the task completes
             if (queue) queue.release();

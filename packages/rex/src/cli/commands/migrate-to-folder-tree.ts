@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { readdir, readFile, stat, unlink } from "node:fs/promises";
 import { info, warn } from "../output.js";
-import { serializeFolderTree, parseFolderTree } from "../../store/index.js";
+import { serializeFolderTree, parseFolderTree, TREE_META_FILENAME } from "../../store/index.js";
 import { parseDocument } from "../../store/markdown-parser.js";
 import { validateDocument } from "../../schema/validate.js";
 import { SCHEMA_VERSION } from "../../schema/index.js";
@@ -144,7 +144,7 @@ async function loadSourceDocument(rexDir: string, treeRoot: string): Promise<{ d
 
 async function readTreeTitle(rexDir: string): Promise<string> {
   try {
-    const raw = await readFile(join(rexDir, "tree-meta.json"), "utf-8");
+    const raw = await readFile(join(rexDir, TREE_META_FILENAME), "utf-8");
     const meta = JSON.parse(raw) as Record<string, unknown>;
     if (typeof meta["title"] === "string") return meta["title"];
   } catch { /* ignore */ }

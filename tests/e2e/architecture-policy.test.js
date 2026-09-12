@@ -1032,8 +1032,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/rex-gateway.ts",
-    maxExports: 30,
-    description: "hench→rex gateway (schema, store, tree, task selection, timestamps)",
+    maxExports: 31,
+    description: "hench→rex gateway (schema, store, tree, task selection, timestamps). Raised from 30 to carry TREE_META_FILENAME: `.rex/tree-meta.json` is rewritten by every folder-tree save, so hench has to stage and discount it wherever it stages and discounts the tree, and hardcoding the name at those three sites is exactly the drift that left it in nobody's list and refused every task completion.",
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
