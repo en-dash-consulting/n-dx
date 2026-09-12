@@ -39,6 +39,7 @@ import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
+import { formatMissingReviewRefusal, reviewNeverRan } from "../analysis/adversarial-review.js";
 import { discoverChangedFiles } from "../analysis/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
@@ -125,6 +126,12 @@ export interface SharedLoopOptions {
    * recommended default in `REVIEW_MODELS`.
    */
   reviewModel?: string;
+  /**
+   * Accept a best-effort review pass (`--review-optional`): a reviewer that
+   * never started warns instead of refusing the completion. See
+   * {@link FinalizeRunOptions.reviewOptional}.
+   */
+  reviewOptional?: boolean;
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
   excludeTaskIds?: Set<string>;
   /** Restrict task selection to this epic (ID). */
@@ -867,6 +874,18 @@ export interface FinalizeRunOptions {
    * the gate would skip the very run it should be testing.
    */
   startingHead?: string;
+  /**
+   * Accept a best-effort adversarial review (`--review-optional`).
+   *
+   * Default (false) enforces the missing-review gate: a run whose reviewer
+   * never started is refused rather than reported completed. Set true when the
+   * operator wants the review attempted but not required — the warning is
+   * still printed and still recorded on the run.
+   *
+   * Only meaningful alongside `--review`; without a review pass there is no
+   * failure to be optional about.
+   */
+  reviewOptional?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -2452,6 +2471,35 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     }
   }
 
+  // Missing-review gate. `--review` is sold as a gate, and an opt-in gate that
+  // silently no-ops is worse than no gate: a reviewer that returned 400 before
+  // it started leaves a run record indistinguishable from one whose reviewer
+  // read the diff and found nothing.
+  //
+  // Checked here rather than at the review call site so it shares the
+  // uncommitted-work gate's machinery, which it needs all of: the same
+  // pre-write position (before "completed" reaches the PRD), the same
+  // completion withdrawal (the agent may have marked the task completed
+  // itself), and the same rollback suppression — the work validated, and
+  // reverting it because a *reviewer* could not start would destroy exactly
+  // what the operator asked to have reviewed.
+  //
+  // Deliberately not a deferral and deliberately not evidence of a stuck task:
+  // the usual cause is a --review-model the installed vendor CLI does not
+  // know, which is a config fix and a re-run. `gated` carries that to
+  // stuck-task detection (agent/analysis/stuck.ts).
+  let reviewGateRefused = false;
+  if (run.status === "completed" && opts.reviewOptional !== true && reviewNeverRan(run.review)) {
+    reviewGateRefused = true;
+    run.status = "failed";
+    run.error = formatMissingReviewRefusal(run.review);
+    run.review.gated = true;
+    info(`\n${run.error}`);
+    if (opts.store) {
+      await withdrawCompletionClaim(opts.store, run, run.error);
+    }
+  }
+
   // Uncommitted-work gate (#363). "completed" is a claim that the work landed,
   // so it is checked before it is written — not after, when the PRD already
   // says the opposite of the truth.
@@ -2550,8 +2598,15 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   //
   // Never after an uncommitted-work refusal: that failure *is* "there is
   // finished work here that nobody committed", so offering to revert it would
-  // put the very files the gate just saved one keystroke from deletion.
-  if (!uncommittedWorkRefused && opts.rollbackOnFailure !== false && FAILURE_STATUSES.has(run.status)) {
+  // put the very files the gate just saved one keystroke from deletion. Same
+  // for the missing-review refusal: the work passed its own validation and the
+  // only thing that failed was the reviewer's spawn.
+  if (
+    !uncommittedWorkRefused &&
+    !reviewGateRefused &&
+    opts.rollbackOnFailure !== false &&
+    FAILURE_STATUSES.has(run.status)
+  ) {
     await performRollbackIfNeeded(projectDir, {
       yes: opts.yes,
       autonomous: opts.autonomous,

@@ -925,6 +925,18 @@ export type RunReviewRecord =
       failed: string;
       /** Human-readable detail for the failure. */
       detail: string;
+      /**
+       * True when this failure *blocked* the run's completion — the operator
+       * asked for a review gate, no reviewer ever ran, and the run was refused
+       * rather than reported `completed`.
+       *
+       * Load-bearing beyond bookkeeping: a run failed for this reason says
+       * nothing about whether the *task* is stuck, so stuck-task detection
+       * skips it (see `agent/analysis/stuck.ts`) and the rollback gate leaves
+       * the validated work in the tree. Absent on a best-effort
+       * (`--review-optional`) failure, which does not block anything.
+       */
+      gated?: boolean;
     };
 
 export interface RunRecord {

@@ -41,6 +41,59 @@ describe("countRecentFailures", () => {
     expect(countRecentFailures("task-a", runs)).toBe(3);
   });
 
+  it("ignores runs the missing-review gate refused", async () => {
+    const { countRecentFailures } = await import("../../../src/agent/analysis/stuck.js");
+
+    // Three runs of one misconfigured `--review-model`. The task itself never
+    // failed — counting these would let one config line mark every task it
+    // touched as stuck and drop it from selection.
+    const refused = (startedAt: string): RunRecord => ({
+      ...makeRun("task-a", "failed", startedAt),
+      review: { failed: "spawn-failed", detail: "API Error: 400", gated: true },
+    });
+
+    const runs: RunRecord[] = [
+      refused("2024-01-01T03:00:00Z"),
+      refused("2024-01-01T02:00:00Z"),
+      refused("2024-01-01T01:00:00Z"),
+    ];
+
+    expect(countRecentFailures("task-a", runs)).toBe(0);
+  });
+
+  it("counts a review failure that did not gate the run", async () => {
+    const { countRecentFailures } = await import("../../../src/agent/analysis/stuck.js");
+
+    // --review-optional, or a reviewer that ran and lost its report: the run
+    // failed for its own reasons and the review record is incidental.
+    const runs: RunRecord[] = [
+      {
+        ...makeRun("task-a", "failed", "2024-01-01T02:00:00Z"),
+        review: { failed: "no-report", detail: "report absent" },
+      },
+      makeRun("task-a", "failed", "2024-01-01T01:00:00Z"),
+    ];
+
+    expect(countRecentFailures("task-a", runs)).toBe(2);
+  });
+
+  it("keeps a genuine failure streak intact across a refused run", async () => {
+    const { countRecentFailures } = await import("../../../src/agent/analysis/stuck.js");
+
+    // The refusal is skipped, not treated as a reset: the two real failures on
+    // either side of it are still one streak.
+    const runs: RunRecord[] = [
+      makeRun("task-a", "failed", "2024-01-01T03:00:00Z"),
+      {
+        ...makeRun("task-a", "failed", "2024-01-01T02:00:00Z"),
+        review: { failed: "spawn-failed", detail: "API Error: 400", gated: true },
+      },
+      makeRun("task-a", "failed", "2024-01-01T01:00:00Z"),
+    ];
+
+    expect(countRecentFailures("task-a", runs)).toBe(2);
+  });
+
   it("stops counting at first non-failure", async () => {
     const { countRecentFailures } = await import("../../../src/agent/analysis/stuck.js");
 

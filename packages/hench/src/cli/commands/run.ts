@@ -22,6 +22,7 @@ import {
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
+import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
 import { HENCH_DIR, safeParseInt, safeParseNonNegInt } from "./constants.js";
 import { ConsecutiveFailureCounter, isFailureStatus } from "./consecutive-failures.js";
 import { CLIError, EpicNotFoundError, requireLLMCLI } from "../errors.js";
@@ -76,6 +77,13 @@ export interface ReviewOptions {
   reviewPass: boolean;
   /** `--review-model` — override the model the reviewer runs on. */
   reviewModel?: string;
+  /**
+   * `--review-optional` — downgrade the missing-review gate to a warning.
+   *
+   * Off by default: `--review` is an opt-in gate, and a gate that silently
+   * no-ops when its reviewer cannot start is worse than no gate at all.
+   */
+  reviewOptional: boolean;
 }
 
 const MAX_TASK_ATTEMPTS = 3;
@@ -844,6 +852,7 @@ async function runOne(
         approveDiff: reviewOpts.approveDiff,
         reviewPass: reviewOpts.reviewPass,
         reviewModel: reviewOpts.reviewModel,
+        reviewOptional: reviewOpts.reviewOptional,
         excludeTaskIds,
         epicId,
         tags,
@@ -924,6 +933,12 @@ async function runOne(
     const testResult = postTests.passed ? green("passed") : red("FAILED");
     info(`Post-task tests: ${testResult} (${scope}, ${postTests.durationMs ?? 0}ms)`);
   }
+
+  // Adversarial review outcome. Printed here as well as mid-run because the
+  // mid-run line is long gone behind the test gate and the commit prompt by
+  // the time anyone reads the result, and "completed" with no review line
+  // beneath it is precisely the ambiguity `--review` exists to remove.
+  for (const line of formatRunReviewStatus(run.review)) info(line);
 
   // Change classification
   info(formatChangeClassification(run.toolCalls));
@@ -1123,10 +1138,18 @@ export async function cmdRun(
       "The review model only applies to the adversarial review pass. Add --review, or drop --review-model.",
     );
   }
+  const reviewOptional = flags["review-optional"] === "true";
+  if (reviewOptional && !reviewPass) {
+    throw new CLIError(
+      "--review-optional was passed without --review.",
+      "It only relaxes the gate the review pass installs. Add --review, or drop --review-optional.",
+    );
+  }
   const reviewOpts: ReviewOptions = {
     approveDiff,
     reviewPass,
     reviewModel: reviewModelFlag?.trim() || undefined,
+    reviewOptional,
   };
   // --no-rollback always wins; otherwise read config (defaults to true).
   // Note: the failure rollback is prompt-only — it never runs without an

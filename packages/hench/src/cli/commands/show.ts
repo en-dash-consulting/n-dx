@@ -6,6 +6,7 @@ import { info, result } from "../output.js";
 import { colorStatus } from "../../prd/llm-gateway.js";
 import { lookupTaskInRex, formatTaskLine } from "./task-lookup.js";
 import { formatTokenReport } from "../token-logging.js";
+import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
 
 export async function cmdShow(
   dir: string,
@@ -52,6 +53,11 @@ export async function cmdShow(
   if (run.tokenUsage.cacheCreationInput || run.tokenUsage.cacheReadInput) {
     info(`  Cache: ${run.tokenUsage.cacheCreationInput ?? 0} created / ${run.tokenUsage.cacheReadInput ?? 0} read`);
   }
+
+  // Whether this run was reviewed, next to the status it qualifies. The run
+  // record is the only copy that outlives the terminal, so a run that was
+  // never reviewed has to say so here or it reads as one that was.
+  for (const line of formatRunReviewStatus(run.review)) result(line);
 
   if (run.summary) {
     info(`\nSummary:\n${run.summary}`);

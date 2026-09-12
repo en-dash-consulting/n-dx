@@ -2229,6 +2229,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     commitWatcher,
     baselineUntracked,
     startingHead,
+    reviewOptional: opts.reviewOptional,
   });
 
   // Retry overhead, recorded whatever the outcome: a task that took four
