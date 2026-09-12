@@ -16,44 +16,33 @@
  * @see packages/hench/src/agent/analysis/livelock.ts
  */
 
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import { codexCliAdapter } from "../../src/agent/lifecycle/adapters/codex-cli-adapter.js";
 import {
   createLivelockDetector,
   DEFAULT_LIVELOCK_THRESHOLD,
+  isProgressTool,
 } from "../../src/agent/analysis/livelock.js";
-import type { LivelockDetection } from "../../src/agent/analysis/livelock.js";
 import { EventAccumulator } from "../../src/agent/lifecycle/event-accumulator.js";
 
-const TEST_COMMAND = '/bin/zsh -lc "pnpm test"';
-
-/** `codex exec --json` announces a command before running it. */
-const SHELL_STARTED = JSON.stringify({
-  type: "item.started",
-  item: { type: "command_execution", command: TEST_COMMAND },
-});
-
-/** …and reports its output when it finishes. */
-const SHELL_COMPLETED = JSON.stringify({
-  type: "item.completed",
-  item: { type: "command_execution", status: "completed", stdout: "1 test failed" },
-});
-
-/** A patch Codex applied after reading that output. */
-const FILE_CHANGED = JSON.stringify({
-  type: "item.completed",
-  item: {
-    type: "file_change",
-    status: "completed",
-    changes: [{ path: "src/thing.ts", kind: "update" }],
-  },
-});
+/**
+ * Captured from a real `codex exec --json` run that writes `capture.txt` and
+ * then reads it. Its matching version file records the CLI version. Keep this
+ * test tied to the JSONL rather than recreating its event objects here: this
+ * seam is exactly where an unverified vendor field would silently disarm
+ * livelock progress crediting.
+ */
+const CAPTURED_LINES = readFileSync(
+  new URL("../fixtures/codex-file-change-real.jsonl", import.meta.url),
+  "utf8",
+).trimEnd().split(/\r?\n/);
 
 /**
  * Replay JSONL lines the way `spawnWithAdapter` does: parse each through the
  * adapter, and show the detector only `tool_use` events.
  */
-function replay(lines: string[]): LivelockDetection | null {
+function replay(lines: readonly string[]) {
   const detector = createLivelockDetector({ threshold: DEFAULT_LIVELOCK_THRESHOLD });
   for (const line of lines) {
     const event = codexCliAdapter.parseEvent(line, 1, {});
@@ -64,57 +53,91 @@ function replay(lines: string[]): LivelockDetection | null {
   return detector.detected;
 }
 
-/** Eight iterations of the loop, with or without the patch in the middle. */
-function cycles(count: number, withFileChange: boolean): string[] {
-  const lines: string[] = [];
-  for (let i = 0; i < count; i++) {
-    lines.push(SHELL_STARTED, SHELL_COMPLETED);
-    if (withFileChange) lines.push(FILE_CHANGED);
-  }
-  return lines;
-}
-
 describe("Codex livelock progress crediting", () => {
-  it("does not fire on an edit-then-retest loop", () => {
-    // Eight iterations is comfortably past the default threshold of six; the
-    // patch between them is what keeps the run alive.
-    expect(replay(cycles(8, true))).toBeNull();
-  });
+  it("maps the real file-change stream and credits its edit as progress", () => {
+    // Every captured JSONL line must pass through the adapter. In particular,
+    // the `item.completed` file_change must become a progress tool rather than
+    // being silently dropped as an unmapped vendor event.
+    const events = CAPTURED_LINES.map((line) => codexCliAdapter.parseEvent(line, 1, {}));
+    const progressEvent = events.find(
+      (event) => event?.type === "tool_use" && event.toolCall && isProgressTool(event.toolCall.tool),
+    );
 
-  it("still fires when the same command repeats with no edit between", () => {
-    const detection = replay(cycles(8, false));
-
-    expect(detection).not.toBeNull();
-    expect(detection!.tool).toBe("shell");
-    expect(detection!.repeats).toBe(DEFAULT_LIVELOCK_THRESHOLD);
-    expect(detection!.message).toContain("pnpm test");
-  });
-
-  it("does not credit a patch Codex failed to apply", () => {
-    const failed = JSON.stringify({
-      type: "item.completed",
-      item: { type: "file_change", status: "failed", changes: [{ path: "src/thing.ts", kind: "update" }] },
+    expect(progressEvent?.toolCall).toEqual({
+      tool: "apply_patch",
+      input: {
+        changes: [expect.objectContaining({ kind: "add" })],
+      },
     });
 
-    const lines: string[] = [];
-    for (let i = 0; i < 8; i++) lines.push(SHELL_STARTED, SHELL_COMPLETED, failed);
+    // The capture settles the field names that this adapter relies on.
+    const rawEvents = CAPTURED_LINES.map((line) => JSON.parse(line) as {
+      type: string;
+      item?: { type?: string; status?: string; changes?: unknown; aggregated_output?: string };
+    });
+    const fileChange = rawEvents.find((event) => event.type === "item.completed" && event.item?.type === "file_change");
+    const command = rawEvents.find((event) => event.type === "item.completed" && event.item?.type === "command_execution");
 
-    expect(replay(lines)).not.toBeNull();
+    expect(fileChange?.item).toMatchObject({ type: "file_change", status: "completed" });
+    expect(fileChange?.item?.changes).toEqual([expect.objectContaining({ kind: "add" })]);
+    expect(command?.item?.aggregated_output).toBe("capture-ok\n");
   });
 
-  it("leaves the accumulator's tool_use/tool_result pairing intact", () => {
-    // The synthesised `apply_patch` has no matching `tool_result`. The
-    // accumulator must record it with an empty output rather than stealing the
-    // shell call's, or dropping either record.
+  it("does not fire when the captured edit-and-command cycle repeats", () => {
+    // Repeat the one real cycle past the livelock threshold. A one-pass replay
+    // would be vacuous because it cannot reach six duplicate shell calls.
+    expect(replay(Array.from({ length: 8 }, () => CAPTURED_LINES).flat())).toBeNull();
+  });
+
+  it("still fires when the captured command repeats with no edit between", () => {
+    const commandStarted = CAPTURED_LINES.find((line) => {
+      const event = JSON.parse(line) as { type?: string; item?: { type?: string } };
+      return event.type === "item.started" && event.item?.type === "command_execution";
+    });
+    expect(commandStarted).toBeDefined();
+
+    const detection = replay(Array.from({ length: 8 }, () => commandStarted!));
+    expect(detection).toMatchObject({ tool: "shell", repeats: DEFAULT_LIVELOCK_THRESHOLD });
+  });
+
+  it("does not credit a failed captured file change as progress", () => {
+    // Preserve the failure-path guarantee while deriving every other field from
+    // the real vendor capture. A failed patch must not keep an edit-then-retest
+    // loop alive indefinitely.
+    const failedCycle = CAPTURED_LINES.map((line) => {
+      const event = JSON.parse(line) as {
+        type?: string;
+        item?: { type?: string; status?: string };
+      };
+      if (event.type !== "item.completed" || event.item?.type !== "file_change") {
+        return line;
+      }
+      return JSON.stringify({ ...event, item: { ...event.item, status: "failed" } });
+    });
+
+    const detection = replay(Array.from({ length: 8 }, () => failedCycle).flat());
+    expect(detection).toMatchObject({ tool: "shell", repeats: DEFAULT_LIVELOCK_THRESHOLD });
+  });
+
+  it("records the captured command output on its shell call", () => {
+    // This capture has no interleaving: its file_change completes before the
+    // command starts. If a future capture establishes the opposite ordering,
+    // add the corresponding legacy applyRuntimeEvent regression before changing
+    // the pairing logic.
+    const fileChangeCompleted = CAPTURED_LINES.findIndex((line) => line.includes('"type":"item.completed","item":{"id":"item_1"'));
+    const commandStarted = CAPTURED_LINES.findIndex((line) => line.includes('"type":"item.started","item":{"id":"item_2"'));
+    expect(fileChangeCompleted).toBeGreaterThanOrEqual(0);
+    expect(commandStarted).toBeGreaterThan(fileChangeCompleted);
+
     const accumulator = new EventAccumulator();
-    for (const line of cycles(1, true)) {
+    for (const line of CAPTURED_LINES) {
       const event = codexCliAdapter.parseEvent(line, 1, {});
       if (event) accumulator.push(event);
     }
 
     const calls = accumulator.toolCalls.calls;
-    expect(calls.map((c) => c.tool)).toEqual(["shell", "apply_patch"]);
-    expect(calls[0].output).toBe("1 test failed");
-    expect(calls[1].output).toBe("");
+    expect(calls.map((c) => c.tool)).toEqual(["apply_patch", "shell"]);
+    expect(calls[0].output).toBe("");
+    expect(calls[1].output).toBe("capture-ok\n");
   });
 });

@@ -483,7 +483,7 @@ describe("CodexCliAdapter: parseEvent (structured JSONL)", () => {
       type: "item.completed",
       item: {
         type: "command_execution",
-        stdout: "tests passed",
+        aggregated_output: "tests passed",
       },
     });
 

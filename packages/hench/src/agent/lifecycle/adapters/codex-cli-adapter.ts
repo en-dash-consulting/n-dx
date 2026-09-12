@@ -382,6 +382,7 @@ function parseCodexJsonLine(
 
       if (itemType === "command_execution") {
         const outputCandidate =
+          (typeof item.aggregated_output === "string" && item.aggregated_output) ||
           (typeof item.output === "string" && item.output) ||
           (typeof item.stdout === "string" && item.stdout) ||
           (typeof item.result === "string" && item.result) ||
