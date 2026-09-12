@@ -105,11 +105,31 @@ export interface ReconcileOptions {
 export const SUCCESSFUL_CHILD_STATUSES: Set<ItemStatus> = new Set(["completed"]);
 
 /**
+ * The minimum shape this module needs to judge a parent's children.
+ *
+ * Deliberately structural rather than `PRDItem`: the auto-fix engine in
+ * `src/fix/` carries its own `FixItem` tree shape and must reuse this
+ * predicate rather than keeping a private copy of the status set — the two
+ * copies drifting apart is exactly how `rex fix` came to repair something
+ * different from what `rex validate` warns about. Widening the parameter is
+ * what lets `fix/` share the real predicate instead of forking it.
+ */
+export interface ChildStatusNode {
+  id: string;
+  status: ItemStatus;
+}
+
+/** A node whose children this module may inspect. See {@link ChildStatusNode}. */
+export interface ParentStatusNode {
+  children?: ChildStatusNode[];
+}
+
+/**
  * Check whether all children of an item are successfully done (`completed`),
  * treating any IDs in `virtuallyCompleted` as if they were already completed.
  */
 export function allChildrenSuccessful(
-  item: PRDItem,
+  item: ParentStatusNode,
   virtuallyCompleted: Set<string>,
 ): boolean {
   if (!item.children || item.children.length === 0) return false;
@@ -119,18 +139,26 @@ export function allChildrenSuccessful(
 }
 
 /**
- * Scan the whole PRD tree bottom-up and return every parent that is
- * `pending` or `in_progress` but whose children are all `completed`.
- * Operates independently of any single trigger item, so it self-heals
- * parents whose event-driven cascade was previously lost (e.g. due to an
- * `appendLog` failure after child completion).
+ * Scan the PRD tree bottom-up and return every `pending` parent whose children
+ * are all `completed`. Only `pending` — an `in_progress` parent is an explicit
+ * claim and is never swept (#368); `rex status` surfaces those for a human via
+ * `findAutoCompletable` instead.
  *
  * Items are returned bottom-up: a feature appears before its epic so that
  * callers can apply updates in order without re-checking the tree.
  *
- * Pass `options.ancestorsOf` whenever the sweep is being run on behalf of one
- * item — it keeps the self-healing but confines it to that item's ancestor
- * chain. See {@link ReconcileOptions.ancestorsOf}.
+ * ## Whole-tree sweeps are an operator action, not an agent-run side effect
+ *
+ * Called without `options.ancestorsOf` this is a whole-tree sweep, which does
+ * self-heal parents whose event-driven cascade was previously lost (e.g. an
+ * `appendLog` failure after child completion). That healing is real but it is
+ * no longer something an agent run performs: since #368 every caller acting on
+ * behalf of a single item passes `ancestorsOf`, which is the whole point of
+ * that option. The unscoped sweep now belongs to `rex fix` (the `stuck_parent`
+ * kind), where an operator asks for it deliberately and can see the diff.
+ *
+ * Do not reintroduce an unscoped call on a run path to "restore self-healing" —
+ * that is precisely the blast radius #368 was filed for.
  *
  * @param items   - The full PRD item tree.
  * @param options - Containment options; whole-tree when omitted.

@@ -257,6 +257,7 @@ export {
   detectTimestampIssues,
   detectOrphanBlockedBy,
   detectParentChildMisalignment,
+  detectStuckParents,
 } from "./fix/index.js";
 export type { FixKind, FixAction, FixResult } from "./fix/index.js";
 

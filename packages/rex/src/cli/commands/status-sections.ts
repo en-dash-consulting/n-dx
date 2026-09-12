@@ -269,6 +269,9 @@ export function renderAutoCompletableHints(items: PRDItem[]): void {
   for (const ac of autoCompletable) {
     info(`  ● ${ac.title} — all children done, can be marked completed`);
   }
+  // The pending ones are repairable without a human deciding each id; the
+  // in_progress ones are an explicit claim and stay a human judgement (#368).
+  info(`  Run ${bold("rex fix")} to close the pending ones.`);
 }
 
 /** Render what to do next hint based on tree stats. */

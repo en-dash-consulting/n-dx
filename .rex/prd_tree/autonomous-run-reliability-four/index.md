@@ -38,6 +38,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Refuse to mark a task completed while its work is uncommitted](./refuse-to-mark-a-task-completed-while.md) | completed |
 | [--reset-deferred must be able to start the run it enables, and a refusal must exit non-zero](./reset-deferred-must-be-able-to-start.md) | completed |
 | [--reset-deferred must commit only its own writes and must not write on --dry-run](./reset-deferred-must-commit-only-its.md) | completed |
-| [rex fix must reopen parents to pending (not in_progress) and run the whole-tree stuck-parent sweep](./rex-fix-must-reopen-parents-to-pending.md) | pending |
+| [rex fix must reopen parents to pending (not in_progress) and run the whole-tree stuck-parent sweep](./rex-fix-must-reopen-parents-to-pending.md) | completed |
 | [Stop a run that repeats an identical tool call instead of letting it loop forever](./stop-a-run-that-repeats-an-identical.md) | completed |
 | [Withdrawing a completion must reopen the ancestors the agent's own cascade already closed](./withdrawing-a-completion-must-reopen.md) | completed |
