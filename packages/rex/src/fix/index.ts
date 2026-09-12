@@ -39,6 +39,7 @@ import {
   SUCCESSFUL_CHILD_STATUSES,
   allChildrenSuccessful,
 } from "../core/parent-completion.js";
+import type { ParentStatusNode } from "../core/parent-completion.js";
 import { collectFixItemIds, collectFixTreePostOrder, walkFixTree } from "./tree.js";
 import type { FixAction, FixItem, FixItemStatus, FixKind, FixResult } from "./types.js";
 
@@ -131,6 +132,18 @@ export function detectParentChildMisalignment(items: FixItem[]): FixAction[] {
 }
 
 /**
+ * The status a falsely-completed parent is reopened to. Named once because
+ * {@link applyParentChildFixes} writes it and {@link findStuckParents} has to
+ * predict it; two literals here is how the plan and the repair drift apart.
+ */
+const REOPENED_STATUS = "pending" as const;
+
+/** Ids that {@link applyParentChildFixes} will reopen to {@link REOPENED_STATUS}. */
+function idsToReopen(items: FixItem[]): Set<string> {
+  return new Set(findMisalignedParents(items).map(({ item }) => item.id));
+}
+
+/**
  * Pending parents whose children are all `completed` — the whole-tree
  * reconciliation, over this module's structural tree shape.
  *
@@ -138,23 +151,66 @@ export function detectParentChildMisalignment(items: FixItem[]): FixAction[] {
  * sweep no agent run performs any more (#368). Post-order plus the
  * `virtuallyCompleted` set is what lets a feature close and then let its epic
  * close in the same pass.
+ *
+ * ## Why `willReopen` exists
+ *
+ * `applyFixes` reopens falsely-completed parents *before* it sweeps, so the
+ * sweep sees a tree the detector never does. `detectIssues` runs on the tree as
+ * it is, and `rex fix --dry-run` prints exactly that — so if the two disagree,
+ * the preview an operator decides on is not what the run does. It diverged in
+ * both directions:
+ *
+ * - **Over-promising.** On epic(pending) → feature(completed) → task(pending),
+ *   the feature still reads `completed` while detecting, so it looked finished
+ *   and the epic above it looked completable. The plan promised to complete an
+ *   epic the real run correctly refused to touch.
+ * - **Under-reporting.** A parent reopened to `pending` has just entered
+ *   `AUTO_COMPLETABLE_STATUSES`. If its blocking child is itself a stuck parent
+ *   that the same sweep closes, the parent becomes completable in that very
+ *   pass — and got completed without ever appearing in the plan.
+ *
+ * So the sweep is computed against each item's *post-repair* status rather
+ * than its current one. `asRepaired` rewrites only what the reopen pass will
+ * rewrite, and hands the result to the shared `allChildrenSuccessful` — the
+ * predicate still comes from `core/`, only the statuses fed to it are the ones
+ * the repair will produce.
  */
-function findStuckParents(items: FixItem[]): FixItem[] {
+function findStuckParents(items: FixItem[], willReopen: Set<string>): FixItem[] {
   const stuck: FixItem[] = [];
   const virtuallyCompleted = new Set<string>();
 
+  /** `item`'s status as the reopen pass will leave it. */
+  const effectiveStatus = (item: FixItem): FixItemStatus =>
+    willReopen.has(item.id) ? REOPENED_STATUS : item.status;
+
+  /**
+   * `item` with its children's statuses as the reopen pass will leave them.
+   * Needed because `allChildrenSuccessful` reads each child's raw status, which
+   * for a to-be-reopened child still says `completed`.
+   */
+  const asRepaired = (item: FixItem): ParentStatusNode =>
+    !item.children || willReopen.size === 0
+      ? item
+      : {
+          children: item.children.map((child) =>
+            willReopen.has(child.id)
+              ? { id: child.id, status: REOPENED_STATUS }
+              : child,
+          ),
+        };
+
   for (const item of collectFixTreePostOrder(items)) {
-    if (SUCCESSFUL_CHILD_STATUSES.has(item.status)) {
+    if (SUCCESSFUL_CHILD_STATUSES.has(effectiveStatus(item))) {
       virtuallyCompleted.add(item.id);
       continue;
     }
 
     // Never close an explicit in_progress claim, and never a deferred,
     // blocked or failing parent (#368).
-    if (!AUTO_COMPLETABLE_STATUSES.has(item.status)) continue;
+    if (!AUTO_COMPLETABLE_STATUSES.has(effectiveStatus(item))) continue;
 
     // Returns false for a childless item, so leaves are never completed here.
-    if (!allChildrenSuccessful(item, virtuallyCompleted)) continue;
+    if (!allChildrenSuccessful(asRepaired(item), virtuallyCompleted)) continue;
 
     stuck.push(item);
     virtuallyCompleted.add(item.id);
@@ -164,7 +220,7 @@ function findStuckParents(items: FixItem[]): FixItem[] {
 }
 
 export function detectStuckParents(items: FixItem[]): FixAction[] {
-  return findStuckParents(items).map((item) => ({
+  return findStuckParents(items, idsToReopen(items)).map((item) => ({
     kind: "stuck_parent" as const,
     itemId: item.id,
     description: `Complete stuck parent "${item.title}" (all ${item.children?.length ?? 0} children completed)`,
@@ -236,7 +292,7 @@ function applyParentChildFixes(items: FixItem[]): number {
   let count = 0;
 
   for (const { item } of findMisalignedParents(items)) {
-    item.status = "pending";
+    item.status = REOPENED_STATUS;
     delete item.completedAt;
     count++;
   }
@@ -254,7 +310,10 @@ function applyParentChildFixes(items: FixItem[]): number {
 function applyStuckParentFixes(items: FixItem[], now: string): number {
   let count = 0;
 
-  for (const item of findStuckParents(items)) {
+  // The reopen pass has already run, so this set is normally empty; computing
+  // it keeps this call identical to the one `detectStuckParents` makes rather
+  // than relying on that ordering staying true.
+  for (const item of findStuckParents(items, idsToReopen(items))) {
     item.status = "completed";
     // The timestamp pass has already run by now and saw this item as pending,
     // so it will not backfill these — set them here or leave the tree in a

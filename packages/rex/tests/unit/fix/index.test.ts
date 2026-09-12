@@ -612,25 +612,175 @@ describe("applyFixes", () => {
     expect(items[0].status).toBe("completed");
   });
 
-  // The two parent repairs must not fight: reopening runs first, and the item
-  // it reopens still holds an unfinished child, so the sweep cannot re-close it.
-  it("does not re-close a parent it just reopened", () => {
-    const items: PRDItem[] = [
+  // A falsely-completed parent is a parent whose subtree is NOT done, so it
+  // must not count as done when deciding whether the parent ABOVE it is
+  // finished. Detection reads the pre-repair tree, where the feature still says
+  // `completed`; the repair reopens it first. Before those two were reconciled,
+  // `rex fix` reported "Complete stuck parent Epic" and then — correctly —
+  // did not do it, so the printed plan and the dry-run preview both lied.
+  it("does not promise to complete an epic above a parent it is about to reopen", () => {
+    const build = (): PRDItem[] => [
       makeItem({
         id: "e1",
         title: "Epic",
+        level: "epic",
+        status: "pending",
+        children: [
+          makeItem({
+            id: "f1",
+            title: "Falsely Completed Feature",
+            level: "feature",
+            status: "completed",
+            startedAt: NOW,
+            completedAt: NOW,
+            children: [makeItem({ id: "t1", title: "Still Open", status: "pending" })],
+          }),
+        ],
+      }),
+    ];
+
+    // The plan `rex fix --dry-run` prints.
+    expect(detectIssues(build()).filter((a) => a.kind === "stuck_parent")).toEqual([]);
+
+    // …and what a real run actually leaves behind, which must match it.
+    const items = build();
+    applyFixes(items, NOW);
+    expect(items[0].status).toBe("pending");
+    expect(items[0].children![0].status).toBe("pending");
+  });
+
+  // The general invariant behind the two cases above: `rex fix --dry-run`
+  // prints `detectIssues`, `rex fix` performs `applyFixes`, and an operator
+  // decides between them by reading the first. If the plan can name a repair
+  // the run does not make, the preview is not a preview.
+  it("promises exactly the completions the run performs, on a mixed tree", () => {
+    const build = (): PRDItem[] => [
+      // Falsely completed: must be reopened, and must not close the epic.
+      makeItem({
+        id: "e1", title: "False Epic", level: "epic", status: "pending",
+        children: [
+          makeItem({
+            id: "f1", title: "False Feature", level: "feature", status: "completed",
+            startedAt: NOW, completedAt: NOW,
+            children: [makeItem({ id: "t1", title: "Open", status: "pending" })],
+          }),
+        ],
+      }),
+      // Genuinely stranded: must close, bottom-up.
+      makeItem({
+        id: "e2", title: "Stranded Epic", level: "epic", status: "pending",
+        children: [
+          makeItem({
+            id: "f2", title: "Stranded Feature", level: "feature", status: "pending",
+            children: [
+              makeItem({ id: "t2", title: "Done", status: "completed", startedAt: NOW, completedAt: NOW }),
+            ],
+          }),
+        ],
+      }),
+      // Blocked by a deferred child: must stay open.
+      makeItem({
+        id: "e3", title: "Deferred Epic", level: "epic", status: "pending",
+        children: [
+          makeItem({ id: "t3", title: "Done", status: "completed", startedAt: NOW, completedAt: NOW }),
+          makeItem({ id: "t4", title: "Deferred", status: "deferred" }),
+        ],
+      }),
+    ];
+
+    const planned = detectIssues(build())
+      .filter((a) => a.kind === "stuck_parent")
+      .map((a) => a.itemId);
+
+    const before = new Map<string, string>();
+    const collect = (ns: PRDItem[], into: Map<string, string>): void => {
+      for (const n of ns) {
+        into.set(n.id, n.status);
+        collect(n.children ?? [], into);
+      }
+    };
+    collect(build(), before);
+
+    const items = build();
+    applyFixes(items, NOW);
+    const after = new Map<string, string>();
+    collect(items, after);
+
+    const newlyCompleted = [...after.entries()]
+      .filter(([id, status]) => status === "completed" && before.get(id) !== "completed")
+      .map(([id]) => id);
+
+    // Same set — compared sorted, because `planned` is post-order and the
+    // snapshot walk above is pre-order.
+    expect([...newlyCompleted].sort()).toEqual([...planned].sort());
+    // The plan itself must still be bottom-up: feature before its epic.
+    expect(planned).toEqual(["f2", "e2"]);
+  });
+
+  // The mirror of the case above. Reopening a parent to `pending` moves it INTO
+  // AUTO_COMPLETABLE_STATUSES, so if the child that was blocking it is itself a
+  // stuck parent the same sweep closes, the parent becomes completable in that
+  // very pass. It was being completed without ever appearing in the plan.
+  it("reports the completion of a parent the reopen pass makes completable", () => {
+    const build = (): PRDItem[] => [
+      makeItem({
+        id: "p",
+        title: "Falsely Completed Epic",
         level: "epic",
         status: "completed",
         startedAt: NOW,
         completedAt: NOW,
         children: [
-          makeItem({ id: "t1", title: "Done", status: "completed", startedAt: NOW, completedAt: NOW }),
-          makeItem({ id: "t2", title: "Deferred", status: "deferred" }),
+          makeItem({
+            id: "c",
+            title: "Stuck Feature",
+            level: "feature",
+            status: "pending",
+            children: [
+              makeItem({ id: "t", title: "Done", status: "completed", startedAt: NOW, completedAt: NOW }),
+            ],
+          }),
+        ],
+      }),
+    ];
+
+    const planned = detectIssues(build())
+      .filter((a) => a.kind === "stuck_parent")
+      .map((a) => a.itemId);
+    expect(planned).toEqual(["c", "p"]);
+
+    const items = build();
+    applyFixes(items, NOW);
+    // The whole subtree really is finished, so completing p is right — the
+    // defect was doing it silently.
+    expect(items[0].status).toBe("completed");
+    expect(items[0].children![0].status).toBe("completed");
+  });
+
+  it("still completes an epic above a legitimately completed feature", () => {
+    const items: PRDItem[] = [
+      makeItem({
+        id: "e1",
+        title: "Epic",
+        level: "epic",
+        status: "pending",
+        children: [
+          makeItem({
+            id: "f1",
+            title: "Genuinely Done Feature",
+            level: "feature",
+            status: "completed",
+            startedAt: NOW,
+            completedAt: NOW,
+            children: [
+              makeItem({ id: "t1", title: "Done", status: "completed", startedAt: NOW, completedAt: NOW }),
+            ],
+          }),
         ],
       }),
     ];
     applyFixes(items, NOW);
-    expect(items[0].status).toBe("pending");
+    expect(items[0].status).toBe("completed");
   });
 
   // Reopening does not touch startedAt — it records when the work began, which
