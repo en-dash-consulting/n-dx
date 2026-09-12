@@ -29,5 +29,6 @@
     }
   },
   "claudePath": "claude",
-  "autoCommit": true
+  "autoCommit": true,
+  "livelockThreshold": 0
 }
