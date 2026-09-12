@@ -1,5 +1,584 @@
 # @n-dx/web
 
+## 0.6.0
+
+### Patch Changes
+
+- [#366](https://github.com/en-dash-consulting/n-dx/pull/366) [`25d7aa6`](https://github.com/en-dash-consulting/n-dx/commit/25d7aa662c414e831fc41dbfc259db94782e0bda) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Spawn the vendor CLI (Claude CLI provider) with `cwd` set to the caller's project directory instead of inheriting the server process's own cwd.
+  
+  `createLLMClient`/`createClient` now accept an optional `cwd`, threaded through to `cli-provider.ts`'s `spawnCli` call. The dashboard's Ask route (`routes-sourcevision-ask.ts`) passes `ctx.projectDir`, so an Ask request run against a different project no longer executes the CLI wherever `ndx start` happened to be launched from. Hench's own spawn path already passed `cwd` and is unchanged.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Enforce `sourcevision.ask` on the endpoint, not just in the viewer.
+  
+  `POST /api/sourcevision/ask` now refuses with `403` and `kind: "disabled"` when
+  the toggle is off. Gating only the viewer made the toggle a property of one
+  client: the panel hid itself while anything else that could reach the port
+  still spent the project's tokens, which is the one consequence the toggle's
+  impact text names.
+  
+  - **Checked before the body is read and before the analysis is loaded**, so a
+    disabled project is told the feature is off rather than told about whichever
+    other precondition it also happens to be missing.
+  - **Fails closed.** A missing `.n-dx.json`, an unparseable one, or a key absent
+    from the registry all resolve to the registry default — `false` for Ask. A
+    gate that opens when it cannot tell is not a gate.
+  - **Read per request, not cached.** Toggles are edited from the dashboard while
+    the server runs; a value read once at startup would keep refusing after the
+    user enabled it.
+  
+  New `isFeatureEnabled(projectDir, key)` in `routes-features.ts` is the shared
+  reader. `disabled` is a first-class `AskErrorKind` with its own status, fallback
+  wording, and entry in the panel's per-kind presentation table, so the card names
+  the fault and points at the Feature Toggles view instead of rendering a bare
+  403. `askFailureKindFromStatus` deliberately does not mirror 403 back to
+  `disabled`: our own 403 carries its kind in the body, and a foreign 403 is an
+  access denial.
+  
+  This diverges from `sourcevision.prMarkdown`, which stays viewer-gated. The
+  difference is deliberate — that page renders from analysis already on disk,
+  while each Ask call spends tokens. The two `/api/rex/*` routes the panel uses
+  (`capture-ask`, `apply-refinements`) are not gated: they belong to the rex
+  scope and neither one calls a model.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Attribute SourceVision Ask token spend in the LLM Utilization view
+  
+  Every Ask call spent real tokens from a surface with no accounting path. Hench
+  runs land in `.hench/runs/` and roll up per PRD item; rex and sourcevision
+  report through their own artifacts. The dashboard's own spend reported nowhere,
+  so the one view whose job is to report the bill was blind to its own.
+  
+  Each call is now appended to `.n-dx-web-usage.jsonl` with vendor, model, input,
+  output, cache-creation and cache-read tokens, plus how the call ended. The
+  utilization aggregation reads it as a fourth package bucket, `web`, rendered as
+  "Dashboard" — its own colour, donut slice, filter option and command row, so it
+  stays separable from hench run spend everywhere the view breaks down by
+  package. Asks are not task-scoped, so the spend is a dashboard bucket rather
+  than being attributed to whichever PRD item happened to be selected.
+  
+  Failed calls are recorded too, with the call counted and whatever the provider
+  reported. A provider that finishes after the ask timed out appends its counts
+  as a second, call-free record, so late tokens are neither lost nor
+  double-counted as a second call. A call that never reached a provider (no
+  analysis, unconstructible client) is deliberately not recorded — the ledger
+  counts calls, not intentions.
+  
+  Cache tokens are now reported in this view rather than hidden, consistent with
+  the hench/rex decision. The server had always counted and priced them
+  (`estimateCost` charges cache writes at 1.25x input and reads at 0.1x), but the
+  viewer's local copy of the wire shape omitted the fields and totalled only
+  input + output — so "Total Tokens" disagreed with the "Est. Cost" beside it, and
+  on a cache-heavy run most of the bill had no visible line. Cache write/read now
+  appear as headline figures, as columns in the vendor-model and command tables,
+  and as their own cost lines.
+  
+  The aggregation cache also fingerprints the ledger, so an answer's cost appears
+  without waiting for an unrelated source to change.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Gate the Explain action on the `sourcevision.ask` toggle.
+  
+  `sourcevision.ask` is experimental and defaults to off, and its impact text says
+  each question spends tokens. The tab list and the sidebar both honoured it; the
+  **Explain** button on Problems and Suggestions rows did not. On a default
+  install that left Ask fully reachable — finding row → Explain → panel → submit →
+  tokens — through the one entry point that is not in the sidebar, while the only
+  control that could turn it off is hidden by the very toggle that is off.
+  
+  Both views now take the toggle as a prop and omit the action when it is false,
+  on the same branch that already omitted it when the surface has nowhere to
+  navigate. The prop defaults to `false`, so a call site that forgets it renders
+  no button rather than an ungated one.
+  
+  The toggle is read in `main.ts` rather than in the views: the view-registry
+  renderers are plain functions dispatched by view id, so a hook called inside one
+  would be a conditional hook in `App`, and Problems and Suggestions both return
+  early from an enrichment gate before their own hooks run.
+  
+  Tests cover the button's absence in both views with the toggle off and with the
+  prop omitted, plus the registry wiring that supplies it — dropping the prop
+  there would have restored the old behaviour with every component-level
+  assertion still passing.
+  
+  The endpoint enforces the same toggle — see the separate changeset for
+  `POST /api/sourcevision/ask`.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Call every hook before the enrichment gate in all three gated SourceVision views.
+  
+  Architecture, Problems and Suggestions each return an `EnrichmentGate` early when
+  the analysis has not reached their threshold, and then called `useMemo` below it.
+  `enrichmentPass` is loaded data — 0 on the first render, real once the data
+  arrives, and different again when an analysis finishes with the dashboard open —
+  so the early return is taken on some renders of the same mounted component and
+  not others, and every hook below it was conditional. Preact matches hooks by
+  position and, unlike React, does not warn: the slots simply shift.
+  
+  All three now call their hooks first and gate afterwards. In Problems and
+  Suggestions `findings` is memoized on the source array while moving, which also
+  makes the memo that keys on it work at all — a fresh array each render meant it
+  recomputed every time. Architecture needed only the one memo hoisted; nothing
+  there keys on `findings`, so it stays a plain filter below the gate.
+  
+  The invariant is pinned structurally, by asserting no view calls a hook after its
+  early return. A behavioural test cannot fail on this defect: the conditional
+  hooks were appended after the stable ones, so nothing is misread today and the
+  exposure is to the next edit. Transition tests cover the other half — crossing
+  the threshold in both directions, repeatedly, renders what it did before.
+  
+  The guard's view list is itself checked against the directory, so a view that
+  renders an `EnrichmentGate` cannot be added without being covered. That gap is
+  why Architecture was missed the first time: the list was hardcoded to two
+  entries while the suite claimed to check every gated view.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Guard the `NDX_CLI_PATH` rung of the ndx binary ladder, and document it.
+  
+  `resolveNdxBin` had an undocumented first rung — `NDX_CLI_PATH` returned
+  verbatim, above every rung its doc comment described, and without the
+  `existsSync` check its twin `N_DX_CLI_PATH` has. Two names for one fact:
+  `packages/core/cli.js` assigns both to its own path on startup, so a server
+  started by `ndx start` carries both.
+  
+  - **Both env rungs are now guarded.** The value is exported to every child of an
+    `ndx` process, so it outlives the install that wrote it. A dev-link install
+    that moved or was uninstalled left a path that no longer exists, and rung 1
+    spawned it anyway — `node <missing file>`, where the rungs below it would have
+    resolved.
+  - **The ladder is documented as five rungs**, including why there are two env
+    names and that the launcher currently outranks the analyzed project's own
+    `node_modules/.bin/ndx`. The prose ladder in `routes-hench.ts` named only
+    `NDX_CLI_PATH`; the doc comment named only `N_DX_CLI_PATH`. Neither was
+    complete.
+  
+  The ladder tests now cover rung 1 — that it beats both the project-local bin and
+  `N_DX_CLI_PATH`, and that a stale value falls through. An ambient `NDX_CLI_PATH`
+  answering silently from rung 1 is what left the rungs below it asserting nothing,
+  which is how the unguarded return stayed invisible: the suite was red for anyone
+  running it from a session `ndx` had launched, and green in CI, which sets neither
+  name.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Resolve a requested port of 0 to a real ephemeral port instead of returning the literal 0.
+  
+  `findAvailablePort(0)` probed port 0 through `checkPort`, whose result is
+  platform-dependent: on Linux the connect probe fails `ECONNREFUSED`, the bind
+  phase then succeeds (binding 0 always does), and the literal 0 came back as
+  the allocated port — `startServer` then logged it, wrote it to the port file,
+  and returned it to callers as a port no client can connect to. Windows masked
+  the bug by failing the connect probe with `EADDRNOTAVAIL` and falling through
+  to the ephemeral allocator, which is why the scoped-route-dispatch integration
+  test passed on Windows and died at boot on Linux CI. Port 0 now takes the
+  ephemeral allocator directly on every platform, which also skips the pointless
+  retry backoff Windows paid while probing it.
+  
+  Also stops the server calling that resolution a fallback. `PortAllocationResult`
+  gains `isFallback` — the request could not be honoured, so a different port was
+  substituted — which is deliberately not the inverse of `isOriginal`. For port 0
+  the bound port is not the number asked for (`isOriginal: false`) but the request
+  was satisfied exactly, so nothing fell back. Both consumers read `!isOriginal`
+  and were wrong: the operator saw `Port 0 is in use — using port 54321 instead.`
+  about a port that was never in use, and `StartResult.isFallback` told a caller
+  that had asked for an ephemeral port it got a fallback. Both now read
+  `isFallback`, so a third consumer is correct by default. `isOriginal` keeps its
+  documented meaning and its value in every case.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Write only the three known fields when applying a PRD refinement.
+  
+  `applyRefinements` spread the posted `updates` object into `updateInTree`, which
+  is an `Object.assign`. The route's shape check never looks at `updates`
+  (`isProposalShape` checks `op`, `id`, `itemId`, and `baseline`), `validateAgainst`
+  checks only that it is non-empty and that `priority`, if present, is valid, and
+  the TypeScript type is erased at runtime — so a crafted proposal carrying
+  `status: "completed"` and `children: []` alongside an honest fingerprint and a
+  diff declaring a description change applied all of it and reported `applied`.
+  `validateDocument` inside the transaction does not catch that: a childless
+  completed epic is schema-valid.
+  
+  `description`, `acceptanceCriteria`, and `priority` are now picked off `updates`
+  individually, at the write, where the next person adding a refinement field is
+  already looking.
+  
+  The model cannot reach this — `RawRefinementSchema` is non-strict so zod strips
+  unknown keys, and `buildEdit` constructs `updates` field by field — and
+  `request-security.ts` blocks cross-site browser mutations, so this is
+  defence-in-depth rather than a closed exploit path. What made it worth fixing is
+  that it contradicted the reason the route gives for its own body check being
+  structural: that field legality is re-established under the lock. For staleness
+  and mutation legality it is; for field scope it was not. That docblock now says
+  so and points at where the scope is actually enforced.
+
+- [#360](https://github.com/en-dash-consulting/n-dx/pull/360) [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Record which n-dx produced each hench run.
+  
+  Several checkouts are usually live at once — a worktree per in-flight PR plus a
+  linked global install — and their run records were indistinguishable, so a token
+  or outcome report could not say which build the numbers came from.
+  
+  `RunRecord` gains two optional fields, stamped at run start by `initRunRecord`
+  and by `hench record`:
+  
+  - `ndxVersion` — `NDX_VERSION` when an orchestrator exports it, otherwise the
+    `@n-dx/hench` manifest version.
+  - `cliPath` — `NDX_CLI_PATH` / `N_DX_CLI_PATH` (exported by `packages/core/cli.js`),
+    falling back to `process.argv[1]`.
+  
+  Both are additive: records written before the fields existed load unchanged, and
+  the dashboard's run detail renders each row only when its value is present. A
+  failed manifest read is not memoized, so one transient error cannot pin every
+  later run in the process to a missing version.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - SourceVision Ask: give each degraded mode a specific, actionable message.
+  
+  The panel's failure card now names the mode it is in rather than reporting
+  "The Ask request failed (502)". Missing analysis offers the analyze/refresh
+  control itself instead of naming a command; credential failures render
+  `@n-dx/llm-client`'s canonical `authFailureGuidance` remediation, ending in
+  `VERIFY_CREDENTIALS_STEP`, sent from the endpoint as a new `remediation` field;
+  timeout, rate limit, and provider error are each reported as themselves, with a
+  retry offered for the two that are transient and the vendor's own retry delay
+  stated when it supplied one. The prompt survives every failure.
+  
+  The endpoint also stops describing one failure while coding another: a typed
+  provider error whose message carries no classifiable text now takes its wording
+  from the kind it resolved to.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the SourceVision Ask panel usable without sight or a mouse.
+  
+  An async text exchange has one accessibility requirement the other
+  SourceVision subviews do not: the answer arrives after an indeterminate delay,
+  so it has to be announced rather than merely rendered. Four defects followed
+  from that, and each is now fixed and pinned by a test in
+  `tests/unit/viewer/ask-view-a11y.test.ts`.
+  
+  - **Arrival was not reliably announced.** The answer card was itself the live
+    region, so the region came into existence in the same render as its content —
+    which screen readers do not reliably announce. There is now one persistent
+    polite region, mounted with empty text while idle, and the answer card is a
+    `role="region"` labelled by its heading. The test asserts *node identity*
+    across the transition, because an equal-looking replacement would satisfy a
+    presence check and still fail a reader.
+  - **Arrival announced the whole answer.** A live region reads its entire text,
+    so a 400-word answer buried the one fact the waiting user needed and talked
+    over whatever they were reading. The region now reports that the answer is
+    ready, how long it is, and where to find it; the answer is read on demand.
+    Making the card live also meant a live *ancestor* claimed every descendant
+    update, so each later "Copied" line re-read the answer with it.
+  - **Submitting stole focus.** The textarea and the submit button were both
+    `disabled` while the request was in flight, and the browser blurs a disabled
+    element — so pressing Enter in the prompt, or Enter on the button, dropped
+    focus to `<body>` and left a keyboard user at the top of the document for the
+    length of an LLM call. The textarea is now `readOnly` and the button carries
+    `aria-disabled`; `submit()` already refused the second request, so nothing
+    needed to be disabled to prevent one.
+  - **Success and failure differed only in hue.** Both feedback lines now carry a
+    shape marker as well as a colour, and a capture failure adds a
+    screen-reader-only "Capture failed:" prefix — its message comes from the
+    server and may state a fact ("PRD is locked by pid 4212") that does not read
+    as a failure on its own.
+  
+  The panel also joins the axe-core audit (idle and deployed-mode states, light
+  and dark), and `docs/accessibility.md` gains the behavioural-suite table that
+  records what axe cannot check.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Wire Copy and Capture-to-PRD actions onto a SourceVision Ask answer
+  
+  Two controls under an answer, plus one shared clipboard module and one new PRD
+  write route.
+  
+  **Copy reuses the PR Markdown view's path rather than reimplementing it.** The
+  copy attempt, the `execCommand` fallback, the permission-denied classification,
+  and the user-facing wording all move to `viewer/utils/clipboard.ts`, which the
+  Ask panel and `pr-markdown.ts` now share — two consumers, so it clears the
+  two-consumer rule without becoming a single-consumer module. `copyTextToClipboard`
+  returns a discriminated result (`{ok: true}` or a named `reason`), so the
+  branching lives in one place: the modern API is skipped entirely when absent
+  rather than called and allowed to throw, and a fallback that succeeds reports
+  success whatever the first attempt's reason was. The four PR Markdown strings
+  are reproduced byte-for-byte and pinned by a test, so a permission denial reads
+  identically on both surfaces.
+  
+  **Capture is confirm-guarded, and says where the item landed.** The first press
+  only arms the action; nothing is written until Confirm — the shape the Overview
+  Next Steps panel uses, and for the same reason. `POST /api/rex/capture-ask`
+  files the exchange as a **task** under a find-or-create "SourceVision Ask"
+  epic (`LEVEL_HIERARCHY` accepts a task under an epic, so no filler feature has
+  to be invented), and the response names the created item, its parent, and
+  whether the epic is new — "Captured to PRD" alone leaves the user hunting for
+  what they just filed.
+  
+  **Deliberately no title dedup, unlike `capture-next-steps`.** There the same
+  recommendation recurs on every analysis and skipping it is a kindness; here the
+  user pressed Confirm on this specific answer, so discarding the write because
+  they once asked something similar would be a capture that reports success and
+  files nothing. Repeat presses are guarded by the confirm step plus an in-flight
+  ref instead.
+  
+  A failed capture surfaces the endpoint's own reason in an `alert` region and
+  leaves the answer intact and re-copyable. Both kinds of feedback are transient
+  and both are dropped when a new question is submitted — including when that
+  question fails — so a "Copied" or "Captured" line can never be read as
+  belonging to an answer it did not come from. Capture's window is five times
+  Copy's, because its message names a destination the user needs time to read.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `POST /api/sourcevision/ask`, answering a question from the existing analysis
+  
+  The SourceVision Ask panel's server half. The request is
+  `{ prompt, seed? }` validated by a zod schema; the response is
+  `{ answer, vendor, model, tokens, contextSources }`.
+  
+  **Bundle, not a tool-use loop.** Context is pre-assembled from the
+  `.sourcevision/` artifacts already on disk — manifest, inventory, imports,
+  zones, findings, derived next steps, component count, and a `CONTEXT.md`
+  excerpt — and sent in a single non-agentic call. A loop that queried lookups on
+  demand would answer a wider range of questions, but at an unbounded number of
+  round trips per question and with no way to test what the model actually saw. A
+  unit test now asserts the assembled facts reach the completion request, which is
+  the property the whole endpoint rests on. Every section is capped and reports
+  what it cut, so the bundle does not grow with the repository until the vendor
+  rejects it as an opaque 400.
+  
+  **Analysis is the only ground truth.** The endpoint reads no source, and refuses
+  with `no_analysis` rather than letting the model answer from its priors when
+  nothing has been analysed. All sourcevision access — including the five artifact
+  schema types the reads are parsed against — goes through
+  `server/domain-gateway.ts`; the gateway's export cap moved 15 → 16 with that
+  reason recorded.
+  
+  **Named failures, and it cannot hang.** Vendor and model come from the project's
+  own config via `loadLLMConfig` + `resolveTaskModel` (new `sourcevision.ask`
+  class, standard tier, reroutable through `llm.routes`), and the pair that served
+  the call is reported back so the panel never has to guess which model produced
+  an answer. The call races a budget — `sourcevision.ask.timeoutMs`, default 120s,
+  also passed down so a CLI-mode child bounds itself — and every failure returns a
+  named `kind` (`timeout`, `rate_limit`, `auth`, `network`, `no_analysis`,
+  `invalid_request`, `llm_error`) with the vendor's retry delay when it supplied
+  one, instead of a generic 500. A provider that already threw a typed
+  `ClaudeClientError` is trusted over re-classifying its message, so a 429 the
+  provider knew about is never downgraded to `unknown`.
+  
+  The task-class registry contract test now scans `web` as well as the three
+  domain packages: web declares classes now, and an unregistered one there
+  resolves silently to the standard tier exactly as it would anywhere else.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Explain a SourceVision finding in plain language from the Problems and
+  Suggestions views.
+  
+  Every finding row now carries an **Explain** action that opens the Ask panel
+  with that finding attached. What travels is the finding's own fields — type,
+  severity, zone, message, and related files — as a structured `seed` beside the
+  prompt, not a pre-written sentence. That distinction is the feature: facts in
+  the question text would be deleted the moment the user reworded it, and a
+  prompt is not something the endpoint can render as a focus section or reason
+  about.
+  
+  The endpoint already accepted a loose `{kind, id, text}` seed. It now also
+  takes `zone`, `files`, and a `labels` map, renders them as their own facts, and
+  — only when a seed produced a focus section — adds three rules requiring the
+  answer to name that finding's zone and files and to state what a fix would
+  touch. An explanation that could have been written without reading this
+  repository is the failure mode, so the extra rules say so outright.
+  
+  Details worth knowing:
+  
+  - **Nothing is defaulted on the way through.** A finding with no severity sends
+    no severity; the list view's "treat missing as info" grouping default stops at
+    the display layer, because telling a model the analysis classified something
+    it did not classify is inventing the field the explanation reasons about.
+    A `global` finding sends no zone rather than the string `"global"`.
+  - **The seed is shown as well as sent, and can be detached.** An answer naming
+    files the user was never shown reads as a guess; a seed that could not be
+    removed would silently ground every later question in whichever finding they
+    arrived from.
+  - **Explain is opt-in per surface.** `FindingsList` also renders for the
+    Architecture view, which has nowhere to send a finding, so the action appears
+    only where a navigation target exists. The button sits outside the row header
+    because that header is itself a button whenever a finding has related files.
+  - The seeded answer supports the same Copy and Capture-to-PRD actions as any
+    other, and an unknown `seed` field is still rejected rather than dropped — a
+    client that guessed the shape is told, not quietly answered without it.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Add the gated SourceVision "Ask" tab and its prompt/response panel
+  
+  The client half of the Ask panel: a tab in `SOURCEVISION_TABS` behind the
+  default-off `sourcevision.ask` feature flag, and a view registered in
+  `view-id.ts`, `view-routing.ts`, and `view-registry.ts` so `/ask` deep-links and
+  survives a reload like every sibling tab. The panel owns the labelled prompt
+  textarea and the submit control, and consumes `POST /api/sourcevision/ask` — it
+  assembles no context and calls no model itself.
+  
+  **One state value, not three booleans.** `idle | submitting | answered | error`
+  is a discriminated union. The `loading`/`error`/`data` triple the older views
+  use admits eight combinations for four legal states, and the illegal ones
+  ("submitting and answered") are exactly the renders that read as a bug to
+  someone waiting on an answer.
+  
+  **An empty prompt is not a request.** A whitespace-only prompt disables the
+  submit control *and* returns early from the handler an Enter keypress reaches,
+  so it never costs a round trip to be told you typed nothing. A concurrent
+  submit is refused through a ref rather than through `state.status`, which has
+  not been applied yet when a double click's second handler runs. A 200 carrying
+  an empty answer is reported as an error rather than rendered as a blank card.
+  
+  **`requiresServer`, so a static export hides it.** The answer is an on-demand
+  LLM call and `ndx export` has no such route — deployed mode's fetch adapter
+  answers every non-GET with a 405 — so the tab is hidden there and the view
+  renders the explanatory card instead, matching the isometric map's contract.
+  
+  Copy/Capture actions on the answer, per-failure-mode wording beyond what the
+  endpoint supplies, and seeding the prompt from a finding are separate tasks
+  under the same feature; the shell is shaped so each lands in one place.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Stamp `lastModified` on tree mutations made inside `store.withTransaction`.
+  
+  Only the single-item store methods (`addItem`/`updateItem`/`removeItem`)
+  stamped. Every batch write mutates the tree directly inside a transaction and
+  so bypassed them: the dashboard's bulk update and merge routes, the Ask panel's
+  apply-refinements, and the CLI restructurers. The item was written to disk
+  looking untouched.
+  
+  That is silent in both directions. `isModifiedSinceSync` asks whether
+  `lastModified > lastSyncedAt`, so a previously-synced item whose stamp never
+  advanced is skipped on push; `resolveConflicts` then does last-write-wins on
+  local versus remote time, and with the local time stale the next
+  `sync_with_remote` overwrites the local change with the remote's value. Nothing
+  reports either half. Reachable on any project configured with a remote adapter.
+  
+  The stamp now belongs to the transaction rather than to each caller —
+  `FileStore.withTransaction` and `FolderTreeStore.withTransaction` signature the
+  tree before running the callback and stamp whatever changed, via
+  `snapshotItemContent` / `stampChangedItems` in `core/sync.ts`.
+  
+  Deliberate details:
+  
+  - **Changed, not merely present.** `migrate-slugs` and `reshape` each open an
+    empty transaction purely to force a rewrite; stamping unconditionally would
+    mark every item in the PRD modified and queue the whole tree for push.
+  - **A parent whose child list changed counts as changed**, which is what
+    `removeItem` already did by hand for exactly this reason.
+  - **A stamp the item arrived with is kept.** `analyze.ts` stamps its accepted
+    items before opening its transaction, deliberately; only an item that is new
+    to the tree *and* unstamped gets one here.
+  - **Sync bookkeeping is excluded from the signature** (`lastModified`,
+    `lastModifiedBy`, `lastSyncedAt`, `remoteId`) — including any of them would
+    make a stamp, or a recorded sync, look like a further modification.
+  - **The actor is resolved before the lock is taken.** `resolveActor` shells out
+    to `git config` on first call; doing that inside the locked span puts a
+    subprocess between every other writer and the PRD.
+  
+  The remote adapters keep their own lock-free `withTransaction` unchanged: they
+  push to systems where these timestamps mean something different.
+
+- [#359](https://github.com/en-dash-consulting/n-dx/pull/359) [`2a3028b`](https://github.com/en-dash-consulting/n-dx/commit/2a3028b436d836839c148a85a71819cf00fd925d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx start` asks who is on the port before killing it, and steps aside for another project's dashboard.
+  
+  The PID file `runWeb` consults lives inside the directory it was given, so a
+  second project or worktree had no entry there. A busy 3117 therefore read as a
+  stranger squatting on the port and `killPortOccupant` SIGKILLed it — including
+  when the occupant was another project's working dashboard. The server's own
+  fallback allocator (`findAvailablePort`, 3117–3200) never got a chance to run,
+  because the orchestrator killed first.
+  
+  A busy port is now probed with a 1.5 s `GET /api/status` before anything is
+  killed:
+  
+  - an n-dx dashboard reporting a **different** `projectDir` is left alone, and
+    this invocation moves to the next free port in 3117–3200;
+  - an n-dx dashboard reporting **this** directory is restarted as before — that
+    is `ndx start`'s documented idempotency, reached here when the PID file is
+    missing;
+  - anything else, including a dashboard too old to report `projectDir`, keeps
+    today's behaviour exactly. An inconclusive probe never widens the kill.
+  
+  `GET /api/status` gained a top-level `projectDir` so the probe has something to
+  attribute the server by. Purely additive.
+
+- [#359](https://github.com/en-dash-consulting/n-dx/pull/359) [`2a3028b`](https://github.com/en-dash-consulting/n-dx/commit/2a3028b436d836839c148a85a71819cf00fd925d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - GET /api/status and GET /api/config now include a `server` object — `projectDir`,
+  `version`, `cliPath`, `pid`, `port`, `startedAt` — identifying the running dashboard
+  process itself, not just the project it serves. `version` and `cliPath` come from the
+  same resolution the dashboard already uses to spawn `ndx` commands (`@n-dx/web`'s own
+  `package.json`, and the `NDX_CLI_PATH`/`N_DX_CLI_PATH` env vars set by `cli.js`), so
+  `ndx which`/the viewer footer can report them without re-deriving them. Purely
+  additive: existing fields on both routes are unchanged.
+
+- [#360](https://github.com/en-dash-consulting/n-dx/pull/360) [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - fix(web): retry readWebVersion() after a transient read failure
+  
+  `readWebVersion()` (used by GET /api/status and GET /api/config's `server`
+  object) memoized its own failure: a read of `packages/web/package.json`
+  that fails transiently — EMFILE under descriptor pressure, a slow mount not
+  yet ready during a startup burst — assigned the sentinel `"unknown"` to the
+  module-level cache, and the truthy check on re-entry then returned
+  `"unknown"` for the life of the process even once the file was readable
+  again.
+  
+  The catch path now returns `"unknown"` without populating the cache, so the
+  next call retries. A successful read is still memoized permanently, since
+  the file does not change under a running process.
+
+- [#357](https://github.com/en-dash-consulting/n-dx/pull/357) [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002) Thanks [@endash-shal](https://github.com/endash-shal)! - Define the monospace token the viewer's panels ask for, and repair three that existed nowhere
+  
+  `--mono`, `--line` and `--panel2` were referenced without a fallback in `pr-markdown.css` and `commands.css` and defined in no stylesheet, so those declarations were dropped: the markdown and command panels rendered in the inherited sans stack, on transparent surfaces, with no borders. They now point at `--font-mono`, `--border` and `--bg-surface`.
+  
+  `--font-mono` is newly defined. Eight other stylesheets already referenced that name through a `monospace` fallback, so they were getting the fallback rather than the intended stack.
+  
+  A test now asserts that every token used without a fallback resolves. The viewer carries a backlog of these — `llm-provider.css` is written against a `--color-*` / `--spacing-*` scheme the project never adopted — which the test allowlists rather than fixes, since choosing replacement values is a visual decision. The allowlist is itself checked for staleness, so an entry that gets defined has to be removed rather than quietly granting permission to break it again.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop an out-of-scope POST to `/api/sourcevision/ask` from killing the server.
+  
+  `handleApiRoutes` gated the ask route with
+  `handleScopedRoute(isInScope(...), handleSourcevisionAskRoute(req, res, ctx))`.
+  The second argument is a value, so the handler was invoked before the guard was
+  read. With `--scope=rex` (or any scope excluding sourcevision) the handler ran
+  anyway, reached the model call, and then wrote to a response the dispatcher's
+  404 fall-through had already finished — throwing `ERR_HTTP_HEADERS_SENT` from an
+  unawaited promise, which terminates the process on Node 22. One local POST took
+  down the dashboard, having first paid for an answer nobody received.
+  
+  The scope check now happens before the handler is invoked, matching the
+  synchronous siblings on either side of it.
+  
+  The eager-evaluation shape is not unique to this route — `handleScopedRoute` has
+  it at every call site, and the same crash reproduces on `/api/notion/sync` under
+  `--scope=sourcevision`. That is pre-existing and tracked separately; this change
+  fixes only the route that reaches an LLM, and leaves a comment at the call site
+  explaining why the guard is inline rather than delegated.
+  
+  Covered by `tests/integration/scoped-route-dispatch.test.ts`, which boots the
+  real server in a child process — the existing ask-route tests mount the handler
+  directly and never touch the dispatcher, which is why they passed throughout.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Make `handleScopedRoute` take a thunk, so an out-of-scope route cannot run.
+  
+  The helper took the handler's *result*, which meant every call site had already
+  invoked its handler before the scope guard was read. On a false guard the
+  promise was neither awaited nor cancelled: the handler ran on, wrote to a
+  response the dispatcher's 404 fall-through had already finished, and threw
+  `ERR_HTTP_HEADERS_SENT` from an unawaited promise — which ends the process on
+  Node 22.
+  
+  Probing the previous build under `--scope` showed `/api/notion/*` and
+  `/api/merge-graph` were reachable this way. The other scoped routes escaped only
+  because they do not accept POST on the paths probed and so returned without
+  writing — luck, not a guard, and it held whether or not the project was
+  initialised.
+  
+  The parameter is now `() => RouteResult`, invoked only when the guard passes, so
+  passing an already-invoked handler is a compile error (`TS2345`) rather than a
+  latent crash. All eleven call sites are migrated, including the ask route, whose
+  one-off inline guard from the previous fix is folded back into the shared
+  mechanism.
+  
+  Also removes `resolveRouteResult`, a no-op ternary whose two branches were
+  identical (`result instanceof Promise ? result : result`) and whose only caller
+  was this helper — `await run()` covers both sync and async handlers.
+  
+  `tests/integration/scoped-route-dispatch.test.ts` gains cases for the two
+  reachable routes; it boots the real server in a child process, because the
+  per-route unit tests mount handlers directly and never touch the dispatcher.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - SourceVision Ask: propose and apply PRD refinements, reviewed as diffs and written under the store lock.
+  
+  A new opt-in refine mode sends the PRD with the question and lets the answer carry proposed changes to existing items — a rewritten description, replacement acceptance criteria, a different priority, a reparent, or a merge with a duplicate sibling. Each proposal renders as a before/after diff of exactly the fields it changes and is accepted or rejected on its own; rejecting issues no request at all.
+  
+  Accepted proposals go to `POST /api/rex/apply-refinements`, which applies them through the rex gateway's `resolveStore` inside `withTransaction`. A proposal whose item changed since the answer was generated is refused as stale rather than applied over the top of whoever changed it, and a PRD lock held by another writer fails the request loudly, naming the holder's PID.
+- Updated dependencies [[`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`25d7aa6`](https://github.com/en-dash-consulting/n-dx/commit/25d7aa662c414e831fc41dbfc259db94782e0bda), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`ab8dccd`](https://github.com/en-dash-consulting/n-dx/commit/ab8dccd9fadf527a84085f079b245dbdb2dc8ce2), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`25d7aa6`](https://github.com/en-dash-consulting/n-dx/commit/25d7aa662c414e831fc41dbfc259db94782e0bda), [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`72609db`](https://github.com/en-dash-consulting/n-dx/commit/72609db1c4572f94ef25a2178d5cac2c17e241dc), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9)]:
+  - @n-dx/rex@0.6.0
+  - @n-dx/llm-client@0.6.0
+  - @n-dx/sourcevision@0.6.0
+
 ## 0.5.2
 
 ### Patch Changes
