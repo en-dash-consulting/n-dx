@@ -1,9 +1,15 @@
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
+import {
+  resolveStore,
+  ensureLegacyPrdMigrated,
+  openClaimsStore,
+  describeSkippedClaims,
+  type SkippedClaim,
+} from "../../store/index.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { findNextTask, collectCompletedIds, explainSelection } from "../../core/next-task.js";
 import { REX_DIR } from "./constants.js";
-import { info, result } from "../output.js";
+import { info, result, isVerbose } from "../output.js";
 import { bold, yellow, red, dim, colorStatus } from "@n-dx/llm-client";
 import { emitMigrationNotification } from "../migration-notification.js";
 
@@ -37,10 +43,21 @@ export async function cmdNext(
   }
 
   const completedIds = collectCompletedIds(doc.items);
-  const nextResult = findNextTask(doc.items, completedIds);
+
+  // Tasks another worktree of this repository is running right now. Skipping
+  // them is the whole point of a claim; naming them is what keeps the skip from
+  // reading as "the task disappeared".
+  const claimed = await openClaimsStore(dir).claimedElsewhere();
+  const skippedClaims = describeSkippedClaims(claimed.values());
+  const nextResult = findNextTask(
+    doc.items,
+    completedIds,
+    claimed.size > 0 ? { excludeIds: new Set(claimed.keys()) } : undefined,
+  );
 
   if (!nextResult) {
     result("COMPLETE — no actionable tasks remaining");
+    printSkippedClaims(skippedClaims);
     return;
   }
 
@@ -48,7 +65,7 @@ export async function cmdNext(
   const explanation = explainSelection(doc.items, nextResult, completedIds);
 
   if (flags.format === "json") {
-    result(JSON.stringify({ item, parents, explanation }, null, 2));
+    result(JSON.stringify({ item, parents, explanation, skippedClaims }, null, 2));
     return;
   }
 
@@ -84,5 +101,24 @@ export async function cmdNext(
     if (explanation.skipped.blocked > 0) parts.push(`${explanation.skipped.blocked} blocked`);
     if (explanation.skipped.unresolvedDeps > 0) parts.push(`${explanation.skipped.unresolvedDeps} awaiting deps`);
     info(`  Skipped: ${parts.join(", ")}`);
+  }
+
+  printSkippedClaims(skippedClaims);
+}
+
+/**
+ * Report the tasks passed over because another worktree holds a claim.
+ *
+ * Only under `--verbose`: in the normal case the operator asked what to work
+ * on, and a list of what somebody else is working on is noise. When the answer
+ * is surprising — the obvious next task was not offered — `--verbose` is where
+ * they look, so that is where the explanation lives.
+ */
+function printSkippedClaims(claims: SkippedClaim[]): void {
+  if (claims.length === 0 || !isVerbose()) return;
+
+  info(`\n  Claimed by another worktree (${claims.length} skipped):`);
+  for (const c of claims) {
+    info(`    ${dim(c.taskId)} — ${c.worktreeRoot}`);
   }
 }

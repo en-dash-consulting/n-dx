@@ -93,6 +93,12 @@ export { resolveStore } from "@n-dx/rex";
 // ---- Folder-tree storage path -----------------------------------------------
 export { PRD_TREE_DIRNAME } from "@n-dx/rex";
 
+// ---- Cross-worktree task claims ---------------------------------------------
+// In-scope under "task selection": a claim is the part of picking a task that
+// another checkout of this repository can see. Without it, two worktrees
+// select the same task and do the same work twice.
+export { openClaimsStore } from "@n-dx/rex";
+
 // ---- Tree utilities ---------------------------------------------------------
 export { findItem, walkTree } from "@n-dx/rex";
 
@@ -125,4 +131,4 @@ export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "@n-dx/re
 // All type imports from rex must flow through this gateway to prevent
 // type-import promotion erosion (a type import can be promoted to a
 // runtime import during refactoring, silently bypassing the gateway).
-export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation } from "@n-dx/rex";
+export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, ClaimsStore, TaskClaim } from "@n-dx/rex";

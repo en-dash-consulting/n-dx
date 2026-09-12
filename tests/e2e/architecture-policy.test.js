@@ -1022,8 +1022,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/web/src/server/rex-gateway.ts",
-    maxExports: 66,
-    description: "web→rex gateway (domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser, folder-tree parser/slug resolver, legacy PRD migration, PRD tree backup snapshots for the dashboard's Restore panel — isValidSnapshotId added to reject a path-traversal id in POST /api/rex/restore before it reaches restoreFromBackup's fs.rm)",
+    maxExports: 69,
+    description: "web→rex gateway (domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser, folder-tree parser/slug resolver, legacy PRD migration, PRD tree backup snapshots for the dashboard's Restore panel — isValidSnapshotId added to reject a path-traversal id in POST /api/rex/restore before it reaches restoreFromBackup's fs.rm; raised from 66 for openClaimsStore and the ClaimsStore/TaskClaim types, which the execute route needs because its activeExecutions map only ever sees this server's own children — without the claim it starts a second agent on a task another worktree is already running)",
   },
   {
     file: "packages/web/src/server/domain-gateway.ts",
@@ -1032,8 +1032,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/rex-gateway.ts",
-    maxExports: 30,
-    description: "hench→rex gateway (schema, store, tree, task selection, timestamps)",
+    maxExports: 33,
+    description: "hench→rex gateway (schema, store, tree, task selection, timestamps). Raised from 30 for the cross-worktree claim surface — openClaimsStore plus the ClaimsStore and TaskClaim types — which is part of picking a task, not a new concern: without it two checkouts of one repository select the same task and run it twice. The store lives in rex because the claims file is PRD-adjacent state and the rex CLI and MCP tools skip claimed tasks too; hench owns only the per-run ledger built on top of it (src/prd/task-claims.ts).",
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",

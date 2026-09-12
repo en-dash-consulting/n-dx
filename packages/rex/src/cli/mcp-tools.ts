@@ -36,7 +36,7 @@ import {
 } from "../core/item-duration-rollup.js";
 import { join } from "node:path";
 import { TOOL_VERSION, REX_DIR } from "./commands/constants.js";
-import { FileStore, resolvePRDFile } from "../store/index.js";
+import { FileStore, resolvePRDFile, openClaimsStore, describeSkippedClaims } from "../store/index.js";
 import { syncFolderTree } from "./commands/folder-tree-sync.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
 import type { PRDStore } from "../store/index.js";
@@ -78,15 +78,26 @@ export async function handleGetPrdStatus(store: PRDStore): Promise<McpResult> {
 
 export async function handleGetNextTask(
   store: PRDStore,
+  projectDir: string,
   args?: { tags?: string[] },
 ): Promise<McpResult> {
   try {
     const doc = await store.loadDocument();
     const completedIds = collectCompletedIds(doc.items);
-    const options = args?.tags?.length ? { tags: args.tags } : undefined;
+
+    // Tasks another worktree of this repository is already running. Reported
+    // alongside the pick, not silently dropped: an agent that asks twice and
+    // gets two different answers needs to be able to see why.
+    const claimed = await openClaimsStore(projectDir).claimedElsewhere();
+    const skippedClaims = describeSkippedClaims(claimed.values());
+
+    const options = {
+      ...(args?.tags?.length ? { tags: args.tags } : {}),
+      ...(claimed.size > 0 ? { excludeIds: new Set(claimed.keys()) } : {}),
+    };
     const result = findNextTask(doc.items, completedIds, options);
     if (!result) {
-      return textResult(JSON.stringify({ next: null, message: "No actionable tasks remaining" }));
+      return textResult(JSON.stringify({ next: null, message: "No actionable tasks remaining", skippedClaims }));
     }
     const explanation = explainSelection(doc.items, result, completedIds);
     return textResult(
@@ -99,6 +110,7 @@ export async function handleGetNextTask(
             level: p.level,
           })),
           explanation,
+          skippedClaims,
         },
         null,
         2,

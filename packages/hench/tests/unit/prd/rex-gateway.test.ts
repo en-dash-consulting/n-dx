@@ -50,6 +50,8 @@ const EXPECTED_EXPORTS = [
   // Level helpers
   "isRootLevel",
   "isWorkItem",
+  // Cross-worktree task claims
+  "openClaimsStore",
   // Finding acknowledgment
   "loadAcknowledged",
   "saveAcknowledged",

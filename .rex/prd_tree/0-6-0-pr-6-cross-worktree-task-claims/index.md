@@ -24,6 +24,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Claims store in the git common dir: .git/ndx/claims.json with pid, worktree, task id and expiry](./claims-store-in-the-git-common-dir-git.md) | pending |
+| [Claims store in the git common dir: .git/ndx/claims.json with pid, worktree, task id and expiry](./claims-store-in-the-git-common-dir-git.md) | completed |
 | [Dashboard shows claimed tasks with the claiming worktree in the PRD tree and the Sessions panel](./dashboard-shows-claimed-tasks-with-the.md) | pending |
-| [ndx work claims the task before starting and releases on finish; get_next_task and hench selection skip live claims](./ndx-work-claims-the-task-before.md) | pending |
+| [ndx work claims the task before starting and releases on finish; get_next_task and hench selection skip live claims](./ndx-work-claims-the-task-before.md) | completed |

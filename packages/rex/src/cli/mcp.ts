@@ -90,11 +90,11 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
 
   server.tool(
     "get_next_task",
-    "Get the next actionable task based on priority and dependencies, with explanation of why it was selected. Use when the user asks what to work on next.",
+    "Get the next actionable task based on priority and dependencies, with explanation of why it was selected. Tasks another worktree of this repository is currently working on are skipped and reported in skippedClaims. Use when the user asks what to work on next.",
     {
       tags: z.array(z.string()).optional().describe("Only return tasks that have at least one of these tags. Omit to return any task regardless of tags."),
     },
-    withMigrationWarning((args) => handleGetNextTask(store, args)),
+    withMigrationWarning((args) => handleGetNextTask(store, dir, args)),
   );
 
   server.tool(

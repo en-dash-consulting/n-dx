@@ -148,6 +148,23 @@ export interface PrioritizationOptions {
    * When empty or undefined, no tag filtering is applied.
    */
   tags?: string[];
+  /**
+   * Task ids to pass over entirely, however actionable they look.
+   *
+   * Used for cross-worktree claims: another checkout of this repository is
+   * already working on these. Deliberately *not* folded into `completedIds` —
+   * that set doubles as the dependency-resolution oracle, so a claimed task
+   * added to it would unblock everything waiting on work that has not actually
+   * been done. An excluded task is skipped as a candidate and still counts as
+   * unfinished for anything that depends on it.
+   */
+  excludeIds?: ReadonlySet<string>;
+}
+
+/** Drop excluded candidates. Returns `entries` untouched when there are none. */
+function filterExcluded(entries: TreeEntry[], excludeIds?: ReadonlySet<string>): TreeEntry[] {
+  if (!excludeIds || excludeIds.size === 0) return entries;
+  return entries.filter((e) => !excludeIds.has(e.item.id));
 }
 
 /**
@@ -358,6 +375,7 @@ export function findActionableTasks(
   if (options?.tags?.length) {
     results = filterByTags(results, options.tags);
   }
+  results = filterExcluded(results, options?.excludeIds);
   results.sort(makeComparator(items, options));
   return results.slice(0, limit);
 }
@@ -377,6 +395,7 @@ export function findNextTask(
   if (options?.tags?.length) {
     results = filterByTags(results, options.tags);
   }
+  results = filterExcluded(results, options?.excludeIds);
   if (results.length === 0) return null;
   results.sort(makeComparator(items, options));
   return results[0];

@@ -29,12 +29,23 @@ const ACQUIRE_TIMEOUT_MS = 10_000;
 
 // ── Options ──────────────────────────────────────────────────────────
 
+/** What the lock is called in error messages when the caller does not say. */
+const DEFAULT_LOCK_LABEL = "PRD";
+
 /** Timing overrides — production callers use the defaults; tests inject small values. */
 export interface LockOptions {
   /** Maximum time to wait for the lock before throwing. */
   acquireTimeoutMs?: number;
   /** Delay between file-lock acquisition retries. */
   retryDelayMs?: number;
+  /**
+   * What this lock guards, for the timeout message — e.g. `"task claim"`
+   * yields "Could not acquire task claim lock". Defaults to `"PRD"`, since
+   * that is what every lock here guarded when the message was written. An
+   * operator who has to decide whether to delete a lock file needs to be told
+   * which resource it belongs to.
+   */
+  label?: string;
 }
 
 // ── Lock file contents ───────────────────────────────────────────────
@@ -86,7 +97,7 @@ const inProcessQueues = new Map<string, Promise<void>>();
  * abandoned queue slot when its turn eventually arrives, so later waiters
  * are not blocked behind it.
  */
-function acquireInProcess(lockPath: string, timeoutMs: number): Promise<() => void> {
+function acquireInProcess(lockPath: string, timeoutMs: number, label: string): Promise<() => void> {
   const prev = inProcessQueues.get(lockPath) ?? Promise.resolve();
 
   let release!: () => void;
@@ -103,8 +114,8 @@ function acquireInProcess(lockPath: string, timeoutMs: number): Promise<() => vo
       // Abandon our slot: release it as soon as our turn comes up.
       void prev.then(() => release());
       reject(new Error(
-        `Could not acquire PRD lock within ${timeoutMs}ms. ` +
-        `Held by this process. Another operation may be writing to the PRD.`,
+        `Could not acquire ${label} lock within ${timeoutMs}ms. ` +
+        `Held by this process. Another operation may be writing to the ${label}.`,
       ));
     }, timeoutMs);
   });
@@ -211,8 +222,9 @@ function sleep(ms: number): Promise<void> {
 export async function acquireLock(lockPath: string, options?: LockOptions): Promise<() => Promise<void>> {
   const acquireTimeoutMs = options?.acquireTimeoutMs ?? ACQUIRE_TIMEOUT_MS;
   const retryDelayMs = options?.retryDelayMs ?? RETRY_DELAY_MS;
+  const label = options?.label ?? DEFAULT_LOCK_LABEL;
 
-  const releaseInProcess = await acquireInProcess(lockPath, acquireTimeoutMs);
+  const releaseInProcess = await acquireInProcess(lockPath, acquireTimeoutMs, label);
   const token = randomUUID();
 
   try {
@@ -254,8 +266,8 @@ export async function acquireLock(lockPath: string, options?: LockOptions): Prom
     }
 
     throw new Error(
-      `Could not acquire PRD lock within ${acquireTimeoutMs}ms. ` +
-      `Held by ${holder}. Another command may be writing to the PRD. ` +
+      `Could not acquire ${label} lock within ${acquireTimeoutMs}ms. ` +
+      `Held by ${holder}. Another command may be writing to the ${label}. ` +
       `If this is stale, delete ${lockPath} manually.`,
     );
   } catch (err) {
