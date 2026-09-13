@@ -42,5 +42,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [--reset-deferred must be able to start the run it enables, and a refusal must exit non-zero](./reset-deferred-must-be-able-to-start.md) | completed |
 | [--reset-deferred must commit only its own writes and must not write on --dry-run](./reset-deferred-must-commit-only-its.md) | completed |
 | [rex fix must reopen parents to pending (not in_progress) and run the whole-tree stuck-parent sweep](./rex-fix-must-reopen-parents-to-pending.md) | completed |
+| [SIGINT rollback-prompt integration tests are flaky and leak Windows handles](./sigint-rollback-prompt-integration.md) | pending |
 | [Stop a run that repeats an identical tool call instead of letting it loop forever](./stop-a-run-that-repeats-an-identical.md) | completed |
+| [Windows stale-lock contention regression test can deadlock](./windows-stale-lock-contention.md) | pending |
 | [Withdrawing a completion must reopen the ancestors the agent's own cascade already closed](./withdrawing-a-completion-must-reopen.md) | completed |

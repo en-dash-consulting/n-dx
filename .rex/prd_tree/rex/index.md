@@ -42,7 +42,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Selective Recommendation Acceptance Syntax](./selective-recommendation-acceptance/index.md) | completed |
 | [Smart Add Cache Validation Enhancement](./smart-add-cache-validation-enhancement/index.md) | completed |
 | [Smart Prune Proposal Caching Enhancement](./smart-prune-proposal-caching-enhancement/index.md) | completed |
-| [Atomic lock publication fails on filesystems without hard-link support](./atomic-lock-publication-fails-on.md) | pending |
+| [Atomic lock publication fails on filesystems without hard-link support](./atomic-lock-publication-fails-on.md) | completed |
 | [Audit MCP tool schemas against PRDItem fields](./audit-mcp-tool-schemas-against-prditem.md) | completed |
 | [Concurrent stale-lock reclaim can unlink a replacement live lock](./concurrent-stale-lock-reclaim-can.md) | pending |
 | [Fix --mode=fast being ignored when --accept is passed to reorganize](./fix-mode-fast-being-ignored-when.md) | completed |
