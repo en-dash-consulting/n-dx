@@ -39,6 +39,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Lock file is readable while empty, so a second writer can reclaim a live lock](./lock-file-is-readable-while-empty-so-a.md) | completed |
 | [PRD tree snapshot must tolerate a concurrent writer's temp files](./prd-tree-snapshot-must-tolerate-a.md) | completed |
 | [Refuse to mark a task completed while its work is uncommitted](./refuse-to-mark-a-task-completed-while.md) | completed |
+| [Relocation-port unit test races with real CI port allocation](./relocation-port-unit-test-races-with.md) | pending |
 | [--reset-deferred must be able to start the run it enables, and a refusal must exit non-zero](./reset-deferred-must-be-able-to-start.md) | completed |
 | [--reset-deferred must commit only its own writes and must not write on --dry-run](./reset-deferred-must-commit-only-its.md) | completed |
 | [rex fix must reopen parents to pending (not in_progress) and run the whole-tree stuck-parent sweep](./rex-fix-must-reopen-parents-to-pending.md) | completed |
