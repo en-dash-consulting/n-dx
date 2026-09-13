@@ -28,4 +28,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Dashboard shows claimed tasks with the claiming worktree in the PRD tree and the Sessions panel](./dashboard-shows-claimed-tasks-with-the.md) | pending |
 | [Make cross-worktree claim lifecycle tests self-contained in CI](./make-cross-worktree-claim-lifecycle.md) | pending |
 | [ndx work claims the task before starting and releases on finish; get_next_task and hench selection skip live claims](./ndx-work-claims-the-task-before.md) | completed |
+| [Print safe recovery commands when a run leaves task-owned work uncommitted](./print-safe-recovery-commands-when-a.md) | blocked |
 | [Retain task claims when uncommitted-work completion is refused](./retain-task-claims-when-uncommitted.md) | blocked |
