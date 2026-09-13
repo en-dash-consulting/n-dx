@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {mkdtemp, readFile, readdir, rm} from "node:fs/promises";
+import {mkdir, mkdtemp, readFile, readdir, rm, stat} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 
@@ -7,6 +7,8 @@ const publication = vi.hoisted(() => ({
   links: [] as Array<{source: string; destination: string; content: string}>,
   writes: [] as string[],
   failTemporaryUnlinkOnce: false,
+  unsupportedLinkCode: undefined as string | undefined,
+  directoryReadContentPath: undefined as string | undefined,
 }));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
@@ -17,12 +19,19 @@ vi.mock("node:fs/promises", async (importOriginal) => {
       publication.writes.push(String(path));
       return (actual.writeFile as (...writeArgs: unknown[]) => Promise<void>)(path, ...args);
     }),
+    readFile: vi.fn(async (path: Parameters<typeof actual.readFile>[0], ...args: unknown[]) => {
+      if (String(path) === publication.directoryReadContentPath) return "directory entry data";
+      return (actual.readFile as (...readArgs: unknown[]) => Promise<unknown>)(path, ...args);
+    }),
     link: vi.fn(async (source: string, destination: string) => {
       publication.links.push({
         source,
         destination,
         content: await actual.readFile(source, "utf-8"),
       });
+      if (publication.unsupportedLinkCode) {
+        throw Object.assign(new Error("hard links unsupported"), {code: publication.unsupportedLinkCode});
+      }
       return actual.link(source, destination);
     }),
     unlink: vi.fn(async (path: Parameters<typeof actual.unlink>[0]) => {
@@ -44,6 +53,8 @@ describe("file-lock publication", () => {
     publication.links.length = 0;
     publication.writes.length = 0;
     publication.failTemporaryUnlinkOnce = false;
+    publication.unsupportedLinkCode = undefined;
+    publication.directoryReadContentPath = undefined;
     if (tempDir) await rm(tempDir, {recursive: true, force: true});
     tempDir = undefined;
   });
@@ -91,5 +102,61 @@ describe("file-lock publication", () => {
     const reacquired = await acquireLock(lockPath);
     await reacquired();
     expect(await readdir(tempDir)).toEqual([expect.stringMatching(/\.tmp$/)]);
+  });
+
+  it.each(["ENOTSUP", "EOPNOTSUPP", "ENOSYS", "EPERM", "EXDEV"])(
+    "falls back to atomic directory publication when hard links fail with %s",
+    async (code) => {
+      tempDir = await mkdtemp(join(tmpdir(), "rex-lock-publication-"));
+      const lockPath = join(tempDir, "prd.lock");
+      publication.unsupportedLinkCode = code;
+
+      const release = await acquireLock(lockPath);
+
+      expect((await stat(lockPath)).isDirectory()).toBe(true);
+      expect(JSON.parse(await readFile(join(lockPath, "owner.json"), "utf-8"))).toMatchObject({
+        pid: process.pid,
+        token: expect.any(String),
+        timestamp: expect.any(String),
+      });
+      expect(publication.links).toHaveLength(1);
+
+      await release();
+      expect(await readdir(tempDir)).toEqual([]);
+    },
+  );
+
+  it("waits on an incomplete fallback publication instead of classifying it as stale", async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "rex-lock-publication-"));
+    const lockPath = join(tempDir, "prd.lock");
+    publication.unsupportedLinkCode = "EOPNOTSUPP";
+    await mkdir(lockPath);
+
+    await expect(acquireLock(lockPath, {acquireTimeoutMs: 80, retryDelayMs: 10}))
+      .rejects.toThrow(/Could not acquire PRD lock/);
+
+    expect(publication.links.length).toBeGreaterThan(1);
+  });
+
+  it("recognizes an incomplete fallback when reading a directory succeeds", async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "rex-lock-publication-"));
+    const lockPath = join(tempDir, "prd.lock");
+    publication.unsupportedLinkCode = "EOPNOTSUPP";
+    publication.directoryReadContentPath = lockPath;
+    await mkdir(lockPath);
+
+    await expect(acquireLock(lockPath, {acquireTimeoutMs: 80, retryDelayMs: 10}))
+      .rejects.toThrow(/Held by a lock publication in progress/);
+
+    expect(publication.links.length).toBeGreaterThan(1);
+  });
+
+  it("does not use the fallback for unrelated link failures", async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "rex-lock-publication-"));
+    const lockPath = join(tempDir, "prd.lock");
+    publication.unsupportedLinkCode = "EACCES";
+
+    await expect(acquireLock(lockPath)).rejects.toMatchObject({code: "EACCES"});
+    expect(await readdir(tempDir)).toEqual([]);
   });
 });
