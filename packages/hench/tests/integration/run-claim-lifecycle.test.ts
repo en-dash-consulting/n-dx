@@ -12,7 +12,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -23,6 +23,28 @@ const rexCli = join(fileURLToPath(import.meta.url), "..", "..", "..", "..", "rex
 
 /** A live PID that is not this process, so its claims read as someone else's. */
 const LIVE_FOREIGN_PID = process.ppid;
+
+/**
+ * A minimal Claude CLI protocol fixture.  Tests configure it explicitly so
+ * their claim assertions are reached on CI machines without a vendor CLI or
+ * credentials. In blocking mode it only returns once the parent test has
+ * sent SIGINT, keeping the run alive long enough to exercise that path.
+ */
+const TEST_VENDOR_SOURCE = `#!/usr/bin/env node
+const { existsSync } = require("node:fs");
+
+if (process.env.HENCH_CLAIM_TEST_MODE === "block") {
+  const releaseFile = process.env.HENCH_CLAIM_TEST_RELEASE_FILE;
+  if (!releaseFile) process.exit(2);
+  const timer = setInterval(() => {
+    if (!existsSync(releaseFile)) return;
+    clearInterval(timer);
+    console.log(JSON.stringify({ type: "result", is_error: true, result: "controlled test vendor failure" }));
+  }, 20);
+} else {
+  console.log(JSON.stringify({ type: "result", is_error: true, result: "controlled test vendor failure" }));
+}
+`;
 
 function node(cli: string, args: string[], cwd: string): string {
   try {
@@ -66,14 +88,18 @@ describe("hench run task claims", () => {
     const epic = extractId(node(rexCli, ["add", "epic", "--title=Epic", repo], repo));
     const taskId = extractId(node(rexCli, ["add", "task", "--title=Task", `--parent=${epic}`, repo], repo));
     node(henchCli, ["init", repo], repo);
+    const vendorPath = await installTestVendor(repo);
+    execFileSync("git", ["add", "--force", ".gitignore", ".n-dx.json", ".hench/claim-lifecycle-vendor.js", vendorPath, ".hench/config.json", ".rex"], { cwd: repo });
+    execFileSync("git", ["-c", "user.name=Hench Test", "-c", "user.email=hench-test@example.test", "commit", "--quiet", "-m", "init"], { cwd: repo });
 
     return { repo, taskId };
   }
 
-  it("leaves no claim behind when the run fails", async () => {
-    // No LLM vendor is configured in a bare temp project, so the run fails
-    // early — which is exactly the path that must still release.
+  it("releases the claim when the pre-run gate stops the run", async () => {
     const { repo, taskId } = await makeProject();
+    // The run takes its explicit-task claim before this gate, then must
+    // release it when the non-interactive gate declines to proceed.
+    await writeFile(join(repo, "uncommitted-fixture.txt"), "fixture dirt\n");
 
     node(henchCli, ["run", `--task=${taskId}`, "--auto", repo], repo);
 
@@ -97,26 +123,78 @@ describe("hench run task claims", () => {
 
   it("releases the claim when the run is interrupted with SIGINT", async () => {
     const { repo, taskId } = await makeProject();
+    const releaseFile = join(repo, ".hench", "claim-lifecycle-release");
 
     const child = spawn("node", [henchCli, "run", `--task=${taskId}`, "--loop", repo], {
       cwd: repo,
-      stdio: "ignore",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        HENCH_CLAIM_TEST_MODE: "block",
+        HENCH_CLAIM_TEST_RELEASE_FILE: releaseFile,
+      },
     });
+    let childOutput = "";
+    child.stdout.on("data", (chunk: Buffer) => { childOutput += chunk; });
+    child.stderr.on("data", (chunk: Buffer) => { childOutput += chunk; });
 
     // Wait for the claim to appear, then interrupt mid-run.
-    const claimed = await waitFor(async () => (await claimsIn(repo)).length > 0, 30_000);
+    await waitFor(async () => (await claimsIn(repo)).length > 0 || child.exitCode !== null, 30_000);
+    const claimed = (await claimsIn(repo)).length > 0;
     // A run that fell over before it could claim proves nothing either way.
-    expect(claimed, "run never took a claim").toBe(true);
+    if (!claimed) throw new Error(`Run never took a claim:\n${childOutput}`);
 
     // A run that had already exited on its own would prove nothing about the
     // interrupt path, so assert we are interrupting something still running.
     expect(child.exitCode, "run exited before it could be interrupted").toBeNull();
     child.kill("SIGINT");
-    await new Promise<void>((resolve) => child.on("exit", () => resolve()));
+    const interrupted = await waitFor(
+      async () => childOutput.includes("Received interrupt — finishing current task then stopping…"),
+      5_000,
+    );
+    if (!interrupted) throw new Error(`Run did not acknowledge SIGINT:\n${childOutput}`);
+    // The protocol fixture remains blocked until after the signal is sent.
+    // It then reports a controlled error, allowing the graceful loop shutdown
+    // to unwind through cmdRun's claim-release finally block.
+    await writeFile(releaseFile, "release");
+    if (child.exitCode === null) {
+      await new Promise<void>((resolve) => child.once("exit", () => resolve()));
+    }
 
     expect(await claimsIn(repo)).toEqual([]);
   }, 90_000);
 });
+
+async function installTestVendor(repo: string): Promise<string> {
+  const vendorSourcePath = join(repo, ".hench", "claim-lifecycle-vendor.js");
+  await writeFile(vendorSourcePath, TEST_VENDOR_SOURCE, { mode: 0o755 });
+
+  // `spawnCli` invokes an explicit path through cmd.exe on Windows. A bare
+  // Unix shebang script is not executable there, so use a tiny .cmd adapter
+  // that forwards the vendor protocol arguments to the Node fixture.
+  const vendorPath = process.platform === "win32"
+    ? join(repo, ".hench", "claim-lifecycle-vendor.cmd")
+    : join(repo, ".hench", "claim-lifecycle-vendor");
+  if (process.platform === "win32") {
+    await writeFile(
+      vendorPath,
+      `@echo off\r\n"${process.execPath}" "%~dp0claim-lifecycle-vendor.js" %*\r\n`,
+    );
+  } else {
+    await writeFile(vendorPath, TEST_VENDOR_SOURCE, { mode: 0o755 });
+    await chmod(vendorPath, 0o755);
+  }
+  await writeFile(
+    join(repo, ".n-dx.json"),
+    JSON.stringify({
+      llm: {
+        vendor: "claude",
+        claude: { cli_path: vendorPath },
+      },
+    }),
+  );
+  return vendorPath;
+}
 
 /** Poll `check` until it is true or the deadline passes. */
 async function waitFor(check: () => Promise<boolean>, timeoutMs: number): Promise<boolean> {
