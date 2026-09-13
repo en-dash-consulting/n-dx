@@ -1,5 +1,566 @@
 # @n-dx/core
 
+## 0.6.0
+
+### Minor Changes
+
+- [#361](https://github.com/en-dash-consulting/n-dx/pull/361) [`ab8dccd`](https://github.com/en-dash-consulting/n-dx/commit/ab8dccd9fadf527a84085f079b245dbdb2dc8ce2) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `.codex/config.toml` now uses cwd-relative stdio commands (`{"command":"n-dx","args":["rex","mcp","."]}`) instead of embedding this checkout's absolute `dist/cli/index.js` paths and project directory — matching the `.mcp.json` fix for Claude Code. Codex launches stdio servers with cwd at the project root, so both servers now start correctly from any worktree or teammate clone, and the registration survives the install moving or a dev-link toggle. The command name respects a configured `cli.name` in `.n-dx.json`.
+
+- [#361](https://github.com/en-dash-consulting/n-dx/pull/361) [`ab8dccd`](https://github.com/en-dash-consulting/n-dx/commit/ab8dccd9fadf527a84085f079b245dbdb2dc8ce2) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx init` no longer registers Claude MCP servers via `claude mcp add --scope local` by default — it relies solely on the tracked, cwd-relative `.mcp.json` written alongside it. Pass `--mcp-scope=local` to restore the local-scope registration for setups that cannot rely on `.mcp.json` being picked up.
+  
+  Init also no longer calls `claude mcp remove --scope user` — user scope is global, and stripping it removed registrations that had nothing to do with the project being initialised. Stale local-scope entries from a prior run are still cleaned up, but only when the existing entry's own recorded arguments actually target the project being initialised.
+  
+  The init recap now reports where MCP registration landed — tracked `.mcp.json`, local scope, or skipped (no `claude` CLI found).
+
+- [#361](https://github.com/en-dash-consulting/n-dx/pull/361) [`ab8dccd`](https://github.com/en-dash-consulting/n-dx/commit/ab8dccd9fadf527a84085f079b245dbdb2dc8ce2) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx init` now writes a tracked `.mcp.json` at the project root with cwd-relative stdio commands for rex and sourcevision (e.g. `{"command":"n-dx","args":["rex","mcp","."]}`), alongside the existing local-scope `claude mcp add` registration.
+  
+  Local scope is stored in `~/.claude.json` keyed by absolute project path, so worktrees and teammate clones got no MCP registration at all, and it broke whenever the install moved or a dev link toggled. `.mcp.json` is committed to the repo instead: every worktree and clone gets the same two entries, resolved relative to whatever directory Claude Code launches the stdio server from.
+  
+  Re-running `ndx init` merges into an existing `.mcp.json` rather than overwriting it — unrelated servers already present are left untouched. The command name respects a configured `cli.name` in `.n-dx.json` for projects that embed n-dx under another binary name.
+
+### Patch Changes
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Attribute SourceVision Ask token spend in the LLM Utilization view
+  
+  Every Ask call spent real tokens from a surface with no accounting path. Hench
+  runs land in `.hench/runs/` and roll up per PRD item; rex and sourcevision
+  report through their own artifacts. The dashboard's own spend reported nowhere,
+  so the one view whose job is to report the bill was blind to its own.
+  
+  Each call is now appended to `.n-dx-web-usage.jsonl` with vendor, model, input,
+  output, cache-creation and cache-read tokens, plus how the call ended. The
+  utilization aggregation reads it as a fourth package bucket, `web`, rendered as
+  "Dashboard" — its own colour, donut slice, filter option and command row, so it
+  stays separable from hench run spend everywhere the view breaks down by
+  package. Asks are not task-scoped, so the spend is a dashboard bucket rather
+  than being attributed to whichever PRD item happened to be selected.
+  
+  Failed calls are recorded too, with the call counted and whatever the provider
+  reported. A provider that finishes after the ask timed out appends its counts
+  as a second, call-free record, so late tokens are neither lost nor
+  double-counted as a second call. A call that never reached a provider (no
+  analysis, unconstructible client) is deliberately not recorded — the ledger
+  counts calls, not intentions.
+  
+  Cache tokens are now reported in this view rather than hidden, consistent with
+  the hench/rex decision. The server had always counted and priced them
+  (`estimateCost` charges cache writes at 1.25x input and reads at 0.1x), but the
+  viewer's local copy of the wire shape omitted the fields and totalled only
+  input + output — so "Total Tokens" disagreed with the "Est. Cost" beside it, and
+  on a cache-heavy run most of the bill had no visible line. Cache write/read now
+  appear as headline figures, as columns in the vendor-model and command tables,
+  and as their own cost lines.
+  
+  The aggregation cache also fingerprints the ledger, so an answer's cost appears
+  without waiting for an unrelated source to change.
+
+- [#360](https://github.com/en-dash-consulting/n-dx/pull/360) [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - fix(core): clamp findRelocationPort's near window to port 65535
+  
+  `findRelocationPort` scanned `requestedPort + 1` through
+  `requestedPort + 83` without clamping to the maximum TCP port. For a
+  requested port near the top of the range (e.g. `--port=65535` or
+  `--port=65500`), the scan reached 65536 and beyond;
+  `net.createConnection` throws `ERR_SOCKET_BAD_PORT` synchronously for a
+  port outside 0–65535, which crashed `ndx start`'s relocation branch
+  instead of relocating or falling back to 3117–3200.
+  
+  The near window's upper bound is now clamped to 65535. `isPortInUse` is
+  also defensive: an out-of-range port is treated as "in use" rather than
+  probed, so no future caller can reintroduce the same crash.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the full-suite gate's timeout configurable via `hench.fullTestTimeoutMs`.
+  
+  It was hardcoded (5 minutes originally, raised to a measured 15 in the same
+  release this ships in). However generous the constant, a suite an operator
+  cannot re-budget will eventually exceed it — and overrunning
+  aborts a task whose work was already done and committed. Set the key in
+  `.hench/config.json` or `.n-dx.json` (the latter wins, as with every other
+  hench key); 0 disables the limit. `ndx config` documents it under a new
+  "Hench test-gate settings" section, alongside `hench.fullTestCommand`.
+  
+  A timeout is now attributable like any other gate failure. It used to return
+  zero packages, so the caller counted zero failures and printed
+  `0/0 package(s) failed` for a run it was about to abort; the result now carries
+  a `workspace` entry naming the command, how long it was given, and the key that
+  moves it.
+
+- [#361](https://github.com/en-dash-consulting/n-dx/pull/361) [`ab8dccd`](https://github.com/en-dash-consulting/n-dx/commit/ab8dccd9fadf527a84085f079b245dbdb2dc8ce2) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Rewrote the MCP registration docs (README, the shared `project-guidance.md`, and `docs/guide/mcp.md`) to describe the tracked `.mcp.json` stdio flow as the default: the one-time Claude Code approval prompt for project servers, the `npx -y @n-dx/core rex mcp .` alternative when `ndx` isn't on `PATH`, and `--mcp-scope=local` for the legacy per-machine registration. HTTP transport (`http://localhost:3117/mcp/rex`) is now documented plainly as safe for a single project only — it points at whichever project currently holds the port — until the multi-project hub (0.7.0) lands.
+
+- [#357](https://github.com/en-dash-consulting/n-dx/pull/357) [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop `rex export` from writing an artifact that becomes the PRD backend.
+  
+  The in-tree guard rejected only paths inside `.rex/prd_tree/`, which is one
+  directory short of the backends the store still falls back to:
+  `FileStore.loadDocument` prefers `.rex/prd.md`, then `.rex/prd.json`, whenever
+  the folder tree is absent.
+  
+  Two reachable outcomes, both of which the guard's own docblock claimed to
+  prevent. `rex export --out=.rex/prd.json` passed: a bundle envelope carries
+  `schema`, `title` and `items`, so it satisfies document validation and silently
+  *becomes* the PRD on a checkout without the tree. And
+  `rex export --format=narrative --out=.rex/prd.md` planted prose at the preferred
+  legacy path, where the markdown parser then throws and blocks every rex command
+  on that checkout.
+  
+  The guard now refuses anywhere inside `.rex/`, which is correct rather than
+  merely wider: nothing is ever legitimately exported into the PRD storage
+  directory. The bundle and narrative carve-outs in the project guidance are
+  reworded to match what the code actually enforces.
+
+- [#359](https://github.com/en-dash-consulting/n-dx/pull/359) [`2a3028b`](https://github.com/en-dash-consulting/n-dx/commit/2a3028b436d836839c148a85a71819cf00fd925d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - fix(core): kill only the process listening on a busy port, never a client
+  
+  `killPortOccupant` selected its victim with `lsof -ti tcp:<port>` and took the
+  first pid. That query lists every process holding a socket on the port —
+  CLIENTS included, not just the LISTEN socket — and lsof prints pids in
+  ascending order, so any older local process with a live or CLOSE_WAIT
+  connection to the dashboard ranked above the listener and was SIGKILLed in its
+  place. Observed while writing `tests/e2e/cli-start-two-projects.test.js`: a
+  vitest worker still holding a CLOSE_WAIT socket 50 ms after its last
+  `/api/status` request was killed instead of the server, which reported as
+  `Worker exited unexpectedly` with no assertion, no attribution, and four
+  orphaned dashboards left behind. Outside tests the candidate victim is a
+  browser tab, a `curl`, or another CLI connected to the dashboard.
+  
+  The POSIX query is now `lsof -t -sTCP:LISTEN -i tcp:<port>`, so a client socket
+  is not a candidate. The win32 `netstat` branch already matched on `LISTENING`
+  and is unchanged apart from collecting every match rather than the first.
+  
+  Whom-to-kill is now a separate, pure decision (`selectKillTarget`) with three
+  refusals, each a case where killing would be a guess: nobody listening, this
+  process among the listeners (the self-preservation guard, which every
+  in-process test of the peer path depends on), and several listening pids —
+  SO_REUSEPORT or a pre-fork server. That last case now fails loudly, naming the
+  pids, rather than killing one at random; `ndx start` reports the port as
+  uncleared and the operator still has `--port=N`.
+  
+  This is the whom-to-kill half of the peer-dashboard work. The `/api/status`
+  probe decides *whether* to kill, and it cannot protect a client, because a
+  client is not what `/api/status` describes.
+
+- [#357](https://github.com/en-dash-consulting/n-dx/pull/357) [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002) Thanks [@endash-shal](https://github.com/endash-shal)! - Add a narrative PRD rendering: `ndx prd export --format=narrative`.
+  
+  The PRD can now be written out as prose Markdown for a stakeholder rather than
+  as a transport bundle. Epics become sections with a stated goal and a
+  rationale, features become described capabilities, and acceptance criteria
+  become readable sentences under a "How we'll know it's done" heading.
+  Dependencies read as sequencing prose — "This follows on from …" — instead of
+  `blockedBy` id lists. The default format is unchanged: `rex export --out=…`
+  still writes the JSON bundle.
+  
+  No internal vocabulary reaches the page. Item ids, folder slugs, and the raw
+  status and priority values are all omitted by construction: every status and
+  priority is mapped to a phrase chosen to be disjoint from the enum literal it
+  replaces (`in_progress` reads as "Under way now", `high` as "Should-have"), so
+  a single regex sweep for the literals is a real proof rather than a spot check.
+  A uuid pasted into a description is resolved to the title it names — or
+  dropped, along with the parentheses it leaves empty, when the title is already
+  in the sentence or resolves to nothing.
+  
+  `--item=<id-or-slug>` narrows the document to one subtree, so a single
+  initiative can be handed over without the rest of the PRD. It resolves an item
+  id, an exact title, a folder path, or a directory name copied out of
+  `.rex/prd_tree/` — including the `-{id6}` suffix, which is often the only part
+  of a directory name that still matches after a slug-rule change. An ambiguous
+  reference lists the candidates instead of guessing, and a valueless `--item` is
+  an error rather than a silent whole-PRD render.
+  
+  Finished and deleted work is excluded by default. `--include-completed`
+  restores finished items for a retrospective-style document; deleted items stay
+  out regardless. A finished container that still holds unfinished children is
+  kept as a section — heading and goal only, with no state or criteria — so its
+  children do not lose the context they sit in.
+  
+  Narrative output is deliberately one-way and is documented as such in the
+  command help, the READMEs, and the PRD-invariant carve-out. The JSON bundle
+  remains the only round-trip surface; nothing parses a narrative document back.
+
+- [#357](https://github.com/en-dash-consulting/n-dx/pull/357) [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002) Thanks [@endash-shal](https://github.com/endash-shal)! - Add a portable PRD bundle: `ndx prd export` / `ndx prd import`.
+  
+  A PRD can now be carried between machines as a single JSON file, without
+  sharing the repo or configuring a remote adapter. `rex export --out=<path>`
+  serializes the whole loaded document; `rex import-bundle --in=<path>` rebuilds
+  `.rex/prd_tree/` from it. The orchestrator exposes both as an `ndx prd`
+  subcommand group; `ndx export`, the static-dashboard exporter, is unchanged.
+  
+  Fidelity is the point — a round trip preserves item ids, hierarchy, level,
+  status, priority, description, acceptance criteria, tags, `blockedBy` edges,
+  source, and attribution metadata. Verified against a 1392-item PRD with no
+  field, parent, or membership differences.
+  
+  The bundle carries the PRD `SCHEMA_VERSION`. Import gates on it more strictly
+  than the store's read path does: a bundle from a newer rex (newer envelope
+  version, newer schema minor, or a different major) is refused before anything
+  is written, rather than imported partially. `isCompatibleSchema` keeps its
+  forward-compatible behaviour for ordinary loads.
+  
+  Import has a defined collision policy instead of last-writer-wins. `--merge`
+  (the default) is additive: local items keep their content and placement, new
+  bundle items are grafted onto the matching parent, an id that already exists
+  anywhere in the tree is reported rather than duplicated, and ids whose content
+  differs are listed with the local copy kept. `--replace` discards the local
+  tree and needs confirmation, or `--yes` when not on a terminal. The tree write
+  runs inside `store.withTransaction`, so it holds the PRD lock across the whole
+  read-modify-write and cannot lose a concurrent writer's items.
+  
+  The bundle is a transport artifact, not a PRD backend: writing one inside
+  `.rex/prd_tree/` is refused in code, and the PRD invariant — the folder tree is
+  the sole writable PRD surface — is documented with an explicit carve-out.
+  
+  The rex-side importer is named `import-bundle` because `rex import` is a
+  long-standing alias for `rex analyze`.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop `prompt-census --write` stamping a commit the measurement did not come from.
+  
+  The census measures the working tree but stamped `.git/HEAD`, so a recording
+  made from a dirty tree attributed its numbers to a commit that did not contain
+  them. That is how the checked-in baseline came to name `3dda8b5b` while
+  containing `JSON_OBJECT_ONLY`, a constant introduced by `0b57e2eb` — one of its
+  own descendants. `--compare` then reported "(no surface changed)" across a range
+  that had demonstrably changed a prompt, and the wrong SHA was published to the
+  docs site.
+  
+  Note what would not have caught it: the token counts were right. Only the
+  attribution was wrong, so no numbers-based check could have noticed.
+  
+  - `--write` now refuses a dirty tree, naming the reason. `--allow-dirty` records
+    anyway and marks the stamp `<sha>-dirty` plus `dirty: true`, so an override
+    can never be mistaken for a clean recording. The markdown header says so too.
+  - Recordings carry a `contentHash` over the measured surfaces and skill bodies —
+    provenance that needs no git and cannot disagree with its own contents.
+  - `tests/e2e/prompt-census.test.js` fails when the repo no longer matches that
+    hash, so a stale baseline cannot merge. Deliberately a content check rather
+    than commit equality: recording dirties the baseline files, so committing them
+    puts HEAD one ahead of the stamp and a SHA assertion would fail after every
+    legitimate re-record.
+  - The dirty check is whole-tree, so an unrelated edit blocks recording. It can
+    report dirty when the measurement would have been faithful, but never clean
+    when it would not — and a false clean is the bug being fixed.
+  
+  `scripts/prompt-census.mjs` joins the "Development scripts" entries in the
+  ALLOWED set of `tests/e2e/architecture-policy.test.js`, since answering "does
+  the tree match HEAD?" from `.git/` alone would mean reimplementing git's index
+  and object store, and the mtime shortcut reports clean after a `touch`.
+  
+  The baseline is re-recorded from a clean tree in the following commit.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Build rex's and sourcevision's LLM prompts through `PromptEnvelope` so their cost
+  is attributable per section rather than as one opaque total.
+  
+  Every prompt in `rex/src/analyze/` and `sourcevision/src/analyzers/` is now
+  declared as a list of named sections against a shared per-package vocabulary,
+  with the paired `*Prompt` function reduced to an assembly call. Prompt text is
+  unchanged apart from removed doubled blank lines, where an absent conditional
+  block used to leave its own padding behind — pinned by `prompt-text-identity`
+  snapshot suites in both packages.
+  
+  The section-measurement helpers (`promptSectionCosts`, `dominantPromptSections`,
+  `formatPromptSectionCosts`, `extractPromptSectionDiagnostics`) moved down to
+  `@n-dx/llm-client` so rex and sourcevision, which sit below hench and cannot
+  import from it, share one implementation instead of a copy; hench keeps only its
+  CLI rendering and reaches the rest through its existing gateway.
+  
+  The prompt census now follows module-local helper calls when extracting static
+  prompt text. Factoring duplicated text into a helper previously dropped it from
+  the count entirely, so a refactor could silently shrink the baseline. Correcting
+  this raised the recorded totals ~5% with no prompt growing — the earlier figures
+  were an undercount — and the baseline records the revision so the jump is not
+  misread as a regression. The baseline also now reports a per-section breakdown
+  for each envelope-built package.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Pin `packages/core/assistant-assets/**/*.md` to LF, so a prompt's measured size
+  does not depend on which OS checked the repo out.
+  
+  `.gitattributes` already pins `.claude/skills/**/*.md` — the copies `ndx init`
+  generates — but not the sources those copies are written from. On a Windows
+  checkout with `core.autocrlf=true` the sources came out CRLF, one extra byte per
+  line, which inflated every shipped skill body: `ndx-adversarial-review` measured
+  20,678 chars against the 20,512 recorded in
+  `docs/analysis/prompt-token-baseline.md`.
+  
+  That failed `tests/e2e/prompt-census.test.js` with a 140-token drift no commit
+  had caused, and the three skills living only in `.claude/skills/` measured
+  exactly right — the pin was the difference. Because CI runs on LF it never saw
+  it, so the guard was red on Windows and green in CI on the same commit.
+  
+  Re-recording the baseline would have been the wrong fix: it would stamp
+  CRLF-inflated figures into the doc and flip the guard on the next platform
+  switch. The tree is renormalized to LF instead, which leaves the index unchanged
+  and stops a Windows publish shipping CRLF skill sources.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `scripts/prompt-census.mjs` and the checked-in prompt token baseline at
+  `docs/analysis/prompt-token-baseline.md`. The census measures every LLM prompt
+  surface across rex, sourcevision, hench, and core using llm-client's existing
+  `budgetPreflight()` estimator, separates fixed prompt text from per-run context,
+  and emits a before/after comparison against the recorded baseline.
+
+- [#360](https://github.com/en-dash-consulting/n-dx/pull/360) [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - fix(core): relocate near the requested port, not into 3117–3200
+  
+  `runWeb`'s peer-relocation branch called `findFreePortInRange(port)`, whose
+  defaults scan 3117–3200 regardless of what `port` actually was — the
+  requested port was used only as the value to skip. An operator who set
+  `web.port` or passed `--port` to steer around an environment that blocks
+  3117 (corporate proxy, another service) had that instruction silently
+  overridden: their second project relocated straight back into 3117–3200,
+  typically landing on 3117 itself.
+  
+  `findRelocationPort` now scans upward from the requested port first
+  (`port + 1` through `port + 83`, the same width as the default range) and
+  falls back to 3117–3200 only when that neighbourhood is full. For the
+  default port (3117) the near window already covers 3118–3200 exactly, so
+  behaviour there is unchanged.
+  
+  `tests/e2e/cli-start-two-projects.test.js` and
+  `tests/unit/web-port-occupant.test.js` are updated to assert the new
+  contract; the latter adds direct coverage of `findRelocationPort`'s window
+  selection for a port outside the default range, the default port itself, and
+  the fallback path.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Remove instructions that rex prompts already gave elsewhere in the same prompt,
+  and resolve a task-size contradiction between them.
+  
+  `TASK_QUALITY_RULES` sized a task at "one focused session (1-4 hours)" while
+  `PRD_SCHEMA` asked for `loe` in engineer-weeks, `CONSOLIDATION_INSTRUCTION` asked
+  for 0.5–4 engineer-week tasks, and decomposition splits anything over
+  `taskThresholdWeeks: 2`. Nine builders carried the hours figure; eight of those
+  also carried a weeks figure. `buildAssessmentEnvelope` — the prompt that decides
+  whether to split or merge a proposal — graded week-scale work against the same
+  hour-scale bar, so it recommended `break_down` on correctly-sized tasks. Sizing
+  is now stated in engineer-weeks everywhere.
+  
+  Deleted as duplicated within the prompt that contained them: the markdown-fence
+  prohibition (already in `OUTPUT_INSTRUCTION`), the "tasks need a description and
+  criteria" and "no vague titles" rules (already in `TASK_QUALITY_RULES`, and
+  restated twice more in `consolidation-guard` and `decompose`), the existing-PRD
+  duplicate rule (kept in `ANTI_PATTERNS`, which reaches every prompt that had
+  both), and `AUTO_PLACEMENT_INSTRUCTION`'s restatement of what `existingId` does.
+  No instruction was removed from a prompt that did not still state it.
+  
+  Measured with `scripts/prompt-census.mjs`: rex drops from 16,121 to 15,217
+  per-call tokens and 7,473 to 7,195 unique, a monorepo total of -904 / -278. A new
+  `prompt-non-redundancy.test.ts` suite pins each rule against reintroduction, and
+  both prompt suites now share one fixture list so a new prompt cannot be covered
+  by one and missed by the other.
+  
+  Also adds `.hench/session-cache.json` to the `ndx init` ignore template, matching
+  this repo's own `.gitignore`.
+
+- [#357](https://github.com/en-dash-consulting/n-dx/pull/357) [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002) Thanks [@endash-shal](https://github.com/endash-shal)! - Scope a PRD bundle to one item: `rex export --item=<id-or-slug> --out=<path.json>`
+  (also `ndx prd export --item=…`).
+  
+  A single epic or feature can now be carried between machines without exporting
+  the whole PRD. The scope is a closure rather than a filter, because a filtered
+  subtree is not importable:
+  
+  - the requested item arrives with **every descendant** beneath it, so the
+    fragment is a working subtree rather than a childless stub;
+  - it arrives with the **transitive `blockedBy` closure**, so a task blocked by
+    an item in a different epic brings that item along. Keeping the edge without
+    the target would import a dangling dependency; dropping the edge would lose
+    sequencing information;
+  - it arrives with the **ancestor containers** of everything selected, so import
+    reconstructs the subtree at its original depth instead of re-parenting it to
+    the root. That applies to items the closure itself pulled in, so a blocker
+    from another epic brings its own chain of containers.
+  
+  Blockers are carried without their own descendants — a blocker is needed as a
+  dependency target, not as a body of work, and expanding it downward would make
+  a scoped export unbounded in practice.
+  
+  The export summary counts the requested subtree and the closure's contribution
+  separately ("2 requested items … closure pulled in 1 blocking item and 3
+  ancestor containers"), because a closure can reach well past what was asked
+  for and a scoped export that quietly grows to half the PRD should say so.
+  `--format=json` reports the same breakdown under a `scope` key.
+  
+  Every `blockedBy` id in a scoped bundle resolves to an item in the same bundle.
+  An edge whose target is missing from the source PRD — already broken before the
+  export — is dropped rather than carried, and reported with the item that held
+  it.
+  
+  `--item` resolves through the same resolver the narrative rendering uses, so a
+  uuid and a folder slug name the same item and one flag keeps one meaning. An
+  unknown or ambiguous reference fails before anything is written, so a mistyped
+  slug never leaves a whole-PRD bundle named after the item it meant to scope to.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Give every workflow skill an explicit stopping condition, and stop exempting the
+  repo-local skills from the portability guards.
+  
+  A skill without a stated ending does not fail loudly — it overruns. The agent
+  finishes what was asked, still holds context and tools, and continues into
+  whatever looks adjacent: fixing the defect it was only asked to report,
+  committing files it was only asked to inspect. Twelve of the thirteen skills
+  ended on their last action with nothing marking it as the last;
+  `ndx-adversarial-review` was the only one that said where it stopped. Each skill
+  now closes with a `## Done when` section naming both the terminating action and
+  what is deliberately out of scope, enforced by `skill-termination.test.js`.
+  
+  `skill-portability.test.js` derived its skill list from the assistant-assets
+  manifest, so `iso-map`, `triage` and `dev-link` — which exist only in
+  `.claude/skills/` — were checked by none of its guards. The suite passed anyway,
+  so the gap was invisible. Both suites now enumerate through
+  `tests/helpers/all-skills.js`, which covers manifest and repo-local skills alike
+  and derives the local set by subtraction, so a new skill of either kind is
+  covered as soon as it appears. The three were already portable; the guard simply
+  did not know they existed.
+  
+  The prompt census now measures skill bodies (`--json`, `--compare`, and a table
+  in the recorded baseline). A skill body enters context whole on invocation, so
+  its size is a per-invocation bill in the same way a builder's fixed text is a
+  per-call one — and it was the one category of prompt text edited by hand most
+  often with no number attached. Recorded at 16,990 tokens across 13 skills, of
+  which `ndx-adversarial-review` is 5,167. Skill totals are reported separately
+  from per-call totals, never summed: a skill run and an analyze call are
+  different events.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix the skill-authoring reference telling authors to write the one commit step
+  CI rejects, and pin the shipped-vs-source difference instead of arguing about it.
+  
+  `SKILLS.md` documented the required commit step as
+  `git commit -m "$(cat <<'EOF' … EOF)"`. `skill-portability.test.js` forbids
+  exactly that construction in skill bodies — heredocs and `$(...)` are POSIX-only,
+  and Git Bash is not part of Windows, so the step fails on a stock PowerShell at
+  the *last* action of a skill, after all the real work is done. Following the
+  documentation produced a skill that failed CI, and nothing could notice because
+  the guard only read skill bodies, never the reference they are written from. The
+  reference now teaches the file-based form the skills already use
+  (`git commit -F`), and the guard covers it.
+  
+  `.claude/skills/<name>/SKILL.md` is generated as YAML frontmatter followed by the
+  canonical body verbatim, so its line count runs about six higher than
+  `assistant-assets/skills/<name>.md`. That gap has been read as drift; it is not.
+  It is now asserted rather than assumed: the generated body must be byte-identical
+  to the canonical source, and the frontmatter may carry only `name`,
+  `description`, and `argument-hint`.
+  
+  That check closes a real gap. `assistant-body-drift.test.js` compares the
+  committed artifact against what the generator produces today, so the two always
+  agree — including when the generator is what is wrong. A renderer that dropped or
+  reordered a section would have kept every suite green while shipping a skill that
+  no longer matched the file its authors edit.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `POST /api/sourcevision/ask`, answering a question from the existing analysis
+  
+  The SourceVision Ask panel's server half. The request is
+  `{ prompt, seed? }` validated by a zod schema; the response is
+  `{ answer, vendor, model, tokens, contextSources }`.
+  
+  **Bundle, not a tool-use loop.** Context is pre-assembled from the
+  `.sourcevision/` artifacts already on disk — manifest, inventory, imports,
+  zones, findings, derived next steps, component count, and a `CONTEXT.md`
+  excerpt — and sent in a single non-agentic call. A loop that queried lookups on
+  demand would answer a wider range of questions, but at an unbounded number of
+  round trips per question and with no way to test what the model actually saw. A
+  unit test now asserts the assembled facts reach the completion request, which is
+  the property the whole endpoint rests on. Every section is capped and reports
+  what it cut, so the bundle does not grow with the repository until the vendor
+  rejects it as an opaque 400.
+  
+  **Analysis is the only ground truth.** The endpoint reads no source, and refuses
+  with `no_analysis` rather than letting the model answer from its priors when
+  nothing has been analysed. All sourcevision access — including the five artifact
+  schema types the reads are parsed against — goes through
+  `server/domain-gateway.ts`; the gateway's export cap moved 15 → 16 with that
+  reason recorded.
+  
+  **Named failures, and it cannot hang.** Vendor and model come from the project's
+  own config via `loadLLMConfig` + `resolveTaskModel` (new `sourcevision.ask`
+  class, standard tier, reroutable through `llm.routes`), and the pair that served
+  the call is reported back so the panel never has to guess which model produced
+  an answer. The call races a budget — `sourcevision.ask.timeoutMs`, default 120s,
+  also passed down so a CLI-mode child bounds itself — and every failure returns a
+  named `kind` (`timeout`, `rate_limit`, `auth`, `network`, `no_analysis`,
+  `invalid_request`, `llm_error`) with the vendor's retry delay when it supplied
+  one, instead of a generic 500. A provider that already threw a typed
+  `ClaudeClientError` is trusted over re-classifying its message, so a 429 the
+  provider knew about is never downgraded to `unknown`.
+  
+  The task-class registry contract test now scans `web` as well as the three
+  domain packages: web declares classes now, and an unregistered one there
+  resolves silently to the standard tier exactly as it would anywhere else.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - State the enrichment output contract once instead of four times, and fix the
+  copy that had already drifted.
+  
+  Four builders across `enrich-batch.ts` and `enrich-per-zone.ts` each spelled out
+  the response format for themselves — the severity enumeration, the "respond with
+  only JSON" instruction, and the later-pass "add only new insights" rule. Written
+  out four times, they had diverged: `buildSingleZoneLaterPassEnvelope` asked for
+  `"Respond with ONLY a JSON object:"` where the other three asked for
+  `"...(no markdown, no explanation)"`, so one enrichment path never forbade
+  markdown at all.
+  
+  That drift was survivable rather than harmless — `tryParseJSON` strips fences
+  before parsing, so a fenced response was recovered — which is precisely why
+  nothing caught it. It still spent output tokens on a path that had asked for
+  none, on a prompt that runs once per zone.
+  
+  The contract now lives in `prompt-envelope.ts` as `JSON_OBJECT_ONLY`,
+  `ONLY_NEW_INSIGHTS`, and `findingsContract(withCategory)`. The category clause is
+  the one intended difference between batch and per-zone prompts — per-zone is the
+  minimal fallback path and `classifyFinding` derives a category from the finding
+  text when the model omits one — so that difference is asserted rather than left
+  to be rediscovered as drift.
+  
+  sourcevision drops from 2,332 to 2,194 unique fixed tokens. Per-call is
+  essentially unchanged: the emitted text is byte-identical for every batch prompt
+  (the `prompt-text-identity` snapshots pass untouched), and the one deliberate
+  change adds the missing no-markdown clause to the per-zone later pass.
+  
+  Also records why `buildReviewerPrompt` lives in `packages/core/`. The
+  orchestration-tier rule is spawn-only, and it constrains *imports*, not string
+  composition: `pair-programming.js` imports nothing but Node built-ins and its
+  core siblings, then hands the prompt to a spawned CLI. Moving it into a package
+  would force core to import it, which is the thing the rule actually forbids.
+
+- [#359](https://github.com/en-dash-consulting/n-dx/pull/359) [`2a3028b`](https://github.com/en-dash-consulting/n-dx/commit/2a3028b436d836839c148a85a71819cf00fd925d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx start` asks who is on the port before killing it, and steps aside for another project's dashboard.
+  
+  The PID file `runWeb` consults lives inside the directory it was given, so a
+  second project or worktree had no entry there. A busy 3117 therefore read as a
+  stranger squatting on the port and `killPortOccupant` SIGKILLed it — including
+  when the occupant was another project's working dashboard. The server's own
+  fallback allocator (`findAvailablePort`, 3117–3200) never got a chance to run,
+  because the orchestrator killed first.
+  
+  A busy port is now probed with a 1.5 s `GET /api/status` before anything is
+  killed:
+  
+  - an n-dx dashboard reporting a **different** `projectDir` is left alone, and
+    this invocation moves to the next free port in 3117–3200;
+  - an n-dx dashboard reporting **this** directory is restarted as before — that
+    is `ndx start`'s documented idempotency, reached here when the PID file is
+    missing;
+  - anything else, including a dashboard too old to report `projectDir`, keeps
+    today's behaviour exactly. An inconclusive probe never widens the kill.
+  
+  `GET /api/status` gained a top-level `projectDir` so the probe has something to
+  attribute the server by. Purely additive.
+
+- [#359](https://github.com/en-dash-consulting/n-dx/pull/359) [`2a3028b`](https://github.com/en-dash-consulting/n-dx/commit/2a3028b436d836839c148a85a71819cf00fd925d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Fix `ndx start`'s port-occupant self/peer check so a symlinked project path
+  (or, on Windows, a different drive-letter/casing spelling) is recognised as
+  the same directory instead of a peer.
+  
+  `classifyPortOccupant` compared `resolve()`d paths, which normalises
+  separators and `..` segments but does not resolve symlinks and does not
+  case-fold. A directory reached through a symlink (e.g. `ndx start ~/work`
+  where `~/work` links to the directory already serving 3117) therefore
+  compared unequal to itself, was classified as a peer, and `runWeb` relocated
+  to a second port instead of restarting — leaving two dashboards live against
+  the same `.rex/prd_tree/`. Foreground `ndx start` never writes a PID file, so
+  this comparison is the only thing guarding idempotent restart in that case.
+  
+  Both sides are now canonicalised with `realpathSync.native` (falling back to
+  `resolve()` when the path no longer exists, so a deleted directory degrades
+  to the old lexical comparison instead of throwing).
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop the pre-run git gate counting the warm-parent session cache as operator work.
+  
+  `.hench/session-cache.json` is rewritten on every orientation, but it was absent from `HENCH_RUNTIME_GITIGNORE_ENTRIES` and from both ignore lists, so `git add -A` in the pre-run commit gate swept it into commits — and a later run then saw its own write as one uncommitted file and refused to start. It is now ignored, discounted by the gate, and written by `hench init`. The ignore template test additionally pins every declared runtime artifact to both ignore files, so the constant can no longer drift away from them.
+- Updated dependencies [[`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`25d7aa6`](https://github.com/en-dash-consulting/n-dx/commit/25d7aa662c414e831fc41dbfc259db94782e0bda), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`ab8dccd`](https://github.com/en-dash-consulting/n-dx/commit/ab8dccd9fadf527a84085f079b245dbdb2dc8ce2), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`25d7aa6`](https://github.com/en-dash-consulting/n-dx/commit/25d7aa662c414e831fc41dbfc259db94782e0bda), [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9), [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`2a3028b`](https://github.com/en-dash-consulting/n-dx/commit/2a3028b436d836839c148a85a71819cf00fd925d), [`2a3028b`](https://github.com/en-dash-consulting/n-dx/commit/2a3028b436d836839c148a85a71819cf00fd925d), [`72609db`](https://github.com/en-dash-consulting/n-dx/commit/72609db1c4572f94ef25a2178d5cac2c17e241dc), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9)]:
+  - @n-dx/rex@0.6.0
+  - @n-dx/llm-client@0.6.0
+  - @n-dx/web@0.6.0
+  - @n-dx/hench@0.6.0
+  - @n-dx/sourcevision@0.6.0
+
 ## 0.5.2
 
 ### Patch Changes
