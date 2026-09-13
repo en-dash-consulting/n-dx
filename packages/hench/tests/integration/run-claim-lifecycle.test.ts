@@ -15,10 +15,11 @@ import { execFileSync, spawn } from "node:child_process";
 import { chmod, mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { openClaimsStore } from "../../src/prd/rex-gateway.js";
 
 const henchCli = join(fileURLToPath(import.meta.url), "..", "..", "..", "dist", "cli", "index.js");
+const henchRunModule = join(fileURLToPath(import.meta.url), "..", "..", "..", "dist", "cli", "commands", "run.js");
 const rexCli = join(fileURLToPath(import.meta.url), "..", "..", "..", "..", "rex", "dist", "cli", "index.js");
 
 /** A live PID that is not this process, so its claims read as someone else's. */
@@ -43,6 +44,31 @@ if (process.env.HENCH_CLAIM_TEST_MODE === "block") {
   }, 20);
 } else {
   console.log(JSON.stringify({ type: "result", is_error: true, result: "controlled test vendor failure" }));
+}
+`;
+
+/**
+ * Windows cannot reliably turn child.kill("SIGINT") into a console Ctrl-C for
+ * a detached test child. This driver retains the real cmdRun lifecycle while
+ * giving the parent an IPC seam to emit the same process-level SIGINT event.
+ */
+const TEST_SIGNAL_DRIVER_SOURCE = `
+const runModule = process.env.HENCH_CLAIM_TEST_RUN_MODULE;
+const taskId = process.env.HENCH_CLAIM_TEST_TASK_ID;
+if (!runModule || !taskId) throw new Error("Missing claim-lifecycle test driver configuration");
+
+const { cmdRun } = await import(runModule);
+process.on("message", (message) => {
+  if (message === "emit-sigint") process.emit("SIGINT");
+});
+
+try {
+  await cmdRun(process.cwd(), { task: taskId, loop: "true" });
+} catch (error) {
+  console.error(error);
+  process.exitCode = 1;
+} finally {
+  if (process.connected) process.disconnect();
 }
 `;
 
@@ -89,7 +115,15 @@ describe("hench run task claims", () => {
     const taskId = extractId(node(rexCli, ["add", "task", "--title=Task", `--parent=${epic}`, repo], repo));
     node(henchCli, ["init", repo], repo);
     const vendorPath = await installTestVendor(repo);
-    execFileSync("git", ["add", "--force", ".gitignore", ".n-dx.json", ".hench/claim-lifecycle-vendor.js", vendorPath, ".hench/config.json", ".rex"], { cwd: repo });
+    const signalDriverPath = await installTestSignalDriver(repo);
+    execFileSync(
+      "git",
+      [
+        "add", "--force", ".gitignore", ".n-dx.json", ".hench/claim-lifecycle-vendor.js",
+        vendorPath, signalDriverPath, ".hench/config.json", ".rex",
+      ],
+      { cwd: repo },
+    );
     execFileSync("git", ["-c", "user.name=Hench Test", "-c", "user.email=hench-test@example.test", "commit", "--quiet", "-m", "init"], { cwd: repo });
 
     return { repo, taskId };
@@ -125,21 +159,36 @@ describe("hench run task claims", () => {
     const { repo, taskId } = await makeProject();
     const releaseFile = join(repo, ".hench", "claim-lifecycle-release");
 
-    const child = spawn("node", [henchCli, "run", `--task=${taskId}`, "--loop", repo], {
-      cwd: repo,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: {
-        ...process.env,
-        HENCH_CLAIM_TEST_MODE: "block",
-        HENCH_CLAIM_TEST_RELEASE_FILE: releaseFile,
+    const windowsSignalDriver = join(repo, ".hench", "claim-lifecycle-signal-driver.mjs");
+    // Keep the actual CLI process on platforms where Node can deliver SIGINT.
+    // On Windows the driver runs the same cmdRun command and receives an IPC
+    // request to emit SIGINT locally, which is the portable signal seam.
+    const child = spawn(
+      process.execPath,
+      process.platform === "win32"
+        ? [windowsSignalDriver]
+        : [henchCli, "run", `--task=${taskId}`, "--loop", repo],
+      {
+        cwd: repo,
+        stdio: process.platform === "win32" ? ["ignore", "pipe", "pipe", "ipc"] : ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          HENCH_CLAIM_TEST_MODE: "block",
+          HENCH_CLAIM_TEST_RELEASE_FILE: releaseFile,
+          HENCH_CLAIM_TEST_RUN_MODULE: pathToFileURL(henchRunModule).href,
+          HENCH_CLAIM_TEST_TASK_ID: taskId,
+        },
       },
-    });
+    );
     let childOutput = "";
     child.stdout.on("data", (chunk: Buffer) => { childOutput += chunk; });
     child.stderr.on("data", (chunk: Buffer) => { childOutput += chunk; });
 
     // Wait for the claim to appear, then interrupt mid-run.
-    await waitFor(async () => (await claimsIn(repo)).length > 0 || child.exitCode !== null, 30_000);
+    await waitFor(async () => {
+      const claimed = (await claimsIn(repo)).length > 0;
+      return (claimed && childOutput.includes("Loop mode: running continuously")) || child.exitCode !== null;
+    }, 30_000);
     const claimed = (await claimsIn(repo)).length > 0;
     // A run that fell over before it could claim proves nothing either way.
     if (!claimed) throw new Error(`Run never took a claim:\n${childOutput}`);
@@ -147,7 +196,12 @@ describe("hench run task claims", () => {
     // A run that had already exited on its own would prove nothing about the
     // interrupt path, so assert we are interrupting something still running.
     expect(child.exitCode, "run exited before it could be interrupted").toBeNull();
-    child.kill("SIGINT");
+    if (process.platform === "win32") {
+      if (!child.send) throw new Error("Windows signal test child has no IPC channel");
+      child.send("emit-sigint");
+    } else {
+      child.kill("SIGINT");
+    }
     const interrupted = await waitFor(
       async () => childOutput.includes("Received interrupt — finishing current task then stopping…"),
       5_000,
@@ -194,6 +248,12 @@ async function installTestVendor(repo: string): Promise<string> {
     }),
   );
   return vendorPath;
+}
+
+async function installTestSignalDriver(repo: string): Promise<string> {
+  const driverPath = join(repo, ".hench", "claim-lifecycle-signal-driver.mjs");
+  await writeFile(driverPath, TEST_SIGNAL_DRIVER_SOURCE, { mode: 0o755 });
+  return driverPath;
 }
 
 /** Poll `check` until it is true or the deadline passes. */
