@@ -7,12 +7,14 @@
  *      so a live in-process holder can never be misjudged as stale no matter
  *      how long its critical section runs.
  *   2. An exclusive lock file with PID + ownership token + timestamp guarding
- *      against other processes. A lock is reclaimed only when its owning
- *      process is gone — never merely because it is old, since a slow writer
- *      and a hung one are indistinguishable from the outside and unlinking a
- *      running writer's lock admits a second writer rather than fencing the
- *      first. Release is compare-and-delete on the ownership token, so a holder
- *      whose lock was taken over can never unlink the new holder's lock.
+ *      against other processes. A lock is considered potentially abandoned
+ *      only when its owning process is gone — never merely because it is old,
+ *      since a slow writer and a hung one are indistinguishable. Locks not owned
+ *      by this acquisition are never unlinked automatically: even a confirmed
+ *      dead owner can be replaced between inspection and path-based deletion.
+ *      Such locks fail loudly with manual-cleanup guidance. Release is
+ *      compare-and-delete on the ownership token, so a holder whose lock was
+ *      taken over can never unlink the new holder's lock.
  *
  * @module store/file-lock
  */
@@ -116,13 +118,16 @@ function acquireInProcess(lockPath: string, timeoutMs: number): Promise<() => vo
 // ── Lock acquisition ─────────────────────────────────────────────────
 
 /**
- * Check if an existing lock file is stale.
+ * Check if an existing lock file appears abandoned.
  *
  * Same-PID lock files are always stale: the in-process mutex guarantees no
  * other live holder exists in this process while we are checking, so such a
  * file is an orphan (failed unlink, or a recycled PID from a dead process).
- * Another process's lock is stale only when that process is gone. Age is
- * deliberately not grounds: see the note at the liveness check below.
+ * Another process's lock appears abandoned only when that process is gone.
+ * This observation is used only to fail early with cleanup guidance. It must
+ * never authorize unlinking by path: a different generation may have replaced
+ * the inspected lock before an unlink executes. Malformed and unreadable locks
+ * receive the same safety-first treatment.
  */
 async function isLockStale(lockPath: string): Promise<boolean> {
   try {
@@ -165,8 +170,8 @@ async function isLockStale(lockPath: string): Promise<boolean> {
  * The body is written under a unique sibling name before link() atomically
  * publishes it at `lockPath`. Writing directly with the `wx` flag would create
  * the public name before its body was written; a competing process could read
- * that empty file as malformed, reclaim it, and enter the critical section
- * alongside the still-live writer. link() fails with EEXIST when another lock
+ * that empty file as malformed and reject an otherwise valid acquisition.
+ * link() fails with EEXIST when another lock
  * is already published, retaining the same exclusive-creation semantics
  * without exposing incomplete contents.
  */
@@ -205,8 +210,25 @@ async function releaseIfOwner(lockPath: string, token: string): Promise<void> {
     if (info && info.token !== token) return; // No longer ours
     await unlink(lockPath);
   } catch {
-    // Lock file already removed (e.g., by stale cleanup) — not an error
+    // Lock file already removed — not an error
   }
+}
+
+async function lockAcquisitionError(lockPath: string, acquireTimeoutMs: number): Promise<Error> {
+  let holder = "unknown process";
+  try {
+    const content = await readFile(lockPath, "utf-8");
+    const info = decodeLock(content);
+    if (info) holder = `PID ${info.pid} (since ${info.timestamp})`;
+  } catch {
+    // Keep the unknown-holder fallback while preserving cleanup guidance.
+  }
+
+  return new Error(
+    `Could not acquire PRD lock within ${acquireTimeoutMs}ms. ` +
+    `Held by ${holder}. Another command may be writing to the PRD. ` +
+    `If this is stale, delete ${lockPath} manually.`,
+  );
 }
 
 function sleep(ms: number): Promise<void> {
@@ -220,8 +242,9 @@ function sleep(ms: number): Promise<void> {
  *
  * Same-process callers queue on an in-process mutex; the file lock guards
  * against other processes. If the lock is held by another live process,
- * retries with a short delay until the timeout expires. Stale locks (dead
- * process or expired) are automatically cleaned up.
+ * retries with a short delay until the timeout expires. Locks that appear
+ * abandoned are not reclaimed automatically because an unlink-by-path could
+ * delete a replacement generation. They fail with manual-cleanup guidance.
  *
  * @param lockPath - Path to the lock file (e.g., `.rex/prd.json.lock`)
  * @throws If the lock cannot be acquired within the timeout
@@ -248,34 +271,17 @@ export async function acquireLock(lockPath: string, options?: LockOptions): Prom
         };
       }
 
-      // Lock exists — held by another process (or orphaned). Check staleness.
+      // Never unlink a lock we did not acquire. Even after observing a dead
+      // owner, another contender can replace that generation before a
+      // path-based unlink executes. Fail loudly and require manual cleanup.
       if (await isLockStale(lockPath)) {
-        try {
-          await unlink(lockPath);
-        } catch {
-          // Another process may have cleaned it up — retry will handle it
-        }
-        continue; // Retry immediately after cleanup
+        throw await lockAcquisitionError(lockPath, acquireTimeoutMs);
       }
 
       await sleep(retryDelayMs);
     }
 
-    // Timeout — provide a helpful error
-    let holder = "unknown process";
-    try {
-      const content = await readFile(lockPath, "utf-8");
-      const info = decodeLock(content);
-      if (info) holder = `PID ${info.pid} (since ${info.timestamp})`;
-    } catch {
-      // Can't read lock info
-    }
-
-    throw new Error(
-      `Could not acquire PRD lock within ${acquireTimeoutMs}ms. ` +
-      `Held by ${holder}. Another command may be writing to the PRD. ` +
-      `If this is stale, delete ${lockPath} manually.`,
-    );
+    throw await lockAcquisitionError(lockPath, acquireTimeoutMs);
   } catch (err) {
     releaseInProcess();
     throw err;
