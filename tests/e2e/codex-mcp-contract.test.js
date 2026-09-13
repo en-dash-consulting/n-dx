@@ -247,7 +247,10 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
+  // maxRetries: on Windows the spawned init's handles can unwind a beat after
+  // it exits, leaving the tree briefly EPERM/EBUSY-locked; without retries the
+  // cleanup itself fails the whole suite even though every test passed.
+  if (tmpDir) rmSync(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // ── Command structure: cwd-relative, no absolute paths ────────────────────

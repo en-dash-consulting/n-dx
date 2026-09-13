@@ -908,7 +908,19 @@ const MIN_FILES_FOR_COHESION_GATE = 5;
  * Each entry must explain why the zone cannot meet the threshold and
  * what structural condition would allow removing the exemption.
  */
-const COHESION_EXCEPTIONS = new Map([]);
+const COHESION_EXCEPTIONS = new Map([
+  [
+    "web-shared",
+    "Foundation layer (packages/web/src/shared/): its modules are independent " +
+      "leaf utilities imported by both server and viewer, so internal edges are " +
+      "structurally absent by design — cohesion measures exactly what the layer " +
+      "must not have. Louvain usually absorbs it into web-viewer (web/CLAUDE.md " +
+      "documents that as a detection artifact); when a re-clustering emits it " +
+      "standalone, it lands ~0.46. Governed instead by boundary-check.test.ts " +
+      "(barrel imports, two-consumer rule, zero upward deps). Remove this entry " +
+      "if shared/ gains real internal structure or stops being emitted as a zone.",
+  ],
+]);
 
 describe("architecture policy: zone cohesion gate", () => {
   it(`all production zones meet minimum cohesion threshold (${COHESION_THRESHOLD})`, (ctx) => {

@@ -524,6 +524,43 @@ describe("server/client boundary", () => {
     expect(violations).toEqual([]);
   });
 
+  /**
+   * Hub zone containment — src/hub/ is the multi-project daemon and its own
+   * zone. Its import surface is deliberately tiny: node built-ins, hub
+   * siblings, src/shared (through the barrel), and the llm-client exec
+   * helpers via its gateway. In particular it must not import from server/
+   * (the hub manages servers; it must not couple to one) or viewer/, and
+   * llm-gateway.ts must be the only hub file that touches @n-dx/llm-client —
+   * the hub spawns processes, so every spawning primitive it can reach has to
+   * be auditable in one file.
+   */
+  it("hub/ imports only node built-ins, siblings, shared barrel, and its llm-gateway", () => {
+    const hubDir = join(WEB_SRC, "hub");
+    const violations: string[] = [];
+
+    try {
+      for (const file of collectTsFiles(hubDir)) {
+        const rel = relPosix(file);
+        for (const imp of extractImportPaths(file)) {
+          const allowed =
+            imp.startsWith("node:") ||
+            imp.startsWith("./") || // hub siblings (and the gateway)
+            imp.includes("../shared/index") ||
+            imp === "../shared" ||
+            (rel === "hub/llm-gateway.ts" && imp === "@n-dx/llm-client");
+          if (!allowed) {
+            violations.push(`${rel} imports "${imp}"`);
+          }
+        }
+      }
+    } catch {
+      // hub/ doesn't exist in test environment — pass
+      return;
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it("no viewer file imports from server", () => {
     const viewerDir = join(WEB_SRC, "viewer");
     const violations: string[] = [];

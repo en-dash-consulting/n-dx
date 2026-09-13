@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { readPRD } from "../helpers/rex-dir-test-support.js";
 
@@ -43,17 +43,56 @@ function runExpectFail(args: string[], timeout = 15000): { stdout: string; stder
 /**
  * Run command with a very short timeout — used for tests that trigger LLM calls
  * where we just want to verify routing, not wait for the LLM response.
+ *
+ * The timeout kill must take the CLI's process *tree*, not just the direct
+ * node child. Smart mode spawns an LLM CLI as a grandchild; spawnSync's
+ * `timeout` only signals the child, and on Windows the orphaned grandchild
+ * kept handles inside tmpDir — so every afterEach cleanup failed with
+ * EBUSY. taskkill /T (win32) or a process-group SIGTERM (POSIX) reaps it.
+ *
+ * `input` is written to the CLI's stdin; stdin is a closed pipe otherwise,
+ * matching what spawnSync's default stdio gave these tests before.
  */
-function runQuick(args: string[]): { stdout: string; stderr: string; timedOut: boolean } {
-  const result = spawnSync("node", [cliPath, ...args], {
-    encoding: "utf-8",
-    timeout: 3000,
+function runQuick(
+  args: string[],
+  input?: string,
+): Promise<{ stdout: string; stderr: string; timedOut: boolean }> {
+  return new Promise((resolve) => {
+    const child = spawn("node", [cliPath, ...args], {
+      // POSIX: lead a new process group so the timeout signal below reaches
+      // the LLM grandchild too. Windows uses taskkill /T for the same reach.
+      detached: process.platform !== "win32",
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf-8");
+    child.stderr.setEncoding("utf-8");
+    child.stdout.on("data", (chunk: string) => (stdout += chunk));
+    child.stderr.on("data", (chunk: string) => (stderr += chunk));
+    child.stdin.end(input ?? "");
+
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      if (child.pid === undefined) return;
+      if (process.platform === "win32") {
+        spawnSync("taskkill", ["/T", "/F", "/PID", String(child.pid)], { stdio: "ignore" });
+      } else {
+        try {
+          process.kill(-child.pid, "SIGTERM");
+        } catch {
+          child.kill("SIGTERM");
+        }
+      }
+    }, 3000);
+
+    const finish = () => {
+      clearTimeout(timer);
+      resolve({ stdout, stderr, timedOut });
+    };
+    child.on("close", finish);
+    child.on("error", finish);
   });
-  return {
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
-    timedOut: result.status === null && result.signal === "SIGTERM",
-  };
 }
 
 describe("rex add (smart mode routing)", () => {
@@ -64,7 +103,9 @@ describe("rex add (smart mode routing)", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    // maxRetries: Windows briefly holds EBUSY on the tree while the spawned
+    // CLI's handles unwind; without retries the cleanup itself fails the test.
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("manual mode still works: rex add epic --title=X", async () => {
@@ -208,7 +249,7 @@ describe("rex add (smart mode routing)", () => {
     const epicId = JSON.parse(epicOut).id;
 
     // Smart mode with --parent triggers LLM analysis scoped to the parent
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       "Add caching for API responses",
       `--parent=${epicId}`,
@@ -246,7 +287,7 @@ describe("rex add (smart mode routing)", () => {
     // Run with short timeout — we just want to verify routing to smart add
     // The command will either print "Analyzing description..." before the LLM call
     // or fail/timeout during the LLM call
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       "Add user authentication with OAuth",
       tmpDir,
@@ -266,7 +307,7 @@ describe("rex add (smart mode routing)", () => {
   it("smart mode with --description flag", async () => {
     run(["init", tmpDir]);
 
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       "--description=Build caching layer",
       tmpDir,
@@ -304,13 +345,15 @@ describe("rex add with multiple descriptions", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    // maxRetries: Windows briefly holds EBUSY on the tree while the spawned
+    // CLI's handles unwind; without retries the cleanup itself fails the test.
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("multiple positional descriptions trigger smart mode with multi label", async () => {
     run(["init", tmpDir]);
 
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       "Add user authentication",
       "Build admin dashboard",
@@ -331,7 +374,7 @@ describe("rex add with multiple descriptions", () => {
   it("two descriptions route to multi-description mode", async () => {
     run(["init", tmpDir]);
 
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       "Add caching layer",
       "Build monitoring dashboard",
@@ -350,7 +393,7 @@ describe("rex add with multiple descriptions", () => {
   it("--description flag combined with positional args", async () => {
     run(["init", tmpDir]);
 
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       "Add auth",
       "--description=Build dashboard",
@@ -381,7 +424,7 @@ describe("rex add with multiple descriptions", () => {
   it("single description still works normally", async () => {
     run(["init", tmpDir]);
 
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       "Add user authentication with OAuth",
       tmpDir,
@@ -408,7 +451,9 @@ describe("rex add --file (idea import)", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    // maxRetries: Windows briefly holds EBUSY on the tree while the spawned
+    // CLI's handles unwind; without retries the cleanup itself fails the test.
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("shows error without .rex/ for --file mode", async () => {
@@ -434,7 +479,7 @@ describe("rex add --file (idea import)", () => {
     );
 
     // Run with short timeout — we just want to verify routing to idea import
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       `--file=${ideasFile}`,
       tmpDir,
@@ -459,7 +504,7 @@ describe("rex add --file (idea import)", () => {
     await writeFile(file1, "add login page");
     await writeFile(file2, "add dashboard");
 
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       `--file=${file1}`,
       `--file=${file2}`,
@@ -483,7 +528,7 @@ describe("rex add --file (idea import)", () => {
     await writeFile(ideasFile, "add charts");
 
     // When both --file and description are provided, --file takes precedence
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       `--file=${ideasFile}`,
       "also add reports",
@@ -507,7 +552,7 @@ describe("rex add --file (idea import)", () => {
     await writeFile(ideasFile, "build a notifications system");
 
     // Only --file flag, no positional description
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       `--file=${ideasFile}`,
       tmpDir,
@@ -526,7 +571,7 @@ describe("rex add --file (idea import)", () => {
     await writeFile(mdFile, `# Auth\n## Login\n- Validate credentials\n`);
 
     // Pass .md file as positional argument (no --file flag)
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       mdFile,
       tmpDir,
@@ -553,7 +598,7 @@ describe("rex add --file (idea import)", () => {
     const txtFile = join(tmpDir, "ideas.txt");
     await writeFile(txtFile, `Requirements:\n- Build the thing\n- Ship it\n`);
 
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       txtFile,
       tmpDir,
@@ -568,7 +613,7 @@ describe("rex add --file (idea import)", () => {
     run(["init", tmpDir]);
 
     // File does NOT exist — should be treated as description text
-    const { stderr, stdout, timedOut } = runQuick([
+    const { stderr, stdout, timedOut } = await runQuick([
       "add",
       "fake-file.md",
       tmpDir,
@@ -593,20 +638,20 @@ describe("rex add with piped stdin", () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    // maxRetries: Windows briefly holds EBUSY on the tree while the spawned
+    // CLI's handles unwind; without retries the cleanup itself fails the test.
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("accepts piped stdin as description", async () => {
     run(["init", tmpDir]);
 
-    const result = spawnSync("node", [cliPath, "add", tmpDir], {
-      input: "Add a notifications system with email and push support",
-      encoding: "utf-8",
-      timeout: 3000,
-    });
+    const { stderr, stdout, timedOut } = await runQuick(
+      ["add", tmpDir],
+      "Add a notifications system with email and push support",
+    );
 
-    const combined = (result.stderr ?? "") + (result.stdout ?? "");
-    const timedOut = result.status === null && result.signal === "SIGTERM";
+    const combined = stderr + stdout;
     expect(
       combined.includes("Analyzing description") ||
       combined.includes("LLM analysis failed") ||
@@ -619,14 +664,9 @@ describe("rex add with piped stdin", () => {
     run(["init", tmpDir]);
 
     const input = "Add user authentication\nwith OAuth and JWT support\nand password reset";
-    const result = spawnSync("node", [cliPath, "add", tmpDir], {
-      input,
-      encoding: "utf-8",
-      timeout: 3000,
-    });
+    const { stderr, stdout, timedOut } = await runQuick(["add", tmpDir], input);
 
-    const combined = (result.stderr ?? "") + (result.stdout ?? "");
-    const timedOut = result.status === null && result.signal === "SIGTERM";
+    const combined = stderr + stdout;
     // Multiline piped input is a single description, not multiple
     expect(
       combined.includes("Analyzing description") ||
@@ -640,18 +680,12 @@ describe("rex add with piped stdin", () => {
   it("piped stdin combines with positional descriptions", async () => {
     run(["init", tmpDir]);
 
-    const result = spawnSync(
-      "node",
-      [cliPath, "add", "Build caching layer", tmpDir],
-      {
-        input: "Add monitoring dashboard",
-        encoding: "utf-8",
-        timeout: 3000,
-      },
+    const { stderr, stdout, timedOut } = await runQuick(
+      ["add", "Build caching layer", tmpDir],
+      "Add monitoring dashboard",
     );
 
-    const combined = (result.stderr ?? "") + (result.stdout ?? "");
-    const timedOut = result.status === null && result.signal === "SIGTERM";
+    const combined = stderr + stdout;
     // Should see 2 descriptions (1 positional + 1 from stdin)
     expect(
       combined.includes("Analyzing 2 descriptions") ||
@@ -664,18 +698,12 @@ describe("rex add with piped stdin", () => {
   it("empty piped input is ignored", async () => {
     run(["init", tmpDir]);
 
-    const result = spawnSync(
-      "node",
-      [cliPath, "add", "Build caching layer", tmpDir],
-      {
-        input: "",
-        encoding: "utf-8",
-        timeout: 3000,
-      },
+    const { stderr, stdout, timedOut } = await runQuick(
+      ["add", "Build caching layer", tmpDir],
+      "",
     );
 
-    const combined = (result.stderr ?? "") + (result.stdout ?? "");
-    const timedOut = result.status === null && result.signal === "SIGTERM";
+    const combined = stderr + stdout;
     // With empty stdin, only the positional description counts
     expect(
       combined.includes("Analyzing description") ||
@@ -689,14 +717,12 @@ describe("rex add with piped stdin", () => {
   it("piped stdin without any other description triggers smart mode", async () => {
     run(["init", tmpDir]);
 
-    const result = spawnSync("node", [cliPath, "add", tmpDir], {
-      input: "Build a REST API for user management",
-      encoding: "utf-8",
-      timeout: 3000,
-    });
+    const { stderr, stdout, timedOut } = await runQuick(
+      ["add", tmpDir],
+      "Build a REST API for user management",
+    );
 
-    const combined = (result.stderr ?? "") + (result.stdout ?? "");
-    const timedOut = result.status === null && result.signal === "SIGTERM";
+    const combined = stderr + stdout;
     // Should NOT show "Missing description" error
     expect(combined).not.toContain("Missing description");
     expect(combined).not.toContain("Missing level");

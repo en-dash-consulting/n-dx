@@ -23,6 +23,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Hub daemon skeleton: `web hub` command, ~/.n-dx registry and pid file, /api/hub/* routes, spawn/attach per-repo servers with health checks](./hub-daemon-skeleton-web-hub-command-n.md) | pending |
+| [Hub daemon skeleton: `web hub` command, ~/.n-dx registry and pid file, /api/hub/* routes, spawn/attach per-repo servers with health checks](./hub-daemon-skeleton-web-hub-command-n.md) | in_progress |
 | [Per-project MCP endpoints /p/:id/mcp/rex and /p/:id/mcp/sourcevision proxied to the project server](./per-project-mcp-endpoints-p-id-mcp-rex.md) | pending |
 | [Reverse proxy HTTP and WebSocket under /p/:id/ with viewer base-path support; root routes alias the sole registered project](./reverse-proxy-http-and-websocket-under.md) | pending |

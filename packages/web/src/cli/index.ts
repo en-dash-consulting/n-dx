@@ -5,11 +5,13 @@
  *
  * Commands:
  *   serve [dir]   - Start the web dashboard server
+ *   hub           - Start the multi-project hub daemon
  */
 
 import { resolve } from "node:path";
 import { suppressKnownDeprecations, setVerbose, setDebug } from "@n-dx/llm-client";
 import { startServer } from "../server/start.js";
+import { startHub } from "../hub/hub.js";
 import type { ViewerScope } from "../shared/view-routing.js";
 
 suppressKnownDeprecations();
@@ -56,11 +58,29 @@ if (command === "serve") {
   const dir = resolve(targetArg || ".");
   const dev = args.includes("--dev");
   await startServer(dir, port, { dev, scope });
+} else if (command === "hub") {
+  // Same reasoning as serve above: the hub is long-running, so the global
+  // NDX_DEBUG mutation from setDebug() must not leak into every child server
+  // it spawns for the rest of its life.
+  delete process.env.NDX_DEBUG;
+
+  const hubDirArg = args.slice(1).find((a) => a.startsWith("--hub-dir="));
+  const handle = await startHub(port, {
+    hubDir: hubDirArg ? resolve(hubDirArg.split("=").slice(1).join("=")) : undefined,
+  });
+
+  const shutdown = async () => {
+    await handle.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", () => void shutdown());
+  process.on("SIGTERM", () => void shutdown());
 } else {
   console.log(`n-dx web dashboard
 
 Commands:
   serve [dir]   Start the web dashboard server
+  hub           Start the multi-project hub daemon (registry at ~/.n-dx)
 
 Options:
   --port=N                  Port to listen on (default: 3117)

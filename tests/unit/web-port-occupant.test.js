@@ -274,14 +274,24 @@ describe("classifyPortOccupant", () => {
       link = null;
     });
 
-    it("reports a dashboard as self when the same directory is reached through a symlink", async () => {
+    it("reports a dashboard as self when the same directory is reached through a symlink", async (ctx) => {
       // Without resolving symlinks, the server's realpath'd projectDir and
       // this invocation's symlink-spelled absDir compare unequal and the
       // caller relocates instead of restarting — starting a second dashboard
       // on the same PRD tree.
       real = await mkdtemp(join(tmpdir(), "ndx-port-occupant-real-"));
       link = join(tmpdir(), `ndx-port-occupant-link-${process.pid}`);
-      await symlink(real, link);
+      try {
+        await symlink(real, link);
+      } catch (err) {
+        // Creating a directory symlink on Windows requires Developer Mode or
+        // elevation; without either the OS refuses with EPERM. That is a
+        // limitation of the machine running the suite, not a defect in
+        // classifyPortOccupant — skip rather than fail on hosts that cannot
+        // mint symlinks. (POSIX hosts never take this branch.)
+        if (err.code === "EPERM" && platform() === "win32") ctx.skip();
+        throw err;
+      }
 
       // The server reports the realpath'd directory it was started with...
       const payload = statusPayload(real);

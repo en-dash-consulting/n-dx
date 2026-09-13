@@ -921,8 +921,12 @@ export interface SpawnToolOptions {
    *
    * - `"inherit"` — child shares the parent's stdin/stdout/stderr (default).
    * - `"pipe"` — capture stdout and stderr; return them in the result.
+   * - `"ignore"` — discard child output. For long-lived children of a daemon
+   *   (the hub's per-project servers): `"pipe"` would buffer output nobody
+   *   reads for the child's whole lifetime, and `"inherit"` interleaves it
+   *   with the daemon's own.
    */
-  stdio?: "inherit" | "pipe";
+  stdio?: "inherit" | "pipe" | "ignore";
   /**
    * When true, spawn the process detached and un-ref it so the parent
    * can exit without waiting. Implies `stdio: "ignore"` (overrides
@@ -1021,7 +1025,7 @@ export function spawnTool(
     const child = spawn(cmd, args, {
       cwd,
       env,
-      stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
+      stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : stdio,
       windowsHide: opts.windowsHide ?? false,
     });
 
@@ -1102,7 +1106,7 @@ export function spawnManaged(
   const child = spawn(cmd, args, {
     cwd,
     env,
-    stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
+    stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : stdio,
     windowsHide: opts.windowsHide ?? false,
   });
 

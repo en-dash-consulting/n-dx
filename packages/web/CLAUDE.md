@@ -18,6 +18,14 @@ Latest analysis (2026-08-24, `main`): `web-viewer` 205 files (cohesion 0.98 / co
 
 **The sections below are directory policies, not zone policies.** Louvain does not currently emit standalone `web-shared`, `crash`, or `viewer-ui-hub` zones, but the directories exist and the rules are enforced by `boundary-check.test.ts` — so they remain in force. See the root `CLAUDE.md` for the threshold definition and universal rules.
 
+## `src/hub/` zone policy
+
+`src/hub/` is the multi-project hub daemon (0.7.0 / PR 8) — a composition root parallel to `web-server`, not part of it. Its import surface is deliberately tiny and enforced by the "hub zone containment" assertion in `boundary-check.test.ts`:
+
+- **Allowed imports:** node built-ins, hub siblings (`./`), `src/shared/` through the barrel, and the llm-client exec helpers via `src/hub/llm-gateway.ts` (re-export only).
+- **Forbidden:** anything from `src/server/` or `src/viewer/` — the hub manages server processes over HTTP; it must never couple to one in-process. Each child repo may run its own n-dx version, so the only contract is the child CLI (`<ndxBin> serve --port=0 <repoRoot>`), the port file (`.n-dx-web.port`), and `GET /api/status`.
+- `llm-gateway.ts` must remain the only hub file importing `@n-dx/llm-client` — the hub spawns processes, and every spawning primitive it can reach has to be auditable in one file.
+
 ## `src/shared/` addition policy
 
 `src/shared/` holds 5 framework-neutral modules (`data-files.ts`, `features.ts`, `index.ts`, `view-id.ts`, `view-routing.ts`). Because both server and viewer files import it, Louvain typically absorbs it into `web-viewer` rather than emitting a separate `web-shared` zone — that is a detection artifact, not a boundary violation, and the rules below apply regardless:
