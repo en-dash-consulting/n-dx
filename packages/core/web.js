@@ -116,10 +116,15 @@ export function isPortInUse(port) {
  * Find the first free port in [start, end], skipping `exclude`.
  * Returns the port, or null when every port in the range is taken.
  */
-export async function findFreePortInRange(exclude, start = PORT_RANGE_START, end = PORT_RANGE_END) {
+export async function findFreePortInRange(
+  exclude,
+  start = PORT_RANGE_START,
+  end = PORT_RANGE_END,
+  isPortInUseFn = isPortInUse,
+) {
   for (let p = start; p <= end; p++) {
     if (p === exclude) continue;
-    if (!(await isPortInUse(p))) return p;
+    if (!(await isPortInUseFn(p))) return p;
   }
   return null;
 }
@@ -151,16 +156,22 @@ const NEAR_PORT_WINDOW = PORT_RANGE_END - PORT_RANGE_START;
  *
  * @param {number} requestedPort
  * @param {number} [nearWindowSize] Exposed for tests; production callers use the default.
+ * @param {(port: number) => Promise<boolean>} [isPortInUseFn] Availability probe; production callers use the socket probe.
  * @returns {Promise<number|null>} The chosen port, or null when neither window has one free.
  */
-export async function findRelocationPort(requestedPort, nearWindowSize = NEAR_PORT_WINDOW) {
+export async function findRelocationPort(
+  requestedPort,
+  nearWindowSize = NEAR_PORT_WINDOW,
+  isPortInUseFn = isPortInUse,
+) {
   const near = await findFreePortInRange(
     requestedPort,
     requestedPort + 1,
     Math.min(requestedPort + nearWindowSize, MAX_PORT),
+    isPortInUseFn,
   );
   if (near !== null) return near;
-  return findFreePortInRange(requestedPort, PORT_RANGE_START, PORT_RANGE_END);
+  return findFreePortInRange(requestedPort, PORT_RANGE_START, PORT_RANGE_END, isPortInUseFn);
 }
 
 /**
