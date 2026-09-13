@@ -12,13 +12,14 @@
  *   2. A ci subprocess that is still running when SIGINT arrives is killed by
  *      the cleanup gate (SIGTERM → SIGKILL after timeout).
  *   3. NO fixture child outlives the test file, whatever the assertions did —
- *      see the teardown. This file used to leak one `hang`-mode double per
- *      SIGINT run, because killing the in-flight step is what let `ndx ci`
- *      advance to the NEXT step while the parent was already exiting. The
- *      escalation the assertions check ran fine; the child it unblocked was the
- *      one that escaped. The production side of that is fixed in
- *      child-lifecycle.js (see createChildProcessTracker's register), and this
- *      teardown is the backstop that makes a recurrence fail loudly.
+ *      see the teardown. Under load, killing the in-flight step can let `ndx ci`
+ *      advance to the NEXT step while the parent is already exiting, and that
+ *      late child used to escape. On an idle machine the parent may exit before
+ *      that next spawn, so this suite's teardown scan is a backstop rather than
+ *      a deterministic reproducer. The production side is fixed in
+ *      child-lifecycle.js (see createChildProcessTracker's register); the
+ *      deterministic real-process regression lives in
+ *      tests/integration/late-arrival-child-cleanup.test.js.
  *
  * It uses the same preload-interception pattern as cli-child-cleanup.test.js:
  * a NODE_OPTIONS=--import preload patches child_process.spawn so that any
