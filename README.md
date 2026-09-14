@@ -310,7 +310,7 @@ If `ndx` isn't on `PATH`, run the CLI through npx instead: `npx -y @n-dx/core re
 
 Codex reads `.codex/config.toml` automatically — no manual registration required.
 
-### HTTP transport — single project only
+### HTTP transport
 
 ```sh
 ndx start .
@@ -319,7 +319,16 @@ claude mcp add --transport http rex http://localhost:3117/mcp/rex
 claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
 ```
 
-`http://localhost:3117/mcp/rex` isn't scoped to a project — it points at whichever `ndx start` currently holds port 3117. Registering it is only safe when you have one n-dx project running at a time: a second `ndx start` on the same port redirects both registrations to the newer project. Prefer stdio (above) if you work across multiple n-dx projects; a multi-project hub landing in 0.7.0 will make HTTP registration safe to share.
+`http://localhost:3117/mcp/rex` isn't scoped to a project — it points at whichever `ndx start` currently holds port 3117. Registering it is only safe when you have one n-dx project running at a time: a second `ndx start` on the same port redirects both registrations to the newer project. Prefer the tracked `.mcp.json` stdio registration (above) — it stays the recommended path; each checkout carries its own working registration.
+
+**Per-project HTTP via the hub (0.7.0).** The hub daemon (`n-dx-web hub`; `ndx hub` orchestration lands later in 0.7.0) runs one server per registered repository and gives each project a stable, id-scoped MCP address that is safe to register alongside other projects:
+
+```sh
+claude mcp add --transport http rex-myproj http://localhost:3117/p/<id>/mcp/rex
+claude mcp add --transport http sourcevision-myproj http://localhost:3117/p/<id>/mcp/sourcevision
+```
+
+While exactly one project is registered with the hub, the unscoped root URLs above keep working — they alias the sole project, so existing registrations survive the move. With several projects registered, the root `/mcp/*` URLs answer 409 naming the registered ids rather than silently picking one.
 
 ### Tools
 
