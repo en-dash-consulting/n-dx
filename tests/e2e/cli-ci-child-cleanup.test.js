@@ -13,7 +13,9 @@
  *      the cleanup gate (SIGTERM → SIGKILL after timeout).
  *   3. The shell-backed docs-build fixture starts a grandchild in hang mode;
  *      SIGINT must reap every recorded fixture PID, including that descendant.
- *   4. NO fixture child outlives the test file, whatever the assertions did —
+ *   4. On headless Windows runners an IPC relay emits SIGINT through n-dx's
+ *      production listener and acknowledges delivery before cleanup assertions.
+ *   5. NO fixture child outlives the test file, whatever the assertions did —
  *      see the teardown. Under load, killing the in-flight step can let `ndx ci`
  *      advance to the NEXT step while the parent is already exiting, and that
  *      late child used to escape. On an idle machine the parent may exit before
@@ -195,13 +197,13 @@ const activeRuns = [];
 
 function spawnCI(tmpDir, mode) {
   const pidFile = join(tmpDir, "ci-child-pids.jsonl");
+  const isWindows = process.platform === "win32";
   const child = spawn(process.execPath, [CLI_PATH, "ci", tmpDir], {
     cwd: tmpDir,
-    // A separate Windows console lets sendSIGINT attach and generate a real
-    // Ctrl+C event for this CLI only. `process.kill(pid, "SIGINT")` is
-    // TerminateProcess on Windows and would bypass the cleanup handler.
-    detached: process.platform === "win32",
-    stdio: ["ignore", "pipe", "pipe"],
+    // Windows has no reliable console on headless GitHub Actions workers, so
+    // the test uses a Node IPC channel there to emit SIGINT through the CLI's
+    // real listener. POSIX keeps the ordinary OS signal route.
+    stdio: isWindows ? ["ignore", "pipe", "pipe", "ipc"] : ["ignore", "pipe", "pipe"],
     env: {
       ...process.env,
       NODE_OPTIONS: withImportedNodeOptions(PRELOAD_PATH),
@@ -211,6 +213,7 @@ function spawnCI(tmpDir, mode) {
       NDX_TEST_CI_MODE: mode,
       NDX_TEST_CI_PID_FILE: pidFile,
       NDX_TEST_CI_REDIRECT_SCRIPT: CI_DOUBLE_PATH,
+      ...(isWindows ? { NDX_TEST_INTERRUPT_IPC: "1" } : {}),
     },
   });
 
@@ -237,10 +240,11 @@ function spawnCI(tmpDir, mode) {
  * Send a SIGINT that reaches the CLI's JavaScript signal handler.
  *
  * Node documents `process.kill(pid, "SIGINT")` as unconditional termination on
- * Windows. For the Windows branch, attach a short-lived PowerShell helper to the
- * detached CLI's console, ignore Ctrl+C in the helper itself, then generate a
- * CTRL_C_EVENT for that console. This is the programmatic equivalent of pressing
- * Ctrl+C, not a direct process termination.
+ * Windows. Headless GitHub Actions runners may not assign the CLI a console, so
+ * AttachConsole cannot make a real Ctrl+C deterministic there. The Windows
+ * branch instead sends an IPC test message that makes the CLI emit SIGINT; this
+ * invokes the production listener installed by installTrackedChildProcessHandlers
+ * and returns only after that listener has received the interruption.
  */
 async function sendSIGINT(child) {
   if (process.platform !== "win32") {
@@ -252,37 +256,27 @@ async function sendSIGINT(child) {
     throw new Error("Cannot send SIGINT to a CI run without a PID.");
   }
 
-  const script = [
-    "Add-Type @'",
-    "using System;",
-    "using System.Runtime.InteropServices;",
-    "public static class ConsoleSignal {",
-    "  [DllImport(\"Kernel32.dll\", SetLastError = true)] public static extern bool FreeConsole();",
-    "  [DllImport(\"Kernel32.dll\", SetLastError = true)] public static extern bool AttachConsole(uint processId);",
-    "  [DllImport(\"Kernel32.dll\", SetLastError = true)] public static extern bool SetConsoleCtrlHandler(IntPtr handler, bool add);",
-    "  [DllImport(\"Kernel32.dll\", SetLastError = true)] public static extern bool GenerateConsoleCtrlEvent(uint controlEvent, uint processGroupId);",
-    "}",
-    "'@",
-    "[ConsoleSignal]::FreeConsole() | Out-Null",
-    `if (-not [ConsoleSignal]::AttachConsole(${child.pid})) { throw \"AttachConsole failed\" }`,
-    "try {",
-    "  if (-not [ConsoleSignal]::SetConsoleCtrlHandler([IntPtr]::Zero, $true)) { throw \"SetConsoleCtrlHandler failed\" }",
-    "  if (-not [ConsoleSignal]::GenerateConsoleCtrlEvent(0, 0)) { throw \"GenerateConsoleCtrlEvent failed\" }",
-    "  Start-Sleep -Milliseconds 100",
-    "} finally { [ConsoleSignal]::FreeConsole() | Out-Null }",
-  ].join("\n");
-
   await new Promise((resolve, reject) => {
-    const helper = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
-      stdio: ["ignore", "ignore", "pipe"],
-      windowsHide: true,
-    });
-    let stderr = "";
-    helper.stderr.on("data", (chunk) => { stderr += chunk; });
-    helper.on("error", reject);
-    helper.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Windows SIGINT helper exited ${code}: ${stderr}`));
+    const onMessage = (message) => {
+      if (message?.type !== "ndx-test-interrupt-received" || message.signal !== "SIGINT") return;
+      finish(resolve);
+    };
+    const onClose = () => finish(reject, new Error("Windows CI run exited before receiving SIGINT."));
+    const finish = (settle, value) => {
+      child.removeListener("message", onMessage);
+      child.removeListener("close", onClose);
+      settle(value);
+    };
+
+    if (!child.connected) {
+      finish(reject, new Error("Windows CI run has no IPC channel for deterministic SIGINT delivery."));
+      return;
+    }
+
+    child.on("message", onMessage);
+    child.once("close", onClose);
+    child.send({ type: "ndx-test-interrupt", signal: "SIGINT" }, (error) => {
+      if (error) finish(reject, error);
     });
   });
 }
