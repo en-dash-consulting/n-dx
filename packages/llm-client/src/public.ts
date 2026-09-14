@@ -273,6 +273,7 @@ export {
   getCurrentBranch,
   getWorktreeRoot,
   getGitCommonDir,
+  listWorktrees,
   sanitizeBranchName,
   isExecutableOnPath,
   spawnTool,
@@ -298,6 +299,7 @@ export type {
   ManagedChild,
   SpawnCliOptions,
   CliInvocationDiagnosis,
+  WorktreeInfo,
 } from "./exec.js";
 
 // Process-tree termination — a kill that reaches descendants, not just the child.

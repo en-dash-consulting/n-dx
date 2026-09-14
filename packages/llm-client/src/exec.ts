@@ -676,6 +676,107 @@ export function getWorktreeRoot(cwd: string): string | null {
   return gitRevParsePath(cwd, "--show-toplevel");
 }
 
+/** One entry of `git worktree list` — a checkout of the repository. */
+export interface WorktreeInfo {
+  /** Realpath-resolved absolute path of the worktree root. */
+  path: string;
+  /** Checked-out branch name (without refs/heads/), or null when detached or bare. */
+  branch: string | null;
+  /** Commit the worktree is at; "" for a bare entry, which has no checkout. */
+  head: string;
+  /** True for the main worktree — the first entry, by git's contract. */
+  isMain: boolean;
+  /** True when HEAD is detached (no branch checked out). */
+  detached: boolean;
+  /** True for the bare repository entry itself. */
+  bare: boolean;
+}
+
+/** Ceiling on the worktree listing — a local git query answers in milliseconds. */
+const LIST_WORKTREES_TIMEOUT_MS = 5_000;
+
+/**
+ * Async git helper — list every worktree of the repository containing `cwd`.
+ *
+ * Parses `git worktree list --porcelain` (entries separated by blank lines:
+ * a `worktree <path>` line, then `HEAD <sha>`, then `branch refs/heads/<x>`
+ * or `detached`, or `bare`). Paths are realpath-resolved like the other git
+ * helpers here, so callers can compare them against their own canonical
+ * paths. Returns `[]` when git is missing, `cwd` is not a repository, or the
+ * query times out — the caller asked "which worktrees", and "none I can
+ * name" is the honest degraded answer. stderr is captured, never inherited:
+ * probing a non-repo is a normal call, not something to print `fatal:` for.
+ *
+ * Async because it sits on the dashboard's request path; the sourcevision
+ * analyzer keeps its own synchronous copy (workspace.ts), which must stay
+ * synchronous and is allowlisted separately in architecture-policy.
+ */
+export function listWorktrees(cwd: string): Promise<WorktreeInfo[]> {
+  return new Promise((resolvePromise) => {
+    execFile(
+      "git",
+      ["worktree", "list", "--porcelain"],
+      {
+        cwd,
+        encoding: "utf-8",
+        timeout: LIST_WORKTREES_TIMEOUT_MS,
+        windowsHide: true,
+      },
+      (error, stdout) => {
+        if (error) {
+          resolvePromise([]);
+          return;
+        }
+        resolvePromise(parseWorktreePorcelain(stdout));
+      },
+    );
+  });
+}
+
+/** Parse the porcelain listing. Split out so the shape is testable without git. */
+function parseWorktreePorcelain(porcelain: string): WorktreeInfo[] {
+  const worktrees: WorktreeInfo[] = [];
+  // Entries are blank-line separated; tolerate CRLF from a misconfigured git.
+  for (const block of porcelain.split(/\r?\n\r?\n/)) {
+    const lines = block.split(/\r?\n/).filter((l) => l.length > 0);
+    if (lines.length === 0) continue;
+
+    let path: string | null = null;
+    let head = "";
+    let branch: string | null = null;
+    let detached = false;
+    let bare = false;
+
+    for (const line of lines) {
+      if (line.startsWith("worktree ")) path = line.slice("worktree ".length);
+      else if (line.startsWith("HEAD ")) head = line.slice("HEAD ".length);
+      else if (line.startsWith("branch refs/heads/")) branch = line.slice("branch refs/heads/".length);
+      else if (line === "detached") detached = true;
+      else if (line === "bare") bare = true;
+    }
+    if (path === null) continue;
+
+    let resolved: string;
+    try {
+      // Same rationale as gitRevParsePath: only the OS call canonicalises
+      // Windows short names and on-disk casing.
+      resolved = realpathSync.native(path);
+    } catch {
+      resolved = path;
+    }
+
+    worktrees.push({
+      path: resolved,
+      branch,
+      head,
+      isMain: worktrees.length === 0,
+      detached,
+      bare,
+    });
+  }
+  return worktrees;
+}
+
 /**
  * Synchronous git helper — get the repository's common git directory.
  *
