@@ -60,6 +60,7 @@ type LockBackend = "hard-link" | "directory";
 type LockState =
   | {kind: "owned"; info: LockInfo}
   | {kind: "initializing"}
+  | {kind: "absent"}
   | {kind: "malformed"};
 
 function encodeLock(token: string): string {
@@ -160,7 +161,12 @@ async function readLockState(lockPath: string): Promise<LockState> {
   let content: string | undefined;
   try {
     content = await readFile(lockPath, "utf-8");
-  } catch {
+  } catch (err) {
+    // The lock can disappear after tryAcquire() observed EEXIST but before
+    // this inspection begins. Retry the acquisition even if another contender
+    // republishes the path before the stat() below: any metadata would belong
+    // to that new generation, not the one that caused our conflict.
+    if (hasErrorCode(err, "ENOENT")) return {kind: "absent"};
     // Directories normally reject readFile(), but FreeBSD returns directory
     // data. Inspect the path type below so both platform behaviours agree.
   }
@@ -177,7 +183,11 @@ async function readLockState(lockPath: string): Promise<LockState> {
         return {kind: "initializing"};
       }
     }
-  } catch {
+  } catch (err) {
+    // A holder can release the lock after our publication attempt saw EEXIST
+    // but before this inspection reaches stat(). This is not malformed lock
+    // content; it is an acquisition race that the caller can safely retry.
+    if (hasErrorCode(err, "ENOENT")) return {kind: "absent"};
     return {kind: "malformed"};
   }
 
@@ -189,9 +199,8 @@ async function readLockState(lockPath: string): Promise<LockState> {
   return {kind: "malformed"};
 }
 
-async function isLockStale(lockPath: string): Promise<boolean> {
-  const state = await readLockState(lockPath);
-  if (state.kind === "initializing") return false;
+function isLockStale(state: LockState): boolean {
+  if (state.kind === "initializing" || state.kind === "absent") return false;
   if (state.kind === "malformed") return true;
 
   const {info} = state;
@@ -364,7 +373,10 @@ export async function acquireLock(lockPath: string, options?: LockOptions): Prom
       // Never unlink a lock we did not acquire. Even after observing a dead
       // owner, another contender can replace that generation before a
       // path-based unlink executes. Fail loudly and require manual cleanup.
-      if (await isLockStale(lockPath)) {
+      const state = await readLockState(lockPath);
+      if (state.kind === "absent") continue;
+
+      if (isLockStale(state)) {
         throw await lockAcquisitionError(lockPath, acquireTimeoutMs);
       }
 

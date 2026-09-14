@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {mkdir, mkdtemp, readFile, readdir, rm, stat} from "node:fs/promises";
+import {mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 
@@ -9,6 +9,9 @@ const publication = vi.hoisted(() => ({
   failTemporaryUnlinkOnce: false,
   unsupportedLinkCode: undefined as string | undefined,
   directoryReadContentPath: undefined as string | undefined,
+  removeBeforeStatPath: undefined as string | undefined,
+  replaceBeforeReadPath: undefined as string | undefined,
+  removeReplacementBeforeRetryPath: undefined as string | undefined,
 }));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
@@ -21,7 +24,24 @@ vi.mock("node:fs/promises", async (importOriginal) => {
     }),
     readFile: vi.fn(async (path: Parameters<typeof actual.readFile>[0], ...args: unknown[]) => {
       if (String(path) === publication.directoryReadContentPath) return "directory entry data";
+      if (String(path) === publication.replaceBeforeReadPath) {
+        publication.replaceBeforeReadPath = undefined;
+        await actual.unlink(path);
+        await actual.writeFile(
+          path,
+          JSON.stringify({pid: process.ppid, token: "replacement-holder", timestamp: new Date().toISOString()}),
+        );
+        publication.removeReplacementBeforeRetryPath = String(path);
+        throw Object.assign(new Error("lock disappeared before inspection"), {code: "ENOENT"});
+      }
       return (actual.readFile as (...readArgs: unknown[]) => Promise<unknown>)(path, ...args);
+    }),
+    stat: vi.fn(async (path: Parameters<typeof actual.stat>[0], ...args: unknown[]) => {
+      if (String(path) === publication.removeBeforeStatPath) {
+        publication.removeBeforeStatPath = undefined;
+        await actual.unlink(path);
+      }
+      return (actual.stat as (...statArgs: unknown[]) => Promise<unknown>)(path, ...args);
     }),
     link: vi.fn(async (source: string, destination: string) => {
       publication.links.push({
@@ -31,6 +51,10 @@ vi.mock("node:fs/promises", async (importOriginal) => {
       });
       if (publication.unsupportedLinkCode) {
         throw Object.assign(new Error("hard links unsupported"), {code: publication.unsupportedLinkCode});
+      }
+      if (String(destination) === publication.removeReplacementBeforeRetryPath) {
+        publication.removeReplacementBeforeRetryPath = undefined;
+        await actual.unlink(destination);
       }
       return actual.link(source, destination);
     }),
@@ -55,6 +79,9 @@ describe("file-lock publication", () => {
     publication.failTemporaryUnlinkOnce = false;
     publication.unsupportedLinkCode = undefined;
     publication.directoryReadContentPath = undefined;
+    publication.removeBeforeStatPath = undefined;
+    publication.replaceBeforeReadPath = undefined;
+    publication.removeReplacementBeforeRetryPath = undefined;
     if (tempDir) await rm(tempDir, {recursive: true, force: true});
     tempDir = undefined;
   });
@@ -149,6 +176,41 @@ describe("file-lock publication", () => {
       .rejects.toThrow(/Held by a lock publication in progress/);
 
     expect(publication.links.length).toBeGreaterThan(1);
+  });
+
+  it("retries when an EEXIST lock disappears before its state is inspected", async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "rex-lock-publication-"));
+    const lockPath = join(tempDir, "prd.lock");
+    await writeFile(
+      lockPath,
+      JSON.stringify({pid: process.ppid, token: "released-holder", timestamp: new Date().toISOString()}),
+    );
+    publication.removeBeforeStatPath = lockPath;
+
+    const release = await acquireLock(lockPath, {acquireTimeoutMs: 200, retryDelayMs: 1});
+
+    // The first link observed the old lock. The second one succeeded after the
+    // inspection saw that it had disappeared, rather than waiting for timeout.
+    expect(publication.links).toHaveLength(2);
+    await expect(stat(lockPath)).resolves.toBeTruthy();
+    await release();
+  });
+
+  it("retries when a new contender republishes after the conflicted lock disappears", async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "rex-lock-publication-"));
+    const lockPath = join(tempDir, "prd.lock");
+    await writeFile(
+      lockPath,
+      JSON.stringify({pid: process.ppid, token: "released-holder", timestamp: new Date().toISOString()}),
+    );
+    publication.replaceBeforeReadPath = lockPath;
+
+    const release = await acquireLock(lockPath, {acquireTimeoutMs: 200, retryDelayMs: 1});
+
+    // A third contender republished after our first EEXIST. Its metadata is
+    // not malformed state from the first contender; after it releases, retry.
+    expect(publication.links).toHaveLength(2);
+    await release();
   });
 
   it("does not use the fallback for unrelated link failures", async () => {
