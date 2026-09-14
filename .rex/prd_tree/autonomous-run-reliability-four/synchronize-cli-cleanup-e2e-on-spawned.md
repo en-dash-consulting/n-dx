@@ -4,14 +4,14 @@ level: "task"
 title: "Synchronize CLI cleanup E2E on spawned-child readiness"
 status: "pending"
 priority: "medium"
-blockedBy:
-  - "1620e4cd-78b8-4835-82b4-14fd54cc3a45"
 tags:
   - "ndx-adversarial-review"
   - "severity:medium"
   - "macos"
   - "ci"
   - "process-lifecycle"
+blockedBy:
+  - "1620e4cd-78b8-4835-82b4-14fd54cc3a45"
 source: "ndx-adversarial-review"
 acceptanceCriteria:
   - "The successful-run cleanup assertion begins only after the fixture has emitted an observable spawned-child readiness signal, or the unrelated docs build is deterministically bypassed in this fixture."

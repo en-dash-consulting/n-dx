@@ -18,23 +18,30 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdir, writeFile, rm, readdir } from "node:fs/promises";
+import { mkdir, writeFile, rm, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 
 /** Set per test; `undefined` means "fall through to the real `cp`". */
-let cpBehaviour: ((attempt: number) => Promise<void> | void) | undefined;
+let cpBehaviour: ((
+  attempt: number,
+  args: Parameters<typeof import("node:fs/promises")["cp"]>,
+) => Promise<void> | void) | undefined;
 let cpCalls = 0;
+const fsMockState = vi.hoisted(() => ({
+  actualCp: undefined as undefined | typeof import("node:fs/promises")["cp"],
+}));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
+  fsMockState.actualCp = actual.cp;
   return {
     ...actual,
     cp: async (...args: Parameters<typeof actual.cp>) => {
       cpCalls += 1;
       if (cpBehaviour) {
-        const outcome = await cpBehaviour(cpCalls);
+        const outcome = await cpBehaviour(cpCalls, args);
         if (outcome !== undefined) return outcome;
       }
       return actual.cp(...args);
@@ -42,7 +49,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   };
 });
 
-const { snapshotPRDTree } = await import("../../../src/core/backup-snapshots.js");
+const { snapshotPRDTree, restoreFromBackup } = await import("../../../src/core/backup-snapshots.js");
 
 /** The error node raises when an entry vanishes between readdir and lstat. */
 function enoent(path: string): NodeJS.ErrnoException {
@@ -84,6 +91,40 @@ describe("snapshotPRDTree — entry vanishing mid-copy", () => {
     // The retry copied everything — a snapshot missing content would be worse
     // than no snapshot, because restore cannot tell the difference.
     expect(await readdir(join(snapshot!.backupPath, "epic_test"))).toEqual(["index.md"]);
+  });
+
+  it("clears a partial copy before retrying so restore cannot resurrect deleted entries", async () => {
+    const obsoleteDir = join(treeRoot, "epic_obsolete");
+    await mkdir(obsoleteDir);
+    await writeFile(join(obsoleteDir, "index.md"), "obsolete");
+
+    cpBehaviour = async (attempt, args) => {
+      if (attempt !== 1) return;
+
+      // Model cp copying some entries, then discovering the obsolete directory
+      // disappeared mid-walk. The failed attempt has already placed it in the
+      // claimed backup directory, exactly the state a retry must discard.
+      await fsMockState.actualCp!(...args);
+      await rm(obsoleteDir, { recursive: true });
+      await writeFile(join(treeRoot, "epic_test", "index.md"), "current");
+      throw enoent(obsoleteDir);
+    };
+
+    const snapshot = await snapshotPRDTree(rexDir);
+
+    expect(snapshot).not.toBeNull();
+    expect(cpCalls).toBe(2);
+    expect(await readFile(join(snapshot!.backupPath, "epic_test", "index.md"), "utf-8")).toBe("current");
+    await expect(readdir(join(snapshot!.backupPath, "epic_obsolete"))).rejects.toMatchObject({ code: "ENOENT" });
+
+    // Restore replaces the live tree, so an obsolete entry from the failed
+    // first attempt would be observable here if the retry merely overlaid it.
+    await mkdir(obsoleteDir);
+    await writeFile(join(obsoleteDir, "index.md"), "added after snapshot");
+    await restoreFromBackup(rexDir, snapshot!.id);
+
+    expect(await readFile(join(treeRoot, "epic_test", "index.md"), "utf-8")).toBe("current");
+    await expect(readdir(obsoleteDir)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("fails loudly when the entry never comes back", async () => {

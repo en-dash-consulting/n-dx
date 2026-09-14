@@ -120,10 +120,20 @@ const COPY_RETRY_MS = 5;
  * was rejected: a snapshot silently missing content is exactly the "safety net
  * that isn't there" `snapshot-guard` exists to avoid, and it would be
  * indistinguishable from a complete one at restore time. Instead the copy is
- * re-walked from scratch. `cp` overwrites by default, so a retry is idempotent,
- * and the next walk simply does not see an entry that is genuinely gone.
+ * re-walked from scratch. Before that walk, every entry from the failed partial
+ * copy is removed from the claimed directory: `cp` overwrites matching paths,
+ * but it does not remove paths absent from its source. Without that reset, a
+ * retry after a deletion could preserve an obsolete PRD item in the backup.
  * Retries are bounded; a persistent ENOENT still fails the command loudly.
  */
+async function clearPartialSnapshot(backupPath: string): Promise<void> {
+  const entries = await readdir(backupPath);
+  await Promise.all(entries.map((entry) => rm(join(backupPath, entry), {
+    recursive: true,
+    force: true,
+  })));
+}
+
 async function copyTree(treeRoot: string, backupPath: string): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
     try {
@@ -140,6 +150,7 @@ async function copyTree(treeRoot: string, backupPath: string): Promise<void> {
         throw new Error(`Failed to snapshot PRD tree to ${backupPath}: ${String(err)}`);
       }
       await new Promise((resolve) => setTimeout(resolve, COPY_RETRY_MS));
+      await clearPartialSnapshot(backupPath);
     }
   }
 }
