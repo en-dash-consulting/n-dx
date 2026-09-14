@@ -23,9 +23,11 @@
  *
  * It uses the same preload-interception pattern as cli-child-cleanup.test.js:
  * a NODE_OPTIONS=--import preload patches child_process.spawn so that any
- * node call to a sourcevision or rex CLI entry point is redirected to a
- * lightweight "double" script.  The double records its PID and behaves
- * according to NDX_TEST_CI_MODE.
+ * node call to a sourcevision or rex CLI entry point, plus the initial docs
+ * build, is redirected to a lightweight "double" script. The docs-build
+ * double emits the first observable child-readiness signal, so the PID-record
+ * deadline never includes the unrelated VitePress build duration. The double
+ * records its PID and behaves according to NDX_TEST_CI_MODE.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -282,8 +284,10 @@ describe("n-dx ci child-process cleanup regression coverage", () => {
 
   it("terminates the ci subprocess after a successful run", async () => {
     const run = spawnCI(tmpDir, "success");
-    // Wait for at least the first intercepted ci subprocess to be recorded.
+    // The docs-build double is the first tracked CI child and emits the
+    // readiness record before this assertion's timeout begins.
     const pidRecord = await readFirstPidRecord(run.pidFile);
+    expect(pidRecord.kind).toBe("docs-build");
     const result = await run.done;
 
     // The parent may exit non-zero if other steps (e.g. docs build) fail in

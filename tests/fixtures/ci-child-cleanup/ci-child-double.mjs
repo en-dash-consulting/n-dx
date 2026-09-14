@@ -17,7 +17,12 @@ const mode = process.env.NDX_TEST_CI_MODE ?? "success";
 if (pidFile) {
   appendFileSync(
     pidFile,
-    `${JSON.stringify({ pid: process.pid, argv: process.argv.slice(2), mode })}\n`,
+    `${JSON.stringify({
+      pid: process.pid,
+      argv: process.argv.slice(2),
+      mode,
+      kind: process.argv[2] === "docs:build" ? "docs-build" : "ci-tool",
+    })}\n`,
     "utf8",
   );
 }
