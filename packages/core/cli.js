@@ -780,6 +780,15 @@ async function detectAndCleanConflictingDashboard(absDir) {
     return { status: "none" };
   }
 
+  // A via:"hub" pid file names the SHARED hub daemon, not a dashboard this
+  // project owns — terminateTreeByPid here would take down every project's
+  // dashboard on a plain `ndx refresh`. The hub's child serves prebuilt
+  // assets; the rebuild race this cleanup exists for is the same one
+  // --live-server already accepts, so the hub is not a conflict.
+  if (info.via === "hub") {
+    return { status: "none" };
+  }
+
   if (!isProcessRunning(info.pid)) {
     // Stale PID file from a previously crashed/killed server — clean up silently.
     await removePidFile(absDir);
@@ -890,7 +899,10 @@ async function signalLiveReload(dir) {
     const res = await fetch(`http://127.0.0.1:${port}/api/reload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: "ndx refresh" }),
+      // dir lets the hub route the signal to THIS project's dashboard when
+      // several are registered (the port file points at the hub in hub mode).
+      // A directly-serving dashboard ignores the field.
+      body: JSON.stringify({ source: "ndx refresh", dir: resolve(dir) }),
       signal: controller.signal,
     });
 

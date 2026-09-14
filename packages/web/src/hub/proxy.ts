@@ -78,6 +78,40 @@ export function proxyHttpRequest(
 }
 
 /**
+ * Forward a request whose body the hub has ALREADY consumed (it had to read
+ * the JSON to route on it — /api/reload's `dir` field). The streaming proxy
+ * cannot be used at that point, so the buffered body is re-sent verbatim and
+ * the child's response relayed.
+ */
+export function proxyBufferedRequest(
+  res: ServerResponse,
+  port: number,
+  path: string,
+  method: string,
+  body: string,
+): void {
+  const proxyReq = request(
+    {
+      host: TARGET_HOST,
+      port,
+      method,
+      path,
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+        host: `${TARGET_HOST}:${port}`,
+      },
+    },
+    (proxyRes) => {
+      res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+      proxyRes.pipe(res);
+    },
+  );
+  proxyReq.on("error", (err) => sendBadGateway(res, err.message));
+  proxyReq.end(body);
+}
+
+/**
  * Forward a WebSocket upgrade to the child on `port` and pipe the sockets.
  *
  * The upgrade request is replayed via http.request — the child's handshake

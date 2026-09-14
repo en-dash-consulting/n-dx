@@ -814,6 +814,30 @@ async function runHubStart(absDir, flags, deps) {
     return 1;
   }
 
+  // Compatibility pointers: tooling that finds the dashboard through
+  // <dir>/.n-dx-web.port (ndx refresh --live-server, the reload signal)
+  // keeps working — the file now names the hub's port, and the hub routes
+  // /api/reload to this project's child. The pid file records via: "hub" so
+  // the legacy stop path knows this pid is the shared hub, not a private
+  // server it may terminate.
+  try {
+    const hubPid = JSON.parse(await readFile(join(hubStateDir(), "hub.pid"), "utf-8"))?.pid ?? null;
+    await writeFile(join(absDir, PORT_FILE), String(hubPort) + "\n", "utf-8");
+    await writeFile(
+      join(absDir, PID_FILE),
+      JSON.stringify(
+        { pid: hubPid, port: hubPort, startedAt: new Date().toISOString(), via: "hub", projectId: id },
+        null,
+        2,
+      ) + "\n",
+      "utf-8",
+    );
+  } catch (err) {
+    // The registration succeeded; a failed pointer write only degrades
+    // refresh --live-server, so report it rather than failing the start.
+    console.error(`Warning: could not write ${PORT_FILE}/${PID_FILE} in ${absDir}: ${err.message}`);
+  }
+
   const projectUrl = `http://localhost:${hubPort}/p/${encodeURIComponent(id)}/`;
   log(`${deps.label} registered with the hub as "${id}"${worktree ? ` (worktree: ${worktree})` : ""}.`);
   log(`  URL: ${projectUrl}`);
@@ -852,6 +876,16 @@ async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(pro
   const info = await readPidFile(dir);
   if (!info) {
     log("No background server found.");
+    return true;
+  }
+
+  // A via:"hub" pid file names the SHARED hub daemon, not a server this
+  // project owns — terminateTreeByPid here would take down every project's
+  // dashboard. Hub-aware stop (unregister + keepAlive) is the follow-up
+  // task; until then, refuse the kill and say why.
+  if (info.via === "hub") {
+    log(`This project is served by the n-dx hub (PID ${info.pid}, port ${info.port}).`);
+    log("Stopping the shared hub from here is not supported yet — it would stop every project's dashboard.");
     return true;
   }
 

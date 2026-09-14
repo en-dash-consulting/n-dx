@@ -179,6 +179,26 @@ describe("ndx start registers with the hub (e2e)", { timeout: 180_000 }, () => {
     }
   });
 
+  it("writes .n-dx-web.port/.pid pointing at the hub, and refresh --live-server reloads THIS project through it", async () => {
+    if (!canBindPorts) return;
+
+    // The pointer files land in the invoked directory (the worktree): the
+    // port file names the HUB's port, the pid file records via:"hub" so the
+    // legacy stop/refresh cleanup paths know this pid is the shared daemon.
+    const portFile = await readFile(join(worktreeA, ".n-dx-web.port"), "utf-8");
+    expect(parseInt(portFile.trim(), 10)).toBe(hubPort);
+
+    const pidFile = JSON.parse(await readFile(join(worktreeA, ".n-dx-web.pid"), "utf-8"));
+    expect(pidFile.via).toBe("hub");
+    expect(pidFile.projectId).toBe("hub-repo-a");
+    expect(pidFile.port).toBe(hubPort);
+
+    // With BOTH projects registered, the reload can only reach the right
+    // dashboard by matching the sender's directory — the acceptance case.
+    const stdout = ndx(["refresh", "--ui-only", "--no-build", "--live-server", worktreeA]);
+    expect(stdout).toContain(`Live reload: attempted on :${hubPort} and succeeded`);
+  });
+
   it("re-running from the same repo is idempotent — same id, no second entry", async () => {
     if (!canBindPorts) return;
 

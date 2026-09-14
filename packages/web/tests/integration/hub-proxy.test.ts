@@ -94,11 +94,17 @@ interface EchoBody {
   host: string | null;
 }
 
-async function register(hub: HubHandle, id: string, repoRoot: string, ndxBin: string): Promise<void> {
+async function register(
+  hub: HubHandle,
+  id: string,
+  repoRoot: string,
+  ndxBin: string,
+  worktree?: string,
+): Promise<void> {
   const res = await fetch(hubUrl(hub, "/api/hub/projects"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, repoRoot, ndxBin }),
+    body: JSON.stringify({ id, repoRoot, ndxBin, worktree }),
   });
   expect(res.status, await res.clone().text()).toBe(201);
 }
@@ -249,6 +255,49 @@ describe("hub reverse proxy", () => {
       const ws = await wsRoundTrip(hub.port, "/");
       expect(ws.status).toBe(101);
       expect(ws.received.toString()).toContain("hello /");
+    } finally {
+      await hub.close();
+    }
+  }, 60_000);
+
+  it("routes /api/reload to the project matching the sender's directory", async () => {
+    // Fresh registry: reload routing decisions depend on exactly what is
+    // registered, so this test controls its own state directory.
+    const wtA = await mkdtemp(join(baseDir, "repo-a-wt-"));
+    const hub = await startHub(0, { hubDir: join(baseDir, "state-reload"), quiet: true, healthCheckIntervalMs: 60_000 });
+    try {
+      await register(hub, "alpha", repoA, stubBin, wtA);
+
+      const reload = (dir?: string) =>
+        fetch(hubUrl(hub, "/api/reload"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dir ? { source: "test", dir } : { source: "test" }),
+        });
+
+      // Sole project: no dir needed — the root-alias rule applies.
+      const sole = await reload();
+      expect(sole.status).toBe(200);
+      expect(((await sole.json()) as EchoBody).url).toBe("/api/reload");
+
+      await register(hub, "beta", repoB, stubBin);
+      const listed = await fetch(hubUrl(hub, "/api/hub/projects"));
+      const { projects } = (await listed.json()) as { projects: Array<{ id: string; port: number }> };
+      const alphaPort = projects.find((p) => p.id === "alpha")!.port;
+      const betaPort = projects.find((p) => p.id === "beta")!.port;
+
+      // dir = B's repo root → B's child answers (its host header names its port).
+      const toB = (await (await reload(repoB)).json()) as EchoBody;
+      expect(toB.host).toContain(String(betaPort));
+
+      // dir = A's registered WORKTREE → still A's child.
+      const toA = (await (await reload(wtA)).json()) as EchoBody;
+      expect(toA.host).toContain(String(alphaPort));
+
+      // dir matching nothing, several projects → 409 naming the candidates.
+      const nowhere = await reload(join(baseDir, "not-a-registered-repo"));
+      expect(nowhere.status).toBe(409);
+      expect(((await nowhere.json()) as { projects: string[] }).projects.sort()).toEqual(["alpha", "beta"]);
     } finally {
       await hub.close();
     }

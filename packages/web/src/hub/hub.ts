@@ -47,8 +47,10 @@ import {
   ChildSpawnError,
   type ChildServer,
 } from "./children.js";
-import { proxyHttpRequest, proxyUpgrade } from "./proxy.js";
+import { proxyHttpRequest, proxyUpgrade, proxyBufferedRequest } from "./proxy.js";
 import { handleEdgeSecurity } from "./edge-security.js";
+import { realpathSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
 import type { Duplex } from "node:stream";
 
 export const DEFAULT_HUB_PORT = 3117;
@@ -116,6 +118,34 @@ export function matchProjectPath(pathname: string): { id: string; path: string }
   const m = pathname.match(/^\/p\/([^/]+)(\/.*)?$/);
   if (!m) return null;
   return { id: decodeURIComponent(m[1]!), path: m[2] ?? "" };
+}
+
+/**
+ * Canonicalize a path for directory comparison: realpath resolves symlinks
+ * and, on win32, drive-letter/name casing; a path that no longer exists
+ * falls back to the resolved spelling (mirrors core/web.js).
+ */
+function canonicalize(pathLike: string): string {
+  const resolved = resolvePath(pathLike);
+  try {
+    return realpathSync.native(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
+/**
+ * The registered project a directory belongs to — matching its repoRoot or
+ * any registered worktree. Exported logic is exercised through the reload
+ * route's integration tests.
+ */
+function projectForDir(state: HubState, dir: string): HubProject | null {
+  const wanted = canonicalize(dir);
+  for (const project of Object.values(state.registry.projects)) {
+    if (canonicalize(project.repoRoot) === wanted) return project;
+    if (project.worktrees.some((w) => canonicalize(w) === wanted)) return project;
+  }
+  return null;
 }
 
 /**
@@ -497,6 +527,44 @@ export async function startHub(port: number = DEFAULT_HUB_PORT, opts: StartHubOp
       }
       if (url.pathname === "/api/hub" || url.pathname.startsWith("/api/hub/")) {
         sendJson(res, 404, { error: `no such route: ${req.method} ${url.pathname}` });
+        return;
+      }
+
+      // ── /api/reload — route by the caller's directory ───────────────────
+      // `ndx refresh --live-server` finds the dashboard through the project's
+      // .n-dx-web.port file, which in hub mode names the HUB's port. The
+      // reload must reach the right child, so the sender includes its
+      // directory and the hub matches it against repoRoot/worktrees. With no
+      // (or an unmatched) dir, the sole registered project still gets it —
+      // the root-alias rule — and several projects answer 409.
+      if (req.method === "POST" && url.pathname === "/api/reload") {
+        const rawBody = await readBody(req);
+        let dir: string | null = null;
+        try {
+          const parsed = JSON.parse(rawBody) as { dir?: unknown };
+          if (typeof parsed.dir === "string" && parsed.dir.length > 0) dir = parsed.dir;
+        } catch {
+          // body is optional — fall through to the sole-project rule
+        }
+        const ids = Object.keys(st.registry.projects);
+        const target =
+          (dir ? projectForDir(st, dir) : null) ??
+          (ids.length === 1 ? st.registry.projects[ids[0]!] : undefined);
+        if (!target) {
+          sendJson(res, 409, {
+            error:
+              ids.length === 0
+                ? "no project is registered with the hub"
+                : `no registered project matches ${dir ?? "(no dir sent)"} — address one under /p/<id>/`,
+            projects: ids,
+          });
+          return;
+        }
+        if (target.port === null) {
+          sendJson(res, 503, { error: `project ${target.id} has no running server` });
+          return;
+        }
+        proxyBufferedRequest(res, target.port, "/api/reload", "POST", rawBody);
         return;
       }
 
