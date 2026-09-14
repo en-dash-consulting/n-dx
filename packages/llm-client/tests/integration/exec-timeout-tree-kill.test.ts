@@ -62,6 +62,17 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
   /** Wall-clock room for the grandchild to prove it is still writing. */
   const OBSERVE_MS = 2000;
 
+  /**
+   * How long the command may run before exec times it out. The grandchild must
+   * reach its first 150ms tick inside this window, or the vacuous-pass guard below
+   * fails for a reason unrelated to tree killing. On Windows the direct child is
+   * MSYS `sh`, and starting it plus a cold `node` has been measured well past 700ms
+   * on a CI runner with other vitest workers competing for the disk — zero ticks
+   * before the kill. The wider window costs a few seconds per pass on that platform
+   * only; POSIX shells start fast enough that 700ms leaves several ticks.
+   */
+  const TIMEOUT_MS = process.platform === "win32" ? 3000 : 700;
+
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "exec-treekill-"));
 
@@ -90,7 +101,7 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
    * relative because cwd is the temp dir — an absolute Windows path inside a
    * `sh -c` string would have its backslashes eaten as escapes.
    */
-  function runTimingOut(timeout = 700) {
+  function runTimingOut(timeout = TIMEOUT_MS) {
     return exec("sh", ["-c", "node grandchild.js"], { cwd: dir, timeout, freeze });
   }
 
@@ -141,7 +152,7 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
 
     // Guards against the whole suite passing vacuously: if the grandchild never
     // started, "nothing was written after the timeout" would prove nothing. At
-    // 150ms per tick under a 700ms timeout it should manage several.
+    // 150ms per tick under TIMEOUT_MS it should manage several.
     expect(await tickCount()).toBeGreaterThan(0);
     expect(readPid()).not.toBe(null);
   });
