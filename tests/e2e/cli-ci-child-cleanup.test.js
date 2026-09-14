@@ -11,7 +11,9 @@
  *   1. A ci subprocess that completes normally is reaped before the parent exits.
  *   2. A ci subprocess that is still running when SIGINT arrives is killed by
  *      the cleanup gate (SIGTERM → SIGKILL after timeout).
- *   3. NO fixture child outlives the test file, whatever the assertions did —
+ *   3. The shell-backed docs-build fixture starts a grandchild in hang mode;
+ *      SIGINT must reap every recorded fixture PID, including that descendant.
+ *   4. NO fixture child outlives the test file, whatever the assertions did —
  *      see the teardown. Under load, killing the in-flight step can let `ndx ci`
  *      advance to the NEXT step while the parent is already exiting, and that
  *      late child used to escape. On an idle machine the parent may exit before
@@ -125,6 +127,17 @@ async function readFirstPidRecord(pidFile, timeoutMs = 3_000) {
   throw new Error(`Timed out waiting for CI child PID record at ${pidFile}`);
 }
 
+async function readPidRecordsUntil(pidFile, predicate, timeoutMs = 3_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const records = await readPidRecords(pidFile);
+    if (predicate(records)) return records;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  throw new Error(`Timed out waiting for required CI child records at ${pidFile}`);
+}
+
 function withImportedNodeOptions(preloadPath) {
   // `--import` needs a file:// URL, not a bare path: on Windows Node rejects
   // `--import=C:\...` with ERR_UNSUPPORTED_ESM_URL_SCHEME ("Received
@@ -184,10 +197,17 @@ function spawnCI(tmpDir, mode) {
   const pidFile = join(tmpDir, "ci-child-pids.jsonl");
   const child = spawn(process.execPath, [CLI_PATH, "ci", tmpDir], {
     cwd: tmpDir,
+    // A separate Windows console lets sendSIGINT attach and generate a real
+    // Ctrl+C event for this CLI only. `process.kill(pid, "SIGINT")` is
+    // TerminateProcess on Windows and would bypass the cleanup handler.
+    detached: process.platform === "win32",
     stdio: ["ignore", "pipe", "pipe"],
     env: {
       ...process.env,
       NODE_OPTIONS: withImportedNodeOptions(PRELOAD_PATH),
+      // The asserted strategy line proves the console event reached ndx's
+      // cleanup handler rather than merely terminating the parent process.
+      NDX_DEBUG_LIFECYCLE: "1",
       NDX_TEST_CI_MODE: mode,
       NDX_TEST_CI_PID_FILE: pidFile,
       NDX_TEST_CI_REDIRECT_SCRIPT: CI_DOUBLE_PATH,
@@ -213,11 +233,60 @@ function spawnCI(tmpDir, mode) {
   return run;
 }
 
-// Runs on Windows as well as POSIX. Caveat for the SIGINT case: on Windows
-// `process.kill(pid, "SIGINT")` is TerminateProcess, so the CLI's signal handler
-// never runs and the subprocess dies because the host's Job Object reaps the
-// tree — not because tracker cleanup ran. See the header of
-// cli-orphan-cleanup.test.js for the full explanation.
+/**
+ * Send a SIGINT that reaches the CLI's JavaScript signal handler.
+ *
+ * Node documents `process.kill(pid, "SIGINT")` as unconditional termination on
+ * Windows. For the Windows branch, attach a short-lived PowerShell helper to the
+ * detached CLI's console, ignore Ctrl+C in the helper itself, then generate a
+ * CTRL_C_EVENT for that console. This is the programmatic equivalent of pressing
+ * Ctrl+C, not a direct process termination.
+ */
+async function sendSIGINT(child) {
+  if (process.platform !== "win32") {
+    process.kill(child.pid, "SIGINT");
+    return;
+  }
+
+  if (!Number.isInteger(child.pid)) {
+    throw new Error("Cannot send SIGINT to a CI run without a PID.");
+  }
+
+  const script = [
+    "Add-Type @'",
+    "using System;",
+    "using System.Runtime.InteropServices;",
+    "public static class ConsoleSignal {",
+    "  [DllImport(\"Kernel32.dll\", SetLastError = true)] public static extern bool FreeConsole();",
+    "  [DllImport(\"Kernel32.dll\", SetLastError = true)] public static extern bool AttachConsole(uint processId);",
+    "  [DllImport(\"Kernel32.dll\", SetLastError = true)] public static extern bool SetConsoleCtrlHandler(IntPtr handler, bool add);",
+    "  [DllImport(\"Kernel32.dll\", SetLastError = true)] public static extern bool GenerateConsoleCtrlEvent(uint controlEvent, uint processGroupId);",
+    "}",
+    "'@",
+    "[ConsoleSignal]::FreeConsole() | Out-Null",
+    `if (-not [ConsoleSignal]::AttachConsole(${child.pid})) { throw \"AttachConsole failed\" }`,
+    "try {",
+    "  if (-not [ConsoleSignal]::SetConsoleCtrlHandler([IntPtr]::Zero, $true)) { throw \"SetConsoleCtrlHandler failed\" }",
+    "  if (-not [ConsoleSignal]::GenerateConsoleCtrlEvent(0, 0)) { throw \"GenerateConsoleCtrlEvent failed\" }",
+    "  Start-Sleep -Milliseconds 100",
+    "} finally { [ConsoleSignal]::FreeConsole() | Out-Null }",
+  ].join("\n");
+
+  await new Promise((resolve, reject) => {
+    const helper = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      stdio: ["ignore", "ignore", "pipe"],
+      windowsHide: true,
+    });
+    let stderr = "";
+    helper.stderr.on("data", (chunk) => { stderr += chunk; });
+    helper.on("error", reject);
+    helper.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Windows SIGINT helper exited ${code}: ${stderr}`));
+    });
+  });
+}
+
 describe("n-dx ci child-process cleanup regression coverage", () => {
   let tmpDir;
 
@@ -301,16 +370,31 @@ describe("n-dx ci child-process cleanup regression coverage", () => {
     { timeout: CHILD_FORCE_KILL_TIMEOUT_MS + SHUTDOWN_ASSERTION_BUFFER_MS + 5_000 },
     async () => {
       const run = spawnCI(tmpDir, "hang");
-      const pidRecord = await readFirstPidRecord(run.pidFile);
+      const records = await readPidRecordsUntil(
+        run.pidFile,
+        (candidate) => candidate.some((record) => record.kind === "docs-build") &&
+          candidate.some((record) => record.kind === "docs-build-grandchild"),
+      );
+      const docsBuild = records.find((record) => record.kind === "docs-build");
+      const docsBuildGrandchild = records.find((record) => record.kind === "docs-build-grandchild");
+      expect(docsBuild).toBeDefined();
+      expect(docsBuildGrandchild).toBeDefined();
 
-      // Interrupt the parent process mid-run.
-      process.kill(run.child.pid, "SIGINT");
+      // Interrupt the parent process mid-run through its real SIGINT handler.
+      await sendSIGINT(run.child);
       const result = await run.done;
 
       expect(result.code).not.toBe(0);
-      await waitForPidExit(
-        pidRecord.pid,
-        CHILD_FORCE_KILL_TIMEOUT_MS + SHUTDOWN_ASSERTION_BUFFER_MS,
+      expect(result.stderr).toContain(
+        process.platform === "win32"
+          ? "[child-lifecycle] taskkill /PID"
+          : "[child-lifecycle] process group kill",
+      );
+      await Promise.all(
+        records.map((record) => waitForPidExit(
+          record.pid,
+          CHILD_FORCE_KILL_TIMEOUT_MS + SHUTDOWN_ASSERTION_BUFFER_MS,
+        )),
       );
     },
   );

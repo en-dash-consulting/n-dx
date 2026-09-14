@@ -38,7 +38,14 @@ if (redirectScript) {
       // unrelated VitePress build while preserving a real tracked child spawn.
       const childCommand = isDocsBuild ? process.execPath : command;
       const childArgs = isDocsBuild ? args : args.slice(1);
-      return originalSpawn.call(this, childCommand, [redirectScript, ...childArgs], options);
+      // sendSIGINT attaches to ndx's detached Windows console. Keep the
+      // docs-build shell in its own console so that generated Ctrl+C reaches
+      // the parent handler only; otherwise Windows would terminate cmd.exe and
+      // its descendants directly, proving nothing about tracker cleanup.
+      const childOptions = isDocsBuild && process.platform === "win32"
+        ? { ...options, detached: true }
+        : options;
+      return originalSpawn.call(this, childCommand, [redirectScript, ...childArgs], childOptions);
     }
 
     return originalSpawn.call(this, command, args, options);

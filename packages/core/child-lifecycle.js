@@ -535,11 +535,10 @@ function killLateArrival(child, {
   if (!isChildRunning(child)) return;
 
   if (treeKill && !supportsProcessGroups(platform)) {
-    // Do not await: register() must retain its synchronous API and the caller can
-    // already be advancing toward process.exit(). terminateTree starts taskkill
-    // synchronously and bounds all later waits.
-    void terminateTree(child, { forceKillTimeoutMs, platform, spawnCliImpl, killGroup, env });
-    return;
+    // register() remains synchronous, but cleanup() retains this promise before
+    // it resolves. Otherwise flushAndExit() can terminate ndx (and its taskkill
+    // helper) while taskkill is still walking a cmd.exe/pnpm tree.
+    return terminateTree(child, { forceKillTimeoutMs, platform, spawnCliImpl, killGroup, env });
   }
 
   if (treeKill && supportsProcessGroups(platform) && child.pid) {
@@ -592,10 +591,31 @@ export function createChildProcessTracker({
     : terminateChildProcess;
 
   const children = new Set();
+  const lateTerminations = new Set();
   let cleanupPromise = null;
 
   function unregister(child) {
     children.delete(child);
+  }
+
+  function retainLateTermination(termination) {
+    if (!termination) return;
+
+    const completion = Promise.resolve(termination)
+      // terminateTree has a direct-child fallback, but a custom test seam may
+      // still reject. Do not let that skip the signal handler's exit path.
+      .catch(() => undefined)
+      .finally(() => lateTerminations.delete(completion));
+    lateTerminations.add(completion);
+  }
+
+  async function waitForLateTerminations() {
+    // A late child is registered by a close handler on an initial child. That
+    // handler runs before terminateTree's wait continuation settles its initial
+    // snapshot, so every Windows taskkill started by that race is retained here.
+    while (lateTerminations.size > 0) {
+      await Promise.allSettled([...lateTerminations]);
+    }
   }
 
   function register(child) {
@@ -609,14 +629,14 @@ export function createChildProcessTracker({
     // orphan per Ctrl-C this way, because killing `sourcevision analyze` let
     // runCI advance a step while the process was on its way out.
     if (cleanupPromise) {
-      killLateArrival(child, {
+      retainLateTermination(killLateArrival(child, {
         treeKill,
         platform,
         forceKillTimeoutMs,
         spawnCliImpl,
         killGroup,
         env,
-      });
+      }));
       return child;
     }
 
@@ -649,7 +669,7 @@ export function createChildProcessTracker({
     if (!cleanupPromise) {
       cleanupPromise = Promise.allSettled(
         [...children].map((child) => terminate(child, forceKillTimeoutMs)),
-      ).then(() => undefined);
+      ).then(waitForLateTerminations);
     }
 
     return cleanupPromise;

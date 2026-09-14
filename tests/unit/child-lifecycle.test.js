@@ -599,6 +599,55 @@ describe("child process lifecycle tracker", () => {
     expect(late.killSignals).toEqual([]);
   });
 
+  it("does not finish cleanup while a late Windows tree kill is still running", async () => {
+    let inFlight;
+    let late;
+    let taskkillCount = 0;
+    const spawnCliImpl = vi.fn(() => {
+      const taskkill = new EventEmitter();
+      taskkillCount += 1;
+
+      if (taskkillCount === 1) {
+        queueMicrotask(() => {
+          inFlight.close(null, "SIGKILL");
+          taskkill.emit("close", 0);
+        });
+      } else {
+        setTimeout(() => {
+          late.close(null, "SIGKILL");
+          taskkill.emit("close", 0);
+        }, 10);
+      }
+      return taskkill;
+    });
+    const tracker = createChildProcessTracker({
+      forceKillTimeoutMs: 50,
+      treeKill: true,
+      platform: "win32",
+      spawnCliImpl,
+    });
+    inFlight = tracker.register(new FakeChildProcess());
+    inFlight.pid = 4242;
+    inFlight.once("close", () => {
+      late = new FakeChildProcess();
+      late.pid = 4243;
+      tracker.register(late);
+    });
+
+    let cleanupFinished = false;
+    const cleanupPromise = tracker.cleanup().then(() => {
+      cleanupFinished = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(spawnCliImpl).toHaveBeenCalledTimes(2);
+    expect(cleanupFinished).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(10);
+    await cleanupPromise;
+    expect(cleanupFinished).toBe(true);
+  });
+
   it("runs tracked cleanup before exiting on SIGTERM", async () => {
     const tracker = createChildProcessTracker({ forceKillTimeoutMs: 50 });
     const processRef = new FakeProcess();
