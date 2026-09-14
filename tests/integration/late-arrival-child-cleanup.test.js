@@ -46,8 +46,8 @@ function waitForGrandchildPid(child) {
 
     const onData = (chunk) => {
       output += chunk;
-      const pid = Number.parseInt(output, 10);
-      if (Number.isInteger(pid)) finish(resolve, pid);
+      const match = output.match(/^(\d+)\r?\n/);
+      if (match) finish(resolve, Number.parseInt(match[1], 10));
     };
     const onError = (error) => finish(reject, error);
     const onExit = () => finish(reject, new Error(`Detached child exited before reporting its grandchild PID: ${output}`));
@@ -105,7 +105,8 @@ describePosix("late detached child registration after the cleanup gate", () => {
         [
           "const { spawn } = require('node:child_process');",
           "const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
-          "process.stdout.write(String(grandchild.pid));",
+          "process.stdout.write(String(grandchild.pid).slice(0, 1));",
+          "setTimeout(() => process.stdout.write(String(grandchild.pid).slice(1) + '\\n'), 10);",
           "setInterval(() => {}, 1000);",
         ].join(" "),
       ],
@@ -137,7 +138,8 @@ describeWindows("late Windows child registration after the cleanup gate", () => 
         [
           "const { spawn } = require('node:child_process');",
           "const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
-          "process.stdout.write(String(grandchild.pid));",
+          "process.stdout.write(String(grandchild.pid).slice(0, 1));",
+          "setTimeout(() => process.stdout.write(String(grandchild.pid).slice(1) + '\\n'), 10);",
           "setInterval(() => {}, 1000);",
         ].join(" "),
       ],
