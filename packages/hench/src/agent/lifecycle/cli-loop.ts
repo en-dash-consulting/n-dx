@@ -1652,7 +1652,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // posture chosen for the work spawn — a reviewer that can only
         // describe a fix is the interactive workflow, not this one.
         permissionMode: "acceptEdits",
-        autonomous,
+        autonomous: autonomous || opts.yes === true || process.stdin.isTTY !== true,
         taskTitle: brief.task.title,
       }
     : undefined;

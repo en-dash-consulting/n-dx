@@ -1,18 +1,11 @@
 {
   "llm": {
-    "vendor": "local",
-    "model": "qwen/qwen3.5-9b",
+    "vendor": "claude",
+    "model": "claude-opus-5",
     "claude": {
       "model": "claude-opus-5"
     },
-    "codex": {},
-    "local": {
-      "model": "qwen/qwen3.5-9b",
-      "timeoutMs": 7200000
-    }
-  },
-  "hench": {
-    "autonomous": true
+    "codex": {}
   },
   "sourcevision": {
     "zones": {
@@ -292,21 +285,8 @@
   },
   "_initVersion": "0.5.2",
   "cli": {
-    "timeoutMs": 0,
-    "name": "n-dx",
-    "timeouts": {
-      "add": 0,
-      "work": 0,
-      "self-heal": 0,
-      "export": 0,
-      "refresh": 0,
-      "start": 0,
-      "dev": 0,
-      "ci": 0,
-      "plan": 0,
-      "recommend": 0,
-      "analyze": 0
-    }
+    "timeoutMs": 18000000,
+    "name": "n-dx"
   },
   "claude": {
     "model": "claude-opus-5"

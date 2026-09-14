@@ -656,7 +656,6 @@ async function promptTestGateFailure(
         return "rerun";
       case "s":
         return "skip";
-      case "c": // context mode for autonomous
       default:
         return "abort";
     }
@@ -2058,10 +2057,13 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   let testGateSkipped = false;
   let resolvedTestCommand: string | undefined;
 
+  // Whenever a completed run bypasses the gate, say so explicitly — a silently
+  // absent gate looks identical to a gate that never should have run, which
+  // hides misconfiguration. Both bypass conditions are covered, not just the flag.
   if (run.status === "completed" && skipFullTestGate) {
-    // Say so explicitly — a silently absent gate looks identical to a gate
-    // that never should have run, which hides misconfiguration.
     stream("Test Gate", "Skipped (--skip-test-gate / hench.skipFullTestGate)");
+  } else if (run.status === "completed" && !run.structuredSummary) {
+    stream("Test Gate", "Skipped (run has no structured summary to gate against)");
   }
 
   if (run.status === "completed" && !skipFullTestGate && run.structuredSummary) {

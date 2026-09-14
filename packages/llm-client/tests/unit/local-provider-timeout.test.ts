@@ -44,7 +44,7 @@ describe("createLocalApiProvider timeout wiring", () => {
     vi.restoreAllMocks();
   });
 
-  it("aborts the request with a configured timeout", async () => {
+  it("passes an abort signal when a timeout is configured", async () => {
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       expect(init?.signal).toBeDefined();
       return okCompletion();
@@ -55,6 +55,30 @@ describe("createLocalApiProvider timeout wiring", () => {
     await provider.complete({ prompt: "hello" });
 
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("aborts the request when the configured timeout elapses", async () => {
+    // A fetch that never resolves on its own: it settles only when the signal
+    // the provider handed it fires. If the provider never arms the timer, this
+    // test hangs instead of passing vacuously.
+    let observedSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => {
+      observedSignal = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          const err = new Error("The operation was aborted");
+          err.name = "AbortError";
+          reject(err);
+        });
+      });
+    }));
+
+    const provider = createLocalApiProvider({ localConfig: { timeoutMs: 20 } });
+    const pending = provider.complete({ prompt: "hello" });
+
+    await expect(pending).rejects.toMatchObject({ reason: "timeout", retryable: true });
+    await expect(pending).rejects.toThrow(/timed out after/);
+    expect(observedSignal?.aborted).toBe(true);
   });
 
   it("sends no abort signal when llm.local.timeoutMs is 0", async () => {
