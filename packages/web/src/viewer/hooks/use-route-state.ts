@@ -8,6 +8,7 @@
 import { useState, useCallback, useEffect } from "preact/hooks";
 import type { ViewId, NavigateTo, AskSeed } from "../types.js";
 import { parseLegacyHashRoute, resolveLocationRoute } from "../route-state.js";
+import { withBase } from "../base-path.js";
 
 export interface RouteState {
   view: ViewId;
@@ -72,7 +73,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     setAskSeed(seed);
     setView(targetView);
     const subId = runId ?? taskId;
-    const urlPath = subId ? `/${targetView}/${subId}` : `/${targetView}`;
+    const urlPath = withBase(subId ? `/${targetView}/${subId}` : `/${targetView}`);
     history.pushState({ view: targetView, file, zone, runId, taskId, askSeed: seed }, "", urlPath);
   }, []);
 
@@ -83,7 +84,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     setSelectedTaskId(null);
     setAskSeed(null);
     setView(id);
-    history.pushState({ view: id, file: null, zone: null, runId: null, taskId: null, askSeed: null }, "", `/${id}`);
+    history.pushState({ view: id, file: null, zone: null, runId: null, taskId: null, askSeed: null }, "", withBase(`/${id}`));
   }, []);
 
   useEffect(() => {
@@ -100,12 +101,12 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
       setSelectedRunId(runId);
       setSelectedTaskId(taskId);
       setAskSeed(null);
-      const hashUrl = hashRoute.subId ? `/${hashRoute.view}/${hashRoute.subId}` : `/${hashRoute.view}`;
+      const hashUrl = withBase(hashRoute.subId ? `/${hashRoute.view}/${hashRoute.subId}` : `/${hashRoute.view}`);
       history.replaceState({ view: hashRoute.view, file: null, zone: null, runId, taskId, askSeed: null }, "", hashUrl);
     } else {
       // Seed the initial history entry — preserve deep-link path if present
       const subId = selectedRunId ?? selectedTaskId;
-      const initialUrl = subId ? `/${view}/${subId}` : `/${view}`;
+      const initialUrl = withBase(subId ? `/${view}/${subId}` : `/${view}`);
       history.replaceState({ view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed: null }, "", initialUrl);
     }
 
@@ -140,7 +141,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
       const isTaskView = parsed.view === "prd";
       setSelectedRunId(isRunView ? parsed.subId : null);
       setSelectedTaskId(isTaskView ? parsed.subId : null);
-      const fallbackUrl = parsed.subId ? `/${parsed.view}/${parsed.subId}` : `/${parsed.view}`;
+      const fallbackUrl = withBase(parsed.subId ? `/${parsed.view}/${parsed.subId}` : `/${parsed.view}`);
       history.replaceState({
         view: parsed.view,
         file: null,

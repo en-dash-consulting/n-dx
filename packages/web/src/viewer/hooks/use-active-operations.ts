@@ -26,6 +26,7 @@ import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { usePolling } from "../views/use-polling.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { useCliName, resolveCliLabel } from "./use-project-metadata.js";
+import { getWsUrl } from "../base-path.js";
 
 export type ActiveOperationKind =
   | "hench" | "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "analyze";
@@ -234,8 +235,7 @@ export function useActiveOperations(): ActiveOperation[] {
     });
 
     try {
-      const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${proto}//${location.host}`);
+      ws = new WebSocket(getWsUrl());
       ws.onmessage = (event) => {
         if (!mountedRef.current) return;
         try {

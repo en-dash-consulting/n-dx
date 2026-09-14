@@ -31,6 +31,7 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
+import { withBase } from "../base-path.js";
 import {
   ISO_MAP_DEFAULTS,
   ISO_MAP_MAX_NODES,
@@ -140,7 +141,9 @@ export function IsoMapView() {
     void generate(ISO_MAP_DEFAULTS);
   }, [deployed, generate]);
 
-  const appliedUrl = buildIsoMapUrl(applied);
+  // Used as an anchor href (open/download), so the fetch adapter cannot
+  // prefix it — behind the hub the link must carry the base path itself.
+  const appliedUrl = withBase(buildIsoMapUrl(applied));
 
   const handleSource = useCallback((e: Event) => {
     const value = (e.target as HTMLSelectElement).value;

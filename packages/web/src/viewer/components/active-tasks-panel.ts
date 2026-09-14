@@ -18,6 +18,7 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { RexTaskLink } from "./rex-task-link.js";
 import { ElapsedTime } from "./elapsed-time.js";
 import type { NavigateTo } from "../types.js";
+import { getWsUrl } from "../base-path.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -260,8 +261,7 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
     let mounted = true;
     fetchExecutions();
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = getWsUrl();
 
     let reconnectDelay = 1000; // ms; doubles on each failure, capped at 30 s
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;

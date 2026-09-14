@@ -12,6 +12,7 @@
 
 import { h } from "preact";
 import { useState, useCallback, useRef } from "preact/hooks";
+import { withBase } from "../base-path.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -28,12 +29,16 @@ export interface CopyLinkButtonProps {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-/** Build a full shareable URL from a path. Uses the current origin. */
+/**
+ * Build a full shareable URL from a path. Uses the current origin, and the
+ * base path when served behind the hub — a copied link must open the same
+ * project the copier was looking at.
+ */
 export function buildShareableUrl(path: string): string {
   const base = typeof window !== "undefined" ? window.location.origin : "";
   // Ensure path starts with /
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${normalizedPath}`;
+  return `${base}${withBase(normalizedPath)}`;
 }
 
 // ── Component ────────────────────────────────────────────────────────

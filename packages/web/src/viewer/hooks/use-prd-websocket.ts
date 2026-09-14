@@ -35,6 +35,7 @@ import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";
 import { removeItemById } from "../components/prd-tree/tree-utils.js";
 import { createWSPipeline } from "../messaging/index.js";
 import { createUpdateBatcher, createDomUpdateGate, createResponseBufferGate } from "../performance/index.js";
+import { getWsUrl } from "../base-path.js";
 
 export interface PRDWebSocketDeps {
   /** Setter for PRD document state (supports functional updates). */
@@ -129,8 +130,7 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
     });
 
     try {
-      const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${proto}//${location.host}`);
+      ws = new WebSocket(getWsUrl());
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);

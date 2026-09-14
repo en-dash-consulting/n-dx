@@ -25,6 +25,8 @@ Latest analysis (2026-08-24, `main`): `web-viewer` 205 files (cohesion 0.98 / co
 - **Allowed imports:** node built-ins, hub siblings (`./`), `src/shared/` through the barrel, and the llm-client exec helpers via `src/hub/llm-gateway.ts` (re-export only).
 - **Forbidden:** anything from `src/server/` or `src/viewer/` — the hub manages server processes over HTTP; it must never couple to one in-process. Each child repo may run its own n-dx version, so the only contract is the child CLI (`<ndxBin> serve --port=0 <repoRoot>`), the port file (`.n-dx-web.port`), and `GET /api/status`.
 - `llm-gateway.ts` must remain the only hub file importing `@n-dx/llm-client` — the hub spawns processes, and every spawning primitive it can reach has to be auditable in one file.
+- **Security duplicate:** `src/hub/edge-security.ts` is a deliberate copy of `src/server/request-security.ts` (the hub cannot import it). The hub enforces the origin policy at the edge and the proxy strips browser-origin metadata before forwarding — a child cannot validate Origin through a proxy, its port never matches. Change the two files in lockstep.
+- **Base path:** behind the hub the viewer lives under `/p/<id>/`; the prefix exists only in the browser (the hub strips it before proxying). Derivation helpers are in `src/shared/base-path.ts`; the viewer's boot-time consumer is `src/viewer/base-path.ts` (fetch adapter, `getWsUrl()`, `withBase()`). Keep the `/p/<id>` pattern in lockstep with `hub/hub.ts` `matchProjectPath`.
 
 ## `src/shared/` addition policy
 

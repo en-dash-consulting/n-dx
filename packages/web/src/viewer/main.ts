@@ -38,12 +38,18 @@ import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
 import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
 import { bootstrap } from "./bootstrap.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
+import { installBasePathFetchAdapter } from "./base-path.js";
 import { renderActiveView, buildValidViews } from "./views/view-registry.js";
 import { initScrollReveal } from "./scroll-reveal.js";
 
 if (isDeployedMode()) {
   installFetchAdapter();
   document.body.classList.add("ndx-deployed");
+} else {
+  // Served live. Behind the hub the document sits under /p/<id>/ and every
+  // root-absolute fetch must carry that prefix; served directly this is a
+  // no-op. Must run before the first fetch below (fetchScope).
+  installBasePathFetchAdapter();
 }
 
 initTheme();

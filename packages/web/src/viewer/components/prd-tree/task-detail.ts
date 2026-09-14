@@ -18,6 +18,7 @@ import { resolveTaskUtilization } from "./task-utilization.js";
 import { isWorkItem, getLevelLabel, getChildLevel } from "./levels.js";
 import { useIndexMd } from "../../hooks/index.js";
 import { IndexMdSectionsPanel } from "./index-md-sections.js";
+import { getWsUrl } from "../../base-path.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -1075,8 +1076,7 @@ function ExecuteTaskButton({
   useEffect(() => {
     if (!executing) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = getWsUrl();
     let ws: WebSocket;
 
     try {

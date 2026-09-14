@@ -47,6 +47,9 @@ import {
   ChildSpawnError,
   type ChildServer,
 } from "./children.js";
+import { proxyHttpRequest, proxyUpgrade } from "./proxy.js";
+import { handleEdgeSecurity } from "./edge-security.js";
+import type { Duplex } from "node:stream";
 
 export const DEFAULT_HUB_PORT = 3117;
 const HEALTH_CHECK_INTERVAL_MS = 15_000;
@@ -102,6 +105,45 @@ interface HubState {
 
 function log(state: HubState, ...args: unknown[]): void {
   if (!state.quiet) console.log("[hub]", ...args);
+}
+
+// ---------------------------------------------------------------------------
+// Path routing (pure — unit-testable without a socket)
+// ---------------------------------------------------------------------------
+
+/** Parse /p/:id/* into the project id and the child-relative path. */
+export function matchProjectPath(pathname: string): { id: string; path: string } | null {
+  const m = pathname.match(/^\/p\/([^/]+)(\/.*)?$/);
+  if (!m) return null;
+  return { id: decodeURIComponent(m[1]!), path: m[2] ?? "" };
+}
+
+/**
+ * Root paths that are API surface rather than pages. With several projects
+ * registered these cannot be aliased to any one child, so they answer 409
+ * with the project list instead of silently picking one.
+ */
+export function isRootApiPath(pathname: string): boolean {
+  return (
+    pathname === "/api" || pathname.startsWith("/api/") ||
+    pathname === "/data" || pathname.startsWith("/data/") ||
+    pathname === "/mcp" || pathname.startsWith("/mcp/")
+  );
+}
+
+/**
+ * Placeholder home page for the multi-project root — one link per project.
+ * PR 9 replaces this with the real hub home; keep it renderable, not pretty.
+ */
+function sendHomePage(state: HubState, res: import("node:http").ServerResponse): void {
+  const items = Object.values(state.registry.projects)
+    .map((p) => `<li><a href="/p/${encodeURIComponent(p.id)}/">${p.name}</a></li>`)
+    .join("");
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(
+    `<!doctype html><title>n-dx hub</title><h1>n-dx hub</h1>` +
+      (items ? `<ul>${items}</ul>` : `<p>No projects registered.</p>`),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +399,30 @@ export async function startHub(port: number = DEFAULT_HUB_PORT, opts: StartHubOp
     void routeRequest(state, req, res);
   });
 
+  // WebSocket upgrades route like requests: /p/:id/* to that project, the
+  // bare root to the sole registered project, anything else refused.
+  server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+    const pathname = (req.url ?? "/").split("?")[0]!;
+    const search = (req.url ?? "").includes("?") ? "?" + (req.url ?? "").split("?").slice(1).join("?") : "";
+    const scoped = matchProjectPath(pathname);
+    if (scoped) {
+      const port = state.registry.projects[scoped.id]?.port;
+      if (port == null) {
+        socket.destroy();
+        return;
+      }
+      proxyUpgrade(req, socket, head, port, (scoped.path || "/") + search);
+      return;
+    }
+    const ids = Object.keys(state.registry.projects);
+    const solePort = ids.length === 1 ? state.registry.projects[ids[0]!]?.port : null;
+    if (solePort != null) {
+      proxyUpgrade(req, socket, head, solePort, pathname + search);
+      return;
+    }
+    socket.destroy();
+  });
+
   const boundPort = await new Promise<number>((resolve, reject) => {
     server.once("error", reject);
     server.listen(port, LOOPBACK_HOST, () => {
@@ -399,6 +465,10 @@ export async function startHub(port: number = DEFAULT_HUB_PORT, opts: StartHubOp
   return { port: boundPort, hubDir, close };
 
   async function routeRequest(st: HubState, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    // The hub is the browser-facing edge: it enforces the origin policy and
+    // the proxy then strips browser-origin metadata (see edge-security.ts for
+    // why the child cannot enforce it through a proxy).
+    if (handleEdgeSecurity(req, res)) return;
     const url = new URL(req.url ?? "/", `http://${LOOPBACK_HOST}:${boundPort}`);
     try {
       if (req.method === "GET" && url.pathname === "/api/hub/health") {
@@ -425,9 +495,69 @@ export async function startHub(port: number = DEFAULT_HUB_PORT, opts: StartHubOp
         await handleUnregister(st, decodeURIComponent(idMatch[1]!), res);
         return;
       }
-      sendJson(res, 404, { error: `no such route: ${req.method} ${url.pathname}` });
+      if (url.pathname === "/api/hub" || url.pathname.startsWith("/api/hub/")) {
+        sendJson(res, 404, { error: `no such route: ${req.method} ${url.pathname}` });
+        return;
+      }
+
+      // ── /p/:id/* — reverse proxy to that project's child ────────────────
+      const scoped = matchProjectPath(url.pathname);
+      if (scoped) {
+        // A bare /p/<id> would make the viewer's relative asset URLs (its
+        // favicon and logos) resolve against /p/ — redirect into the slashed
+        // form so the document base is the project root.
+        if (scoped.path === "") {
+          res.writeHead(308, { Location: `/p/${encodeURIComponent(scoped.id)}/${url.search}` });
+          res.end();
+          return;
+        }
+        const port = resolveProjectPort(st, scoped.id, res);
+        if (port !== null) proxyHttpRequest(req, res, port, scoped.path + url.search);
+        return;
+      }
+
+      // ── Root alias ──────────────────────────────────────────────────────
+      // With exactly one project registered the hub is transparent: every
+      // root route behaves as today's direct `web serve`, so single-project
+      // users notice nothing. With zero or several, the API surface cannot
+      // pick a project silently — it answers 409 naming the candidates — and
+      // pages get the (placeholder) hub home.
+      const ids = Object.keys(st.registry.projects);
+      if (ids.length === 1) {
+        const port = resolveProjectPort(st, ids[0]!, res);
+        if (port !== null) proxyHttpRequest(req, res, port, url.pathname + url.search);
+        return;
+      }
+      if (isRootApiPath(url.pathname)) {
+        sendJson(res, 409, {
+          error:
+            ids.length === 0
+              ? "no project is registered with the hub"
+              : "several projects are registered — address one under /p/<id>/",
+          projects: ids,
+        });
+        return;
+      }
+      sendHomePage(st, res);
     } catch (err) {
       sendJson(res, 500, { error: String(err) });
     }
   }
+}
+
+/**
+ * The port of a project's child, or null after answering the request with
+ * why there is none (404 unknown id, 503 registered but not running).
+ */
+function resolveProjectPort(state: HubState, id: string, res: ServerResponse): number | null {
+  const project = state.registry.projects[id];
+  if (!project) {
+    sendJson(res, 404, { error: `unknown project: ${id}` });
+    return null;
+  }
+  if (project.port === null) {
+    sendJson(res, 503, { error: `project ${id} has no running server` });
+    return null;
+  }
+  return project.port;
 }

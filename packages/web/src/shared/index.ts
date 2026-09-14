@@ -19,3 +19,4 @@ export {
   buildValidViews,
   isKnownViewPath,
 } from "./view-routing.js";
+export { deriveBasePath, stripBasePath, joinBasePath } from "./base-path.js";

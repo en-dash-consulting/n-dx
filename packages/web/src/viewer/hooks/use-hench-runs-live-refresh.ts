@@ -28,6 +28,7 @@
 
 import { useEffect, useRef } from "preact/hooks";
 import { createWSPipeline } from "./use-gateway.js";
+import { getWsUrl } from "../base-path.js";
 
 /** Mirrors the server's TaskExecutionStatus (routes-hench.ts). */
 export interface HenchExecutionProgress {
@@ -85,8 +86,7 @@ export function useHenchRunsLiveRefresh(
     });
 
     try {
-      const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${proto}//${location.host}`);
+      ws = new WebSocket(getWsUrl());
       ws.onmessage = (event) => {
         if (!mountedRef.current) return;
         try {

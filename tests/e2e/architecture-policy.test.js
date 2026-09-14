@@ -1029,8 +1029,8 @@ describe("architecture policy: zone cohesion gate", () => {
 const BOUNDARY_FILES = [
   {
     file: "packages/web/src/viewer/external.ts",
-    maxExports: 26,
-    description: "viewer outbound gateway (schema types, shared utilities, messaging)",
+    maxExports: 29,
+    description: "viewer outbound gateway (schema types, shared utilities, messaging; deriveBasePath/stripBasePath/joinBasePath added for hub base-path support — the viewer derives /p/<id> from its own pathname and must reach the shared helpers through this gateway)",
   },
   {
     file: "packages/web/src/server/rex-gateway.ts",

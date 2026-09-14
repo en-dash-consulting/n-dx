@@ -50,6 +50,22 @@ describe("route-state", () => {
     expect(parsePathnameRoute("/hench-runs/run-123", VIEWS)).toEqual({ view: "hench-runs", subId: "run-123" });
   });
 
+  it("parses routes served behind the hub's /p/<id>/ base path", () => {
+    // Behind the hub the document pathname carries the project prefix; the
+    // view is whatever follows it. Deep links must survive the prefix too.
+    expect(parsePathnameRoute("/p/alpha/overview", VIEWS)).toEqual({ view: "overview", subId: null });
+    expect(parsePathnameRoute("/p/alpha/prd/task-123", VIEWS)).toEqual({ view: "prd", subId: "task-123" });
+    expect(parsePathnameRoute("/p/alpha/", VIEWS)).toBeNull(); // project root — default view
+    expect(parsePathnameRoute("/p/alpha", VIEWS)).toBeNull();
+    // resolveLocationRoute strips uniformly for popstate/boot callers too.
+    expect(resolveLocationRoute("/p/alpha/hench-runs/run-9", "", VIEWS)).toEqual({
+      view: "hench-runs",
+      subId: "run-9",
+    });
+    // A project id must never leak into view parsing as the view name.
+    expect(parsePathnameRoute("/p/overview", VIEWS)).toBeNull();
+  });
+
   it("maps legacy nested rex token usage links to the token-usage view", () => {
     expect(parsePathnameRoute("/rex-dashboard/token-usage", VIEWS)).toEqual({ view: "token-usage", subId: null });
     expect(parseLegacyHashRoute("#rex-dashboard/token_usage", VIEWS)).toEqual({ view: "token-usage", subId: null });

@@ -17,6 +17,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { usePolling } from "../views/use-polling.js";
+import { getWsUrl } from "../base-path.js";
 import {
   createWSPipeline,
   isFeatureDisabled,
@@ -156,8 +157,7 @@ export function useProjectStatus(): ProjectStatus | null {
     });
 
     try {
-      const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${proto}//${location.host}`);
+      ws = new WebSocket(getWsUrl());
       ws.onmessage = (event) => {
         if (!mountedRef.current) return;
         try {

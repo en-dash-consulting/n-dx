@@ -14,6 +14,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { getWsUrl } from "../base-path.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -109,8 +110,7 @@ export function ConcurrencyPanel() {
     fetchConcurrency();
 
     // Connect to WebSocket for real-time updates
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = getWsUrl();
     let ws: WebSocket | null = null;
 
     try {

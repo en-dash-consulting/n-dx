@@ -1,4 +1,5 @@
 import type { ViewId } from "./types.js";
+import { deriveBasePath, stripBasePath } from "./external.js";
 
 export interface ParsedRoute {
   view: ViewId;
@@ -42,7 +43,11 @@ function normalizeHashView(base: string): string {
 }
 
 export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>): ParsedRoute | null {
-  const raw = pathname.slice(1).replace(/^\/+/, "").replace(/\/+$/, "");
+  // Behind the hub the document lives under /p/<id>/ — the view is whatever
+  // follows that base. Deriving from the same pathname keeps this pure and
+  // means every caller (boot, popstate, fallback re-parse) strips uniformly.
+  const routePath = stripBasePath(pathname, deriveBasePath(pathname));
+  const raw = routePath.slice(1).replace(/^\/+/, "").replace(/\/+$/, "");
   if (!raw) return null;
 
   const slashIdx = raw.indexOf("/");

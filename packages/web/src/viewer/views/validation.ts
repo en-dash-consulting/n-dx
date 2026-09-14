@@ -9,6 +9,7 @@
 import { h, Fragment } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
+import { withBase } from "../base-path.js";
 import type { NavigateTo } from "../types.js";
 import { useCliName } from "../hooks/index.js";
 
@@ -944,7 +945,7 @@ export function ValidationView({ navigateTo }: { navigateTo?: NavigateTo }) {
     if (navigateTo) {
       navigateTo("prd", { taskId: id });
     } else {
-      history.pushState({ view: "prd", file: null, zone: null }, "", `/prd/${id}`);
+      history.pushState({ view: "prd", file: null, zone: null }, "", withBase(`/prd/${id}`));
     }
     // Also dispatch custom event as a fallback for cases where the PRD view
     // is already mounted and needs to react to the navigation.
