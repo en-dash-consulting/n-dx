@@ -49,7 +49,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   };
 });
 
-const { snapshotPRDTree, restoreFromBackup } = await import("../../../src/core/backup-snapshots.js");
+const { snapshotPRDTree, restoreFromBackup, getAvailableBackups } = await import("../../../src/core/backup-snapshots.js");
 
 /** The error node raises when an entry vanishes between readdir and lstat. */
 function enoent(path: string): NodeJS.ErrnoException {
@@ -135,6 +135,36 @@ describe("snapshotPRDTree — entry vanishing mid-copy", () => {
     await expect(snapshotPRDTree(rexDir)).rejects.toThrow(/Failed to snapshot PRD tree/);
     // Bounded: it does not spin.
     expect(cpCalls).toBe(3);
+  });
+
+  it("does not publish an exhausted partial copy as the newest restore target", async () => {
+    // A known-good backup gives --latest a meaningful target before the next
+    // snapshot exhausts its retries.
+    const completeSnapshot = await snapshotPRDTree(rexDir);
+    expect(completeSnapshot).not.toBeNull();
+
+    cpCalls = 0;
+    cpBehaviour = () => {
+      throw enoent(join(treeRoot, "epic_gone"));
+    };
+
+    await expect(snapshotPRDTree(rexDir)).rejects.toThrow(/Failed to snapshot PRD tree/);
+    expect(cpCalls).toBe(3);
+
+    // The failed snapshot's staging directory is removed before the error is
+    // surfaced, and only the fully copied backup remains selectable.
+    expect(await getAvailableBackups(rexDir)).toEqual([completeSnapshot!.id]);
+    expect((await readdir(join(rexDir, ".backups"))).some((name) =>
+      name.startsWith(".snapshot_staging_"),
+    )).toBe(false);
+
+    // This is the target restore --latest would choose. If the failed copy had
+    // been published, the restore would instead select a partial (or empty)
+    // directory with a newer id.
+    await writeFile(join(treeRoot, "epic_test", "index.md"), "changed after backup");
+    cpBehaviour = undefined;
+    await restoreFromBackup(rexDir, completeSnapshot!.id);
+    expect(await readFile(join(treeRoot, "epic_test", "index.md"), "utf-8")).toBe("Test");
   });
 
   it("does not retry an error that is not a vanished entry", async () => {

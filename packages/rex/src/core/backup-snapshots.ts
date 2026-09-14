@@ -100,7 +100,7 @@ const COPY_ATTEMPTS = 3;
 const COPY_RETRY_MS = 5;
 
 /**
- * Copy the live tree into an already-claimed snapshot directory.
+ * Copy the live tree into an already-claimed staging directory.
  *
  * Two things make this more than a plain `cp`:
  *
@@ -170,17 +170,31 @@ async function copyTree(treeRoot: string, backupPath: string): Promise<void> {
  */
 async function claimBackupDir(
   backupsDir: string,
-): Promise<{ timestamp: string; id: string; backupPath: string }> {
+): Promise<{ timestamp: string; id: string; backupPath: string; stagingPath: string }> {
   for (let attempt = 0; attempt < CLAIM_ATTEMPTS; attempt += 1) {
     const timestamp = new Date().toISOString();
     const id = encodeSnapshotId(timestamp);
     const backupPath = join(backupsDir, `prd_tree_${id}`);
+    // A snapshot must not be visible to restore until its copy has completed.
+    // The leading dot keeps this reservation out of getAvailableBackups while
+    // it is being copied or retried.
+    const stagingPath = join(backupsDir, `.snapshot_staging_${id}`);
 
     try {
       // Not recursive: this must fail when the directory already exists, which
       // is precisely the signal that another writer claimed this millisecond.
-      await mkdir(backupPath);
-      return { timestamp, id, backupPath };
+      await mkdir(stagingPath);
+
+      // A clock moving backwards can reproduce a name belonging to an already
+      // published snapshot. Keep the staging claim private, discard it, and
+      // obtain a fresh timestamp instead of allowing rename to replace it.
+      if (await dirExists(backupPath)) {
+        await rm(stagingPath, { recursive: true, force: true });
+        await new Promise((resolve) => setTimeout(resolve, CLAIM_RETRY_MS));
+        continue;
+      }
+
+      return { timestamp, id, backupPath, stagingPath };
     } catch (err) {
       const code = err && typeof err === "object" && "code" in err
         ? (err as { code?: string }).code
@@ -239,13 +253,27 @@ export async function snapshotPRDTree(rexDir: string): Promise<BackupSnapshot | 
   // lost and re-reads the clock instead of colliding. The pause is there so the
   // millisecond can actually advance — retrying against the same clock reading
   // would just lose again.
-  const { timestamp, id, backupPath } = await claimBackupDir(backupsDir);
+  const { timestamp, id, backupPath, stagingPath } = await claimBackupDir(backupsDir);
 
-  // Copy tree into the directory we now exclusively own. This is the second
-  // race in this function: the claim above fixed two snapshots colliding on a
-  // directory name, and `copyTree` handles a concurrent *writer* mutating the
-  // tree while it is being read.
-  await copyTree(treeRoot, backupPath);
+  // Copy tree into the private staging directory we now exclusively own. This
+  // is the second race in this function: the claim above fixed two snapshots
+  // colliding on a directory name, and `copyTree` handles a concurrent *writer*
+  // mutating the tree while it is being read. Publishing with rename means a
+  // failed copy is never a restore target, even during retry cleanup.
+  try {
+    await copyTree(treeRoot, stagingPath);
+    await rename(stagingPath, backupPath);
+  } catch (err) {
+    try {
+      await rm(stagingPath, { recursive: true, force: true });
+    } catch (cleanupErr) {
+      throw new Error(
+        `Failed to discard incomplete PRD snapshot at ${stagingPath}: ${String(cleanupErr)}. ` +
+          `Original snapshot failure: ${String(err)}`,
+      );
+    }
+    throw err;
+  }
 
   return { timestamp, id, backupPath };
 }
