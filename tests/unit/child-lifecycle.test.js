@@ -567,6 +567,38 @@ describe("child process lifecycle tracker", () => {
     expect(late.killSignals).toEqual(["SIGKILL"]);
   });
 
+  it("uses bounded Windows tree cleanup for a late child", async () => {
+    let late;
+    const spawnCliImpl = vi.fn(() => {
+      const taskkill = new EventEmitter();
+      queueMicrotask(() => {
+        late.close(null, "SIGKILL");
+        taskkill.emit("close", 0);
+      });
+      return taskkill;
+    });
+    const tracker = createChildProcessTracker({
+      forceKillTimeoutMs: 50,
+      treeKill: true,
+      platform: "win32",
+      spawnCliImpl,
+    });
+
+    await tracker.cleanup();
+
+    late = new FakeChildProcess();
+    late.pid = 4242;
+    tracker.register(late);
+    await Promise.resolve();
+
+    expect(spawnCliImpl).toHaveBeenCalledWith(
+      "taskkill",
+      ["/PID", "4242", "/T", "/F"],
+      { stdio: "ignore", windowsHide: true },
+    );
+    expect(late.killSignals).toEqual([]);
+  });
+
   it("runs tracked cleanup before exiting on SIGTERM", async () => {
     const tracker = createChildProcessTracker({ forceKillTimeoutMs: 50 });
     const processRef = new FakeProcess();

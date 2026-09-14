@@ -509,22 +509,38 @@ export async function terminateTree(child, {
 /**
  * Kill a child that arrived after the cleanup gate had already run.
  *
- * SYNCHRONOUS AND STRAIGHT TO SIGKILL, deliberately. {@link escalateTermination}
- * cannot be used here: it awaits a grace period, and by then the caller has
- * reached `process.exit()` — so the child outlives the parent, which is the whole
- * failure this closes. Signal delivery is synchronous, so there is no window.
+ * POSIX IS SYNCHRONOUS AND STRAIGHT TO SIGKILL, deliberately.
+ * {@link escalateTermination} cannot be used there: it awaits a grace period,
+ * and by then the caller has reached `process.exit()` — so the child outlives
+ * the parent, which is the whole failure this closes. Signal delivery is
+ * synchronous, so there is no window.
  *
  * The graceful phase is also already over in every sense that matters: cleanup()
  * has SIGTERMed and SIGKILLed everything it knew about, and nothing spawned after
  * that point has work worth protecting.
  *
- * WINDOWS LIMITATION: `child.kill` is TerminateProcess and nothing walks the tree,
- * so grandchildren of a late child survive. `taskkill /T /F` would reach them but
- * has to be spawned and awaited, which reintroduces the window this avoids. Same
- * trade, and same reasoning, as the taskkill limitation documented above.
+ * Windows has no synchronous tree signal. Start the same bounded `taskkill /T /F`
+ * path used by {@link terminateTree}; spawning taskkill happens before its first
+ * await, and its own completion wait is bounded. This preserves the tree-kill
+ * contract for a late pnpm or shell child rather than leaving its descendant alive.
  */
-function killLateArrival(child, { treeKill, platform, killGroup }) {
+function killLateArrival(child, {
+  treeKill,
+  platform,
+  forceKillTimeoutMs,
+  spawnCliImpl,
+  killGroup,
+  env,
+}) {
   if (!isChildRunning(child)) return;
+
+  if (treeKill && !supportsProcessGroups(platform)) {
+    // Do not await: register() must retain its synchronous API and the caller can
+    // already be advancing toward process.exit(). terminateTree starts taskkill
+    // synchronously and bounds all later waits.
+    void terminateTree(child, { forceKillTimeoutMs, platform, spawnCliImpl, killGroup, env });
+    return;
+  }
 
   if (treeKill && supportsProcessGroups(platform) && child.pid) {
     try {
@@ -553,17 +569,26 @@ function killLateArrival(child, { treeKill, platform, killGroup }) {
  *   rather than the POSIX mechanism: Windows has no process groups but does tree-kill.
  * @param {NodeJS.Platform} [options.platform] - Overridable so the late-arrival kill is
  *   testable on any host, matching {@link terminateTree}'s seam.
+ * @param {Function} [options.spawnCliImpl] - Injectable Windows taskkill spawn, threaded
+ *   to both normal and late-arrival tree cleanup.
  * @param {Function} [options.killGroup] - Injectable group signaller (defaults to process.kill).
  */
 export function createChildProcessTracker({
   forceKillTimeoutMs = DEFAULT_FORCE_KILL_TIMEOUT_MS,
   treeKill = false,
   platform = process.platform,
+  spawnCliImpl = spawnCli,
   killGroup = (pid, signal) => process.kill(pid, signal),
   env = process.env,
 } = {}) {
   const terminate = treeKill
-    ? (child, timeoutMs) => terminateTree(child, { forceKillTimeoutMs: timeoutMs, platform, killGroup, env })
+    ? (child, timeoutMs) => terminateTree(child, {
+      forceKillTimeoutMs: timeoutMs,
+      platform,
+      spawnCliImpl,
+      killGroup,
+      env,
+    })
     : terminateChildProcess;
 
   const children = new Set();
@@ -584,7 +609,14 @@ export function createChildProcessTracker({
     // orphan per Ctrl-C this way, because killing `sourcevision analyze` let
     // runCI advance a step while the process was on its way out.
     if (cleanupPromise) {
-      killLateArrival(child, { treeKill, platform, killGroup });
+      killLateArrival(child, {
+        treeKill,
+        platform,
+        forceKillTimeoutMs,
+        spawnCliImpl,
+        killGroup,
+        env,
+      });
       return child;
     }
 

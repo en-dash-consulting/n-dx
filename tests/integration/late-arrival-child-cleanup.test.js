@@ -122,3 +122,35 @@ describePosix("late detached child registration after the cleanup gate", () => {
     ]);
   });
 });
+
+const describeWindows = process.platform === "win32" ? describe : describe.skip;
+
+describeWindows("late Windows child registration after the cleanup gate", () => {
+  it("tree-kills the real late child and grandchild within the deadline", async () => {
+    const tracker = createChildProcessTracker({ treeKill: true });
+    await tracker.cleanup();
+
+    const child = spawn(
+      process.execPath,
+      [
+        "-e",
+        [
+          "const { spawn } = require('node:child_process');",
+          "const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
+          "process.stdout.write(String(grandchild.pid));",
+          "setInterval(() => {}, 1000);",
+        ].join(" "),
+      ],
+      { stdio: ["ignore", "pipe", "ignore"], ...treeKillSpawnOptions() },
+    );
+    const grandchildPid = await waitForGrandchildPid(child);
+    pidsToReap = [child.pid, grandchildPid];
+
+    tracker.register(child);
+
+    await Promise.all([
+      waitForPidExit(child.pid, "Late Windows child"),
+      waitForPidExit(grandchildPid, "Late Windows grandchild"),
+    ]);
+  });
+});
