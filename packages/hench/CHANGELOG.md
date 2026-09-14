@@ -1,5 +1,376 @@
 # @n-dx/hench
 
+## 0.6.0
+
+### Patch Changes
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop the pre-run git gate self-blocking on hench's own lock directory
+  
+  `ndx work --auto` on a project without hench's `.gitignore` entries refused to
+  start with "Refusing to start an autonomous run with 1 uncommitted file(s), 0
+  line(s) changed in the working tree" — and left a clean tree behind, so the
+  message looked unreproducible. The dirt was `.hench/locks/`, created at process
+  startup before the gate runs and removed again on exit.
+  
+  The gate now discounts hench's own runtime artifacts (`.hench/locks/`,
+  `.hench/runs/`, `.hench/usage-cursors/`, `.hench-commit-msg.txt`) when reading
+  `git status --porcelain`, so a lock the run itself created can never count as
+  operator dirt. `.hench/config.json` is deliberately not discounted — it is
+  operator-authored and a pending change to it should still stop the run.
+  
+  `hench init` also now writes those `.gitignore` entries ahead of its
+  already-initialized early return, so a project initialized before the entries
+  existed picks them up on the next `ndx init` instead of staying exposed.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the full-suite gate's timeout configurable via `hench.fullTestTimeoutMs`.
+  
+  It was hardcoded (5 minutes originally, raised to a measured 15 in the same
+  release this ships in). However generous the constant, a suite an operator
+  cannot re-budget will eventually exceed it — and overrunning
+  aborts a task whose work was already done and committed. Set the key in
+  `.hench/config.json` or `.n-dx.json` (the latter wins, as with every other
+  hench key); 0 disables the limit. `ndx config` documents it under a new
+  "Hench test-gate settings" section, alongside `hench.fullTestCommand`.
+  
+  A timeout is now attributable like any other gate failure. It used to return
+  zero packages, so the caller counted zero failures and printed
+  `0/0 package(s) failed` for a run it was about to abort; the result now carries
+  a `workspace` entry naming the command, how long it was given, and the key that
+  moves it.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - fix(hench): stop reporting a clean dependency audit for one that never ran
+  
+  `runDependencyAudit` failed OPEN. Both of its steps guarded the parse on
+  `stdout` being non-empty, and a command that cannot be spawned comes back from
+  `exec` as exitCode 1 with empty stdout — so the parse was skipped, the all-zero
+  initializer was returned untouched, and the function answered `ran: true`. The
+  caller then printed `✓ No vulnerabilities or outdated packages found` for an
+  audit that had executed nothing. Two bare `catch {}` blocks discarded any throw
+  on the way. This was the reverse of the direction a security-adjacent check
+  should fail, and worse than being loudly wrong: it was silently reassuring.
+  
+  Each step is now classified, and every way of failing to produce counts is
+  reported as `ran: false` with a reason: never launched (naming the spawn error),
+  killed on timeout, a non-zero exit with no output (carrying the stderr tail, so
+  `ERR_PNPM_NO_LOCKFILE` reaches the operator), unparseable JSON, and a payload
+  that parses but carries no vulnerability data — pnpm reports its own errors as
+  JSON too. `exitCode 0` with no output stays a real empty report, because
+  `pnpm outdated --json` prints nothing when every dependency is current.
+  
+  `DependencyAuditResult` now has a three-outcome contract — ran, partial, and
+  inconclusive — with per-step `commands.audit` / `commands.outdated` records
+  saying which half failed and why. **An inconclusive audit warns and proceeds**,
+  and the reasoning is recorded on the type: the audit gates nothing today (a run
+  with ten critical vulnerabilities proceeds), so a `pnpm` that will not spawn must
+  not be a harder stop than the vulnerabilities themselves; the defect being fixed
+  is the false clean bill of health, not the decision to continue. A future gate
+  that wants to fail closed can already distinguish the state.
+  
+  The dead `hasIssues` computation is gone. It was this defect in miniature —
+  OR-ing over counts a never-launched step had left at zero — and nothing read it.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Run shell commands in a shell that exists on Windows.
+  
+  `execShellCmd` hardcoded `sh -c` on every platform. On Windows `sh` ships with
+  Git for Windows and is on PATH only inside Git Bash, so from PowerShell or
+  cmd.exe — the default shells — the spawn failed with ENOENT. `exec` reported
+  that as `exitCode: 1` with empty output, which is indistinguishable from a
+  command that ran and failed: hench's test gate concluded the suite was broken
+  after essentially every task, and `rex verify` reported `passed: false` for
+  tests that never started.
+  
+  `execShellCmd` now resolves the shell per platform — `sh -c` wherever a POSIX
+  shell is resolvable, `cmd.exe /d /s /c` on a Windows box without one. POSIX
+  behaviour is unchanged, and Windows machines that have Git for Windows keep
+  POSIX semantics rather than being switched to cmd.exe.
+  
+  `ExecResult` gains `launched`, which is `false` when the command never started.
+  Callers that infer pass/fail from `exitCode` alone can no longer mistake an
+  unlaunchable command for a failing one; `rex verify` and hench's `run_command`
+  now report the two cases differently.
+  
+  The two remaining sites that spawned `sh` directly (hench's `execShell`, rex's
+  `verify`) are routed through `execShellCmd`, and an architecture-policy guard
+  fails the build if a new one appears.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop an autonomous run blocking on the lock file it just created itself.
+  
+  `ndx work --auto` refused to start with "Refusing to start an autonomous run
+  with 1 uncommitted file(s), 0 line(s) changed in the working tree", and the tree
+  read clean to anyone who checked afterwards — so the report looked
+  unreproducible. The file was `.hench/locks/`, which hench creates the instant a
+  run starts, before any real work happens, and removes on exit. The run blocked
+  on its own bookkeeping, then erased the evidence.
+  
+  `hench init` already gitignores those paths, which covers a freshly initialised
+  project. It does not cover a project initialised before that landed, or one
+  whose `.gitignore` was edited, so the gate no longer depends on the ignore rule:
+  paths hench wrote for itself are excluded from the dirty check directly.
+  `.hench/config.json` is deliberately not in that set — it is meant to be
+  committed, so an edit to it still stops an autonomous run.
+  
+  The path list now lives in one place (`HENCH_RUNTIME_ARTIFACTS`) rather than
+  being written out separately by `hench init` and the gate, which are required to
+  agree.
+  
+  The dirty check also now passes `--untracked-files=all`. Without it git collapses
+  a wholly-untracked directory into one entry — a fresh project reports
+  `?? .hench/`, never `?? .hench/locks/` — so the exclusion could not see what was
+  inside and the run blocked anyway. It also makes the count honest: a directory of
+  forty new files was previously reported as "1 uncommitted file(s)".
+  
+  The same exclusion applies to the post-run rollback check, where hench's own lock
+  and run files should likewise never make a rollback look necessary.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop the pre-run gate blocking on hench's own lock when the project is not the
+  repository root.
+  
+  `git status --porcelain` reports paths relative to the repository root, not to
+  the directory it was invoked from. A run in `sub/` therefore sees
+  `?? sub/.hench/locks/run.lock`, which does not start with `.hench/locks/`, so
+  the runtime-artifact exclusion missed it and an autonomous run refused to start
+  on a file hench had created moments earlier — then removed on exit, leaving
+  "1 uncommitted file(s), 0 line(s) changed" against a tree that read clean by the
+  time anyone looked. That is the bug the exclusion was added to fix; it simply
+  never applied outside the repo root, which is where every test had put the
+  project.
+  
+  `excludeHenchRuntimeArtifacts` now takes the project directory and resolves the
+  project's position within the repo, applying that prefix to the patterns rather
+  than stripping it from each line. A sibling project's `other/.hench/runs/` stays
+  outside the match, since that is somebody else's uncommitted work. The parameter
+  is required, so both call sites — the pre-run gate and the rollback check — are
+  checked by the compiler rather than by review.
+  
+  Both paths are canonicalised before being subtracted. `git rev-parse` resolves
+  symlinks and a project directory generally has not, so on macOS a path under
+  `/var` or `/tmp` returns as `/private/var/...` — and a symlinked home or
+  checkout does the same on any platform. Comparing the raw strings produced a
+  `..` relative path that fell back to the old root-relative behaviour, i.e. the
+  same bug, on developer machines only. This was caught by the new tests rather
+  than reasoned about.
+  
+  Outside a repository, or with git unavailable, the prefix is empty and behaviour
+  is unchanged.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop the agent prompt telling the agent the same thing twice, and make a retry
+  brief say what to do differently.
+  
+  hench assembles one model call from two halves built in different files — the
+  system prompt and the task brief — and neither could see what the other emitted.
+  The duplication was invisible in either file alone and only appeared in the
+  assembled envelope:
+  
+  - **The project block was written twice.** `buildSystemPrompt` emitted
+    `## Project Info` (Project / CLI command / Validate command / Test command)
+    and `formatTaskBrief` emitted `## Project` with the same four values under
+    different labels. The system prompt keeps them — it also carries the
+    use-the-CLI-name instruction, and it is the stable half while the brief
+    changes per task.
+  - **`## Rules` and `## Workflow` had become two renderings of one list.** Read
+    before changing, run the tests, and the whole `git add -A` +
+    `.hench-commit-msg.txt` + do-not-commit procedure each appeared in both.
+    `## Rules` now holds constraints only; steps live in `## Workflow`, which
+    carries the full instruction rather than half of it.
+  
+  `PREVIOUS FAILURE` printed the prior failure text under a heading and stopped,
+  leaving the model to infer what to change — and the most available continuation
+  is the approach it just watched fail. The section now names the retry, asks for
+  a diagnosis before any edit, and requires an explicit statement of what is being
+  done differently if the previous approach is being kept.
+  
+  Measured with `scripts/prompt-census.mjs --dump hench`: the assembled prompt for
+  the representative task drops from 653 to 584 tokens (-10.6%), system 466 → 416
+  and brief 187 → 167. Retries now cost slightly more than before by design — the
+  corrective instruction is the point.
+  
+  One caller sends the brief without hench's system prompt: `callVerifier` in
+  `lifecycle/loop.ts` pairs it with a reviewer prompt of its own. It asks whether a
+  solution satisfies the acceptance criteria, which the project name and command
+  list do not bear on, so it loses nothing it used.
+  
+  A new `prompt-non-redundancy.test.ts` asserts against the assembled envelope for
+  both providers, so a fact restated across the two halves fails even though each
+  file alone looks correct.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Build rex's and sourcevision's LLM prompts through `PromptEnvelope` so their cost
+  is attributable per section rather than as one opaque total.
+  
+  Every prompt in `rex/src/analyze/` and `sourcevision/src/analyzers/` is now
+  declared as a list of named sections against a shared per-package vocabulary,
+  with the paired `*Prompt` function reduced to an assembly call. Prompt text is
+  unchanged apart from removed doubled blank lines, where an absent conditional
+  block used to leave its own padding behind — pinned by `prompt-text-identity`
+  snapshot suites in both packages.
+  
+  The section-measurement helpers (`promptSectionCosts`, `dominantPromptSections`,
+  `formatPromptSectionCosts`, `extractPromptSectionDiagnostics`) moved down to
+  `@n-dx/llm-client` so rex and sourcevision, which sit below hench and cannot
+  import from it, share one implementation instead of a copy; hench keeps only its
+  CLI rendering and reaches the rest through its existing gateway.
+  
+  The prompt census now follows module-local helper calls when extracting static
+  prompt text. Factoring duplicated text into a helper previously dropped it from
+  the count entirely, so a refactor could silently shrink the baseline. Correcting
+  this raised the recorded totals ~5% with no prompt growing — the earlier figures
+  were an undercount — and the baseline records the revision so the jump is not
+  misread as a regression. The baseline also now reports a per-section breakdown
+  for each envelope-built package.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Charge the adversarial review pass's per-turn tokens to the run record.
+  
+  `runAdversarialReviewPass` added the reviewer's aggregate spend to
+  `run.tokenUsage` but never merged `result.turnTokenUsage` into
+  `run.turnTokenUsage` — `accumulateResult` is the only path that concats the
+  per-turn array, and the review pass does not go through it.
+  
+  The per-turn half is the one that reaches the rollups. Rex's
+  `extractHenchTokenEvents` builds its usage events from `turnTokenUsage`
+  whenever that array is non-empty and then advances to the next run; it never
+  falls back to the aggregate. A run carrying only the executor's turns
+  therefore reports only the executor's spend, however large `tokenUsage` grew.
+  
+  Measured on live run 5c1e9bee (executor claude-sonnet-4-6, reviewer
+  claude-opus-5): `run.tokenUsage.output` was 28,920 while all 20 per-turn
+  entries were tagged sonnet and summed to 3,154 output. `ndx usage` printed the
+  aggregate as its headline (29,082) and the per-turn sum as the per-command
+  line (3,200) in the same report — an 89% under-report — and priced the whole
+  run at Sonnet rates although roughly 25.8k of the 28.9k output tokens were
+  billed to opus-5.
+  
+  The two halves now move together in one place, `chargeReviewToRun`. The
+  reviewer's turn numbers restart at 1, so they are offset past the executor's
+  highest turn to keep `turn` monotonic within a run. Entries are tagged with
+  the review model, with an unresolved model (the local vendor sends no model
+  flag) normalized from `""` to absent so the `turn.model ?? run.model` fallback
+  downstream still engages. A reviewer that reports no per-turn data contributes
+  none rather than one synthetic entry — fabricated per-turn data is
+  indistinguishable from measured data once written.
+
+- [#360](https://github.com/en-dash-consulting/n-dx/pull/360) [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Bind hench's automatic commits to the checkout the run started in. Run records
+  now carry `worktreeRoot`, `branch` and `startHead`, captured at run start, and
+  each of the four automatic commit sites (pre-run gate, completion metadata,
+  commit-message watcher, review repairs) re-checks them before committing. A run
+  whose HEAD has been moved to another branch, detached, or whose worktree root no
+  longer matches refuses to commit and reports the expected and actual values,
+  leaving the working tree untouched.
+  
+  `getCurrentHead` and `getCurrentBranch` now capture git's stderr instead of
+  inheriting it, matching their `rev-parse` siblings: probing a directory that may
+  not be a repository no longer prints `fatal: not a git repository` to the
+  terminal.
+
+- [#360](https://github.com/en-dash-consulting/n-dx/pull/360) [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Record which n-dx produced each hench run.
+  
+  Several checkouts are usually live at once — a worktree per in-flight PR plus a
+  linked global install — and their run records were indistinguishable, so a token
+  or outcome report could not say which build the numbers came from.
+  
+  `RunRecord` gains two optional fields, stamped at run start by `initRunRecord`
+  and by `hench record`:
+  
+  - `ndxVersion` — `NDX_VERSION` when an orchestrator exports it, otherwise the
+    `@n-dx/hench` manifest version.
+  - `cliPath` — `NDX_CLI_PATH` / `N_DX_CLI_PATH` (exported by `packages/core/cli.js`),
+    falling back to `process.argv[1]`.
+  
+  Both are additive: records written before the fields existed load unchanged, and
+  the dashboard's run detail renders each row only when its value is present. A
+  failed manifest read is not memoized, so one transient error cannot pin every
+  later run in the process to a missing version.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - fix(hench): stop failing a run for a test suite that never started
+  
+  `runTestGate` inferred pass/fail from `exitCode` alone. A command that cannot
+  be spawned comes back from `exec` as exitCode 1 with empty stdout and stderr —
+  byte for byte what a real failing exit looks like — so the only thing separating
+  "your tests failed" from "the suite never started" is `ExecResult.launched`,
+  which was never read.
+  
+  The consequences ran well past a misleading message. In autonomous mode the gate
+  failure aborted the run, which set `run.status = "failed"`, which skipped
+  `updateCompletedTaskStatus` and short-circuited the commit prompt. Finished,
+  committed work went unrecorded in the PRD, the loop re-selected the same task,
+  and three strikes auto-cancelled it. Operators saw `✗ 0/0 package(s) failed` and
+  `Test gate failed:` with nothing after the colon. On Windows without a POSIX
+  shell this fired on essentially every task until b5a3a3e0 fixed shell resolution.
+  
+  Now:
+  
+  - A gate that could not be executed is reported as `ran: false` with an error
+    naming the spawn failure — inconclusive, not a verdict. `TestGateResult` says
+    so explicitly: check `ran` before `passed`.
+  - The lifecycle treats that as inconclusive and leaves `run.status` alone, so the
+    PRD write and the commit still happen, and prints a distinct message rather
+    than claiming a test failure.
+  - The retry loop terminates instead of spinning to the 5-attempt cap re-running a
+    command that cannot launch, then failing the run for exhausting its retries.
+  - A gate failure with no package results names a reason instead of ending in a
+    bare colon.
+  
+  The same `launched` gap is fixed in `runTestsForFiles`, `runTypecheck` (cleanup
+  transformations — still fails closed, since it guards a mutation, but no longer
+  reports a spawn failure as type errors), and completion validation. The rex
+  requirements executor folds the spawn error into stderr, since its contract has
+  no field for it. `runDependencyAudit` was left annotated and tracked separately,
+  because its fail-open behaviour was a design decision about a security-adjacent
+  check rather than a mechanical one; it is fixed in its own changeset.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - fix(hench): show the actual test failure instead of `0/0 package(s) failed`
+  
+  The gate threw away every diagnostic for the test command it selects by default.
+  `parseVitestOutput` expected vitest JSON, but `autoDetectTestCommand` returns
+  `npm run test` whenever package.json has a `test` script — most repos, and this
+  one, where it runs `scripts/run-all-tests.mjs` and prints a human-readable
+  summary. `JSON.parse` threw, the fallback searched only stderr while that runner
+  writes its summary to stdout, and an empty array came back. The lifecycle
+  rendered it as `✗ 0/0 package(s) failed` with no output to print, so a real
+  failure was indistinguishable from a suite that never launched — and neither
+  said anything useful.
+  
+  - The parser reads both streams and never returns an empty array for a run that
+    produced output. When it cannot parse, it surfaces the raw output instead of
+    reporting nothing.
+  - Failing packages are named only from lines carrying a failure marker. Scanning
+    the whole output collected every package the run mentioned, which would have
+    reported five passing packages as failures alongside the one that failed.
+  - Raw output is taken from stdout and stderr combined. Vitest puts `×` markers on
+    stdout and the AssertionError block on stderr, and the existing helper takes
+    `stdout || stderr` — so the operator was told which test failed but not why.
+  - A passing run is reported as passing with no output attached, so the package
+    count is honest on the happy path too.
+  - Timeouts report distinctly, naming both the budget and the elapsed time and
+    keeping whatever output arrived before the kill. A timeout still fails the run:
+    a gate that cannot finish on freshly changed code is a reason to stop.
+  
+  `TEST_GATE_TIMEOUT` raised 5m → 15m. The full suite here measures 248s idle —
+  83% of the old ceiling — and the gate runs while the agent's own subprocesses are
+  still competing for cores. It is a hang guardrail, not a latency SLA, and the
+  measurement is recorded next to the constant.
+  
+  Verified end to end by running the real gate against a deliberately failing test:
+  the output now carries the test name, `AssertionError: expected 42 to be 43`, and
+  the source line.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop the pre-run git gate counting the warm-parent session cache as operator work.
+  
+  `.hench/session-cache.json` is rewritten on every orientation, but it was absent from `HENCH_RUNTIME_GITIGNORE_ENTRIES` and from both ignore lists, so `git add -A` in the pre-run commit gate swept it into commits — and a later run then saw its own write as one uncommitted file and refused to start. It is now ignored, discounted by the gate, and written by `hench init`. The ignore template test additionally pins every declared runtime artifact to both ignore files, so the constant can no longer drift away from them.
+
+- [#360](https://github.com/en-dash-consulting/n-dx/pull/360) [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `getWorktreeRoot(cwd)` and `getGitCommonDir(cwd)` to the llm-client exec
+  helpers, re-exported through hench's llm-gateway.
+  
+  Both run `git rev-parse` synchronously, matching their `getCurrentHead` /
+  `getCurrentBranch` siblings, and return a realpath-resolved absolute path or
+  null outside a repository. `getWorktreeRoot` reports the containing worktree's
+  own root — a linked worktree's, not the main checkout's — and
+  `getGitCommonDir` reports the shared `.git`, which is identical across every
+  worktree of one repository. Together they let a caller tell "same repo,
+  different worktree" from "different repo", which is what binding a hench run's
+  automatic commits to the worktree it started in requires.
+- Updated dependencies [[`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`25d7aa6`](https://github.com/en-dash-consulting/n-dx/commit/25d7aa662c414e831fc41dbfc259db94782e0bda), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`ab8dccd`](https://github.com/en-dash-consulting/n-dx/commit/ab8dccd9fadf527a84085f079b245dbdb2dc8ce2), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`25d7aa6`](https://github.com/en-dash-consulting/n-dx/commit/25d7aa662c414e831fc41dbfc259db94782e0bda), [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`39bff34`](https://github.com/en-dash-consulting/n-dx/commit/39bff349a349b4cfc5bd96a4b6ec6fde925fb002), [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9)]:
+  - @n-dx/rex@0.6.0
+  - @n-dx/llm-client@0.6.0
+
 ## 0.5.2
 
 ### Patch Changes

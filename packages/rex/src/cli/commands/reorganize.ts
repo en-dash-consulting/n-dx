@@ -34,13 +34,14 @@ async function runLlmAnalysis(
   flags: Record<string, string>,
 ): Promise<ReshapeProposal[]> {
   try {
-    const { setLLMConfig, setClaudeConfig, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
+    const { setLLMConfig, setClaudeConfig, setProjectDir, getLLMVendor, resolveConfiguredModel } = await import("../../analyze/reason.js");
     const { reasonForReshape } = await import("../../analyze/reshape-reason.js");
 
     const llmConfig = await loadLLMConfig(rexDir);
     setLLMConfig(llmConfig);
     const claudeConfig = await loadClaudeConfig(rexDir);
     setClaudeConfig(claudeConfig);
+    setProjectDir(dir);
 
     // Resolve model: explicit flag > vendor config > default
     const resolvedModel = resolveConfiguredModel(flags.model);

@@ -80,7 +80,7 @@ interface RunDiagnosticsData {
   approvals?: string;
 }
 
-interface RunDetail extends RunSummary {
+export interface RunDetail extends RunSummary {
   toolCalls?: Array<{ tool: string; input?: unknown; output?: unknown }>;
   turnTokenUsage?: Array<{
     turn: number;
@@ -94,6 +94,10 @@ interface RunDetail extends RunSummary {
   invocationContext?: "cli" | "api";
   /** Files changed with git status codes (A/M/D/R/C/T). Format: "STATUS\tPATH". */
   fileChangesWithStatus?: string[];
+  /** Version of the n-dx build that produced this run. Absent on older records. */
+  ndxVersion?: string;
+  /** Path of the CLI that launched this run. Absent on older records. */
+  cliPath?: string;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -442,7 +446,7 @@ function FileChangesList({ fileChangesWithStatus }: { fileChangesWithStatus?: st
 }
 
 /** Detail panel for the selected run. */
-function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: () => void; navigateTo?: NavigateTo }) {
+export function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: () => void; navigateTo?: NavigateTo }) {
   const status = getStatusConfig(run.status);
   const totalTokens = (run.tokenUsage.input ?? 0)
     + (run.tokenUsage.output ?? 0)
@@ -534,6 +538,20 @@ function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: ()
         h("span", { class: "hench-info-label" }, "Run ID"),
         h("span", { class: "hench-info-value hench-info-mono" }, run.id),
       ),
+      // Which n-dx produced this run. Both are absent on records written before
+      // the fields existed, and on installs where the manifest was unreadable.
+      run.ndxVersion
+        ? h("div", { class: "hench-info-row" },
+            h("span", { class: "hench-info-label" }, "n-dx Version"),
+            h("span", { class: "hench-info-value hench-info-mono" }, run.ndxVersion),
+          )
+        : null,
+      run.cliPath
+        ? h("div", { class: "hench-info-row" },
+            h("span", { class: "hench-info-label" }, "CLI Path"),
+            h("span", { class: "hench-info-value hench-info-mono", title: run.cliPath }, run.cliPath),
+          )
+        : null,
     ),
 
     // Activity counts

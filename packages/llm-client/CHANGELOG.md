@@ -1,5 +1,126 @@
 # @n-dx/llm-client
 
+## 0.6.0
+
+### Patch Changes
+
+- [#366](https://github.com/en-dash-consulting/n-dx/pull/366) [`25d7aa6`](https://github.com/en-dash-consulting/n-dx/commit/25d7aa662c414e831fc41dbfc259db94782e0bda) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Spawn the vendor CLI (Claude CLI provider) with `cwd` set to the caller's project directory instead of inheriting the server process's own cwd.
+  
+  `createLLMClient`/`createClient` now accept an optional `cwd`, threaded through to `cli-provider.ts`'s `spawnCli` call. The dashboard's Ask route (`routes-sourcevision-ask.ts`) passes `ctx.projectDir`, so an Ask request run against a different project no longer executes the CLI wherever `ndx start` happened to be launched from. Hench's own spawn path already passed `cwd` and is unchanged.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Run shell commands in a shell that exists on Windows.
+  
+  `execShellCmd` hardcoded `sh -c` on every platform. On Windows `sh` ships with
+  Git for Windows and is on PATH only inside Git Bash, so from PowerShell or
+  cmd.exe — the default shells — the spawn failed with ENOENT. `exec` reported
+  that as `exitCode: 1` with empty output, which is indistinguishable from a
+  command that ran and failed: hench's test gate concluded the suite was broken
+  after essentially every task, and `rex verify` reported `passed: false` for
+  tests that never started.
+  
+  `execShellCmd` now resolves the shell per platform — `sh -c` wherever a POSIX
+  shell is resolvable, `cmd.exe /d /s /c` on a Windows box without one. POSIX
+  behaviour is unchanged, and Windows machines that have Git for Windows keep
+  POSIX semantics rather than being switched to cmd.exe.
+  
+  `ExecResult` gains `launched`, which is `false` when the command never started.
+  Callers that infer pass/fail from `exitCode` alone can no longer mistake an
+  unlaunchable command for a failing one; `rex verify` and hench's `run_command`
+  now report the two cases differently.
+  
+  The two remaining sites that spawned `sh` directly (hench's `execShell`, rex's
+  `verify`) are routed through `execShellCmd`, and an architecture-policy guard
+  fails the build if a new one appears.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Build rex's and sourcevision's LLM prompts through `PromptEnvelope` so their cost
+  is attributable per section rather than as one opaque total.
+  
+  Every prompt in `rex/src/analyze/` and `sourcevision/src/analyzers/` is now
+  declared as a list of named sections against a shared per-package vocabulary,
+  with the paired `*Prompt` function reduced to an assembly call. Prompt text is
+  unchanged apart from removed doubled blank lines, where an absent conditional
+  block used to leave its own padding behind — pinned by `prompt-text-identity`
+  snapshot suites in both packages.
+  
+  The section-measurement helpers (`promptSectionCosts`, `dominantPromptSections`,
+  `formatPromptSectionCosts`, `extractPromptSectionDiagnostics`) moved down to
+  `@n-dx/llm-client` so rex and sourcevision, which sit below hench and cannot
+  import from it, share one implementation instead of a copy; hench keeps only its
+  CLI rendering and reaches the rest through its existing gateway.
+  
+  The prompt census now follows module-local helper calls when extracting static
+  prompt text. Factoring duplicated text into a helper previously dropped it from
+  the count entirely, so a refactor could silently shrink the baseline. Correcting
+  this raised the recorded totals ~5% with no prompt growing — the earlier figures
+  were an undercount — and the baseline records the revision so the jump is not
+  misread as a regression. The baseline also now reports a per-section breakdown
+  for each envelope-built package.
+
+- [#360](https://github.com/en-dash-consulting/n-dx/pull/360) [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Bind hench's automatic commits to the checkout the run started in. Run records
+  now carry `worktreeRoot`, `branch` and `startHead`, captured at run start, and
+  each of the four automatic commit sites (pre-run gate, completion metadata,
+  commit-message watcher, review repairs) re-checks them before committing. A run
+  whose HEAD has been moved to another branch, detached, or whose worktree root no
+  longer matches refuses to commit and reports the expected and actual values,
+  leaving the working tree untouched.
+  
+  `getCurrentHead` and `getCurrentBranch` now capture git's stderr instead of
+  inheriting it, matching their `rev-parse` siblings: probing a directory that may
+  not be a repository no longer prints `fatal: not a git repository` to the
+  terminal.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `POST /api/sourcevision/ask`, answering a question from the existing analysis
+  
+  The SourceVision Ask panel's server half. The request is
+  `{ prompt, seed? }` validated by a zod schema; the response is
+  `{ answer, vendor, model, tokens, contextSources }`.
+  
+  **Bundle, not a tool-use loop.** Context is pre-assembled from the
+  `.sourcevision/` artifacts already on disk — manifest, inventory, imports,
+  zones, findings, derived next steps, component count, and a `CONTEXT.md`
+  excerpt — and sent in a single non-agentic call. A loop that queried lookups on
+  demand would answer a wider range of questions, but at an unbounded number of
+  round trips per question and with no way to test what the model actually saw. A
+  unit test now asserts the assembled facts reach the completion request, which is
+  the property the whole endpoint rests on. Every section is capped and reports
+  what it cut, so the bundle does not grow with the repository until the vendor
+  rejects it as an opaque 400.
+  
+  **Analysis is the only ground truth.** The endpoint reads no source, and refuses
+  with `no_analysis` rather than letting the model answer from its priors when
+  nothing has been analysed. All sourcevision access — including the five artifact
+  schema types the reads are parsed against — goes through
+  `server/domain-gateway.ts`; the gateway's export cap moved 15 → 16 with that
+  reason recorded.
+  
+  **Named failures, and it cannot hang.** Vendor and model come from the project's
+  own config via `loadLLMConfig` + `resolveTaskModel` (new `sourcevision.ask`
+  class, standard tier, reroutable through `llm.routes`), and the pair that served
+  the call is reported back so the panel never has to guess which model produced
+  an answer. The call races a budget — `sourcevision.ask.timeoutMs`, default 120s,
+  also passed down so a CLI-mode child bounds itself — and every failure returns a
+  named `kind` (`timeout`, `rate_limit`, `auth`, `network`, `no_analysis`,
+  `invalid_request`, `llm_error`) with the vendor's retry delay when it supplied
+  one, instead of a generic 500. A provider that already threw a typed
+  `ClaudeClientError` is trusted over re-classifying its message, so a 429 the
+  provider knew about is never downgraded to `unknown`.
+  
+  The task-class registry contract test now scans `web` as well as the three
+  domain packages: web declares classes now, and an unregistered one there
+  resolves silently to the standard tier exactly as it would anywhere else.
+
+- [#360](https://github.com/en-dash-consulting/n-dx/pull/360) [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `getWorktreeRoot(cwd)` and `getGitCommonDir(cwd)` to the llm-client exec
+  helpers, re-exported through hench's llm-gateway.
+  
+  Both run `git rev-parse` synchronously, matching their `getCurrentHead` /
+  `getCurrentBranch` siblings, and return a realpath-resolved absolute path or
+  null outside a repository. `getWorktreeRoot` reports the containing worktree's
+  own root — a linked worktree's, not the main checkout's — and
+  `getGitCommonDir` reports the shared `.git`, which is identical across every
+  worktree of one repository. Together they let a caller tell "same repo,
+  different worktree" from "different repo", which is what binding a hench run's
+  automatic commits to the worktree it started in requires.
+
 ## 0.5.2
 
 ### Patch Changes

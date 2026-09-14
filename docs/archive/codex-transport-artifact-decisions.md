@@ -219,6 +219,30 @@ These decisions unblock the following tasks:
 
 ---
 
+## 8. 2026-09-11 Update: cwd-relative commands (PR 3)
+
+The `command = "node"` / absolute-path `args` shape in §5 above is superseded.
+`.codex/config.toml` now uses cwd-relative commands, matching the tracked
+`.mcp.json` decision for Claude Code (`0.6.0 / PR 3`):
+
+```toml
+[mcp_servers.rex]
+command = "ndx"
+args = ["rex", "mcp", "."]
+
+[mcp_servers.sourcevision]
+command = "ndx"
+args = ["sv", "mcp", "."]
+```
+
+`command` is the project's resolved CLI name (`cli-identity.js#getCliName` —
+respects a configured `cli.name` in `.n-dx.json`, defaulting to `n-dx`).
+Codex launches stdio servers with cwd at the project root, so this resolves
+correctly from any worktree or teammate clone without embedding a
+machine-specific absolute path — the same problem the absolute paths in §5
+caused for `.mcp.json`. See `packages/core/assistant-assets.js`
+(`renderCodexConfigToml`) and `packages/core/codex-integration.js`.
+
 ## References
 
 - `assistant-assets/manifest.json` — vendor targets and MCP server descriptors

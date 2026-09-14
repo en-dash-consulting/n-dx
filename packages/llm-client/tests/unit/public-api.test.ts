@@ -138,6 +138,8 @@ import {
   execShellCmd,
   getCurrentHead,
   getCurrentBranch,
+  getWorktreeRoot,
+  getGitCommonDir,
   isExecutableOnPath,
   spawnTool,
   spawnManaged,
@@ -348,6 +350,14 @@ describe("public API — process execution exports", () => {
 
   it("exports getCurrentBranch as a function", () => {
     expect(typeof getCurrentBranch).toBe("function");
+  });
+
+  it("exports getWorktreeRoot as a function", () => {
+    expect(typeof getWorktreeRoot).toBe("function");
+  });
+
+  it("exports getGitCommonDir as a function", () => {
+    expect(typeof getGitCommonDir).toBe("function");
   });
 
   it("exports isExecutableOnPath as a function", () => {

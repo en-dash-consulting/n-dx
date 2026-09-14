@@ -31,6 +31,7 @@ export {
   setLLMConfig,
   setClaudeConfig,
   setClaudeClient,
+  setProjectDir,
   getAuthMode,
   getLLMVendor,
   resolveConfiguredModel,

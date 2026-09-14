@@ -1,14 +1,18 @@
 /**
- * `ndx init <dir>` must register MCP servers for `<dir>`, not for the shell's
- * current directory.
+ * `ndx init` no longer registers local-scope MCP servers by default — it
+ * relies on the tracked, cwd-relative `.mcp.json` instead (see
+ * mcp-json-tracked.test.js). `--mcp-scope=local` restores the legacy
+ * `claude mcp add --scope local` path for people who cannot rely on
+ * `.mcp.json` being picked up, and in that mode `ndx init <dir>` must still
+ * register against `<dir>`, not the shell's current directory.
  *
  * `registerMcpServers` shells out to `claude mcp remove` / `claude mcp add`
  * without a `cwd`, so the child inherits the caller's working directory. Since
- * `claude mcp add` defaults to local scope — which is stored per-directory —
- * `cd ~/repoA && ndx init ~/repoB` stripped repoA's rex/sourcevision
- * registrations and replaced them with entries pointing at repoB. Observed in
- * the wild via the E2E suite: the developer's own repo ended up with two MCP
- * servers aimed at a deleted temp directory.
+ * `claude mcp add --scope local` is stored per-directory,
+ * `cd ~/repoA && ndx init --mcp-scope=local ~/repoB` stripped repoA's
+ * rex/sourcevision registrations and replaced them with entries pointing at
+ * repoB. Observed in the wild via the E2E suite: the developer's own repo
+ * ended up with two MCP servers aimed at a deleted temp directory.
  *
  * Both halves matter and are asserted separately: the entries must land under
  * the initialised project, and their target argument must be that project.
@@ -79,9 +83,27 @@ async function readRegistrations() {
   return byProject;
 }
 
-describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope", () => {
-  it("registers against the initialised project, not the caller's cwd", async () => {
+describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope (default — tracked .mcp.json)", () => {
+  it("makes no local-scope registration at all by default", async () => {
     execFileSync("node", [CLI_PATH, "init", "--provider=claude", projectDir], {
+      encoding: "utf-8",
+      timeout: DEFAULT_TIMEOUT,
+      stdio: "pipe",
+      cwd: cwdDir,
+      env: { ...process.env, CLAUDE_CONFIG_DIR: configDir },
+    });
+
+    const byProject = await readRegistrations();
+    expect(
+      Object.keys(byProject),
+      "default init must not call `claude mcp add` — it relies on tracked .mcp.json instead",
+    ).toEqual([]);
+  });
+});
+
+describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope (--mcp-scope=local)", () => {
+  it("registers against the initialised project, not the caller's cwd", async () => {
+    execFileSync("node", [CLI_PATH, "init", "--provider=claude", "--mcp-scope=local", projectDir], {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
@@ -105,7 +127,7 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope", () => {
   });
 
   it("points every server at the initialised project", async () => {
-    execFileSync("node", [CLI_PATH, "init", "--provider=claude", projectDir], {
+    execFileSync("node", [CLI_PATH, "init", "--provider=claude", "--mcp-scope=local", projectDir], {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
@@ -133,9 +155,10 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope", () => {
   });
 
   it("leaves other projects' registrations alone", async () => {
-    // The remove-then-add cycle runs across local, project and user scope. With
-    // the wrong cwd it strips whatever the caller's directory had registered,
-    // which is how a developer lost their working registrations to a test.
+    // The remove-then-add cycle only touches local scope now, but with the
+    // wrong cwd it would still strip whatever the caller's directory had
+    // registered, which is how a developer lost their working registrations
+    // to a test.
     execFileSync(
       "claude",
       ["mcp", "add", "unrelated", "--", "node", "/tmp/unrelated.js"],
@@ -147,7 +170,7 @@ describe.skipIf(!HAS_CLAUDE)("ndx init MCP registration scope", () => {
       },
     );
 
-    execFileSync("node", [CLI_PATH, "init", "--provider=claude", projectDir], {
+    execFileSync("node", [CLI_PATH, "init", "--provider=claude", "--mcp-scope=local", projectDir], {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",

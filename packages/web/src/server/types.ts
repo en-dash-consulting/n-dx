@@ -18,6 +18,17 @@ export interface ServerContext {
   dev: boolean;
   /** When set, restricts the dashboard to a single package's views and APIs. */
   scope?: ViewerScope;
+  /**
+   * Port this server is bound to. Set once at startup in {@link startServer}.
+   * Optional because tests construct `ServerContext` directly without it —
+   * consumers (e.g. `buildServerInfo` in routes-status.ts) fall back gracefully.
+   */
+  port?: number;
+  /**
+   * ISO timestamp this server started listening. Set once at startup in
+   * {@link startServer}. Optional for the same reason as {@link port}.
+   */
+  startedAt?: string;
 }
 
 /** A route handler receives the request, response, and server context. */

@@ -34,6 +34,7 @@ import {
   DEFAULT_CODEX_MODEL,
   setLLMConfig,
   setClaudeConfig,
+  setProjectDir,
   getAuthMode,
   getLLMVendor,
   applyDecompositionPass,
@@ -478,6 +479,7 @@ async function initLLMClients(
   setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
   setClaudeConfig(claudeConfig);
+  setProjectDir(dir);
 
   if (!noLlm) {
     const vendor = getLLMVendor();

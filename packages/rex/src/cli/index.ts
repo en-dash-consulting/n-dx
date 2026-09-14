@@ -9,6 +9,7 @@ import { setQuiet, setVerbose, setDebug } from "./output.js";
 import { CLI_ERROR_CODES, formatTypoSuggestion, suppressKnownDeprecations } from "@n-dx/llm-client";
 import { isItemLevel } from "../schema/index.js";
 import { join } from "node:path";
+import { resolveDir } from "./resolve-dir.js";
 
 suppressKnownDeprecations();
 
@@ -155,15 +156,6 @@ function parseArgs(argv: string[]): {
   }
 
   return { command, positional, flags, multiFlags };
-}
-
-/** Resolve project directory from the last positional argument or cwd. */
-function resolveDir(positional: string[]): string {
-  const last = positional[positional.length - 1];
-  if (last && !last.startsWith("-")) {
-    return resolve(last);
-  }
-  return process.cwd();
 }
 
 /**

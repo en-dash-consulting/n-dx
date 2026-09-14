@@ -193,7 +193,9 @@ describe("getCurrentHead", () => {
     expect(mockExecFileSync).toHaveBeenCalledWith(
       "git",
       ["rev-parse", "HEAD"],
-      { cwd: "/project", encoding: "utf-8" },
+      // stderr is captured, not inherited: probing a directory that may not be
+      // a repository must not print `fatal: not a git repository` to the user.
+      { cwd: "/project", encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
     );
   });
 

@@ -20,6 +20,14 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { join, dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { getMcpServers, renderCodexConfigToml } from "../../packages/core/assistant-assets.js";
+import { setupCodexIntegration } from "../../packages/core/codex-integration.js";
+
+const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 
 // ── Imports from compiled dist/ artifacts ──────────────────────────────────
 
@@ -476,6 +484,65 @@ describe("Codex config validation gauntlet", () => {
       };
       expect(request.prompt).toContain("\n");
       expect(request).toBeDefined();
+    });
+  });
+
+  // ── .codex/config.toml — cwd-relative MCP commands, no absolute paths ─────
+
+  describe(".codex/config.toml uses cwd-relative MCP commands", () => {
+    it("renderCodexConfigToml produces no absolute paths", () => {
+      const content = renderCodexConfigToml("ndx");
+      expect(content).not.toMatch(/"\/[^"]*"/);
+      expect(content).not.toMatch(/"[A-Za-z]:\\\\[^"]*"/);
+    });
+
+    it("every server's args are [cliCommand, mcpCommand, '.'] with a bare command", () => {
+      const content = renderCodexConfigToml("ndx");
+      const servers = getMcpServers();
+      for (const [name, descriptor] of Object.entries(servers)) {
+        const subcommand = descriptor.cliCommand ?? name;
+        expect(content).toContain(`[mcp_servers.${name}]`);
+        expect(content).toContain('command = "ndx"');
+        expect(content).toContain(`args = ["${subcommand}", "${descriptor.mcpCommand}", "."]`);
+      }
+    });
+
+    it("a generated .codex/config.toml on disk has no absolute paths, including the project dir itself", () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), "ndx-codex-config-validation-"));
+      try {
+        setupCodexIntegration(tmpDir);
+        const content = readFileSync(join(tmpDir, ".codex", "config.toml"), "utf-8");
+        expect(content).not.toContain(tmpDir);
+        expect(content).not.toMatch(/"\/[^"]*"/);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("regenerating .codex/config.toml is idempotent — re-running init twice produces byte-identical output", () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), "ndx-codex-config-validation-"));
+      try {
+        setupCodexIntegration(tmpDir);
+        const first = readFileSync(join(tmpDir, ".codex", "config.toml"), "utf-8");
+        setupCodexIntegration(tmpDir);
+        const second = readFileSync(join(tmpDir, ".codex", "config.toml"), "utf-8");
+        expect(second).toBe(first);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("the recommended gitignore snippet does not list .mcp.json — it is meant to be tracked", () => {
+      // .codex/config.toml itself is an optional gitignore entry (commit only
+      // if the team uses Codex), but .mcp.json is Claude's *tracked* config —
+      // Codex setup must not cause it to be recommended for exclusion either.
+      const template = readFileSync(
+        resolve(REPO_ROOT, "packages/core/assistant-assets/ndx.gitignore"),
+        "utf-8",
+      );
+      expect(template).not.toContain(".mcp.json");
+      const repoGitignore = readFileSync(resolve(REPO_ROOT, ".gitignore"), "utf-8");
+      expect(repoGitignore).not.toContain(".mcp.json");
     });
   });
 
