@@ -3,5 +3,6 @@
     "npmjs",
     "slideout",
     "vitepress"
-  ]
+  ],
+  "lmstudioCode.minContextLength": 131072
 }
