@@ -73,6 +73,20 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
    */
   const TIMEOUT_MS = process.platform === "win32" ? 3000 : 700;
 
+  /** How long "leaves no descendant" polls for the grandchild to be reaped. */
+  const REAP_DEADLINE_MS = 3000;
+
+  /**
+   * Per-test vitest budget. Each case spends TIMEOUT_MS waiting for exec to time
+   * the command out, then either observes for OBSERVE_MS or polls for up to
+   * REAP_DEADLINE_MS — on Windows that is already 5000–6000ms, which is vitest's
+   * entire default budget before exec's kill-and-reap and the directory reads are
+   * counted. Derive the budget from the same constants, with slack for a loaded
+   * runner, so widening one of them cannot silently push a case past the limit.
+   */
+  const SLACK_MS = 3000;
+  const TEST_BUDGET_MS = TIMEOUT_MS + Math.max(OBSERVE_MS, REAP_DEADLINE_MS) + SLACK_MS;
+
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "exec-treekill-"));
 
@@ -155,7 +169,7 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
     // 150ms per tick under TIMEOUT_MS it should manage several.
     expect(await tickCount()).toBeGreaterThan(0);
     expect(readPid()).not.toBe(null);
-  });
+  }, TEST_BUDGET_MS);
 
   it("leaves no descendant process running", async () => {
     await runTimingOut();
@@ -166,13 +180,13 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
     // Give the kill a moment to be reaped, then require it to be gone. Polling
     // rather than a fixed sleep so a fast machine does not wait needlessly and a
     // slow one does not fail spuriously.
-    const deadline = Date.now() + 3000;
+    const deadline = Date.now() + REAP_DEADLINE_MS;
     while (isAlive(pid!) && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 50));
     }
 
     expect(isAlive(pid!)).toBe(false);
-  });
+  }, TEST_BUDGET_MS);
 
   it("stops writing to the workspace once the timeout is reported", async () => {
     await runTimingOut();
@@ -183,5 +197,5 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
 
     // The grandchild writes every 150ms, so a survivor would add ~13 files here.
     expect(afterObserving).toBe(atTimeout);
-  });
+  }, TEST_BUDGET_MS);
 });
