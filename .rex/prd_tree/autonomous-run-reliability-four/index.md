@@ -48,7 +48,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [SIGINT rollback-prompt integration tests are flaky and leak Windows handles](./sigint-rollback-prompt-integration.md) | completed |
 | [Stop a run that repeats an identical tool call instead of letting it loop forever](./stop-a-run-that-repeats-an-identical.md) | completed |
 | [Synchronize CLI cleanup E2E on spawned-child readiness](./synchronize-cli-cleanup-e2e-on-spawned.md) | pending |
-| [Tree-kill late Windows children and their descendants](./tree-kill-late-windows-children-and.md) | completed |
+| [Tree-kill late Windows children and their descendants](./tree-kill-late-windows-children-and.md) | pending |
 | [Windows orphan-child E2E fixture can start without its grandchild](./windows-orphan-child-e2e-fixture-can.md) | completed |
 | [Windows stale-lock contention regression test can deadlock](./windows-stale-lock-contention.md) | completed |
 | [Withdrawing a completion must reopen the ancestors the agent's own cascade already closed](./withdrawing-a-completion-must-reopen.md) | completed |
