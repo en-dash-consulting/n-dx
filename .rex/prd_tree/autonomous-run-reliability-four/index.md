@@ -2,7 +2,7 @@
 id: "fc1b9f67-17e9-45db-a9d1-fc1e865f97ba"
 level: "epic"
 title: "Autonomous run reliability: four defects found running wave 1"
-status: "completed"
+status: "pending"
 priority: "critical"
 tags:
   - "reliability"
@@ -11,7 +11,6 @@ tags:
   - "rex"
 source: "GitHub issues #362-#365, filed from the wave-1 session 2026-09-11"
 startedAt: "2026-09-11T22:32:16.148Z"
-completedAt: "2026-09-13T18:06:18.593Z"
 endedAt: "2026-09-13T18:06:18.593Z"
 acceptanceCriteria:
   - "A run that repeats an identical failing tool call is stopped rather than looping indefinitely (#362)."
@@ -19,7 +18,7 @@ acceptanceCriteria:
   - "An epic does not auto-complete while any child is deferred, blocked or failing (#364)."
   - "`--reset-deferred` can actually start the run it enables, and a refusal exits non-zero (#365)."
 description: "All four were hit while producing the 0.6.0 wave-1 PRs (#359, #360, #361, #366) and are filed as GitHub issues #362, #363, #364 and #365. Each is independent; fix them in one PR off main.\n\nWhy before the release: 0.6.0 is the release that makes concurrent checkouts safe, which is an invitation to run more autonomous work in parallel. These four defects all make autonomous runs unreliable, and #363 silently loses completed work while reporting success.\nConventions: cross-package imports go through the gateway modules; hench must not import node:child_process (tests/e2e/architecture-policy.test.js enforces it). Add a changeset with scoped package names. Run `pnpm test` from the repo root before declaring done."
-lastModified: "2026-09-13T18:06:18.915Z"
+lastModified: "2026-09-14T04:47:02.169Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -40,6 +39,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Livelock intercept does not kill its child on Windows, failing CLI Smoke (Windows)](./livelock-intercept-does-not-kill-its.md) | completed |
 | [Lock file is readable while empty, so a second writer can reclaim a live lock](./lock-file-is-readable-while-empty-so-a.md) | completed |
 | [PRD tree snapshot must tolerate a concurrent writer's temp files](./prd-tree-snapshot-must-tolerate-a.md) | completed |
+| [Publish only a complete PRD snapshot after a retry](./publish-only-a-complete-prd-snapshot.md) | pending |
 | [Refuse to mark a task completed while its work is uncommitted](./refuse-to-mark-a-task-completed-while.md) | completed |
 | [Relocation-port unit test races with real CI port allocation](./relocation-port-unit-test-races-with.md) | completed |
 | [--reset-deferred must be able to start the run it enables, and a refusal must exit non-zero](./reset-deferred-must-be-able-to-start.md) | completed |
@@ -47,6 +47,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [rex fix must reopen parents to pending (not in_progress) and run the whole-tree stuck-parent sweep](./rex-fix-must-reopen-parents-to-pending.md) | completed |
 | [SIGINT rollback-prompt integration tests are flaky and leak Windows handles](./sigint-rollback-prompt-integration.md) | completed |
 | [Stop a run that repeats an identical tool call instead of letting it loop forever](./stop-a-run-that-repeats-an-identical.md) | completed |
+| [Synchronize CLI cleanup E2E on spawned-child readiness](./synchronize-cli-cleanup-e2e-on-spawned.md) | pending |
+| [Tree-kill late Windows children and their descendants](./tree-kill-late-windows-children-and.md) | pending |
 | [Windows orphan-child E2E fixture can start without its grandchild](./windows-orphan-child-e2e-fixture-can.md) | completed |
 | [Windows stale-lock contention regression test can deadlock](./windows-stale-lock-contention.md) | completed |
 | [Withdrawing a completion must reopen the ancestors the agent's own cascade already closed](./withdrawing-a-completion-must-reopen.md) | completed |
