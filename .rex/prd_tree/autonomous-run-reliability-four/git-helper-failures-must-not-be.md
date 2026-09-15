@@ -9,6 +9,7 @@ tags:
   - "git"
   - "ndx-capture"
 source: "ndx-capture"
+startedAt: "2026-09-15T02:10:45.018Z"
 acceptanceCriteria:
   - "A failed Git add or commit returns a non-success result to the Hench lifecycle and no success message is printed."
   - "A rejected signing request, failing hook, or Git identity error cannot be reported as a completed stage or commit operation."
@@ -16,6 +17,6 @@ acceptanceCriteria:
   - "Regression tests force non-zero Git outcomes for the affected helpers and assert the user-facing result and working-tree safety."
   - "Focused Hench tests and typecheck pass, with a patch changeset for @n-dx/hench."
 description: "P2 follow-up approved for PR #370. The Hench lifecycle uses execStdout for git add and git commit helpers even though it resolves an empty result on command failure. A rejected signing prompt, pre-commit hook, or Git identity error can therefore print Staged or Committed despite no Git mutation. Preserve the original failure, do not claim success, and prevent a later task from absorbing the previous task's PRD write. Review evidence: packages/hench/src/agent/lifecycle/shared.ts helper paths around stageReviewRepairs and commitResetDeferredChanges, backed by execStdout behavior in the shared execution helper."
-lastModified: "2026-09-15T02:08:37.530Z"
+lastModified: "2026-09-15T02:27:38.393Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

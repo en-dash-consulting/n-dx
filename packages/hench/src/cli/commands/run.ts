@@ -459,7 +459,10 @@ export async function resetDeferredAndCommit(
   // Commit the reset's own PRD-tree write immediately so the pre-run commit
   // gate sees a clean tree instead of refusing the very run --reset-deferred
   // exists to resume (GitHub #365).
-  await commitResetDeferredChanges(projectDir, resetCount);
+  const commitResult = await commitResetDeferredChanges(projectDir, resetCount);
+  if (commitResult.error) {
+    throw commitResult.error;
+  }
   return resetCount;
 }
 

@@ -23,7 +23,8 @@ import type { HenchConfig, RunRecord, RunMemoryStats, TaskBrief, TurnTokenUsage,
 import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
-import { getCurrentHead, execStdout } from "../../process/exec.js";
+import { exec, getCurrentHead, execStdout } from "../../process/exec.js";
+import type { ExecResult } from "../../process/exec.js";
 import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
@@ -1112,6 +1113,29 @@ async function performRollbackIfNeeded(
 // Pending-commit prompt helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Turn a failed structured process result into the original Git failure.
+ *
+ * `execStdout` is intentionally lossy: it is ideal for read-only probes, but
+ * mutations need the exit status so a rejected hook or signing prompt cannot
+ * look like a completed operation.
+ */
+function gitMutationError(result: ExecResult): Error {
+  return result.error ?? new Error(result.stderr.trim() || result.stdout.trim() || "Git command failed");
+}
+
+/** Execute a Git mutation and reject when Git did not complete it. */
+async function execGitMutation(
+  projectDir: string,
+  args: string[],
+  timeout: number,
+): Promise<void> {
+  const result = await exec("git", args, { cwd: projectDir, timeout });
+  if (!result.launched || result.exitCode !== 0) {
+    throw gitMutationError(result);
+  }
+}
+
 /** Project-root sentinel where the agent writes its proposed commit message. */
 const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
 
@@ -1145,22 +1169,21 @@ export function pendingCommitMessageExists(projectDir: string): boolean {
  * ever staged them, and the completion gate refused the run for the leak.
  *
  * Mirrors the file list {@link commitReviewRepairsIfNeeded} commits on the
- * autoCommit path. Best-effort, like the PRD staging beside it: a repair
- * that cannot be staged is reported, not fatal to the commit.
+ * autoCommit path. A repair that cannot be staged is returned to the caller,
+ * which withdraws the completion claim rather than committing a partial task.
  */
-async function stageReviewRepairs(projectDir: string, run: RunRecord): Promise<void> {
+async function stageReviewRepairs(projectDir: string, run: RunRecord): Promise<Error | undefined> {
   const review = run.review;
   if (!review || review.failed !== undefined) return;
   if (!review.repairedFiles || review.repairedFiles.length === 0) return;
 
   try {
-    await execStdout("git", ["add", "--", ...review.repairedFiles], {
-      cwd: projectDir,
-      timeout: 10_000,
-    });
+    await execGitMutation(projectDir, ["add", "--", ...review.repairedFiles], 10_000);
     detail(`Staged ${review.repairedFiles.length} review repair(s)`);
   } catch (err) {
-    detail(`Warning: could not stage review repairs: ${(err as Error).message}`);
+    const error = err as Error;
+    detail(`Warning: could not stage review repairs: ${error.message}`);
+    return error;
   }
 }
 
@@ -1312,12 +1335,9 @@ export async function proposePreRunCommitMessage(
  * context exists yet, so the run-scoped trailers do not apply).
  */
 async function commitPreRunChanges(projectDir: string, message: string): Promise<void> {
-  await execStdout("git", ["add", "-A"], { cwd: projectDir, timeout: 30_000 });
+  await execGitMutation(projectDir, ["add", "-A"], 30_000);
   const trailers = `N-DX: pre-run commit gate\n${buildCoAuthoredByTrailerLine()}`;
-  await execStdout("git", ["commit", "-m", message, "-m", trailers], {
-    cwd: projectDir,
-    timeout: 30_000,
-  });
+  await execGitMutation(projectDir, ["commit", "-m", message, "-m", trailers], 30_000);
 }
 
 /**
@@ -1411,27 +1431,32 @@ async function prdPathsToStage(
  * The commit is scoped to those same paths, so it lands the PRD write and
  * nothing else — work the operator had already staged stays staged.
  *
- * Skips silently, returning 0, when no PRD path exists, when the directory
- * isn't a git repo, or when nothing ends up staged.
+ * Returns `error` when Git cannot stage or commit the paths. A missing PRD
+ * path or empty staged set remains a successful no-op.
  */
-async function commitPrdTreeIfStaged(projectDir: string, message: string): Promise<number> {
+export interface PrdTreeCommitResult {
+  staged: number;
+  error?: Error;
+}
+
+async function commitPrdTreeIfStaged(projectDir: string, message: string): Promise<PrdTreeCommitResult> {
   const prdPaths = await prdPathsToStage(projectDir);
 
   if (prdPaths.length === 0) {
-    return 0;
+    return { staged: 0 };
   }
 
   try {
     for (const prdPath of prdPaths) {
-      await execStdout("git", ["add", prdPath], { cwd: projectDir, timeout: 10_000 });
+      await execGitMutation(projectDir, ["add", prdPath], 10_000);
     }
-  } catch {
-    return 0; // not in a git repo
+  } catch (err) {
+    return { staged: 0, error: err as Error };
   }
 
   const staged = await countStagedFiles(projectDir, [".rex/"]);
   if (staged === 0) {
-    return 0;
+    return { staged: 0 };
   }
 
   try {
@@ -1446,14 +1471,14 @@ async function commitPrdTreeIfStaged(projectDir: string, message: string): Promi
     // catch below reports that and leaves the PRD write in the tree for the
     // gate to name, which is the right outcome: a run started mid-merge should
     // not be quietly extending the merge commit.
-    await execStdout(
-      "git", ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine(), "--", ...prdPaths],
-      { cwd: projectDir, timeout: 30_000 },
+    await execGitMutation(
+      projectDir,
+      ["commit", "-m", message, "-m", buildCoAuthoredByTrailerLine(), "--", ...prdPaths],
+      30_000,
     );
-    return staged;
+    return { staged };
   } catch (err) {
-    detail(`Warning: could not commit PRD tree changes: ${(err as Error).message}`);
-    return 0;
+    return { staged, error: err as Error };
   }
 }
 
@@ -1469,7 +1494,7 @@ async function commitCompletionMetadata(
   projectDir: string,
   taskId: string,
   origin?: RunGitOrigin,
-): Promise<void> {
+): Promise<PrdTreeCommitResult> {
   // #360's guard, kept ahead of the staging helper so a moved checkout leaves
   // the tree exactly as it was. Reported, never thrown — the metadata staying
   // dirty is an inspection burden, not a broken run. It lives here rather than
@@ -1482,17 +1507,20 @@ async function commitCompletionMetadata(
       `⚠ Refusing to commit completion metadata: ${drift}. ` +
         `The PRD changes remain in the working tree.`,
     );
-    return;
+    return { staged: 0 };
   }
 
   // Stages the whole `.rex/prd_tree/` (the completion write may touch the task
   // plus cascaded ancestors). Under the no-concurrent-PRD-writers contract this
   // is just this run's metadata; the message reflects it may span the tree.
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
-  const staged = await commitPrdTreeIfStaged(projectDir, message);
-  if (staged > 0) {
-    detail(`Committed completion metadata (${staged} PRD file(s))`);
+  const result = await commitPrdTreeIfStaged(projectDir, message);
+  if (result.error) {
+    detail(`Warning: could not commit PRD tree changes: ${result.error.message}`);
+  } else if (result.staged > 0) {
+    detail(`Committed completion metadata (${result.staged} PRD file(s))`);
   }
+  return result;
 }
 
 /**
@@ -1512,8 +1540,10 @@ async function commitCompletionMetadata(
  * means the gate only ever sees a genuinely dirty tree: the user's own
  * uncommitted work, which must still refuse.
  *
- * A no-op (returns without doing anything) when `resetCount` is 0 — nothing
- * was reset, so there is nothing of this call's own to commit.
+ * A no-op (`{ staged: 0 }`) when `resetCount` is 0 — nothing was reset, so
+ * there is nothing of this call's own to commit. A failed Git operation is
+ * returned with its original error so callers must not start a later task
+ * against this task's uncommitted PRD write.
  *
  * **PRECONDITION: the PRD tree must have been clean before the reset ran.**
  * This stages `.rex/prd_tree/` and the sidecar wholesale and cannot tell the
@@ -1528,13 +1558,16 @@ async function commitCompletionMetadata(
 export async function commitResetDeferredChanges(
   projectDir: string,
   resetCount: number,
-): Promise<void> {
-  if (resetCount <= 0) return;
+): Promise<PrdTreeCommitResult> {
+  if (resetCount <= 0) return { staged: 0 };
   const message = `chore(prd): reset ${resetCount} deferred/failing task(s) to pending (--reset-deferred)`;
-  const staged = await commitPrdTreeIfStaged(projectDir, message);
-  if (staged > 0) {
-    detail(`Committed --reset-deferred changes (${staged} PRD file(s))`);
+  const result = await commitPrdTreeIfStaged(projectDir, message);
+  if (result.error) {
+    detail(`Warning: could not commit --reset-deferred changes: ${result.error.message}`);
+  } else if (result.staged > 0) {
+    detail(`Committed --reset-deferred changes (${result.staged} PRD file(s))`);
   }
+  return result;
 }
 
 export interface PreRunCommitGateOptions {
@@ -1683,8 +1716,8 @@ export async function performPreRunCommitGateIfNeeded(
   if (choice === "stop") return "stop";
   if (choice === "commit") {
     // Between capture and here the operator answered a prompt, which is long
-    // enough for another process to move the checkout. Refusing is non-fatal,
-    // matching the commit-failure branch below: the changes stay in the tree.
+    // enough for another process to move the checkout. The changes stay in
+    // the tree and the caller must not start a run that could absorb them.
     const drift = checkOrigin(projectDir, opts.origin);
     if (drift) {
       info(
@@ -1697,7 +1730,8 @@ export async function performPreRunCommitGateIfNeeded(
       await commit(projectDir, proposed);
       info("Committed pre-existing changes. Starting run…");
     } catch (err) {
-      info(`⚠ Pre-run commit failed: ${(err as Error).message} — proceeding without committing.`);
+      info(`⚠ Pre-run commit failed: ${(err as Error).message} — stopping before work starts.`);
+      return "stop";
     }
   }
   return "proceed";
@@ -1809,7 +1843,17 @@ export async function performCommitPromptIfNeeded(
   // completion gate already discounted them on that promise. Staged before
   // the count below, so an index the executor left empty does not skip the
   // commit and orphan the repairs the gate just waved through.
-  await stageReviewRepairs(projectDir, run);
+  const reviewStageFailure = await stageReviewRepairs(projectDir, run);
+  if (reviewStageFailure) {
+    run.status = "failed";
+    run.error = `Could not stage review repairs: ${reviewStageFailure.message}`;
+    info(`\n${run.error}`);
+    if (store) {
+      await withdrawCompletionClaim(store, run, run.error);
+    }
+    try { unlinkSync(msgPath); } catch { /* ignore */ }
+    return;
+  }
 
   const stagedCount = await countStagedFiles(projectDir);
   if (stagedCount === 0) {
@@ -1886,18 +1930,19 @@ export async function performCommitPromptIfNeeded(
         const prdPaths = await prdPathsToStage(projectDir, { includeLegacyMarkdown: true });
 
         for (const prdPath of prdPaths) {
-          await execStdout("git", ["add", prdPath], {
-            cwd: projectDir,
-            timeout: 10_000,
-          });
+          await execGitMutation(projectDir, ["add", prdPath], 10_000);
         }
         if (prdPaths.length > 0) {
           detail(`Staged ${prdPaths.length} PRD path(s)`);
         }
       } catch (err) {
-        // Best-effort: if staging fails, proceed with commit anyway
-        // The status update has already been persisted to disk
-        detail(`Warning: could not stage PRD files: ${(err as Error).message}`);
+        const error = err as Error;
+        run.status = "failed";
+        run.error = `Could not stage PRD files: ${error.message}`;
+        info(`\n${run.error}`);
+        await withdrawCompletionClaim(store, run, run.error);
+        try { unlinkSync(msgPath); } catch { /* ignore */ }
+        return;
       }
     } catch (err) {
       // Best-effort: if PRD update fails, proceed with commit anyway
@@ -1994,10 +2039,7 @@ export async function performCommitPromptIfNeeded(
   }
 
   try {
-    await execStdout("git", ["commit", "-F", PENDING_COMMIT_FILE], {
-      cwd: projectDir,
-      timeout: 30_000,
-    });
+    await execGitMutation(projectDir, ["commit", "-F", PENDING_COMMIT_FILE], 30_000);
     info(`Commit created — ${stagedCount} file(s).`);
 
     // Capture commit attribution and changed files after successful commit
@@ -2061,7 +2103,13 @@ export async function performCommitPromptIfNeeded(
       }
     }
   } catch (err) {
-    info(`Commit failed: ${(err as Error).message}`);
+    const error = err as Error;
+    run.status = "failed";
+    run.error = `Commit failed: ${error.message}`;
+    info(run.error);
+    if (store) {
+      await withdrawCompletionClaim(store, run, run.error);
+    }
   } finally {
     try { unlinkSync(msgPath); } catch { /* ignore */ }
   }
@@ -2594,7 +2642,15 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // and swept into whatever commit happens next.
   if (opts.autoCommit === true && run.status === "completed" && run.taskId) {
     await commitReviewRepairsIfNeeded(projectDir, run);
-    await commitCompletionMetadata(projectDir, run.taskId, run);
+    const completionMetadata = await commitCompletionMetadata(projectDir, run.taskId, run);
+    if (completionMetadata.error) {
+      run.status = "failed";
+      run.error = `Could not commit completion metadata: ${completionMetadata.error.message}`;
+      info(`\n${run.error}`);
+      if (opts.store) {
+        await withdrawCompletionClaim(opts.store, run, run.error);
+      }
+    }
   }
 
   // Rollback uncommitted changes when the run failed (unless suppressed).
