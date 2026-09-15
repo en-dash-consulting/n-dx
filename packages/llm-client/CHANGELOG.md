@@ -1,5 +1,35 @@
 # @n-dx/llm-client
 
+## 0.6.1
+
+### Patch Changes
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - fix(llm-client): stop dropping documented llm.local settings at load time
+  
+  `extractLocalConfig` whitelists keys, and it only copied `host`, `port`,
+  `model`, and `lightModel`. Every other documented `llm.local` setting —
+  `timeoutMs`, `maxContextTokens`, `reviewModel`, and the `verifier` block —
+  was silently discarded on load: operators set them in `.n-dx.json`, the
+  loader dropped them, and the local loop ran on its defaults with no error
+  anywhere. Notably this made `llm.local.timeoutMs` (the configurable request
+  timeout for slow local models) inert when set via config.
+  
+  All documented `LocalConfig` fields now survive the load, including
+  `timeoutMs: 0` (wait indefinitely), which must not be dropped by a truthiness
+  check. The verifier block is validated field-by-field like the rest.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the local (LM Studio) per-request timeout configurable via `llm.local.timeoutMs`
+  
+  Local completions were bounded by a hardcoded 5-minute abort in three places — the
+  local API provider, hench's local tool loop, and the second-model verifier (60 s) —
+  so a slow local model failed with `NDX_CLI_TIMEOUT` no matter what the CLI-timeout
+  settings said. `cli.timeoutMs` / the "CLI Timeouts" page bound a whole command, not
+  an individual HTTP request, so setting them to unlimited had no effect on this path.
+  
+  All three now read `llm.local.timeoutMs` (default 300000, `0` = no timeout), settable
+  via `ndx config llm.local.timeoutMs <ms>` or the LLM Provider settings page. The
+  timeout error message now names the key to change.
+
 ## 0.6.0
 
 ### Patch Changes

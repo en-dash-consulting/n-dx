@@ -1,5 +1,354 @@
 # @n-dx/hench
 
+## 0.6.1
+
+### Patch Changes
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Allow API-loop completion commits to include Hench's Rex execution-log update while continuing to require real agent work.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - fix(hench): API-provider loops validate completion like the CLI loop
+  
+  The local (LM Studio), Google, and Claude API loops treated "the model stopped
+  calling tools" as completion: the run was recorded as completed, the task was
+  marked done in the PRD, and completion metadata was committed — even when the
+  model changed nothing at all. The CLI vendors (claude, codex) have always run
+  `validateCompletion` first and rejected such runs. A qwen run that made one
+  status-update tool call and quit was therefore "completed" under vendor=local
+  when the identical behaviour under vendor=claude would have failed with
+  "Completion rejected".
+  
+  All three API loops now apply the same post-loop gate the CLI loop applies in
+  `processSuccessfulResult`: a completion claim with no meaningful changes fails
+  the run and resets the task to pending (`completion_rejected`) so the next
+  cycle retries it.
+  
+  `validateCompletion` itself now shares the test gate's change discovery
+  (`discoverChangedFiles`, moved to `validation/changed-files.ts` to respect the
+  zone boundary) instead of a raw `git diff --stat`. Two defects fall out of the
+  old diff:
+  
+  - `.rex/`/`.hench/` bookkeeping counted as changes — hench dirties the task's
+    PRD file on every run, so a do-nothing run still validated as "has changes".
+  - Untracked files never appear in a diff, so a purely-additive task (new module
+    + new test, nothing committed) was rejected as "no changes detected".
+  
+  Both loops now pass `baselineUntracked` through, so a user's pre-existing
+  untracked files are not attributed to the run.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Calibrate the uncommitted-work guards so autonomous runs stop refusing their own PRD writes.
+  
+  Three defects, all of which made a run refuse on dirt its own code had just
+  produced.
+  
+  **The between-task guard stopped every loop at its first failed task.** It
+  discounted nothing but hench's runtime artifacts, on the premise that an
+  uncommitted `.rex/prd_tree/` meant the previous task's status write never
+  landed. That only holds for a task that *succeeded*: every failure path writes
+  a `deferred`/`pending` status and commits nothing, because both committers run
+  only for a completed run and the rollback never reverts unattended. So the
+  first deferred, failed or timed-out task stopped the loop outright, and the
+  consecutive-failure counter and stuck-task skipping were unreachable. The
+  guard now discounts the PRD paths; the completion gate in `finalizeRun` still
+  covers the case that is real leakage.
+  
+  **`.rex/tree-meta.json` refused every completion.** Every folder-tree save
+  rewrites the tracked sidecar, and where the committed copy predates the schema
+  marker the rewrite changes its bytes. It is not a hench runtime artifact and
+  not under `.rex/prd_tree/`, so it was discounted by neither gate and staged by
+  neither committer — the first PRD write of any run left it dirty and the
+  completion gate refused every task from then on. It is now a PRD commit path
+  everywhere the tree is, off a single `TREE_META_FILENAME` constant exported by
+  rex so the staging, discounting and skipping sites cannot drift apart.
+  
+  **`--epic-by-epic` had no between-task guard at all.** It iterates tasks in its
+  own loop, which was never wired to the guard, so the work-tangling the guard
+  exists to prevent still happened there. It now runs the same check before every
+  task but the first of the invocation, counted across epics.
+  
+  Also fixes the porcelain reader underneath all three. `git status --porcelain`
+  output was split with `output.trim()`, which strips the leading space of the
+  *first* line only — and that space is the blank index column of an unstaged
+  change. The first entry's path parsed one character short, matching no discount
+  rule, and its worktree column was read as the index column, so a ` M` file
+  masqueraded as staged and was discounted outright. Whichever entry git listed
+  first was the one corrupted, which is why it looked intermittent.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Completion no longer cascades over an in_progress parent or outside the run's subtree ([#368](https://github.com/en-dash-consulting/n-dx/issues/368))
+  
+  A run that hit the account session limit on turn 1 — status failed, 1 turn,
+  zero tool calls, no changes; the agent never ran — nonetheless closed a task
+  and an epic belonging to another user, in an epic it had never touched, and
+  rewrote `lastModifiedBy` on both to whoever was running the command. The task
+  was an open investigation with unmet acceptance criteria whose single subtask
+  happened to be completed. It was caught only because the run left the tree
+  dirty and someone read the diff.
+  
+  Three independent things had to be true for that to happen, and all three are
+  now fixed:
+  
+  - **An `in_progress` parent is no longer auto-completed by a child
+    transition.** `AUTO_COMPLETABLE_STATUSES` is `{pending}`;
+    `in_progress` is a deliberate claim that the parent has work of its own.
+    `remove-task.ts` now imports that set rather than keeping a second copy.
+    `rex status`'s auto-completable *hint* still lists `in_progress` parents, so
+    one that really has finished is surfaced for a human to confirm.
+  - **A cascade cannot leave the subtree the run is operating on.**
+    `reconcileAutoCompletions` takes `{ ancestorsOf }`, which confines its
+    whole-tree self-healing sweep to that item's ancestor chain; an unrecognised
+    id contains it to nothing rather than degrading to a full sweep. Hench's
+    `rex_update_status` passes the task it was asked to update.
+  - **A cascade no longer rewrites authorship.** New
+    `WriteOptions.preserveModifiedBy` keeps an item's existing `lastModifiedBy`
+    while still stamping `lastModified`; every cascade write site (hench's tool,
+    `rex update`, the `update_task_status` MCP tool, `rex remove`) sets it. Both
+    local stores and all four remote adapters honour it, and it survives the
+    transaction-level stamp in `stampChangedItems`.
+  
+  This is distinct from [#364](https://github.com/en-dash-consulting/n-dx/issues/364), which narrowed which *child* statuses count as
+  done. Here the child genuinely is completed, so that predicate was satisfied
+  and the cascade still fired. Both guards are needed; the module header of
+  `core/parent-completion.ts` records why they must not be merged.
+  
+  Also declares `lastModified` / `lastModifiedBy` on `PRDItem`. Both were
+  already written by every store adapter but reached readers as `unknown`
+  through the index signature.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Credit Codex file edits as livelock progress. The Codex adapter mapped only `command_execution` items to tool calls, so every command reached the livelock detector as one tool named `shell` and a patch was invisible — a normal edit-then-retest loop was killed as a livelock at the sixth identical `pnpm test`. A completed `file_change` item now becomes an `apply_patch` tool call, which is the detector's progress signal; a failed or not-yet-applied patch still is not.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - fix(hench): stop counting `.rex/`/`.hench/` bookkeeping as the run's changed files
+  
+  `discoverChangedFiles` decides whether the full-suite test gate runs at all: an
+  empty set skips it. But the set was built from `git diff` against the pre-run
+  commit with no path filtering, and hench dirties `.rex/prd_tree/<task>/index.md`
+  on every run the moment it marks the task in-progress. Every run therefore
+  "changed files" — even one whose agent produced no code at all — so the gate ran
+  the full workspace suite, and any pre-existing failure anywhere in the repo
+  failed the run, reset the task to pending, and offered to revert the operator's
+  own uncommitted PRD edits.
+  
+  `.rex/` and `.hench/` paths are now excluded from the discovered set, in both
+  the diff-derived and untracked halves. They are never the run's work product:
+  the agent's own prompt forbids touching them, the completion-metadata commit
+  stages `.rex/prd_tree` through its own dedicated path, and the reviewer's
+  repaired-files set already filtered them the same way. A run that changed only
+  bookkeeping now skips the gate with "No files modified in prior phases", and a
+  run with real changes is tested exactly as before.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - fix(hench): the completion gate discounts only what the commit prompt will actually commit
+  
+  Two follow-ups from the [#370](https://github.com/en-dash-consulting/n-dx/issues/370) review of the uncommitted-work gate ([#363](https://github.com/en-dash-consulting/n-dx/issues/363)):
+  
+  - Staged work was discounted whenever `autoCommit` was off, on the theory that
+    the commit prompt would land it. But the prompt only commits when a non-empty
+    `.hench-commit-msg.txt` exists — an agent that ran `git add -A` and never
+    wrote the message passed the gate with every path staged, the PRD recorded
+    `completed`, and nothing was committed. The gate now discounts the index only
+    when that message file is present with content.
+  - Reviewer repairs were discounted only on the autoCommit path, although
+    `--review` runs regardless of it. With the default `autoCommit=false` the
+    reviewer's unstaged edits failed the gate, the completion was withdrawn, and
+    the executor's staged work never landed either. Repairs are now discounted
+    whenever the review produced a usable report, and the commit prompt stages
+    them before `git commit -F` so they ride the executor's commit — the promise
+    the reviewer prompt already made.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Report failed Git staging and commit operations instead of treating them as successful.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Refuse to mark a task completed while its work is uncommitted ([#363](https://github.com/en-dash-consulting/n-dx/issues/363))
+  
+  A run could finish with the agent's files still in the working tree while the
+  only commit to land was hench's own `chore(prd): commit PRD tree changes (task
+  <id> completed)` — the code sat uncommitted and the PRD recorded the opposite
+  of the truth. In a `--loop` run it compounded: the next task started on a tree
+  still holding the previous task's output, and the two tangled together.
+  
+  `finalizeRun` now checks the working tree before the completion status is
+  written. Paths a later step of the same run still commits are discounted — the
+  PRD folder tree, the review repairs on the autoCommit path, and the staged
+  index wherever the commit prompt follows — as are hench's own runtime
+  artifacts, matching the pre-run gate's existing discount. Anything left is
+  finished work with no owner: the run fails, names every path, and the task is
+  reset to pending (including when the agent had already written `completed`
+  itself). Nothing is discarded, and the failure suppresses the rollback prompt
+  so the refused work cannot be reverted by the next keystroke.
+  
+  Autonomous multi-task runs now re-check the tree between tasks and stop rather
+  than starting a task on top of the previous one's output.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - feat(hench): local loop context tracking, condensation, and pressure tinting
+  
+  The local (LM Studio) loop managed context by count: keep the last 20
+  turn-pairs, silently discard everything older (and, by an off-by-one, the
+  task brief itself). For a local model that is both amnesia and wasted
+  prefill. With `llm.local.maxContextTokens` set, the loop now manages the
+  window by measurement — each response's `prompt_tokens` is the actual size
+  of the request just sent:
+  
+  - **Token-triggered condensation.** At ≥70% of the window, old tool outputs
+    are digested in place (first 200 chars kept — free, no model call). At
+    ≥90%, the middle of the conversation is additionally summarized via one
+    extra chat/completions call and replaced with the summary, preserving the
+    brief and the model's recent working set. Rewrites are rare by design —
+    each one invalidates the server's prompt-prefix cache once.
+  - **Visible accounting.** Every condensation prints a `[Context]` line
+    (captured into the run log like all stream output), the tok/s metric line
+    gains `· ctx N% (used/window)`, the run record gets a
+    `contextCondensations` count, and the run summary prints
+    `Context window: condensed N time(s)` for local runs.
+  - **Pressure tinting.** The model's own streamed text — and only it, not
+    tool lines or metrics — renders yellow at ≥70% and red at ≥90% window
+    fill. Terminal only: the run log stays plain text.
+  
+  Without `maxContextTokens` the loop keeps the count-based fallback prune
+  (now preserving the brief and never orphaning tool results) and prints a
+  one-line hint that context tracking is off.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - fix(hench): local loop dispatches tool calls on finish_reason "stop", shows reasoning, and re-prompts no-work completion claims
+  
+  Three divergences between the local (LM Studio) loop and the CLI vendors,
+  found while chasing a qwen3.5 run that burned tokens across two blank turns,
+  made one bookkeeping tool call, and quit:
+  
+  - **Tool calls were silently discarded when `finish_reason` was `"stop"`.**
+    The loop's done-check was `no tool calls OR finish_reason "stop"/"end_turn"`,
+    and LM Studio reports `"stop"` for some models even when `tool_calls` is
+    populated — so the model's work orders were dropped and the run ended. The
+    model is now done only when it stops calling tools; `finish_reason` no longer
+    short-circuits dispatch.
+  
+  - **Reasoning output was invisible.** Thinking models (qwen, deepseek-r1)
+    return their chain of thought in `reasoning_content` (or `reasoning`) with an
+    empty `content`, so the operator watched blank turns consume tokens. When a
+    turn has reasoning but no content, the reasoning is now streamed under a
+    `(thinking)` label. Display only — it is never fed back into the
+    conversation.
+  
+  - **A no-work completion claim ended the run on the spot.** The Claude API
+    loop re-prompts plan-only turns; the local and Gemini loops now give the
+    same second chance: when the model claims completion but the run has changed
+    nothing, it is told to execute (up to 2 reminders) before the claim stands —
+    after which completion validation rejects it and the task resets to pending.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the local (LM Studio) per-request timeout configurable via `llm.local.timeoutMs`
+  
+  Local completions were bounded by a hardcoded 5-minute abort in three places — the
+  local API provider, hench's local tool loop, and the second-model verifier (60 s) —
+  so a slow local model failed with `NDX_CLI_TIMEOUT` no matter what the CLI-timeout
+  settings said. `cli.timeoutMs` / the "CLI Timeouts" page bound a whole command, not
+  an individual HTTP request, so setting them to unlimited had no effect on this path.
+  
+  All three now read `llm.local.timeoutMs` (default 300000, `0` = no timeout), settable
+  via `ndx config llm.local.timeoutMs <ms>` or the LLM Provider settings page. The
+  timeout error message now names the key to change.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Stabilize SIGINT rollback-prompt integration cleanup on Windows.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `--reset-deferred` can now start the run it enables, and a refused run exits non-zero ([#365](https://github.com/en-dash-consulting/n-dx/issues/365))
+  
+  `ndx work --auto --loop --reset-deferred` on a clean tree reset deferred/failing
+  tasks to pending — which writes `.rex/prd_tree/` — and the pre-run commit gate
+  then refused to start because the tree was dirty with the files the reset
+  itself had just produced. Exit code was 0, so the refusal read as success in
+  an unattended context and the tasks stayed deferred forever.
+  
+  The reset now commits its own PRD-tree write immediately
+  (`commitResetDeferredChanges`), the same pattern already used to commit a
+  task's completion write on the autoCommit path. The pre-run gate therefore
+  only ever sees a genuinely dirty tree — the user's own uncommitted work —
+  which still refuses exactly as before.
+  
+  Also fixed: the gate's refusal path returned without setting a nonzero exit
+  code, so a real refusal (dirty tree, no `--reset-deferred` involved) also
+  reported success. `process.exitCode` is now set to `1` whenever the gate
+  declines to start the run.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `--reset-deferred` now commits only its own PRD write, and writes nothing on `--dry-run`.
+  
+  The reset's auto-commit stages `.rex/prd_tree/` wholesale, so an operator edit already sitting there was committed too — under `chore(prd): reset N deferred/failing task(s)`, with hench's Co-Authored-By trailer, in a TTY, with no prompt. The PRD tree is now checked for existing dirt *before* the reset writes; when it is already dirty the reset still runs but nothing is committed, and the pre-run gate reports the tree and exits 1 as it did before. Dirt outside the PRD tree still commits normally.
+  
+  `--dry-run --reset-deferred` no longer writes the reset to disk. It previously left `.rex/prd_tree/` dirty (the commit is skipped on a dry run), which made the next real autonomous run refuse to start.
+  
+  Hench's PRD commits are now scoped to a pathspec. `git commit` with no pathspec commits the whole index, so work the operator had staged before the run was committed under `chore(prd): …` with hench's trailer — by the reset above, and equally by the completion-metadata commit on the `--auto-commit` path. Both now land only `.rex/prd_tree/` and `.rex/tree-meta.json`, leaving anything else staged and untouched.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A review pass that could not run no longer reports a completed, reviewed task
+  
+  `ndx work --review` is a gate, but a reviewer whose spawn failed (a stale vendor
+  CLI, a `--review-model` the installed binary rejects) left a run that reported
+  `completed`, committed, and said nothing — indistinguishable from a reviewer that
+  read the diff and found nothing.
+  
+  A reviewer that never started now refuses the completion: the run fails naming the
+  missing review, the task returns to `pending` (not deferred), the validated work is
+  left in the tree rather than rolled back, and the run does not count toward
+  stuck-task detection, because the usual cause is a config line rather than a defect
+  in the task. `--review-optional` downgrades the refusal to a warning.
+  
+  A reviewer that *did* run and only lost its report still warns, as before. Both the
+  end-of-run summary and `hench show` now carry a review line, so a run that was never
+  reviewed says so where the terminal output does not survive.
+  
+  Also fixes `run.review` being silently dropped whenever a run record was read back
+  from disk: the run-record schema did not declare the field, and zod strips what it
+  does not declare. `hench show` could not report whether a run was reviewed, and the
+  stuck-task exemption above could not see its own marker.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Give the pre-run and post-run git gates one porcelain path matcher, and collapse
+  two duplicated helpers.
+  
+  The uncommitted-work gate had its own `normalize` plus a project-path matcher
+  that re-implemented `isHenchRuntimeArtifact` line for line: same normalisation,
+  same "trailing slash matches the directory and everything beneath it" rule, same
+  decision to apply the repo prefix to the pattern rather than strip it from the
+  path. Two copies of one rule across the two gates that judge the same
+  `git status --porcelain` line, so fixing either one could leave them disagreeing
+  about whether a run's own output counted as operator work. `matchesProjectPath`
+  now lives in `store/artifacts.ts` and both call it — `isHenchRuntimeArtifact` is
+  it, applied to the runtime-artifact list.
+  
+  `commitPrdTreeIfStaged` inlined a staged-file count that `countStagedFiles`, a
+  few hundred lines above it in the same file, already did — differing only in
+  carrying a `.rex/` pathspec. `countStagedFiles` now takes an optional pathspec.
+  
+  Livelock detection kept three things to remember it had already fired: a
+  per-signature `reported` set, a `firstDetection` slot and the `record` return
+  value. Firing is terminal — the API loop breaks on the first detection and the
+  CLI loop kills the child and gates further records on `!result.livelock` — so no
+  caller could ever observe the second and third. One `detection` field replaces
+  them. The call that gets named is unchanged for every real caller, since they
+  all stop at the first signature to reach the threshold.
+  
+  No behaviour change.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Stop an autonomous run that repeats the same tool call, and report its real counters while it runs (GH [#362](https://github.com/en-dash-consulting/n-dx/issues/362))
+  
+  A run could spend eighty minutes and sixteen million cache-read tokens repeating one cycle — relaunch the test suite, sleep, block on a background task whose process had died, re-read the same unchanged diff — and nothing caught it. `lastActivityAt` advances on every tool call and polling is a tool call, so the heartbeat monitor saw maximal activity, while the run record still said 0 turns and 0 tokens, so the dashboard drew it as idle.
+  
+  Both halves are fixed:
+  
+  - **Livelock detection.** Identical tool calls — same name, same arguments, and the same result where the provider exposes one — counted inside a sliding window, with any file-mutating call clearing the count. Six repeats with nothing written in between stops the run and names the repeated call. A fix loop that edits between two identical test runs is unaffected. Tunable via `hench.livelockThreshold` (0 disables).
+  - **Truthful heartbeats.** The CLI loop's in-flight turn and token counters are now folded onto the run record on every heartbeat, so a running task is no longer reported as 0/0.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Terminate the full vendor CLI process tree when plan-mode or livelock intercepts stop a spawn, including cmd.exe-wrapped children on Windows.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - Test gate fixes for local/API-provider runs:
+  
+  - Wire up the documented `--skip-test-gate` flag on `hench run` (and therefore `ndx work`). It was referenced in gate error messages but never parsed; the only control was the persistent `hench.skipFullTestGate` config field. The flag now applies per-invocation.
+  - Honor `hench.autonomous` config in the API loop (vendor=local/google), not just the CLI loop — previously a local-model run aborted on test gate failure even with `autonomous: true` set in `.n-dx.json`.
+  - The autonomous "context" gate action now completes the gate instead of re-running the full suite to the 5-attempt cap and failing the run anyway.
+  - A test gate that resolves on the fifth attempt (pass/skip/context) is no longer marked as "max retry attempts exceeded".
+  - A gate skipped via flag/config now prints "Test Gate: Skipped" instead of silently not running.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Withdrawing a completion now reopens the ancestors the run's own cascade closed.
+  
+  When the uncommitted-work gate refused a completion, the task went back to
+  `pending` but the feature and epic its cascade had just closed stayed
+  `completed` — the parent/child inconsistency `rex validate` warns about, with no
+  path that repairs it. The withdrawal now walks up with rex's `findParentResets`
+  and reopens every consecutive completed ancestor, preserving their authorship.
+- Updated dependencies [[`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d)]:
+  - @n-dx/rex@0.6.1
+  - @n-dx/llm-client@0.6.1
+
 ## 0.6.0
 
 ### Patch Changes
