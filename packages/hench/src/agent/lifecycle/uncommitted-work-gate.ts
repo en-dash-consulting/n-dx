@@ -48,12 +48,15 @@ import {
  * artifact nor under the tree, and the completion gate refused every task
  * forever. The same dirt defeated `--reset-deferred` (#365) one gate earlier.
  *
- * The legacy `.rex/prd.md` is deliberately absent: no PRD mutation writes it
- * any more, so a run cannot dirty it and there is nothing there to discount.
+ * The append-only execution log is also part of the PRD write: each status
+ * transition records its audit entry there. The legacy `.rex/prd.md` remains
+ * absent because no PRD mutation writes it any more.
  */
 export const PRD_COMMIT_PATHS: readonly string[] = [
   `.rex/${PRD_TREE_DIRNAME}/`,
   `.rex/${TREE_META_FILENAME}`,
+  ".rex/execution-log.jsonl",
+  ".rex/execution-log.1.jsonl",
 ];
 
 /** How many paths the refusal message lists before it truncates. */

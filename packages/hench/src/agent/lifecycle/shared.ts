@@ -1360,6 +1360,10 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
 
 /** The legacy flat-markdown PRD. Read-only for years; still staged if present. */
 const PRD_MARKDOWN_FILENAME = "prd.md";
+/** Append-only task-status audit log written by every PRD adapter. */
+const PRD_EXECUTION_LOG_FILENAME = "execution-log.jsonl";
+/** Single rotated execution-log backup retained by the file adapter. */
+const PRD_EXECUTION_LOG_BACKUP_FILENAME = "execution-log.1.jsonl";
 
 /**
  * The project-relative PRD paths that exist in `projectDir` and should be
@@ -1384,6 +1388,8 @@ async function prdPathsToStage(
   const candidates = [
     PRD_TREE_DIRNAME,
     TREE_META_FILENAME,
+    PRD_EXECUTION_LOG_FILENAME,
+    PRD_EXECUTION_LOG_BACKUP_FILENAME,
     ...(opts.includeLegacyMarkdown ? [PRD_MARKDOWN_FILENAME] : []),
   ];
   return candidates

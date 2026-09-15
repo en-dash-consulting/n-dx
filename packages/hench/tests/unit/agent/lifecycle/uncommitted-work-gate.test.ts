@@ -73,6 +73,18 @@ describe("findUncommittedWork", () => {
         withDirty([" M .rex/tree-meta.json"], { discountPaths: [...PRD_COMMIT_PATHS] }),
       ),
     ).resolves.toEqual({ clean: true, paths: [] });
+
+    await expect(
+      findUncommittedWork(
+        withDirty([" M .rex/execution-log.jsonl"], { discountPaths: [...PRD_COMMIT_PATHS] }),
+      ),
+    ).resolves.toEqual({ clean: true, paths: [] });
+
+    await expect(
+      findUncommittedWork(
+        withDirty(["?? .rex/execution-log.1.jsonl"], { discountPaths: [...PRD_COMMIT_PATHS] }),
+      ),
+    ).resolves.toEqual({ clean: true, paths: [] });
   });
 
   it("does not treat the sidecar prefix as a directory", async () => {

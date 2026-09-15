@@ -14,6 +14,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
+import { initGitFixtureRepoSync } from "../helpers/index.js";
 import { initConfig } from "../../src/store/config.js";
 import { defaultRegistry } from "../../src/prd/llm-gateway.js";
 import type {
@@ -50,13 +52,19 @@ describe("livelock detection in the agent loop", () => {
       "utf-8",
     );
     await writeFile(join(rexDir, "execution-log.jsonl"), "", "utf-8");
-    await writeFile(join(projectDir, "target.txt"), "unchanging contents", "utf-8");
+    await writeFile(join(projectDir, "target.ts"), "export const target = 'initial';\n", "utf-8");
 
     await writeFile(
       join(projectDir, ".n-dx.json"),
       JSON.stringify({ llm: { vendor: "google", google: { api_key: "AIza-test-key" } } }),
       "utf-8",
     );
+
+    // Completion validation is git-derived. Give every fixture a deterministic
+    // baseline before the loop's tracked-file writes begin.
+    initGitFixtureRepoSync(projectDir);
+    execFileSync("git", ["add", "-A"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "baseline"], { cwd: projectDir, stdio: "ignore" });
   });
 
   afterEach(async () => {
@@ -105,7 +113,7 @@ describe("livelock detection in the agent loop", () => {
     // Reading the same file over and over: identical name, identical arguments,
     // identical result, nothing written — the shape of the #362 poll loop.
     vi.spyOn(defaultRegistry, "getActiveProvider").mockReturnValue(
-      scriptedProvider(() => toolTurn("read_file", { path: "target.txt" })),
+      scriptedProvider(() => toolTurn("read_file", { path: "target.ts" })),
     );
 
     const { run } = await runLoop();
@@ -122,7 +130,22 @@ describe("livelock detection in the agent loop", () => {
     // write is the progress signal — twelve turns must not trip the detector.
     vi.spyOn(defaultRegistry, "getActiveProvider").mockReturnValue(
       scriptedProvider((call) => {
-        if (call >= 12) {
+        if (call === 12) {
+          return {
+            parts: [
+              { functionCall: { name: "git", args: { subcommand: "add", args: "target.ts" } } },
+              { functionCall: { name: "write_file", args: { path: ".hench-commit-msg.txt", content: "feat: revise target\n" } } },
+            ],
+            functionCalls: [
+              { name: "git", args: { subcommand: "add", args: "target.ts" } },
+              { name: "write_file", args: { path: ".hench-commit-msg.txt", content: "feat: revise target\n" } },
+            ],
+            text: "",
+            finishReason: "STOP",
+            usage: { input: 10, output: 2 },
+          };
+        }
+        if (call > 12) {
           return {
             parts: [{ text: "Done." }],
             functionCalls: [],
@@ -132,8 +155,8 @@ describe("livelock detection in the agent loop", () => {
           };
         }
         return call % 2 === 0
-          ? toolTurn("read_file", { path: "target.txt" })
-          : toolTurn("write_file", { path: "target.txt", content: `revision ${call}` });
+          ? toolTurn("read_file", { path: "target.ts" })
+          : toolTurn("write_file", { path: "target.ts", content: `export const target = 'revision ${call}';\n` });
       }),
     );
 
@@ -141,7 +164,7 @@ describe("livelock detection in the agent loop", () => {
 
     expect(run.error).toBeUndefined();
     expect(run.status).toBe("completed");
-    expect(run.turns).toBe(13);
+    expect(run.turns).toBe(14);
   }, 30_000);
 
   it("is disabled by hench.livelockThreshold = 0", async () => {
@@ -155,7 +178,7 @@ describe("livelock detection in the agent loop", () => {
               finishReason: "STOP",
               usage: { input: 10, output: 2 },
             }
-          : toolTurn("read_file", { path: "target.txt" }),
+          : toolTurn("read_file", { path: "target.ts" }),
       ),
     );
 
@@ -173,7 +196,10 @@ describe("livelock detection in the agent loop", () => {
       model: "gemini-2.5-pro", yes: true, autonomous: true,
     });
 
-    expect(run.status).toBe("completed");
-    expect(run.turns).toBe(21);
+    expect(run.status).toBe("failed");
+    expect(run.error).toContain("No changes detected");
+    // The initial claim plus two execution reminders still cannot complete
+    // without real work, even when livelock detection is disabled.
+    expect(run.turns).toBe(23);
   }, 30_000);
 });
