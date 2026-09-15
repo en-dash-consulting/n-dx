@@ -2,7 +2,7 @@
 id: "dfe51045-8489-4d38-9904-36994a823717"
 level: "task"
 title: "`ndx export` sanitizer leaves test output, command lines, and audit errors in published run records"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "ndx-adversarial-review"
@@ -10,12 +10,15 @@ tags:
   - "severity:high"
   - "core"
 source: "ndx-adversarial-review"
+startedAt: "2026-09-15T21:44:38.601Z"
+completedAt: "2026-09-15T21:56:21.502Z"
+endedAt: "2026-09-15T21:56:21.502Z"
 acceptanceCriteria:
   - "A default `ndx export` of a fixture run carrying a sentinel string in every free-text field of the run record (`testGate.packages[].failureOutput`, `structuredSummary.postRunTests.output` and `.error`, `structuredSummary.commandsExecuted[].command`, `structuredSummary.testsRun[].command`, `dependencyAudit.error` and `dependencyAudit.commands.*.error`, `cleanupTransformations.error` and `batches[].error`, `diagnostics.notes[]`) writes `api/hench/runs/<id>.json` and `api/hench/runs.json` that do not contain the sentinel"
   - "The exported record is built from an explicit allowlist of summary fields, so a free-text field added to `RunRecord` later is excluded by default rather than published by default"
   - "With `--include-transcripts`, the per-run file carries the full record as before"
   - "`tests/unit/export-sanitize.test.js` walks every string leaf of the fixture and asserts none survives in the written output, instead of asserting only on the fields the sanitizer deletes"
 description: "**Severity:** high · **Verdict:** must-fix · **Incomplete fix in commit 796be400 (this branch)** · Found by `/ndx-adversarial-review` 2026-09-15.\n\n**Failure scenario.** `sanitizeRunForExport` (`packages/core/export.js:173`) is a denylist: it deletes `toolCalls`, `events`, `error`, `diagnostics.promptSections`, `testGate.error`. Everything else in the `RunRecord` is published verbatim. Free-text fields that survive: `testGate.packages[].failureOutput` — the raw test-runner output (`packages/hench/src/tools/test-runner.ts:655`, `:659`, `:751`); `structuredSummary.postRunTests.output` and `.error`; `structuredSummary.commandsExecuted[].command` and `testsRun[].command` — the literal command lines the agent ran, inline tokens included; `dependencyAudit.error` and `dependencyAudit.commands.audit/outdated.error`; `cleanupTransformations.error` and `batches[].error`; `diagnostics.notes[]`. `structuredSummary` is also copied whole into the `runs.json` index (`export.js:476`). A failing test that prints an env dump, or an agent `curl -H \"Authorization: Bearer …\"`, ends up in the static site while the deploy manifest says transcripts are excluded, and `--deploy=github --yes` force-pushes it.\n\n**Refutation attempted.** Looked for a second pass over the record before `writeJSON`, and for truncation/redaction where `failureOutput` and `postRunTests.output` are set — none; both store raw output (bounded only by size). Checked whether these fields are structured rather than free text — they are strings from process stdout/stderr.\n\n**Evidence.** `packages/core/export.js:173-190` (denylist), `:455-476` (summary copies `structuredSummary`), `packages/hench/src/schema/v1.ts:629` (`PostRunTestRecord.output`), `:679` (`TestPackageResult.failureOutput`), `RunSummaryData.commandsExecuted`.\n\n**Reachability.** Every `ndx export` and every dashboard Export click, on any project whose runs have a failed test gate, post-run tests, or executed commands — the common case.\n\n**Not covered.** `tests/unit/export-sanitize.test.js` asserts only that the five deleted fields are gone; its fixture puts the secret only in those fields, so it is green.\n\n**Related.** Sibling item “`ndx export` strips `error` from per-run files but still publishes it in the `runs.json` index” covers the `error` field in the index; this item covers the remaining fields and the mechanism. Fixing both with one allowlisted `summarizeRunForExport` is the natural shape.\n\n**Solution options.**\n1. Extend the denylist with the fields above. Cheap, but every additive `RunRecord` field (they land regularly — see the `v1 additive field` comments) is a new leak until someone remembers.\n2. *(Recommended)* Replace the denylist with an allowlist: copy only id, taskId, taskTitle, startedAt/finishedAt/lastActivityAt, status, turns, summary, model, vendor, weight, tokenUsage/tokens, `structuredSummary.counts`, `testGate.ran`/`passed`/`totalDurationMs`, review counts, `transcriptOmitted`. Use the same function for the `runs.json` entries. Test with a fixture that puts a sentinel in every string leaf and asserts `JSON.stringify(written)` does not contain it. Moderate cost, one function plus one test; risk is dropping a field the static Task Audit view renders — check `task-audit.ts` and `hench-runs` views for the fields they read."
-lastModified: "2026-09-15T20:55:27.127Z"
+lastModified: "2026-09-15T21:56:21.876Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
