@@ -1,5 +1,90 @@
 # @n-dx/core
 
+## 0.6.1
+
+### Patch Changes
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Make the explicit dashboard-port relocation test deterministic under concurrent CI port allocation.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the local (LM Studio) per-request timeout configurable via `llm.local.timeoutMs`
+  
+  Local completions were bounded by a hardcoded 5-minute abort in three places — the
+  local API provider, hench's local tool loop, and the second-model verifier (60 s) —
+  so a slow local model failed with `NDX_CLI_TIMEOUT` no matter what the CLI-timeout
+  settings said. `cli.timeoutMs` / the "CLI Timeouts" page bound a whole command, not
+  an individual HTTP request, so setting them to unlimited had no effect on this path.
+  
+  All three now read `llm.local.timeoutMs` (default 300000, `0` = no timeout), settable
+  via `ndx config llm.local.timeoutMs <ms>` or the LLM Provider settings page. The
+  timeout error message now names the key to change.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Make the detached process-tree regression fixture use the active Node executable,
+  report shell launch errors, and clean up Windows fixture processes reliably.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Make the detached process-tree test wait for server startup before diagnosing its shell-launched child.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Prove cleanup-gated late child termination with real OS processes, including a
+  detached POSIX process group and its grandchild.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Reap child processes spawned after the cleanup gate has already run.
+  
+  `createChildProcessTracker`'s `cleanup()` terminated the children it knew about
+  at the moment it was called, then the process exited. But terminating the
+  in-flight child is precisely what unblocks whatever was awaiting it — so the
+  caller promptly spawned the next one, and that child was adopted into a set
+  nobody would drain again.
+  
+  `ndx ci` leaked one orphan per Ctrl-C this way: the gate SIGKILLed `sourcevision
+  analyze`, `runCapture` resolved, `runCI` advanced to `sourcevision validate`, and
+  the parent exited leaving that child reparented to PID 1. A sweep of one dev
+  machine found 31 of them across seven worktrees, holding 431 MB, the oldest alive
+  for over 11 hours — enough to push hench's memory monitor toward throttling later
+  autonomous runs.
+  
+  `register()` now refuses to adopt a child once cleanup has started and SIGKILLs
+  it instead — synchronously, and without the SIGTERM grace period, because the
+  grace period is exactly the window in which the parent exits first. This was a
+  production defect, not only a test-side leak; the test fix is the backstop.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A review pass that could not run no longer reports a completed, reviewed task
+  
+  `ndx work --review` is a gate, but a reviewer whose spawn failed (a stale vendor
+  CLI, a `--review-model` the installed binary rejects) left a run that reported
+  `completed`, committed, and said nothing — indistinguishable from a reviewer that
+  read the diff and found nothing.
+  
+  A reviewer that never started now refuses the completion: the run fails naming the
+  missing review, the task returns to `pending` (not deferred), the validated work is
+  left in the tree rather than rolled back, and the run does not count toward
+  stuck-task detection, because the usual cause is a config line rather than a defect
+  in the task. `--review-optional` downgrades the refusal to a warning.
+  
+  A reviewer that *did* run and only lost its report still warns, as before. Both the
+  end-of-run summary and `hench show` now carry a review line, so a run that was never
+  reviewed says so where the terminal output does not survive.
+  
+  Also fixes `run.review` being silently dropped whenever a run record was read back
+  from disk: the run-record schema did not declare the field, and zod strips what it
+  does not declare. `hench show` could not report whether a run was reviewed, and the
+  stuck-task exemption above could not see its own marker.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Stop an autonomous run that repeats the same tool call, and report its real counters while it runs (GH [#362](https://github.com/en-dash-consulting/n-dx/issues/362))
+  
+  A run could spend eighty minutes and sixteen million cache-read tokens repeating one cycle — relaunch the test suite, sleep, block on a background task whose process had died, re-read the same unchanged diff — and nothing caught it. `lastActivityAt` advances on every tool call and polling is a tool call, so the heartbeat monitor saw maximal activity, while the run record still said 0 turns and 0 tokens, so the dashboard drew it as idle.
+  
+  Both halves are fixed:
+  
+  - **Livelock detection.** Identical tool calls — same name, same arguments, and the same result where the provider exposes one — counted inside a sliding window, with any file-mutating call clearing the count. Six repeats with nothing written in between stops the run and names the repeated call. A fix loop that edits between two identical test runs is unaffected. Tunable via `hench.livelockThreshold` (0 disables).
+  - **Truthful heartbeats.** The CLI loop's in-flight turn and token counters are now folded onto the run record on every heartbeat, so a running task is no longer reported as 0/0.
+
+- [#370](https://github.com/en-dash-consulting/n-dx/pull/370) [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Tree-kill descendants of children registered after cleanup has begun on Windows.
+- Updated dependencies [[`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59)]:
+  - @n-dx/hench@0.6.1
+  - @n-dx/rex@0.6.1
+  - @n-dx/llm-client@0.6.1
+  - @n-dx/web@0.6.1
+  - @n-dx/sourcevision@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes
