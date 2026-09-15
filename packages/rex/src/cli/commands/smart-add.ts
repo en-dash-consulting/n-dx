@@ -26,6 +26,7 @@ import {
   resolveConfiguredModel,
   setLLMConfig,
   setClaudeConfig,
+  setProjectDir,
   getAuthMode,
   getLLMVendor,
   applyConsolidationGuard,
@@ -1156,6 +1157,7 @@ async function initializeSmartAddLLM(
   setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexConfigDir);
   setClaudeConfig(claudeConfig);
+  setProjectDir(dir);
 
   const vendor = getLLMVendor();
   llmDebug(`resolved vendor=${vendor ?? "unknown"} configDir=${rexConfigDir}`);

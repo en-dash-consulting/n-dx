@@ -28,7 +28,7 @@ import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
-import { handleStatusRoute, clearStatusCache } from "./routes-status.js";
+import { handleStatusRoute, clearStatusCache, buildServerInfo } from "./routes-status.js";
 import { handleConfigRoute } from "./routes-config.js";
 import { handleSearchRoute } from "./routes-search.js";
 import { handleNotionRoute } from "./routes-notion.js";
@@ -522,7 +522,8 @@ function closeWatchers(handles: WatcherHandles): void {
   }
 }
 
-function handleConfigEndpoint(
+/** @internal exported for unit testing only — not part of the route dispatch API. */
+export function handleConfigEndpoint(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
@@ -532,7 +533,13 @@ function handleConfigEndpoint(
   const path = (req.url || "/").split("?")[0];
   if ((path !== "/api/config") || (req.method || "GET") !== "GET") return false;
   res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
-  res.end(JSON.stringify({ scope: ctx.scope ?? null, initialized: isProjectInitialized(ctx) }));
+  res.end(JSON.stringify({
+    scope: ctx.scope ?? null,
+    initialized: isProjectInitialized(ctx),
+    // Same shape as ProjectStatus.server (routes-status.ts) — the viewer
+    // footer (PR 7) reads it here instead of the heavier /api/status call.
+    server: buildServerInfo(ctx),
+  }));
   return true;
 }
 
@@ -814,7 +821,15 @@ export async function startServer(
   }
 
   // Create server context
-  const ctx: ServerContext = { projectDir: absDir, svDir, rexDir, dev, scope };
+  const ctx: ServerContext = {
+    projectDir: absDir,
+    svDir,
+    rexDir,
+    dev,
+    scope,
+    port: actualPort,
+    startedAt: new Date().toISOString(),
+  };
 
   const watcher = createDataWatcher(ctx, assets.viewerPath);
   const wsHealthTracker = new WsHealthTracker();

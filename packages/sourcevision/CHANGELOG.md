@@ -1,5 +1,91 @@
 # @n-dx/sourcevision
 
+## 0.6.0
+
+### Patch Changes
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Discover isometric-map infrastructure from CloudFormation and SAM templates, not only Terraform. `.yaml`/`.yml` files are scanned for a top-level `Resources:` block plus a namespaced `Type:` — strict enough that a CI workflow or a k8s manifest is never mistaken for infrastructure — and resource types are normalised (`AWS::SQS::Queue` → `aws_sqs_queue`) so both dialects share the one classification table instead of each carrying its own. Name literals come from `BucketName`/`QueueName`/… properties but never from a `!Ref` or `!Sub`, which is not a name. A project on CloudFormation now gets infrastructure nodes with nothing declared by hand in `.n-dx.json`.
+
+- [#351](https://github.com/en-dash-consulting/n-dx/pull/351) [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e) Thanks [@endash-shal](https://github.com/endash-shal)! - Check declared injection seams against the call graph on the isometric map. A seam declared under `sourcevision.isoMap.injectionSeams` was previously drawn on trust, so a refactor could leave the declaration behind and the map would keep asserting a relationship nothing invokes. Where `callgraph.json` is available, each named callback is now looked for on the receiving side: a corroborated seam's panel names the file and expression that matched, a seam the call graph does not support is drawn thinner and fainter with a sparser dash and labelled "unverified", and callbacks nothing calls are listed in the page footer. A view with no call graph reports the seams as unchecked rather than marking them unverified.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - Build rex's and sourcevision's LLM prompts through `PromptEnvelope` so their cost
+  is attributable per section rather than as one opaque total.
+  
+  Every prompt in `rex/src/analyze/` and `sourcevision/src/analyzers/` is now
+  declared as a list of named sections against a shared per-package vocabulary,
+  with the paired `*Prompt` function reduced to an assembly call. Prompt text is
+  unchanged apart from removed doubled blank lines, where an absent conditional
+  block used to leave its own padding behind — pinned by `prompt-text-identity`
+  snapshot suites in both packages.
+  
+  The section-measurement helpers (`promptSectionCosts`, `dominantPromptSections`,
+  `formatPromptSectionCosts`, `extractPromptSectionDiagnostics`) moved down to
+  `@n-dx/llm-client` so rex and sourcevision, which sit below hench and cannot
+  import from it, share one implementation instead of a copy; hench keeps only its
+  CLI rendering and reaches the rest through its existing gateway.
+  
+  The prompt census now follows module-local helper calls when extracting static
+  prompt text. Factoring duplicated text into a helper previously dropped it from
+  the count entirely, so a refactor could silently shrink the baseline. Correcting
+  this raised the recorded totals ~5% with no prompt growing — the earlier figures
+  were an undercount — and the baseline records the revision so the jump is not
+  misread as a regression. The baseline also now reports a per-section breakdown
+  for each envelope-built package.
+
+- [#366](https://github.com/en-dash-consulting/n-dx/pull/366) [`25d7aa6`](https://github.com/en-dash-consulting/n-dx/commit/25d7aa662c414e831fc41dbfc259db94782e0bda) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Spawn the vendor CLI (Claude CLI provider) with `cwd` set to the project directory being analyzed, instead of inheriting the calling process's own cwd.
+  
+  `rex analyze <dir>` and `sv analyze <dir>` (and the other LLM-assisted commands that share the same module-level client — `reorganize`, `prune`, `reshape`, `smart-add`, and the reorganize MCP tool) now call `setProjectDir(dir)` alongside `setClaudeConfig`/`setLLMConfig`, so the vendor CLI resolves its own project context (CLAUDE.md, `.mcp.json`) against the directory being analyzed rather than wherever the command was invoked from. Matches the fix already applied to the dashboard's Ask route.
+
+- [#356](https://github.com/en-dash-consulting/n-dx/pull/356) [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13) Thanks [@endash-shal](https://github.com/endash-shal)! - State the enrichment output contract once instead of four times, and fix the
+  copy that had already drifted.
+  
+  Four builders across `enrich-batch.ts` and `enrich-per-zone.ts` each spelled out
+  the response format for themselves — the severity enumeration, the "respond with
+  only JSON" instruction, and the later-pass "add only new insights" rule. Written
+  out four times, they had diverged: `buildSingleZoneLaterPassEnvelope` asked for
+  `"Respond with ONLY a JSON object:"` where the other three asked for
+  `"...(no markdown, no explanation)"`, so one enrichment path never forbade
+  markdown at all.
+  
+  That drift was survivable rather than harmless — `tryParseJSON` strips fences
+  before parsing, so a fenced response was recovered — which is precisely why
+  nothing caught it. It still spent output tokens on a path that had asked for
+  none, on a prompt that runs once per zone.
+  
+  The contract now lives in `prompt-envelope.ts` as `JSON_OBJECT_ONLY`,
+  `ONLY_NEW_INSIGHTS`, and `findingsContract(withCategory)`. The category clause is
+  the one intended difference between batch and per-zone prompts — per-zone is the
+  minimal fallback path and `classifyFinding` derives a category from the finding
+  text when the model omits one — so that difference is asserted rather than left
+  to be rediscovered as drift.
+  
+  sourcevision drops from 2,332 to 2,194 unique fixed tokens. Per-call is
+  essentially unchanged: the emitted text is byte-identical for every batch prompt
+  (the `prompt-text-identity` snapshots pass untouched), and the one deliberate
+  change adds the missing no-markdown clause to the per-zone later pass.
+  
+  Also records why `buildReviewerPrompt` lives in `packages/core/`. The
+  orchestration-tier rule is spawn-only, and it constrains *imports*, not string
+  composition: `pair-programming.js` imports nothing but Node built-ins and its
+  core siblings, then hands the prompt to a spawned CLI. Moving it into a package
+  would force core to import it, which is the thing the rule actually forbids.
+
+- [#354](https://github.com/en-dash-consulting/n-dx/pull/354) [`72609db`](https://github.com/en-dash-consulting/n-dx/commit/72609db1c4572f94ef25a2178d5cac2c17e241dc) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Fix `analyze` promoting git worktree checkouts as sub-analyses.
+  
+  Sub-analysis discovery walked into `.claude/worktrees/<name>/` and other in-repo
+  worktrees. Each is a full checkout carrying its own `.sourcevision/`, so every
+  live worktree injected a duplicate copy of the parent's zones — one observed run
+  returned 120 zones, 87 of them duplicates.
+  
+  `findSubSvDirs()` now skips `.claude`, and additionally skips any directory that
+  `git worktree list --porcelain` reports as a registered worktree nested inside
+  the analysis root. Worktree resolution is best-effort: if git is unavailable or
+  the directory is not a repository, the scan behaves exactly as before. The root
+  itself is never skipped, so analyzing a project that is itself a worktree still
+  works.
+- Updated dependencies [[`25d7aa6`](https://github.com/en-dash-consulting/n-dx/commit/25d7aa662c414e831fc41dbfc259db94782e0bda), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`8a117e9`](https://github.com/en-dash-consulting/n-dx/commit/8a117e930e44eec6ff73f7844fc32c05e999cb13), [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9), [`d21d0ab`](https://github.com/en-dash-consulting/n-dx/commit/d21d0ab9d291fe444726d038415d8cddd5fc8e8e), [`94dc3bb`](https://github.com/en-dash-consulting/n-dx/commit/94dc3bb9b2e7e82b3d13e73059e43a78f69e30a9)]:
+  - @n-dx/llm-client@0.6.0
+
 ## 0.5.2
 
 ### Patch Changes

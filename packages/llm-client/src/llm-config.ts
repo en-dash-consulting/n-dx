@@ -16,6 +16,7 @@ import {
   type CodexConfig,
   type GoogleConfig,
   type LocalConfig,
+  type LocalVerifierConfig,
 } from "./llm-types.js";
 import type { ClaudeConfig } from "./types.js";
 import { normalizeCodexModel } from "./config.js";
@@ -31,15 +32,41 @@ function extractVendor(value: unknown): LLMVendor | undefined {
   return isLLMVendor(value) ? value : undefined;
 }
 
+function extractLocalVerifierConfig(value: unknown): LocalVerifierConfig | undefined {
+  const v = asRecord(value);
+  if (!v) return undefined;
+
+  const cfg: LocalVerifierConfig = {};
+  if (typeof v.host === "string" && v.host) cfg.host = v.host;
+  if (typeof v.port === "number" && v.port > 0) cfg.port = v.port;
+  if (typeof v.model === "string" && v.model) cfg.model = v.model;
+  if (typeof v.maxCycles === "number" && v.maxCycles >= 0) cfg.maxCycles = v.maxCycles;
+  return Object.keys(cfg).length > 0 ? cfg : undefined;
+}
+
 function extractLocalConfig(value: unknown): LocalConfig | undefined {
   const v = asRecord(value);
   if (!v) return undefined;
 
+  // This function whitelists keys — a key it does not copy never reaches
+  // runtime no matter what .n-dx.json says. It previously copied only
+  // host/port/model/lightModel, which silently disabled every other
+  // documented llm.local setting (timeoutMs, maxContextTokens, reviewModel,
+  // verifier): operators set them, the loader dropped them, and the loop saw
+  // its defaults.
   const cfg: LocalConfig = {};
   if (typeof v.host === "string" && v.host) cfg.host = v.host;
   if (typeof v.port === "number" && v.port > 0) cfg.port = v.port;
   if (typeof v.model === "string" && v.model) cfg.model = v.model;
   if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = v.lightModel;
+  if (typeof v.reviewModel === "string" && v.reviewModel) cfg.reviewModel = v.reviewModel;
+  if (typeof v.maxContextTokens === "number" && v.maxContextTokens > 0) {
+    cfg.maxContextTokens = v.maxContextTokens;
+  }
+  // 0 is meaningful for timeoutMs (= wait indefinitely), so accept >= 0.
+  if (typeof v.timeoutMs === "number" && v.timeoutMs >= 0) cfg.timeoutMs = v.timeoutMs;
+  const verifier = extractLocalVerifierConfig(v.verifier);
+  if (verifier) cfg.verifier = verifier;
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 

@@ -62,6 +62,31 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
   /** Wall-clock room for the grandchild to prove it is still writing. */
   const OBSERVE_MS = 2000;
 
+  /**
+   * How long the command may run before exec times it out. The grandchild must
+   * reach its first 150ms tick inside this window, or the vacuous-pass guard below
+   * fails for a reason unrelated to tree killing. On Windows the direct child is
+   * MSYS `sh`, and starting it plus a cold `node` has been measured well past 700ms
+   * on a CI runner with other vitest workers competing for the disk — zero ticks
+   * before the kill. The wider window costs a few seconds per pass on that platform
+   * only; POSIX shells start fast enough that 700ms leaves several ticks.
+   */
+  const TIMEOUT_MS = process.platform === "win32" ? 3000 : 700;
+
+  /** How long "leaves no descendant" polls for the grandchild to be reaped. */
+  const REAP_DEADLINE_MS = 3000;
+
+  /**
+   * Per-test vitest budget. Each case spends TIMEOUT_MS waiting for exec to time
+   * the command out, then either observes for OBSERVE_MS or polls for up to
+   * REAP_DEADLINE_MS — on Windows that is already 5000–6000ms, which is vitest's
+   * entire default budget before exec's kill-and-reap and the directory reads are
+   * counted. Derive the budget from the same constants, with slack for a loaded
+   * runner, so widening one of them cannot silently push a case past the limit.
+   */
+  const SLACK_MS = 3000;
+  const TEST_BUDGET_MS = TIMEOUT_MS + Math.max(OBSERVE_MS, REAP_DEADLINE_MS) + SLACK_MS;
+
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "exec-treekill-"));
 
@@ -90,7 +115,7 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
    * relative because cwd is the temp dir — an absolute Windows path inside a
    * `sh -c` string would have its backslashes eaten as escapes.
    */
-  function runTimingOut(timeout = 700) {
+  function runTimingOut(timeout = TIMEOUT_MS) {
     return exec("sh", ["-c", "node grandchild.js"], { cwd: dir, timeout, freeze });
   }
 
@@ -141,10 +166,10 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
 
     // Guards against the whole suite passing vacuously: if the grandchild never
     // started, "nothing was written after the timeout" would prove nothing. At
-    // 150ms per tick under a 700ms timeout it should manage several.
+    // 150ms per tick under TIMEOUT_MS it should manage several.
     expect(await tickCount()).toBeGreaterThan(0);
     expect(readPid()).not.toBe(null);
-  });
+  }, TEST_BUDGET_MS);
 
   it("leaves no descendant process running", async () => {
     await runTimingOut();
@@ -155,13 +180,13 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
     // Give the kill a moment to be reaped, then require it to be gone. Polling
     // rather than a fixed sleep so a fast machine does not wait needlessly and a
     // slow one does not fail spuriously.
-    const deadline = Date.now() + 3000;
+    const deadline = Date.now() + REAP_DEADLINE_MS;
     while (isAlive(pid!) && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 50));
     }
 
     expect(isAlive(pid!)).toBe(false);
-  });
+  }, TEST_BUDGET_MS);
 
   it("stops writing to the workspace once the timeout is reported", async () => {
     await runTimingOut();
@@ -172,5 +197,5 @@ describeEachNeedsPosixShell(POLICIES)("exec timeout terminates the whole process
 
     // The grandchild writes every 150ms, so a survivor would add ~13 files here.
     expect(afterObserving).toBe(atTimeout);
-  });
+  }, TEST_BUDGET_MS);
 });

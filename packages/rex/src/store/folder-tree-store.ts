@@ -57,6 +57,14 @@ export class FolderTreeStore implements PRDStore {
    * than this. Zero means "never loaded" — such a save may delete nothing.
    */
   private loadedAt = 0;
+  /**
+   * Load-time identity (resolved path → content digest) of every item file
+   * the last load or save left on disk. The serializer's guard needs it to
+   * tell a same-writer relocation from a move that would paper over another
+   * writer's edit to the same item. Empty means "never loaded": no relocation
+   * of a newer file can be vouched for.
+   */
+  private loadedFiles: ReadonlyMap<string, string> = new Map();
 
   constructor(rexDir: string) {
     this.rexDir = rexDir;
@@ -88,7 +96,8 @@ export class FolderTreeStore implements PRDStore {
       }
     }
 
-    const { items } = await parseFolderTree(this.treeRoot);
+    const { items, fileDigests } = await parseFolderTree(this.treeRoot);
+    this.loadedFiles = fileDigests;
     return { schema, title, items };
   }
 
@@ -96,10 +105,15 @@ export class FolderTreeStore implements PRDStore {
   private async writeTree(doc: PRDDocument): Promise<void> {
     await mkdir(this.treeRoot, { recursive: true });
     await writeFile(this.path("tree-meta.json"), JSON.stringify(treeMetaContents(doc)), "utf-8");
-    await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    const written = await serializeFolderTree(doc.items, this.treeRoot, {
+      loadedAt: this.loadedAt,
+      loadedFiles: this.loadedFiles,
+    });
     // A completed save makes this instance's view of the tree current again:
-    // its own writes must not read as "another writer's work" on the next save.
+    // its own writes must not read as "another writer's work" on the next save,
+    // and the files it just wrote are the ones it can vouch for relocating.
     this.loadedAt = Date.now();
+    this.loadedFiles = written.fileDigests;
   }
 
   /**

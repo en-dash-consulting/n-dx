@@ -118,6 +118,7 @@ function debugLog(message: string): void {
 function spawnOnce(
   cliBinary: string,
   request: CompletionRequest,
+  cwd?: string,
 ): Promise<CompletionResult> {
   return new Promise((resolve, reject) => {
     const format = request.outputFormat ?? "json";
@@ -139,6 +140,7 @@ function spawnOnce(
     const proc = spawnCli(cliBinary, args, {
       stdio: ["pipe", "pipe", "pipe"],
       env: cleanEnv,
+      cwd,
     });
     proc.stdin!.on("error", () => {/* handled by proc error/close */});
     proc.stdin!.write(request.prompt);
@@ -427,7 +429,7 @@ export function createCliClient(options: CliProviderOptions): ClaudeClient & LLM
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-          return await spawnOnce(cliBinary, request);
+          return await spawnOnce(cliBinary, request, options.cwd);
         } catch (err) {
           lastError = err as Error;
 

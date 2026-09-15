@@ -103,7 +103,7 @@ codex login
 | Instructions | `CLAUDE.md` | Project guidance, architecture docs, workflow rules |
 | Skills | `.claude/skills/{name}/SKILL.md` | Slash-command skills (YAML frontmatter format) |
 | Settings | `.claude/settings.local.json` | Auto-approved read-only MCP tool permissions |
-| MCP servers | Registered via `claude mcp add` (or auto-configured for Codex) | Rex and SourceVision stdio servers |
+| MCP servers | Tracked `.mcp.json` (or `.codex/config.toml` for Codex) | Rex and SourceVision stdio servers |
 
 To start working with Claude Code after init:
 
@@ -111,7 +111,7 @@ To start working with Claude Code after init:
 claude    # open Claude Code — it reads CLAUDE.md automatically
 ```
 
-Claude discovers skills from `.claude/skills/` and MCP servers from `.claude/settings.local.json`. For HTTP MCP transport (recommended for production), see [MCP Integration](./mcp).
+Claude discovers skills from `.claude/skills/` and MCP servers from `.mcp.json`, with tool permissions from `.claude/settings.local.json`. For HTTP MCP transport — only safe with a single n-dx project running at a time until 0.7.0 — see [MCP Integration](./mcp).
 
 ### Codex
 

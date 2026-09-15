@@ -10,7 +10,7 @@ Actual `src/` sub-directories:
 | `cli/` | Command handlers, help, output | — |
 | `guard/` | Policy limits, rate limiting, audit trail | — |
 | `prd/` | PRD integration via `rex-gateway.ts` and `llm-gateway.ts` | ❌ |
-| `process/` | Process lifecycle, concurrency management | ❌ |
+| `process/` | Process lifecycle, concurrency management, git checkout identity | ❌ |
 | `queue/` | Work queueing | — |
 | `quota/` | Token quota retrieval and formatting | — |
 | `schema/` | Type definitions and validation | — |

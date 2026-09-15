@@ -32,6 +32,8 @@ interface LocalVendorConfig {
   host: string | null;
   port: number | null;
   maxContextTokens: number | null;
+  /** Per-request timeout in ms for local completions; 0 = no timeout, null = 5 min default. */
+  timeoutMs: number | null;
   verifier: LocalVerifierVendorConfig;
 }
 
@@ -567,6 +569,8 @@ function LocalSection({
 
   const maxContextTokens = editValues["local.maxContextTokens"]
     ?? (config.maxContextTokens !== null ? String(config.maxContextTokens) : "");
+  const timeoutMs = editValues["local.timeoutMs"]
+    ?? (config.timeoutMs !== null ? String(config.timeoutMs) : "");
   const verifierHost = editValues["local.verifier.host"] ?? config.verifier.host ?? "";
   const verifierPort = editValues["local.verifier.port"]
     ?? (config.verifier.port !== null ? String(config.verifier.port) : "");
@@ -708,6 +712,24 @@ function LocalSection({
         value: maxContextTokens,
         placeholder: "e.g. 32768",
         onInput: (e: Event) => onChange("local.maxContextTokens", (e.target as HTMLInputElement).value),
+      }),
+    ),
+    h("div", { class: `llm-field${dirtyKeys.has("local.timeoutMs") ? " llm-field-dirty" : ""}` },
+      h("label", { class: "llm-field-label", htmlFor: "local.timeoutMs" },
+        "Request timeout (ms)",
+        dirtyKeys.has("local.timeoutMs") ? h("span", { class: "llm-dirty-dot" }, " •") : null,
+      ),
+      h("p", { class: "llm-field-desc" },
+        "How long to wait for a single response from the local server. Enter 0 for no limit, or e.g. 7200000 for 2 hours. Leave blank for the 5-minute default. This is per request — the CLI Timeouts page bounds the whole command instead, so setting that to unlimited does not extend this.",
+      ),
+      h("input", {
+        id: "local.timeoutMs",
+        type: "text",
+        inputMode: "numeric",
+        class: "llm-text-input",
+        value: timeoutMs,
+        placeholder: "e.g. 7200000 (0 = no limit)",
+        onInput: (e: Event) => onChange("local.timeoutMs", (e.target as HTMLInputElement).value),
       }),
     ),
     h("details", { class: "llm-verifier-details", open: verifierConfigured || verifierDirty },
@@ -914,6 +936,10 @@ export function LlmProviderView() {
         const saved = data.local.maxContextTokens !== null ? String(data.local.maxContextTokens) : "";
         if (editValues["local.maxContextTokens"] !== saved) dirtyKeys.add("local.maxContextTokens");
       }
+      if ("local.timeoutMs" in editValues) {
+        const saved = data.local.timeoutMs !== null ? String(data.local.timeoutMs) : "";
+        if (editValues["local.timeoutMs"] !== saved) dirtyKeys.add("local.timeoutMs");
+      }
       for (const f of ["host", "model"] as const) {
         const k = `local.verifier.${f}`;
         if (k in editValues && editValues[k] !== (data.local.verifier[f] ?? "")) dirtyKeys.add(k);
@@ -1049,7 +1075,8 @@ export function LlmProviderView() {
           key: VIEWER_LLM_VENDOR.LOCAL,
           config: data!.local ?? {
             model: null, lightModel: null, host: null, port: null,
-            maxContextTokens: null, verifier: { host: null, port: null, model: null, maxCycles: null },
+            maxContextTokens: null, timeoutMs: null,
+            verifier: { host: null, port: null, model: null, maxCycles: null },
           },
           editValues,
           onChange: handleField,

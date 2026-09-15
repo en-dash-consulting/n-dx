@@ -16,6 +16,7 @@ import { CLIError } from "../errors.js";
 import { result, info, warn } from "../output.js";
 import type { RunRecord, RunStatus, TokenUsage } from "../../schema/index.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
+import { resolveCliPath, resolveNdxVersion } from "../../process/toolchain-identity.js";
 
 const VALID_STATUSES: readonly RunStatus[] = [
   "running",
@@ -123,6 +124,8 @@ export async function cmdRecord(
     assisted: true,
     actor: await resolveActor(dir),
     host: resolveHost(),
+    ndxVersion: resolveNdxVersion(),
+    cliPath: resolveCliPath(),
   };
 
   // saveRun derives the normalized `tokens` tuple from `tokenUsage`, so the PRD

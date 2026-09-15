@@ -17,6 +17,14 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join, dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { setupClaudeIntegration } from "../../packages/core/claude-integration.js";
+import { getMcpServers } from "../../packages/core/assistant-assets.js";
+
+const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 
 // ── Imports from compiled dist/ artifacts ──────────────────────────────────
 
@@ -420,6 +428,94 @@ describe("Claude config validation gauntlet", () => {
         expect(typeof msg).toBe("string");
         expect(msg.length).toBeGreaterThan(0);
       });
+    });
+  });
+
+  // ── Tracked .mcp.json — shape, idempotent merge, no absolute paths ────────
+  //
+  // `ndx init` writes cwd-relative stdio server entries for rex and
+  // sourcevision straight to `.mcp.json` (packages/core/claude-integration.js
+  // writeMcpJson) instead of registering them with `claude mcp add`. The full
+  // shape/merge/recovery matrix lives in tests/e2e/mcp-json-tracked.test.js;
+  // this block pins the same contract from the Claude config-validation
+  // gauntlet so a regression here fails the suite that owns Claude-vendor
+  // acceptance criteria, not just the standalone e2e file.
+  describe("tracked .mcp.json", () => {
+    let tmpDir;
+    let originalClaudeCliPath;
+    const serverNames = Object.keys(getMcpServers()).sort();
+
+    beforeEach(() => {
+      tmpDir = mkdtempSync(join(tmpdir(), "ndx-claude-config-validation-"));
+      // .mcp.json is written independent of the `claude` CLI — force
+      // discovery to fail so these tests stay fast and don't shell out.
+      originalClaudeCliPath = process.env.CLAUDE_CLI_PATH;
+      process.env.CLAUDE_CLI_PATH = "/nonexistent/path/to/claude";
+    });
+
+    afterEach(() => {
+      rmSync(tmpDir, { recursive: true, force: true });
+      if (originalClaudeCliPath === undefined) delete process.env.CLAUDE_CLI_PATH;
+      else process.env.CLAUDE_CLI_PATH = originalClaudeCliPath;
+    });
+
+    function readMcpJson() {
+      return JSON.parse(readFileSync(join(tmpDir, ".mcp.json"), "utf-8"));
+    }
+
+    it("writes a valid .mcp.json shape — every manifest server, cwd-relative, no absolute paths", () => {
+      setupClaudeIntegration(tmpDir);
+      const config = readMcpJson();
+
+      expect(Object.keys(config.mcpServers).sort()).toEqual(serverNames);
+      for (const entry of Object.values(config.mcpServers)) {
+        expect(typeof entry.command).toBe("string");
+        expect(entry.command.startsWith("/")).toBe(false);
+        expect(Array.isArray(entry.args)).toBe(true);
+        expect(entry.args[entry.args.length - 1]).toBe(".");
+        for (const arg of entry.args) {
+          expect(arg.startsWith("/")).toBe(false);
+          expect(arg).not.toContain(tmpDir);
+        }
+      }
+    });
+
+    it("merging is idempotent — re-running init twice produces byte-identical output", () => {
+      setupClaudeIntegration(tmpDir);
+      const first = readMcpJson();
+      setupClaudeIntegration(tmpDir);
+      const second = readMcpJson();
+      expect(second).toEqual(first);
+    });
+
+    it("merges into an existing .mcp.json without disturbing unrelated servers", () => {
+      writeFileSync(
+        join(tmpDir, ".mcp.json"),
+        JSON.stringify({ mcpServers: { unrelated: { command: "node", args: ["./other.js"] } } }, null, 2),
+      );
+      setupClaudeIntegration(tmpDir);
+      const config = readMcpJson();
+      expect(config.mcpServers.unrelated).toEqual({ command: "node", args: ["./other.js"] });
+      for (const name of serverNames) {
+        expect(config.mcpServers[name]).toBeDefined();
+      }
+    });
+
+    it("a generated .mcp.json on disk has no absolute paths, including the project dir itself", () => {
+      setupClaudeIntegration(tmpDir);
+      const content = readFileSync(join(tmpDir, ".mcp.json"), "utf-8");
+      expect(content).not.toContain(tmpDir);
+      expect(content).not.toMatch(/"\/[^"]*"/);
+    });
+
+    it("the recommended gitignore snippet does not list .mcp.json — it is meant to be tracked", () => {
+      const template = readFileSync(
+        resolve(REPO_ROOT, "packages/core/assistant-assets/ndx.gitignore"),
+        "utf-8",
+      );
+      expect(template).not.toContain(".mcp.json");
+      const repoGitignore = readFileSync(resolve(REPO_ROOT, ".gitignore"), "utf-8");
+      expect(repoGitignore).not.toContain(".mcp.json");
     });
   });
 });

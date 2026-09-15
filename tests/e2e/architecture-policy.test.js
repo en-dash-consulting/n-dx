@@ -245,7 +245,11 @@ describe("architecture policy: intra-package layering", () => {
  * Peer orchestration imports (cli.js importing from web.js, etc.) are
  * allowed — they are all at the same tier level.
  */
-const ORCHESTRATION_FILES = ["packages/core/cli.js", "packages/core/web.js", "packages/core/ci.js"];
+const ORCHESTRATION_FILES = [
+  "packages/core/cli.js",
+  "packages/core/web.js",
+  "packages/core/ci.js",
+];
 
 /**
  * Files at the orchestration tier that are allowed to be imported by
@@ -271,15 +275,17 @@ const ORCHESTRATION_PEERS = new Set([
  */
 const PACKAGE_IMPORT_PATTERN =
   /(?:import|export)\s+.*\s+from\s+["'](?:\.\/)?packages\//;
-const DIRECT_PKG_IMPORT_PATTERN =
-  /(?:import|export)\s+.*\s+from\s+["']@n-dx\//;
+const DIRECT_PKG_IMPORT_PATTERN = /(?:import|export)\s+.*\s+from\s+["']@n-dx\//;
 
 describe("architecture policy: orchestration spawn-only rule", () => {
   for (const file of ORCHESTRATION_FILES) {
     it(`${file} does not import from package internals`, () => {
       const fullPath = join(ROOT, file);
       // Committed source: absence means the declaration above is stale.
-      expect(existsSync(fullPath), `${file} is declared here but does not exist`).toBe(true);
+      expect(
+        existsSync(fullPath),
+        `${file} is declared here but does not exist`,
+      ).toBe(true);
 
       const content = readFileSync(fullPath, "utf-8");
       const violations = [];
@@ -335,51 +341,63 @@ describe("architecture policy: orchestration spawn-only rule", () => {
 const DOCUMENTED_POLICIES = [
   {
     rule: "Domain packages must not import from execution or orchestration layers",
-    enforcedBy: "domain-isolation.test.js → architecture policy: domain layer isolation",
+    enforcedBy:
+      "domain-isolation.test.js → architecture policy: domain layer isolation",
   },
   {
     rule: "Rex and sourcevision must never import each other",
-    enforcedBy: "domain-isolation.test.js → architecture policy: domain layer isolation",
+    enforcedBy:
+      "domain-isolation.test.js → architecture policy: domain layer isolation",
   },
   {
     rule: "Orchestration-tier scripts must spawn CLIs, not import libraries",
-    enforcedBy: "architecture-policy.test.js → architecture policy: orchestration spawn-only rule",
+    enforcedBy:
+      "architecture-policy.test.js → architecture policy: orchestration spawn-only rule",
   },
   {
     rule: "Cross-package runtime imports must flow through gateway modules",
-    enforcedBy: "domain-isolation.test.js → architecture policy: gateway enforcement",
+    enforcedBy:
+      "domain-isolation.test.js → architecture policy: gateway enforcement",
   },
   {
     rule: "Gateway files must contain only re-exports (no logic)",
-    enforcedBy: "domain-isolation.test.js → architecture policy: gateway enforcement",
+    enforcedBy:
+      "domain-isolation.test.js → architecture policy: gateway enforcement",
   },
   {
     rule: "Type imports must also flow through gateways (prevent promotion erosion)",
-    enforcedBy: "domain-isolation.test.js → architecture policy: gateway enforcement",
+    enforcedBy:
+      "domain-isolation.test.js → architecture policy: gateway enforcement",
   },
   {
     rule: "Foundation tier (@n-dx/llm-client) must not import from upper tiers",
-    enforcedBy: "domain-isolation.test.js → architecture policy: foundation tier boundary",
+    enforcedBy:
+      "domain-isolation.test.js → architecture policy: foundation tier boundary",
   },
   {
     rule: "Orchestration scripts must not import @n-dx/llm-client",
-    enforcedBy: "domain-isolation.test.js → architecture policy: foundation tier boundary",
+    enforcedBy:
+      "domain-isolation.test.js → architecture policy: foundation tier boundary",
   },
   {
     rule: "Domain-layer files must not import from CLI layer (intra-package layering)",
-    enforcedBy: "architecture-policy.test.js → architecture policy: intra-package layering",
+    enforcedBy:
+      "architecture-policy.test.js → architecture policy: intra-package layering",
   },
   {
     rule: "Direct child_process imports forbidden outside allowed files",
-    enforcedBy: "architecture-policy.test.js → architecture policy: process execution",
+    enforcedBy:
+      "architecture-policy.test.js → architecture policy: process execution",
   },
   {
     rule: "No cycles in the zone-level import graph",
-    enforcedBy: "architecture-policy.test.js → architecture policy: zone import cycle detection",
+    enforcedBy:
+      "architecture-policy.test.js → architecture policy: zone import cycle detection",
   },
   {
     rule: "config.js must only import from node: builtins (spawn-exempt exception)",
-    enforcedBy: "domain-isolation.test.js → architecture policy: orchestration tier boundary",
+    enforcedBy:
+      "domain-isolation.test.js → architecture policy: orchestration tier boundary",
   },
   {
     rule: "No source file may import from .rex/, .sourcevision/, or .hench/ directories",
@@ -391,19 +409,23 @@ const DOCUMENTED_POLICIES = [
   },
   {
     rule: "Production zones must meet minimum cohesion threshold (0.5)",
-    enforcedBy: "architecture-policy.test.js → architecture policy: zone cohesion gate",
+    enforcedBy:
+      "architecture-policy.test.js → architecture policy: zone cohesion gate",
   },
   {
     rule: "Boundary gateway files must not exceed export caps",
-    enforcedBy: "architecture-policy.test.js → architecture policy: boundary file export caps",
+    enforcedBy:
+      "architecture-policy.test.js → architecture policy: boundary file export caps",
   },
   {
     rule: "Web package internal zones must not form import cycles",
-    enforcedBy: "architecture-policy.test.js → architecture policy: web package intra-zone cycle detection",
+    enforcedBy:
+      "architecture-policy.test.js → architecture policy: web package intra-zone cycle detection",
   },
   {
     rule: "Dynamic imports must not cross zone boundaries without documentation",
-    enforcedBy: "architecture-policy.test.js → architecture policy: dynamic import audit",
+    enforcedBy:
+      "architecture-policy.test.js → architecture policy: dynamic import audit",
   },
   {
     rule: "web-shared consumers must import through barrel index, not leaf files",
@@ -411,11 +433,13 @@ const DOCUMENTED_POLICIES = [
   },
   {
     rule: ".rex/prd.md is read and written only in the migration helper",
-    enforcedBy: "architecture-policy.test.js → architecture policy: PRD storage invariant (prd.md migration-helper-only)",
+    enforcedBy:
+      "architecture-policy.test.js → architecture policy: PRD storage invariant (prd.md migration-helper-only)",
   },
   {
     rule: "No CLI spawn site may use shell:true+args (DEP0190 pattern) — use win-spawn.js helpers instead",
-    enforcedBy: "architecture-policy.test.js → architecture policy: DEP0190 spawn guard",
+    enforcedBy:
+      "architecture-policy.test.js → architecture policy: DEP0190 spawn guard",
   },
 ];
 
@@ -434,7 +458,11 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
       // Each entry must reference a real test file
       const testFile = policy.enforcedBy.split(" → ")[0];
       expect(
-        ["architecture-policy.test.js", "domain-isolation.test.js", "boundary-check.test.ts"].includes(testFile),
+        [
+          "architecture-policy.test.js",
+          "domain-isolation.test.js",
+          "boundary-check.test.ts",
+        ].includes(testFile),
         `Unknown enforcement test file: ${testFile}`,
       ).toBe(true);
     });
@@ -463,21 +491,66 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
  */
 const CYCLE_EXEMPT_ZONE_TYPES = new Set(["test", "infrastructure"]);
 const CYCLE_EXCEPTIONS = new Map([
-  ["incremental", "Small incremental analysis cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch."],
-  ["mcp", "Rex MCP tools cluster; cycles with the duplicate-named 'web' zone (first file in rex package) making intra-rex edges appear cross-package to the cycle detector."],
-  ["refresh", "Small viewer refresh-throttle cluster in packages/web/; all observed cycle edges (refresh → web and web → refresh) are intra-packages/web imports, but the multi-package 'web' Louvain zone's first file is in packages/rex so packageFamily('web') resolves to 'rex', making these intra-package edges appear cross-package to the cycle detector."],
-  ["refresh-throttle-pipeline", "Louvain renamed the 'refresh' zone to 'refresh-throttle-pipeline'; same packageFamily mismatch root cause — all files are intra-packages/web but the 'web' zone's first file resolves to rex, making the edges appear cross-package."],
-  ["rex-core", "Small rex core cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason — both zones are in the rex package."],
-  ["rex-recommend", "Small rex recommendation cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
-  ["rex-store", "Rex store/persistence cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
-  ["rex-unit", "Small rex unit cluster (src/core/tree.ts); cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
-  ["sync", "Small sync command cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason."],
-  ["use", "Small hooks/utilities cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch."],
-  ["web-2", "Small viewer utility cluster; current SourceVision split still routes shared types through the web hub."],
-  ["web-4", "Small viewer data-loading cluster; cycles with the multi-package 'web' zone for the same packageFamily mismatch reason as 'polling'."],
-  ["web-server", "Web server cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch."],
-  ["web-viewer-search-overlay", "Search overlay component zone; confirmed genuine cycle with web-viewer — search-overlay.ts imports getLevelEmoji (runtime) and NavigateTo (type) from web-viewer while components/index.ts imports back. Tracked in CLAUDE.md 'Confirmed zone-level cycles' table."],
-  ["web-viewer", "Viewer facade cluster; cohesion now meets threshold but still cycles with the multi-package 'web' zone due to the packageFamily mismatch (web zone first file is rex)."],
+  [
+    "incremental",
+    "Small incremental analysis cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch.",
+  ],
+  [
+    "mcp",
+    "Rex MCP tools cluster; cycles with the duplicate-named 'web' zone (first file in rex package) making intra-rex edges appear cross-package to the cycle detector.",
+  ],
+  [
+    "refresh",
+    "Small viewer refresh-throttle cluster in packages/web/; all observed cycle edges (refresh → web and web → refresh) are intra-packages/web imports, but the multi-package 'web' Louvain zone's first file is in packages/rex so packageFamily('web') resolves to 'rex', making these intra-package edges appear cross-package to the cycle detector.",
+  ],
+  [
+    "refresh-throttle-pipeline",
+    "Louvain renamed the 'refresh' zone to 'refresh-throttle-pipeline'; same packageFamily mismatch root cause — all files are intra-packages/web but the 'web' zone's first file resolves to rex, making the edges appear cross-package.",
+  ],
+  [
+    "rex-core",
+    "Small rex core cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason — both zones are in the rex package.",
+  ],
+  [
+    "rex-recommend",
+    "Small rex recommendation cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason.",
+  ],
+  [
+    "rex-store",
+    "Rex store/persistence cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason.",
+  ],
+  [
+    "rex-unit",
+    "Small rex unit cluster (src/core/tree.ts); cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason.",
+  ],
+  [
+    "sync",
+    "Small sync command cluster; cycles with the duplicate-named 'web' zone for the same packageFamily mismatch reason.",
+  ],
+  [
+    "use",
+    "Small hooks/utilities cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch.",
+  ],
+  [
+    "web-2",
+    "Small viewer utility cluster; current SourceVision split still routes shared types through the web hub.",
+  ],
+  [
+    "web-4",
+    "Small viewer data-loading cluster; cycles with the multi-package 'web' zone for the same packageFamily mismatch reason as 'polling'.",
+  ],
+  [
+    "web-server",
+    "Web server cluster; cycles with the multi-package 'web' zone due to packageFamily mismatch.",
+  ],
+  [
+    "web-viewer-search-overlay",
+    "Search overlay component zone; confirmed genuine cycle with web-viewer — search-overlay.ts imports getLevelEmoji (runtime) and NavigateTo (type) from web-viewer while components/index.ts imports back. Tracked in CLAUDE.md 'Confirmed zone-level cycles' table.",
+  ],
+  [
+    "web-viewer",
+    "Viewer facade cluster; cohesion now meets threshold but still cycles with the multi-package 'web' zone due to the packageFamily mismatch (web zone first file is rex).",
+  ],
 ]);
 
 describe("architecture policy: zone import cycle detection", () => {
@@ -491,14 +564,18 @@ describe("architecture policy: zone import cycle detection", () => {
     // Load zone types from .n-dx.json to identify test/infrastructure zones
     const configPath = join(ROOT, ".n-dx.json");
     const zoneTypes = existsSync(configPath)
-      ? JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones?.types ?? {}
+      ? (JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones
+          ?.types ?? {})
       : {};
 
     // Build set of production zone IDs (exclude test and infrastructure zones)
     const productionZones = new Set();
     for (const zone of data.zones || []) {
       const zoneType = zoneTypes[zone.id];
-      if ((!zoneType || !CYCLE_EXEMPT_ZONE_TYPES.has(zoneType)) && !CYCLE_EXCEPTIONS.has(zone.id)) {
+      if (
+        (!zoneType || !CYCLE_EXEMPT_ZONE_TYPES.has(zoneType)) &&
+        !CYCLE_EXCEPTIONS.has(zone.id)
+      ) {
         productionZones.add(zone.id);
       }
     }
@@ -519,7 +596,8 @@ describe("architecture policy: zone import cycle detection", () => {
 
     // Load zone pins from .n-dx.json to remap file→zone assignments
     const zonePins = existsSync(configPath)
-      ? JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones?.pins ?? {}
+      ? (JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones
+          ?.pins ?? {})
       : {};
 
     // Build file-to-zone lookup with pins applied (pins override analyzed zones)
@@ -542,7 +620,10 @@ describe("architecture policy: zone import cycle detection", () => {
       if (existsSync(srcPath)) {
         const srcContent = readFileSync(srcPath, "utf-8");
         // Extract the target filename stem to check import presence
-        const targetBase = c.to.split("/").pop().replace(/\.\w+$/, "");
+        const targetBase = c.to
+          .split("/")
+          .pop()
+          .replace(/\.\w+$/, "");
         if (!srcContent.includes(targetBase)) continue; // import was removed
       }
       correctedCrossings.push({
@@ -558,14 +639,17 @@ describe("architecture policy: zone import cycle detection", () => {
     const graph = new Map();
     for (const c of correctedCrossings) {
       if (c.fromZone === c.toZone) continue; // skip self-edges
-      if (!productionZones.has(c.fromZone) || !productionZones.has(c.toZone)) continue;
+      if (!productionZones.has(c.fromZone) || !productionZones.has(c.toZone))
+        continue;
       if (packageFamily(c.fromZone) === packageFamily(c.toZone)) continue; // skip intra-package
       if (!graph.has(c.fromZone)) graph.set(c.fromZone, new Set());
       graph.get(c.fromZone).add(c.toZone);
     }
 
     // DFS cycle detection
-    const WHITE = 0, GRAY = 1, BLACK = 2;
+    const WHITE = 0,
+      GRAY = 1,
+      BLACK = 2;
     const color = new Map();
     const cycles = [];
 
@@ -606,9 +690,7 @@ describe("architecture policy: zone import cycle detection", () => {
     }
 
     if (cycles.length > 0) {
-      const descriptions = cycles.map(
-        (c) => `  ${c.join(" → ")}`
-      );
+      const descriptions = cycles.map((c) => `  ${c.join(" → ")}`);
       expect.fail(
         [
           `Zone-level import cycles detected (${cycles.length} cycle${cycles.length > 1 ? "s" : ""}):`,
@@ -652,7 +734,8 @@ describe("architecture policy: non-web zone coupling guard", () => {
 
     // Load zone types to exclude test/infrastructure zones
     const zoneTypes = existsSync(configPath)
-      ? JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones?.types ?? {}
+      ? (JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones
+          ?.types ?? {})
       : {};
 
     const productionZones = new Set();
@@ -665,7 +748,8 @@ describe("architecture policy: non-web zone coupling guard", () => {
 
     // Load zone pins
     const zonePins = existsSync(configPath)
-      ? JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones?.pins ?? {}
+      ? (JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones
+          ?.pins ?? {})
       : {};
 
     // Build file-to-zone with pins
@@ -703,9 +787,7 @@ describe("architecture policy: non-web zone coupling guard", () => {
     ]);
 
     // Foundation tier — imports *to* these families are always allowed
-    const FOUNDATION_FAMILIES = new Set([
-      "packages-llm-client",
-    ]);
+    const FOUNDATION_FAMILIES = new Set(["packages-llm-client"]);
 
     const violations = [];
 
@@ -714,7 +796,8 @@ describe("architecture policy: non-web zone coupling guard", () => {
       const toZone = fileToZone.get(c.to) ?? c.toZone;
 
       if (fromZone === toZone) continue;
-      if (!productionZones.has(fromZone) || !productionZones.has(toZone)) continue;
+      if (!productionZones.has(fromZone) || !productionZones.has(toZone))
+        continue;
 
       const fromFamily = packageFamily(fromZone);
       const toFamily = packageFamily(toZone);
@@ -725,7 +808,10 @@ describe("architecture policy: non-web zone coupling guard", () => {
       if (FOUNDATION_FAMILIES.has(toFamily)) continue;
 
       // Only flag if both families are in the coupling-free set
-      if (COUPLING_FREE_FAMILIES.has(fromFamily) && COUPLING_FREE_FAMILIES.has(toFamily)) {
+      if (
+        COUPLING_FREE_FAMILIES.has(fromFamily) &&
+        COUPLING_FREE_FAMILIES.has(toFamily)
+      ) {
         violations.push(`${fromZone} → ${toZone} (${c.from} → ${c.to})`);
       }
     }
@@ -826,7 +912,11 @@ describe("architecture policy: process execution", () => {
       // Skip allowed files
       if (ALLOWED.has(rel)) continue;
       // Skip test files
-      if (/\.test\.(ts|js|mjs)$/.test(rel) || /(?:^|[\/\\])tests?[\/\\]/.test(rel)) continue;
+      if (
+        /\.test\.(ts|js|mjs)$/.test(rel) ||
+        /(?:^|[\/\\])tests?[\/\\]/.test(rel)
+      )
+        continue;
 
       const content = readFileSync(file, "utf-8");
 
@@ -917,7 +1007,8 @@ describe("architecture policy: zone cohesion gate", () => {
 
     const configPath = join(ROOT, ".n-dx.json");
     const zoneTypes = existsSync(configPath)
-      ? JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones?.types ?? {}
+      ? (JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones
+          ?.types ?? {})
       : {};
 
     const violations = [];
@@ -979,7 +1070,9 @@ describe("architecture policy: zone cohesion gate", () => {
       const cohesion = summary.riskMetrics?.cohesion;
       const fileCount = summary.fileCount ?? summary.files?.length ?? 0;
       if (fileCount < MIN_FILES_FOR_COHESION_GATE) {
-        stale.push(`${zoneId} (zone has ${fileCount} files; auto-skipped by size threshold)`);
+        stale.push(
+          `${zoneId} (zone has ${fileCount} files; auto-skipped by size threshold)`,
+        );
         continue;
       }
       if (cohesion !== undefined && cohesion >= COHESION_THRESHOLD) {
@@ -1018,27 +1111,32 @@ const BOUNDARY_FILES = [
   {
     file: "packages/web/src/viewer/external.ts",
     maxExports: 26,
-    description: "viewer outbound gateway (schema types, shared utilities, messaging)",
+    description:
+      "viewer outbound gateway (schema types, shared utilities, messaging)",
   },
   {
     file: "packages/web/src/server/rex-gateway.ts",
     maxExports: 66,
-    description: "web→rex gateway (domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser, folder-tree parser/slug resolver, legacy PRD migration, PRD tree backup snapshots for the dashboard's Restore panel — isValidSnapshotId added to reject a path-traversal id in POST /api/rex/restore before it reaches restoreFromBackup's fs.rm)",
+    description:
+      "web→rex gateway (domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser, folder-tree parser/slug resolver, legacy PRD migration, PRD tree backup snapshots for the dashboard's Restore panel — isValidSnapshotId added to reject a path-traversal id in POST /api/rex/restore before it reaches restoreFromBackup's fs.rm)",
   },
   {
     file: "packages/web/src/server/domain-gateway.ts",
     maxExports: 16,
-    description: "web→sourcevision gateway (MCP server factory, domain types, iso-map builder, analysis-output schema types). Raised from 15 to carry the five artifact schema types (Manifest, Inventory, Imports, Zones, Components) that the Ask endpoint's context assembler parses .sourcevision/*.json against — sourcevision exposes no loader, so the types are the only thing keeping those disk reads honest about the schema, and importing them from @n-dx/sourcevision at the read site would bypass the gateway.",
+    description:
+      "web→sourcevision gateway (MCP server factory, domain types, iso-map builder, analysis-output schema types). Raised from 15 to carry the five artifact schema types (Manifest, Inventory, Imports, Zones, Components) that the Ask endpoint's context assembler parses .sourcevision/*.json against — sourcevision exposes no loader, so the types are the only thing keeping those disk reads honest about the schema, and importing them from @n-dx/sourcevision at the read site would bypass the gateway.",
   },
   {
     file: "packages/hench/src/prd/rex-gateway.ts",
     maxExports: 30,
-    description: "hench→rex gateway (schema, store, tree, task selection, timestamps)",
+    description:
+      "hench→rex gateway (schema, store, tree, task selection, timestamps)",
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 162,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; Windows-safe CLI spawn surface — quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation + SpawnCliOptions/CliInvocationDiagnosis types added for the GH #37/#68/#69 spawn hardening so cli-loop can route .cmd shims through cmd.exe; diagnoseCliNotFound added so cli-loop's close/non-zero-exit path surfaces the Windows 'not recognized' missing-CLI diagnosis; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries; parseLmStudioError added so the local-LLM provider can classify LM Studio server errors; LLM_VENDOR/LLMVendor helpers added so hench uses the canonical vendor literal set through the approved gateway; resolveReviewModel + REVIEW_MODELS added so the adversarial review pass resolves its own model tier through the gateway instead of hardcoding a model in cli-loop; resolveTaskModel added so hench resolves the agent loop and the pre-run commit message by task class — agent.execute and git.commit-message — through the class→tier→model registry rather than calling resolveVendorModel with a hardcoded weight; assemblePromptText + the prompt section-measurement surface — extractPromptSectionDiagnostics, promptSectionCosts, dominantPromptSections, formatPromptSectionCosts and the PromptSectionCost type — added when the envelope was extended to rex and sourcevision: those packages sit below hench and cannot import from it, so the extractor moved down to the foundation tier and hench now reaches its own diagnostics through the gateway rather than owning the implementation)",
+    maxExports: 165,
+    description:
+      "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token-accumulation, google/tier model catalogs — TIER_MODELS + GOOGLE_MODELS added for the Google vendor integration; Gemini tool-loop surface — toGeminiFunctionDeclaration(s), GeminiFunctionDeclaration/GeminiSchema and GeminiToolProvider/GeminiContent/GeminiPart/GeminiToolBlock/GeminiGenerateResult/GenerateContentWithToolsArgs added for the Gemini agentic tool-use loop; Windows-safe CLI spawn surface — quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation + SpawnCliOptions/CliInvocationDiagnosis types added for the GH #37/#68/#69 spawn hardening so cli-loop can route .cmd shims through cmd.exe; diagnoseCliNotFound added so cli-loop's close/non-zero-exit path surfaces the Windows 'not recognized' missing-CLI diagnosis; isAuthError added so the CLI run-loop can detect auth/session loss and halt before cascading retries; parseLmStudioError added so the local-LLM provider can classify LM Studio server errors; LLM_VENDOR/LLMVendor helpers added so hench uses the canonical vendor literal set through the approved gateway; resolveReviewModel + REVIEW_MODELS added so the adversarial review pass resolves its own model tier through the gateway instead of hardcoding a model in cli-loop; resolveTaskModel added so hench resolves the agent loop and the pre-run commit message by task class — agent.execute and git.commit-message — through the class→tier→model registry rather than calling resolveVendorModel with a hardcoded weight; assemblePromptText + the prompt section-measurement surface — extractPromptSectionDiagnostics, promptSectionCosts, dominantPromptSections, formatPromptSectionCosts and the PromptSectionCost type — added when the envelope was extended to rex and sourcevision: those packages sit below hench and cannot import from it, so the extractor moved down to the foundation tier and hench now reaches its own diagnostics through the gateway rather than owning the implementation; getWorktreeRoot + getGitCommonDir added so a hench run can record which worktree and repository it started in and refuse an automatic commit once HEAD has moved — hench cannot import node:child_process, so the git probe has to reach it through this gateway; resolveLocalTimeoutMs added so the local (LM Studio) loop and its verifier resolve llm.local.timeoutMs through the gateway — raised 164→165 when the local-timeout branch merged with main's worktree git-probe surface, each of which had counted its own additions against 163)",
   },
 ];
 
@@ -1054,11 +1152,14 @@ describe("architecture policy: boundary file export caps", () => {
       const content = readFileSync(fullPath, "utf-8");
 
       // Count export statements (both named exports and re-exports)
-      const exportMatches = content.match(/\bexport\s+(?:type\s+)?{[^}]*}/g) || [];
+      const exportMatches =
+        content.match(/\bexport\s+(?:type\s+)?{[^}]*}/g) || [];
       let exportCount = 0;
       for (const match of exportMatches) {
         // Count comma-separated items within braces
-        const inner = match.replace(/^export\s+(?:type\s+)?{/, "").replace(/}$/, "");
+        const inner = match
+          .replace(/^export\s+(?:type\s+)?{/, "")
+          .replace(/}$/, "");
         exportCount += inner.split(",").filter((s) => s.trim()).length;
       }
 
@@ -1101,19 +1202,19 @@ describe("architecture policy: analyzer test coverage pairing", () => {
    * a justification comment.
    */
   const EXEMPT_ANALYZERS = new Set([
-    "index",                  // barrel re-export
-    "enrich-config",          // configuration constants only
-    "enrich-batch",           // thin orchestration wrapper around enrich-per-zone
-    "enrich",                 // AI enrichment orchestrator — covered by zone-enrichment.test.ts
-    "enrich-parsing",         // parsing helpers — covered by zone-enrichment.test.ts and enrich-per-zone.test.ts
+    "index", // barrel re-export
+    "enrich-config", // configuration constants only
+    "enrich-batch", // thin orchestration wrapper around enrich-per-zone
+    "enrich", // AI enrichment orchestrator — covered by zone-enrichment.test.ts
+    "enrich-parsing", // parsing helpers — covered by zone-enrichment.test.ts and enrich-per-zone.test.ts
     "server-route-detection", // extension of route-detection — tested via route-detection integration
-    "claude-client",          // LLM API wrapper — covered by integration tests, requires API key for unit tests
-    "context",                // CONTEXT.md output generator — covered by e2e/analyze tests
-    "llms-txt",               // llms.txt output generator — covered by e2e/analyze tests
-    "louvain",                // Louvain community detection algorithm — covered by zone-detection.test.ts
-    "route-detection",        // route detection — tested via server-route-detection exemption and e2e
-    "zone-hash",              // deterministic zone hashing — covered by zone-detection.test.ts
-    "zones",                  // zone orchestrator — covered by zone-detection.test.ts and zone-enrichment.test.ts
+    "claude-client", // LLM API wrapper — covered by integration tests, requires API key for unit tests
+    "context", // CONTEXT.md output generator — covered by e2e/analyze tests
+    "llms-txt", // llms.txt output generator — covered by e2e/analyze tests
+    "louvain", // Louvain community detection algorithm — covered by zone-detection.test.ts
+    "route-detection", // route detection — tested via server-route-detection exemption and e2e
+    "zone-hash", // deterministic zone hashing — covered by zone-detection.test.ts
+    "zones", // zone orchestrator — covered by zone-detection.test.ts and zone-enrichment.test.ts
   ]);
 
   it("each analyzer service has a corresponding test file", () => {
@@ -1141,7 +1242,10 @@ describe("architecture policy: analyzer test coverage pairing", () => {
         [
           "Analyzer services without corresponding test files:",
           "",
-          ...missing.map((m) => `  - src/analyzers/${m}.ts → tests/unit/analyzers/${m}.test.ts`),
+          ...missing.map(
+            (m) =>
+              `  - src/analyzers/${m}.ts → tests/unit/analyzers/${m}.test.ts`,
+          ),
           "",
           "Either add a test file or add the analyzer name to EXEMPT_ANALYZERS with justification.",
         ].join("\n"),
@@ -1180,7 +1284,8 @@ describe("architecture policy: web package intra-zone cycle detection", () => {
     // Load zone pins from .n-dx.json
     const configPath = join(ROOT, ".n-dx.json");
     const zonePins = existsSync(configPath)
-      ? JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones?.pins ?? {}
+      ? (JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones
+          ?.pins ?? {})
       : {};
 
     // Build file-to-zone lookup with pins applied
@@ -1200,7 +1305,8 @@ describe("architecture policy: web package intra-zone cycle detection", () => {
 
     // Load zone types to identify test zones
     const zoneTypes = existsSync(configPath)
-      ? JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones?.types ?? {}
+      ? (JSON.parse(readFileSync(configPath, "utf-8"))?.sourcevision?.zones
+          ?.types ?? {})
       : {};
 
     // Check for reverse edges (lower-rank zone importing from higher-rank zone
@@ -1222,12 +1328,19 @@ describe("architecture policy: web package intra-zone cycle detection", () => {
 
       // Skip package entry points — public.ts and cli/index.ts are composition
       // roots that necessarily import across all zones
-      if (c.from.endsWith("/public.ts") || c.from.endsWith("/cli/index.ts")) continue;
+      if (c.from.endsWith("/public.ts") || c.from.endsWith("/cli/index.ts"))
+        continue;
 
       // Skip viewer-message-pipeline → web-viewer edges from hook/polling files
       // that share types with viewer components (legitimate cross-zone type deps)
-      if (fromZone === "viewer-message-pipeline" && toZone === "web-viewer" &&
-          (c.from.includes("/hooks/") || c.from.includes("/polling/") || c.from.includes("/components/prd-tree/"))) continue;
+      if (
+        fromZone === "viewer-message-pipeline" &&
+        toZone === "web-viewer" &&
+        (c.from.includes("/hooks/") ||
+          c.from.includes("/polling/") ||
+          c.from.includes("/components/prd-tree/"))
+      )
+        continue;
 
       // A reverse edge: importing from a zone lower in the load order
       // is expected. But importing from a zone HIGHER in the load order
@@ -1237,7 +1350,10 @@ describe("architecture policy: web package intra-zone cycle detection", () => {
         const srcPath = join(ROOT, c.from);
         if (!existsSync(srcPath)) continue;
         const srcContent = readFileSync(srcPath, "utf-8");
-        const targetBase = c.to.split("/").pop().replace(/\.\w+$/, "");
+        const targetBase = c.to
+          .split("/")
+          .pop()
+          .replace(/\.\w+$/, "");
         if (!srcContent.includes(targetBase)) continue;
         violations.push(`${fromZone} → ${toZone} (${c.from} imports ${c.to})`);
       }
@@ -1275,53 +1391,154 @@ describe("architecture policy: web package intra-zone cycle detection", () => {
  */
 const DOCUMENTED_DYNAMIC_IMPORTS = new Map([
   // Hench CLI — lazy-loads command handlers to reduce startup time
-  ["packages/hench/src/cli/index.ts", "CLI command dispatch — lazy-loads command handlers"],
-  ["packages/hench/src/cli/commands/config.ts", "Lazy-loads LLM config helpers on demand"],
-  ["packages/hench/src/cli/commands/run.ts", "Lazy-loads agent runner on demand"],
-  ["packages/hench/src/cli/commands/task-lookup.ts", "Lazy-loads rex gateway for task resolution"],
+  [
+    "packages/hench/src/cli/index.ts",
+    "CLI command dispatch — lazy-loads command handlers",
+  ],
+  [
+    "packages/hench/src/cli/commands/config.ts",
+    "Lazy-loads LLM config helpers on demand",
+  ],
+  [
+    "packages/hench/src/cli/commands/run.ts",
+    "Lazy-loads agent runner on demand",
+  ],
+  [
+    "packages/hench/src/cli/commands/task-lookup.ts",
+    "Lazy-loads rex gateway for task resolution",
+  ],
   // Rex CLI — lazy-loads command handlers and heavy dependencies
-  ["packages/rex/src/cli/index.ts", "CLI command dispatch — lazy-loads command handlers"],
-  ["packages/rex/src/cli/commands/analyze.ts", "Chunked-review lazy import — loaded only during interactive proposal review"],
-  ["packages/rex/src/cli/commands/migrate-to-folder-tree.ts", "Lazy-loads node:readline only for the interactive legacy-file cleanup prompt"],
-  ["packages/rex/src/cli/commands/import-bundle.ts", "Lazy-loads node:readline only for the interactive --replace confirmation prompt — skipped entirely with --yes or off a TTY"],
-  ["packages/rex/src/cli/commands/prune.ts", "Lazy-loads LLM client for smart prune proposals"],
-  ["packages/rex/src/cli/commands/remove.ts", "Lazy-loads LLM client for smart remove analysis"],
-  ["packages/rex/src/cli/commands/reorganize.ts", "Lazy-loads LLM client for reorganization proposals"],
-  ["packages/rex/src/cli/commands/reshape.ts", "Lazy-loads LLM client for reshape analysis"],
-  ["packages/rex/src/cli/commands/restore.ts", "Lazy-loads node:readline only for the interactive restore confirmation prompt — skipped entirely with --yes"],
-  ["packages/rex/src/cli/commands/smart-add.ts", "Lazy-loads LLM client for smart add proposals"],
-  ["packages/rex/src/cli/commands/validate-interactive.ts", "Lazy-loads LLM client for interactive validation"],
-  ["packages/rex/src/cli/commands/verify.ts", "Lazy-loads LLM client for verify analysis"],
+  [
+    "packages/rex/src/cli/index.ts",
+    "CLI command dispatch — lazy-loads command handlers",
+  ],
+  [
+    "packages/rex/src/cli/commands/analyze.ts",
+    "Chunked-review lazy import — loaded only during interactive proposal review",
+  ],
+  [
+    "packages/rex/src/cli/commands/migrate-to-folder-tree.ts",
+    "Lazy-loads node:readline only for the interactive legacy-file cleanup prompt",
+  ],
+  [
+    "packages/rex/src/cli/commands/import-bundle.ts",
+    "Lazy-loads node:readline only for the interactive --replace confirmation prompt — skipped entirely with --yes or off a TTY",
+  ],
+  [
+    "packages/rex/src/cli/commands/prune.ts",
+    "Lazy-loads LLM client for smart prune proposals",
+  ],
+  [
+    "packages/rex/src/cli/commands/remove.ts",
+    "Lazy-loads LLM client for smart remove analysis",
+  ],
+  [
+    "packages/rex/src/cli/commands/reorganize.ts",
+    "Lazy-loads LLM client for reorganization proposals",
+  ],
+  [
+    "packages/rex/src/cli/commands/reshape.ts",
+    "Lazy-loads LLM client for reshape analysis",
+  ],
+  [
+    "packages/rex/src/cli/commands/restore.ts",
+    "Lazy-loads node:readline only for the interactive restore confirmation prompt — skipped entirely with --yes",
+  ],
+  [
+    "packages/rex/src/cli/commands/smart-add.ts",
+    "Lazy-loads LLM client for smart add proposals",
+  ],
+  [
+    "packages/rex/src/cli/commands/validate-interactive.ts",
+    "Lazy-loads LLM client for interactive validation",
+  ],
+  [
+    "packages/rex/src/cli/commands/verify.ts",
+    "Lazy-loads LLM client for verify analysis",
+  ],
   // Sourcevision CLI — lazy-loads the isometric renderer
-  ["packages/sourcevision/src/cli/commands/iso.ts", "Lazy-loads the iso model builder and HTML renderer — only needed for the opt-in `sv iso` command, never during analyze"],
+  [
+    "packages/sourcevision/src/cli/commands/iso.ts",
+    "Lazy-loads the iso model builder and HTML renderer — only needed for the opt-in `sv iso` command, never during analyze",
+  ],
   // Core — lazy-loads utilities
-  ["packages/core/config.js", "Lazy-loads llm-client vendor reset helpers when the vendor changes, plus the shared auth-failure guidance and the cli-brand color palette on the preflight-failure error path"],
-  ["packages/core/cli.js", "Lazy-loads cli-ink.js (Ink + React TUI renderer) only during `ndx init` when stdout is a TTY and --quiet is unset — avoids React/Ink import cost on every CLI invocation and in non-interactive environments"],
-  ["packages/rex/src/cli/mcp-tools.ts", "Lazy-loads MCP tool handlers on demand"],
-  ["packages/rex/src/analyze/reason.ts", "Lazy-loads LLM client for reason analysis"],
+  [
+    "packages/core/config.js",
+    "Lazy-loads llm-client vendor reset helpers when the vendor changes, plus the shared auth-failure guidance and the cli-brand color palette on the preflight-failure error path",
+  ],
+  [
+    "packages/core/cli.js",
+    "Lazy-loads cli-ink.js (Ink + React TUI renderer) only during `ndx init` when stdout is a TTY and --quiet is unset — avoids React/Ink import cost on every CLI invocation and in non-interactive environments",
+  ],
+  [
+    "packages/rex/src/cli/mcp-tools.ts",
+    "Lazy-loads MCP tool handlers on demand",
+  ],
+  [
+    "packages/rex/src/analyze/reason.ts",
+    "Lazy-loads LLM client for reason analysis",
+  ],
   // Sourcevision — lazy-loads analyzers and heavy dependencies
-  ["packages/sourcevision/src/cli/index.ts", "CLI command dispatch — lazy-loads analyzers"],
-  ["packages/sourcevision/src/analyzers/callgraph-findings.ts", "Lazy-loads callgraph analysis on demand"],
-  ["packages/sourcevision/src/analyzers/convergence.ts", "Lazy-loads convergence analyzer on demand"],
-  ["packages/sourcevision/src/analyzers/imports.ts", "Lazy-loads import graph analysis on demand"],
+  [
+    "packages/sourcevision/src/cli/index.ts",
+    "CLI command dispatch — lazy-loads analyzers",
+  ],
+  [
+    "packages/sourcevision/src/analyzers/callgraph-findings.ts",
+    "Lazy-loads callgraph analysis on demand",
+  ],
+  [
+    "packages/sourcevision/src/analyzers/convergence.ts",
+    "Lazy-loads convergence analyzer on demand",
+  ],
+  [
+    "packages/sourcevision/src/analyzers/imports.ts",
+    "Lazy-loads import graph analysis on demand",
+  ],
   // Init LLM selection — lazy-loads enquirer prompt library
-  ["packages/core/init-llm.js", "Lazy-loads enquirer for interactive provider/model selection"],
+  [
+    "packages/core/init-llm.js",
+    "Lazy-loads enquirer for interactive provider/model selection",
+  ],
   // Web server — lazy-loads route handlers
-  ["packages/web/src/server/routes-integrations.ts", "Lazy-loads integration handlers on demand"],
-  ["packages/web/src/server/routes-notion.ts", "Lazy-loads Notion integration on demand"],
-  ["packages/web/src/server/routes-rex/health.ts", "Lazy-loads health check analysis on demand"],
+  [
+    "packages/web/src/server/routes-integrations.ts",
+    "Lazy-loads integration handlers on demand",
+  ],
+  [
+    "packages/web/src/server/routes-notion.ts",
+    "Lazy-loads Notion integration on demand",
+  ],
+  [
+    "packages/web/src/server/routes-rex/health.ts",
+    "Lazy-loads health check analysis on demand",
+  ],
   // Core orchestrator — dynamic import of rex public API for export pre-rendering
-  ["packages/core/export.js", "Lazy-loads rex functions for static export pre-rendering"],
+  [
+    "packages/core/export.js",
+    "Lazy-loads rex functions for static export pre-rendering",
+  ],
   // Hench agent — deferred node: builtins for lock file and cleanup operations
-  ["packages/hench/src/agent/lifecycle/shared.ts", "Lazy-loads node:fs and node:path for lock file cleanup — deferred to avoid import overhead on code paths that never touch the filesystem"],
-  ["packages/hench/src/tools/cleanup-transformations.ts", "Lazy-loads node:fs/promises for file deletion — async filesystem access isolated to the tool cleanup path"],
-  ["packages/hench/src/tools/test-command-resolver.ts", "Lazy-loads node:readline only when interactive prompts are needed for test command resolution — avoids import cost in automated/config-resolved paths"],
+  [
+    "packages/hench/src/agent/lifecycle/shared.ts",
+    "Lazy-loads node:fs and node:path for lock file cleanup — deferred to avoid import overhead on code paths that never touch the filesystem",
+  ],
+  [
+    "packages/hench/src/tools/cleanup-transformations.ts",
+    "Lazy-loads node:fs/promises for file deletion — async filesystem access isolated to the tool cleanup path",
+  ],
+  [
+    "packages/hench/src/tools/test-command-resolver.ts",
+    "Lazy-loads node:readline only when interactive prompts are needed for test command resolution — avoids import cost in automated/config-resolved paths",
+  ],
 ]);
 
 describe("architecture policy: dynamic import audit", () => {
   it("all dynamic imports in package sources are documented", () => {
     const packagesDir = join(ROOT, "packages");
-    expect(existsSync(packagesDir), "packages/ is missing from the repo").toBe(true);
+    expect(existsSync(packagesDir), "packages/ is missing from the repo").toBe(
+      true,
+    );
 
     const undocumented = [];
     const dynamicImportRe = /await\s+import\s*\(/g;
@@ -1332,7 +1549,8 @@ describe("architecture policy: dynamic import audit", () => {
           const full = join(dir, entry.name);
           if (entry.isDirectory()) {
             // Skip node_modules, dist, tests
-            if (["node_modules", "dist", "tests", ".git"].includes(entry.name)) continue;
+            if (["node_modules", "dist", "tests", ".git"].includes(entry.name))
+              continue;
             scanDir(full);
           } else if (entry.isFile() && /\.[tj]sx?$/.test(entry.name)) {
             const content = readFileSync(full, "utf-8");
@@ -1428,7 +1646,9 @@ describe("architecture policy: dynamic import audit", () => {
     ];
 
     // Every dynamic import must be declared
-    const undeclared = targets.filter((t) => !DECLARED_DYNAMIC_DEPS.includes(t));
+    const undeclared = targets.filter(
+      (t) => !DECLARED_DYNAMIC_DEPS.includes(t),
+    );
     if (undeclared.length > 0) {
       expect.fail(
         `Undeclared dynamic imports in analyze.ts:\n${undeclared.map((t) => `  - ${t}`).join("\n")}\n\nAdd them to DECLARED_DYNAMIC_DEPS in architecture-policy.test.js`,
@@ -1469,7 +1689,9 @@ describe("architecture policy: required test annotations", () => {
     for (const relPath of REQUIRED_TEST_FILES) {
       const absPath = join(ROOT, relPath);
       if (!existsSync(absPath)) {
-        violations.push(`${relPath} — file does not exist (required test deleted?)`);
+        violations.push(
+          `${relPath} — file does not exist (required test deleted?)`,
+        );
         continue;
       }
 
@@ -1608,7 +1830,11 @@ describe("architecture policy: PRD storage invariant (prd.md migration-helper-on
       if (PRD_MD_MIGRATION_HELPER_FILES.has(rel)) continue;
 
       // Allow test files (they test the migration helper)
-      if (/\.test\.(ts|js|mjs)$/.test(rel) || /(?:^|[\/\\])tests?[\/\\]/.test(rel)) continue;
+      if (
+        /\.test\.(ts|js|mjs)$/.test(rel) ||
+        /(?:^|[\/\\])tests?[\/\\]/.test(rel)
+      )
+        continue;
 
       // Allow dist/ output (compiled from allowed source files)
       if (rel.startsWith("dist/") || rel.includes("/dist/")) continue;
@@ -1623,7 +1849,12 @@ describe("architecture policy: PRD storage invariant (prd.md migration-helper-on
           const line = lines[lineNum];
           // Skip lines that are purely comments or block comment markers
           const trimmed = line.trim();
-          if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed === "/**" || trimmed === "*/") {
+          if (
+            trimmed.startsWith("//") ||
+            trimmed.startsWith("*") ||
+            trimmed === "/**" ||
+            trimmed === "*/"
+          ) {
             continue;
           }
           if (prdMdPattern.test(line)) {
@@ -1752,7 +1983,7 @@ const SHELL_STRING_EXEMPT = new Map([
   // was retired rather than left standing (PRD task c990fd76).
   [
     "packages/core/ci.js",
-    "`shell: process.platform === \"win32\"` on the `pnpm docs:build` spawn. pnpm " +
+    '`shell: process.platform === "win32"` on the `pnpm docs:build` spawn. pnpm ' +
       "is a .cmd shim on Windows; documented as an out-of-scope follow-up when " +
       "the four CLI spawn sites were routed through win-spawn.js.",
   ],
@@ -1768,7 +1999,8 @@ const SHELL_STRING_EXEMPT = new Map([
  * (execFile, execFileSync).
  */
 function importsShellStringApi(content) {
-  const importRe = /(?:import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["']|require\(["'](?:node:)?child_process["']\)\s*;?)/g;
+  const importRe =
+    /(?:import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["']|require\(["'](?:node:)?child_process["']\)\s*;?)/g;
   for (const match of content.matchAll(importRe)) {
     const named = match[1];
     if (!named) continue; // bare require() — checked by the child_process allowlist
@@ -1815,13 +2047,18 @@ function collectShellScanFiles() {
   const walk = (absDir, relDir) => {
     for (const entry of readdirSync(absDir, { withFileTypes: true })) {
       const name = entry.name;
-      if (name === "node_modules" || name === "dist" || name === "tests") continue;
+      if (name === "node_modules" || name === "dist" || name === "tests")
+        continue;
       if (name.startsWith(".")) continue;
       const abs = join(absDir, name);
       const rel = relDir ? `${relDir}/${name}` : name;
       if (entry.isDirectory()) {
         walk(abs, rel);
-      } else if (/\.(js|mjs|cjs|ts|tsx)$/.test(name) && !/\.d\.ts$/.test(name) && !/\.test\./.test(name)) {
+      } else if (
+        /\.(js|mjs|cjs|ts|tsx)$/.test(name) &&
+        !/\.d\.ts$/.test(name) &&
+        !/\.test\./.test(name)
+      ) {
         files.push(rel);
       }
     }
@@ -1840,7 +2077,9 @@ function collectShellScanFiles() {
 
 describe("architecture policy: shell-string and DEP0190 spawn guard", () => {
   it("SHELL_STRING_EXEMPT contains no stale entries (all files exist on disk)", () => {
-    const stale = [...SHELL_STRING_EXEMPT.keys()].filter((rel) => !existsSync(join(ROOT, rel)));
+    const stale = [...SHELL_STRING_EXEMPT.keys()].filter(
+      (rel) => !existsSync(join(ROOT, rel)),
+    );
     if (stale.length > 0) {
       expect.fail(
         [
@@ -1912,14 +2151,18 @@ describe("architecture policy: shell-string and DEP0190 spawn guard", () => {
 
         // Pattern 1: shell: process.platform — always banned in scope
         if (/shell:\s*process\.platform/.test(codeOnlyLine)) {
-          violations.push(`${rel}:${i + 1} — shell: process.platform (DEP0190 pattern; use win-spawn.js helpers)`);
+          violations.push(
+            `${rel}:${i + 1} — shell: process.platform (DEP0190 pattern; use win-spawn.js helpers)`,
+          );
           continue;
         }
 
         // Pattern 2: shell: true — banned except when spawn args is empty []
         if (/shell:\s*true/.test(codeOnlyLine)) {
           if (!shellTrueIsEmptyArgsPattern(lines, i)) {
-            violations.push(`${rel}:${i + 1} — shell: true with non-empty args (DEP0190 pattern; use win-spawn.js helpers)`);
+            violations.push(
+              `${rel}:${i + 1} — shell: true with non-empty args (DEP0190 pattern; use win-spawn.js helpers)`,
+            );
           }
         }
       }
@@ -1991,7 +2234,9 @@ describe("architecture policy: shell-string and DEP0190 spawn guard", () => {
         continue;
       }
       if (!POSIX_SHELL_SPAWN_RE.test(readFileSync(full, "utf-8"))) {
-        stale.push(`${rel} — no longer spawns a POSIX shell; exemption is dead`);
+        stale.push(
+          `${rel} — no longer spawns a POSIX shell; exemption is dead`,
+        );
       }
     }
 

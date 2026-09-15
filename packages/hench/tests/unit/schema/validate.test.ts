@@ -362,6 +362,30 @@ describe("validateConfig", () => {
     });
   });
 
+  describe("autonomous field", () => {
+    it("survives validateConfig — not stripped as unknown key", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), autonomous: true };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.autonomous).toBe(true);
+      }
+    });
+
+    it("is optional (backward compat)", () => {
+      const result = validateConfig(DEFAULT_HENCH_CONFIG());
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.autonomous).toBeUndefined();
+      }
+    });
+
+    it("rejects a non-boolean value", () => {
+      const result = validateConfig({ ...DEFAULT_HENCH_CONFIG(), autonomous: "yes" });
+      expect(result.ok).toBe(false);
+    });
+  });
+
   describe("fullTestCommand field", () => {
     it("survives validateConfig — not stripped as unknown key", () => {
       const config = { ...DEFAULT_HENCH_CONFIG(), fullTestCommand: "pnpm test" };
@@ -654,6 +678,34 @@ describe("validateRunRecord", () => {
     it("rejects a non-string actor", () => {
       const run = { ...validRun, actor: 42 };
       const result = validateRunRecord(run);
+      expect(result.ok).toBe(false);
+    });
+  });
+
+  describe("toolchain attribution", () => {
+    // The schema strips keys it does not declare, so an undeclared field would
+    // survive the write and vanish on the next load.
+    it("preserves ndxVersion and cliPath through validation", () => {
+      const run = { ...validRun, ndxVersion: "0.6.0", cliPath: "/opt/n-dx/cli.js" };
+      const result = validateRunRecord(run);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.ndxVersion).toBe("0.6.0");
+        expect(result.data.cliPath).toBe("/opt/n-dx/cli.js");
+      }
+    });
+
+    it("accepts a legacy run record carrying neither field", () => {
+      const result = validateRunRecord(validRun);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.ndxVersion).toBeUndefined();
+        expect(result.data.cliPath).toBeUndefined();
+      }
+    });
+
+    it("rejects a non-string ndxVersion", () => {
+      const result = validateRunRecord({ ...validRun, ndxVersion: 6 });
       expect(result.ok).toBe(false);
     });
   });

@@ -168,7 +168,11 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 
 ## MCP Servers
 
-Rex and sourcevision expose MCP servers over HTTP (`ndx start`, port 3117 by default) and stdio (auto-registered by `ndx init`). HTTP uses [Streamable HTTP](https://modelcontextprotocol.io/) with session management (`Mcp-Session-Id` header, created automatically on first request). See `README.md` for registration commands.
+Rex and sourcevision expose MCP servers over stdio (default) and HTTP (`ndx start`, port 3117 by default). See `README.md` for full registration commands.
+
+**stdio (default):** `ndx init` writes a tracked `.mcp.json` at the project root with cwd-relative commands (`ndx rex mcp .`, `ndx sv mcp .`) — committed to the repo, so every worktree and clone gets the same working registration. Claude Code shows a one-time approval prompt for a project's servers the first time it opens the checkout. If `ndx` isn't on `PATH`, use `npx -y @n-dx/core rex mcp .` / `npx -y @n-dx/core sv mcp .`, or re-run init with `--mcp-scope=local` to fall back to the older per-machine `claude mcp add --scope local` registration.
+
+**HTTP — single project only:** `http://localhost:3117/mcp/rex` points at whichever project currently holds port 3117, not a specific one — registering it is only safe with one n-dx project running at a time, until the multi-project hub (0.7.0) lands. HTTP uses [Streamable HTTP](https://modelcontextprotocol.io/) with session management (`Mcp-Session-Id` header, created automatically on first request).
 
 **Migrating from stdio to HTTP (Claude):** start the server (`ndx start --background .`), remove the stdio registrations (`claude mcp remove rex && claude mcp remove sourcevision`), then add the HTTP ones (`claude mcp add --transport http rex http://localhost:3117/mcp/rex`, same for sourcevision).
 

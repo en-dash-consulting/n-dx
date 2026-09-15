@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { acquireLock, withLock } from "../../../src/store/file-lock.js";
+import { acquireLock, withLock, removeStaleLock } from "../../../src/store/file-lock.js";
+import { readFile } from "node:fs/promises";
 
 describe("file-lock", () => {
   let tmpDir: string;
@@ -127,34 +128,6 @@ describe("file-lock", () => {
     expect(order).toEqual([1, 2, 3]);
   });
 
-  it("does not steal a lock file that exists but is empty (mid-creation race)", async () => {
-    // `tryAcquire` creates the lock with O_EXCL and then writes its JSON, so a
-    // concurrent process can momentarily read an empty lock file. That window
-    // must not be read as "stale" — doing so unlinked a live writer's lock and
-    // let two `rex import-bundle` processes interleave, which the stale-save
-    // guard then caught. An empty (or otherwise unparseable) lock is treated as
-    // held-by-someone: this acquirer waits and times out rather than stealing.
-    const lockPath = await makeLockPath();
-    await writeFile(lockPath, ""); // the transient state, frozen
-
-    await expect(
-      acquireLock(lockPath, { acquireTimeoutMs: 200, retryDelayMs: 20 }),
-    ).rejects.toThrow(/Could not acquire PRD lock/);
-
-    // The empty lock was left in place, not stolen or unlinked.
-    await expect(stat(lockPath)).resolves.toBeTruthy();
-  });
-
-  it("does not steal a lock file with garbage (unparseable) contents", async () => {
-    const lockPath = await makeLockPath();
-    await writeFile(lockPath, "not json at all");
-
-    await expect(
-      acquireLock(lockPath, { acquireTimeoutMs: 200, retryDelayMs: 20 }),
-    ).rejects.toThrow(/Could not acquire PRD lock/);
-    await expect(stat(lockPath)).resolves.toBeTruthy();
-  });
-
   it("does not steal a live same-process lock however long it is held", async () => {
     const lockPath = await makeLockPath();
     const order: string[] = [];
@@ -213,6 +186,74 @@ describe("file-lock", () => {
 
     const release = await acquireLock(lockPath, { acquireTimeoutMs: 500 });
     await release();
+  });
+
+  it("waits out a lock caught mid-creation instead of stealing it", async () => {
+    // writeFile with 'wx' opens the file and then writes its content — two
+    // syscalls. A waiter reading between them sees an empty file, and an
+    // empty file used to decode as "malformed = stale", so the waiter
+    // unlinked a LIVE writer's lock and entered the critical section
+    // alongside it. Malformed must be confirmed after a grace delay: a
+    // corpse stays malformed, a mid-creation lock becomes valid.
+    const lockPath = await makeLockPath();
+    await writeFile(lockPath, ""); // the mid-creation window, frozen
+
+    // The "writer" finishes its content write shortly after.
+    const liveForeignPid = process.ppid;
+    setTimeout(() => {
+      void writeFile(
+        lockPath,
+        JSON.stringify({ pid: liveForeignPid, token: "t", timestamp: new Date().toISOString() }),
+      );
+    }, 20);
+
+    await expect(
+      acquireLock(lockPath, { acquireTimeoutMs: 600, retryDelayMs: 20 }),
+    ).rejects.toThrow(new RegExp(`PID ${liveForeignPid}`));
+  });
+
+  it("reclaims a lock that stays malformed across the grace delay", async () => {
+    // A truncated write from a crashed writer never becomes valid — after
+    // the mid-creation grace it is still garbage, and garbage is reclaimed.
+    const lockPath = await makeLockPath();
+    await writeFile(lockPath, "not json at all");
+
+    const release = await acquireLock(lockPath, { acquireTimeoutMs: 2_000 });
+    await release();
+  });
+
+  it("a late stale-cleanup never deletes the lock a faster cleaner's successor created", async () => {
+    // Two waiters can both judge the same corpse stale. The winner removes it
+    // and creates its own lock; the loser's removal used to land AFTER that
+    // creation and unlink the winner's live lock — admitting a second writer.
+    // Removal is claim-by-rename with content verification, so a removal
+    // armed with a stale judgment cannot delete a lock that has since been
+    // replaced.
+    const lockPath = await makeLockPath();
+    const corpse = JSON.stringify({ pid: 999999999, token: "corpse", timestamp: new Date().toISOString() });
+    await writeFile(lockPath, corpse);
+
+    // Cleaner 1 removes the corpse…
+    await removeStaleLock(lockPath, corpse);
+    // …and its successor writes a fresh live lock.
+    const fresh = JSON.stringify({ pid: process.pid, token: "fresh", timestamp: new Date().toISOString() });
+    await writeFile(lockPath, fresh);
+
+    // Cleaner 2, still armed with the corpse judgment, arrives late.
+    await removeStaleLock(lockPath, corpse);
+
+    // The fresh lock survived.
+    await expect(readFile(lockPath, "utf-8")).resolves.toBe(fresh);
+  });
+
+  it("removeStaleLock removes exactly the lock it judged", async () => {
+    const lockPath = await makeLockPath();
+    const corpse = JSON.stringify({ pid: 999999999, token: "corpse", timestamp: new Date().toISOString() });
+    await writeFile(lockPath, corpse);
+
+    await removeStaleLock(lockPath, corpse);
+
+    await expect(stat(lockPath)).rejects.toThrow();
   });
 
   it("times out when the lock is held in-process beyond acquireTimeoutMs", async () => {

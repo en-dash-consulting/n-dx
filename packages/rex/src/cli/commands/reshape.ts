@@ -7,7 +7,7 @@ import { toCanonicalJSON } from "../../core/canonical.js";
 import { ARCHIVE_FILE, loadArchive, trimArchive } from "../../core/archive.js";
 import type { MergeAuditEntry, GroupAuditEntry } from "../../core/archive.js";
 import { reasonForReshape, formatReshapeProposal, reasonForBodyMerge } from "../../analyze/reshape-reason.js";
-import { setLLMConfig, setClaudeConfig, resolveConfiguredModel } from "../../analyze/reason.js";
+import { setLLMConfig, setClaudeConfig, setProjectDir, resolveConfiguredModel } from "../../analyze/reason.js";
 import { loadLLMConfig, loadClaudeConfig } from "../../store/project-config.js";
 import { migrateToFolderPerTask } from "../../core/folder-per-task-migration.js";
 import { ensureSnapshot, formatRecoveryHint } from "../snapshot-guard.js";
@@ -104,6 +104,7 @@ async function _cmdReshapeCore(
   setLLMConfig(llmConfig);
   const claudeConfig = await loadClaudeConfig(rexDir);
   setClaudeConfig(claudeConfig);
+  setProjectDir(dir);
 
   const dryRun = flags["dry-run"] === "true";
   const accept = flags.accept === "true";

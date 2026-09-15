@@ -206,19 +206,23 @@ describe("config.toml structural validity", () => {
     }
   });
 
-  it("every server uses command = \"node\"", () => {
+  it("every server uses the same bare (non-path) command name", () => {
     const sections = parseTomlSections(tomlContent);
+    const commands = new Set();
     for (const name of serverNames) {
       const section = sections.get(`mcp_servers.${name}`);
-      expect(section.command).toBe('"node"');
+      const command = section.command.replace(/^"(.*)"$/, "$1");
+      expect(command, `${name} command looks like a path`).not.toMatch(/[/\\]/);
+      commands.add(command);
     }
+    expect(commands.size).toBe(1);
   });
 
   it("every server args is a valid 3-element TOML array", () => {
     const sections = parseTomlSections(tomlContent);
     for (const name of serverNames) {
       const section = sections.get(`mcp_servers.${name}`);
-      // args should be: ["<entrypoint>", "<mcp-command>", "<project-dir>"]
+      // args should be: ["<cliCommand>", "<mcp-command>", "."]
       const argsMatch = section.args.match(/^\[(.+)\]$/);
       expect(argsMatch, `${name} args is not a TOML array`).not.toBeNull();
 
@@ -229,13 +233,13 @@ describe("config.toml structural validity", () => {
     }
   });
 
-  it("every server args[0] ends with dist/cli/index.js (entrypoint)", () => {
+  it("every server args[0] matches manifest cliCommand", () => {
     const sections = parseTomlSections(tomlContent);
-    for (const name of serverNames) {
+    for (const [name, descriptor] of Object.entries(servers)) {
       const section = sections.get(`mcp_servers.${name}`);
       const elements = section.args.match(/^\[(.+)\]$/)[1].match(/"([^"]*)"/g);
-      const entrypoint = elements[0].slice(1, -1).replace(/\\\\/g, "\\"); // strip quotes + unescape TOML
-      expect(entrypoint, `${name} entrypoint path`).toMatch(/dist[/\\]cli[/\\]index\.js$/);
+      const cliCommand = elements[0].slice(1, -1);
+      expect(cliCommand).toBe(descriptor.cliCommand ?? name);
     }
   });
 
@@ -249,14 +253,18 @@ describe("config.toml structural validity", () => {
     }
   });
 
-  it("every server args[2] is the project directory", () => {
+  it("every server args[2] is the cwd-relative '.' (no project directory embedded)", () => {
     const sections = parseTomlSections(tomlContent);
     for (const name of serverNames) {
       const section = sections.get(`mcp_servers.${name}`);
       const elements = section.args.match(/^\[(.+)\]$/)[1].match(/"([^"]*)"/g);
-      const projectDir = elements[2].slice(1, -1).replace(/\\\\/g, "\\");
-      expect(projectDir).toBe(tmpDir);
+      const dirArg = elements[2].slice(1, -1);
+      expect(dirArg).toBe(".");
     }
+  });
+
+  it("contains no absolute paths anywhere (tmpDir never appears)", () => {
+    expect(tomlContent).not.toContain(tmpDir);
   });
 
   it("no sandbox, approval, or model configuration keys", () => {
@@ -439,16 +447,10 @@ describe("artifact regeneration stability", () => {
       // AGENTS.md should be identical (path-independent)
       expect(secondAgents).toBe(agentsContent);
 
-      // config.toml structure should match (paths differ due to tmpdir)
-      // Compare section headers and key names
-      const extractStructure = (content) =>
-        content
-          .split("\n")
-          .filter((l) => l.match(/^\[/) || l.match(/^\w+\s*=/))
-          .map((l) => l.replace(/"[^"]*"/g, '"..."'))
-          .join("\n");
-
-      expect(extractStructure(secondToml)).toBe(extractStructure(tomlContent));
+      // config.toml is now fully cwd-relative — nothing embeds the target
+      // directory, so regenerating in a different tmpdir with no
+      // package.json (same DEFAULT_CLI_NAME) produces byte-identical output.
+      expect(secondToml).toBe(tomlContent);
     } finally {
       rmSync(secondDir, { recursive: true, force: true });
     }
