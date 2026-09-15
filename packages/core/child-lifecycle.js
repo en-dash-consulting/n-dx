@@ -507,6 +507,57 @@ export async function terminateTree(child, {
 }
 
 /**
+ * Kill a child that arrived after the cleanup gate had already run.
+ *
+ * POSIX IS SYNCHRONOUS AND STRAIGHT TO SIGKILL, deliberately.
+ * {@link escalateTermination} cannot be used there: it awaits a grace period,
+ * and by then the caller has reached `process.exit()` — so the child outlives
+ * the parent, which is the whole failure this closes. Signal delivery is
+ * synchronous, so there is no window.
+ *
+ * The graceful phase is also already over in every sense that matters: cleanup()
+ * has SIGTERMed and SIGKILLed everything it knew about, and nothing spawned after
+ * that point has work worth protecting.
+ *
+ * Windows has no synchronous tree signal. Start the same bounded `taskkill /T /F`
+ * path used by {@link terminateTree}; spawning taskkill happens before its first
+ * await, and its own completion wait is bounded. This preserves the tree-kill
+ * contract for a late pnpm or shell child rather than leaving its descendant alive.
+ */
+function killLateArrival(child, {
+  treeKill,
+  platform,
+  forceKillTimeoutMs,
+  spawnCliImpl,
+  killGroup,
+  env,
+}) {
+  if (!isChildRunning(child)) return;
+
+  if (treeKill && !supportsProcessGroups(platform)) {
+    // register() remains synchronous, but cleanup() retains this promise before
+    // it resolves. Otherwise flushAndExit() can terminate ndx (and its taskkill
+    // helper) while taskkill is still walking a cmd.exe/pnpm tree.
+    return terminateTree(child, { forceKillTimeoutMs, platform, spawnCliImpl, killGroup, env });
+  }
+
+  if (treeKill && supportsProcessGroups(platform) && child.pid) {
+    try {
+      killGroup(-child.pid, "SIGKILL");
+      return;
+    } catch {
+      // No group of its own, or it drained already — deal with the child itself.
+    }
+  }
+
+  try {
+    child.kill("SIGKILL");
+  } catch {
+    // Already gone.
+  }
+}
+
+/**
  * Create a tracker that registers and cleans up child processes.
  *
  * @param {object} [options]
@@ -515,25 +566,79 @@ export async function terminateTree(child, {
  *   tree via {@link terminateTree} instead of only the direct child. Spawn such children with
  *   {@link treeKillSpawnOptions} so the POSIX path can reach grandchildren. Named for the intent
  *   rather than the POSIX mechanism: Windows has no process groups but does tree-kill.
+ * @param {NodeJS.Platform} [options.platform] - Overridable so the late-arrival kill is
+ *   testable on any host, matching {@link terminateTree}'s seam.
+ * @param {Function} [options.spawnCliImpl] - Injectable Windows taskkill spawn, threaded
+ *   to both normal and late-arrival tree cleanup.
+ * @param {Function} [options.killGroup] - Injectable group signaller (defaults to process.kill).
  */
 export function createChildProcessTracker({
   forceKillTimeoutMs = DEFAULT_FORCE_KILL_TIMEOUT_MS,
   treeKill = false,
+  platform = process.platform,
+  spawnCliImpl = spawnCli,
+  killGroup = (pid, signal) => process.kill(pid, signal),
   env = process.env,
 } = {}) {
   const terminate = treeKill
-    ? (child, timeoutMs) => terminateTree(child, { forceKillTimeoutMs: timeoutMs, env })
+    ? (child, timeoutMs) => terminateTree(child, {
+      forceKillTimeoutMs: timeoutMs,
+      platform,
+      spawnCliImpl,
+      killGroup,
+      env,
+    })
     : terminateChildProcess;
 
   const children = new Set();
+  const lateTerminations = new Set();
   let cleanupPromise = null;
 
   function unregister(child) {
     children.delete(child);
   }
 
+  function retainLateTermination(termination) {
+    if (!termination) return;
+
+    const completion = Promise.resolve(termination)
+      // terminateTree has a direct-child fallback, but a custom test seam may
+      // still reject. Do not let that skip the signal handler's exit path.
+      .catch(() => undefined)
+      .finally(() => lateTerminations.delete(completion));
+    lateTerminations.add(completion);
+  }
+
+  async function waitForLateTerminations() {
+    // A late child is registered by a close handler on an initial child. That
+    // handler runs before terminateTree's wait continuation settles its initial
+    // snapshot, so every Windows taskkill started by that race is retained here.
+    while (lateTerminations.size > 0) {
+      await Promise.allSettled([...lateTerminations]);
+    }
+  }
+
   function register(child) {
     if (!child || typeof child.kill !== "function") return child;
+
+    // AFTER THE GATE: cleanup() has already taken its snapshot, so adopting this
+    // child would put it in a set nobody drains again — it would simply outlive
+    // the parent. This is not a rare race: terminating the in-flight child is
+    // precisely what unblocks the caller awaiting it, so the caller's next spawn
+    // lands here by construction. `ndx ci` leaked one `sourcevision validate`
+    // orphan per Ctrl-C this way, because killing `sourcevision analyze` let
+    // runCI advance a step while the process was on its way out.
+    if (cleanupPromise) {
+      retainLateTermination(killLateArrival(child, {
+        treeKill,
+        platform,
+        forceKillTimeoutMs,
+        spawnCliImpl,
+        killGroup,
+        env,
+      }));
+      return child;
+    }
 
     children.add(child);
 
@@ -546,11 +651,25 @@ export function createChildProcessTracker({
     return child;
   }
 
+  /**
+   * Terminate every tracked child. Idempotent — repeat calls await the first.
+   *
+   * ONE-WAY: calling this retires the tracker. Afterwards {@link register} no
+   * longer adopts children, it SIGKILLs them on arrival, because a child adopted
+   * after the snapshot would never be drained again. Every caller today runs this
+   * on a path that ends in `process.exit()`, which is the only shape it supports.
+   *
+   * SO DO NOT USE IT AS "kill what is running and carry on" — a tracker that
+   * resumed spawning after a non-terminal cleanup would have every subsequent
+   * child killed the moment it started, silently. If that use ever becomes
+   * necessary, it needs a separate `drain()` that does not latch, not a relaxation
+   * of this one.
+   */
   async function cleanup() {
     if (!cleanupPromise) {
       cleanupPromise = Promise.allSettled(
         [...children].map((child) => terminate(child, forceKillTimeoutMs)),
-      ).then(() => undefined);
+      ).then(waitForLateTerminations);
     }
 
     return cleanupPromise;

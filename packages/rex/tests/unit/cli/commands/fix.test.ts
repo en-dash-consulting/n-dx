@@ -44,11 +44,17 @@ describe("cmdFix", () => {
             children: [
               {
                 id: "t1",
-                title: "Task",
+                title: "Done Task",
                 level: "task",
                 status: "completed",
                 startedAt: "2026-01-01T00:00:00.000Z",
                 completedAt: "2026-01-02T00:00:00.000Z",
+              },
+              {
+                id: "t2",
+                title: "Open Task",
+                level: "task",
+                status: "pending",
               },
             ],
           },
@@ -208,7 +214,7 @@ describe("cmdFix", () => {
   // ── Parent-child alignment ─────────────────────────────────────────────────
 
   describe("parent-child alignment", () => {
-    it("resets completed parent with non-terminal children", async () => {
+    it("reopens a completed parent with unfinished children to pending", async () => {
       writeConfig(tmpDir, VALID_CONFIG);
       writePRD(tmpDir, {
         schema: "rex/v1",
@@ -235,8 +241,147 @@ describe("cmdFix", () => {
 
       await cmdFix(tmpDir, {});
       const doc = readPRD(tmpDir);
-      expect(doc.items[0].status).toBe("in_progress");
+      expect(doc.items[0].status).toBe("pending");
       expect(doc.items[0].completedAt).toBeUndefined();
+    });
+
+    it("renders the parent alignment icon and label", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      writePRD(tmpDir, {
+        schema: "rex/v1",
+        title: "Test",
+        items: [
+          {
+            id: "e1",
+            title: "Epic",
+            level: "epic",
+            status: "completed",
+            startedAt: "2026-01-01T00:00:00.000Z",
+            completedAt: "2026-01-10T00:00:00.000Z",
+            children: [
+              { id: "t1", title: "Still Pending", level: "task", status: "pending" },
+            ],
+          },
+        ],
+      });
+
+      await cmdFix(tmpDir, {});
+      const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(output).toContain("🔄");
+
+      const logContent = readFileSync(join(tmpDir, ".rex", "execution-log.jsonl"), "utf-8");
+      expect(logContent).toContain("parent alignment(s)");
+    });
+  });
+
+  // ── Stuck parents ──────────────────────────────────────────────────────────
+
+  describe("stuck parents", () => {
+    it("completes a pending parent whose children are all completed", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      writePRD(tmpDir, {
+        schema: "rex/v1",
+        title: "Test",
+        items: [
+          {
+            id: "e1",
+            title: "Epic",
+            level: "epic",
+            status: "pending",
+            children: [
+              {
+                id: "f1",
+                title: "Stranded Feature",
+                level: "feature",
+                status: "pending",
+                children: [
+                  {
+                    id: "t1",
+                    title: "Done",
+                    level: "task",
+                    status: "completed",
+                    startedAt: "2026-01-01T00:00:00.000Z",
+                    completedAt: "2026-01-02T00:00:00.000Z",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+      await cmdFix(tmpDir, {});
+      const doc = readPRD(tmpDir);
+      expect(doc.items[0].children?.[0].status).toBe("completed");
+      expect(doc.items[0].status).toBe("completed");
+      expect(doc.items[0].completedAt).toBeDefined();
+    });
+
+    it("renders the stuck-parent icon and label", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      writePRD(tmpDir, {
+        schema: "rex/v1",
+        title: "Test",
+        items: [
+          {
+            id: "f1",
+            title: "Feature",
+            level: "feature",
+            status: "pending",
+            children: [
+              {
+                id: "t1",
+                title: "Done",
+                level: "task",
+                status: "completed",
+                startedAt: "2026-01-01T00:00:00.000Z",
+                completedAt: "2026-01-02T00:00:00.000Z",
+              },
+            ],
+          },
+        ],
+      });
+
+      await cmdFix(tmpDir, {});
+      const output = stdoutSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(output).toContain("✅");
+      expect(output).toContain("Complete stuck parent");
+
+      const logContent = readFileSync(join(tmpDir, ".rex", "execution-log.jsonl"), "utf-8");
+      expect(logContent).toContain("stuck parent(s)");
+    });
+
+    it("reports the kind in the JSON summary", async () => {
+      writeConfig(tmpDir, VALID_CONFIG);
+      writePRD(tmpDir, {
+        schema: "rex/v1",
+        title: "Test",
+        items: [
+          {
+            id: "f1",
+            title: "Feature",
+            level: "feature",
+            status: "pending",
+            children: [
+              {
+                id: "t1",
+                title: "Done",
+                level: "task",
+                status: "completed",
+                startedAt: "2026-01-01T00:00:00.000Z",
+                completedAt: "2026-01-02T00:00:00.000Z",
+              },
+            ],
+          },
+        ],
+      });
+
+      await cmdFix(tmpDir, { format: "json" });
+      const jsonCall = stdoutSpy.mock.calls.find((c) => {
+        try { JSON.parse(c[0]); return true; } catch { return false; }
+      });
+      const report = JSON.parse(jsonCall![0]);
+      expect(report.summary.byKind.stuck_parent).toBe(1);
     });
   });
 

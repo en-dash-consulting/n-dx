@@ -8,6 +8,23 @@ import type { RunRecord } from "../../schema/index.js";
 const FAILURE_STATUSES: Set<string> = new Set(["failed", "timeout", "budget_exceeded"]);
 
 /**
+ * True when a run failed only because the missing-review gate refused it.
+ *
+ * Such a run says nothing about the task: its work validated, and what failed
+ * was the reviewer's spawn — typically a `--review-model` the installed vendor
+ * CLI does not accept. Counting it would let a single misconfiguration mark
+ * every task it touched as stuck and quietly drop them from selection, which
+ * is the opposite of what the operator needs after fixing one config line.
+ *
+ * Neither counted nor treated as a reset: the run is skipped outright, so a
+ * genuine failure streak on either side of it stays visible as one streak.
+ */
+function isReviewGateRefusal(run: RunRecord): boolean {
+  const review = run.review;
+  return review !== undefined && review.failed !== undefined && review.gated === true;
+}
+
+/**
  * Count the number of consecutive recent failures for a given task.
  *
  * Walks through runs most-recent-first (the array must be sorted by
@@ -21,6 +38,7 @@ export function countRecentFailures(
   let count = 0;
   for (const run of runs) {
     if (run.taskId !== taskId) continue;
+    if (isReviewGateRefusal(run)) continue;
     if (FAILURE_STATUSES.has(run.status)) {
       count++;
     } else {

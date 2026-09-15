@@ -62,6 +62,7 @@ interface FakeReadlineHandle {
   answer: (text: string) => void;
   /** Trigger the readline-surface SIGINT event (raw-mode Ctrl-C path). */
   emitRlSigint: () => void;
+  close: () => void;
   closed: boolean;
 }
 
@@ -71,8 +72,15 @@ interface FakeReadlineHandle {
  * array captures each interface the code under test opens so tests can
  * drive the prompt deterministically.
  */
-function installFakeReadline(): { fakes: FakeReadlineHandle[] } {
+function installFakeReadline(): {
+  fakes: FakeReadlineHandle[];
+  promptReady: Promise<FakeReadlineHandle>;
+} {
   const fakes: FakeReadlineHandle[] = [];
+  let resolvePrompt!: (fake: FakeReadlineHandle) => void;
+  const promptReady = new Promise<FakeReadlineHandle>((resolve) => {
+    resolvePrompt = resolve;
+  });
   vi.doMock("node:readline", () => ({
     createInterface: () => {
       let answerCb: ((answer: string) => void) | undefined;
@@ -82,16 +90,18 @@ function installFakeReadline(): { fakes: FakeReadlineHandle[] } {
         emitRlSigint: () => {
           for (const l of listeners.SIGINT ?? []) l();
         },
+        close: () => {
+          fake.closed = true;
+        },
         closed: false,
       };
       fakes.push(fake);
       return {
         question: (_q: string, cb: (answer: string) => void) => {
           answerCb = cb;
+          resolvePrompt(fake);
         },
-        close: () => {
-          fake.closed = true;
-        },
+        close: fake.close,
         on: (event: string, listener: (...a: unknown[]) => void) => {
           if (!listeners[event]) listeners[event] = [];
           listeners[event].push(listener);
@@ -105,14 +115,26 @@ function installFakeReadline(): { fakes: FakeReadlineHandle[] } {
       };
     },
   }));
-  return { fakes };
+  return { fakes, promptReady };
 }
 
-async function waitForFakePrompt(fakes: FakeReadlineHandle[]): Promise<void> {
-  const deadline = Date.now() + 2_000;
-  while (fakes.length === 0 && Date.now() < deadline) {
-    await new Promise<void>((r) => setTimeout(r, 10));
+const pendingPromptOperations = new Set<Promise<unknown>>();
+
+function trackPromptOperation<T>(operation: Promise<T>): Promise<T> {
+  let tracked!: Promise<T>;
+  tracked = operation.finally(() => {
+    pendingPromptOperations.delete(tracked);
+  });
+  pendingPromptOperations.add(tracked);
+  return tracked;
+}
+
+async function settlePromptOperations(fakes: FakeReadlineHandle[]): Promise<void> {
+  for (const fake of fakes) {
+    if (!fake.closed) fake.answer("n");
   }
+  await Promise.allSettled([...pendingPromptOperations]);
+  for (const fake of fakes) fake.close();
 }
 
 /** Snapshot existing SIGINT listeners and clear the slot for a test. */
@@ -135,6 +157,8 @@ describe("prompt SIGINT suspension", () => {
   let projectDir: string;
   let henchDir: string;
   let originalIsTTY: boolean | undefined;
+  let initialSigintListeners: Array<(...a: unknown[]) => void>;
+  let fakes: FakeReadlineHandle[];
 
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), "hench-sigint-prompt-"));
@@ -152,9 +176,13 @@ describe("prompt SIGINT suspension", () => {
       value: true,
       configurable: true,
     });
+    initialSigintListeners = process.listeners("SIGINT") as Array<(...a: unknown[]) => void>;
+    fakes = [];
   });
 
   afterEach(async () => {
+    await settlePromptOperations(fakes);
+    restoreSigintListeners(initialSigintListeners);
     vi.doUnmock("node:readline");
     vi.resetModules();
     vi.restoreAllMocks();
@@ -166,7 +194,8 @@ describe("prompt SIGINT suspension", () => {
   });
 
   it("detaches and restores outer SIGINT listeners around the rollback prompt", async () => {
-    const { fakes } = installFakeReadline();
+    const fakeReadline = installFakeReadline();
+    fakes = fakeReadline.fakes;
     vi.resetModules();
 
     await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
@@ -185,15 +214,14 @@ describe("prompt SIGINT suspension", () => {
       );
 
       const run = buildFailedRun();
-      const finalizePromise = finalizeRun({
+      const finalizePromise = trackPromptOperation(finalizeRun({
         run,
         henchDir,
         projectDir,
         rollbackOnFailure: true,
-      });
+      }));
 
-      // Give the async prompt setup a tick to open.
-      await waitForFakePrompt(fakes);
+      await fakeReadline.promptReady;
 
       expect(fakes).toHaveLength(1);
       // Outer handler is suspended while the prompt is visible.
@@ -213,12 +241,14 @@ describe("prompt SIGINT suspension", () => {
       const content = await readFile(join(projectDir, "src.ts"), "utf-8");
       expect(content).toBe("export const x = 999;\n");
     } finally {
+      await settlePromptOperations(fakes);
       restoreSigintListeners(priorListeners);
     }
   });
 
   it("holds the first Ctrl-C during the rollback prompt and keeps the prompt answerable", async () => {
-    const { fakes } = installFakeReadline();
+    const fakeReadline = installFakeReadline();
+    fakes = fakeReadline.fakes;
     vi.resetModules();
 
     await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
@@ -234,14 +264,14 @@ describe("prompt SIGINT suspension", () => {
       );
 
       const run = buildFailedRun();
-      const finalizePromise = finalizeRun({
+      const finalizePromise = trackPromptOperation(finalizeRun({
         run,
         henchDir,
         projectDir,
         rollbackOnFailure: true,
-      });
+      }));
 
-      await waitForFakePrompt(fakes);
+      await fakeReadline.promptReady;
       expect(fakes).toHaveLength(1);
 
       // Emit a process-level SIGINT while the prompt is visible. The
@@ -268,6 +298,7 @@ describe("prompt SIGINT suspension", () => {
       const content = await readFile(join(projectDir, "src.ts"), "utf-8");
       expect(content).toBe("export const x = 1;\n");
     } finally {
+      await settlePromptOperations(fakes);
       restoreSigintListeners(priorListeners);
     }
   });
@@ -282,7 +313,8 @@ describe("prompt SIGINT suspension", () => {
     // shim, the second Ctrl-C delivered while the rollback prompt is
     // open would immediately kill the process before the user can
     // answer.
-    const { fakes } = installFakeReadline();
+    const fakeReadline = installFakeReadline();
+    fakes = fakeReadline.fakes;
     vi.resetModules();
 
     await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
@@ -309,15 +341,14 @@ describe("prompt SIGINT suspension", () => {
       );
 
       const run = buildFailedRun();
-      const finalizePromise = finalizeRun({
+      const finalizePromise = trackPromptOperation(finalizeRun({
         run,
         henchDir,
         projectDir,
         rollbackOnFailure: true,
-      });
+      }));
 
-      // Let the prompt open.
-      await waitForFakePrompt(fakes);
+      await fakeReadline.promptReady;
       expect(fakes).toHaveLength(1);
       // Precondition: the outer force-exit handler is detached while
       // the prompt is open.
@@ -349,6 +380,7 @@ describe("prompt SIGINT suspension", () => {
       );
       expect(restored).toHaveLength(1);
     } finally {
+      await settlePromptOperations(fakes);
       restoreSigintListeners(priorListeners);
       exitSpy.mockRestore();
     }
@@ -359,7 +391,8 @@ describe("prompt SIGINT suspension", () => {
     // of (or in addition to) the process-level signal. The prompt
     // listens on both so either delivery channel uses the same hold
     // behavior.
-    const { fakes } = installFakeReadline();
+    const fakeReadline = installFakeReadline();
+    fakes = fakeReadline.fakes;
     vi.resetModules();
 
     await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
@@ -375,14 +408,14 @@ describe("prompt SIGINT suspension", () => {
       );
 
       const run = buildFailedRun();
-      const finalizePromise = finalizeRun({
+      const finalizePromise = trackPromptOperation(finalizeRun({
         run,
         henchDir,
         projectDir,
         rollbackOnFailure: true,
-      });
+      }));
 
-      await waitForFakePrompt(fakes);
+      await fakeReadline.promptReady;
       expect(fakes).toHaveLength(1);
 
       fakes[0].emitRlSigint();
@@ -398,12 +431,14 @@ describe("prompt SIGINT suspension", () => {
       expect(outerHandler).not.toHaveBeenCalled();
       expect(fakes[0].closed).toBe(true);
     } finally {
+      await settlePromptOperations(fakes);
       restoreSigintListeners(priorListeners);
     }
   });
 
   it("still performs rollback when the user accepts the prompt", async () => {
-    const { fakes } = installFakeReadline();
+    const fakeReadline = installFakeReadline();
+    fakes = fakeReadline.fakes;
     vi.resetModules();
 
     await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
@@ -419,14 +454,14 @@ describe("prompt SIGINT suspension", () => {
       );
 
       const run = buildFailedRun();
-      const finalizePromise = finalizeRun({
+      const finalizePromise = trackPromptOperation(finalizeRun({
         run,
         henchDir,
         projectDir,
         rollbackOnFailure: true,
-      });
+      }));
 
-      await waitForFakePrompt(fakes);
+      await fakeReadline.promptReady;
       expect(fakes).toHaveLength(1);
 
       // Accept the rollback.
@@ -440,12 +475,14 @@ describe("prompt SIGINT suspension", () => {
       const content = await readFile(join(projectDir, "src.ts"), "utf-8");
       expect(content).toBe("export const x = 1;\n");
     } finally {
+      await settlePromptOperations(fakes);
       restoreSigintListeners(priorListeners);
     }
   });
 
   it("applies the same SIGINT suspension to the commit-approval prompt", async () => {
-    const { fakes } = installFakeReadline();
+    const fakeReadline = installFakeReadline();
+    fakes = fakeReadline.fakes;
     vi.resetModules();
 
     await makeInitialCommit(projectDir, "src.ts", "export const x = 1;\n");
@@ -465,15 +502,15 @@ describe("prompt SIGINT suspension", () => {
       );
 
       const run = buildCompletedRun();
-      const promptPromise = performCommitPromptIfNeeded(
+      const promptPromise = trackPromptOperation(performCommitPromptIfNeeded(
         run,
         projectDir,
         /* autoCommit */ false,
         /* yes */ false,
         /* autonomous */ false,
-      );
+      ));
 
-      await waitForFakePrompt(fakes);
+      await fakeReadline.promptReady;
       expect(fakes).toHaveLength(1);
 
       // Outer handler is suspended — a SIGINT during the commit prompt
@@ -487,6 +524,7 @@ describe("prompt SIGINT suspension", () => {
       expect(process.listeners("SIGINT")).toContain(outerHandler);
       expect(fakes[0].closed).toBe(true);
     } finally {
+      await settlePromptOperations(fakes);
       restoreSigintListeners(priorListeners);
     }
   });

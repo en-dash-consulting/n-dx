@@ -22,9 +22,10 @@
 
 import { mkdir, readFile, writeFile, readdir, rm, rename, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { randomUUID } from "node:crypto";
 import type { PRDItem } from "../schema/index.js";
 import { digestItemFile } from "./folder-tree-parser.js";
+import { atomicWriteTempPath } from "./atomic-write.js";
+import { TREE_META_FILENAME } from "./paths.js";
 
 /**
  * Slug length cap, held at 40 for Windows' 260-character `MAX_PATH`.
@@ -536,7 +537,7 @@ async function locateById(
   wantDirectory: boolean,
 ): Promise<string | undefined> {
   for (const entry of entries) {
-    if (entry === "tree-meta.json") continue;
+    if (entry === TREE_META_FILENAME) continue;
     const candidate = wantDirectory ? join(dir, entry, "index.md") : join(dir, entry);
     if (!wantDirectory && !entry.endsWith(".md")) continue;
     if (!wantDirectory && entry === "index.md") continue;
@@ -894,7 +895,7 @@ async function writeIfChanged(
     // File does not exist — proceed with write
   }
 
-  const tmpPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+  const tmpPath = atomicWriteTempPath(filePath);
   await writeFile(tmpPath, content, "utf8");
   await rename(tmpPath, filePath);
   result.filesWritten++;

@@ -302,7 +302,7 @@ describe("removeTask", () => {
     expect(result.parentAutoCompletions).toEqual([]);
   });
 
-  it("treats deferred siblings as terminal for auto-completion", () => {
+  it("does not auto-complete when a remaining sibling is deferred (GH #364)", () => {
     const items: PRDItem[] = [
       makeItem({
         id: "e1",
@@ -324,8 +324,57 @@ describe("removeTask", () => {
     const result = removeTask(items, "t1");
 
     expect(result.ok).toBe(true);
-    // f1 only has t2 (deferred) — deferred counts as terminal
-    expect(result.parentAutoCompletions.length).toBeGreaterThan(0);
-    expect(result.parentAutoCompletions[0]).toMatchObject({ id: "f1" });
+    // f1 only has t2 (deferred) — deferred does not count as done
+    expect(result.parentAutoCompletions).toEqual([]);
+  });
+
+  it("does not auto-complete when a remaining sibling is blocked", () => {
+    const items: PRDItem[] = [
+      makeItem({
+        id: "e1",
+        title: "Epic 1",
+        level: "epic",
+        children: [
+          makeItem({
+            id: "f1",
+            title: "Feature 1",
+            level: "feature",
+            children: [
+              makeItem({ id: "t1", title: "Task 1" }),
+              makeItem({ id: "t2", title: "Task 2", status: "blocked" }),
+            ],
+          }),
+        ],
+      }),
+    ];
+    const result = removeTask(items, "t1");
+
+    expect(result.ok).toBe(true);
+    expect(result.parentAutoCompletions).toEqual([]);
+  });
+
+  it("does not auto-complete when a remaining sibling is failing", () => {
+    const items: PRDItem[] = [
+      makeItem({
+        id: "e1",
+        title: "Epic 1",
+        level: "epic",
+        children: [
+          makeItem({
+            id: "f1",
+            title: "Feature 1",
+            level: "feature",
+            children: [
+              makeItem({ id: "t1", title: "Task 1" }),
+              makeItem({ id: "t2", title: "Task 2", status: "failing" }),
+            ],
+          }),
+        ],
+      }),
+    ];
+    const result = removeTask(items, "t1");
+
+    expect(result.ok).toBe(true);
+    expect(result.parentAutoCompletions).toEqual([]);
   });
 });

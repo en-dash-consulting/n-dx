@@ -48,6 +48,7 @@ describe("stopping a detached server takes its children with it", () => {
         "const fs = require('fs');",
         "const path = require('path');",
         "fs.writeFileSync(path.join(__dirname, 'child.pid'), String(process.pid));",
+        "fs.writeFileSync(path.join(__dirname, 'child.ready'), JSON.stringify({ pid: process.pid }));",
         "let n = 0;",
         "setInterval(() => {",
         "  n++;",
@@ -66,21 +67,36 @@ describe("stopping a detached server takes its children with it", () => {
     // the first version of this test managed to be vacuous. The real server reaches
     // its CLIs through cmd.exe (spawnCli) or `sh -c`, and neither is libuv-managed,
     // so their children escape the job and survive. That is the tree worth testing.
-    // `stdio: 'ignore'` is right for the child's OUTPUT but must not extend to the
-    // spawn's own failure: with the error discarded, an unresolvable `sh` looked
-    // identical to a surviving orphan — the grandchild simply never appeared, and
-    // the wait below expired into `expected false to be true`. The error is
-    // recorded to a file because this runs in another process, and the assertion
-    // reads it back to say which of the two happened.
+    // Use the exact Node executable that is running this test. On Windows, `sh`
+    // can be available through Git for Windows while its PATH does not contain
+    // Node; a bare `node child.js` then exits in the shell without ever reaching
+    // the fixture. Keep `& wait` so sh remains a real intermediary rather than
+    // exec-replacing itself with Node on POSIX.
+    //
+    // Capture shell stderr and its exit status as well as spawn's error event.
+    // The server is a separate process, so writing that information to the temp
+    // directory makes a missing executable actionable instead of a five-second
+    // readiness timeout with no diagnosis.
     await writeFile(
       join(dir, "server.js"),
       [
         "const fs = require('fs');",
         "const path = require('path');",
         "const { spawn } = require('child_process');",
-        "const child = spawn('sh', ['-c', 'node child.js'], { cwd: __dirname, stdio: 'ignore' });",
+        "fs.writeFileSync(path.join(__dirname, 'server.ready'), JSON.stringify({ pid: process.pid }));",
+        `const shellCommand = ${JSON.stringify(`${JSON.stringify(process.execPath)} child.js & wait`)};`,
+        "const child = spawn('sh', ['-c', shellCommand], { cwd: __dirname, stdio: ['ignore', 'ignore', 'pipe'] });",
+        "const launchErrorPath = path.join(__dirname, 'launch-error.txt');",
+        "if (child.pid !== undefined) fs.writeFileSync(path.join(__dirname, 'shell.pid'), String(child.pid));",
+        "let stderr = '';",
+        "child.stderr.setEncoding('utf8');",
+        "child.stderr.on('data', (chunk) => { stderr += chunk; });",
         "child.on('error', (err) => {",
-        "  fs.writeFileSync(path.join(__dirname, 'spawn-error.txt'), String(err && err.message || err));",
+        "  fs.appendFileSync(launchErrorPath, `Could not launch sh: ${String(err && err.message || err)}\\n`);",
+        "});",
+        "child.on('close', (code, signal) => {",
+        "  if (code === 0 && signal === null) return;",
+        "  fs.appendFileSync(launchErrorPath, `sh exited with code ${code} and signal ${signal}.\\n${stderr}`);",
         "});",
         "setTimeout(() => {}, 60000);",
       ].join("\n"),
@@ -89,32 +105,70 @@ describe("stopping a detached server takes its children with it", () => {
   });
 
   afterEach(async () => {
-    // Reap whatever the test itself leaked, so one failure cannot wedge later runs
-    // or (on Windows) hold the temp directory open.
-    for (const pid of [server?.pid, readChildPid()].filter((p) => typeof p === "number")) {
+    // Reap every known member individually as a backstop. The assertion itself
+    // exercises tree termination from the server PID; teardown must also handle a
+    // failure before child.ready exists, when only the shell PID was recorded.
+    // Waiting for disappearance before rm is necessary on Windows, where a process
+    // with cwd or an open file in this directory prevents its removal.
+    const pids = [...new Set([server?.pid, readShellPid(), readChildPid()])]
+      .filter((pid) => typeof pid === "number");
+    await Promise.allSettled(
+      pids.map((pid) => terminateTreeByPid(pid, { forceKillTimeoutMs: 500 })),
+    );
+    for (const pid of pids) {
+      if (!isAlive(pid)) continue;
       try {
         process.kill(pid, "SIGKILL");
-      } catch {
-        // already gone
+      } catch (error) {
+        if (isAlive(pid)) throw error;
       }
     }
+    expect(await waitFor(() => pids.every((pid) => !isAlive(pid)))).toBe(true);
     server = null;
     await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
-  /** Whatever the stand-in server recorded about its own failed spawn, if any. */
-  function readSpawnError() {
+  /** Shell spawn or child-executable failure recorded by the stand-in server. */
+  function readLaunchError() {
     try {
-      return readFileSync(join(dir, "spawn-error.txt"), "utf-8").trim() || null;
+      return readFileSync(join(dir, "launch-error.txt"), "utf-8").trim() || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function readRecordedPid(name) {
+    try {
+      const pid = Number.parseInt(readFileSync(join(dir, name), "utf-8").trim(), 10);
+      return Number.isInteger(pid) ? pid : null;
     } catch {
       return null;
     }
   }
 
   function readChildPid() {
+    return readRecordedPid("child.pid");
+  }
+
+  function readShellPid() {
+    return readRecordedPid("shell.pid");
+  }
+
+  /** The detached server owns this record; it separates its startup from its child's. */
+  function readReadyServerPid() {
     try {
-      const pid = Number.parseInt(readFileSync(join(dir, "child.pid"), "utf-8").trim(), 10);
-      return Number.isInteger(pid) ? pid : null;
+      const ready = JSON.parse(readFileSync(join(dir, "server.ready"), "utf-8"));
+      return Number.isInteger(ready?.pid) ? ready.pid : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** The child owns this record; it is the startup handshake, not a timer guess. */
+  function readReadyChildPid() {
+    try {
+      const ready = JSON.parse(readFileSync(join(dir, "child.ready"), "utf-8"));
+      return Number.isInteger(ready?.pid) ? ready.pid : null;
     } catch {
       return null;
     }
@@ -151,19 +205,35 @@ describe("stopping a detached server takes its children with it", () => {
       stdio: "ignore",
       detached: true,
     });
+    let serverLaunchError = null;
+    server.once("error", (error) => {
+      serverLaunchError = `Could not launch the detached stand-in server: ${error.message}`;
+    });
 
-    // Wait until the child is genuinely up and working, so a pass cannot mean
-    // "nothing was ever running". On expiry, say WHY nothing came up: a shell that
-    // failed to launch is not the orphaned grandchild this test is looking for.
-    if (!(await waitFor(async () => readChildPid() !== null && (await tickCount()) > 0))) {
+    // The server's record must arrive before we attribute any delay to the shell
+    // or its Node grandchild. Windows CI can defer a detached process long enough
+    // to make an otherwise healthy child readiness timeout misleading.
+    if (!(await waitFor(() => serverLaunchError !== null || readReadyServerPid() !== null))) {
+      throw new Error(
+        serverLaunchError ?? "The detached stand-in server never announced startup.",
+      );
+    }
+    if (serverLaunchError) throw new Error(serverLaunchError);
+    expect(readReadyServerPid()).toBe(server.pid);
+
+    // The ready record establishes that the grandchild started; a tick then proves
+    // it is doing the work whose absence we assert below. On expiry, include the
+    // shell's exact diagnostic so a missing executable is not mistaken for an
+    // orphan-cleanup regression.
+    if (!(await waitFor(async () => readReadyChildPid() !== null && (await tickCount()) > 0))) {
       throw new Error(
         describeShellStartupFailure({
           what: "The stand-in server's grandchild",
-          recordedError: readSpawnError(),
+          recordedError: readLaunchError(),
         }),
       );
     }
-    const childPid = readChildPid();
+    const childPid = readReadyChildPid();
     expect(childPid).not.toBe(null);
     expect(isAlive(childPid)).toBe(true);
 

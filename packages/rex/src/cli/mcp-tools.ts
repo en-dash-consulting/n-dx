@@ -177,7 +177,10 @@ export async function handleUpdateTaskStatus(
       detail: `${existing.status} → ${status}${force ? " (forced)" : ""}`,
     });
 
-    // Auto-complete parent items when a child is completed or deferred
+    // Re-check parent auto-completion after this status change. A deferred
+    // status can never itself make a parent auto-completable (only a fully
+    // `completed` child set can — see parent-completion.ts), but re-checking
+    // here is harmless and keeps this in sync with mcp-tools' other trigger.
     const autoCompleted: Array<{ id: string; title: string; level: string }> = [];
     if (status === "completed" || status === "deferred") {
       const doc = await store.loadDocument();
@@ -195,7 +198,9 @@ export async function handleUpdateTaskStatus(
         await store.updateItem(item.id, {
           status: "completed" as ItemStatus,
           ...parentTsUpdates,
-        }, { applyAttribution: true, projectDir });
+          // Cascaded close, not a deliberate edit of this ancestor — leave its
+          // authorship with whoever last touched it on purpose (#368).
+        }, { applyAttribution: true, preserveModifiedBy: true, projectDir });
         await store.appendLog({
           timestamp: new Date().toISOString(),
           event: "auto_completed",

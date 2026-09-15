@@ -3,6 +3,10 @@ import type { TreeEntry } from "./tree.js";
 import { walkTree, findItem } from "./tree.js";
 import { extractKeywords, scoreMatch } from "./keywords.js";
 import { collectRequirements } from "./requirements.js";
+import { allChildrenSuccessful } from "./parent-completion.js";
+
+/** No item is being treated as completed-in-advance when explaining a choice. */
+const NO_VIRTUAL_COMPLETIONS: Set<string> = new Set();
 
 /** Safe ancestor priority: returns medium (2) when no parents exist. */
 function bestAncestorPriority(parents: PRDItem[]): number {
@@ -296,10 +300,7 @@ function collectActionable(
       if (item.status === "completed" || item.status === "deferred") continue;
 
       if (item.children && item.children.length > 0) {
-        const allChildrenDone = item.children.every(
-          (c) => c.status === "completed" || c.status === "deferred" || c.status === "cancelled",
-        );
-        if (allChildrenDone) {
+        if (allChildrenSuccessful(item, NO_VIRTUAL_COMPLETIONS)) {
           results.push({ item, parents: parentChain });
         }
       } else {
@@ -421,10 +422,7 @@ export function explainSelection(
 
     // Skip intermediate branch nodes — only count leaves and finalize-ready parents
     if (!isLeaf(item)) {
-      const allChildrenDone = item.children!.every(
-        (c) => c.status === "completed" || c.status === "deferred",
-      );
-      if (!allChildrenDone) continue; // branch with active children — don't count
+      if (!allChildrenSuccessful(item, NO_VIRTUAL_COMPLETIONS)) continue;
     }
 
     if (item.status === "completed") {
@@ -479,14 +477,11 @@ export function explainSelection(
   if (selected.item.status === "in_progress") {
     summaryParts.push(`"${selected.item.title}" is already in_progress`);
   } else {
-    // Check if this is a parent with all children done
-    const allChildrenDone =
-      selected.item.children &&
-      selected.item.children.length > 0 &&
-      selected.item.children.every(
-        (c) => c.status === "completed" || c.status === "deferred",
-      );
-    if (allChildrenDone) {
+    // Check if this is a parent with all children done. The shared predicate,
+    // not a local status set: the inline copy here still counted `deferred` as
+    // done after #364 narrowed the real rule to `completed`, so a parent with a
+    // deferred child was announced as "all children completed".
+    if (allChildrenSuccessful(selected.item, NO_VIRTUAL_COMPLETIONS)) {
       summaryParts.push(
         `"${selected.item.title}" — all children completed, ready to finalize`,
       );

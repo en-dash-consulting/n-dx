@@ -496,6 +496,158 @@ describe("child process lifecycle tracker", () => {
     expect(tracker.size()).toBe(0);
   });
 
+  // WHY THIS CASE EXISTS. Killing the in-flight child is what UNBLOCKS whatever
+  // was awaiting it, so the caller's own loop promptly spawns the next one — and
+  // it lands after cleanup() has already taken its snapshot. `ndx ci` leaked one
+  // orphan per Ctrl-C exactly this way: the cleanup gate SIGKILLed `sourcevision
+  // analyze`, runCapture resolved, runCI marched on to `sourcevision validate`,
+  // and the parent exited leaving that child reparented to PID 1. A sweep found
+  // 31 of them, the oldest 11 hours old.
+  it("kills a child registered after cleanup has started rather than adopting it", async () => {
+    const tracker = createChildProcessTracker({ forceKillTimeoutMs: 50 });
+    let late;
+
+    const inFlight = tracker.register(new FakeChildProcess((signal, proc) => {
+      if (signal === "SIGKILL") proc.close(null, signal);
+    }));
+    // Stand in for the awaiting caller resuming the moment its child dies.
+    inFlight.once("close", () => {
+      late = tracker.register(new FakeChildProcess());
+    });
+
+    const cleanupPromise = tracker.cleanup();
+    await vi.advanceTimersByTimeAsync(50);
+    await vi.advanceTimersByTimeAsync(0);
+    await cleanupPromise;
+
+    expect(inFlight.killSignals).toEqual(["SIGTERM", "SIGKILL"]);
+    // Straight to SIGKILL: the graceful phase is over and the parent is on its
+    // way to process.exit(), so a SIGTERM grace period is just a window in which
+    // the parent dies first and the child is orphaned.
+    expect(late.killSignals).toEqual(["SIGKILL"]);
+    expect(tracker.size()).toBe(0);
+  });
+
+  it("group-kills a late child on POSIX so its grandchildren go too", async () => {
+    const killGroup = vi.fn();
+    const tracker = createChildProcessTracker({
+      forceKillTimeoutMs: 50,
+      treeKill: true,
+      platform: "linux",
+      killGroup,
+    });
+
+    await tracker.cleanup();
+
+    const late = new FakeChildProcess();
+    late.pid = 4242;
+    tracker.register(late);
+
+    expect(killGroup).toHaveBeenCalledWith(-4242, "SIGKILL");
+    expect(late.killSignals).toEqual([]);
+  });
+
+  it("falls back to a direct kill when the late child leads no group", async () => {
+    const killGroup = vi.fn(() => {
+      throw new Error("ESRCH");
+    });
+    const tracker = createChildProcessTracker({
+      forceKillTimeoutMs: 50,
+      treeKill: true,
+      platform: "linux",
+      killGroup,
+    });
+
+    await tracker.cleanup();
+
+    const late = new FakeChildProcess();
+    late.pid = 4242;
+    tracker.register(late);
+
+    expect(late.killSignals).toEqual(["SIGKILL"]);
+  });
+
+  it("uses bounded Windows tree cleanup for a late child", async () => {
+    let late;
+    const spawnCliImpl = vi.fn(() => {
+      const taskkill = new EventEmitter();
+      queueMicrotask(() => {
+        late.close(null, "SIGKILL");
+        taskkill.emit("close", 0);
+      });
+      return taskkill;
+    });
+    const tracker = createChildProcessTracker({
+      forceKillTimeoutMs: 50,
+      treeKill: true,
+      platform: "win32",
+      spawnCliImpl,
+    });
+
+    await tracker.cleanup();
+
+    late = new FakeChildProcess();
+    late.pid = 4242;
+    tracker.register(late);
+    await Promise.resolve();
+
+    expect(spawnCliImpl).toHaveBeenCalledWith(
+      "taskkill",
+      ["/PID", "4242", "/T", "/F"],
+      { stdio: "ignore", windowsHide: true },
+    );
+    expect(late.killSignals).toEqual([]);
+  });
+
+  it("does not finish cleanup while a late Windows tree kill is still running", async () => {
+    let inFlight;
+    let late;
+    let taskkillCount = 0;
+    const spawnCliImpl = vi.fn(() => {
+      const taskkill = new EventEmitter();
+      taskkillCount += 1;
+
+      if (taskkillCount === 1) {
+        queueMicrotask(() => {
+          inFlight.close(null, "SIGKILL");
+          taskkill.emit("close", 0);
+        });
+      } else {
+        setTimeout(() => {
+          late.close(null, "SIGKILL");
+          taskkill.emit("close", 0);
+        }, 10);
+      }
+      return taskkill;
+    });
+    const tracker = createChildProcessTracker({
+      forceKillTimeoutMs: 50,
+      treeKill: true,
+      platform: "win32",
+      spawnCliImpl,
+    });
+    inFlight = tracker.register(new FakeChildProcess());
+    inFlight.pid = 4242;
+    inFlight.once("close", () => {
+      late = new FakeChildProcess();
+      late.pid = 4243;
+      tracker.register(late);
+    });
+
+    let cleanupFinished = false;
+    const cleanupPromise = tracker.cleanup().then(() => {
+      cleanupFinished = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(spawnCliImpl).toHaveBeenCalledTimes(2);
+    expect(cleanupFinished).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(10);
+    await cleanupPromise;
+    expect(cleanupFinished).toBe(true);
+  });
+
   it("runs tracked cleanup before exiting on SIGTERM", async () => {
     const tracker = createChildProcessTracker({ forceKillTimeoutMs: 50 });
     const processRef = new FakeProcess();

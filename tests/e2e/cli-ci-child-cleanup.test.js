@@ -11,12 +11,27 @@
  *   1. A ci subprocess that completes normally is reaped before the parent exits.
  *   2. A ci subprocess that is still running when SIGINT arrives is killed by
  *      the cleanup gate (SIGTERM → SIGKILL after timeout).
+ *   3. The shell-backed docs-build fixture starts a grandchild in hang mode;
+ *      SIGINT must reap every recorded fixture PID, including that descendant.
+ *   4. On headless Windows runners an IPC relay emits SIGINT through n-dx's
+ *      production listener and acknowledges delivery before cleanup assertions.
+ *   5. NO fixture child outlives the test file, whatever the assertions did —
+ *      see the teardown. Under load, killing the in-flight step can let `ndx ci`
+ *      advance to the NEXT step while the parent is already exiting, and that
+ *      late child used to escape. On an idle machine the parent may exit before
+ *      that next spawn, so this suite's teardown scan is a backstop rather than
+ *      a deterministic reproducer. The production side is fixed in
+ *      child-lifecycle.js (see createChildProcessTracker's register); the
+ *      deterministic real-process regression lives in
+ *      tests/integration/late-arrival-child-cleanup.test.js.
  *
  * It uses the same preload-interception pattern as cli-child-cleanup.test.js:
  * a NODE_OPTIONS=--import preload patches child_process.spawn so that any
- * node call to a sourcevision or rex CLI entry point is redirected to a
- * lightweight "double" script.  The double records its PID and behaves
- * according to NDX_TEST_CI_MODE.
+ * node call to a sourcevision or rex CLI entry point, plus the initial docs
+ * build, is redirected to a lightweight "double" script. The docs-build
+ * double emits the first observable child-readiness signal, so the PID-record
+ * deadline never includes the unrelated VitePress build duration. The double
+ * records its PID and behaves according to NDX_TEST_CI_MODE.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -39,6 +54,9 @@ const CI_DOUBLE_PATH = join(
 // Mirror child-lifecycle.js defaults so the timing budget is consistent.
 const CHILD_FORCE_KILL_TIMEOUT_MS = 5_000;
 const SHUTDOWN_ASSERTION_BUFFER_MS = 1_500;
+
+/** How long teardown waits for an already-killed child to leave the process table. */
+const ORPHAN_REAP_GRACE_MS = 2_000;
 
 function isPidRunning(pid) {
   if (!Number.isInteger(pid)) return false;
@@ -63,6 +81,35 @@ async function waitForPidExit(pid, timeoutMs) {
 }
 
 /**
+ * Every PID record written so far, or [] when the file does not exist yet.
+ *
+ * Used by teardown rather than by the assertions: the tests only care about the
+ * FIRST child, but every child the run spawned has to be accounted for or the
+ * ones the assertions never mention leak.
+ */
+async function readPidRecords(pidFile) {
+  let content;
+  try {
+    content = await readFile(pidFile, "utf8");
+  } catch {
+    return [];
+  }
+
+  return content
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line)];
+      } catch {
+        // Torn final line — the double appends, so a partial write is possible.
+        return [];
+      }
+    });
+}
+
+/**
  * Read the first PID record written by ci-child-double.mjs.
  * Polls until the record appears or the timeout elapses.
  */
@@ -80,6 +127,17 @@ async function readFirstPidRecord(pidFile, timeoutMs = 3_000) {
   }
 
   throw new Error(`Timed out waiting for CI child PID record at ${pidFile}`);
+}
+
+async function readPidRecordsUntil(pidFile, predicate, timeoutMs = 3_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const records = await readPidRecords(pidFile);
+    if (predicate(records)) return records;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  throw new Error(`Timed out waiting for required CI child records at ${pidFile}`);
 }
 
 function withImportedNodeOptions(preloadPath) {
@@ -128,17 +186,34 @@ async function setupCiProject(dir) {
   );
 }
 
+/**
+ * Runs started by the current test, so teardown can reap them whatever the
+ * assertions did. Tracked explicitly rather than relying on process-group
+ * semantics: the CLI spawns its children detached (they lead their OWN groups,
+ * by design, so the tracker can tree-kill them), which is exactly what stops a
+ * group kill aimed at the test's own child from reaching them.
+ */
+const activeRuns = [];
+
 function spawnCI(tmpDir, mode) {
   const pidFile = join(tmpDir, "ci-child-pids.jsonl");
+  const isWindows = process.platform === "win32";
   const child = spawn(process.execPath, [CLI_PATH, "ci", tmpDir], {
     cwd: tmpDir,
-    stdio: ["ignore", "pipe", "pipe"],
+    // Windows has no reliable console on headless GitHub Actions workers, so
+    // the test uses a Node IPC channel there to emit SIGINT through the CLI's
+    // real listener. POSIX keeps the ordinary OS signal route.
+    stdio: isWindows ? ["ignore", "pipe", "pipe", "ipc"] : ["ignore", "pipe", "pipe"],
     env: {
       ...process.env,
       NODE_OPTIONS: withImportedNodeOptions(PRELOAD_PATH),
+      // The asserted strategy line proves the console event reached ndx's
+      // cleanup handler rather than merely terminating the parent process.
+      NDX_DEBUG_LIFECYCLE: "1",
       NDX_TEST_CI_MODE: mode,
       NDX_TEST_CI_PID_FILE: pidFile,
       NDX_TEST_CI_REDIRECT_SCRIPT: CI_DOUBLE_PATH,
+      ...(isWindows ? { NDX_TEST_INTERRUPT_IPC: "1" } : {}),
     },
   });
 
@@ -147,7 +222,7 @@ function spawnCI(tmpDir, mode) {
   child.stdout.on("data", (chunk) => stdout.push(chunk.toString()));
   child.stderr.on("data", (chunk) => stderr.push(chunk.toString()));
 
-  return {
+  const run = {
     child,
     pidFile,
     done: new Promise((resolve) => {
@@ -156,13 +231,56 @@ function spawnCI(tmpDir, mode) {
       });
     }),
   };
+
+  activeRuns.push(run);
+  return run;
 }
 
-// Runs on Windows as well as POSIX. Caveat for the SIGINT case: on Windows
-// `process.kill(pid, "SIGINT")` is TerminateProcess, so the CLI's signal handler
-// never runs and the subprocess dies because the host's Job Object reaps the
-// tree — not because tracker cleanup ran. See the header of
-// cli-orphan-cleanup.test.js for the full explanation.
+/**
+ * Send a SIGINT that reaches the CLI's JavaScript signal handler.
+ *
+ * Node documents `process.kill(pid, "SIGINT")` as unconditional termination on
+ * Windows. Headless GitHub Actions runners may not assign the CLI a console, so
+ * AttachConsole cannot make a real Ctrl+C deterministic there. The Windows
+ * branch instead sends an IPC test message that makes the CLI emit SIGINT; this
+ * invokes the production listener installed by installTrackedChildProcessHandlers
+ * and returns only after that listener has received the interruption.
+ */
+async function sendSIGINT(child) {
+  if (process.platform !== "win32") {
+    process.kill(child.pid, "SIGINT");
+    return;
+  }
+
+  if (!Number.isInteger(child.pid)) {
+    throw new Error("Cannot send SIGINT to a CI run without a PID.");
+  }
+
+  await new Promise((resolve, reject) => {
+    const onMessage = (message) => {
+      if (message?.type !== "ndx-test-interrupt-received" || message.signal !== "SIGINT") return;
+      finish(resolve);
+    };
+    const onClose = () => finish(reject, new Error("Windows CI run exited before receiving SIGINT."));
+    const finish = (settle, value) => {
+      child.removeListener("message", onMessage);
+      child.removeListener("close", onClose);
+      settle(value);
+    };
+
+    if (!child.connected) {
+      finish(reject, new Error("Windows CI run has no IPC channel for deterministic SIGINT delivery."));
+      return;
+    }
+
+    child.on("message", onMessage);
+    child.once("close", onClose);
+    child.send({ type: "ndx-test-interrupt", signal: "SIGINT" }, (error) => {
+      if (error) finish(reject, error);
+    });
+  });
+}
+
 describe("n-dx ci child-process cleanup regression coverage", () => {
   let tmpDir;
 
@@ -172,18 +290,67 @@ describe("n-dx ci child-process cleanup regression coverage", () => {
   });
 
   afterEach(async () => {
+    // 1. The CLI parent. A case that failed an assertion or timed out never
+    //    awaited run.done, and a live parent goes on spawning pipeline steps.
+    for (const run of activeRuns) {
+      if (run.child.exitCode === null && run.child.signalCode === null) {
+        try {
+          run.child.kill("SIGKILL");
+        } catch {
+          // Already gone.
+        }
+      }
+    }
+
+    // 2. The fixture doubles, unconditionally and by PID. `hang` mode ignores
+    //    SIGTERM by design, so this goes straight to SIGKILL. Without it a
+    //    failing or timing-out case leaves a node process reparented to PID 1
+    //    on every single run — a sweep of one dev machine found 31 of them
+    //    holding 431 MB, the oldest alive for over 11 hours.
+    const survivors = [];
+    for (const run of activeRuns) {
+      for (const record of await readPidRecords(run.pidFile)) {
+        if (!isPidRunning(record.pid)) continue;
+
+        // Bounded grace before calling it a survivor: a child SIGKILLed moments
+        // before its parent exited can still answer signal 0 while it is a
+        // zombie awaiting reparenting, and signal 0 cannot tell the two apart.
+        try {
+          await waitForPidExit(record.pid, ORPHAN_REAP_GRACE_MS);
+          continue;
+        } catch {
+          // Genuinely still running.
+        }
+
+        survivors.push(`${record.pid} (${(record.argv ?? []).join(" ")})`);
+        try {
+          process.kill(record.pid, "SIGKILL");
+        } catch {
+          // Raced us to exit.
+        }
+      }
+    }
+    activeRuns.length = 0;
+
     // maxRetries/retryDelay: the CLI child is spawned with cwd: tmpDir, so on
     // Windows the directory can still be handle-locked when teardown runs and
     // rmdir fails with EBUSY. Under full-suite load this is the difference
     // between green and an intermittent red that has nothing to do with the
     // assertion under test.
     await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+
+    // Loud, not silent. The processes above have already been reaped, so this
+    // never leaks regardless — but a regression that reintroduces the leak has
+    // to fail a test rather than accumulate quietly across suite runs.
+    expect(survivors).toEqual([]);
   });
 
   it("terminates the ci subprocess after a successful run", async () => {
     const run = spawnCI(tmpDir, "success");
-    // Wait for at least the first intercepted ci subprocess to be recorded.
+    // The docs-build double is the first tracked CI child and emits the
+    // readiness record before this assertion's timeout begins.
     const pidRecord = await readFirstPidRecord(run.pidFile);
+    expect(pidRecord.kind).toBe("docs-build");
     const result = await run.done;
 
     // The parent may exit non-zero if other steps (e.g. docs build) fail in
@@ -197,16 +364,31 @@ describe("n-dx ci child-process cleanup regression coverage", () => {
     { timeout: CHILD_FORCE_KILL_TIMEOUT_MS + SHUTDOWN_ASSERTION_BUFFER_MS + 5_000 },
     async () => {
       const run = spawnCI(tmpDir, "hang");
-      const pidRecord = await readFirstPidRecord(run.pidFile);
+      const records = await readPidRecordsUntil(
+        run.pidFile,
+        (candidate) => candidate.some((record) => record.kind === "docs-build") &&
+          candidate.some((record) => record.kind === "docs-build-grandchild"),
+      );
+      const docsBuild = records.find((record) => record.kind === "docs-build");
+      const docsBuildGrandchild = records.find((record) => record.kind === "docs-build-grandchild");
+      expect(docsBuild).toBeDefined();
+      expect(docsBuildGrandchild).toBeDefined();
 
-      // Interrupt the parent process mid-run.
-      process.kill(run.child.pid, "SIGINT");
+      // Interrupt the parent process mid-run through its real SIGINT handler.
+      await sendSIGINT(run.child);
       const result = await run.done;
 
       expect(result.code).not.toBe(0);
-      await waitForPidExit(
-        pidRecord.pid,
-        CHILD_FORCE_KILL_TIMEOUT_MS + SHUTDOWN_ASSERTION_BUFFER_MS,
+      expect(result.stderr).toContain(
+        process.platform === "win32"
+          ? "[child-lifecycle] taskkill /PID"
+          : "[child-lifecycle] process group kill",
+      );
+      await Promise.all(
+        records.map((record) => waitForPidExit(
+          record.pid,
+          CHILD_FORCE_KILL_TIMEOUT_MS + SHUTDOWN_ASSERTION_BUFFER_MS,
+        )),
       );
     },
   );

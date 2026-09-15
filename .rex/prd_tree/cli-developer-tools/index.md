@@ -2,10 +2,11 @@
 id: "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6"
 level: "epic"
 title: "CLI & Developer Tools"
-status: "completed"
+status: "pending"
 startedAt: "2026-04-02T17:55:36.327Z"
-completedAt: "2026-04-10T18:34:32.028Z"
 description: "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline."
+lastModified: "2026-09-12T10:11:47.717Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -17,7 +18,7 @@ description: "Command-line interface: error handling, validation, formatting, he
 | [ANSI Color Reset Consistency in Tool Output](./ansi-color-reset-consistency-in-tool/index.md) | completed |
 | [Auto-Commit on Completion for File-Modifying Claude Code Skills](./auto-commit-on-completion-for-file/index.md) | completed |
 | [Auto-Persist Self-Heal Recommendations into PRD Without Execution](./auto-persist-self-heal-recommendations/index.md) | completed |
-| [Child Process Cleanup and Exit Hygiene](./child-process-cleanup-and-exit-hygiene/index.md) | completed |
+| [Child Process Cleanup and Exit Hygiene](./child-process-cleanup-and-exit-hygiene/index.md) | pending |
 | [CLI Hint Correctness, Test Coverage, and Documentation Sync](./cli-hint-correctness-test-coverage-and/index.md) | completed |
 | [CLI Robustness](./cli-robustness/index.md) | completed |
 | [CLI User Experience and Developer Tools](./cli-user-experience-and-developer-tools/index.md) | completed |

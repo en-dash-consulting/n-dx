@@ -232,7 +232,9 @@ export async function cmdRemove(
       await store.updateItem(parent.id, {
         status: "completed" as ItemStatus,
         ...tsUpdates,
-      });
+        // Cascaded close, not a deliberate edit of this ancestor — leave its
+        // authorship with whoever last touched it on purpose (#368).
+      }, { preserveModifiedBy: true });
       await store.appendLog({
         timestamp: new Date().toISOString(),
         event: "auto_completed",

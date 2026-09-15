@@ -140,13 +140,16 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     vi.spyOn(defaultRegistry, "getActiveProvider").mockReturnValue(provider);
   }
 
-  async function runLoop() {
+  async function runLoop(overrides: { livelockThreshold?: number } = {}) {
     const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../src/store/config.js");
 
     const config = await loadConfig(henchDir);
     config.skipFullTestGate = true;
+    if (overrides.livelockThreshold !== undefined) {
+      config.livelockThreshold = overrides.livelockThreshold;
+    }
     const store = createStore("file", join(projectDir, ".rex"));
 
     const result = await agentLoop({
@@ -169,25 +172,55 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
           type: "function",
           function: {
             name: "write_file",
-            arguments: JSON.stringify({ path: "local-output.txt", content: "written by local model" }),
+            arguments: JSON.stringify({ path: "local-output.ts", content: "export const source = 'local';\n" }),
           },
         }],
         finish_reason: "stop",
       },
-      // Turn 2: no tool calls → completion claim, valid because a file changed.
+      // Turn 2: stage the output as the API prompt requires.
+      {
+        content: null,
+        tool_calls: [{
+          id: "call-2",
+          type: "function",
+          function: {
+            name: "git",
+            arguments: JSON.stringify({ subcommand: "add", args: "local-output.ts" }),
+          },
+        }],
+        finish_reason: "stop",
+      },
+      // Turn 3: leave the commit handoff for the non-interactive finalizer.
+      {
+        content: null,
+        tool_calls: [{
+          id: "call-3",
+          type: "function",
+          function: {
+            name: "write_file",
+            arguments: JSON.stringify({ path: ".hench-commit-msg.txt", content: "feat: write local output\n" }),
+          },
+        }],
+        finish_reason: "stop",
+      },
+      // Turn 4: no tool calls → completion claim, valid because a file changed.
       { content: "Done — the file is written.", finish_reason: "stop" },
     ]);
 
     const { result } = await runLoop();
 
-    expect(existsSync(join(projectDir, "local-output.txt"))).toBe(true);
-    const written = await readFile(join(projectDir, "local-output.txt"), "utf-8");
-    expect(written).toContain("written by local model");
+    expect(existsSync(join(projectDir, "local-output.ts"))).toBe(true);
+    const written = await readFile(join(projectDir, "local-output.ts"), "utf-8");
+    expect(written).toContain("local");
 
     expect(result.run.status).toBe("completed");
-    expect(result.run.turns).toBe(2);
+    expect(result.run.turns).toBe(4);
     expect(result.run.toolCalls.length).toBeGreaterThanOrEqual(1);
     expect(result.run.toolCalls[0].tool).toBe("write_file");
+    expect(execFileSync("git", ["show", "--format=", "--name-only", "HEAD"], {
+      cwd: projectDir,
+      encoding: "utf-8",
+    })).toContain("local-output.ts");
   });
 
   it("condenses the window under measured context pressure and records the count", async () => {
@@ -204,6 +237,10 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     );
     // A file large enough that its read_file output is worth digesting.
     await writeFile(join(projectDir, "big-notes.txt"), "x".repeat(1_200), "utf-8");
+    // These are fixture setup, not agent work. Commit them before the loop so
+    // the API run captures a clean, deterministic baseline.
+    execFileSync("git", ["add", "-A"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "context baseline"], { cwd: projectDir, stdio: "ignore" });
 
     const readTurn = (id: string, promptTokens: number): ScriptedTurn => ({
       content: null,
@@ -234,16 +271,41 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
           type: "function",
           function: {
             name: "write_file",
-            arguments: JSON.stringify({ path: "final-output.txt", content: "done" }),
+            arguments: JSON.stringify({ path: "final-output.ts", content: "export const done = true;\n" }),
           },
         }],
         prompt_tokens: 10_000,
       },
-      // Turn 9: completion claim.
+      // Turn 9: stage the output.
+      {
+        content: null,
+        tool_calls: [{
+          id: "c9",
+          type: "function",
+          function: { name: "git", arguments: JSON.stringify({ subcommand: "add", args: "final-output.ts" }) },
+        }],
+        prompt_tokens: 10_000,
+      },
+      // Turn 10: hand the staged work to the commit finalizer.
+      {
+        content: null,
+        tool_calls: [{
+          id: "c10",
+          type: "function",
+          function: {
+            name: "write_file",
+            arguments: JSON.stringify({ path: ".hench-commit-msg.txt", content: "feat: write final output\n" }),
+          },
+        }],
+        prompt_tokens: 10_000,
+      },
+      // Turn 11: completion claim.
       { content: "Done.", prompt_tokens: 10_000 },
     ]);
 
-    const { result } = await runLoop();
+    // This test exercises context compaction, not livelock detection; its
+    // intentionally repeated reads have no writes until the final edit.
+    const { result } = await runLoop({ livelockThreshold: 0 });
 
     expect(result.run.status).toBe("completed");
     // Both stages fired: at least one digest event and one summarize event.
@@ -256,8 +318,9 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
       .filter((b) => "tools" in b);
     const allSentText = JSON.stringify(toolRequestBodies.at(-1)!.messages);
     expect(allSentText).toContain("[Earlier context condensed]");
-    const postDigestText = JSON.stringify(toolRequestBodies.at(-3)!.messages);
-    expect(postDigestText).toContain("[tool output condensed]");
+    expect(toolRequestBodies.some((body) =>
+      JSON.stringify(body.messages).includes("[tool output condensed]"),
+    )).toBe(true);
   });
 
   it("re-prompts a no-change completion claim, then fails the run — same standard as the CLI loop", async () => {
