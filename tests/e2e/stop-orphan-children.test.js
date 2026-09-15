@@ -83,6 +83,7 @@ describe("stopping a detached server takes its children with it", () => {
         "const fs = require('fs');",
         "const path = require('path');",
         "const { spawn } = require('child_process');",
+        "fs.writeFileSync(path.join(__dirname, 'server.ready'), JSON.stringify({ pid: process.pid }));",
         `const shellCommand = ${JSON.stringify(`${JSON.stringify(process.execPath)} child.js & wait`)};`,
         "const child = spawn('sh', ['-c', shellCommand], { cwd: __dirname, stdio: ['ignore', 'ignore', 'pipe'] });",
         "const launchErrorPath = path.join(__dirname, 'launch-error.txt');",
@@ -153,6 +154,16 @@ describe("stopping a detached server takes its children with it", () => {
     return readRecordedPid("shell.pid");
   }
 
+  /** The detached server owns this record; it separates its startup from its child's. */
+  function readReadyServerPid() {
+    try {
+      const ready = JSON.parse(readFileSync(join(dir, "server.ready"), "utf-8"));
+      return Number.isInteger(ready?.pid) ? ready.pid : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** The child owns this record; it is the startup handshake, not a timer guess. */
   function readReadyChildPid() {
     try {
@@ -194,6 +205,21 @@ describe("stopping a detached server takes its children with it", () => {
       stdio: "ignore",
       detached: true,
     });
+    let serverLaunchError = null;
+    server.once("error", (error) => {
+      serverLaunchError = `Could not launch the detached stand-in server: ${error.message}`;
+    });
+
+    // The server's record must arrive before we attribute any delay to the shell
+    // or its Node grandchild. Windows CI can defer a detached process long enough
+    // to make an otherwise healthy child readiness timeout misleading.
+    if (!(await waitFor(() => serverLaunchError !== null || readReadyServerPid() !== null))) {
+      throw new Error(
+        serverLaunchError ?? "The detached stand-in server never announced startup.",
+      );
+    }
+    if (serverLaunchError) throw new Error(serverLaunchError);
+    expect(readReadyServerPid()).toBe(server.pid);
 
     // The ready record establishes that the grandchild started; a tick then proves
     // it is doing the work whose absence we assert below. On expiry, include the
