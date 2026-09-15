@@ -149,6 +149,27 @@ describe("findNextTask", () => {
     expect(result!.item.id).toBe("e1");
   });
 
+  it.each(["deferred", "cancelled"] as const)(
+    "does not select a parent with a completed and %s child",
+    (incompleteStatus) => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Epic",
+          level: "epic",
+          children: [
+            makeItem({ id: "t1", title: "Completed task", status: "completed" }),
+            makeItem({ id: "t2", title: "Incomplete task", status: incompleteStatus }),
+          ],
+        }),
+      ];
+      const completedIds = new Set(["t1"]);
+
+      expect(findNextTask(items, completedIds)).toBeNull();
+      expect(findActionableTasks(items, completedIds)).toEqual([]);
+    },
+  );
+
   it("selects critical task in low-priority epic over medium task in high-priority epic", () => {
     const items: PRDItem[] = [
       makeItem({

@@ -300,10 +300,7 @@ function collectActionable(
       if (item.status === "completed" || item.status === "deferred") continue;
 
       if (item.children && item.children.length > 0) {
-        const allChildrenDone = item.children.every(
-          (c) => c.status === "completed" || c.status === "deferred" || c.status === "cancelled",
-        );
-        if (allChildrenDone) {
+        if (allChildrenSuccessful(item, NO_VIRTUAL_COMPLETIONS)) {
           results.push({ item, parents: parentChain });
         }
       } else {
@@ -425,10 +422,7 @@ export function explainSelection(
 
     // Skip intermediate branch nodes — only count leaves and finalize-ready parents
     if (!isLeaf(item)) {
-      const allChildrenDone = item.children!.every(
-        (c) => c.status === "completed" || c.status === "deferred",
-      );
-      if (!allChildrenDone) continue; // branch with active children — don't count
+      if (!allChildrenSuccessful(item, NO_VIRTUAL_COMPLETIONS)) continue;
     }
 
     if (item.status === "completed") {
