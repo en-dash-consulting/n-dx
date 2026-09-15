@@ -21,6 +21,11 @@ import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import {
+  validateConfigKeyValue,
+  getConfigValue as getNestedValue,
+  setConfigValue as setNestedValue,
+} from "./hench-config-fields.js";
 
 const ADAPTIVE_PREFIX = "/api/hench/adaptive/";
 
@@ -478,28 +483,6 @@ function generateAdjustments(
 
 // ── Config mutation helpers ──────────────────────────────────────────
 
-function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const parts = path.split(".");
-  let current = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
-    if (!(parts[i] in current) || typeof current[parts[i]] !== "object" || current[parts[i]] === null) {
-      current[parts[i]] = {};
-    }
-    current = current[parts[i]] as Record<string, unknown>;
-  }
-  current[parts[parts.length - 1]] = value;
-}
-
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const parts = path.split(".");
-  let current: unknown = obj;
-  for (const part of parts) {
-    if (current === null || current === undefined || typeof current !== "object") return undefined;
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
-}
-
 // ── Route handler ────────────────────────────────────────────────────
 
 /** Handle adaptive workflow adjustment API requests. Returns true if handled. */
@@ -720,6 +703,14 @@ async function handleApplyAdjustment(
     return true;
   }
 
+  // Only a known config field with a correctly-typed value may be written, and
+  // never a prototype-poisoning path. Refuse before touching the config file.
+  const applyError = validateConfigKeyValue(configKey, newValue);
+  if (applyError) {
+    errorResponse(res, 400, applyError);
+    return true;
+  }
+
   // Read and modify config
   const configPath = join(ctx.projectDir, ".hench", "config.json");
   let config: Record<string, unknown>;
@@ -829,6 +820,14 @@ async function handleSetOverride(
 
   if (!key || value === undefined) {
     errorResponse(res, 400, "Request must include 'key' and 'value'");
+    return true;
+  }
+
+  // Same gate as apply: an override may only set a known config field to a
+  // correctly-typed value, never an invented key or a prototype segment.
+  const overrideError = validateConfigKeyValue(key, value);
+  if (overrideError) {
+    errorResponse(res, 400, overrideError);
     return true;
   }
 

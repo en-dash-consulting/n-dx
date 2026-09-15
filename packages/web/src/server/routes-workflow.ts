@@ -429,8 +429,60 @@ function analyzeWorkflow(
 
 // ── Config mutation helpers ──────────────────────────────────────────
 
+/**
+ * The only config keys `POST .../apply` may write, mapped to the type their
+ * value must have. This is the single source of truth for what a suggestion can
+ * change: it is the exact set of keys `generateSuggestions` emits in its
+ * `configChanges`, and a test asserts the two never drift (a new suggestion
+ * emitting an un-allowlisted key fails CI).
+ *
+ * The endpoint applies machine-generated suggestions, not free-form config
+ * edits. Without this allowlist a same-origin caller could set
+ * `guard.allowedCommands`, `guard.blockedPaths`, or `permissionMode`, and the
+ * next hench run would execute with those — arbitrary commands, no path
+ * sandbox, permissions bypassed. All three applyable values are nonnegative
+ * integers (see packages/hench/src/schema/validate.ts).
+ */
+export const APPLYABLE_SUGGESTION_KEYS: Record<string, "number"> = {
+  tokenBudget: "number",
+  maxTurns: "number",
+  "retry.maxRetries": "number",
+};
+
+/** Path segments that would poison the prototype chain if used as an object key. */
+const FORBIDDEN_PATH_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Validate a `changes` map against {@link APPLYABLE_SUGGESTION_KEYS}.
+ * Returns an error message for the first offending entry, or null if every
+ * entry is an allowlisted key with a value of the required type. Called before
+ * any write (and before preview), so a rejected request leaves the config file
+ * byte-for-byte unchanged.
+ */
+function validateSuggestionChanges(changes: Record<string, unknown>): string | null {
+  for (const [key, value] of Object.entries(changes)) {
+    const segments = key.split(".");
+    if (segments.some((seg) => FORBIDDEN_PATH_SEGMENTS.has(seg))) {
+      return `Key "${key}" contains a forbidden path segment.`;
+    }
+    const expected = APPLYABLE_SUGGESTION_KEYS[key];
+    if (!expected) {
+      return `Key "${key}" is not an applyable suggestion setting. Allowed: ${Object.keys(APPLYABLE_SUGGESTION_KEYS).join(", ")}.`;
+    }
+    if (expected === "number") {
+      if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+        return `Value for "${key}" must be a nonnegative integer (got ${JSON.stringify(value)}).`;
+      }
+    }
+  }
+  return null;
+}
+
 function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
   const parts = path.split(".");
+  // Defense in depth: refuse prototype-poisoning segments even though
+  // validateSuggestionChanges already rejects them upstream.
+  if (parts.some((part) => FORBIDDEN_PATH_SEGMENTS.has(part))) return;
   let current = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     if (!(parts[i] in current) || typeof current[parts[i]] !== "object" || current[parts[i]] === null) {
@@ -594,6 +646,15 @@ async function handleApplySuggestion(
   const changes = body.changes as Record<string, unknown> | undefined;
   if (!changes || typeof changes !== "object" || Object.keys(changes).length === 0) {
     errorResponse(res, 400, "Request must include a 'changes' object with config path/value pairs");
+    return true;
+  }
+
+  // Only the keys the suggestion generator emits may be written here, with a
+  // value of the right type. Checked before preview and before any write, so a
+  // rejected request never touches the config file.
+  const changesError = validateSuggestionChanges(changes);
+  if (changesError) {
+    errorResponse(res, 400, changesError);
     return true;
   }
 

@@ -80,6 +80,37 @@ describe("validateCommand", () => {
     });
   });
 
+  describe("newline and redirection injection prevention", () => {
+    it("rejects a newline-separated second command", () => {
+      // The reproduced bypass: the old operator regex did not include \n, so
+      // `sh -c` ran the second line.
+      expect(() => validateCommand("npm --version\nrm -rf ~/x", allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand("npm test\r\ncurl evil.com", allowedCommands)).toThrow("shell operator");
+    });
+
+    it("rejects output redirection to a file", () => {
+      expect(() => validateCommand("npm test > ~/.bashrc", allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand("node script.js >> out.log", allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand("npm test < input", allowedCommands)).toThrow("shell operator");
+    });
+
+    it("rejects subshells", () => {
+      expect(() => validateCommand("npm test (echo hi)", allowedCommands)).toThrow("shell operator");
+    });
+
+    it("allows shell metacharacters inside quotes (single command)", () => {
+      // These are legitimate: the metacharacters are quoted arguments to a
+      // single program, not shell composition. The old blunt regex rejected
+      // some of these ($, backtick, &&) even though the shell would not act on
+      // them; the quote-aware scan does not.
+      expect(() => validateCommand("node -e \"console.log('hello')\"", allowedCommands)).not.toThrow();
+      expect(() => validateCommand("node -e \"if (1 > 0) { process.exit(0) }\"", allowedCommands)).not.toThrow();
+      expect(() => validateCommand("node -e \"const x = a && b\"", allowedCommands)).not.toThrow();
+      expect(() => validateCommand("node -e 'a; b; c'", allowedCommands)).not.toThrow();
+      expect(() => validateCommand("vitest run \"tests/**/*.test.ts\"", allowedCommands)).not.toThrow();
+    });
+  });
+
   describe("command substitution injection prevention", () => {
     it("rejects $() command substitution", () => {
       expect(() => validateCommand("node $(cat /etc/passwd)", allowedCommands)).toThrow("shell operator");
@@ -135,7 +166,10 @@ describe("validateCommand", () => {
     });
 
     it("rejects /dev/ redirects", () => {
-      expect(() => validateCommand("npm run > /dev/sda", allowedCommands)).toThrow("dangerous pattern");
+      // `>` is now caught as an unquoted shell operator (a redirect) before the
+      // /dev/-specific dangerous pattern runs. Either way it is rejected; the
+      // broader operator rule simply fires first.
+      expect(() => validateCommand("npm run > /dev/sda", allowedCommands)).toThrow("shell operator");
     });
 
     it("rejects dangerous chmod patterns", () => {
@@ -163,11 +197,11 @@ describe("validateCommand", () => {
       expect(() => validateCommand("npm test;id", allowedCommands)).toThrow("shell operator");
     });
 
-    it("handles newlines in command (should reject)", () => {
-      // Newlines could be used for injection in some contexts
-      // The current implementation doesn't specifically block newlines
-      // but they shouldn't appear in normal commands
-      expect(() => validateCommand("npm\ntest", allowedCommands)).not.toThrow(); // depends on implementation
+    it("rejects newlines in a command", () => {
+      // A raw newline is a command separator to `sh -c`. The guard used to let
+      // it through (this test asserted .not.toThrow, contradicting its own
+      // name); it is now rejected — see the newline-injection bypass this fixed.
+      expect(() => validateCommand("npm\ntest", allowedCommands)).toThrow("shell operator");
     });
   });
 

@@ -544,13 +544,16 @@ async function handleRecommend(
 /**
  * POST /api/commands/export — ndx export static dashboard
  *
- * `deploy: "github"` additionally pushes the exported output to the
- * `n-dx-dashboard` branch on the project's git remote (force-push — see
- * `deployToGitHubPages` in packages/core/export.js). That's a real,
- * user-visible remote write, so the trigger is opt-in via the request body
- * and the viewer gates it behind an explicit confirmation step; this route
- * does not add its own extra confirmation, matching every other
- * spawn-and-report trigger in this file.
+ * `deploy: "github"` additionally force-pushes the exported output to the
+ * `n-dx-dashboard` branch on the project's git remote (see `deployToGitHubPages`
+ * in packages/core/export.js). That is a real, irreversible remote write, so it
+ * requires `confirmDeploy: true` in the body — set by the viewer's confirmation
+ * step — and is refused (400) without it. The spawned CLI has no TTY and would
+ * refuse `--deploy=github` on its own; this route passes `--yes` to carry the
+ * confirmation already collected in the browser past that refusal. `deploy`
+ * without `confirmDeploy` is refused rather than silently downgraded, so a
+ * plain export request can never turn into a deploy. `includeTranscripts: true`
+ * maps to `--include-transcripts`; by default agent transcripts are stripped.
  */
 async function handleExport(
   req: IncomingMessage,
@@ -561,10 +564,15 @@ async function handleExport(
   let basePath: string | undefined;
   let cname: string | undefined;
   let deployGithub = false;
+  let confirmDeploy = false;
+  let includeTranscripts = false;
   try {
     const body = await readBody(req);
     if (body) {
-      const input = JSON.parse(body) as { outDir?: string; basePath?: string; cname?: string; deploy?: string };
+      const input = JSON.parse(body) as {
+        outDir?: string; basePath?: string; cname?: string; deploy?: string;
+        confirmDeploy?: boolean; includeTranscripts?: boolean;
+      };
       if (input.outDir && typeof input.outDir === "string") {
         outDir = input.outDir.trim();
       }
@@ -575,9 +583,21 @@ async function handleExport(
         cname = input.cname.trim();
       }
       deployGithub = input.deploy === "github";
+      confirmDeploy = input.confirmDeploy === true;
+      includeTranscripts = input.includeTranscripts === true;
     }
   } catch {
     // Use defaults
+  }
+
+  // `--deploy=github` force-pushes to the project's remote. The spawned CLI
+  // refuses that in this non-TTY child unless `--yes` is passed, so the viewer
+  // gates it behind an explicit confirmation step and sends `confirmDeploy`.
+  // Refuse here rather than spawn a command that will only refuse itself —
+  // and never turn a plain export request into a silent deploy.
+  if (deployGithub && !confirmDeploy) {
+    errorResponse(res, 400, "Deploy to GitHub Pages requires confirmDeploy: true (the dashboard's deploy confirmation step sets it).");
+    return true;
   }
 
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
@@ -585,7 +605,13 @@ async function handleExport(
   if (outDir) cmdArgs.push(`--out-dir=${outDir}`);
   if (basePath) cmdArgs.push(`--base-path=${basePath}`);
   if (cname) cmdArgs.push(`--cname=${cname}`);
-  if (deployGithub) cmdArgs.push("--deploy=github");
+  if (includeTranscripts) cmdArgs.push("--include-transcripts");
+  if (deployGithub) {
+    cmdArgs.push("--deploy=github");
+    // The child has no TTY; --yes carries the confirmation already collected
+    // in the browser past the CLI's own non-TTY refusal.
+    cmdArgs.push("--yes");
+  }
   cmdArgs.push(ctx.projectDir);
 
   try {

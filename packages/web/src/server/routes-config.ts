@@ -100,14 +100,41 @@ function readJSON(path: string): Record<string, unknown> | null {
   }
 }
 
+/** Deep-merge the local config layer over the shared one; objects recurse, everything else is replaced. */
+function mergeConfigLayers(
+  shared: Record<string, unknown> | null,
+  local: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!shared) return local;
+  if (!local) return shared;
+  const out: Record<string, unknown> = { ...shared };
+  for (const [key, value] of Object.entries(local)) {
+    const existing = out[key];
+    if (
+      value && typeof value === "object" && !Array.isArray(value)
+      && existing && typeof existing === "object" && !Array.isArray(existing)
+    ) {
+      out[key] = mergeConfigLayers(existing as Record<string, unknown>, value as Record<string, unknown>);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 /** Extract configuration summary from project files. */
 async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
   const henchConfigPath = join(ctx.projectDir, ".hench", "config.json");
   const ndxConfigPath = join(ctx.projectDir, ".n-dx.json");
+  const ndxLocalConfigPath = join(ctx.projectDir, ".n-dx.local.json");
   const pkgPath = join(ctx.projectDir, "package.json");
 
   const henchConfig = readJSON(henchConfigPath);
-  const ndxConfig = readJSON(ndxConfigPath);
+  // `ndx config` writes api_key and cli_path to the gitignored .n-dx.local.json,
+  // so the auth-method detection below must see the merged view or the footer
+  // reports "none" for a perfectly configured project. Local wins, as in
+  // every other reader (core config.js, @n-dx/llm-client).
+  const ndxConfig = mergeConfigLayers(readJSON(ndxConfigPath), readJSON(ndxLocalConfigPath));
   const pkgJson = readJSON(pkgPath);
 
   // Vendor and model from modern llm.* namespace
@@ -158,9 +185,12 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
         const data = await resp.json() as { data?: Array<{ id: string }> };
         const liveModel = data.data?.[0]?.id ?? null;
         if (liveModel && liveModel !== model) {
-          // Persist live model back to .n-dx.json so config stays current
+          // Persist live model back to .n-dx.json so config stays current.
+          // Start from the shared file on disk, not the merged view: the
+          // merge carries .n-dx.local.json values (api_key, cli_path) that
+          // must never be copied into the committed file.
           try {
-            const updated: Record<string, unknown> = ndxConfig ? { ...ndxConfig } : {};
+            const updated: Record<string, unknown> = readJSON(ndxConfigPath) ?? {};
             if (!updated.llm || typeof updated.llm !== "object") {
               updated.llm = { vendor: LLM_VENDOR.LOCAL };
             }

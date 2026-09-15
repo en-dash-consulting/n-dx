@@ -1,6 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { createServer, type Server } from "node:http";
+import { connect } from "node:net";
 import { describe, expect, it } from "vitest";
 import { handleRequestSecurity } from "../../src/server/request-security.js";
+import { MAX_REQUEST_BODY_BYTES } from "../../src/server/response-utils.js";
 
 interface MockResponse {
   response: ServerResponse;
@@ -21,6 +24,7 @@ function makeRequest(
     method,
     headers: normalized,
     socket: { localPort },
+    destroy: () => {},
   } as unknown as IncomingMessage;
 }
 
@@ -142,5 +146,85 @@ describe("HTTP request origin protection", () => {
 
     expect(handleRequestSecurity(req, res.response)).toBe(true);
     expect(res.status()).toBe(403);
+  });
+});
+
+describe("request body size limit", () => {
+  it("rejects a request whose Content-Length exceeds the cap with 413", () => {
+    const req = makeRequest("POST", {
+      "content-length": String(MAX_REQUEST_BODY_BYTES + 1),
+    });
+    const res = makeResponse();
+
+    expect(handleRequestSecurity(req, res.response)).toBe(true);
+    expect(res.status()).toBe(413);
+  });
+
+  it("allows a request at exactly the cap", () => {
+    const req = makeRequest("POST", {
+      "content-length": String(MAX_REQUEST_BODY_BYTES),
+    });
+    const res = makeResponse();
+
+    // Not handled by the size guard — falls through to normal processing.
+    // (No Origin header, safe path → returns false so a route can run.)
+    expect(handleRequestSecurity(req, res.response)).toBe(false);
+    expect(res.status()).toBeUndefined();
+  });
+
+  it("ignores a missing or non-numeric Content-Length", () => {
+    const cases: Record<string, string>[] = [{}, { "content-length": "not-a-number" }];
+    for (const headers of cases) {
+      const req = makeRequest("POST", headers);
+      const res = makeResponse();
+      expect(handleRequestSecurity(req, res.response)).toBe(false);
+    }
+  });
+});
+
+describe("request body size limit (integration)", () => {
+  function startServer(): Promise<{ server: Server; port: number }> {
+    return new Promise((resolve) => {
+      const server = createServer((req, res) => {
+        if (handleRequestSecurity(req, res)) return;
+        res.writeHead(200);
+        res.end("ok");
+      });
+      server.listen(0, "127.0.0.1", () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        resolve({ server, port });
+      });
+    });
+  }
+
+  it("answers 413 and closes the connection on an over-cap Content-Length", async () => {
+    const { server, port } = await startServer();
+    try {
+      const { statusLine, closed } = await new Promise<{ statusLine: string; closed: boolean }>((resolve, reject) => {
+        const socket = connect({ host: "127.0.0.1", port }, () => {
+          // Declare an over-cap body but send only a sliver — the guard rejects
+          // on the header alone, before the (never-sent) 10 MB would arrive.
+          socket.write(
+            `POST /api/anything HTTP/1.1\r\n` +
+            `Host: 127.0.0.1:${port}\r\n` +
+            `Content-Type: application/json\r\n` +
+            `Content-Length: ${MAX_REQUEST_BODY_BYTES + 1}\r\n` +
+            `\r\n` +
+            `{`,
+          );
+        });
+        let buf = "";
+        let sawResponse = false;
+        socket.on("data", (chunk: Buffer) => { buf += chunk.toString("utf-8"); if (buf.includes("\r\n")) sawResponse = true; });
+        socket.on("close", () => resolve({ statusLine: buf.split("\r\n")[0], closed: sawResponse }));
+        socket.on("error", reject);
+        setTimeout(() => reject(new Error("timeout")), 3000);
+      });
+      expect(statusLine).toContain("413");
+      expect(closed).toBe(true);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
   });
 });

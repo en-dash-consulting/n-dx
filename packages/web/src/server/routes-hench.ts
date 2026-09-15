@@ -42,6 +42,12 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import {
+  CONFIG_FIELD_META,
+  validateFieldValue,
+  getConfigValue as getNestedValue,
+  setConfigValue as setNestedValue,
+} from "./hench-config-fields.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { IncrementalTaskUsageAggregator } from "./task-usage.js";
 import {
@@ -125,36 +131,6 @@ interface RunSummary {
   invocationContext?: "cli" | "api";
 }
 
-/** Config field metadata for the UI. */
-interface ConfigFieldInfo {
-  path: string;
-  label: string;
-  description: string;
-  type: "string" | "number" | "boolean" | "enum" | "array";
-  enumValues?: string[];
-  category: string;
-}
-
-/** Known config field metadata — mirrors the CLI config module. */
-const CONFIG_FIELD_META: ConfigFieldInfo[] = [
-  { path: "provider", label: "Provider", description: "Claude provider: 'cli' (Claude Code) or 'api' (direct API)", type: "enum", enumValues: ["cli", "api"], category: "execution" },
-  { path: "model", label: "Model", description: "Claude model to use (e.g. sonnet, opus, haiku)", type: "string", category: "execution" },
-  { path: "maxTurns", label: "Max Turns", description: "Maximum conversation turns per run", type: "number", category: "execution" },
-  { path: "maxTokens", label: "Max Tokens per Request", description: "Maximum tokens per API request", type: "number", category: "execution" },
-  { path: "tokenBudget", label: "Token Budget", description: "Total token budget per run (input+output). 0 = unlimited", type: "number", category: "execution" },
-  { path: "loopPauseMs", label: "Loop Pause (ms)", description: "Pause between loop/iteration runs in milliseconds", type: "number", category: "execution" },
-  { path: "maxFailedAttempts", label: "Max Failed Attempts", description: "Consecutive failures before a task is considered stuck", type: "number", category: "task-selection" },
-  { path: "rexDir", label: "Rex Directory", description: "Path to the .rex directory for task data", type: "string", category: "task-selection" },
-  { path: "retry.maxRetries", label: "Max Retries", description: "Number of retry attempts for transient API errors", type: "number", category: "retry" },
-  { path: "retry.baseDelayMs", label: "Base Retry Delay (ms)", description: "Initial delay before first retry (doubles each attempt)", type: "number", category: "retry" },
-  { path: "retry.maxDelayMs", label: "Max Retry Delay (ms)", description: "Maximum delay between retries (caps exponential backoff)", type: "number", category: "retry" },
-  { path: "guard.blockedPaths", label: "Blocked Paths", description: "Glob patterns for paths the agent cannot modify", type: "array", category: "guard" },
-  { path: "guard.allowedCommands", label: "Allowed Commands", description: "Shell commands the agent is permitted to execute", type: "array", category: "guard" },
-  { path: "guard.commandTimeout", label: "Command Timeout (ms)", description: "Maximum time for a single command execution", type: "number", category: "guard" },
-  { path: "guard.maxFileSize", label: "Max File Size (bytes)", description: "Maximum file size the agent can write", type: "number", category: "guard" },
-  { path: "apiKeyEnv", label: "API Key Env Var", description: "Environment variable name for Anthropic API key", type: "string", category: "general" },
-];
-
 /** Default config values for detecting non-default settings. */
 const DEFAULT_CONFIG: Record<string, unknown> = {
   provider: "cli",
@@ -222,57 +198,6 @@ function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
     return JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return null;
-  }
-}
-
-/** Get a nested value from an object using dot-path notation. */
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const parts = path.split(".");
-  let current: unknown = obj;
-  for (const part of parts) {
-    if (current === null || current === undefined || typeof current !== "object") {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
-}
-
-/** Set a nested value in an object using dot-path notation. */
-function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const parts = path.split(".");
-  let current = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
-    if (!(parts[i] in current) || typeof current[parts[i]] !== "object" || current[parts[i]] === null) {
-      current[parts[i]] = {};
-    }
-    current = current[parts[i]] as Record<string, unknown>;
-  }
-  current[parts[parts.length - 1]] = value;
-}
-
-/** Basic type validation for config values. */
-function validateFieldValue(field: ConfigFieldInfo, value: unknown): string | null {
-  switch (field.type) {
-    case "number":
-      if (typeof value !== "number" || isNaN(value)) return `${field.label} must be a number`;
-      if (value < 0) return `${field.label} must be non-negative`;
-      return null;
-    case "boolean":
-      if (typeof value !== "boolean") return `${field.label} must be a boolean`;
-      return null;
-    case "enum":
-      if (field.enumValues && !field.enumValues.includes(String(value)))
-        return `${field.label} must be one of: ${field.enumValues.join(", ")}`;
-      return null;
-    case "array":
-      if (!Array.isArray(value)) return `${field.label} must be an array`;
-      return null;
-    case "string":
-      if (typeof value !== "string" || value.length === 0) return `${field.label} must be a non-empty string`;
-      return null;
-    default:
-      return null;
   }
 }
 

@@ -74,6 +74,7 @@
     "readme-generator.js",
     "git-preflight.js",
     "gitattributes-pins.js",
+    "gitignore.js",
     "self-heal-confirm.js",
     "stale-check.js",
     "commit-trailers.js",

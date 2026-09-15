@@ -12,6 +12,7 @@
  *   3. zone health check            (cohesion/coupling threshold assertions)
  *   3a. zone ID consistency         (zones.json ↔ zone output directories)
  *   3b. gateway import boundary     (cross-package imports must use gateways)
+ *   3e. config secrets              (no api_key in a git-tracked .n-dx.json)
  *   4. rex validate --format=json   (PRD health checks)
  *   5. rex status --format=json     (completion stats)
  *
@@ -22,6 +23,7 @@ import { spawn, spawnSync } from "child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
+import { findSharedSecrets } from "./config.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -203,10 +205,11 @@ async function runAnalysisPhase(dir, info, isJSON, tools, spawnTracked) {
 }
 
 /**
- * Phase: architectural boundary checks (synchronous).
- * Steps: zone health, zone ID consistency, gateway imports, architecture policy, data-layer contract.
+ * Phase: architectural boundary checks.
+ * Steps: zone health, zone ID consistency, gateway imports, architecture policy,
+ * data-layer contract, config secrets (the one async step — it reads .n-dx.json).
  */
-function runBoundaryPhase(dir, info, isJSON) {
+async function runBoundaryPhase(dir, info, isJSON) {
   const steps = [];
   let allOk = true;
 
@@ -315,6 +318,25 @@ function runBoundaryPhase(dir, info, isJSON) {
     info(`  ✗ data-layer contract`);
     if (!isJSON) {
       for (const v of dataLayerResult.violations) info(`    ✗ ${v.file}:${v.line} — ${v.message}`);
+    }
+  }
+
+  // Step 3e: config secrets
+  info("── config secrets ──");
+  const secretsResult = await checkConfigSecrets(dir);
+  if (!secretsResult.ok) allOk = false;
+  steps.push({
+    name: "config-secrets",
+    ok: secretsResult.ok,
+    detail: secretsResult.detail,
+    ...(secretsResult.secrets.length > 0 ? { secrets: secretsResult.secrets } : {}),
+  });
+  if (secretsResult.secrets.length === 0) {
+    info(`  ✓ config secrets (no API keys in .n-dx.json)`);
+  } else {
+    info(`  ${secretsResult.ok ? "⚠" : "✗"} config secrets — ${secretsResult.detail}`);
+    if (!isJSON) {
+      for (const k of secretsResult.secrets) info(`    ${secretsResult.ok ? "⚠" : "✗"} ${k}`);
     }
   }
 
@@ -455,7 +477,7 @@ export async function runCI(dir, flags, { run, tools, spawnTracked = spawn }) {
 
   const docsPhase = await runDocsPhase(dir, info, isJSON, spawnTracked);
   const analysisPhase = await runAnalysisPhase(dir, info, isJSON, tools, spawnTracked);
-  const boundaryPhase = runBoundaryPhase(dir, info, isJSON);
+  const boundaryPhase = await runBoundaryPhase(dir, info, isJSON);
   const rexPhase = await runRexPhase(dir, info, isJSON, tools, spawnTracked);
 
   const allOk = docsPhase.ok && analysisPhase.ok && boundaryPhase.ok && rexPhase.ok;
@@ -1151,6 +1173,61 @@ const ARCHITECTURE_SOURCE_FILES = ["CLAUDE.md", "gateway-rules.json", "PACKAGE_G
  * or orchestration scripts should trigger guide doc review.
  */
 const GUIDE_SOURCE_FILES = ["cli.js", "help.js", "CLAUDE.md"];
+
+/**
+ * Is `relPath` tracked by git in `cwd`? False outside a repo or without git.
+ *
+ * @param {string} relPath  Path relative to `cwd`
+ * @param {string} cwd
+ * @returns {boolean}
+ */
+function isGitTracked(relPath, cwd) {
+  try {
+    const result = spawnSync("git", ["ls-files", "--error-unmatch", "--", relPath], {
+      cwd,
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: "pipe",
+    });
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check that the shared `.n-dx.json` carries no API keys.
+ *
+ * `ndx config *.api_key` writes to `.n-dx.local.json`, but a project
+ * configured before that routing existed — or one edited by hand — can still
+ * hold a key in the shared file. The severity depends on git: a key in a
+ * *tracked* `.n-dx.json` is on (or about to be on) the remote, so the step
+ * fails; an untracked one is a warning with the fix named. Outside a git
+ * repository there is nothing to leak to, so the step passes with a note.
+ *
+ * @param {string} dir Project root
+ * @returns {Promise<{ ok: boolean, detail: string, secrets: string[] }>}
+ */
+async function checkConfigSecrets(dir) {
+  const secrets = await findSharedSecrets(dir);
+  if (secrets.length === 0) {
+    return { ok: true, detail: "no API keys in .n-dx.json", secrets };
+  }
+  const tracked = isGitTracked(".n-dx.json", dir);
+  const list = secrets.join(", ");
+  if (tracked) {
+    return {
+      ok: false,
+      detail: `.n-dx.json is committed to git and contains ${list} — rotate the key, then re-run \`ndx config <key> <value>\` so it is written to .n-dx.local.json`,
+      secrets,
+    };
+  }
+  return {
+    ok: true,
+    detail: `.n-dx.json contains ${list} — re-run \`ndx config <key> <value>\` to move it to .n-dx.local.json before committing`,
+    secrets,
+  };
+}
 
 /**
  * Get the Unix timestamp of the most recent git commit that touched a file.

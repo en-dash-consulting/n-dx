@@ -20,8 +20,63 @@
 
 import { GuardError } from "./paths.js";
 
-/** Shell metacharacters that enable command chaining or subshells. */
-const SHELL_OPERATORS = /[;&|`$]/;
+/**
+ * Shell metacharacters that are dangerous when the shell would treat them as
+ * active — command separators/background (`; & |`), substitution (`` ` `` `$`),
+ * redirection (`< >`), and subshells (`( )`). A run_command string is executed
+ * through `sh -c`, so any *unquoted* occurrence can chain a second command or
+ * redirect to a file. They are permitted inside quotes because a legitimate
+ * single command routinely carries them there — e.g. `node -e "console.log('x')"`.
+ */
+const ACTIVE_SHELL_OPERATORS = new Set([";", "&", "|", "`", "$", "<", ">", "(", ")"]);
+
+/**
+ * Scan a command line for a shell metacharacter the shell would act on.
+ *
+ * Tracks POSIX single/double-quote state so an operator inside quotes is
+ * ignored (it is a literal to the shell) while an unquoted one is reported.
+ * A raw newline or carriage return is always reported: `sh -c` treats it as a
+ * command separator, and a single-line tool invocation has no need for one —
+ * this is what closed the `"npm --version\nrm -rf ~"` bypass, which the old
+ * `/[;&|` + "`" + `$]/` test missed entirely.
+ *
+ * Conservative by construction: the quote model mirrors POSIX `sh` (single
+ * quotes are literal; double quotes allow `\` to escape; an unquoted `\`
+ * escapes the next char), so a character this scanner judges "active" is one
+ * the shell would also treat as active.
+ *
+ * @returns the offending character (or "newline"), or null if the line is clean.
+ */
+export function findActiveShellOperator(command: string): string | null {
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+
+  for (const ch of command) {
+    if (ch === "\n" || ch === "\r") return "newline";
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+      continue;
+    }
+    if (quote === '"') {
+      if (ch === "\\") escaped = true;
+      else if (ch === '"') quote = null;
+      continue;
+    }
+
+    // Unquoted.
+    if (ch === "\\") { escaped = true; continue; }
+    if (ch === "'" || ch === '"') { quote = ch; continue; }
+    if (ACTIVE_SHELL_OPERATORS.has(ch)) return ch;
+  }
+
+  return null;
+}
 
 /**
  * Patterns matching dangerous command invocations.
@@ -55,11 +110,17 @@ export function validateCommand(
     throw new GuardError("Empty command");
   }
 
-  // Block shell operators that allow chaining or subshells.
-  // Commands run via sh -c, so any of these could execute arbitrary code.
-  if (SHELL_OPERATORS.test(trimmed)) {
+  // Block shell operators the shell would act on (outside quotes, plus any raw
+  // newline). Commands run via sh -c, so an unquoted `;`, `|`, `>` or newline
+  // could chain a second command or redirect to a file — bypassing the
+  // executable allowlist below.
+  const operator = findActiveShellOperator(trimmed);
+  if (operator) {
+    const shown = operator === "newline" ? "a newline" : `"${operator}"`;
     throw new GuardError(
-      `Command contains shell operator. Commands must be simple (no ;, &, |, $, backticks): ${trimmed}`,
+      `Command contains shell operator ${shown}. Commands must be a single invocation ` +
+      `with no chaining, redirection, substitution, or subshells (metacharacters inside ` +
+      `quotes are allowed): ${trimmed}`,
     );
   }
 

@@ -242,7 +242,7 @@ ndx config llm.codex.cli_path codex .
 | `ndx dev [dir]` | Start dev server with live reload |
 | `ndx ci [dir]` | Run analysis pipeline and validate PRD health |
 | `ndx config [key] [value]` | View and edit settings (`--json`, `--help`) |
-| `ndx export [dir]` | Export static deployable dashboard (`--out-dir`, `--deploy=github`) |
+| `ndx export [dir]` | Export static deployable dashboard (`--out-dir`, `--deploy=github` confirms first — `--yes` for unattended; agent transcripts excluded unless `--include-transcripts`) |
 | `ndx prd export\|import` | Carry the PRD between machines as a portable JSON bundle (`--out`, `--in`, `--replace`), scoped to one item with `--item` (its subtree, its `blockedBy` closure, and its ancestors), or write a stakeholder document with `--format=narrative` (`--include-completed`; one-way) — distinct from `ndx export` above |
 | `ndx iso [dir]` | Render a standalone isometric architecture map (`--source=auto\|sourcevision\|scan`, `--max-nodes=N`, `--no-externals`) |
 | `ndx auth [dir]` | Check and configure LLM provider credentials |

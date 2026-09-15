@@ -122,6 +122,25 @@ describe("Config API routes", () => {
       expect(data.authMethod).toBe("api-key");
     });
 
+    it("detects api-key auth when the key lives only in .n-dx.local.json", async () => {
+      // `ndx config *.api_key` writes to the gitignored local file; the shared
+      // file may exist without the key. The footer must still show ✓.
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "claude" } }),
+      );
+      await writeFile(
+        join(tmpDir, ".n-dx.local.json"),
+        JSON.stringify({ claude: { api_key: "sk-ant-local" } }),
+      );
+
+      clearConfigCaches();
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
+      const data = await res.json();
+
+      expect(data.authMethod).toBe("api-key");
+    });
+
     it("detects cli auth method from provider", async () => {
       const henchDir = join(tmpDir, ".hench");
       await mkdir(henchDir, { recursive: true });

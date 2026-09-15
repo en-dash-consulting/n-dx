@@ -4,9 +4,12 @@
  * Implements the generic {@link LLMProvider} interface for the "google" vendor
  * in "api" mode. Uses the Generative Language API:
  *
- * - `POST /v1beta/models/{model}:generateContent?key={apiKey}` for completions
- * - `POST /v1beta/models/{model}:streamGenerateContent?key={apiKey}&alt=sse` for streaming
- * - `GET /v1beta/models?key={apiKey}` for auth validation
+ * - `POST /v1beta/models/{model}:generateContent` for completions
+ * - `POST /v1beta/models/{model}:streamGenerateContent?alt=sse` for streaming
+ * - `GET /v1beta/models` for auth validation
+ *
+ * The API key is sent in the `x-goog-api-key` request header, never in the URL
+ * query string — a `?key=` URL is recorded by proxies and egress logs.
  *
  * ## Model validation
  *
@@ -262,6 +265,10 @@ export function createGoogleApiProvider(
       false,
     );
   }
+  // The guard above narrows apiKey to string, but that narrowing does not flow
+  // into the nested closures below (a closure sees the declared type). Capture
+  // it so authHeaders/validateAuth can put it in a string-typed header value.
+  const resolvedApiKey: string = apiKey;
 
   const defaultModel = googleConfig?.model ?? DEFAULT_MODEL;
   // Validate the configured default model at construction time.
@@ -282,11 +289,21 @@ export function createGoogleApiProvider(
   /**
    * Build the full request URL for a given model and action.
    *
-   * Appends the API key as a query parameter (required by the Gemini REST API).
+   * The API key is NOT in the URL — it travels in the `x-goog-api-key` header
+   * (see {@link authHeaders}) so it never reaches a proxy or egress log.
    */
   function buildUrl(model: string, action: "generateContent" | "streamGenerateContent"): string {
-    const base = `${baseUrl}/models/${encodeURIComponent(model)}:${action}?key=${apiKey}`;
-    return action === "streamGenerateContent" ? `${base}&alt=sse` : base;
+    const base = `${baseUrl}/models/${encodeURIComponent(model)}:${action}`;
+    return action === "streamGenerateContent" ? `${base}?alt=sse` : base;
+  }
+
+  /**
+   * Request headers carrying JSON content type and the Gemini API key. The key
+   * goes here rather than in the URL query string so it is not captured by
+   * proxies, egress logs, or a future URL-logging debug path.
+   */
+  function authHeaders(): Record<string, string> {
+    return { "Content-Type": "application/json", "x-goog-api-key": resolvedApiKey };
   }
 
   /**
@@ -336,7 +353,7 @@ export function createGoogleApiProvider(
         try {
           const response = await fetch(buildUrl(model, "generateContent"), {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: authHeaders(),
             body: buildToolBody(args),
           });
 
@@ -422,8 +439,9 @@ export function createGoogleApiProvider(
 
     async validateAuth(): Promise<boolean> {
       try {
-        const response = await fetch(`${baseUrl}/models?key=${apiKey}`, {
+        const response = await fetch(`${baseUrl}/models`, {
           method: "GET",
+          headers: { "x-goog-api-key": resolvedApiKey },
         });
         if (response.status === 401 || response.status === 403) {
           return false;
@@ -457,7 +475,7 @@ export function createGoogleApiProvider(
         try {
           const response = await fetch(buildUrl(model, "generateContent"), {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: authHeaders(),
             body: buildBody(request.prompt),
           });
 
@@ -524,7 +542,7 @@ export function createGoogleApiProvider(
 
       const response = await fetch(buildUrl(model, "streamGenerateContent"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(),
         body: buildBody(request.prompt),
       });
 

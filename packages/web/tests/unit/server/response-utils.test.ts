@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
-import { jsonResponse, errorResponse } from "../../../src/server/response-utils.js";
+import { EventEmitter } from "node:events";
+import { jsonResponse, errorResponse, readBody, MAX_REQUEST_BODY_BYTES } from "../../../src/server/response-utils.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal test server that calls a handler and captures the response. */
@@ -116,5 +117,42 @@ describe("errorResponse", () => {
     } finally {
       await closeRouteTestServer(server);
     }
+  });
+});
+
+describe("readBody size cap", () => {
+  /** A minimal IncomingMessage stand-in: an event emitter with a spied destroy. */
+  function fakeRequest(): IncomingMessage & { destroyed: boolean } {
+    const req = new EventEmitter() as unknown as IncomingMessage & { destroyed: boolean };
+    req.destroyed = false;
+    (req as unknown as { destroy: () => void }).destroy = () => { (req as { destroyed: boolean }).destroyed = true; };
+    return req;
+  }
+
+  it("resolves a normal body unchanged", async () => {
+    const req = fakeRequest();
+    const promise = readBody(req);
+    req.emit("data", Buffer.from('{"a":1}'));
+    req.emit("end");
+    expect(await promise).toBe('{"a":1}');
+  });
+
+  it("rejects and destroys the request when the body exceeds the cap", async () => {
+    const req = fakeRequest();
+    const promise = readBody(req);
+    // Two chunks straddling the cap so the overflow is detected mid-stream,
+    // not only from a single oversized allocation.
+    req.emit("data", Buffer.alloc(MAX_REQUEST_BODY_BYTES - 1));
+    req.emit("data", Buffer.alloc(2));
+    await expect(promise).rejects.toThrow(/exceeds the .* limit/);
+    expect((req as { destroyed: boolean }).destroyed).toBe(true);
+  });
+
+  it("accepts a body exactly at the cap", async () => {
+    const req = fakeRequest();
+    const promise = readBody(req);
+    req.emit("data", Buffer.alloc(MAX_REQUEST_BODY_BYTES));
+    req.emit("end");
+    expect((await promise).length).toBe(MAX_REQUEST_BODY_BYTES);
   });
 });
