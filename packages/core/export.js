@@ -152,16 +152,97 @@ function getGitInfo(dir) {
   }
 }
 
+// ── Run-record export allowlist ──────────────────────────────────────────────
+//
+// A `.hench/runs/*.json` record carries the agent's raw activity: every
+// `toolCalls[].input`/`output`, the `events` stream, `error` bodies, raw
+// test-runner output, the literal command lines the agent ran. Any of those
+// can contain whatever the agent read or printed — `.env` contents, a
+// `process.env` dump, an `Authorization:` header typed into a `curl`.
+//
+// This is an ALLOWLIST, and deliberately so. It replaced a denylist that
+// deleted five named fields and published the rest, which meant every field
+// added to `RunRecord` — and they land regularly, see the `v1 additive field`
+// comments in `packages/hench/src/schema/v1.ts` — was published by default and
+// was a leak until someone remembered to deny it. Adding a field to the schema
+// must not be able to change what `ndx export` publishes. If a new field needs
+// to reach the static dashboard, it goes in one of the lists below, and that
+// edit is the review point.
+//
+// The lists carry only what the deployed viewer actually renders (see
+// `RunSummary`/`RunDetail` in `packages/web/src/viewer/views/hench-runs.ts`)
+// plus the numeric rollups. Two deliberate omissions that are *not* oversights:
+//
+//  - `cliPath` — the viewer does render it, but it is an absolute path on the
+//    operator's machine (`/Users/<name>/…`), and `--deploy=github` force-pushes
+//    the export to a public branch. The viewer treats it as optional.
+//  - `actor` / `host` — the run's git identity (name + email) and hostname.
+//    Nothing renders them, and they identify a person, not the work.
+
+/** Top-level `RunRecord` fields copied verbatim onto an exported record. */
+const EXPORTED_RUN_FIELDS = Object.freeze([
+  "id", "taskId", "taskTitle",
+  "startedAt", "finishedAt", "lastActivityAt",
+  "status", "turns", "summary",
+  "model", "vendor", "weight", "ndxVersion",
+  "invocationContext", "assisted",
+]);
+
+/** `TokenUsage` / `RunTokens` / `TurnTokenUsage` — numeric, plus vendor labels. */
+const EXPORTED_TOKEN_USAGE_FIELDS = Object.freeze(["input", "output", "cacheCreationInput", "cacheReadInput"]);
+const EXPORTED_RUN_TOKENS_FIELDS = Object.freeze(["input", "output", "cached", "total"]);
+const EXPORTED_TURN_TOKEN_FIELDS = Object.freeze([
+  "turn", "input", "output", "cacheCreationInput", "cacheReadInput", "vendor", "model", "diagnosticStatus",
+]);
+
+/** `SummaryCounts` — the activity counters the run detail view renders. */
+const EXPORTED_COUNT_FIELDS = Object.freeze([
+  "filesRead", "filesChanged", "commandsExecuted", "testsRun", "toolCallsTotal",
+]);
+
 /**
- * Remove transcript-bearing fields from a hench run record for export.
+ * `RunDiagnostics` — vendor/parse labels only.
  *
- * A `.hench/runs/*.json` record carries the agent's raw activity — every
- * `toolCalls[].input`/`output`, the `events` stream, `error` bodies, prompt
- * section text, and the test-gate error. Any of these can contain whatever the
- * agent read or printed: `.env` contents, a `process.env` dump, fixture data.
- * The exported dashboard only needs the *summary* of a run (status, token
- * usage, structured counts), so strip the rest by default and mark the record
- * so the static Task Audit view can explain the absence.
+ * `notes[]` is free text set by the vendor wrapper and `promptSections` is
+ * prompt composition detail; neither is needed to explain a run's outcome.
+ */
+const EXPORTED_DIAGNOSTIC_FIELDS = Object.freeze([
+  "tokenDiagnosticStatus", "parseMode", "vendor", "sandbox", "approvals",
+]);
+
+/**
+ * `TestGateResult` — the verdict, never the output.
+ *
+ * `ran` is what distinguishes "did not run" from "failed"; see the interface
+ * docblock in the hench schema. `packages[].failureOutput` is raw test-runner
+ * stdout and stays out.
+ */
+const EXPORTED_TEST_GATE_FIELDS = Object.freeze(["ran", "passed", "totalDurationMs"]);
+
+/** `RunReviewRecord` — counts only; `failed`/`detail`/`reportPath` are free text or local paths. */
+const EXPORTED_REVIEW_FIELDS = Object.freeze([
+  "findingCount", "unresolvedCount", "unrepairedMustFixCount", "failedActionCount", "fixesApplied", "resumedSession", "model",
+]);
+
+/**
+ * Copy `fields` from `src` into a fresh object, skipping absent keys.
+ * Returns undefined when `src` is not an object, so callers can omit the key.
+ */
+function pickFields(src, fields) {
+  if (!src || typeof src !== "object" || Array.isArray(src)) return undefined;
+  const out = {};
+  for (const key of fields) {
+    if (src[key] !== undefined) out[key] = src[key];
+  }
+  return out;
+}
+
+/**
+ * Build the published form of a hench run record — the per-run detail file.
+ *
+ * Copies only the fields named in the allowlist above and marks the record so
+ * the viewer can explain the absence of a transcript. Anything not named is
+ * dropped, including fields that did not exist when this was written.
  *
  * Pure: returns a new object, never mutates `run`. Pass
  * `{ includeTranscripts: true }` to opt back into the full record.
@@ -172,20 +253,86 @@ function getGitInfo(dir) {
  */
 export function sanitizeRunForExport(run, opts = {}) {
   if (opts.includeTranscripts) return run;
-  const out = { ...run };
-  delete out.toolCalls;
-  delete out.events;
-  delete out.error;
-  if (out.diagnostics && typeof out.diagnostics === "object") {
-    out.diagnostics = { ...out.diagnostics };
-    delete out.diagnostics.promptSections;
+
+  const out = pickFields(run, EXPORTED_RUN_FIELDS);
+
+  const tokenUsage = pickFields(run.tokenUsage, EXPORTED_TOKEN_USAGE_FIELDS);
+  if (tokenUsage) out.tokenUsage = tokenUsage;
+  const tokens = pickFields(run.tokens, EXPORTED_RUN_TOKENS_FIELDS);
+  if (tokens) out.tokens = tokens;
+  if (Array.isArray(run.turnTokenUsage)) {
+    out.turnTokenUsage = run.turnTokenUsage.map((turn) => pickFields(turn, EXPORTED_TURN_TOKEN_FIELDS) ?? {});
   }
-  if (out.testGate && typeof out.testGate === "object") {
-    out.testGate = { ...out.testGate };
-    delete out.testGate.error;
+
+  if (run.structuredSummary && typeof run.structuredSummary === "object") {
+    const structured = {};
+    const counts = pickFields(run.structuredSummary.counts, EXPORTED_COUNT_FIELDS);
+    if (counts) structured.counts = counts;
+    // "STATUS\tPATH" entries from git diff-tree — repo-relative paths, which
+    // the export already publishes wholesale in the sourcevision inventory.
+    if (Array.isArray(run.structuredSummary.fileChangesWithStatus)) {
+      structured.fileChangesWithStatus = run.structuredSummary.fileChangesWithStatus.filter((e) => typeof e === "string");
+    }
+    out.structuredSummary = structured;
   }
+
+  const diagnostics = pickFields(run.diagnostics, EXPORTED_DIAGNOSTIC_FIELDS);
+  if (diagnostics) out.diagnostics = diagnostics;
+  const testGate = pickFields(run.testGate, EXPORTED_TEST_GATE_FIELDS);
+  if (testGate) out.testGate = testGate;
+  const review = pickFields(run.review, EXPORTED_REVIEW_FIELDS);
+  if (review) out.review = review;
+
   out.transcriptOmitted = true;
   return out;
+}
+
+/**
+ * Build one entry of the `api/hench/runs.json` index.
+ *
+ * The index is loaded first by the static dashboard and is what the runs list
+ * renders from, so it gets its own, narrower allowlist — mirroring the live
+ * server's `toRunSummary` (`packages/web/src/server/routes-hench.ts`) so the
+ * two surfaces agree on what a run summary is.
+ *
+ * `error` is transcript-bearing (a failure body can echo whatever the agent
+ * read) and is published only under `--include-transcripts`; otherwise the
+ * entry carries `transcriptOmitted` so the list can say why it is missing.
+ *
+ * @param {Record<string, unknown>} run
+ * @param {{ includeTranscripts?: boolean }} [opts]
+ * @returns {Record<string, unknown>}
+ */
+export function summarizeRunForExport(run, opts = {}) {
+  const usage = (run.tokenUsage && typeof run.tokenUsage === "object") ? run.tokenUsage : {};
+  const diagnostics = (run.diagnostics && typeof run.diagnostics === "object") ? run.diagnostics : {};
+  const counts = pickFields(run.structuredSummary?.counts, EXPORTED_COUNT_FIELDS);
+
+  const entry = {
+    id: run.id,
+    taskId: run.taskId,
+    taskTitle: run.taskTitle,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+    lastActivityAt: run.lastActivityAt,
+    status: run.status,
+    turns: run.turns || 0,
+    summary: run.summary,
+    model: run.model,
+    vendor: run.vendor ?? diagnostics.vendor,
+    tokenDiagnosticStatus: diagnostics.tokenDiagnosticStatus,
+    invocationContext: run.invocationContext,
+    tokenUsage: {
+      input: usage.input || 0,
+      output: usage.output || 0,
+      cacheCreationInput: usage.cacheCreationInput,
+      cacheReadInput: usage.cacheReadInput,
+    },
+  };
+  if (counts) entry.structuredSummary = { counts };
+  if (opts.includeTranscripts) entry.error = run.error;
+  else entry.transcriptOmitted = true;
+  return entry;
 }
 
 /** Count files matching `pred` anywhere under `root`. Missing root → 0. */
@@ -229,7 +376,7 @@ export function formatDeployManifest(m) {
     `  Remote:       ${m.remote ?? "(no origin remote configured)"}`,
     `  Branch:       ${m.branch} (overwritten)`,
     `  Publishes:    ${m.itemCount} PRD item file(s), ${m.runCount} hench run summary(ies), and SourceVision analysis data`,
-    `  Transcripts:  ${m.includeTranscripts ? "INCLUDED (tool inputs/outputs, events, errors)" : "excluded (tool inputs/outputs, events, errors are not published)"}`,
+    `  Transcripts:  ${m.includeTranscripts ? "INCLUDED (tool inputs/outputs, events, errors, test output, commands run)" : "excluded (run summaries only — no tool output, test output, commands run, or error text is published)"}`,
     "  Anyone with access to the remote can read this, and it cannot be undone from here.",
   ];
 }
@@ -454,27 +601,10 @@ export async function runExport(args) {
         // Individual run — transcripts stripped unless --include-transcripts.
         writeJSON(join(outDir, "api", "hench", "runs", `${run.id}.json`), sanitizeRunForExport(run, { includeTranscripts }));
 
-        // Summary (strip heavy fields)
-        runs.push({
-          id: run.id,
-          taskId: run.taskId,
-          taskTitle: run.taskTitle,
-          startedAt: run.startedAt,
-          finishedAt: run.finishedAt,
-          lastActivityAt: run.lastActivityAt,
-          status: run.status,
-          turns: run.turns || 0,
-          summary: run.summary,
-          error: run.error,
-          model: run.model,
-          tokenUsage: {
-            input: usage.input || 0,
-            output: usage.output || 0,
-            cacheCreationInput: usage.cacheCreationInput,
-            cacheReadInput: usage.cacheReadInput,
-          },
-          structuredSummary: run.structuredSummary,
-        });
+        // Index entry — allowlisted, same as the detail file. This used to copy
+        // `error` and the whole `structuredSummary` (which carries raw
+        // post-run test output and the literal commands the agent ran).
+        runs.push(summarizeRunForExport(run, { includeTranscripts }));
       } catch { /* skip malformed run files */ }
     }
     runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));

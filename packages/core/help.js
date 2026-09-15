@@ -1134,10 +1134,14 @@ const ORCHESTRATOR_HELP_DEFS = {
           "Published:     PRD items (titles, descriptions, acceptance criteria,\n" +
           "               status), SourceVision analysis data (file inventory,\n" +
           "               import graph, zones), and hench run summaries (status,\n" +
-          "               token usage, files changed).\n" +
-          "Not published: agent transcripts — tool-call inputs and outputs, event\n" +
-          "               streams, and error bodies. These can contain anything the\n" +
-          "               agent read or printed (.env contents, fixture data).\n" +
+          "               token usage, activity counts).\n" +
+          "Not published: anything free-text a run recorded — tool-call inputs and\n" +
+          "               outputs, event streams, error bodies, test-runner output,\n" +
+          "               and the command lines the agent ran. These can contain\n" +
+          "               anything the agent read or printed (.env contents, an env\n" +
+          "               dump from a failing test, an inline API token).\n" +
+          "               A run record is published through an allowlist, so a field\n" +
+          "               added to it later is excluded until named there.\n" +
           "               Pass --include-transcripts to publish them deliberately.\n" +
           "\n" +
           "--deploy=github force-pushes the export to origin/n-dx-dashboard. It\n" +
@@ -1150,7 +1154,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--base-path=<path>", description: "Base URL path for deployment (default: /)" },
       { flag: "--deploy=github", description: "Push to the n-dx-dashboard branch for GitHub Pages (asks first)" },
       { flag: "--yes", description: "Skip the deploy confirmation (required when stdin is not a TTY)" },
-      { flag: "--include-transcripts", description: "Publish hench tool-call transcripts, events and error bodies" },
+      { flag: "--include-transcripts", description: "Publish the full hench run records — transcripts, events, test and error output" },
     ],
     examples: [
       { command: "ndx export", description: "Export to ./ndx-export" },

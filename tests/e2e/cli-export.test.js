@@ -91,6 +91,71 @@ describe("ndx export", () => {
     });
   });
 
+  describe("published run records", () => {
+    // A run record whose free-text fields all carry the same sentinel. The
+    // published files are written in step 3 of the export, before the viewer
+    // assets are needed, so this assertion holds whether or not the viewer is
+    // built in the checkout running the test.
+    const SENTINEL = "sk-ant-api03-LEAKED-FROM-DOTENV";
+
+    async function writeLeakyRun() {
+      await writeFile(join(dir, ".hench", "runs", "run-1.json"), JSON.stringify({
+        id: "run-1",
+        taskId: "t1",
+        taskTitle: "Wire the thing",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        status: "failed",
+        turns: 2,
+        error: `ENOENT while reading ${SENTINEL}`,
+        tokenUsage: { input: 1, output: 1 },
+        structuredSummary: {
+          counts: { filesRead: 1, filesChanged: 1, commandsExecuted: 1, testsRun: 1, toolCallsTotal: 2 },
+          commandsExecuted: [{ command: `curl -H "Authorization: Bearer ${SENTINEL}" https://x`, exitStatus: "ok", durationMs: 1 }],
+          testsRun: [{ command: `pnpm test # ${SENTINEL}`, passed: false, durationMs: 1 }],
+          postRunTests: { ran: true, passed: false, output: `env dump: KEY=${SENTINEL}`, error: `spawn: ${SENTINEL}`, targetedFiles: [] },
+        },
+        testGate: {
+          ran: true,
+          passed: false,
+          packages: [{ name: "packages/hench", passed: false, failureOutput: `AssertionError: ${SENTINEL}` }],
+          error: `vitest: ${SENTINEL}`,
+        },
+        dependencyAudit: { ran: false, skipped: false, error: `audit: ${SENTINEL}`, commands: { audit: { command: "pnpm audit", exitCode: null, ran: false, error: `spawn ENOENT ${SENTINEL}` } } },
+        cleanupTransformations: { ran: true, appliedCount: 0, rolledBackCount: 1, batches: [{ transformations: [], validated: false, rolledBack: true, error: `tsc: ${SENTINEL}` }], error: `cleanup: ${SENTINEL}` },
+        diagnostics: { tokenDiagnosticStatus: "complete", parseMode: "stream-json", notes: [`codex_usage_missing: ${SENTINEL}`] },
+        toolCalls: [{ turn: 1, tool: "read_file", input: { path: ".env" }, output: SENTINEL, durationMs: 1 }],
+      }));
+    }
+
+    it("strip every free-text field from the per-run file and the index", async () => {
+      await writeLeakyRun();
+      ndx(["export", dir], dir);
+
+      const outDir = join(dir, "ndx-export", "api", "hench");
+      const detail = await readFile(join(outDir, "runs", "run-1.json"), "utf-8");
+      const index = await readFile(join(outDir, "runs.json"), "utf-8");
+
+      expect(detail).not.toContain(SENTINEL);
+      expect(index).not.toContain(SENTINEL);
+
+      // …and the run is still there, summarised, not silently dropped.
+      const parsed = JSON.parse(index);
+      expect(parsed.total).toBe(1);
+      expect(parsed.runs[0].id).toBe("run-1");
+      expect(parsed.runs[0].status).toBe("failed");
+      expect(parsed.runs[0].transcriptOmitted).toBe(true);
+      expect(JSON.parse(detail).structuredSummary.counts.toolCallsTotal).toBe(2);
+    });
+
+    it("publish the full record under --include-transcripts", async () => {
+      await writeLeakyRun();
+      ndx(["export", "--include-transcripts", dir], dir);
+
+      const outDir = join(dir, "ndx-export", "api", "hench");
+      expect(await readFile(join(outDir, "runs", "run-1.json"), "utf-8")).toContain(SENTINEL);
+    });
+  });
+
   describe("output directory hygiene", () => {
     it("gitignores the default out-dir when export runs inside the project", async () => {
       // Even a run that stops at the gate must not leave `ndx-export/`
