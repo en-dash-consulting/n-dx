@@ -14,8 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
-import { initGitFixtureRepoSync } from "../helpers/index.js";
+import { commitGitFixtureBaseline } from "../helpers/index.js";
 import { initConfig } from "../../src/store/config.js";
 import { defaultRegistry } from "../../src/prd/llm-gateway.js";
 import type {
@@ -62,9 +61,7 @@ describe("livelock detection in the agent loop", () => {
 
     // Completion validation is git-derived. Give every fixture a deterministic
     // baseline before the loop's tracked-file writes begin.
-    initGitFixtureRepoSync(projectDir);
-    execFileSync("git", ["add", "-A"], { cwd: projectDir, stdio: "ignore" });
-    execFileSync("git", ["commit", "-m", "baseline"], { cwd: projectDir, stdio: "ignore" });
+    commitGitFixtureBaseline(projectDir);
   });
 
   afterEach(async () => {

@@ -13,8 +13,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // validateCompletion runs git and the test command through exec, which SPAWNS
 // rather than calling execFile: execFile drops the `detached` option and so
 // cannot make a child a process-group leader.
+//
+// `execFile` must invoke its callback. `execStdout` — which changed-file
+// discovery uses to locate the project inside its repository — wraps execFile
+// in a promise that only settles from that callback, so a bare `vi.fn()`
+// stub makes every test in this file hang until the 30s timeout rather than
+// fail with a readable message. Answering with empty stdout is the right
+// default here: it means "no repo root reported", i.e. the project is the
+// repository root, which is what these fixtures describe.
 vi.mock("node:child_process", () => ({
-  execFile: vi.fn(),
+  execFile: vi.fn((..._args: unknown[]) => {
+    const callback = _args.findLast((arg) => typeof arg === "function");
+    if (callback) (callback as (e: null, o: string, r: string) => void)(null, "", "");
+  }),
   spawn: vi.fn(),
 }));
 

@@ -24,10 +24,28 @@
  * untracked files that were already present when the run started: those are
  * the user's, not this run's.
  *
+ * ## Why an unborn HEAD is not a failure
+ *
+ * A repository with no commits has no HEAD to diff against, so `git diff`
+ * fails exactly as it does outside a repository. Reading both as "git could
+ * not answer" made every completion claim in a freshly `git init`-ed project
+ * unverifiable: the agent wrote real files, the gate saw no evidence, and the
+ * run failed with "No changes detected" — permanently, since nothing the
+ * agent could do would produce a commit to diff from. An unborn HEAD is a
+ * *known* baseline of nothing, so the working tree is read from
+ * `git status` instead and everything in it counts.
+ *
  * @module hench/validation/changed-files
  */
 
 import { exec } from "../process/exec.js";
+import {
+  isHenchRuntimeArtifact,
+  matchesProjectPath,
+  parsePorcelainPath,
+  repoRelativePrefix,
+  splitPorcelainLines,
+} from "../store/artifacts.js";
 
 const GIT_TIMEOUT = 10_000;
 
@@ -43,42 +61,92 @@ const GIT_TIMEOUT = 10_000;
  * no code at all — and a pre-existing failure anywhere in the workspace then
  * fails the run and resets a task that was never the cause.
  *
- * Git emits forward-slash paths on every platform, so prefix matching is safe.
+ * Project-relative with a trailing slash, matched through
+ * {@link matchesProjectPath} rather than a bare `startsWith`. Git reports
+ * porcelain and diff paths relative to the *repository* root, so in a project
+ * nested below that root the real lines read `sub/.rex/…` and a bare prefix
+ * test misses every one of them — every run then "changed files" on its own
+ * status write alone, which is exactly the vacuous gate this list exists to
+ * prevent.
  */
 const BOOKKEEPING_PREFIXES = [".rex/", ".hench/"];
 
-function isBookkeepingPath(path: string): boolean {
-  return BOOKKEEPING_PREFIXES.some((prefix) => path.startsWith(prefix));
+/**
+ * Decide, for one repository, whether a path is hench's own bookkeeping.
+ *
+ * Combines the PRD/run-record directories above with
+ * {@link isHenchRuntimeArtifact}, hench's shared runtime-artifact list. The
+ * second is not redundant: `.hench-commit-msg.txt` is the commit-message
+ * handoff hench writes at the repository *root*, so it is under neither
+ * `.rex/` nor `.hench/`, and a run whose only output was that file used to
+ * satisfy the completion gate on hench's own scratch file.
+ *
+ * `repoPrefix` comes from {@link repoRelativePrefix} — see the note on
+ * {@link BOOKKEEPING_PREFIXES} for why it is required.
+ */
+function makeBookkeepingFilter(repoPrefix: string): (path: string) => boolean {
+  return (path: string) =>
+    matchesProjectPath(path, BOOKKEEPING_PREFIXES, repoPrefix) ||
+    isHenchRuntimeArtifact(path, repoPrefix);
+}
+
+/** One `git status --porcelain` entry, reduced to what this module needs. */
+interface StatusEntry {
+  path: string;
+  /** True for a `??` line — a file git has never been told about. */
+  untracked: boolean;
 }
 
 /**
- * List untracked files individually.
+ * List working-tree status entries individually.
  *
  * Deliberately not `listUntrackedPaths` from `./review.js`: that uses a plain
  * `--porcelain`, which collapses a new directory to a single `src/` entry.
  * That is the right granularity for the rollback path it serves (`git clean
  * -fd -- src/` removes the tree), but useless here — the test gate aggregates
  * results per file path, and `src/` names no file and maps to no package.
+ *
+ * Tracked entries are returned alongside the untracked ones because the
+ * unborn-HEAD baseline has no diff to read them from; see
+ * {@link discoverChangedFiles}.
  */
-async function listUntrackedFiles(projectDir: string, timeout: number): Promise<string[]> {
+async function listStatusEntries(projectDir: string, timeout: number): Promise<StatusEntry[]> {
   const result = await exec(
     "git",
     ["status", "--porcelain", "--untracked-files=all"],
     { cwd: projectDir, timeout },
   );
   if (result.exitCode !== 0) return [];
-  return result.stdout
-    .split("\n")
-    .filter((line) => line.startsWith("?? "))
-    .map((line) => {
-      // Paths with spaces or special characters come back double-quoted.
-      let path = line.slice(3).trim();
-      if (path.length >= 2 && path.startsWith('"') && path.endsWith('"')) {
-        path = path.slice(1, -1);
-      }
-      return path;
-    })
-    .filter(Boolean);
+  return splitPorcelainLines(result.stdout)
+    .map((line) => ({ path: parsePorcelainPath(line), untracked: line.startsWith("??") }))
+    .filter((entry) => entry.path.length > 0);
+}
+
+/**
+ * True when `projectDir` is inside a repository whose HEAD has no commit yet.
+ *
+ * This is a *known* baseline, not a missing one: a repository with no commits
+ * started from nothing, so everything present is the run's work. Telling it
+ * apart from "not a repository" is the whole point — `git diff HEAD` fails
+ * identically in both cases, and collapsing them made every completion claim
+ * in a freshly `git init`-ed project unverifiable, so a run that wrote real
+ * files was rejected with "No changes detected" and could never finish.
+ */
+async function hasUnbornHead(projectDir: string, timeout: number): Promise<boolean> {
+  const inWorkTree = await exec("git", ["rev-parse", "--is-inside-work-tree"], {
+    cwd: projectDir,
+    timeout,
+  }).catch(() => undefined);
+  if (!inWorkTree || inWorkTree.exitCode !== 0 || inWorkTree.stdout.trim() !== "true") {
+    return false;
+  }
+
+  // `--verify --quiet` exits non-zero on an unborn HEAD and prints nothing.
+  const head = await exec("git", ["rev-parse", "--verify", "--quiet", "HEAD"], {
+    cwd: projectDir,
+    timeout,
+  }).catch(() => undefined);
+  return head !== undefined && head.exitCode !== 0;
 }
 
 export interface DiscoverChangedFilesOptions {
@@ -113,29 +181,45 @@ export async function discoverChangedFiles(
     cwd: projectDir,
     timeout,
   }).catch(() => undefined);
+  const diffOutput = diff !== undefined && diff.exitCode === 0 ? diff.stdout : undefined;
 
-  // A non-zero exit means the question could not be answered — not a git
-  // repo, or a baseline commit this repo does not have (e.g. the run started
-  // on a branch that was since rewritten). Either way, say so.
-  if (!diff || diff.exitCode !== 0) return undefined;
+  // A non-zero exit usually means the question could not be answered — not a
+  // git repo, or a baseline commit this repo does not have (e.g. the run
+  // started on a branch that was since rewritten). The one case that is *not*
+  // unanswerable is a repository with no commits yet: its baseline is known,
+  // and it is nothing, so the working tree below is the whole answer. Gated on
+  // no starting head having been captured, because a caller that named a
+  // commit named one this repository does not have — still unanswerable.
+  const unborn =
+    diffOutput === undefined &&
+    !startingHead?.trim() &&
+    (await hasUnbornHead(projectDir, timeout));
+  if (diffOutput === undefined && !unborn) return undefined;
 
-  const changed = new Set(
-    diff.stdout
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .filter((path) => !isBookkeepingPath(path)),
-  );
+  const isBookkeepingPath = makeBookkeepingFilter(await repoRelativePrefix(projectDir));
 
-  // Untracked files never appear in a diff, so add them explicitly. A failure
-  // here is not fatal: the diff-derived set is still better than nothing.
+  const changed = new Set<string>();
+  for (const line of (diffOutput ?? "").split("\n")) {
+    const path = line.trim();
+    if (path && !isBookkeepingPath(path)) changed.add(path);
+  }
+
+  // Untracked files never appear in a diff, so add them explicitly. On an
+  // unborn HEAD neither do tracked ones — there is no commit to diff against,
+  // so the index's own additions are read from the same status output. A
+  // failure here is not fatal: the diff-derived set is still better than
+  // nothing.
   try {
-    const untracked = await listUntrackedFiles(projectDir, timeout);
     // The baseline may name a directory (that is what the rollback snapshot
     // records), so exclude by prefix as well as by exact match.
     const excluded = baselineUntracked ?? [];
-    for (const path of untracked) {
+    for (const { path, untracked } of await listStatusEntries(projectDir, timeout)) {
       if (isBookkeepingPath(path)) continue;
+      if (!untracked) {
+        // Tracked changes came from the diff, except when there was none.
+        if (unborn) changed.add(path);
+        continue;
+      }
       const wasPresent = excluded.some(
         (base) => base === path || (base.endsWith("/") && path.startsWith(base)),
       );

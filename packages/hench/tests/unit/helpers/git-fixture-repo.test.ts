@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import {
   initGitFixtureRepo,
   initGitFixtureRepoSync,
+  commitGitFixtureBaseline,
   cleanupProjectDir,
 } from "../../helpers/index.js";
 
@@ -81,5 +82,26 @@ describe("git fixture repos", () => {
     expect(await configValue("core.autocrlf")).toBe("false");
     expect(await configValue("core.eol")).toBe("lf");
     expect(await lfSurvivesCheckout()).toBe("export const x = 1;\n");
+  });
+
+  it("disables commit signing, which the fixture identity could not satisfy", async () => {
+    await initGitFixtureRepo(dir);
+
+    expect(await configValue("commit.gpgsign")).toBe("false");
+  });
+
+  it("commits a baseline and returns the commit it created", async () => {
+    // Completion is git-derived, so a fixture repo without a commit gives the
+    // gate a different question than production ever asks.
+    await writeFile(join(dir, "src.ts"), "export const x = 1;\n", "utf-8");
+
+    const head = commitGitFixtureBaseline(dir);
+
+    const { stdout } = await run("git", ["rev-parse", "HEAD"], { cwd: dir });
+    expect(head).toBe(stdout.trim());
+    expect(head).toMatch(/^[0-9a-f]{40,64}$/);
+
+    const { stdout: tracked } = await run("git", ["ls-files"], { cwd: dir });
+    expect(tracked.trim()).toBe("src.ts");
   });
 });

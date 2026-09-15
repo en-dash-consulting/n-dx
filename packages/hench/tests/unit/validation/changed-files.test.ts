@@ -184,4 +184,110 @@ describe("discoverChangedFiles", () => {
     });
     expect(changed).toBeUndefined();
   });
+
+  it("excludes .hench-commit-msg.txt — hench writes its own commit handoff", async () => {
+    // It sits at the repository root, so neither the `.rex/` nor the `.hench/`
+    // prefix covers it. A run whose only output was hench's own scratch file
+    // used to satisfy the completion gate on it.
+    await writeFile(join(repoDir, ".hench-commit-msg.txt"), "feat: something\n");
+
+    expect(await discoverChangedFiles({ projectDir: repoDir, startingHead })).toEqual([]);
+  });
+
+  describe("a project nested below the repository root", () => {
+    // git reports diff and porcelain paths relative to the REPOSITORY root, so
+    // every bookkeeping path arrives as `sub/.rex/…`. A bare prefix test
+    // matched none of them and hench's own status write counted as the run's
+    // work — the completion gate accepting a run that produced no code.
+    let projectDir: string;
+
+    beforeEach(async () => {
+      projectDir = join(repoDir, "sub");
+      await mkdir(join(projectDir, ".rex/prd_tree/some-epic"), { recursive: true });
+      await writeFile(join(projectDir, ".rex/prd_tree/some-epic/index.md"), "status: pending\n");
+      await writeFile(join(projectDir, "base.ts"), "export const base = 1;\n");
+      git(repoDir, "add", "-A");
+      git(repoDir, "commit", "-m", "nested baseline");
+      startingHead = git(repoDir, "rev-parse", "HEAD").trim();
+    });
+
+    it("excludes the project's own bookkeeping writes", async () => {
+      await writeFile(join(projectDir, ".rex/prd_tree/some-epic/index.md"), "status: in_progress\n");
+      await writeFile(join(projectDir, ".hench-commit-msg.txt"), "feat: something\n");
+      await mkdir(join(projectDir, ".hench/runs"), { recursive: true });
+      await writeFile(join(projectDir, ".hench/runs/run-1.json"), "{}\n");
+
+      expect(await discoverChangedFiles({ projectDir, startingHead })).toEqual([]);
+    });
+
+    it("still reports the project's real work", async () => {
+      await writeFile(join(projectDir, ".rex/prd_tree/some-epic/index.md"), "status: in_progress\n");
+      await writeFile(join(projectDir, "base.ts"), "export const base = 2;\n");
+      await writeFile(join(projectDir, "created.ts"), "export const created = 1;\n");
+
+      const changed = await discoverChangedFiles({ projectDir, startingHead });
+      expect(changed!.sort()).toEqual(["sub/base.ts", "sub/created.ts"]);
+    });
+  });
+
+  describe("a repository with no commits yet", () => {
+    // `git diff HEAD` fails on an unborn HEAD exactly as it does outside a
+    // repository. Reading both as "git could not answer" rejected every
+    // completion claim in a freshly `git init`-ed project, permanently: no
+    // agent action can produce a commit for the gate to diff from.
+    let freshDir: string;
+
+    beforeEach(async () => {
+      freshDir = await mkdtemp(join(tmpdir(), "hench-unborn-head-"));
+      initGitFixtureRepoSync(freshDir);
+    });
+
+    afterEach(async () => {
+      await rm(freshDir, { recursive: true, force: true });
+    });
+
+    it("counts a file the run created", async () => {
+      await writeFile(join(freshDir, "work.ts"), "export const work = 1;\n");
+
+      expect(await discoverChangedFiles({ projectDir: freshDir, baselineUntracked: [] })).toEqual([
+        "work.ts",
+      ]);
+    });
+
+    it("counts a file the run created and staged", async () => {
+      await writeFile(join(freshDir, "work.ts"), "export const work = 1;\n");
+      git(freshDir, "add", "-A");
+
+      expect(await discoverChangedFiles({ projectDir: freshDir, baselineUntracked: [] })).toEqual([
+        "work.ts",
+      ]);
+    });
+
+    it("still reports nothing when the run did nothing", async () => {
+      // The operator's pre-existing scratch is not the run's work, and there
+      // is no commit that could make it look like it is.
+      await writeFile(join(freshDir, "scratch.txt"), "mine\n");
+
+      expect(
+        await discoverChangedFiles({ projectDir: freshDir, baselineUntracked: ["scratch.txt"] }),
+      ).toEqual([]);
+    });
+
+    it("excludes bookkeeping, so a PRD write alone is not the run's work", async () => {
+      await mkdir(join(freshDir, ".rex/prd_tree/some-epic"), { recursive: true });
+      await writeFile(join(freshDir, ".rex/prd_tree/some-epic/index.md"), "status: in_progress\n");
+
+      expect(await discoverChangedFiles({ projectDir: freshDir, baselineUntracked: [] })).toEqual(
+        [],
+      );
+    });
+
+    it("still returns undefined for a starting head the repository does not have", async () => {
+      const changed = await discoverChangedFiles({
+        projectDir: freshDir,
+        startingHead: "0000000000000000000000000000000000000000",
+      });
+      expect(changed).toBeUndefined();
+    });
+  });
 });
