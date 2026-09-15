@@ -17,6 +17,6 @@ acceptanceCriteria:
   - "An incomplete directory-backed fallback lock remains contended and reports that publication is in progress rather than becoming an unknown stale holder."
   - "The six lock failures from CI run 35000812304 pass, including stale/dead/malformed manual-cleanup cases and fallback publication diagnostics."
 description: "Merge regression on PR #370: merge c6f24499 reintroduced automatic stale-lock reclamation from main, replacing this task's accepted safety-first manual-cleanup design. CI run 35000812304 now fails six Rex lock regressions: stale/dead/malformed locks are reclaimed when they must fail loudly, and an incomplete directory fallback loses its in-progress publication diagnostic. Restore the established safe behavior without weakening atomic publication or release ownership checks."
-lastModified: "2026-09-15T17:45:28.588Z"
+lastModified: "2026-09-15T17:59:32.738Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---

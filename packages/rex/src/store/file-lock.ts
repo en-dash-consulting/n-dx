@@ -9,12 +9,12 @@
  *   2. An exclusive lock path with PID + ownership token + timestamp guarding
  *      against other processes. Complete lock content is published atomically
  *      through a hard link, with an atomic directory fallback on filesystems
- *      without hard-link support. A lock is reclaimed only when its owning
- *      process is gone — never merely because it is old, since a slow writer
- *      and a hung one are indistinguishable from the outside and unlinking a
- *      running writer's lock admits a second writer rather than fencing the
- *      first. Release is compare-and-delete on the ownership token, so a holder
- *      whose lock was taken over can never unlink the new holder's lock.
+ *      without hard-link support. Locks not owned by this acquisition are
+ *      never unlinked automatically: even a confirmed dead owner can be
+ *      replaced between inspection and path-based deletion. Such locks fail
+ *      loudly with manual-cleanup guidance. Release is compare-and-delete on
+ *      the ownership token, so a holder whose lock was taken over can never
+ *      unlink the new holder's lock.
  *
  * @module store/file-lock
  */
@@ -151,9 +151,8 @@ type LockVerdict =
   | { kind: "live" }
   /** File vanished while looking — retry the exclusive create. */
   | { kind: "gone" }
-  /** Provably abandoned. `content` is the exact bytes the judgment was made
-   *  on, required by {@link removeStaleLock}'s verification. */
-  | { kind: "stale"; content: string; backend: LockBackend };
+  /** Provably abandoned or malformed. Manual cleanup is required. */
+  | { kind: "stale" };
 
 /**
  * Judge an existing lock file.
@@ -162,7 +161,9 @@ type LockVerdict =
  * other live holder exists in this process while we are checking, so such a
  * file is an orphan (failed unlink, or a recycled PID from a dead process).
  * Another process's lock is stale only when that process is gone. Age is
- * deliberately not grounds: see the note at the liveness check below.
+ * deliberately not grounds: see the note at the liveness check below. This
+ * observation must never authorize an unlink: another contender can replace
+ * the inspected generation before path-based deletion executes.
  *
  * A malformed lock is re-read after {@link MALFORMED_LOCK_GRACE_MS}: it may be
  * a lock caught mid-creation rather than a corpse, and stealing a live
@@ -199,11 +200,11 @@ async function assessLock(lockPath: string): Promise<LockVerdict> {
       return { kind: "gone" };
     }
     info = decodeLock(content);
-    if (!info) return { kind: "stale", content, backend }; // Still garbage — a corpse.
+    if (!info) return { kind: "stale" }; // Still garbage — manual cleanup required.
   }
 
   // Orphaned same-process lock (see doc comment)
-  if (info.pid === process.pid) return { kind: "stale", content, backend };
+  if (info.pid === process.pid) return { kind: "stale" };
 
   // Owner process is dead — the only grounds for taking someone else's lock.
   //
@@ -223,74 +224,9 @@ async function assessLock(lockPath: string): Promise<LockVerdict> {
   // writer fails after `ACQUIRE_TIMEOUT_MS` with an error naming the holding
   // PID and the path to delete. That is loud, bounded and recoverable, which
   // a silently interleaved write is not.
-  if (!isProcessAlive(info.pid)) return { kind: "stale", content, backend };
+  if (!isProcessAlive(info.pid)) return { kind: "stale" };
 
   return { kind: "live" };
-}
-
-/**
- * Remove a lock judged stale — without ever deleting a live writer's lock.
- *
- * A bare `unlink` here has a race two waiters can hit under load: both judge
- * the same corpse stale, the faster one unlinks it and creates its own lock,
- * and the slower one's unlink then lands on the fresh lock — admitting a
- * second writer into the critical section, the exact lost-update the lock
- * exists to prevent.
- *
- * Instead the stale file is CLAIMED by an atomic rename to a tombstone path
- * unique to this waiter: of all racing cleaners exactly one rename succeeds,
- * and the losers get ENOENT and go back to the retry loop. The claimed bytes
- * are then compared with the bytes the staleness judgment was made on; a
- * mismatch means the path was re-locked between judgment and claim, and the
- * claim is rolled back by renaming the tombstone home. (The rollback itself
- * can only collide with a third writer inside the same microsecond window —
- * and a displaced writer's release is a compare-and-delete that no-ops, so
- * even that residue is bounded.)
- *
- * @internal Exported for tests only.
- */
-export async function removeStaleLock(
-  lockPath: string,
-  judgedContent: string,
-  backend: LockBackend = "hard-link",
-): Promise<void> {
-  const tombstone = `${lockPath}.reclaim-${process.pid}-${randomUUID()}`;
-  try {
-    await rename(lockPath, tombstone);
-  } catch {
-    return; // Another cleaner claimed it first — nothing left to remove.
-  }
-
-  let claimed: string | null = null;
-  try {
-    const ownerPath = backend === "directory" ? `${tombstone}/${FALLBACK_OWNER_FILE}` : tombstone;
-    claimed = await readFile(ownerPath, "utf-8");
-  } catch {
-    return; // Tombstone vanished — nothing to verify or roll back.
-  }
-
-  if (claimed !== judgedContent) {
-    // We claimed a lock we never judged — the path was re-locked between
-    // judgment and claim. Put it back.
-    try {
-      await rename(tombstone, lockPath);
-    } catch {
-      if (backend === "directory") {
-        await unlink(`${tombstone}/${FALLBACK_OWNER_FILE}`).catch(() => {});
-        await rmdir(tombstone).catch(() => {});
-      } else {
-        await unlink(tombstone).catch(() => {});
-      }
-    }
-    return;
-  }
-
-  if (backend === "directory") {
-    await unlink(`${tombstone}/${FALLBACK_OWNER_FILE}`).catch(() => {});
-    await rmdir(tombstone).catch(() => {});
-  } else {
-    await unlink(tombstone).catch(() => {});
-  }
 }
 
 /**
@@ -357,6 +293,29 @@ async function releaseIfOwner(lockPath: string, token: string, backend: LockBack
   }
 }
 
+async function lockAcquisitionError(lockPath: string, acquireTimeoutMs: number): Promise<Error> {
+  let holder = "unknown process";
+  let backend: LockBackend | undefined;
+  try {
+    backend = (await stat(lockPath)).isDirectory() ? "directory" : "hard-link";
+    const ownerPath = backend === "directory" ? `${lockPath}/${FALLBACK_OWNER_FILE}` : lockPath;
+    const content = await readFile(ownerPath, "utf-8");
+    const info = decodeLock(content);
+    if (info) holder = `PID ${info.pid} (since ${info.timestamp})`;
+    else if (backend === "directory") holder = "a lock publication in progress";
+  } catch {
+    // An incomplete directory-backed lock is published before owner.json.
+    // Its existence is contention, not an unknown or stale holder.
+    if (backend === "directory") holder = "a lock publication in progress";
+  }
+
+  return new Error(
+    `Could not acquire PRD lock within ${acquireTimeoutMs}ms. ` +
+    `Held by ${holder}. Another command may be writing to the PRD. ` +
+    `If this is stale, delete ${lockPath} manually.`,
+  );
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -368,8 +327,9 @@ function sleep(ms: number): Promise<void> {
  *
  * Same-process callers queue on an in-process mutex; the file lock guards
  * against other processes. If the lock is held by another live process,
- * retries with a short delay until the timeout expires. Stale locks (dead
- * process or expired) are automatically cleaned up.
+ * retries with a short delay until the timeout expires. Locks that appear
+ * abandoned are not reclaimed automatically because an unlink-by-path could
+ * delete a replacement generation. They fail with manual-cleanup guidance.
  *
  * @param lockPath - Path to the lock file (e.g., `.rex/prd.json.lock`)
  * @throws If the lock cannot be acquired within the timeout
@@ -400,8 +360,7 @@ export async function acquireLock(lockPath: string, options?: LockOptions): Prom
       // Lock exists — held by another process (or orphaned). Judge it.
       const verdict = await assessLock(lockPath);
       if (verdict.kind === "stale") {
-        await removeStaleLock(lockPath, verdict.content, verdict.backend);
-        continue; // Retry immediately after cleanup
+        throw await lockAcquisitionError(lockPath, acquireTimeoutMs);
       }
       if (verdict.kind === "gone") {
         continue; // Vanished while looking — retry the exclusive create
@@ -410,22 +369,7 @@ export async function acquireLock(lockPath: string, options?: LockOptions): Prom
       await sleep(retryDelayMs);
     }
 
-    // Timeout — provide a helpful error
-    let holder = "unknown process";
-    try {
-      const ownerPath = (await stat(lockPath)).isDirectory() ? `${lockPath}/${FALLBACK_OWNER_FILE}` : lockPath;
-      const content = await readFile(ownerPath, "utf-8");
-      const info = decodeLock(content);
-      if (info) holder = `PID ${info.pid} (since ${info.timestamp})`;
-    } catch {
-      // Can't read lock info
-    }
-
-    throw new Error(
-      `Could not acquire PRD lock within ${acquireTimeoutMs}ms. ` +
-      `Held by ${holder}. Another command may be writing to the PRD. ` +
-      `If this is stale, delete ${lockPath} manually.`,
-    );
+    throw await lockAcquisitionError(lockPath, acquireTimeoutMs);
   } catch (err) {
     releaseInProcess();
     throw err;
