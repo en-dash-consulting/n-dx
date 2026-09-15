@@ -128,6 +128,7 @@ export {
   quoteWindowsToken,
   buildWindowsCliCommandLine,
   spawnCli,
+  terminateProcessTree,
   diagnoseCliInvocation,
   diagnoseCliNotFound,
 } from "@n-dx/llm-client";
@@ -215,7 +216,7 @@ export {
 } from "@n-dx/llm-client";
 
 // ---- Local API error parsing ------------------------------------------------
-export { parseLmStudioError } from "@n-dx/llm-client";
+export { parseLmStudioError, resolveLocalTimeoutMs } from "@n-dx/llm-client";
 
 // ---- Provider registry ------------------------------------------------------
 export {

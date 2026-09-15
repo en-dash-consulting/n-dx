@@ -13,9 +13,10 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
-import { mkdir, writeFile, readdir, stat, readFile, rm } from "node:fs/promises";
+import { mkdir, writeFile, readdir, stat, readFile, rm, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
+import { atomicWriteTempPath } from "../../src/store/atomic-write.js";
 import {
   snapshotPRDTree,
   restoreFromBackup,
@@ -207,6 +208,62 @@ describe("backup-snapshots", () => {
     for (const snapshot of snapshots) {
       expect(await readFile(join(snapshot!.backupPath, "epic_test", "index.md"), "utf-8")).toBe("Test");
     }
+  });
+
+  it("skips a concurrent writer's in-flight temp file instead of aborting", async () => {
+    // Second race in snapshotPRDTree, after the EEXIST one above. `cp` reads a
+    // directory and then lstats each entry; an atomic writer's
+    // `<file>.<pid>.<uuid>.tmp` that exists at readdir and is renamed away
+    // before the lstat raised ENOENT and failed the whole command —
+    // `rex import-bundle` aborting because some other process finished a write.
+    // Observed at ~18% on this branch's concurrent-import test.
+    const epicDir = join(treeRoot, "epic_test");
+    await mkdir(epicDir, { recursive: true });
+    await writeFile(join(epicDir, "index.md"), "Test");
+    const tempPath = atomicWriteTempPath(join(epicDir, "index.md"));
+    await writeFile(tempPath, "half-written");
+
+    const snapshot = await snapshotPRDTree(rexDir);
+
+    expect(snapshot).not.toBeNull();
+    // The real file is there; the temp file is not content and must not be in
+    // a rollback point.
+    expect(await readFile(join(snapshot!.backupPath, "epic_test", "index.md"), "utf-8")).toBe("Test");
+    const copied = await readdir(join(snapshot!.backupPath, "epic_test"));
+    expect(copied).toEqual(["index.md"]);
+  });
+
+  it("still snapshots when a temp file vanishes mid-walk", async () => {
+    // The end-to-end shape of the bug: a writer renaming its temp file into
+    // place while the snapshot is walking. Nothing is filtered by name here at
+    // the OS level — the file really does disappear — so this exercises the
+    // filter doing its job before the lstat rather than a retry after it.
+    const epicDir = join(treeRoot, "epic_test");
+    await mkdir(epicDir, { recursive: true });
+    await writeFile(join(epicDir, "index.md"), "Test");
+
+    const temps: string[] = [];
+    for (let i = 0; i < 40; i += 1) {
+      const target = join(epicDir, `item_${i}.md`);
+      const tempPath = atomicWriteTempPath(target);
+      await writeFile(tempPath, `item ${i}`);
+      temps.push(tempPath);
+    }
+
+    // Rename them into place while the snapshot walks the same directory.
+    const renames = (async () => {
+      for (const tempPath of temps) {
+        await rename(tempPath, tempPath.replace(/\.\d+\.[^.]+\.tmp$/, ""));
+      }
+    })();
+
+    const snapshot = await snapshotPRDTree(rexDir);
+    await renames;
+
+    expect(snapshot).not.toBeNull();
+    const copied = await readdir(join(snapshot!.backupPath, "epic_test"));
+    expect(copied.some((name) => name.endsWith(".tmp"))).toBe(false);
+    expect(copied).toContain("index.md");
   });
 
   it("should be idempotent when creating snapshots of the same tree state", async () => {

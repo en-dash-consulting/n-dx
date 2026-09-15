@@ -1,0 +1,53 @@
+# n-dx documentation
+
+> n-dx is a development toolkit that analyses an existing codebase, builds a
+> product requirements document from it, and executes tasks against that PRD
+> autonomously. It is built by En Dash Consulting and documented here.
+
+The short version of how it fits together: **SourceVision** reads the
+codebase and produces machine-readable context — a file inventory, an import
+graph, zones found by community detection, a React component catalog.
+**Rex** turns that context into a PRD tree and drives work against it. The
+CLI and the MCP server are how you and your agent talk to both.
+
+- Repository: https://github.com/en-dash-consulting/n-dx
+- Marketing site: https://n-dx.dev
+- These docs: https://docs.n-dx.dev
+
+## Start here
+
+- [Quickstart](https://docs.n-dx.dev/guide/quickstart) — the shortest path to a first run
+- [Getting started](https://docs.n-dx.dev/guide/getting-started)
+- [Existing project onboarding](https://docs.n-dx.dev/guide/existing-project) — pointing n-dx at a codebase that already exists
+- [Workflow](https://docs.n-dx.dev/guide/workflow) — the loop the toolkit is built around
+- [Commands](https://docs.n-dx.dev/guide/commands)
+- [Configuration](https://docs.n-dx.dev/guide/configuration)
+
+## Working with an agent
+
+- [Skills reference](https://docs.n-dx.dev/guide/skills) — the skills that ship with n-dx
+- [MCP integration](https://docs.n-dx.dev/guide/mcp) — exposing n-dx to Claude Code and other MCP clients
+- [Self-heal loop](https://docs.n-dx.dev/guide/self-heal)
+- [PRD storage layout](https://docs.n-dx.dev/guide/prd-storage) — what lives in `.rex/` and why
+- [Codebase onboarding](https://docs.n-dx.dev/guide/onboarding)
+
+## How it works
+
+- [Architecture overview](https://docs.n-dx.dev/architecture/overview)
+- [Packages overview](https://docs.n-dx.dev/packages/overview)
+- [SourceVision](https://docs.n-dx.dev/packages/sourcevision) — static analysis: inventory, import graph, zone detection, component catalog
+- [Rex](https://docs.n-dx.dev/packages/rex) — PRD tree and task execution
+
+## Contributing
+
+- [Testing](https://docs.n-dx.dev/contributing/testing)
+
+## Not current
+
+- [Archive](https://docs.n-dx.dev/archive/) — point-in-time discovery and design
+  records, kept because they explain *why* a decision was made. Every page
+  there describes the project as it was on the day it was written and has not
+  been maintained since. Model IDs, metrics, file counts and test results in
+  those pages are frequently out of date. They are excluded from the sitemap
+  for that reason, and should not be read as a description of how n-dx works
+  today.

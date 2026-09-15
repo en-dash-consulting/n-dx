@@ -6,6 +6,7 @@
  * - **adaptive** — project evolution metrics → automatic config adjustments
  * - **adversarial-review** — review-pass prompt construction and report parsing
  * - **review**   — diff collection and interactive approval gate
+ * - **livelock** — repeated-identical-call detection (agent busy but not moving)
  * - **spin**     — empty-turn detection (agent producing text without tool calls)
  * - **stuck**    — consecutive-failure detection for task-level blocking
  * - **workflow** — historical run analysis → optimization suggestions
@@ -82,6 +83,21 @@ export {
   isSpinningRun,
   DEFAULT_SPIN_THRESHOLD,
 } from "./spin.js";
+
+// ── Livelock detection ───────────────────────────────────────────────
+export {
+  createLivelockDetector,
+  isProgressTool,
+  DEFAULT_LIVELOCK_THRESHOLD,
+  DEFAULT_LIVELOCK_WINDOW,
+} from "./livelock.js";
+
+export type {
+  LivelockDetector,
+  LivelockDetection,
+  LivelockObservation,
+  LivelockDetectorOptions,
+} from "./livelock.js";
 
 // ── Stuck detection ──────────────────────────────────────────────────
 export {

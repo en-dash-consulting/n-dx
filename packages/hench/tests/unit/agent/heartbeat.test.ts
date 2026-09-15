@@ -113,6 +113,42 @@ describe("heartbeat", () => {
     hb.stop();
   });
 
+  it("persists counters the beforeSave hook writes (GH #362)", async () => {
+    // The hook exists because the CLI loop's turns and tokens live in the
+    // in-flight spawn: without it the heartbeat saves a fresh timestamp on a
+    // record still reporting 0/0, and the dashboard reads a busy run as idle.
+    const run = makeRunRecord();
+    const hb = startHeartbeat("/tmp/hench", run, 50, () => {
+      run.turns = 40;
+      run.tokenUsage = { input: 1200, output: 300 };
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+
+    expect(mockSaveRun).toHaveBeenCalledTimes(1);
+    const saved = mockSaveRun.mock.calls[0][1];
+    expect(saved.turns).toBe(40);
+    expect(saved.tokenUsage).toEqual({ input: 1200, output: 300 });
+
+    hb.stop();
+  });
+
+  it("still saves the beat when the beforeSave hook throws", async () => {
+    const run = makeRunRecord();
+    const hb = startHeartbeat("/tmp/hench", run, 50, () => {
+      throw new Error("counter read failed");
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+
+    // Stale counters are better than a missing heartbeat: a run whose
+    // timestamp stops advancing is reaped as orphaned.
+    expect(run.lastActivityAt).toBeDefined();
+    expect(mockSaveRun).toHaveBeenCalledTimes(1);
+
+    hb.stop();
+  });
+
   it("sets lastActivityAt to a valid ISO timestamp", async () => {
     const run = makeRunRecord();
     const hb = startHeartbeat("/tmp/hench", run, 50);

@@ -29,7 +29,14 @@ export interface FixItem {
 export type FixKind =
   | "missing_timestamp"
   | "orphan_blocked_by"
-  | "parent_child_alignment";
+  | "parent_child_alignment"
+  /**
+   * A `pending` parent whose children are all `completed` — a completion
+   * cascade that was lost, so the parent never closed. Repairing it is the
+   * operator's path to the whole-tree reconciliation that agent runs stopped
+   * performing in #368. See `detectStuckParents`.
+   */
+  | "stuck_parent";
 
 export interface FixAction {
   kind: FixKind;

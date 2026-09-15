@@ -20,6 +20,8 @@ import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { initGitFixtureRepoSync } from "../helpers/index.js";
 import { initConfig } from "../../src/store/config.js";
 import { defaultRegistry } from "../../src/prd/llm-gateway.js";
 import type {
@@ -63,6 +65,12 @@ describe("Gemini agentic tool-use loop", () => {
       JSON.stringify({ llm: { vendor: "google", google: { api_key: "AIza-test-key" } } }),
       "utf-8",
     );
+
+    // Completion validation discovers changes via git; without a repo (and a
+    // baseline commit) every completion claim is rejected as unverifiable.
+    initGitFixtureRepoSync(projectDir);
+    execFileSync("git", ["add", "-A"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "baseline"], { cwd: projectDir, stdio: "ignore" });
   });
 
   afterEach(async () => {
@@ -95,19 +103,35 @@ describe("Gemini agentic tool-use loop", () => {
     const provider = mockGeminiProvider([
       // Turn 1: request a write_file tool call
       {
-        parts: [{ functionCall: { name: "write_file", args: { path: "gemini-output.txt", content: "written by gemini" } } }],
-        functionCalls: [{ name: "write_file", args: { path: "gemini-output.txt", content: "written by gemini" } }],
+        parts: [{ functionCall: { name: "write_file", args: { path: "gemini-output.ts", content: "export const source = 'gemini';\n" } } }],
+        functionCalls: [{ name: "write_file", args: { path: "gemini-output.ts", content: "export const source = 'gemini';\n" } }],
         text: "",
         finishReason: "STOP",
         usage: { input: 100, output: 20 },
       },
-      // Turn 2: no tool calls → completion
+      // Turn 2: stage the output as the API prompt requires.
+      {
+        parts: [{ functionCall: { name: "git", args: { subcommand: "add", args: "gemini-output.ts" } } }],
+        functionCalls: [{ name: "git", args: { subcommand: "add", args: "gemini-output.ts" } }],
+        text: "",
+        finishReason: "STOP",
+        usage: { input: 40, output: 10 },
+      },
+      // Turn 3: leave the commit handoff for the non-interactive finalizer.
+      {
+        parts: [{ functionCall: { name: "write_file", args: { path: ".hench-commit-msg.txt", content: "feat: write Gemini output\n" } } }],
+        functionCalls: [{ name: "write_file", args: { path: ".hench-commit-msg.txt", content: "feat: write Gemini output\n" } }],
+        text: "",
+        finishReason: "STOP",
+        usage: { input: 20, output: 5 },
+      },
+      // Turn 4: no tool calls → completion
       {
         parts: [{ text: "Done — the file is written." }],
         functionCalls: [],
         text: "Done — the file is written.",
         finishReason: "STOP",
-        usage: { input: 40, output: 10 },
+        usage: { input: 10, output: 3 },
       },
     ]);
 
@@ -129,15 +153,15 @@ describe("Gemini agentic tool-use loop", () => {
 
     expect(spy).toHaveBeenCalled();
 
-    // The loop ran two turns and completed.
-    expect(result.run.turns).toBe(2);
+    // The loop ran its write, staging, and commit-handoff turns before completion.
+    expect(result.run.turns).toBe(4);
     expect(result.run.status).toBe("completed");
     expect(result.run.summary).toContain("Done");
 
     // The write_file tool was actually dispatched (file written under projectDir).
-    expect(existsSync(join(projectDir, "gemini-output.txt"))).toBe(true);
-    const written = await readFile(join(projectDir, "gemini-output.txt"), "utf-8");
-    expect(written).toContain("written by gemini");
+    expect(existsSync(join(projectDir, "gemini-output.ts"))).toBe(true);
+    const written = await readFile(join(projectDir, "gemini-output.ts"), "utf-8");
+    expect(written).toContain("gemini");
 
     // Tool call recorded in the run.
     expect(result.run.toolCalls.length).toBeGreaterThanOrEqual(1);
@@ -145,13 +169,19 @@ describe("Gemini agentic tool-use loop", () => {
 
     // Per-turn token usage attributed to google.
     expect(result.run.turnTokenUsage).toBeDefined();
-    expect(result.run.turnTokenUsage!.length).toBe(2);
+    expect(result.run.turnTokenUsage!.length).toBe(4);
     for (const t of result.run.turnTokenUsage!) {
       expect(t.vendor).toBe("google");
     }
-    // Accumulated totals (100+40 input, 20+10 output).
-    expect(result.run.tokenUsage.input).toBe(140);
-    expect(result.run.tokenUsage.output).toBe(30);
+    // Accumulated totals (100+40+20+10 input, 20+10+5+3 output).
+    expect(result.run.tokenUsage.input).toBe(170);
+    expect(result.run.tokenUsage.output).toBe(38);
+
+    // This completed through the real git-derived path, not a mocked verdict.
+    expect(execFileSync("git", ["show", "--format=", "--name-only", "HEAD"], {
+      cwd: projectDir,
+      encoding: "utf-8",
+    })).toContain("gemini-output.ts");
 
     // The loop passed function declarations to the provider.
     const firstCallArgs = (provider.generateContentWithTools as ReturnType<typeof vi.fn>).mock.calls[0][0];
@@ -159,11 +189,14 @@ describe("Gemini agentic tool-use loop", () => {
     expect(firstCallArgs.tools[0].functionDeclarations.some((d: { name: string }) => d.name === "write_file")).toBe(true);
   });
 
-  it("completes in a single turn when the model emits no tool calls", async () => {
+  it("rejects a completion claim that changed nothing — same standard as the CLI loop", async () => {
     const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../src/store/config.js");
 
+    // The model immediately declares itself done without touching a file.
+    // API loops used to record this as "completed" and mark the task done in
+    // the PRD; the CLI loop has always rejected it via validateCompletion.
     const provider = mockGeminiProvider([
       {
         parts: [{ text: "Nothing to do." }],
@@ -184,8 +217,15 @@ describe("Gemini agentic tool-use loop", () => {
       model: "gemini-2.5-pro", yes: true, autonomous: true,
     });
 
-    expect(result.run.turns).toBe(1);
-    expect(result.run.status).toBe("completed");
+    // Initial claim + 2 execution re-prompts = 3 turns before the loop gives up.
+    expect(result.run.turns).toBe(3);
     expect(result.run.toolCalls.length).toBe(0);
+    expect(result.run.status).toBe("failed");
+    expect(result.run.error).toContain("No changes detected");
+
+    // The task went back to pending — not completed — so the next cycle retries it.
+    const doc = await store.loadDocument();
+    const task = doc!.items.find((i: { id: string }) => i.id === "task-1");
+    expect(task!.status).toBe("pending");
   });
 });

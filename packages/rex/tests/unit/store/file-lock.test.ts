@@ -43,14 +43,28 @@ describe("file-lock", () => {
     await release();
   });
 
-  it("detects stale lock from dead PID and recovers", async () => {
+  it("refuses to reclaim a lock from a dead PID automatically", async () => {
     const lockPath = await makeLockPath();
-    // Write a lock file with a PID that doesn't exist
     await writeFile(lockPath, JSON.stringify({ pid: 999999999, timestamp: new Date().toISOString() }));
 
-    // Should recover by cleaning the stale lock
+    await expect(
+      acquireLock(lockPath, { acquireTimeoutMs: 500 }),
+    ).rejects.toThrow(`delete ${lockPath} manually`);
+    await expect(stat(lockPath)).resolves.toBeTruthy();
+
+    await rm(lockPath);
     const release = await acquireLock(lockPath);
     await release();
+  });
+
+  it("requires manual cleanup for a malformed lock", async () => {
+    const lockPath = await makeLockPath();
+    await writeFile(lockPath, "incomplete lock contents");
+
+    await expect(
+      acquireLock(lockPath, { acquireTimeoutMs: 500 }),
+    ).rejects.toThrow(`delete ${lockPath} manually`);
+    await expect(stat(lockPath)).resolves.toBeTruthy();
   });
 
   it("never steals another live process's lock, however old it is", async () => {
@@ -88,9 +102,7 @@ describe("file-lock", () => {
     ).rejects.toThrow(new RegExp(`PID ${liveForeignPid}`));
   });
 
-  it("still reclaims an ancient lock once its owner is gone", async () => {
-    // The other half: refusing to steal from the living must not turn a crashed
-    // writer's leftover lock into a permanent outage.
+  it("requires manual cleanup for an ancient lock whose owner is gone", async () => {
     const lockPath = await makeLockPath();
     await writeFile(
       lockPath,
@@ -101,8 +113,10 @@ describe("file-lock", () => {
       }),
     );
 
-    const release = await acquireLock(lockPath, { acquireTimeoutMs: 1_000 });
-    await release();
+    await expect(
+      acquireLock(lockPath, { acquireTimeoutMs: 500 }),
+    ).rejects.toThrow(`delete ${lockPath} manually`);
+    await expect(stat(lockPath)).resolves.toBeTruthy();
   });
 
   it("serializes concurrent withLock calls", async () => {
@@ -174,17 +188,56 @@ describe("file-lock", () => {
     await rm(lockPath, { force: true });
   });
 
-  it("recovers an orphaned same-process lock file", async () => {
+  it("requires manual cleanup for an orphaned same-process lock file", async () => {
     const lockPath = await makeLockPath();
     // Fresh lock file with our own PID but no in-process holder — an orphan
-    // (e.g. leftover from a failed unlink). Must be cleaned, not waited on.
+    // (e.g. leftover from a failed unlink). Its path cannot be deleted safely
+    // after inspection because another process may replace its generation.
     await writeFile(
       lockPath,
       JSON.stringify({ pid: process.pid, token: "orphan", timestamp: new Date().toISOString() }),
     );
 
-    const release = await acquireLock(lockPath, { acquireTimeoutMs: 500 });
-    await release();
+    await expect(
+      acquireLock(lockPath, { acquireTimeoutMs: 500 }),
+    ).rejects.toThrow(`delete ${lockPath} manually`);
+    await expect(stat(lockPath)).resolves.toBeTruthy();
+  });
+
+  it("waits out a lock caught mid-creation instead of stealing it", async () => {
+    // writeFile with 'wx' opens the file and then writes its content — two
+    // syscalls. A waiter reading between them sees an empty file, and an
+    // empty file used to decode as "malformed = stale", so the waiter
+    // unlinked a LIVE writer's lock and entered the critical section
+    // alongside it. Malformed must be confirmed after a grace delay: a
+    // corpse stays malformed, a mid-creation lock becomes valid.
+    const lockPath = await makeLockPath();
+    await writeFile(lockPath, ""); // the mid-creation window, frozen
+
+    // The "writer" finishes its content write shortly after.
+    const liveForeignPid = process.ppid;
+    setTimeout(() => {
+      void writeFile(
+        lockPath,
+        JSON.stringify({ pid: liveForeignPid, token: "t", timestamp: new Date().toISOString() }),
+      );
+    }, 20);
+
+    await expect(
+      acquireLock(lockPath, { acquireTimeoutMs: 600, retryDelayMs: 20 }),
+    ).rejects.toThrow(new RegExp(`PID ${liveForeignPid}`));
+  });
+
+  it("requires manual cleanup for a lock that stays malformed across the grace delay", async () => {
+    // A truncated write from a crashed writer never becomes valid. It must
+    // remain in place: deleting it after inspection could delete a replacement
+    // generation published by another contender.
+    const lockPath = await makeLockPath();
+    await writeFile(lockPath, "not json at all");
+
+    await expect(acquireLock(lockPath, { acquireTimeoutMs: 2_000 }))
+      .rejects.toThrow(`delete ${lockPath} manually`);
+    await expect(stat(lockPath)).resolves.toBeTruthy();
   });
 
   it("times out when the lock is held in-process beyond acquireTimeoutMs", async () => {

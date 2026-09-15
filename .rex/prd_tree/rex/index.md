@@ -2,13 +2,12 @@
 id: "bf053fb2-509d-4acf-aa61-7243e66027e5"
 level: "epic"
 title: "Rex"
-status: "completed"
+status: "pending"
 startedAt: "2026-03-24T20:09:27.774Z"
-completedAt: "2026-09-08T19:37:01.205Z"
 endedAt: "2026-09-08T19:37:01.205Z"
 description: "PRD management: hierarchical epics/features/tasks/subtasks, smart add from natural language, LLM-powered analysis and recommendations, validation, pruning, reshaping. Stores state in .rex/prd.json."
-lastModified: "2026-09-08T19:37:01.220Z"
-lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
+lastModified: "2026-09-12T09:10:25.446Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
 ## Children
@@ -31,7 +30,7 @@ lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
 | [PRD Management Enhancement](./prd-management-enhancement/index.md) | completed |
 | [PRD structure and lifecycle](./prd-structure-and-lifecycle/index.md) | completed |
 | [PRD Tree CLI Visualization Command](./prd-tree-cli-visualization-command/index.md) | completed |
-| [Proactive PRD structure health checks](./proactive-prd-structure-health-checks/index.md) | completed |
+| [Proactive PRD structure health checks](./proactive-prd-structure-health-checks/index.md) | pending |
 | [Replace Hash-Suffix Title Disambiguation with Rename-or-Merge Resolution](./replace-hash-suffix-title/index.md) | completed |
 | [Reshape Consolidation of Hash-Suffixed Same-Title Items Under Generated Parent](./reshape-consolidation-of-hash-suffixed/index.md) | completed |
 | [Reshape Same-Parent Duplicate Merge with Backup Audit Trail](./reshape-same-parent-duplicate-merge/index.md) | completed |
@@ -43,7 +42,9 @@ lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"
 | [Selective Recommendation Acceptance Syntax](./selective-recommendation-acceptance/index.md) | completed |
 | [Smart Add Cache Validation Enhancement](./smart-add-cache-validation-enhancement/index.md) | completed |
 | [Smart Prune Proposal Caching Enhancement](./smart-prune-proposal-caching-enhancement/index.md) | completed |
+| [Atomic lock publication fails on filesystems without hard-link support](./atomic-lock-publication-fails-on.md) | completed |
 | [Audit MCP tool schemas against PRDItem fields](./audit-mcp-tool-schemas-against-prditem.md) | completed |
+| [Concurrent stale-lock reclaim can unlink a replacement live lock](./concurrent-stale-lock-reclaim-can.md) | pending |
 | [Fix --mode=fast being ignored when --accept is passed to reorganize](./fix-mode-fast-being-ignored-when.md) | completed |
 | [Investigate flaky store-roundtrip concurrency test (0 items after serialized mutations)](./investigate-flaky-store-roundtrip.md) | completed |
 | [rex add hangs indefinitely when stdin is an open pipe](./rex-add-hangs-indefinitely-when-stdin.md) | completed |

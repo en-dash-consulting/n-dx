@@ -2816,6 +2816,21 @@ const signalHandlers = installTrackedChildProcessHandlers({
   },
 });
 
+// Windows GitHub Actions runners can launch Node without a console. In that
+// case there is no Ctrl+C event to generate or attach to, even for a detached
+// child. The CI cleanup regression uses this IPC relay only in that headless
+// test configuration: emitting SIGINT runs the same listener installed above,
+// while its acknowledgement proves the listener received the interruption
+// before the test begins checking reaped PIDs.
+if (process.env.NDX_TEST_INTERRUPT_IPC === "1" && typeof process.send === "function") {
+  process.on("message", (message) => {
+    if (message?.type !== "ndx-test-interrupt" || message.signal !== "SIGINT") return;
+
+    process.emit("SIGINT");
+    process.send({ type: "ndx-test-interrupt-received", signal: "SIGINT" });
+  });
+}
+
 // Catch unhandled errors at the top level — never show stack traces
 process.on("uncaughtException", (err) => {
   if (err instanceof ExitRequest) {

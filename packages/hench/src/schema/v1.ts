@@ -180,6 +180,17 @@ export interface HenchConfig {
    */
   autoCommit?: boolean;
   /**
+   * When true, runs are in autonomous mode (non-interactive) without passing
+   * --auto/--loop/--epic-by-epic on every invocation. In this mode:
+   * - Test gate failures fail the run, as they do for any autonomous run —
+   *   there is no operator to answer the rerun/skip/abort prompt
+   * - Commit prompts are bypassed; the agent commits itself directly
+   * - Rollback on failure is disabled (no non-interactive revert prompt)
+   *
+   * The CLI flags above always take precedence over this setting.
+   */
+  autonomous?: boolean;
+  /**
    * How task spawns relate to vendor sessions.
    *
    * - `"fork"` (default where supported) — run orientation once, then fork
@@ -217,6 +228,15 @@ export interface HenchConfig {
    * breakdown rather than continuing to spend.
    */
   maxSpawnsPerTask?: number;
+  /**
+   * Identical tool calls, inside a sliding window and with no file written in
+   * between, before a run is stopped as livelocked (default: 6; 0 disables).
+   *
+   * The escape hatch exists because the threshold is a judgement call about
+   * other people's workloads — see `agent/analysis/livelock.ts` for how it was
+   * picked and what "identical" means.
+   */
+  livelockThreshold?: number;
   /**
    * When true, skip the mandatory full test suite gate before commit.
    * Default: false (gate is mandatory). The --skip-test-gate CLI flag sets this.
@@ -916,6 +936,18 @@ export type RunReviewRecord =
       failed: string;
       /** Human-readable detail for the failure. */
       detail: string;
+      /**
+       * True when this failure *blocked* the run's completion — the operator
+       * asked for a review gate, no reviewer ever ran, and the run was refused
+       * rather than reported `completed`.
+       *
+       * Load-bearing beyond bookkeeping: a run failed for this reason says
+       * nothing about whether the *task* is stuck, so stuck-task detection
+       * skips it (see `agent/analysis/stuck.ts`) and the rollback gate leaves
+       * the validated work in the tree. Absent on a best-effort
+       * (`--review-optional`) failure, which does not block anything.
+       */
+      gated?: boolean;
     };
 
 export interface RunRecord {
@@ -1012,6 +1044,13 @@ export interface RunRecord {
    * v1 additive field.
    */
   spawnBreakdown?: Record<string, number>;
+  /**
+   * How many times the in-memory conversation window was condensed during
+   * the run (tool-output digests and LLM summarization passes both count).
+   * Set by the local (LM Studio) tool loop; absent for vendors that manage
+   * their own context. v1 additive field.
+   */
+  contextCondensations?: number;
   retryAttempts?: number;
   /** Structured metadata derived from tool calls at run finalization. */
   structuredSummary?: RunSummaryData;

@@ -10,7 +10,7 @@
  */
 
 import { execStdout } from "../../process/exec.js";
-import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
+import { excludeHenchRuntimeArtifacts, splitPorcelainLines } from "../../store/artifacts.js";
 
 /** Size of the uncommitted changes in the working tree. */
 export interface ChangeMagnitude {
@@ -70,7 +70,7 @@ export async function measureChangeMagnitude(
       timeout: 15_000,
     });
     files = (
-      await excludeHenchRuntimeArtifacts(status.trim().split("\n").filter(Boolean), projectDir)
+      await excludeHenchRuntimeArtifacts(splitPorcelainLines(status), projectDir)
     ).length;
   } catch {
     // Not a git repo or git unavailable — report zero files.

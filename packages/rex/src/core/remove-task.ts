@@ -1,19 +1,8 @@
-import type { PRDItem, ItemStatus } from "../schema/index.js";
+import type { PRDItem } from "../schema/index.js";
 import { getLevelLabel } from "../schema/index.js";
 import { findItem } from "./tree.js";
 import { deleteItem, cleanBlockedByRefs } from "./delete.js";
-
-/**
- * Statuses that count as terminal for auto-completion checks.
- * A parent is auto-completable only when every remaining child has one of these.
- */
-const TERMINAL_STATUSES: Set<ItemStatus> = new Set(["completed", "deferred"]);
-
-/**
- * Statuses where a parent is eligible for auto-completion.
- * Already-completed, deferred, or blocked parents are left alone.
- */
-const AUTO_COMPLETABLE_STATUSES: Set<ItemStatus> = new Set(["pending", "in_progress"]);
+import { allChildrenSuccessful, AUTO_COMPLETABLE_STATUSES } from "./parent-completion.js";
 
 /**
  * Descriptor for a parent item that is eligible for auto-completion
@@ -46,7 +35,7 @@ export interface RemoveTaskResult {
   error?: string;
   /**
    * Parent items that are now eligible for auto-completion because all
-   * their remaining children are in a terminal state (completed/deferred).
+   * their remaining children are `completed`.
    *
    * Ordered bottom-up (immediate parent first, then grandparent, etc.).
    * The caller is responsible for actually updating these items' status —
@@ -55,7 +44,7 @@ export interface RemoveTaskResult {
    *
    * Empty when:
    * - The operation failed.
-   * - The parent still has pending/in_progress children.
+   * - The parent still has pending/in_progress/deferred/blocked/failing children.
    * - The parent has no remaining children (empty parents don't auto-complete).
    * - The parent is already completed or in a non-completable state.
    */
@@ -71,7 +60,7 @@ export interface RemoveTaskResult {
  * - Cleans up `blockedBy` references in remaining items that pointed
  *   to any of the deleted items.
  * - Identifies parent items that are now eligible for auto-completion
- *   (all remaining children completed or deferred).
+ *   (all remaining children completed).
  *
  * The function mutates `items` in place (consistent with {@link deleteItem}
  * and {@link pruneItems}).
@@ -116,25 +105,21 @@ export function removeTask(items: PRDItem[], taskId: string): RemoveTaskResult {
 
   // 5. Check for parent auto-completion candidates
   //    Walk up the ancestor chain: if a parent's remaining children are all
-  //    terminal, it becomes a candidate. Keep going as long as each ancestor
-  //    would also become terminal (simulating the cascade).
+  //    successfully done, it becomes a candidate. Keep going as long as each
+  //    ancestor would also become done (simulating the cascade). Uses the
+  //    same predicate as findAutoCompletions/reconcileAutoCompletions — a
+  //    deferred/blocked/failing remaining child breaks the cascade.
   const parentAutoCompletions: ParentAutoCompletion[] = [];
   const virtuallyCompleted = new Set<string>();
 
   for (let i = parents.length - 1; i >= 0; i--) {
     const parent = parents[i];
 
-    // Only auto-complete parents that are pending or in_progress
+    // Only auto-complete pending parents — an explicit in_progress is not
+    // ours to close (#368). Shared predicate, not a local copy.
     if (!AUTO_COMPLETABLE_STATUSES.has(parent.status)) break;
 
-    // Check if all remaining children are terminal
-    // (including parents we've already decided to auto-complete)
-    const childrenTerminal = parent.children && parent.children.length > 0 &&
-      parent.children.every(
-        (c) => TERMINAL_STATUSES.has(c.status) || virtuallyCompleted.has(c.id),
-      );
-
-    if (!childrenTerminal) break;
+    if (!allChildrenSuccessful(parent, virtuallyCompleted)) break;
 
     parentAutoCompletions.push({
       id: parent.id,

@@ -15,7 +15,7 @@
  * @see packages/web/src/server/routes-status.ts — the payload being probed
  */
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, symlink } from "node:fs/promises";
@@ -32,7 +32,6 @@ import {
   killPortOccupant,
   listenerPidsOnPort,
   selectKillTarget,
-  isPortInUse,
   runWeb,
 } from "../../packages/core/web.js";
 
@@ -568,55 +567,16 @@ describe("findRelocationPort", () => {
   // orchestration tier avoids exposing more surface than callers need.
   const PORT_RANGE_START = 3117;
   const PORT_RANGE_END = 3200;
-  const NEAR_WINDOW_SIZE = PORT_RANGE_END - PORT_RANGE_START;
+  it("selects the immediate free successor of an explicit port outside the default range", async () => {
+    const port = 34001;
+    const probe = vi.fn(async (candidate) => candidate !== port + 1);
 
-  /**
-   * Bind a port whose immediate successor is verifiably free, so the
-   * relocation target is deterministic.
-   *
-   * Do NOT use an OS-assigned ephemeral port here. On Windows the ephemeral
-   * band (49152+) is where Hyper-V/WinNAT reserve large contiguous blocks, and
-   * on the CI runner every port in an 83-wide window above one read as in use
-   * — so relocation correctly fell back to 3117 and an assertion about the
-   * near window failed for a platform reason, not a behavioural one. Binding
-   * in a quiet band and checking the successor with the product's OWN
-   * predicate makes the expectation exact and platform-independent.
-   *
-   * Returns null when no such pair exists, which is a real answer on a host
-   * whose port space is that contended — the caller skips rather than fails.
-   */
-  async function bindPortWithFreeSuccessor() {
-    for (let candidate = 34001; candidate < 34200; candidate += 2) {
-      if (await isPortInUse(candidate + 1)) continue;
-      const server = createServer(() => {});
-      servers.push(server);
-      const bound = await new Promise((res) => {
-        server.once("error", () => res(false));
-        server.listen(candidate, "127.0.0.1", () => res(true));
-      });
-      if (!bound) continue;
-      // Re-check after binding: something may have taken the successor since.
-      if (await isPortInUse(candidate + 1)) continue;
-      return candidate;
-    }
-    return null;
-  }
+    const relocated = await findRelocationPort(port, undefined, probe);
 
-  it("scans upward from an explicit port outside the default range", async (ctx) => {
-    const port = await bindPortWithFreeSuccessor();
-    if (port === null) {
-      // No bindable port with a free successor on this host. Nothing to assert
-      // about the near window; see bindPortWithFreeSuccessor for why.
-      ctx.skip();
-      return;
-    }
-    expect(port < PORT_RANGE_START || port > PORT_RANGE_END).toBe(true);
-
-    // Exact, because the successor was just verified free with the same
-    // predicate findFreePortInRange uses.
-    const relocated = await findRelocationPort(port);
     expect(relocated).toBe(port + 1);
-    // The whole point of the near window: it must not jump to the default range.
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(probe).toHaveBeenCalledWith(port + 1);
+    // A free near port must win over the default fallback range.
     expect(relocated < PORT_RANGE_START || relocated > PORT_RANGE_END).toBe(true);
   });
 
@@ -624,40 +584,56 @@ describe("findRelocationPort", () => {
     // The near window for the default port (3118–3200) is exactly the
     // default fallback range, so this must land inside it just as before
     // this function existed.
-    const relocated = await findRelocationPort(PORT_RANGE_START);
-    expect(relocated).not.toBeNull();
-    expect(relocated).toBeGreaterThanOrEqual(PORT_RANGE_START + 1);
-    expect(relocated).toBeLessThanOrEqual(PORT_RANGE_END);
+    const relocated = await findRelocationPort(
+      PORT_RANGE_START,
+      undefined,
+      async (candidate) => candidate !== PORT_RANGE_START + 1,
+    );
+    expect(relocated).toBe(PORT_RANGE_START + 1);
   });
 
   it("falls back to the default range once the near window is exhausted", async () => {
-    const { port } = await startServer(() => {});
     // A zero-width near window (end < start) never finds anything, forcing
-    // the fallback deterministically — occupying dozens of real sockets to
-    // exhaust the real near window would be slow and flaky.
-    const relocated = await findRelocationPort(port, 0);
-    expect(relocated).not.toBeNull();
-    expect(relocated).toBeGreaterThanOrEqual(PORT_RANGE_START);
-    expect(relocated).toBeLessThanOrEqual(PORT_RANGE_END);
+    // the fallback deterministically without binding a real socket.
+    const probe = vi.fn(async (candidate) => candidate !== PORT_RANGE_START);
+    const relocated = await findRelocationPort(
+      34001,
+      0,
+      probe,
+    );
+    expect(relocated).toBe(PORT_RANGE_START);
+    // This must use the injected probe for the fallback too. Otherwise the
+    // result depends on a real listener on 3117 and silently reintroduces the
+    // CI allocation race this suite is meant to avoid.
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect(probe).toHaveBeenCalledWith(PORT_RANGE_START);
   });
 
   it("clamps the near window at 65535 instead of scanning past it", async () => {
     // requestedPort + 1 (65536) is already out of range, so the near window
     // is empty and this must fall straight through to the 3117–3200 fallback
     // instead of throwing ERR_SOCKET_BAD_PORT.
-    const relocated = await findRelocationPort(65535);
-    expect(relocated).not.toBeNull();
-    expect(relocated).toBeGreaterThanOrEqual(PORT_RANGE_START);
-    expect(relocated).toBeLessThanOrEqual(PORT_RANGE_END);
+    const relocated = await findRelocationPort(
+      65535,
+      undefined,
+      async (candidate) => candidate !== PORT_RANGE_START,
+    );
+    expect(relocated).toBe(PORT_RANGE_START);
   });
 
   it("scans up to but never past 65535 for a near-boundary port", async () => {
     // The near window would naturally extend to 65500 + 83 = 65583; it must
     // be clamped so no candidate above 65535 is ever probed.
-    const relocated = await findRelocationPort(65500);
-    expect(relocated).not.toBeNull();
-    expect(relocated).toBeGreaterThanOrEqual(65501);
-    expect(relocated).toBeLessThanOrEqual(65535);
+    const probe = vi.fn(async (candidate) => candidate !== PORT_RANGE_START);
+    const relocated = await findRelocationPort(
+      65500,
+      undefined,
+      probe,
+    );
+    expect(relocated).toBe(PORT_RANGE_START);
+    expect(probe).toHaveBeenCalledWith(65501);
+    expect(probe).toHaveBeenCalledWith(65535);
+    expect(probe).not.toHaveBeenCalledWith(65536);
   });
 });
 

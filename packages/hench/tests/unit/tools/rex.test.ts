@@ -56,7 +56,7 @@ describe("toolRexUpdateStatus", () => {
     const parentItem = {
       id: "feature-1",
       title: "Feature",
-      status: "in_progress",
+      status: "pending",
       level: "feature",
       children: [
         { id: "task-1", title: "First task", status: "completed", level: "task" },
@@ -217,7 +217,7 @@ describe("toolRexUpdateStatus — cascade independence", () => {
     const parentItem = {
       id: "feature-1",
       title: "Feature",
-      status: "in_progress",
+      status: "pending",
       level: "feature",
       children: [
         { id: "task-1", title: "First task", status: "completed", level: "task" },
@@ -260,7 +260,7 @@ describe("toolRexUpdateStatus — cascade independence", () => {
     expect(result).toContain("Auto-completed");
   });
 
-  it("uses whole-tree reconciliation — heals a stuck parent from a prior missed cascade", async () => {
+  it("heals a stuck ancestor from a prior missed cascade", async () => {
     const store = mockStore();
     const task2Initial = { id: "task-2", title: "Task 2", status: "in_progress", level: "task" };
     const feature1 = {
@@ -294,13 +294,55 @@ describe("toolRexUpdateStatus — cascade independence", () => {
 
     const result = await toolRexUpdateStatus(store, "task-2", { status: "completed" });
 
-    // feature-1 gets healed by whole-tree reconciliation (all children now terminal)
+    // feature-1 is an ancestor of task-2, so the scoped sweep still reaches it.
+    // Containment (#368) bounds the sweep; it does not disable self-healing.
     expect(store.updateItem).toHaveBeenCalledWith(
       "feature-1",
       expect.objectContaining({ status: "completed" }),
-      expect.any(Object),
+      expect.objectContaining({ preserveModifiedBy: true }),
     );
     expect(result).toContain("Auto-completed");
+  });
+
+  it("does not take authorship of an ancestor it closed (GH #368)", async () => {
+    const store = mockStore();
+    const task2Initial = { id: "task-2", title: "Task 2", status: "in_progress", level: "task" };
+    const feature1 = {
+      id: "feature-1",
+      title: "Feature 1",
+      status: "pending",
+      level: "feature",
+      children: [
+        { id: "task-1", title: "Task 1", status: "completed", level: "task" },
+        task2Initial,
+      ],
+    };
+    store.getItem.mockImplementation(async (id: string) => {
+      if (id === "task-2") return task2Initial;
+      if (id === "feature-1") return feature1;
+      return null;
+    });
+    store.loadDocument.mockResolvedValue({
+      schema: "rex/v1",
+      title: "Test",
+      items: [{
+        ...feature1,
+        children: [
+          { id: "task-1", title: "Task 1", status: "completed", level: "task" },
+          { ...task2Initial, status: "completed" },
+        ],
+      }],
+    });
+
+    await toolRexUpdateStatus(store, "task-2", { status: "completed" });
+
+    // The task the user asked about is attributed to them; the ancestor closed
+    // as a side effect keeps whatever author it already had.
+    const [taskWrite, parentWrite] = store.updateItem.mock.calls;
+    expect(taskWrite[0]).toBe("task-2");
+    expect(taskWrite[2]?.preserveModifiedBy).toBeUndefined();
+    expect(parentWrite[0]).toBe("feature-1");
+    expect(parentWrite[2]?.preserveModifiedBy).toBe(true);
   });
 });
 

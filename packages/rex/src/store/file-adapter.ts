@@ -8,6 +8,7 @@ import { findItem, walkTree, insertChild, updateInTree, removeFromTree } from ".
 import {
   stampModified,
   stampModifiedFields,
+  stampUpdatedFields,
   stampActor,
   snapshotItemContent,
   stampChangedItems,
@@ -27,7 +28,7 @@ import { parseFolderTree } from "./folder-tree-parser.js";
 import { serializeFolderTree } from "./folder-tree-serializer.js";
 import { resolveGitBranch } from "./branch-naming.js";
 import { withSelfHealTag } from "./self-heal-tag.js";
-import { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
+import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "./paths.js";
 import type { PRDStore, StoreCapabilities, WriteOptions } from "./contracts.js";
 
 /** Canonical filename for the consolidated PRD document. */
@@ -41,6 +42,11 @@ export class FileStore implements PRDStore {
    * than this. Zero means "never loaded" — such a save may delete nothing.
    */
   private loadedAt = 0;
+  /**
+   * Load-time identity (resolved path → content digest) of the item files the
+   * last load or save left on disk — see FolderTreeStore.loadedFiles.
+   */
+  private loadedFiles: ReadonlyMap<string, string> = new Map();
   private itemToFile: Map<string, string> = new Map();
   private fileMetadata: Map<string, { schema: string; title: string }> = new Map();
   private ownershipLoaded = false;
@@ -268,12 +274,16 @@ export class FileStore implements PRDStore {
       }
       await mkdir(this.treeRoot, { recursive: true });
       await atomicWrite(
-        this.path("tree-meta.json"),
+        this.path(TREE_META_FILENAME),
         JSON.stringify(treeMetaContents(doc)),
       );
-      await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+      const written = await serializeFolderTree(doc.items, this.treeRoot, {
+        loadedAt: this.loadedAt,
+        loadedFiles: this.loadedFiles,
+      });
       // A completed save makes this instance's view current again — see writeFolderTree.
       this.loadedAt = Date.now();
+      this.loadedFiles = written.fileDigests;
       this.rebuildOwnershipFromItems(doc);
       return result;
     });
@@ -428,7 +438,7 @@ export class FileStore implements PRDStore {
     let schema = SCHEMA_VERSION;
     let treeMetaPresent = false;
     try {
-      const raw = await readFile(this.path("tree-meta.json"), "utf-8");
+      const raw = await readFile(this.path(TREE_META_FILENAME), "utf-8");
       const meta = parseTreeMeta(raw);
       if (meta.title !== undefined) title = meta.title;
       if (meta.schema !== undefined) schema = meta.schema;
@@ -441,7 +451,8 @@ export class FileStore implements PRDStore {
 
     // Parse items from the folder tree
     try {
-      const { items } = await parseFolderTree(this.treeRoot);
+      const { items, fileDigests } = await parseFolderTree(this.treeRoot);
+      this.loadedFiles = fileDigests;
       if (items.length === 0 && !treeMetaPresent && (await this.hasLegacySource())) {
         return this.loadLegacyDocument();
       }
@@ -488,13 +499,18 @@ export class FileStore implements PRDStore {
   private async writeFolderTree(doc: PRDDocument): Promise<void> {
     await mkdir(this.treeRoot, { recursive: true });
     await atomicWrite(
-      this.path("tree-meta.json"),
+      this.path(TREE_META_FILENAME),
       JSON.stringify(treeMetaContents(doc)),
     );
-    await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    const written = await serializeFolderTree(doc.items, this.treeRoot, {
+      loadedAt: this.loadedAt,
+      loadedFiles: this.loadedFiles,
+    });
     // A completed save makes this instance's view of the tree current again:
-    // its own writes must not read as "another writer's work" on the next save.
+    // its own writes must not read as "another writer's work" on the next save,
+    // and the files it just wrote are the ones it can vouch for relocating.
     this.loadedAt = Date.now();
+    this.loadedFiles = written.fileDigests;
     this.rebuildOwnershipFromItems(doc);
   }
 
@@ -587,14 +603,13 @@ export class FileStore implements PRDStore {
   async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
     const owner = await this.resolveOwnerFile(id);
     const attributedUpdates = this.applyWriteAttribution(updates, owner, options);
-    // Merge in lastModified/lastModifiedBy directly (rather than building a
-    // full merged item via `stampModified`) since `updateInTree` applies a
-    // partial `Object.assign` onto the existing item.
-    const stampedUpdates: Partial<PRDItem> = {
-      ...attributedUpdates,
-      ...(await stampModifiedFields()),
-    };
     await this.withFileTransaction(owner, async (doc) => {
+      // A partial patch rather than a full merged item, since `updateInTree`
+      // applies an `Object.assign` onto the existing item. Resolved inside the
+      // transaction because `preserveModifiedBy` needs the item's current
+      // author (see WriteOptions).
+      const existing = findItem(doc.items, id);
+      const stampedUpdates = await stampUpdatedFields(existing?.item, attributedUpdates, options);
       if (!updateInTree(doc.items, id, stampedUpdates)) {
         throw new Error(`Item "${id}" not found`);
       }

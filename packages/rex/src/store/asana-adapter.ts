@@ -19,7 +19,7 @@ import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { toCanonicalJSON } from "../core/canonical.js";
 import { findItem, walkTree } from "../core/tree.js";
-import { stampModified, stampActor } from "../core/sync.js";
+import { stampModified, stampUpdatedItem, stampActor } from "../core/sync.js";
 import {
   mapAsanaToDocument,
   mapItemToCreate,
@@ -127,7 +127,7 @@ export class AsanaStore implements PRDStore {
     );
   }
 
-  async updateItem(id: string, updates: Partial<PRDItem>, _options?: WriteOptions): Promise<void> {
+  async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
     const gid = await this.resolveAsanaGid(id);
     if (!gid) {
       throw new Error(`Item "${id}" not found`);
@@ -139,8 +139,7 @@ export class AsanaStore implements PRDStore {
       throw new Error(`Item "${id}" not found`);
     }
 
-    const merged = { ...entry.item, ...updates } as PRDItem;
-    const stamped = await stampModified(merged);
+    const stamped = await stampUpdatedItem(entry.item, updates, options);
     await this.client.updateTask(gid, mapItemToUpdate(stamped));
   }
 

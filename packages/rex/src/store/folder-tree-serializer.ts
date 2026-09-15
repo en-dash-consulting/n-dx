@@ -21,9 +21,11 @@
  */
 
 import { mkdir, readFile, writeFile, readdir, rm, rename, stat } from "node:fs/promises";
-import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { join, resolve } from "node:path";
 import type { PRDItem } from "../schema/index.js";
+import { digestItemFile } from "./folder-tree-parser.js";
+import { atomicWriteTempPath } from "./atomic-write.js";
+import { TREE_META_FILENAME } from "./paths.js";
 
 /**
  * Slug length cap, held at 40 for Windows' 260-character `MAX_PATH`.
@@ -62,6 +64,15 @@ export interface SerializeResult {
   directoriesCreated: number;
   /** Stale directories removed (items no longer in PRD). */
   directoriesRemoved: number;
+  /**
+   * Identity of every item file in the saved tree after this call: resolved
+   * absolute path → {@link digestItemFile} of its content, whether the file
+   * was written or already matched. Stores adopt this as their new
+   * `loadedFiles` so a follow-up save by the same writer (a leaf-to-folder
+   * promotion of an item it just created, say) can vouch for the files it is
+   * about to relocate without reloading the tree.
+   */
+  fileDigests: Map<string, string>;
 }
 
 /**
@@ -83,6 +94,17 @@ export interface SerializeOptions {
    * `allowBulkDelete` is set.
    */
   loadedAt?: number;
+  /**
+   * Load-time identity of the item files the snapshot was parsed from
+   * (resolved path → content digest), as returned by `parseFolderTree` or by
+   * the previous `serializeFolderTree` result. Required for the relocation
+   * exemption: a deletion candidate newer than `loadedAt` whose item id IS in
+   * the document being saved is allowed only when its current content still
+   * matches the digest recorded here. Without a matching entry the candidate
+   * is protected by mtime alone — a newer file is someone else's work until
+   * proven otherwise.
+   */
+  loadedFiles?: ReadonlyMap<string, string>;
   /**
    * Explicit intent to delete without staleness proof — a deliberate
    * whole-tree rewrite (migration, restore). Skips the guard entirely.
@@ -117,6 +139,7 @@ export async function serializeFolderTree(
     filesSkipped: 0,
     directoriesCreated: 0,
     directoriesRemoved: 0,
+    fileDigests: new Map(),
   };
 
   await ensureDir(treeRoot, result);
@@ -126,7 +149,7 @@ export async function serializeFolderTree(
   const staleEntries: StaleEntry[] = [];
   await writeSiblings(items, treeRoot, result, staleEntries);
 
-  await guardStaleEntries(staleEntries, options);
+  await guardStaleEntries(staleEntries, options, collectItemIds(items));
 
   for (const entry of staleEntries) {
     await rm(entry.path, { recursive: entry.isDir, force: true });
@@ -136,15 +159,50 @@ export async function serializeFolderTree(
   return result;
 }
 
+/** Every item id in the tree being saved, at any depth. */
+function collectItemIds(items: PRDItem[], into = new Set<string>()): Set<string> {
+  for (const item of items) {
+    into.add(item.id);
+    if (item.children) collectItemIds(item.children, into);
+  }
+  return into;
+}
+
 /**
  * Refuse deletions a stale snapshot cannot vouch for.
  *
- * With `loadedAt`, a candidate whose newest on-disk mtime (recursive — a fresh
- * child inside an old folder counts) is later than the load was written after
- * the snapshot was taken; deleting it would destroy another writer's work.
- * With no options at all the legacy delete-freely behavior is kept.
+ * With `loadedAt`, a candidate containing a file that is both newer than the
+ * load AND carries an item id absent from the document being saved was
+ * written by another writer after the snapshot was taken; deleting it would
+ * destroy their work. With no options at all the legacy delete-freely
+ * behavior is kept.
+ *
+ * The id check is what tells a RELOCATION apart from a deletion. Promoting a
+ * leaf `<slug>.md` into `<slug>/index.md` (item gains its first child)
+ * removes a file the same writer created moments earlier — under Windows
+ * timestamp granularity its mtime is indistinguishable from a concurrent
+ * writer's, but its item id is present in the document being saved, so
+ * nothing is lost. Observed live as the flaky web-route failures ("expected
+ * 400 to be 200"): capture handlers add an epic and then its first child in
+ * back-to-back transactions, and the guard fired on the promotion's leaf
+ * cleanup. An mtime-only comparison cannot be made safe with tolerance —
+ * the same-writer gap and a genuine racing write occupy the same range.
+ *
+ * The id alone is not enough, though: it says the item survives, not that
+ * THIS version of it does. Two writers load X; A edits X and saves; B, still
+ * on its old snapshot, moves X under another parent. B's save writes its
+ * stale copy at the destination and removes A's newer source file — X is in
+ * B's document, so an id-only exemption would wave the deletion through and
+ * A's edit would vanish with no error. So a relocation is exempt only when
+ * the source file's content still digests to what the snapshot recorded for
+ * that path in `loadedFiles`: unchanged since load means the copy being
+ * written elsewhere carries everything the source held.
  */
-async function guardStaleEntries(staleEntries: StaleEntry[], options: SerializeOptions): Promise<void> {
+async function guardStaleEntries(
+  staleEntries: StaleEntry[],
+  options: SerializeOptions,
+  savedIds: Set<string>,
+): Promise<void> {
   if (staleEntries.length === 0 || options.allowBulkDelete || options.loadedAt === undefined) return;
 
   // stat().mtimeMs carries fractional milliseconds while Date.now() is an
@@ -155,15 +213,16 @@ async function guardStaleEntries(staleEntries: StaleEntry[], options: SerializeO
 
   const violations: string[] = [];
   for (const entry of staleEntries) {
-    if ((await newestMtime(entry.path)) > options.loadedAt + MTIME_TOLERANCE_MS) {
-      violations.push(await describeEntry(entry));
+    const unseen = await deletesUnseenWork(entry.path, options.loadedAt + MTIME_TOLERANCE_MS, savedIds, options.loadedFiles);
+    if (unseen !== null) {
+      violations.push(await describeEntry(unseen));
     }
   }
   if (violations.length === 0) return;
 
   throw new Error(
     `Stale-save guard: this save would delete ${violations.length} item${violations.length === 1 ? "" : "s"} ` +
-      `written after the document being saved was loaded — the snapshot is stale, and saving it would ` +
+      `written or edited after the document being saved was loaded — the snapshot is stale, and saving it would ` +
       `destroy another writer's work:\n` +
       violations.map((v) => `  - ${v}`).join("\n") +
       `\nReload the document (or run the mutation inside store.withTransaction) and retry. ` +
@@ -171,35 +230,61 @@ async function guardStaleEntries(staleEntries: StaleEntry[], options: SerializeO
   );
 }
 
-/** Newest mtime under `path` (the entry itself and, for directories, everything inside). */
-async function newestMtime(path: string): Promise<number> {
-  let newest = 0;
+/**
+ * The path of the first file under `path` whose deletion would destroy work
+ * the saved document does not carry, or null when there is none. Such a file
+ * is newer than the load and either its item id is missing from `savedIds`,
+ * or the id is present but the content no longer matches what the snapshot
+ * loaded from that path (a concurrent edit the relocation would overwrite
+ * with its stale copy). Returning the file rather than a verdict lets the
+ * error name the item actually at risk, not the directory that contains it.
+ *
+ * Directory mtimes are deliberately ignored — a directory's mtime bumps on
+ * any child rename and identifies nothing; only files carry items. A newer
+ * file with no parseable id stays protected by mtime alone: unknown content
+ * is guarded, not assumed safe.
+ */
+async function deletesUnseenWork(
+  path: string,
+  newerThan: number,
+  savedIds: Set<string>,
+  loadedFiles: ReadonlyMap<string, string> | undefined,
+): Promise<string | null> {
   try {
     const info = await stat(path);
-    newest = info.mtimeMs;
-    if (!info.isDirectory()) return newest;
-    for (const entry of await readdir(path)) {
-      const childNewest = await newestMtime(join(path, entry));
-      if (childNewest > newest) newest = childNewest;
+    if (info.isDirectory()) {
+      for (const child of await readdir(path)) {
+        const unseen = await deletesUnseenWork(join(path, child), newerThan, savedIds, loadedFiles);
+        if (unseen !== null) return unseen;
+      }
+      return null;
     }
+    if (info.mtimeMs <= newerThan) return null;
+    const raw = await readFile(path, "utf8");
+    const id = /^id:\s*"?([^"\n]+?)"?\s*$/m.exec(raw)?.[1];
+    if (!id || !savedIds.has(id)) return path;
+    // Relocation candidate: the item lives on elsewhere in the saved tree.
+    // Exempt only if the file is byte-for-byte what this snapshot loaded from
+    // it — otherwise the copy being written elsewhere is missing an edit.
+    const loadedDigest = loadedFiles?.get(resolve(path));
+    return loadedDigest === undefined || loadedDigest !== digestItemFile(raw) ? path : null;
   } catch {
     // Vanished mid-scan — nothing left to protect.
+    return null;
   }
-  return newest;
 }
 
-/** Human-readable identity for a doomed entry: title and id from its frontmatter, else its path. */
-async function describeEntry(entry: StaleEntry): Promise<string> {
-  const contentFile = entry.isDir ? join(entry.path, "index.md") : entry.path;
+/** Human-readable identity for a doomed item file: title and id from its frontmatter, else its path. */
+async function describeEntry(contentFile: string): Promise<string> {
   try {
     const raw = await readFile(contentFile, "utf8");
     const title = /^title:\s*"?(.*?)"?\s*$/m.exec(raw)?.[1];
     const id = /^id:\s*"?([^"\n]+?)"?\s*$/m.exec(raw)?.[1];
-    if (title || id) return `${title ?? "(untitled)"} [${id ?? "?"}] (${entry.path})`;
+    if (title || id) return `${title ?? "(untitled)"} [${id ?? "?"}] (${contentFile})`;
   } catch {
     // No readable frontmatter — the path still identifies it.
   }
-  return entry.path;
+  return contentFile;
 }
 
 /**
@@ -452,7 +537,7 @@ async function locateById(
   wantDirectory: boolean,
 ): Promise<string | undefined> {
   for (const entry of entries) {
-    if (entry === "tree-meta.json") continue;
+    if (entry === TREE_META_FILENAME) continue;
     const candidate = wantDirectory ? join(dir, entry, "index.md") : join(dir, entry);
     if (!wantDirectory && !entry.endsWith(".md")) continue;
     if (!wantDirectory && entry === "index.md") continue;
@@ -797,6 +882,9 @@ async function writeIfChanged(
   content: string,
   result: SerializeResult,
 ): Promise<void> {
+  // Either branch leaves `content` on disk at `filePath`, so its digest is
+  // the file's identity from here on — see SerializeResult.fileDigests.
+  result.fileDigests.set(resolve(filePath), digestItemFile(content));
   try {
     const existing = await readFile(filePath, "utf8");
     if (existing === content) {
@@ -807,7 +895,7 @@ async function writeIfChanged(
     // File does not exist — proceed with write
   }
 
-  const tmpPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+  const tmpPath = atomicWriteTempPath(filePath);
   await writeFile(tmpPath, content, "utf8");
   await rename(tmpPath, filePath);
   result.filesWritten++;

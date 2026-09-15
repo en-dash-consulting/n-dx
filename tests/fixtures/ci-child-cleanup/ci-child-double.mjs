@@ -10,19 +10,42 @@
  */
 
 import { appendFileSync } from "node:fs";
+import { spawn } from "node:child_process";
 
 const pidFile = process.env.NDX_TEST_CI_PID_FILE;
 const mode = process.env.NDX_TEST_CI_MODE ?? "success";
 
-if (pidFile) {
+const kind = process.argv[2] === "docs:build" ? "docs-build" : "ci-tool";
+
+function recordPid(record) {
+  if (!pidFile) return;
+
   appendFileSync(
     pidFile,
-    `${JSON.stringify({ pid: process.pid, argv: process.argv.slice(2), mode })}\n`,
+    `${JSON.stringify(record)}\n`,
     "utf8",
   );
 }
 
+recordPid({ pid: process.pid, argv: process.argv.slice(2), mode, kind });
+
 if (mode === "hang") {
+  if (kind === "docs-build") {
+    // The Windows docs-build path is shell-backed (`cmd.exe` → node), so this
+    // makes the real CI shutdown test prove taskkill /T reaches below that
+    // tracked shell child as well as its direct Node process.
+    const grandchild = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      stdio: "ignore",
+    });
+    recordPid({
+      pid: grandchild.pid,
+      argv: ["docs-build-grandchild"],
+      mode,
+      kind: "docs-build-grandchild",
+      parentPid: process.pid,
+    });
+  }
+
   process.on("SIGTERM", () => {
     // Deliberately ignore graceful termination so parent must escalate to SIGKILL.
   });

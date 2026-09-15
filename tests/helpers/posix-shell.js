@@ -81,22 +81,21 @@ export function itNeedsPosixShell(name, fn, timeout) {
 }
 
 /**
- * Explain a startup failure in terms of the shell when that is the cause.
+ * Explain a shell-mediated startup failure with its recorded launch detail.
  *
- * For the case where the shell resolved but the spawn still failed — a broken
- * Git install, a PATH entry pointing at a deleted file — the recorded error is
- * the only evidence, so it goes in the message rather than being discarded.
+ * For the case where the shell resolved but either it or the executable it
+ * launches still failed — a broken Git install, a PATH entry pointing at a
+ * deleted file, or a missing child executable — the recorded error is the only
+ * evidence, so it goes in the message rather than being discarded.
  */
 export function describeShellStartupFailure({ what, recordedError }) {
   const lines = [`${what} never started.`];
   if (recordedError) {
-    // The error names the binary it tried to launch, so the message does not
-    // second-guess it with `sh` — the two differ when a test sabotages the name.
-    lines.push(`The spawn reported: ${recordedError}.`);
-    lines.push("That is a failure to launch the shell, not a failure of the behaviour under test.");
+    lines.push(`The shell-mediated launch reported: ${recordedError}.`);
+    lines.push("That is a fixture launch failure, not a failure of the behaviour under test.");
   } else {
     lines.push(
-      `\`${POSIX_SHELL}\` resolved on PATH and the child recorded no spawn error, ` +
+      `\`${POSIX_SHELL}\` resolved on PATH and the child recorded no launch error, ` +
         "so this looks like a genuine failure of the behaviour under test.",
     );
   }
