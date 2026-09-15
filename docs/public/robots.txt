@@ -1,0 +1,13 @@
+# docs.n-dx.dev
+#
+# Documentation is meant to be read, including by the AI assistants people
+# increasingly ask instead of searching. Everything is allowed.
+#
+# /archive/ is crawlable but deliberately absent from the sitemap: those pages
+# record why past decisions were made and are explicitly not a description of
+# how n-dx works today.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://docs.n-dx.dev/sitemap.xml
