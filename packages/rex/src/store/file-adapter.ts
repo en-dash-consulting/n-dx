@@ -42,6 +42,11 @@ export class FileStore implements PRDStore {
    * than this. Zero means "never loaded" — such a save may delete nothing.
    */
   private loadedAt = 0;
+  /**
+   * Load-time identity (resolved path → content digest) of the item files the
+   * last load or save left on disk — see FolderTreeStore.loadedFiles.
+   */
+  private loadedFiles: ReadonlyMap<string, string> = new Map();
   private itemToFile: Map<string, string> = new Map();
   private fileMetadata: Map<string, { schema: string; title: string }> = new Map();
   private ownershipLoaded = false;
@@ -272,9 +277,13 @@ export class FileStore implements PRDStore {
         this.path(TREE_META_FILENAME),
         JSON.stringify(treeMetaContents(doc)),
       );
-      await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+      const written = await serializeFolderTree(doc.items, this.treeRoot, {
+        loadedAt: this.loadedAt,
+        loadedFiles: this.loadedFiles,
+      });
       // A completed save makes this instance's view current again — see writeFolderTree.
       this.loadedAt = Date.now();
+      this.loadedFiles = written.fileDigests;
       this.rebuildOwnershipFromItems(doc);
       return result;
     });
@@ -442,7 +451,8 @@ export class FileStore implements PRDStore {
 
     // Parse items from the folder tree
     try {
-      const { items } = await parseFolderTree(this.treeRoot);
+      const { items, fileDigests } = await parseFolderTree(this.treeRoot);
+      this.loadedFiles = fileDigests;
       if (items.length === 0 && !treeMetaPresent && (await this.hasLegacySource())) {
         return this.loadLegacyDocument();
       }
@@ -492,10 +502,15 @@ export class FileStore implements PRDStore {
       this.path(TREE_META_FILENAME),
       JSON.stringify(treeMetaContents(doc)),
     );
-    await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    const written = await serializeFolderTree(doc.items, this.treeRoot, {
+      loadedAt: this.loadedAt,
+      loadedFiles: this.loadedFiles,
+    });
     // A completed save makes this instance's view of the tree current again:
-    // its own writes must not read as "another writer's work" on the next save.
+    // its own writes must not read as "another writer's work" on the next save,
+    // and the files it just wrote are the ones it can vouch for relocating.
     this.loadedAt = Date.now();
+    this.loadedFiles = written.fileDigests;
     this.rebuildOwnershipFromItems(doc);
   }
 

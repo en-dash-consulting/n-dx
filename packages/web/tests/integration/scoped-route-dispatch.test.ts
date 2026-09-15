@@ -57,7 +57,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { execFile } from "node:child_process";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { assertFreshServerBuild } from "../helpers/built-server-guard.js";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
@@ -155,16 +155,10 @@ async function runDriver(scope: string, routePath: string): Promise<DriverResult
 }
 
 describe("scoped route dispatch", () => {
+  // Shared guard: missing-build AND stale-build both fail as build problems
+  // with the fix in the message, instead of as the behaviour under test.
   beforeAll(() => {
-    if (!existsSync(SERVER_ENTRY)) {
-      expect.fail(
-        [
-          `Missing build output: ${SERVER_ENTRY}`,
-          "This test boots the real server in a child process, so it needs the",
-          "compiled server. Run 'pnpm --filter @n-dx/web build' first.",
-        ].join("\n"),
-      );
-    }
+    assertFreshServerBuild();
   });
 
   it("does not run the ask route when sourcevision is out of scope", async () => {

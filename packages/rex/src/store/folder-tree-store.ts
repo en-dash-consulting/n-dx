@@ -58,6 +58,8 @@ export class FolderTreeStore implements PRDStore {
    * than this. Zero means "never loaded" — such a save may delete nothing.
    */
   private loadedAt = 0;
+  /** Identity of item files at load/save time, used by relocation-safe deletes. */
+  private loadedFiles: ReadonlyMap<string, string> = new Map();
 
   constructor(rexDir: string) {
     this.rexDir = rexDir;
@@ -89,7 +91,8 @@ export class FolderTreeStore implements PRDStore {
       }
     }
 
-    const { items } = await parseFolderTree(this.treeRoot);
+    const { items, fileDigests } = await parseFolderTree(this.treeRoot);
+    this.loadedFiles = fileDigests;
     return { schema, title, items };
   }
 
@@ -97,10 +100,14 @@ export class FolderTreeStore implements PRDStore {
   private async writeTree(doc: PRDDocument): Promise<void> {
     await mkdir(this.treeRoot, { recursive: true });
     await writeFile(this.path(TREE_META_FILENAME), JSON.stringify(treeMetaContents(doc)), "utf-8");
-    await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    const written = await serializeFolderTree(doc.items, this.treeRoot, {
+      loadedAt: this.loadedAt,
+      loadedFiles: this.loadedFiles,
+    });
     // A completed save makes this instance's view of the tree current again:
     // its own writes must not read as "another writer's work" on the next save.
     this.loadedAt = Date.now();
+    this.loadedFiles = written.fileDigests;
   }
 
   /**

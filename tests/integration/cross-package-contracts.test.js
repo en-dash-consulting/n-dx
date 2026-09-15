@@ -646,7 +646,7 @@ describe("gateway export auto-detection", () => {
         "mapApprovalToCodexFlag", "toAnthropicToolDef", "toAnthropicToolDefs",
         "toOpenAiToolDef", "toOpenAiToolDefs", "toGeminiFunctionDeclaration",
         "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry",
-        "classifyLLMError", "isAuthError", "parseLmStudioError", "getNextFailoverAttempt",
+        "classifyLLMError", "isAuthError", "parseLmStudioError", "resolveLocalTimeoutMs", "getNextFailoverAttempt",
         "quoteWindowsToken", "buildWindowsCliCommandLine", "spawnCli", "terminateProcessTree",
         "diagnoseCliInvocation", "diagnoseCliNotFound", "isLLMVendor"],
       ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "REVIEW_MODELS", "GOOGLE_MODELS",
