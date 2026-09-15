@@ -32,6 +32,18 @@ import {
   describeShellStartupFailure,
 } from "../helpers/posix-shell.js";
 
+/**
+ * An absolute path a POSIX shell can execute on either platform.
+ *
+ * Git for Windows' `sh` runs a native `C:/...` path, and forward slashes remove
+ * the one ambiguity a Windows path carries into a shell word: a backslash before
+ * `$`, a quote or another backslash is an escape inside double quotes, so the
+ * same literal that works today silently breaks under a different install root.
+ */
+function toShellPath(absolutePath) {
+  return absolutePath.replace(/\\/g, "/");
+}
+
 describe("stopping a detached server takes its children with it", () => {
   let dir;
   /** @type {import("node:child_process").ChildProcess | null} */
@@ -67,16 +79,26 @@ describe("stopping a detached server takes its children with it", () => {
     // the first version of this test managed to be vacuous. The real server reaches
     // its CLIs through cmd.exe (spawnCli) or `sh -c`, and neither is libuv-managed,
     // so their children escape the job and survive. That is the tree worth testing.
-    // Use the exact Node executable that is running this test. On Windows, `sh`
-    // can be available through Git for Windows while its PATH does not contain
-    // Node; a bare `node child.js` then exits in the shell without ever reaching
-    // the fixture. Keep `& wait` so sh remains a real intermediary rather than
-    // exec-replacing itself with Node on POSIX.
     //
-    // Capture shell stderr and its exit status as well as spawn's error event.
-    // The server is a separate process, so writing that information to the temp
-    // directory makes a missing executable actionable instead of a five-second
-    // readiness timeout with no diagnosis.
+    // Both paths are absolute, and their separators are normalised to `/`. On
+    // Windows `sh` comes from Git for Windows, whose PATH need not contain Node,
+    // so a bare `node child.js` exits in the shell without ever reaching the
+    // fixture; and a backslash path is one refactor away from being read as an
+    // escape sequence by that shell. Keep the job backgrounded so sh remains a
+    // real intermediary rather than exec-replacing itself with Node on POSIX.
+    //
+    // `wait` is given the job's pid. With no operand it waits for every child but
+    // exits 0 unconditionally, so a grandchild that died on launch left sh exiting
+    // 0 with its diagnosis only on a stderr stream nothing persisted — which is
+    // exactly the "resolved on PATH and recorded no launch error" dead end Windows
+    // CI reported. Now sh carries the grandchild's status, stderr is written as it
+    // arrives, and every shell exit is recorded: while the grandchild lives, sh
+    // does not exit at all, so any close before the assertion is evidence.
+    const nodeForShell = toShellPath(process.execPath);
+    const childForShell = toShellPath(join(dir, "child.js"));
+    const shellCommand =
+      `${JSON.stringify(nodeForShell)} ${JSON.stringify(childForShell)} &` +
+      ' node_pid=$!; wait "$node_pid"; exit $?';
     await writeFile(
       join(dir, "server.js"),
       [
@@ -84,19 +106,18 @@ describe("stopping a detached server takes its children with it", () => {
         "const path = require('path');",
         "const { spawn } = require('child_process');",
         "fs.writeFileSync(path.join(__dirname, 'server.ready'), JSON.stringify({ pid: process.pid }));",
-        `const shellCommand = ${JSON.stringify(`${JSON.stringify(process.execPath)} child.js & wait`)};`,
+        `const shellCommand = ${JSON.stringify(shellCommand)};`,
         "const child = spawn('sh', ['-c', shellCommand], { cwd: __dirname, stdio: ['ignore', 'ignore', 'pipe'] });",
         "const launchErrorPath = path.join(__dirname, 'launch-error.txt');",
+        "const stderrPath = path.join(__dirname, 'shell-stderr.txt');",
         "if (child.pid !== undefined) fs.writeFileSync(path.join(__dirname, 'shell.pid'), String(child.pid));",
-        "let stderr = '';",
         "child.stderr.setEncoding('utf8');",
-        "child.stderr.on('data', (chunk) => { stderr += chunk; });",
+        "child.stderr.on('data', (chunk) => { fs.appendFileSync(stderrPath, chunk); });",
         "child.on('error', (err) => {",
         "  fs.appendFileSync(launchErrorPath, `Could not launch sh: ${String(err && err.message || err)}\\n`);",
         "});",
         "child.on('close', (code, signal) => {",
-        "  if (code === 0 && signal === null) return;",
-        "  fs.appendFileSync(launchErrorPath, `sh exited with code ${code} and signal ${signal}.\\n${stderr}`);",
+        "  fs.appendFileSync(launchErrorPath, `sh exited with code ${code} and signal ${signal}\\n`);",
         "});",
         "setTimeout(() => {}, 60000);",
       ].join("\n"),
@@ -112,24 +133,55 @@ describe("stopping a detached server takes its children with it", () => {
     // with cwd or an open file in this directory prevents its removal.
     const pids = [...new Set([server?.pid, readShellPid(), readChildPid()])]
       .filter((pid) => typeof pid === "number");
-    await Promise.allSettled(
-      pids.map((pid) => terminateTreeByPid(pid, { forceKillTimeoutMs: 500 })),
-    );
-    for (const pid of pids) {
-      if (!isAlive(pid)) continue;
-      try {
-        process.kill(pid, "SIGKILL");
-      } catch (error) {
-        if (isAlive(pid)) throw error;
-      }
-    }
-    expect(await waitFor(() => pids.every((pid) => !isAlive(pid)))).toBe(true);
     server = null;
-    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    try {
+      await Promise.allSettled(
+        pids.map((pid) => terminateTreeByPid(pid, { forceKillTimeoutMs: 500 })),
+      );
+      for (const pid of pids) {
+        if (!isAlive(pid)) continue;
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch (error) {
+          if (isAlive(pid)) throw error;
+        }
+      }
+      expect(await waitFor(() => pids.every((pid) => !isAlive(pid)))).toBe(true);
+    } finally {
+      // Unconditional: a survivor that fails the check above must not also leak a
+      // temp directory into every later run. Removal is still attempted after the
+      // waits, so on Windows the common case has no holder left.
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
   });
 
-  /** Shell spawn or child-executable failure recorded by the stand-in server. */
+  /**
+   * Shell spawn, shell exit, and grandchild-executable failures recorded by the
+   * stand-in server — which is a separate process, so the temp directory is the
+   * only channel back to the assertion. stderr is included even when the shell
+   * is still running: `command not found` reaches the stream well before the
+   * exit that carries its status.
+   */
   function readLaunchError() {
+    const recorded = ["launch-error.txt", "shell-stderr.txt"]
+      .map((name) => {
+        try {
+          return readFileSync(join(dir, name), "utf-8").trim();
+        } catch {
+          return "";
+        }
+      })
+      .filter(Boolean);
+    return recorded.length > 0 ? recorded.join(" ") : null;
+  }
+
+  /**
+   * A terminal shell failure: spawn's error event, or an exit. Distinct from
+   * `readLaunchError` because stderr alone does not mean the launch failed, while
+   * a shell that has exited will never produce the grandchild — so the wait can
+   * end on the diagnosis rather than on the clock.
+   */
+  function readShellFailure() {
     try {
       return readFileSync(join(dir, "launch-error.txt"), "utf-8").trim() || null;
     } catch {
@@ -225,7 +277,11 @@ describe("stopping a detached server takes its children with it", () => {
     // it is doing the work whose absence we assert below. On expiry, include the
     // shell's exact diagnostic so a missing executable is not mistaken for an
     // orphan-cleanup regression.
-    if (!(await waitFor(async () => readReadyChildPid() !== null && (await tickCount()) > 0))) {
+    const childReady = async () =>
+      readShellFailure() !== null ||
+      (readReadyChildPid() !== null && (await tickCount()) > 0);
+    const reachedReady = await waitFor(childReady);
+    if (!reachedReady || readReadyChildPid() === null || (await tickCount()) === 0) {
       throw new Error(
         describeShellStartupFailure({
           what: "The stand-in server's grandchild",
