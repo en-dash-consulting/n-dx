@@ -18,7 +18,8 @@
  */
 
 import { readFile, readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { createHash } from "node:crypto";
 import type {
   PRDItem,
   ItemLevel,
@@ -43,6 +44,24 @@ export interface FolderParseResult {
   items: PRDItem[];
   /** Non-fatal warnings encountered during traversal. */
   warnings: ParseWarning[];
+  /**
+   * Load-time identity of every item file this parse read: resolved absolute
+   * path → {@link digestItemFile} of its on-disk content. Stores hand this to
+   * the serializer's stale-save guard so a relocation cleanup can prove the
+   * file it removes is the one this snapshot was built from — a concurrent
+   * edit to the same item changes the digest and is refused instead of
+   * being overwritten by the stale copy.
+   */
+  fileDigests: Map<string, string>;
+}
+
+/**
+ * Content digest used as an item file's load-time identity. Both the parser
+ * (recording) and the serializer (checking, and re-recording after a save)
+ * must use this one function so the two sides never disagree on form.
+ */
+export function digestItemFile(raw: string): string {
+  return createHash("sha1").update(raw).digest("hex");
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -59,15 +78,16 @@ export interface FolderParseResult {
 export async function parseFolderTree(treeRoot: string): Promise<FolderParseResult> {
   const warnings: ParseWarning[] = [];
   const items: PRDItem[] = [];
+  const digests = new Map<string, string>();
 
   const rootExists = await isDirectory(treeRoot);
   if (!rootExists) {
     warnings.push({ path: treeRoot, message: "Tree root directory does not exist" });
-    return { items, warnings };
+    return { items, warnings, fileDigests: digests };
   }
 
   for (const childDir of await listSubdirs(treeRoot)) {
-    const item = await parseDirRecursive(join(treeRoot, childDir), 1, warnings);
+    const item = await parseDirRecursive(join(treeRoot, childDir), 1, warnings, digests);
     if (item) items.push(item);
   }
 
@@ -76,12 +96,12 @@ export async function parseFolderTree(treeRoot: string): Promise<FolderParseResu
   // but a malformed PRD that puts a non-epic item at root must still
   // round-trip — `validate` is designed to detect that misplacement and to
   // surface duplicate ids, so we do not deduplicate here.
-  const rootLeaves = await discoverLeafChildMarkdownFiles(treeRoot, "", 1, warnings);
+  const rootLeaves = await discoverLeafChildMarkdownFiles(treeRoot, "", 1, warnings, digests);
   for (const leaf of rootLeaves) {
     items.push(leaf);
   }
 
-  return { items, warnings };
+  return { items, warnings, fileDigests: digests };
 }
 
 /**
@@ -104,12 +124,13 @@ async function parseDirRecursive(
   dir: string,
   depth: number,
   warnings: ParseWarning[],
+  digests: Map<string, string>,
   fromReconstructedParent: boolean = false,
 ): Promise<PRDItem | null> {
   const itemFile = await discoverItemFile(dir, warnings);
   if (!itemFile) return null;
 
-  const item = await parseItemFileFromFrontmatter(itemFile, depth, warnings, fromReconstructedParent);
+  const item = await parseItemFileFromFrontmatter(itemFile, depth, warnings, digests, fromReconstructedParent);
   if (!item) return null;
 
   // Check for single-child reconstruction: if this item has __parentId,
@@ -129,12 +150,12 @@ async function parseDirRecursive(
       // pass fromReconstructedParent=true to suppress depth mismatch warnings for children.
       const childItems: PRDItem[] = [];
       for (const childDir of await listSubdirs(dir)) {
-        const child = await parseDirRecursive(join(dir, childDir), depth + 1, warnings, true);
+        const child = await parseDirRecursive(join(dir, childDir), depth + 1, warnings, digests, true);
         if (child) childItems.push(child);
       }
       // Tasks may also carry legacy `## Subtask:` sections if this is a task item.
       if (current.level === "task") {
-        const legacySubtasks = await readLegacySubtasksIfTask(itemFile, warnings);
+        const legacySubtasks = await readLegacySubtasksIfTask(itemFile, warnings, digests);
         if (legacySubtasks.length > 0) {
           const seenIds = new Set(childItems.map((c) => c.id));
           for (const legacy of legacySubtasks) {
@@ -171,7 +192,7 @@ async function parseDirRecursive(
 
   // Single-child optimization: check for orphaned children in the current directory
   // (items flattened from a subdirectory due to single-child optimization)
-  const orphanedChild = await findOrphanedChildInCurrentDir(dir, itemFile, warnings);
+  const orphanedChild = await findOrphanedChildInCurrentDir(dir, itemFile, warnings, digests);
   if (orphanedChild) {
     // Recursively reconstruct the parent chain (in case of nested single-children)
     let parent = reconstructParentFromChildMetadata(orphanedChild, warnings);
@@ -206,7 +227,7 @@ async function parseDirRecursive(
 
       // Still check for subdirectories in case there are non-single-child items
       for (const childDir of await listSubdirs(dir)) {
-        const child = await parseDirRecursive(join(dir, childDir), depth + 1, warnings);
+        const child = await parseDirRecursive(join(dir, childDir), depth + 1, warnings, digests);
         if (child) childItems.push(child);
       }
 
@@ -218,7 +239,7 @@ async function parseDirRecursive(
   // Recursively parse subdirectories as children (branch subtasks and lower).
   const childItems: PRDItem[] = [];
   for (const childDir of await listSubdirs(dir)) {
-    const child = await parseDirRecursive(join(dir, childDir), depth + 1, warnings);
+    const child = await parseDirRecursive(join(dir, childDir), depth + 1, warnings, digests);
     if (child) childItems.push(child);
   }
 
@@ -226,7 +247,7 @@ async function parseDirRecursive(
   // Skip the item's own file (`index.md` or a legacy `<title>.md`) and any
   // file we already loaded as an orphaned-child shim above.
   const seenIds = new Set(childItems.map((c) => c.id));
-  const leafChildren = await discoverLeafChildMarkdownFiles(dir, itemFile, depth + 1, warnings);
+  const leafChildren = await discoverLeafChildMarkdownFiles(dir, itemFile, depth + 1, warnings, digests);
   for (const leaf of leafChildren) {
     if (!seenIds.has(leaf.id)) {
       childItems.push(leaf);
@@ -237,7 +258,7 @@ async function parseDirRecursive(
   // Tasks may also carry legacy `## Subtask:` sections in their index.md.
   // Merge them in, preferring directory-based subtasks on id collisions.
   if (item.level === "task") {
-    const legacySubtasks = await readLegacySubtasksIfTask(itemFile, warnings);
+    const legacySubtasks = await readLegacySubtasksIfTask(itemFile, warnings, digests);
     if (legacySubtasks.length > 0) {
       for (const legacy of legacySubtasks) {
         if (!seenIds.has(legacy.id)) {
@@ -264,6 +285,7 @@ async function discoverLeafChildMarkdownFiles(
   itemFile: string,
   depth: number,
   warnings: ParseWarning[],
+  digests: Map<string, string>,
 ): Promise<PRDItem[]> {
   let entries: string[];
   try {
@@ -279,7 +301,7 @@ async function discoverLeafChildMarkdownFiles(
     const filePath = join(dir, entry);
     if (filePath === itemFile) continue;
 
-    const text = await readIndexFile(filePath, warnings);
+    const text = await readIndexFile(filePath, warnings, digests);
     if (text === null) continue;
     const fm = parseFrontmatter(text, filePath, warnings);
     if (fm === null) continue;
@@ -294,7 +316,7 @@ async function discoverLeafChildMarkdownFiles(
     // warning by reusing the reconstructed-parent flag — leaves and
     // reconstructed children share the same property: the depth-to-level
     // mapping does not apply to them.
-    const item = await parseItemFileFromFrontmatter(filePath, depth, warnings, true);
+    const item = await parseItemFileFromFrontmatter(filePath, depth, warnings, digests, true);
     if (item) found.push(item);
   }
 
@@ -458,6 +480,7 @@ async function findOrphanedChildInCurrentDir(
   dir: string,
   itemFile: string,
   warnings: ParseWarning[],
+  digests: Map<string, string>,
 ): Promise<PRDItem | null> {
   let entries: string[];
   try {
@@ -473,7 +496,7 @@ async function findOrphanedChildInCurrentDir(
 
   for (const mdFile of markdownFiles) {
     const filePath = join(dir, mdFile);
-    const text = await readIndexFile(filePath, warnings);
+    const text = await readIndexFile(filePath, warnings, digests);
     if (text === null) continue;
 
     const fm = parseFrontmatter(text, filePath, warnings);
@@ -483,7 +506,7 @@ async function findOrphanedChildInCurrentDir(
     if (fm.__parentId !== undefined) {
       // Parse this as a PRDItem
       const depth = (await isDirectory(dir)) ? 1 : 0; // Rough depth estimate
-      const item = await parseItemFileFromFrontmatter(filePath, depth, warnings);
+      const item = await parseItemFileFromFrontmatter(filePath, depth, warnings, digests);
       if (item) return item;
     }
   }
@@ -498,8 +521,9 @@ async function findOrphanedChildInCurrentDir(
 async function readLegacySubtasksIfTask(
   filePath: string,
   warnings: ParseWarning[],
+  digests: Map<string, string>,
 ): Promise<PRDItem[]> {
-  const text = await readIndexFile(filePath, warnings);
+  const text = await readIndexFile(filePath, warnings, digests);
   if (text === null) return [];
   return parseSubtaskSections(text, filePath, warnings);
 }
@@ -591,9 +615,10 @@ async function parseItemFileFromFrontmatter(
   filePath: string,
   depth: number,
   warnings: ParseWarning[],
+  digests: Map<string, string>,
   fromReconstructedParent: boolean = false,
 ): Promise<PRDItem | null> {
-  const text = await readIndexFile(filePath, warnings);
+  const text = await readIndexFile(filePath, warnings, digests);
   if (text === null) return null;
 
   const fm = parseFrontmatter(text, filePath, warnings);
@@ -602,7 +627,11 @@ async function parseItemFileFromFrontmatter(
   return buildItem(fm, filePath, depth, warnings, fromReconstructedParent);
 }
 
-async function readIndexFile(filePath: string, warnings: ParseWarning[]): Promise<string | null> {
+async function readIndexFile(
+  filePath: string,
+  warnings: ParseWarning[],
+  digests: Map<string, string>,
+): Promise<string | null> {
   try {
     // Normalize CRLF → LF before any parsing. rex serializes with LF, but a
     // Windows checkout without eol=lf pins (core.autocrlf=true) hands us CRLF.
@@ -612,6 +641,10 @@ async function readIndexFile(filePath: string, warnings: ParseWarning[]): Promis
     // frontmatter mapping and DROPS every remaining field — a data-loss bug on
     // the next parse→save round trip, not just a cosmetic one.
     const raw = await readFile(filePath, "utf8");
+    // Identity of the exact bytes this parse consumed, keyed the way the
+    // serializer will look the file up. Recorded before normalization so it
+    // matches a later digest of the file as it sits on disk.
+    digests.set(resolve(filePath), digestItemFile(raw));
     return raw.replace(/\r\n/g, "\n");
   } catch {
     warnings.push({ path: filePath, message: "index.md not found or unreadable" });
