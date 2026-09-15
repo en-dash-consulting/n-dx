@@ -39,6 +39,45 @@ describe("loadLLMConfig", () => {
     expect(cfg.claude?.cli_path).toBe("/usr/local/bin/claude");
   });
 
+  it("reads every documented llm.local setting — the extractor whitelist must not lag the type", async () => {
+    // extractLocalConfig whitelists keys, so a key it does not copy is
+    // silently dead: operators set llm.local.timeoutMs / maxContextTokens /
+    // verifier in .n-dx.json and the loader dropped them, leaving the loop on
+    // its defaults with no error anywhere.
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          vendor: "local",
+          local: {
+            host: "127.0.0.1",
+            port: 4321,
+            model: "qwen-test",
+            lightModel: "qwen-light",
+            reviewModel: "qwen-review",
+            maxContextTokens: 32768,
+            timeoutMs: 0,
+            verifier: { host: "127.0.0.1", port: 1235, model: "verifier-model", maxCycles: 3 },
+          },
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir);
+    expect(cfg.local?.host).toBe("127.0.0.1");
+    expect(cfg.local?.port).toBe(4321);
+    expect(cfg.local?.model).toBe("qwen-test");
+    expect(cfg.local?.lightModel).toBe("qwen-light");
+    expect(cfg.local?.reviewModel).toBe("qwen-review");
+    expect(cfg.local?.maxContextTokens).toBe(32768);
+    // 0 is meaningful (wait indefinitely) and must survive the load.
+    expect(cfg.local?.timeoutMs).toBe(0);
+    expect(cfg.local?.verifier).toEqual({
+      host: "127.0.0.1", port: 1235, model: "verifier-model", maxCycles: 3,
+    });
+  });
+
   it("falls back to legacy top-level claude config", async () => {
     await writeFile(
       join(tmpDir, ".n-dx.json"),

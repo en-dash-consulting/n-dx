@@ -14,13 +14,11 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { initGitFixtureRepoSync } from "../helpers/index.js";
-// Previously guarded with itNeedsPosixShell: the gate spawned `sh` on every
-// platform, so on a stock Windows PATH it never launched and `ran` was false.
-// It now resolves a shell the platform actually has, and `exit 0` is a builtin
-// in both sh and cmd.exe — so these run everywhere, which is the point: this is
-// where a Windows gate that cannot launch its shell gets caught.
-// See tests/shell-spawn-inventory.md.
-import { discoverChangedFiles } from "../../src/agent/analysis/changed-files.js";
+// These cases assert the gate actually RAN, which needs the `sh -c` that
+// runTestGate spawns on every platform — so they are shell-dependent for real,
+// not shape-only. See tests/shell-spawn-inventory.md.
+import { itNeedsPosixShell } from "../helpers/posix-shell.js";
+import { discoverChangedFiles } from "../../src/validation/changed-files.js";
 import { runTestGate } from "../../src/tools/test-runner.js";
 
 function git(dir: string, ...args: string[]): string {

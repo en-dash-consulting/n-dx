@@ -362,6 +362,30 @@ describe("validateConfig", () => {
     });
   });
 
+  describe("autonomous field", () => {
+    it("survives validateConfig — not stripped as unknown key", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), autonomous: true };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.autonomous).toBe(true);
+      }
+    });
+
+    it("is optional (backward compat)", () => {
+      const result = validateConfig(DEFAULT_HENCH_CONFIG());
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.autonomous).toBeUndefined();
+      }
+    });
+
+    it("rejects a non-boolean value", () => {
+      const result = validateConfig({ ...DEFAULT_HENCH_CONFIG(), autonomous: "yes" });
+      expect(result.ok).toBe(false);
+    });
+  });
+
   describe("fullTestCommand field", () => {
     it("survives validateConfig — not stripped as unknown key", () => {
       const config = { ...DEFAULT_HENCH_CONFIG(), fullTestCommand: "pnpm test" };

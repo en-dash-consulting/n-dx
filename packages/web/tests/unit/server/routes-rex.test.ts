@@ -721,8 +721,12 @@ describe("Rex API routes", () => {
           }],
         }),
       });
-      expect(res.status).toBe(200);
-      const data = await res.json();
+      // The body is the only diagnostic a failing run leaves behind — the
+      // route folds any thrown error into a 400 body. Sighted flaky under the
+      // full suite with nothing but "expected 400 to be 200" retained.
+      const bodyText = await res.text();
+      expect(res.status, bodyText).toBe(200);
+      const data = JSON.parse(bodyText);
       expect(data.ok).toBe(true);
       expect(data.acceptedCount).toBe(1);
       expect(data.addedCount).toBe(3); // epic + feature + task
@@ -765,8 +769,9 @@ describe("Rex API routes", () => {
           }],
         }),
       });
-      expect(res.status).toBe(200);
-      const data = await res.json();
+      const bodyText = await res.text();
+      expect(res.status, bodyText).toBe(200);
+      const data = JSON.parse(bodyText);
       expect(data.addedCount).toBe(3); // epic + 1 feature + 1 task (not deselected feature/task)
     });
 

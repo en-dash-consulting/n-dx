@@ -17,7 +17,7 @@
  * @module store/file-lock
  */
 
-import {writeFile, readFile, unlink} from "node:fs/promises";
+import {writeFile, readFile, unlink, rename} from "node:fs/promises";
 import {randomUUID} from "node:crypto";
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -26,6 +26,17 @@ const RETRY_DELAY_MS = 50;
 
 /** Maximum time to wait for a lock before giving up. */
 const ACQUIRE_TIMEOUT_MS = 10_000;
+
+/**
+ * How long a malformed lock file gets to become valid before it is judged a
+ * corpse. `tryAcquire` creates the lock with two syscalls (open, then write),
+ * so a reader landing between them sees an empty file — indistinguishable, at
+ * that instant, from a crashed writer's truncated leftovers. The difference is
+ * time: a mid-creation lock is valid microseconds later, a corpse never is.
+ * The delay only has to outlive a single write syscall on a saturated disk;
+ * it is paid only on the rare malformed sighting, never on the happy path.
+ */
+const MALFORMED_LOCK_GRACE_MS = 100;
 
 // ── Options ──────────────────────────────────────────────────────────
 
@@ -115,48 +126,125 @@ function acquireInProcess(lockPath: string, timeoutMs: number): Promise<() => vo
 
 // ── Lock acquisition ─────────────────────────────────────────────────
 
+/** What a waiter should do about an existing lock file. */
+type LockVerdict =
+  /** Owned by a live writer — wait. */
+  | { kind: "live" }
+  /** File vanished while looking — retry the exclusive create. */
+  | { kind: "gone" }
+  /** Provably abandoned. `content` is the exact bytes the judgment was made
+   *  on, required by {@link removeStaleLock}'s verification. */
+  | { kind: "stale"; content: string };
+
 /**
- * Check if an existing lock file is stale.
+ * Judge an existing lock file.
  *
  * Same-PID lock files are always stale: the in-process mutex guarantees no
  * other live holder exists in this process while we are checking, so such a
  * file is an orphan (failed unlink, or a recycled PID from a dead process).
  * Another process's lock is stale only when that process is gone. Age is
  * deliberately not grounds: see the note at the liveness check below.
+ *
+ * A malformed lock is re-read after {@link MALFORMED_LOCK_GRACE_MS}: it may be
+ * a lock caught mid-creation rather than a corpse, and stealing a live
+ * writer's lock over a transient read is exactly the interleaving this module
+ * exists to prevent.
  */
-async function isLockStale(lockPath: string): Promise<boolean> {
+async function assessLock(lockPath: string): Promise<LockVerdict> {
+  let content: string;
   try {
-    const content = await readFile(lockPath, "utf-8");
-    const info = decodeLock(content);
-    if (!info) return true; // Malformed = stale
-
-    // Orphaned same-process lock (see doc comment)
-    if (info.pid === process.pid) return true;
-
-    // Owner process is dead — the only grounds for taking someone else's lock.
-    //
-    // Age used to be sufficient as well, on the theory that a lock older than
-    // `staleMs` belonged to a hung process. But a hung process and a merely
-    // slow one look identical from the outside, and unlinking the lock of a
-    // running writer does not fence it off — it just lets a second writer into
-    // the critical section alongside it. That is a lost update, and it was
-    // observed rather than theorised: two concurrent `rex import-bundle`
-    // processes on a loaded machine, the second one's save rejected by the
-    // stale-save guard for deleting an item the first had written moments
-    // earlier. A 30-second threshold is nowhere near the runtime of a healthy
-    // import when the whole test suite is competing for the disk.
-    //
-    // The cost of this is a lock whose owner died and whose PID has since been
-    // recycled by an unrelated live process: nothing will reclaim it, and every
-    // writer fails after `ACQUIRE_TIMEOUT_MS` with an error naming the holding
-    // PID and the path to delete. That is loud, bounded and recoverable, which
-    // a silently interleaved write is not.
-    if (!isProcessAlive(info.pid)) return true;
-
-    return false;
+    content = await readFile(lockPath, "utf-8");
   } catch {
-    return true; // Can't read = stale
+    return { kind: "gone" };
   }
+
+  let info = decodeLock(content);
+  if (!info) {
+    // Possibly mid-creation — give the writer's content write time to land.
+    await sleep(MALFORMED_LOCK_GRACE_MS);
+    try {
+      content = await readFile(lockPath, "utf-8");
+    } catch {
+      return { kind: "gone" };
+    }
+    info = decodeLock(content);
+    if (!info) return { kind: "stale", content }; // Still garbage — a corpse.
+  }
+
+  // Orphaned same-process lock (see doc comment)
+  if (info.pid === process.pid) return { kind: "stale", content };
+
+  // Owner process is dead — the only grounds for taking someone else's lock.
+  //
+  // Age used to be sufficient as well, on the theory that a lock older than
+  // `staleMs` belonged to a hung process. But a hung process and a merely
+  // slow one look identical from the outside, and unlinking the lock of a
+  // running writer does not fence it off — it just lets a second writer into
+  // the critical section alongside it. That is a lost update, and it was
+  // observed rather than theorised: two concurrent `rex import-bundle`
+  // processes on a loaded machine, the second one's save rejected by the
+  // stale-save guard for deleting an item the first had written moments
+  // earlier. A 30-second threshold is nowhere near the runtime of a healthy
+  // import when the whole test suite is competing for the disk.
+  //
+  // The cost of this is a lock whose owner died and whose PID has since been
+  // recycled by an unrelated live process: nothing will reclaim it, and every
+  // writer fails after `ACQUIRE_TIMEOUT_MS` with an error naming the holding
+  // PID and the path to delete. That is loud, bounded and recoverable, which
+  // a silently interleaved write is not.
+  if (!isProcessAlive(info.pid)) return { kind: "stale", content };
+
+  return { kind: "live" };
+}
+
+/**
+ * Remove a lock judged stale — without ever deleting a live writer's lock.
+ *
+ * A bare `unlink` here has a race two waiters can hit under load: both judge
+ * the same corpse stale, the faster one unlinks it and creates its own lock,
+ * and the slower one's unlink then lands on the fresh lock — admitting a
+ * second writer into the critical section, the exact lost-update the lock
+ * exists to prevent.
+ *
+ * Instead the stale file is CLAIMED by an atomic rename to a tombstone path
+ * unique to this waiter: of all racing cleaners exactly one rename succeeds,
+ * and the losers get ENOENT and go back to the retry loop. The claimed bytes
+ * are then compared with the bytes the staleness judgment was made on; a
+ * mismatch means the path was re-locked between judgment and claim, and the
+ * claim is rolled back by renaming the tombstone home. (The rollback itself
+ * can only collide with a third writer inside the same microsecond window —
+ * and a displaced writer's release is a compare-and-delete that no-ops, so
+ * even that residue is bounded.)
+ *
+ * @internal Exported for tests only.
+ */
+export async function removeStaleLock(lockPath: string, judgedContent: string): Promise<void> {
+  const tombstone = `${lockPath}.reclaim-${process.pid}-${randomUUID()}`;
+  try {
+    await rename(lockPath, tombstone);
+  } catch {
+    return; // Another cleaner claimed it first — nothing left to remove.
+  }
+
+  let claimed: string | null = null;
+  try {
+    claimed = await readFile(tombstone, "utf-8");
+  } catch {
+    return; // Tombstone vanished — nothing to verify or roll back.
+  }
+
+  if (claimed !== judgedContent) {
+    // We claimed a lock we never judged — the path was re-locked between
+    // judgment and claim. Put it back.
+    try {
+      await rename(tombstone, lockPath);
+    } catch {
+      await unlink(tombstone).catch(() => {});
+    }
+    return;
+  }
+
+  await unlink(tombstone).catch(() => {});
 }
 
 /**
@@ -230,14 +318,14 @@ export async function acquireLock(lockPath: string, options?: LockOptions): Prom
         };
       }
 
-      // Lock exists — held by another process (or orphaned). Check staleness.
-      if (await isLockStale(lockPath)) {
-        try {
-          await unlink(lockPath);
-        } catch {
-          // Another process may have cleaned it up — retry will handle it
-        }
+      // Lock exists — held by another process (or orphaned). Judge it.
+      const verdict = await assessLock(lockPath);
+      if (verdict.kind === "stale") {
+        await removeStaleLock(lockPath, verdict.content);
         continue; // Retry immediately after cleanup
+      }
+      if (verdict.kind === "gone") {
+        continue; // Vanished while looking — retry the exclusive create
       }
 
       await sleep(retryDelayMs);

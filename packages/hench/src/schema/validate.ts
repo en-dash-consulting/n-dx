@@ -72,6 +72,7 @@ export const HenchConfigSchema = z.object({
   claudePath: z.string().optional(),
   rollbackOnFailure: z.boolean().optional(),
   autoCommit: z.boolean().optional(),
+  autonomous: z.boolean().optional(),
   sessionStrategy: z.enum(["fork", "batch", "cold"]).optional(),
   tasksPerSession: z.number().int().positive().optional().default(4),
   parentMaxAgeHours: z.number().positive().optional().default(24),
