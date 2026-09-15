@@ -173,6 +173,7 @@ describe("hench → rex gateway contract", () => {
     "formatRequirementsValidation",
     "isRootLevel",
     "isWorkItem",
+    "openClaimsStore",
     "loadAcknowledged",
     "saveAcknowledged",
     "acknowledgeFinding",
@@ -395,6 +396,7 @@ describe("web → rex gateway contract", () => {
     "getAvailableBackups",
     "restoreFromBackup",
     "isValidSnapshotId",
+    "openClaimsStore",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -593,6 +595,7 @@ describe("gateway export auto-detection", () => {
         "findAutoCompletions", "reconcileAutoCompletions", "findParentResets",
         "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
+        "openClaimsStore",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "TREE_META_FILENAME", "SELF_HEAL_TAG"],
     ]);
@@ -689,6 +692,7 @@ describe("gateway export auto-detection", () => {
         "serializeDocument", "parseDocument",
         "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "cascadeParentReset",
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId",
+        "openClaimsStore",
         "LEVEL_HIERARCHY", "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "CHILD_LEVEL"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME"],

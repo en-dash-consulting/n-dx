@@ -17,6 +17,7 @@
  */
 
 import { watch as fsWatch } from "node:fs";
+import type { FSWatcher } from "node:fs";
 import { readFileSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { execStdout } from "../../process/exec.js";
@@ -84,6 +85,7 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
   let timerArmed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let pollTimer: ReturnType<typeof setInterval> | undefined;
+  let watcher: FSWatcher | undefined;
   let watcherClosed = false;
   let autoCommitted = false;
 
@@ -98,7 +100,7 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
     if (!watcherClosed) {
       watcherClosed = true;
       try {
-        watcher.close();
+        watcher?.close();
       } catch {
         // already closed or never opened
       }
@@ -198,15 +200,27 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
   // Watch the project directory for filesystem events. The `filename` argument
   // carries the base name on platforms that support it (Linux, macOS); on
   // others it may be null — in that case we check unconditionally.
-  const watcher = fsWatch(projectDir, (event, filename) => {
-    if (filename === PENDING_COMMIT_FILE || filename === null) {
-      checkFile();
-    }
-  });
+  // A project can exhaust the host's watch descriptor limit while an agent is
+  // running. `fs.watch` reports that either by throwing here or with an error
+  // event after it opens. In both cases, retain the polling fallback.
+  try {
+    watcher = fsWatch(projectDir, (event, filename) => {
+      if (filename === PENDING_COMMIT_FILE || filename === null) {
+        checkFile();
+      }
+    });
+    watcher.on("error", (error) => {
+      detail(`Commit message watcher unavailable; using polling fallback: ${(error as Error).message}`);
+      closeWatcher();
+    });
 
-  // Prevent the watcher from keeping the process alive after the run ends.
-  if (typeof watcher.unref === "function") {
-    watcher.unref();
+    // Prevent the watcher from keeping the process alive after the run ends.
+    if (typeof watcher.unref === "function") {
+      watcher.unref();
+    }
+  } catch (error) {
+    watcherClosed = true;
+    detail(`Commit message watcher unavailable; using polling fallback: ${(error as Error).message}`);
   }
 
   // Fallback poll in case fs.watch never delivers an event (see

@@ -66,6 +66,13 @@ export type { TreeEntry, TreeStats } from "@n-dx/rex";
 // ---- Rex task selection -----------------------------------------------------
 export { findNextTask, collectCompletedIds } from "@n-dx/rex";
 
+// ---- Rex cross-worktree task claims -----------------------------------------
+// The dashboard's activeExecutions map only ever sees this server's own
+// children; a claim is how it learns that a task is already running in another
+// checkout of the repository.
+export { openClaimsStore } from "@n-dx/rex";
+export type { ClaimsStore, TaskClaim } from "@n-dx/rex";
+
 // ---- Rex timestamps ---------------------------------------------------------
 export { computeTimestampUpdates } from "@n-dx/rex";
 

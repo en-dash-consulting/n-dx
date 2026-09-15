@@ -29,6 +29,47 @@ describe("collectCompletedIds", () => {
   });
 });
 
+describe("excludeIds", () => {
+  it("passes over an excluded task and picks the next one", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Task 1" }),
+      makeItem({ id: "t2", title: "Task 2" }),
+    ];
+    const result = findNextTask(items, new Set(), { excludeIds: new Set(["t1"]) });
+    expect(result!.item.id).toBe("t2");
+  });
+
+  it("returns null when every candidate is excluded", () => {
+    const items: PRDItem[] = [makeItem({ id: "t1", title: "Task 1" })];
+    expect(findNextTask(items, new Set(), { excludeIds: new Set(["t1"]) })).toBeNull();
+  });
+
+  it("leaves tasks blocked by an excluded task blocked", () => {
+    // The reason excludeIds is not folded into completedIds: an excluded task
+    // is being worked on elsewhere, not finished, so nothing waiting on it may
+    // be handed out as though the dependency were satisfied.
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Blocker" }),
+      makeItem({ id: "t2", title: "Dependent", blockedBy: ["t1"] }),
+    ];
+    expect(findNextTask(items, new Set(), { excludeIds: new Set(["t1"]) })).toBeNull();
+  });
+
+  it("drops excluded tasks from findActionableTasks", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Task 1" }),
+      makeItem({ id: "t2", title: "Task 2" }),
+    ];
+    const actionable = findActionableTasks(items, new Set(), 20, { excludeIds: new Set(["t1"]) });
+    expect(actionable.map((e) => e.item.id)).toEqual(["t2"]);
+  });
+
+  it("is a no-op when the set is empty", () => {
+    const items: PRDItem[] = [makeItem({ id: "t1", title: "Task 1" })];
+    expect(findNextTask(items, new Set(), { excludeIds: new Set() })!.item.id).toBe("t1");
+  });
+});
+
 describe("findNextTask", () => {
   it("returns first pending leaf", () => {
     const items: PRDItem[] = [

@@ -48,6 +48,7 @@ import {
   collectAllIds,
   aggregateItemTokenUsage,
   aggregateItemDurations,
+  openClaimsStore,
 } from "./rex-gateway.js";
 import type {
   PRDDocument,
@@ -1178,6 +1179,24 @@ async function handleExecute(
       error: "Task is already being executed",
       runId: active.runId,
       taskId,
+    });
+    return true;
+  }
+
+  // `activeExecutions` only knows about this server's own children. A claim is
+  // the same question asked of the whole repository: another worktree may have
+  // an `ndx work` running on this task, and starting a second one would have
+  // two agents editing the same code against the same PRD item.
+  const claim = (await openClaimsStore(ctx.projectDir).claimedElsewhere()).get(taskId);
+  if (claim) {
+    jsonResponse(res, 409, {
+      error: `Task is already being worked on in another worktree: ${claim.worktreeRoot}`,
+      taskId,
+      claimedBy: {
+        worktreeRoot: claim.worktreeRoot,
+        pid: claim.pid,
+        claimedAt: claim.claimedAt,
+      },
     });
     return true;
   }

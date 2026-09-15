@@ -102,6 +102,32 @@ describe("startCommitMsgWatcher — timeout handler branches", () => {
     expect(existsSync(msgPath)).toBe(false);
   });
 
+  it("falls back to polling when opening the filesystem watcher throws", async () => {
+    const fs = await vi.importActual<typeof import("node:fs")>("node:fs");
+    vi.doMock("node:fs", () => ({
+      ...fs,
+      watch: vi.fn(() => { throw new Error("EMFILE: too many open files"); }),
+    }));
+    vi.resetModules();
+
+    try {
+      const { startCommitMsgWatcher } = await import(
+        "../../../../src/agent/lifecycle/commit-msg-watcher.js"
+      );
+      const msgPath = join(projectDir, ".hench-commit-msg.txt");
+      const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 100 });
+
+      await writeFile(msgPath, "", "utf-8");
+      await waitFor(() => !existsSync(msgPath), 3000);
+      watcher.cancel();
+
+      expect(existsSync(msgPath)).toBe(false);
+    } finally {
+      vi.doUnmock("node:fs");
+      vi.resetModules();
+    }
+  });
+
   it("non-empty file: commits staged changes and removes the file", async () => {
     await setupGitRepo(projectDir);
 

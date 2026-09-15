@@ -7,7 +7,8 @@ import {
   collectRequirements,
   isWorkItem,
 } from "../../prd/rex-gateway.js";
-import type { PRDStore, PRDItem, TreeEntry } from "../../prd/rex-gateway.js";
+import type { PRDStore, PRDItem, TreeEntry, TaskClaim } from "../../prd/rex-gateway.js";
+import { claimedElsewhere } from "../../prd/task-claims.js";
 import { resolveProjectCliName, DEFAULT_CLI_NAME } from "./cli-identity.js";
 import type {
   TaskBrief,
@@ -210,10 +211,21 @@ export async function assembleTaskBrief(
 
     const epicId = options?.epicId;
 
+    // Tasks another worktree of this repository is already running. Passed as
+    // `excludeIds` rather than folded into `skipIds`: a claimed task is not
+    // done, and anything blocked on it must stay blocked.
+    const claimed = options?.projectDir
+      ? await claimedElsewhere(options.projectDir)
+      : new Map<string, TaskClaim>();
+    const selection = {
+      ...(tags ? { tags } : {}),
+      ...(claimed.size > 0 ? { excludeIds: new Set(claimed.keys()) } : {}),
+    };
+
     if (epicId) {
       // Epic filter active: get all actionable tasks and filter to epic
       const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
-      const allActionable = findActionableTasks(doc.items, skipIds, Infinity, tags ? { tags } : undefined);
+      const allActionable = findActionableTasks(doc.items, skipIds, Infinity, selection);
 
       // Filter to tasks within the epic and not in excludeIds
       const epicActionable = allActionable.filter(
@@ -228,7 +240,7 @@ export async function assembleTaskBrief(
       entry = epicActionable[0];
     } else {
       // No epic filter: use standard findNextTask
-      entry = findNextTask(doc.items, skipIds, tags ? { tags } : undefined);
+      entry = findNextTask(doc.items, skipIds, selection);
       if (!entry) {
         throw new Error("No actionable tasks found in PRD");
       }
