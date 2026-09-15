@@ -22,6 +22,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execStdout } from "../../process/exec.js";
+import { execCheckedGit, execGitMutation } from "../../process/git-mutation.js";
 import { checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
 
 const GIT_TIMEOUT = 30_000;
@@ -134,9 +135,16 @@ export async function commitReviewRepairs(
     await execStdout("git", ["rev-parse", "HEAD"], { cwd: projectDir, timeout })
   ).trim();
 
-  await execStdout("git", ["add", "-A", "--", ...paths], { cwd: projectDir, timeout });
-  await execStdout(
-    "git",
+  await execGitMutation(projectDir, ["add", "-A", "--", ...paths], timeout);
+  const stagedPaths = await execCheckedGit(
+    projectDir,
+    ["diff", "--cached", "--name-only", "--", ...paths],
+    timeout,
+  );
+  if (!stagedPaths.stdout.trim()) return undefined;
+
+  await execGitMutation(
+    projectDir,
     [
       "commit",
       "-m",
@@ -146,7 +154,7 @@ export async function commitReviewRepairs(
       "--",
       ...paths,
     ],
-    { cwd: projectDir, timeout },
+    timeout,
   );
 
   const newHead = (

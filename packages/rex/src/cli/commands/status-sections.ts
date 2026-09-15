@@ -13,9 +13,10 @@ import {
 } from "../../core/token-usage.js";
 import { formatAggregateTokenUsage, formatBudgetWarnings } from "./token-format.js";
 import { walkTree } from "../../core/tree.js";
+import { SUCCESSFUL_CHILD_STATUSES } from "../../core/parent-completion.js";
 import { info, warn, result } from "../output.js";
 import { bold, cyan } from "@n-dx/llm-client";
-import type { PRDItem, ItemStatus } from "../../schema/index.js";
+import type { PRDItem } from "../../schema/index.js";
 import type { PRDStore } from "../../store/index.js";
 import {
   FileStore,
@@ -124,15 +125,25 @@ export function findStaleItems(items: PRDItem[], now: Date = new Date()): PRDIte
   return stale;
 }
 
-/** Find parent items whose children are all completed or deferred. */
+/**
+ * Find parent items whose children are all `completed`. Uses the same CHILD
+ * predicate as parent-completion.ts — a deferred, blocked, or failing child
+ * must keep the parent out of this list (GitHub #364).
+ *
+ * It deliberately does NOT use `AUTO_COMPLETABLE_STATUSES` for the parent, and
+ * still lists `in_progress` parents. This is a hint printed for a human, not a
+ * mutation: since #368 stopped the cascade from closing an `in_progress`
+ * parent, a parent that really has finished would otherwise go unmentioned
+ * forever. Surfacing it here is the escape hatch — the human decides. Do not
+ * "align" this with the mutation predicate; the divergence is the point.
+ */
 export function findAutoCompletable(items: PRDItem[]): Array<{ id: string; title: string }> {
   const results: Array<{ id: string; title: string }> = [];
-  const TERMINAL: Set<ItemStatus> = new Set(["completed", "deferred"]);
   for (const { item } of walkTree(items)) {
     if (
       item.children && item.children.length > 0 &&
       (item.status === "pending" || item.status === "in_progress") &&
-      item.children.every((c) => TERMINAL.has(c.status))
+      item.children.every((c) => SUCCESSFUL_CHILD_STATUSES.has(c.status))
     ) {
       results.push({ id: item.id, title: item.title });
     }
@@ -258,6 +269,9 @@ export function renderAutoCompletableHints(items: PRDItem[]): void {
   for (const ac of autoCompletable) {
     info(`  ● ${ac.title} — all children done, can be marked completed`);
   }
+  // The pending ones are repairable without a human deciding each id; the
+  // in_progress ones are an explicit claim and stay a human judgement (#368).
+  info(`  Run ${bold("rex fix")} to close the pending ones.`);
 }
 
 /** Render what to do next hint based on tree stats. */

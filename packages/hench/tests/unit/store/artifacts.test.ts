@@ -5,6 +5,7 @@ import {
   excludeHenchRuntimeArtifacts,
   isHenchRuntimeArtifact,
   parsePorcelainPath,
+  splitPorcelainLines,
 } from "../../../src/store/artifacts.js";
 
 /**
@@ -67,6 +68,29 @@ describe("isHenchRuntimeArtifact", () => {
     expect(isHenchRuntimeArtifact("other/.hench/runs/r.json", "sub/")).toBe(false);
     // With a prefix, a root-level artifact path belongs to a different project.
     expect(isHenchRuntimeArtifact(".hench/locks/run.lock", "sub/")).toBe(false);
+  });
+});
+
+describe("splitPorcelainLines", () => {
+  it("keeps the blank index column of the first line", () => {
+    // The bug this exists for: `output.trim()` stripped the leading space of
+    // line one only, shifting its whole XY field left. The path then parsed a
+    // character short — `.rex/prd_tree/…` became `rex/prd_tree/…`, matching no
+    // discount rule — and the worktree column was read as the index column, so
+    // an unstaged modification looked fully staged. Whichever entry git listed
+    // first was the one corrupted, which made it look intermittent.
+    const lines = splitPorcelainLines(" M .rex/tree-meta.json\n?? leaked.ts\n");
+    expect(lines).toEqual([" M .rex/tree-meta.json", "?? leaked.ts"]);
+    expect(parsePorcelainPath(lines[0])).toBe(".rex/tree-meta.json");
+  });
+
+  it("drops blank lines and tolerates CRLF", () => {
+    expect(splitPorcelainLines(" M a.ts\r\n\r\n?? b.ts\r\n")).toEqual([" M a.ts", "?? b.ts"]);
+  });
+
+  it("reports a clean tree as no lines", () => {
+    expect(splitPorcelainLines("")).toEqual([]);
+    expect(splitPorcelainLines("\n")).toEqual([]);
   });
 });
 

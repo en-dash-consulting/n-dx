@@ -149,6 +149,27 @@ describe("findNextTask", () => {
     expect(result!.item.id).toBe("e1");
   });
 
+  it.each(["deferred", "cancelled"] as const)(
+    "does not select a parent with a completed and %s child",
+    (incompleteStatus) => {
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Epic",
+          level: "epic",
+          children: [
+            makeItem({ id: "t1", title: "Completed task", status: "completed" }),
+            makeItem({ id: "t2", title: "Incomplete task", status: incompleteStatus }),
+          ],
+        }),
+      ];
+      const completedIds = new Set(["t1"]);
+
+      expect(findNextTask(items, completedIds)).toBeNull();
+      expect(findActionableTasks(items, completedIds)).toEqual([]);
+    },
+  );
+
   it("selects critical task in low-priority epic over medium task in high-priority epic", () => {
     const items: PRDItem[] = [
       makeItem({
@@ -349,6 +370,48 @@ describe("explainSelection", () => {
     expect(explanation.skipped.blocked).toBe(1);
     expect(explanation.skipped.unresolvedDeps).toBe(1);
     expect(explanation.skipped.total).toBe(4);
+  });
+
+  it("calls a parent ready to finalize when every child is completed", () => {
+    const items: PRDItem[] = [
+      makeItem({
+        id: "e1",
+        title: "Epic One",
+        level: "epic",
+        children: [
+          makeItem({ id: "t1", title: "Task 1", status: "completed" }),
+          makeItem({ id: "t2", title: "Task 2", status: "completed" }),
+        ],
+      }),
+    ];
+    const completedIds = new Set(["t1", "t2"]);
+    const explanation = explainSelection(items, { item: items[0]!, parents: [] }, completedIds);
+
+    expect(explanation.summary).toContain("all children completed, ready to finalize");
+  });
+
+  it("does not call a parent ready to finalize when a child is deferred", () => {
+    // GH #364: `SUCCESSFUL_CHILD_STATUSES` was narrowed to `{completed}`
+    // precisely so a deferred child stops counting as done. A local
+    // `completed || deferred` copy here survived that change and announced
+    // "all children completed" over a subtree that still has open work in it.
+    const items: PRDItem[] = [
+      makeItem({
+        id: "e1",
+        title: "Epic One",
+        level: "epic",
+        priority: "high",
+        children: [
+          makeItem({ id: "t1", title: "Task 1", status: "completed" }),
+          makeItem({ id: "t2", title: "Task 2", status: "deferred" }),
+        ],
+      }),
+    ];
+    const completedIds = new Set(["t1"]);
+    const explanation = explainSelection(items, { item: items[0]!, parents: [] }, completedIds);
+
+    expect(explanation.summary).not.toContain("all children completed");
+    expect(explanation.summary).toContain("high");
   });
 
   it("explains depth-first traversal path", () => {

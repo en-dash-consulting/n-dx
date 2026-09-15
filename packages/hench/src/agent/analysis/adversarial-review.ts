@@ -47,6 +47,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import type { RunReviewRecord } from "../../schema/index.js";
+
 // ── Report shape ─────────────────────────────────────────────────────────
 
 /** Severity scale — mirrors the four levels in the `ndx-adversarial-review` skill. */
@@ -102,6 +104,24 @@ export type ReviewFailureReason =
   | "malformed-report"
   | "spawn-failed"
   | "unsupported-vendor";
+
+/**
+ * The failure reasons meaning **no reviewer ever attacked the change**.
+ *
+ * The distinction the rest of the gate is built on. `spawn-failed` and
+ * `unsupported-vendor` are both "the session never started" — a stale CLI, a
+ * model the installed binary rejects, a vendor with no reviewer. Nothing read
+ * the diff, so the operator has no review, only the absence of one.
+ *
+ * `no-report` and `malformed-report` are the opposite case: a reviewer did
+ * run and did attack the change, and only the report transport broke. That is
+ * a lost result, not an absent pass, and the module contract above keeps it a
+ * warning rather than a refusal.
+ */
+export const REVIEW_NEVER_RAN_REASONS: readonly ReviewFailureReason[] = [
+  "spawn-failed",
+  "unsupported-vendor",
+];
 
 /** Outcome of a review pass, from the caller's point of view. */
 export type ReviewPassOutcome =
@@ -589,4 +609,69 @@ export function formatUnresolvedWarning(report: ReviewReport): string[] {
   }
   lines.push("Inspect them before trusting this commit.");
   return lines;
+}
+
+// ── The missing-review gate ──────────────────────────────────────────────
+
+/** The failed half of {@link RunReviewRecord}, as narrowed by {@link reviewNeverRan}. */
+export type FailedReviewRecord = Extract<RunReviewRecord, { failed: string }>;
+
+/**
+ * True when the record says a reviewer never ran.
+ *
+ * See {@link REVIEW_NEVER_RAN_REASONS} for why only two of the four failure
+ * reasons qualify. False for a successful pass, for an absent one (`--review`
+ * was not passed), and for a reviewer that ran but lost its report.
+ */
+export function reviewNeverRan(
+  review: RunReviewRecord | undefined,
+): review is FailedReviewRecord {
+  if (!review || review.failed === undefined) return false;
+  return REVIEW_NEVER_RAN_REASONS.includes(review.failed as ReviewFailureReason);
+}
+
+/**
+ * The refusal text for a run whose reviewer never started.
+ *
+ * Names the missing review first, because the thing an operator must not
+ * conclude from this run is "reviewed, nothing found". The remedy lines matter
+ * as much as the diagnosis: the common cause is a `--review-model` the
+ * installed vendor CLI does not know, which is a one-line fix followed by a
+ * re-run — not a defect in the task.
+ */
+export function formatMissingReviewRefusal(review: FailedReviewRecord): string {
+  return [
+    `Refusing to report this task completed: the adversarial review never ran (${review.failed}).`,
+    `  ${review.detail}`,
+    "  --review is a gate. A reviewer that could not start is not a reviewer that",
+    "  found nothing, so the run does not get to claim a reviewed completion.",
+    "  The work itself validated and is left in place — fix the reviewer (usually",
+    "  --review-model or the vendor CLI version) and re-run, or pass",
+    "  --review-optional to accept best-effort review.",
+  ].join("\n");
+}
+
+/**
+ * The review line for the end-of-run summary, or `[]` when `--review` was off.
+ *
+ * The mid-run review output scrolls away behind the test gate and the commit
+ * prompt, so a run that was never reviewed looked identical at the bottom of
+ * the terminal to one that was. This is the line that tells them apart, and it
+ * is printed on the best-effort path too — where the run *does* complete.
+ */
+export function formatRunReviewStatus(review: RunReviewRecord | undefined): string[] {
+  if (!review) return [];
+
+  if (review.failed !== undefined) {
+    const verb = reviewNeverRan(review) ? "NEVER RAN" : "PRODUCED NO REPORT";
+    return [
+      `Review: ⚠ ${verb} (${review.failed}) — this task was NOT reviewed`,
+      `        ${review.detail}`,
+    ];
+  }
+
+  const model = review.model || "the loaded model";
+  const unresolved =
+    review.unresolvedCount > 0 ? `, ${review.unresolvedCount} unresolved` : "";
+  return [`Review: ${review.findingCount} finding(s)${unresolved} (${model})`];
 }

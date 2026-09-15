@@ -237,21 +237,21 @@ describe("prd_tree atomic writes and crash-safety", () => {
       expect(doc.items.map((i) => i.id).sort()).toEqual(["test-1", "test-2"]);
     });
 
-    it("lock timeout prevents indefinite waiting", async () => {
+    it("fails loudly instead of automatically reclaiming a stale lock", async () => {
       const lockPath = join(rexDir, "prd.lock");
 
       // Manually create a stale lock (very old timestamp)
       const staleTime = new Date(Date.now() - 60 * 1000).toISOString(); // 60 seconds ago
       await writeFile(lockPath, JSON.stringify({ pid: 999999, timestamp: staleTime }), "utf-8");
 
-      // Try to acquire lock — should succeed by detecting staleness
-      const release = await acquireLock(lockPath);
-      expect(release).toBeDefined();
-      await release();
+      await expect(
+        acquireLock(lockPath, {acquireTimeoutMs: 500}),
+      ).rejects.toThrow(`delete ${lockPath} manually`);
 
-      // Lock should be cleaned up
+      // Automatic deletion has an unavoidable generation race, so crashed
+      // writer recovery intentionally requires the documented manual cleanup.
       const entries = await readdir(rexDir);
-      expect(entries).not.toContain("prd.lock");
+      expect(entries).toContain("prd.lock");
     });
 
     it("concurrent mutations don't corrupt PRD state", async () => {

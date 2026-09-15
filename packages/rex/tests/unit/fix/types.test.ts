@@ -23,13 +23,14 @@ describe("FixItemStatus", () => {
 });
 
 describe("FixKind", () => {
-  it("includes all three fix kinds", () => {
+  it("includes all four fix kinds", () => {
     const kinds: FixKind[] = [
       "missing_timestamp",
       "orphan_blocked_by",
       "parent_child_alignment",
+      "stuck_parent",
     ];
-    expect(kinds).toHaveLength(3);
+    expect(kinds).toHaveLength(4);
   });
 });
 

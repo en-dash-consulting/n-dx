@@ -1,0 +1,26 @@
+---
+id: "f30e0ef3-a0f2-45cb-80d6-3bceec23003c"
+level: "task"
+title: "Publish only a complete PRD snapshot after a retry"
+status: "completed"
+priority: "high"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:high"
+  - "rex"
+  - "snapshot"
+source: "ndx-adversarial-review"
+startedAt: "2026-09-14T04:50:41.337Z"
+completedAt: "2026-09-14T20:56:09.084Z"
+endedAt: "2026-09-14T20:56:09.084Z"
+acceptanceCriteria:
+  - "After any retry, a successful backup contains exactly the files present in the source at the successful-copy boundary; it cannot retain files copied by an earlier failed attempt."
+  - "A deterministic partial-copy retry regression deletes or changes an entry between attempts and proves restoring the successful snapshot cannot resurrect the obsolete entry."
+  - "A copy that exhausts its retries is removed or marked incomplete before callers can select it as the newest restore point; restore never consumes a partial or empty snapshot."
+  - "A deterministic exhausted-copy regression proves the failed snapshot cannot become the restore target."
+  - "Existing concurrent-writer and backup-directory-claim behavior remains covered, and the focused Rex snapshot tests pass."
+  - "A patch changeset for @n-dx/rex is included."
+description: "PR #370 review found that snapshotPrdTree retries fs.cp into the same claimed backup directory. When a partial first copy sees a concurrent deletion, a later successful retry can retain entries that no longer exist in the source; restoring that backup can resurrect deleted PRD items. Make every retry produce an exact source snapshot by clearing safely before retrying or using isolated staging plus atomic publication. Add a partial-copy retry regression test.\n\nFollow-up from the next adversarial review: when a copy exhausts its retries, its partially copied or empty claimed backup directory remains under .rex/.backups and can sort as the newest restore point. Remove it or make it unselectable before surfacing the failure; no restore command may target an incomplete snapshot."
+lastModified: "2026-09-14T20:56:09.405Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

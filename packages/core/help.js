@@ -954,6 +954,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-model=<model>", description: "Model for the review pass (default: the recommended reviewer for your vendor)" },
+      { flag: "--review-optional", description: "Accept a best-effort review: warn instead of refusing the completion when the reviewer cannot start" },
       { flag: "--approve-diff", description: "Show proposed changes and prompt for approval (was --review before the review pass took that flag)" },
       { flag: "--max-turns=<n>", description: "Override max agent turns per task" },
       { flag: "--token-budget=<n>", description: "Cap total tokens per run (0 = unlimited)" },

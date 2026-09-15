@@ -53,6 +53,23 @@ export interface WriteOptions {
   applyAttribution?: boolean;
 
   /**
+   * When true, keep the item's existing `lastModifiedBy` instead of stamping
+   * the current actor. `lastModified` is still updated — the item did change.
+   *
+   * For writes the caller is making *on someone else's item's behalf* rather
+   * than at the user's request: the auto-completion cascade is the only such
+   * writer today. Before GitHub #368 a cascade rewrote authorship, so a run
+   * that closed a teammate's item also took credit for it, and `git blame` on
+   * the PRD pointed at the wrong person. Ownership belongs to whoever last
+   * edited the item deliberately.
+   *
+   * Honoured by every adapter. Ignored where there is nothing to preserve
+   * (no prior `lastModifiedBy`), in which case the current actor is stamped
+   * as usual.
+   */
+  preserveModifiedBy?: boolean;
+
+  /**
    * Project directory used for git branch resolution.
    * Implementations may fall back to their own local project root.
    */

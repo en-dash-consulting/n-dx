@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, appendFile, rename } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -63,6 +63,7 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
     await mkdir(taskDir, { recursive: true });
     taskIndexPath = join(taskDir, "index.md");
     await writeFile(taskIndexPath, "# Test task\nstatus: in_progress\n", "utf-8");
+    await writeFile(join(rexDir, "execution-log.jsonl"), "baseline log\n", "utf-8");
 
     await execAsync("git add .", { cwd: projectDir });
     await execAsync('git commit -m "initial"', { cwd: projectDir });
@@ -143,6 +144,47 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
 
     const { stdout: fullMsg } = await execAsync("git log -1 --format='%B'", { cwd: projectDir });
     expect(fullMsg).toContain("Co-Authored-By:");
+  });
+
+  it("commits both sides of an execution-log rotation", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+    const rexDir = join(projectDir, ".rex");
+    const logPath = join(rexDir, "execution-log.jsonl");
+    let rotationPending = true;
+
+    const mockStore = {
+      getItem: vi.fn(async (id: string) =>
+        id === taskId ? { id: taskId, status: "in_progress", title: "Test task", level: "task" } : null,
+      ),
+      updateItem: vi.fn(async (id: string, updates: Record<string, unknown>) => {
+        if (id === taskId && updates.status === "completed") {
+          const current = readFileSync(taskIndexPath, "utf-8").replace(/\r\n/g, "\n");
+          await writeFile(taskIndexPath, current.replace("status: in_progress", "status: completed"), "utf-8");
+        }
+      }),
+      appendLog: vi.fn(async () => {
+        if (rotationPending) {
+          rotationPending = false;
+          await rename(logPath, join(rexDir, "execution-log.1.jsonl"));
+        }
+        await appendFile(logPath, "completion log\n", "utf-8");
+      }),
+      loadDocument: vi.fn(async () => ({ items: [] })),
+    };
+
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(taskId),
+      henchDir,
+      projectDir,
+      autoCommit: true,
+      skipFullTestGate: true,
+      store: mockStore,
+    });
+
+    expect(await getRexDirtyLines(projectDir)).toHaveLength(0);
+    const { stdout: changed } = await execAsync("git show --format= --name-only HEAD", { cwd: projectDir });
+    expect(changed).toContain(".rex/execution-log.jsonl");
+    expect(changed).toContain(".rex/execution-log.1.jsonl");
   });
 
   it("no-ops cleanly when task is already completed (nothing to stage)", async () => {

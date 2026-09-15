@@ -121,12 +121,12 @@ describe("performPreRunCommitGateIfNeeded", () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
-  it("proceeds gracefully when the commit fails", async () => {
+  it("stops before work starts when the commit fails", async () => {
     const commit = vi.fn(async () => {
       throw new Error("nothing to commit");
     });
     const { opts } = makeOpts({ choice: "commit", commit });
-    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("proceed");
+    expect(await performPreRunCommitGateIfNeeded(opts)).toBe("stop");
     expect(commit).toHaveBeenCalledOnce();
   });
 

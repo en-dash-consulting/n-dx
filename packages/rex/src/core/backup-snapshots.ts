@@ -15,6 +15,7 @@
 
 import { readdir, stat, mkdir, cp, rm, rename } from "node:fs/promises";
 import { join } from "node:path";
+import { isAtomicWriteTempPath } from "../store/atomic-write.js";
 
 /**
  * Result of a backup snapshot operation.
@@ -92,6 +93,68 @@ const CLAIM_ATTEMPTS = 20;
 /** Pause between claim attempts — long enough for the millisecond to tick over. */
 const CLAIM_RETRY_MS = 2;
 
+/** How many times the tree copy is re-walked after an entry vanished under it. */
+const COPY_ATTEMPTS = 3;
+
+/** Pause before re-walking, so the writer that is mid-rename can finish. */
+const COPY_RETRY_MS = 5;
+
+/**
+ * Copy the live tree into an already-claimed staging directory.
+ *
+ * Two things make this more than a plain `cp`:
+ *
+ * **Temp files are filtered out.** The atomic writers in `store/` create
+ * `<file>.<pid>.<uuid>.tmp` beside their target and rename it into place. Those
+ * files are not PRD content and must not appear in a rollback point — and,
+ * because `cp` reads a directory and then `lstat`s each entry, one that is
+ * renamed away in between raises ENOENT and fails the whole command. Filtering
+ * removes the file from the walk before it can be stat'd. The predicate lives
+ * next to the writer (`isAtomicWriteTempPath`) so the two cannot drift.
+ *
+ * **A vanished entry is retried, not tolerated.** The filter closes the
+ * dominant window but not the only one: `serializeToFolderTree` deletes stale
+ * directories (`rm(entry.path, { recursive: true })`) as part of a normal save,
+ * and this snapshot runs *before* the PRD lock is taken, so any entry can
+ * disappear mid-walk. The alternative — skip the missing entry and keep going —
+ * was rejected: a snapshot silently missing content is exactly the "safety net
+ * that isn't there" `snapshot-guard` exists to avoid, and it would be
+ * indistinguishable from a complete one at restore time. Instead the copy is
+ * re-walked from scratch. Before that walk, every entry from the failed partial
+ * copy is removed from the claimed directory: `cp` overwrites matching paths,
+ * but it does not remove paths absent from its source. Without that reset, a
+ * retry after a deletion could preserve an obsolete PRD item in the backup.
+ * Retries are bounded; a persistent ENOENT still fails the command loudly.
+ */
+async function clearPartialSnapshot(backupPath: string): Promise<void> {
+  const entries = await readdir(backupPath);
+  await Promise.all(entries.map((entry) => rm(join(backupPath, entry), {
+    recursive: true,
+    force: true,
+  })));
+}
+
+async function copyTree(treeRoot: string, backupPath: string): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await cp(treeRoot, backupPath, {
+        recursive: true,
+        filter: (src) => !isAtomicWriteTempPath(src),
+      });
+      return;
+    } catch (err) {
+      const code = err && typeof err === "object" && "code" in err
+        ? (err as { code?: string }).code
+        : undefined;
+      if (code !== "ENOENT" || attempt >= COPY_ATTEMPTS) {
+        throw new Error(`Failed to snapshot PRD tree to ${backupPath}: ${String(err)}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, COPY_RETRY_MS));
+      await clearPartialSnapshot(backupPath);
+    }
+  }
+}
+
 /**
  * Exclusively claim a snapshot directory, retrying on a name already taken.
  *
@@ -107,17 +170,31 @@ const CLAIM_RETRY_MS = 2;
  */
 async function claimBackupDir(
   backupsDir: string,
-): Promise<{ timestamp: string; id: string; backupPath: string }> {
+): Promise<{ timestamp: string; id: string; backupPath: string; stagingPath: string }> {
   for (let attempt = 0; attempt < CLAIM_ATTEMPTS; attempt += 1) {
     const timestamp = new Date().toISOString();
     const id = encodeSnapshotId(timestamp);
     const backupPath = join(backupsDir, `prd_tree_${id}`);
+    // A snapshot must not be visible to restore until its copy has completed.
+    // The leading dot keeps this reservation out of getAvailableBackups while
+    // it is being copied or retried.
+    const stagingPath = join(backupsDir, `.snapshot_staging_${id}`);
 
     try {
       // Not recursive: this must fail when the directory already exists, which
       // is precisely the signal that another writer claimed this millisecond.
-      await mkdir(backupPath);
-      return { timestamp, id, backupPath };
+      await mkdir(stagingPath);
+
+      // A clock moving backwards can reproduce a name belonging to an already
+      // published snapshot. Keep the staging claim private, discard it, and
+      // obtain a fresh timestamp instead of allowing rename to replace it.
+      if (await dirExists(backupPath)) {
+        await rm(stagingPath, { recursive: true, force: true });
+        await new Promise((resolve) => setTimeout(resolve, CLAIM_RETRY_MS));
+        continue;
+      }
+
+      return { timestamp, id, backupPath, stagingPath };
     } catch (err) {
       const code = err && typeof err === "object" && "code" in err
         ? (err as { code?: string }).code
@@ -176,13 +253,26 @@ export async function snapshotPRDTree(rexDir: string): Promise<BackupSnapshot | 
   // lost and re-reads the clock instead of colliding. The pause is there so the
   // millisecond can actually advance — retrying against the same clock reading
   // would just lose again.
-  const { timestamp, id, backupPath } = await claimBackupDir(backupsDir);
+  const { timestamp, id, backupPath, stagingPath } = await claimBackupDir(backupsDir);
 
-  // Copy tree into the directory we now exclusively own.
+  // Copy tree into the private staging directory we now exclusively own. This
+  // is the second race in this function: the claim above fixed two snapshots
+  // colliding on a directory name, and `copyTree` handles a concurrent *writer*
+  // mutating the tree while it is being read. Publishing with rename means a
+  // failed copy is never a restore target, even during retry cleanup.
   try {
-    await cp(treeRoot, backupPath, { recursive: true });
+    await copyTree(treeRoot, stagingPath);
+    await rename(stagingPath, backupPath);
   } catch (err) {
-    throw new Error(`Failed to snapshot PRD tree to ${backupPath}: ${String(err)}`);
+    try {
+      await rm(stagingPath, { recursive: true, force: true });
+    } catch (cleanupErr) {
+      throw new Error(
+        `Failed to discard incomplete PRD snapshot at ${stagingPath}: ${String(cleanupErr)}. ` +
+          `Original snapshot failure: ${String(err)}`,
+      );
+    }
+    throw err;
   }
 
   return { timestamp, id, backupPath };

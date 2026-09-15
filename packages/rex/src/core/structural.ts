@@ -1,5 +1,6 @@
 import type { PRDItem, ItemLevel } from "../schema/index.js";
 import {LEVEL_HIERARCHY, getContainerLevels, isWorkItem} from "../schema/index.js";import { walkTree, collectAllIds } from "./tree.js";
+import { SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
 
 export interface EpiclessFeature {
   itemId: string;
@@ -293,17 +294,19 @@ function findTimestampInconsistencies(items: PRDItem[]): string[] {
  * Find parent-child status inconsistencies.
  *
  * Detects:
- * - Completed parent with non-terminal children (pending, in_progress, blocked)
+ * - Completed parent with a non-successful child (pending, in_progress,
+ *   deferred, blocked, failing — see GitHub #364: a completed parent with a
+ *   deferred child is exactly the "half-migration reported as done" bug).
+ *   Uses the same predicate as parent-completion.ts's auto-completion checks.
  */
 function findParentChildInconsistencies(items: PRDItem[]): string[] {
   const warnings: string[] = [];
-  const terminalStatuses = new Set<string>(["completed", "deferred"]);
 
   for (const { item } of walkTree(items)) {
     if (item.status !== "completed") continue;
     if (!item.children || item.children.length === 0) continue;
 
-    const nonTerminal = item.children.filter((c) => !terminalStatuses.has(c.status));
+    const nonTerminal = item.children.filter((c) => !SUCCESSFUL_CHILD_STATUSES.has(c.status));
     if (nonTerminal.length > 0) {
       const childSummary = nonTerminal
         .slice(0, 3)
