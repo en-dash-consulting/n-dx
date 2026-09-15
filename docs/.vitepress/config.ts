@@ -5,6 +5,20 @@ export default defineConfig({
   description: "AI-powered development toolkit",
   base: "/",
 
+  // Generates sitemap.xml at build time, so it can never drift from the pages
+  // that actually exist — the reason not to hand-write one for a docs site
+  // that gains and loses pages every week.
+  sitemap: {
+    hostname: "https://docs.n-dx.dev",
+    transformItems: (items) =>
+      // docs/archive/index.md says every page under it is unmaintained and
+      // "not a description of how n-dx works today". A sitemap is a request
+      // to index; asking Google to index 17 pages the project has already
+      // disowned would put stale answers in front of people looking for
+      // current ones.
+      items.filter((item) => !item.url.startsWith("archive/")),
+  },
+
   head: [
     ["link", { rel: "icon", type: "image/png", href: "/n-dx-logo.png" }],
     ["script", { async: "", src: "https://www.googletagmanager.com/gtag/js?id=G-C1ZPPSFEZD" }],
