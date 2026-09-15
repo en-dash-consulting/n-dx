@@ -26,7 +26,7 @@ function completedRun(): RunRecord {
   };
 }
 
-async function failGitMutation(operation: "add" | "commit", message: string): Promise<void> {
+async function failGitMutation(operation: "add" | "commit" | "diff", message: string): Promise<void> {
   vi.resetModules();
   vi.doMock("../../src/process/exec.js", async (importOriginal) => {
     const actual = await importOriginal<typeof import("../../src/process/exec.js")>();
@@ -233,6 +233,145 @@ describe("Git mutation failures in the Hench lifecycle", () => {
       const { stdout: log } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
       expect(log.trim()).toBe("initial");
       const { stdout: status } = await execAsync("git status --porcelain", { cwd: projectDir });
+      expect(status).toContain(".rex/prd_tree/task/index.md");
+    } finally {
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it("withdraws auto-commit completion when staging reviewer repairs is rejected", async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), "hench-auto-review-add-failure-"));
+    try {
+      const henchDir = join(projectDir, ".hench");
+      const taskId = "task-1";
+      const taskPath = join(projectDir, ".rex", "prd_tree", "task", "index.md");
+      const sourcePath = join(projectDir, "src.ts");
+      await initGitFixtureRepo(projectDir);
+      await initConfig(henchDir);
+      await mkdir(join(henchDir, "runs"), { recursive: true });
+      await mkdir(join(projectDir, ".rex", "prd_tree", "task"), { recursive: true });
+      await writeFile(taskPath, "status: in_progress\n", "utf-8");
+      await writeFile(sourcePath, "export const value = 1;\n", "utf-8");
+      await execAsync("git add . && git commit -m initial", { cwd: projectDir });
+      await writeFile(sourcePath, "export const value = 2; // reviewer repair\n", "utf-8");
+
+      let taskStatus = "in_progress";
+      const store = {
+        getItem: vi.fn(async (id: string) => id === taskId
+          ? { id: taskId, status: taskStatus, title: "Test task", level: "task" }
+          : null),
+        updateItem: vi.fn(async (id: string, updates: { status?: string }) => {
+          if (id !== taskId || !updates.status) return;
+          taskStatus = updates.status;
+          const current = await readFile(taskPath, "utf-8");
+          await writeFile(taskPath, current.replace(/status: \w+/, `status: ${updates.status}`), "utf-8");
+        }),
+        appendLog: vi.fn(async () => {}),
+        loadDocument: vi.fn(async () => ({ items: [] })),
+      };
+
+      await failGitMutation("add", "fatal: could not lock index");
+      const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+      const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+      const run = completedRun();
+      run.review = {
+        model: "reviewer",
+        resumedSession: false,
+        findingCount: 1,
+        unresolvedCount: 0,
+        unrepairedMustFixCount: 0,
+        failedActionCount: 0,
+        fixesApplied: true,
+        repairedFiles: ["src.ts"],
+      };
+      await finalizeRun({
+        run,
+        henchDir,
+        projectDir,
+        autoCommit: true,
+        rollbackOnFailure: false,
+        skipFullTestGate: true,
+        store: store as never,
+      });
+
+      expect(run.status).toBe("failed");
+      expect(run.error).toContain("fatal: could not lock index");
+      expect(run.review.repairCommit).toBeUndefined();
+      expect(taskStatus).toBe("pending");
+      expect(consoleLog.mock.calls.flat().join("\n")).toContain("Could not commit review repairs");
+      expect(consoleLog.mock.calls.flat().join("\n")).not.toContain("Committed review repairs");
+      const { stdout: log } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+      expect(log.trim()).toBe("initial");
+      const { stdout: status } = await execAsync("git status --porcelain", { cwd: projectDir });
+      expect(status).toContain("src.ts");
+      expect(status).toContain(".rex/prd_tree/task/index.md");
+    } finally {
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it("withdraws auto-commit completion when checking staged reviewer repairs fails", async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), "hench-auto-review-diff-failure-"));
+    try {
+      const henchDir = join(projectDir, ".hench");
+      const taskId = "task-1";
+      const taskPath = join(projectDir, ".rex", "prd_tree", "task", "index.md");
+      const sourcePath = join(projectDir, "src.ts");
+      await initGitFixtureRepo(projectDir);
+      await initConfig(henchDir);
+      await mkdir(join(henchDir, "runs"), { recursive: true });
+      await mkdir(join(projectDir, ".rex", "prd_tree", "task"), { recursive: true });
+      await writeFile(taskPath, "status: in_progress\n", "utf-8");
+      await writeFile(sourcePath, "export const value = 1;\n", "utf-8");
+      await execAsync("git add . && git commit -m initial", { cwd: projectDir });
+      await writeFile(sourcePath, "export const value = 2; // reviewer repair\n", "utf-8");
+
+      let taskStatus = "in_progress";
+      const store = {
+        getItem: vi.fn(async (id: string) => id === taskId
+          ? { id: taskId, status: taskStatus, title: "Test task", level: "task" }
+          : null),
+        updateItem: vi.fn(async (id: string, updates: { status?: string }) => {
+          if (id !== taskId || !updates.status) return;
+          taskStatus = updates.status;
+          const current = await readFile(taskPath, "utf-8");
+          await writeFile(taskPath, current.replace(/status: \w+/, `status: ${updates.status}`), "utf-8");
+        }),
+        appendLog: vi.fn(async () => {}),
+        loadDocument: vi.fn(async () => ({ items: [] })),
+      };
+
+      await failGitMutation("diff", "fatal: index is corrupt");
+      const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+      const run = completedRun();
+      run.review = {
+        model: "reviewer",
+        resumedSession: false,
+        findingCount: 1,
+        unresolvedCount: 0,
+        unrepairedMustFixCount: 0,
+        failedActionCount: 0,
+        fixesApplied: true,
+        repairedFiles: ["src.ts"],
+      };
+      await finalizeRun({
+        run,
+        henchDir,
+        projectDir,
+        autoCommit: true,
+        rollbackOnFailure: false,
+        skipFullTestGate: true,
+        store: store as never,
+      });
+
+      expect(run.status).toBe("failed");
+      expect(run.error).toContain("fatal: index is corrupt");
+      expect(run.review.repairCommit).toBeUndefined();
+      expect(taskStatus).toBe("pending");
+      const { stdout: log } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+      expect(log.trim()).toBe("initial");
+      const { stdout: status } = await execAsync("git status --porcelain", { cwd: projectDir });
+      expect(status).toContain("src.ts");
       expect(status).toContain(".rex/prd_tree/task/index.md");
     } finally {
       await rm(projectDir, { recursive: true, force: true });

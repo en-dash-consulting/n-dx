@@ -24,7 +24,7 @@ import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { exec, getCurrentHead, execStdout } from "../../process/exec.js";
-import type { ExecResult } from "../../process/exec.js";
+import { execGitMutation } from "../../process/git-mutation.js";
 import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
@@ -1113,29 +1113,6 @@ async function performRollbackIfNeeded(
 // Pending-commit prompt helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Turn a failed structured process result into the original Git failure.
- *
- * `execStdout` is intentionally lossy: it is ideal for read-only probes, but
- * mutations need the exit status so a rejected hook or signing prompt cannot
- * look like a completed operation.
- */
-function gitMutationError(result: ExecResult): Error {
-  return result.error ?? new Error(result.stderr.trim() || result.stdout.trim() || "Git command failed");
-}
-
-/** Execute a Git mutation and reject when Git did not complete it. */
-async function execGitMutation(
-  projectDir: string,
-  args: string[],
-  timeout: number,
-): Promise<void> {
-  const result = await exec("git", args, { cwd: projectDir, timeout });
-  if (!result.launched || result.exitCode !== 0) {
-    throw gitMutationError(result);
-  }
-}
-
 /** Project-root sentinel where the agent writes its proposed commit message. */
 const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
 
@@ -1345,8 +1322,9 @@ async function commitPreRunChanges(projectDir: string, message: string): Promise
  * Called on the autoCommit path only: the interactive commit prompt already
  * sweeps repairs into the task's commit, but on autoCommit the executor
  * committed its own work before the review ran, so the repairs have no other
- * owner. A failure here is reported, never thrown — an uncommitted repair is
- * an inspection burden, not a broken task.
+ * owner. A failed repair commit is propagated to finalization so it can
+ * withdraw the completion claim rather than leave the repair for a later
+ * task to absorb.
  */
 export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRecord): Promise<void> {
   const review = run.review;
@@ -1371,10 +1349,12 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
       );
     }
   } catch (err) {
+    const error = err as Error;
     info(
-      `⚠ Review repairs could not be committed (${(err as Error).message}). ` +
+      `⚠ Review repairs could not be committed (${error.message}). ` +
         `They remain in the working tree: ${review.repairedFiles.join(", ")}`,
     );
+    throw error;
   }
 }
 
@@ -2641,14 +2621,27 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // this commit its must-fix repairs would be orphaned in the working tree
   // and swept into whatever commit happens next.
   if (opts.autoCommit === true && run.status === "completed" && run.taskId) {
-    await commitReviewRepairsIfNeeded(projectDir, run);
-    const completionMetadata = await commitCompletionMetadata(projectDir, run.taskId, run);
-    if (completionMetadata.error) {
+    try {
+      await commitReviewRepairsIfNeeded(projectDir, run);
+    } catch (err) {
+      const error = err as Error;
       run.status = "failed";
-      run.error = `Could not commit completion metadata: ${completionMetadata.error.message}`;
+      run.error = `Could not commit review repairs: ${error.message}`;
       info(`\n${run.error}`);
       if (opts.store) {
         await withdrawCompletionClaim(opts.store, run, run.error);
+      }
+    }
+
+    if (run.status === "completed") {
+      const completionMetadata = await commitCompletionMetadata(projectDir, run.taskId, run);
+      if (completionMetadata.error) {
+        run.status = "failed";
+        run.error = `Could not commit completion metadata: ${completionMetadata.error.message}`;
+        info(`\n${run.error}`);
+        if (opts.store) {
+          await withdrawCompletionClaim(opts.store, run, run.error);
+        }
       }
     }
   }
