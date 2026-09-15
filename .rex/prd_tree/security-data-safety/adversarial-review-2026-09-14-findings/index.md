@@ -18,8 +18,11 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Dashboard config validator accepts values hench's schema rejects, leaving `.hench/config.json` unloadable](./dashboard-config-validator-accepts.md) | pending |
 | [hench command guard passes `$(…)` and backticks inside double quotes, which `sh` expands](./hench-command-guard-passes-and.md) | pending |
 | [hench command guard's POSIX quote model lets `&`, `|`, `<`, `>` through on the cmd.exe fallback](./hench-command-guard-s-posix-quote.md) | pending |
 | [`ndx ci` config-secrets step never fails on a git-tracked `.n-dx.local.json`](./ndx-ci-config-secrets-step-never-fails.md) | pending |
+| [`ndx export` sanitizer leaves test output, command lines, and audit errors in published run records](./ndx-export-sanitizer-leaves-test.md) | pending |
 | [`ndx export` silently appends its out-dir to `.gitignore`, even when that directory is git-tracked](./ndx-export-silently-appends-its-out.md) | pending |
 | [`ndx export` strips `error` from per-run files but still publishes it in the `runs.json` index](./ndx-export-strips-error-from-per-run.md) | pending |
+| [`readBody` destroys an over-cap chunked request before any response, so the client sees EPIPE instead of the documented 400](./readbody-destroys-an-over-cap-chunked.md) | pending |
