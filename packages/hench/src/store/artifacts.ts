@@ -32,6 +32,10 @@
  * @module hench/store/artifacts
  */
 
+import { relative as relativePath } from "node:path";
+import { realpath } from "node:fs/promises";
+import { execStdout } from "../process/exec.js";
+
 /**
  * `.gitignore` lines written by `hench init` covering hench's runtime output.
  *
@@ -43,6 +47,7 @@ export const HENCH_RUNTIME_GITIGNORE_ENTRIES: readonly string[] = [
   ".hench/runs/",
   ".hench/locks/",
   ".hench/usage-cursors/",
+  ".hench/reviews/",
   ".hench/session-cache.json",
   ".hench-commit-msg.txt",
 ];
@@ -59,13 +64,64 @@ const RUNTIME_FILES = HENCH_RUNTIME_GITIGNORE_ENTRIES.filter((e) => !e.endsWith(
  * tracked) and anything beneath them.
  *
  * @param path Repository-relative path, as reported by git.
+ * @param repoPrefix The project's location within the repo, from
+ *   {@link repoRelativePrefix}; `""` when the project is the repo root.
  */
-export function isHenchRuntimeArtifact(path: string): boolean {
+export function isHenchRuntimeArtifact(path: string, repoPrefix = ""): boolean {
   const normalized = path.replace(/\\/g, "/").replace(/^\.\//, "");
-  if (RUNTIME_FILES.includes(normalized)) return true;
-  return RUNTIME_DIRS.some(
-    (dir) => normalized === dir || normalized === dir.slice(0, -1) || normalized.startsWith(dir),
-  );
+  if (RUNTIME_FILES.some((file) => normalized === repoPrefix + file)) return true;
+  return RUNTIME_DIRS.some((entry) => {
+    const dir = repoPrefix + entry;
+    return normalized === dir || normalized === dir.slice(0, -1) || normalized.startsWith(dir);
+  });
+}
+
+/**
+ * Where the project sits inside its repository, as a porcelain path prefix.
+ *
+ * **`git status --porcelain` reports paths relative to the repository root, not
+ * to the directory it was invoked from.** That is the whole reason this
+ * function exists, and it is the assumption every match above rests on. A run
+ * in `sub/` sees `?? sub/.hench/locks/run.lock`, so matching that against a
+ * bare `.hench/locks/` fails and hench's own lock file counts as operator work
+ * — which made the gate refuse to start on a file it had just created, then
+ * remove it on exit so the tree read clean to anyone who looked afterwards.
+ *
+ * Every path hench cares about is expressed relative to `projectDir`, so the
+ * prefix is applied to the pattern rather than stripped from each line. That
+ * keeps a sibling project's `other/.hench/runs/` outside the match: it is
+ * somebody else's uncommitted work, not this project's runtime state.
+ *
+ * @param projectDir - the directory hench is operating on
+ * @returns `""` when the project *is* the repo root, otherwise a `sub/`-style
+ *   prefix. Also `""` when the directory is not in a repository or git is
+ *   unavailable — `execStdout` resolves empty rather than throwing, and the
+ *   pre-nesting behaviour is the right thing to fall back to.
+ */
+async function repoRelativePrefix(projectDir: string): Promise<string> {
+  const root = (
+    await execStdout("git", ["rev-parse", "--show-toplevel"], {
+      cwd: projectDir,
+      timeout: 15_000,
+    })
+  ).trim();
+  if (!root) return "";
+
+  // Both sides must be canonical before they can be subtracted. `git rev-parse`
+  // resolves symlinks and `projectDir` generally has not: on macOS a path under
+  // `/var/...` or `/tmp/...` comes back as `/private/var/...`, and a symlinked
+  // home or checkout does the same anywhere. Comparing the two raw strings
+  // yields a `..`-laden relative path, the guard below discards it, and the
+  // prefix silently falls back to "" — leaving exactly the bug this function
+  // was written to fix, on developer machines only.
+  const canonical = await realpath(projectDir).catch(() => projectDir);
+  const canonicalRoot = await realpath(root).catch(() => root);
+
+  const rel = relativePath(canonicalRoot, canonical).replaceAll("\\", "/");
+  // `..` means projectDir is outside the reported root, which should not happen
+  // — treat it as unknown rather than building a nonsense prefix.
+  if (!rel || rel.startsWith("..")) return "";
+  return `${rel}/`;
 }
 
 /**
@@ -98,7 +154,22 @@ export function parsePorcelainPath(line: string): string {
 /**
  * Drop hench's own runtime artifacts from a list of `git status --porcelain`
  * lines, leaving only paths that represent operator work.
+ *
+ * `projectDir` is required rather than defaulted because porcelain paths are
+ * repo-root-relative and the artifact list is project-relative: without it the
+ * two cannot be compared, and a default would silently reintroduce the
+ * nested-project bug at whichever call site forgot to pass one. Making it
+ * mandatory means the compiler, not a reviewer, checks that the callers agree.
+ *
+ * @param porcelainLines - porcelain lines, as produced for `projectDir`
+ * @param projectDir - the directory those lines were collected for
+ * @see HENCH_RUNTIME_GITIGNORE_ENTRIES — the list, shared with `hench init`
+ * @see repoRelativePrefix — why the project's position in the repo matters
  */
-export function excludeHenchRuntimeArtifacts(porcelainLines: string[]): string[] {
-  return porcelainLines.filter((line) => !isHenchRuntimeArtifact(parsePorcelainPath(line)));
+export async function excludeHenchRuntimeArtifacts(
+  porcelainLines: string[],
+  projectDir: string,
+): Promise<string[]> {
+  const prefix = await repoRelativePrefix(projectDir);
+  return porcelainLines.filter((line) => !isHenchRuntimeArtifact(parsePorcelainPath(line), prefix));
 }

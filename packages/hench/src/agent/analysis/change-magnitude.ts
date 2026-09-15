@@ -65,11 +65,13 @@ export async function measureChangeMagnitude(
   let files = 0;
   let linesChanged = 0;
   try {
-    const status = await exec("git", ["status", "--porcelain"], {
+    const status = await exec("git", ["status", "--porcelain", "--untracked-files=all"], {
       cwd: projectDir,
       timeout: 15_000,
     });
-    files = excludeHenchRuntimeArtifacts(status.trim().split("\n").filter(Boolean)).length;
+    files = (
+      await excludeHenchRuntimeArtifacts(status.trim().split("\n").filter(Boolean), projectDir)
+    ).length;
   } catch {
     // Not a git repo or git unavailable — report zero files.
   }

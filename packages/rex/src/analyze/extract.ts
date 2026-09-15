@@ -32,6 +32,8 @@ import {
   normalizeTitle,
 } from "./analyze-shared.js";
 import { spawnClaude } from "./llm-bridge.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import { section, rexPromptEnvelope, rexPrompt } from "./prompt-envelope.js";
 import {
   validateFileInput,
   validateMarkdownContent,
@@ -1536,34 +1538,48 @@ export function isAmbiguousStructure(
  * The prompt includes the raw content and asks the LLM to classify it
  * into the standard epic → feature → task hierarchy.
  */
-function buildDisambiguationPrompt(
+export function buildDisambiguationEnvelope(
+  content: string,
+  existingTitles: Set<string>,
+): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "You are a product requirements analyst. The following document contains requirements but its structure is ambiguous. Analyze the content and organize it into a hierarchical PRD structure.",
+    ),
+    section("schema", PRD_SCHEMA),
+    section("quality", TASK_QUALITY_RULES),
+    section(
+      "structure",
+      [
+        "Guidelines for disambiguation:",
+        "- Group related requirements under coherent epics and features.",
+        "- Identify implicit groupings from context (e.g., authentication-related items belong together).",
+        "- Separate distinct concerns into different epics.",
+        "- Convert prose requirements into actionable task titles.",
+        "- Extract acceptance criteria from detailed descriptions.",
+        "- Do NOT include items that duplicate existing ones listed below.",
+      ].join("\n"),
+    ),
+    section(
+      "existing-prd",
+      existingTitles.size > 0
+        ? `Existing items to avoid duplicating:\n${[...existingTitles].map((t) => `- ${t}`).join("\n")}`
+        : "",
+    ),
+    section(
+      "input",
+      `Document to analyze:\n---\n${content.slice(0, 20_000)}\n---`,
+    ),
+    section("output", OUTPUT_INSTRUCTION),
+  ]);
+}
+
+export function buildDisambiguationPrompt(
   content: string,
   existingTitles: Set<string>,
 ): string {
-  const existingList = existingTitles.size > 0
-    ? `\nExisting items to avoid duplicating:\n${[...existingTitles].map((t) => `- ${t}`).join("\n")}\n`
-    : "";
-
-  return `You are a product requirements analyst. The following document contains requirements but its structure is ambiguous. Analyze the content and organize it into a hierarchical PRD structure.
-
-${PRD_SCHEMA}
-
-${TASK_QUALITY_RULES}
-
-Guidelines for disambiguation:
-- Group related requirements under coherent epics and features.
-- Identify implicit groupings from context (e.g., authentication-related items belong together).
-- Separate distinct concerns into different epics.
-- Convert prose requirements into actionable task titles.
-- Extract acceptance criteria from detailed descriptions.
-- Do NOT include items that duplicate existing ones listed below.
-${existingList}
-Document to analyze:
----
-${content.slice(0, 20_000)}
----
-
-${OUTPUT_INSTRUCTION}`;
+  return rexPrompt(buildDisambiguationEnvelope(content, existingTitles));
 }
 
 /**

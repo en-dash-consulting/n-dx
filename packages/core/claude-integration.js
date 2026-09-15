@@ -16,7 +16,7 @@
  * @module n-dx/claude-integration
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmdirSync, unlinkSync, readdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmdirSync, unlinkSync, readdirSync, realpathSync } from "fs";
 import { createRequire } from "module";
 import { join, resolve } from "path";
 // execFileSyncCli, not execSync: every argument here is a filesystem path
@@ -35,6 +35,7 @@ import {
   writeVendorSkills,
   renderClaudeMd,
 } from "./assistant-assets.js";
+import { getCliName } from "./cli-identity.js";
 import { homedir } from "os";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -183,45 +184,133 @@ function extractExecError(err) {
 }
 
 /**
- * Register MCP servers with Claude Code CLI (best-effort).
- * Prefers HTTP transport if the web server is running, falls back to stdio.
+ * Resolve the path to Claude Code's global config file, where `claude mcp
+ * add --scope local` stores its per-directory server map. Honors
+ * `CLAUDE_CONFIG_DIR` the same way the CLI itself does; defaults to the
+ * user's home directory.
+ * @returns {string}
  */
-function registerMcpServers(dir) {
+function claudeGlobalConfigPath() {
+  const configDir = process.env.CLAUDE_CONFIG_DIR || homedir();
+  return join(configDir, ".claude.json");
+}
+
+/**
+ * Candidate keys under which a project's local-scope entry might be stored:
+ * the literal resolved dir, plus its realpath (Claude Code resolves through
+ * symlinks when recording the project key, which matters for e.g. macOS
+ * `/var` → `/private/var` temp dirs).
+ * @param {string} absDir
+ * @returns {string[]}
+ */
+function projectConfigKeyCandidates(absDir) {
+  const candidates = [absDir];
+  try {
+    const real = realpathSync(absDir);
+    if (real !== absDir) candidates.push(real);
+  } catch {
+    // Directory may not exist (tests) — literal key is still tried.
+  }
+  return candidates;
+}
+
+/**
+ * Read the local-scope `mcpServers` map Claude Code has on file for this
+ * project, if any. Returns undefined when the config file is missing,
+ * unparsable, or holds no entry for this project.
+ * @param {string} absDir
+ * @returns {Record<string, { args?: string[] }> | undefined}
+ */
+function readLocalMcpServers(absDir) {
+  let config;
+  try {
+    config = JSON.parse(readFileSync(claudeGlobalConfigPath(), "utf-8"));
+  } catch {
+    return undefined;
+  }
+  for (const key of projectConfigKeyCandidates(absDir)) {
+    const servers = config?.projects?.[key]?.mcpServers;
+    if (servers) return servers;
+  }
+  return undefined;
+}
+
+/**
+ * True only when Claude Code has a local-scope entry named `name` under this
+ * project AND that entry's own recorded args target this directory (its last
+ * arg — the project dir positional in the `mcp add` command below — equals
+ * `absDir`). Local scope is already keyed per-directory, but this extra
+ * check guards against removing an entry that merely happens to share a
+ * project key without actually pointing here.
+ * @param {string} absDir
+ * @param {string} name
+ * @returns {boolean}
+ */
+function localEntryTargetsProject(absDir, name) {
+  const servers = readLocalMcpServers(absDir);
+  const args = servers?.[name]?.args;
+  return Array.isArray(args) && args.length > 0 && args[args.length - 1] === absDir;
+}
+
+/**
+ * Register MCP servers with Claude Code CLI (best-effort).
+ *
+ * Defaults to leaving registration to the tracked `.mcp.json` written by
+ * `writeMcpJson()` — no `claude mcp add` call is made. Pass
+ * `{ mcpScope: "local" }` to restore the legacy behaviour of registering via
+ * `claude mcp add --scope local`, for people who cannot rely on `.mcp.json`
+ * being picked up (e.g. Claude Code versions predating project-scope stdio
+ * servers).
+ *
+ * Either way, a stale local-scope entry from a prior run is cleaned up first
+ * so re-running init (in either mode) doesn't leave a dangling local
+ * registration behind. Only "local" scope is ever touched: "project" scope
+ * is `.mcp.json` itself (owned by `writeMcpJson()`, not the CLI), and "user"
+ * scope is global — removing it would strip a registration that has nothing
+ * to do with this project.
+ *
+ * @param {string} dir
+ * @param {{ mcpScope?: "local" }} [opts]
+ */
+function registerMcpServers(dir, opts = {}) {
+  const useLocalScope = opts.mcpScope === "local";
   const discovery = discoverClaudeCli(dir);
   if (!discovery.found) {
-    return { registered: false, reason: "claude CLI not found", searched: discovery.searched };
+    return { registered: false, reason: "claude CLI not found", searched: discovery.searched, mode: useLocalScope ? "local" : "tracked" };
   }
 
   const claudeCmd = discovery.path;
-  const results = [];
   const absDir = resolve(dir);
   const servers = getMcpServers();
 
-  // Register each MCP server defined in the manifest via stdio transport.
-  //
-  // Every claude invocation runs with `cwd: absDir`. Local scope — the default
-  // for `claude mcp add` — is stored per-directory, so without this the child
-  // inherits the caller's working directory and `ndx init <other-project>`
-  // registers the servers against wherever the shell happened to be, pointing
-  // them at a project that is not the one being initialised. The remove loop
-  // needs it just as much: run from the wrong directory it strips that
-  // directory's rex/sourcevision registrations instead of the target's.
+  // Clean up any stale local-scope entry left by a prior run — but only one
+  // that actually targets this project (see localEntryTargetsProject above).
+  for (const name of Object.keys(servers)) {
+    if (!localEntryTargetsProject(absDir, name)) continue;
+    try {
+      execFileSyncCli(claudeCmd, ["mcp", "remove", "--scope", "local", name], {
+        stdio: "ignore",
+        timeout: 5_000,
+        cwd: absDir,
+      });
+    } catch {
+      // Already gone — fine.
+    }
+  }
+
+  if (!useLocalScope) {
+    return {
+      registered: false,
+      reason: "using tracked .mcp.json (pass --mcp-scope=local to register local scope instead)",
+      mode: "tracked",
+    };
+  }
+
+  const results = [];
   for (const [name, descriptor] of Object.entries(servers)) {
     const bin = resolveSubPackageCli(descriptor.package, descriptor.npmName);
-    // Remove existing registration(s) first to make init idempotent —
-    // `claude mcp add` fails if the server already exists in any scope.
-    for (const scope of ["local", "project", "user"]) {
-      try {
-        execFileSyncCli(claudeCmd, ["mcp", "remove", "--scope", scope, name], {
-          stdio: "ignore",
-          timeout: 5_000,
-          cwd: absDir,
-        });
-      } catch {
-        // Server may not exist in this scope — continue cleanup.
-      }
-    }
     try {
+      // `claude mcp add --scope local` — the flag-gated legacy path.
       execFileSyncCli(
         claudeCmd,
         ["mcp", "add", "--scope", "local", name, "--", "node", bin, descriptor.mcpCommand, absDir],
@@ -233,7 +322,78 @@ function registerMcpServers(dir) {
     }
   }
 
-  return { registered: true, servers: results };
+  return { registered: true, servers: results, mode: "local" };
+}
+
+// ── Tracked .mcp.json ─────────────────────────────────────────────────────────
+
+/**
+ * Build the .mcp.json server entry map for the current manifest, using
+ * cwd-relative commands (`<cliName> <cliCommand> mcp .`) instead of the
+ * absolute paths `registerMcpServers` uses. Claude Code launches
+ * project-scope stdio servers with cwd at the checkout root, so a command
+ * like `ndx rex mcp .` resolves correctly from any worktree or teammate
+ * clone without embedding a machine-specific path.
+ *
+ * @param {string} cliName  Resolved CLI command name (see cli-identity.js)
+ * @returns {Record<string, { command: string, args: string[] }>}
+ */
+function buildTrackedMcpServers(cliName) {
+  const servers = getMcpServers();
+  const entries = {};
+  for (const [name, descriptor] of Object.entries(servers)) {
+    const subcommand = descriptor.cliCommand ?? name;
+    entries[name] = { command: cliName, args: [subcommand, descriptor.mcpCommand, "."] };
+  }
+  return entries;
+}
+
+/**
+ * Write (or merge into) `<dir>/.mcp.json` — a tracked, cwd-relative MCP
+ * server registration for Claude Code.
+ *
+ * Unlike `registerMcpServers()` (local scope, absolute paths, keyed by
+ * directory in `~/.claude.json`), this file is committed to the repo: every
+ * worktree and teammate gets the same two entries, resolved relative to
+ * whichever directory Claude Code launches the stdio server from — no
+ * absolute paths, so it survives the install moving or a dev-link toggle.
+ *
+ * Existing entries not defined in the n-dx manifest (a project's own MCP
+ * servers) are preserved untouched — only the manifest's own server names
+ * are (re)written each run, so re-running init is idempotent and merges
+ * safely instead of clobbering the file.
+ *
+ * @param {string} dir  Absolute project root directory
+ * @returns {{ written: boolean, path: string, servers: string[] }}
+ */
+function writeMcpJson(dir) {
+  const mcpJsonPath = join(dir, ".mcp.json");
+
+  let existing = {};
+  if (existsSync(mcpJsonPath)) {
+    try {
+      existing = JSON.parse(readFileSync(mcpJsonPath, "utf-8"));
+    } catch {
+      // Corrupted or unparseable — start fresh rather than fail init.
+      existing = {};
+    }
+  }
+  if (existing === null || typeof existing !== "object" || Array.isArray(existing)) {
+    existing = {};
+  }
+  if (!existing.mcpServers || typeof existing.mcpServers !== "object" || Array.isArray(existing.mcpServers)) {
+    existing.mcpServers = {};
+  }
+
+  const cliName = getCliName(dir);
+  const managed = buildTrackedMcpServers(cliName);
+  for (const [name, entry] of Object.entries(managed)) {
+    existing.mcpServers[name] = entry;
+  }
+
+  writeFileSync(mcpJsonPath, JSON.stringify(existing, null, 2) + "\n");
+
+  return { written: true, path: mcpJsonPath, servers: Object.keys(managed) };
 }
 
 /**
@@ -402,17 +562,21 @@ export function formatClaudeCliNotFoundError(searched) {
  * Run the full Claude Code integration setup.
  *
  * @param {string} dir  Project root directory
- * @returns {{ settings: object, skills: object, mcp: object, instructions: object }}
+ * @param {{ mcpScope?: "local" }} [opts]  Pass `{ mcpScope: "local" }` to
+ *   register MCP servers via `claude mcp add --scope local` instead of
+ *   relying on the tracked `.mcp.json` (the default).
+ * @returns {{ settings: object, skills: object, mcp: object, mcpJson: object, instructions: object }}
  */
-export function setupClaudeIntegration(dir) {
+export function setupClaudeIntegration(dir, opts = {}) {
   const absDir = resolve(dir);
 
   const settings = mergeSettings(absDir);
   const skills = writeSkills(absDir);
-  const mcp = registerMcpServers(absDir);
+  const mcp = registerMcpServers(absDir, opts);
+  const mcpJson = writeMcpJson(absDir);
   const instructions = writeClaudeMd(absDir);
 
-  return { settings, skills, mcp, instructions };
+  return { settings, skills, mcp, mcpJson, instructions };
 }
 
 /**
@@ -443,14 +607,16 @@ export function printClaudeSetupSummary(result) {
   console.log(`  Skills: wrote ${result.skills.written} workflow skills (${skillList})`);
 
   // MCP
-  if (!result.mcp.registered) {
+  if (result.mcp.mode === "tracked") {
+    console.log(`  MCP servers: ${result.mcp.reason}`);
+  } else if (!result.mcp.registered) {
     console.log(`  MCP servers: skipped (${result.mcp.reason})`);
     console.log("  To register manually, see: ndx --help init");
   } else {
     const ok = result.mcp.servers.filter((s) => s.ok);
     const failed = result.mcp.servers.filter((s) => !s.ok);
     if (ok.length > 0) {
-      console.log(`  MCP servers: registered ${ok.map((s) => s.name).join(", ")} (${ok[0].transport})`);
+      console.log(`  MCP servers: registered ${ok.map((s) => s.name).join(", ")} (local scope, ${ok[0].transport})`);
     }
     if (failed.length > 0) {
       const detail = failed
@@ -458,5 +624,10 @@ export function printClaudeSetupSummary(result) {
         .join(", ");
       console.log(`  MCP servers: failed to register ${detail}`);
     }
+  }
+
+  // Tracked .mcp.json
+  if (result.mcpJson && result.mcpJson.written) {
+    console.log(`  .mcp.json: tracked, cwd-relative entries for ${result.mcpJson.servers.join(", ")}`);
   }
 }

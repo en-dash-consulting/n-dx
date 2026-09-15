@@ -168,6 +168,29 @@ describe("port utilities", () => {
   });
 
   describe("findAvailablePort", () => {
+    it("resolves port 0 to a real ephemeral port, never the literal 0", async () => {
+      // Port 0 means "any free port". Probing it through checkPort is
+      // platform-dependent: on Linux the connect probe fails ECONNREFUSED and
+      // the bind phase succeeds (binding 0 always does), so the literal 0 was
+      // returned as the port — the server then reported a port no client can
+      // connect to. Windows masked this by failing the connect probe with
+      // EADDRNOTAVAIL and taking the ephemeral fallback.
+      const result = await findAvailablePort(0);
+      expect(result.port).toBeGreaterThan(0);
+      expect(result.isOriginal).toBe(false);
+      expect(result.requestedPort).toBe(0);
+    });
+
+    it("does not call a resolved port 0 a fallback", async () => {
+      // isOriginal stays false — the bound port is not the number requested,
+      // which is what that flag means. But nothing fell back: port 0 asks for
+      // "any free port" and got exactly that. Reporting it as a fallback made
+      // the server announce "Port 0 is in use", and handed the same false
+      // signal to programmatic callers through StartResult.isFallback.
+      const result = await findAvailablePort(0);
+      expect(result.isFallback, "port 0 was honoured, not substituted").toBe(false);
+    });
+
     it("returns the preferred port when it is available", async () => {
       // Find a free port to use as our "preferred"
       const tmp = createServer();
@@ -183,6 +206,7 @@ describe("port utilities", () => {
       expect(result.port).toBe(freePort);
       expect(result.isOriginal).toBe(true);
       expect(result.requestedPort).toBe(freePort);
+      expect(result.isFallback).toBe(false);
     });
 
     it("falls back to next available port when preferred is occupied", async () => {
@@ -205,6 +229,7 @@ describe("port utilities", () => {
       expect(result.requestedPort).toBe(port1);
       expect(result.port).toBeGreaterThan(port1);
       expect(result.port).toBeLessThanOrEqual(port1 + 10);
+      expect(result.isFallback, "a genuinely occupied port did fall back").toBe(true);
     });
 
     it("throws when no port is available in range", async () => {

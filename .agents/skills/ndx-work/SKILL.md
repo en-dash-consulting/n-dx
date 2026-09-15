@@ -20,3 +20,12 @@ Pick up a task from the PRD and begin working on it.
 12. Record the work in hench run history so it is auditable alongside `ndx work` runs, together with what it cost: run `ndx hench record --task=<id> --status=completed --startedAt=<time from step 7> --title="<task title>" --summary="<one-line summary>"`. Token usage is read automatically from this Claude Code session's transcript and attributed to the task — only the spend since the previous record, so several tasks in one session each get their own slice rather than all claiming the total. Use `--status=cancelled` (or `failed`) instead if the task was not completed, and `--no-tokens` to record without usage.
 
 > **Assisted run, not a hench run.** This skill drives the task directly through Claude Code, so — unlike `ndx work` — it does not spawn the hench agent. The record written in step 12 is marked `assisted` to keep it distinguishable from an agent run, and its token usage is read from the session transcript that Claude Code writes (located via `CLAUDE_CODE_SESSION_ID`), so `ndx usage` and the dashboard's per-item rollup include this work. If no transcript can be found the record is still written with zero usage — an unrecorded run is worse than one missing its tokens — and the command says which happened.
+
+## Done when
+
+`ndx hench record` has written the run record for **one** task. Stop there. Do
+not pick up the next task, and do not start follow-up work the task revealed —
+capture it as a PRD item instead and let it be selected on its own merits.
+
+If the task could not be completed, the run still ends here: record it with
+`--status=cancelled` or `failed` rather than leaving no record.

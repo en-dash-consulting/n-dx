@@ -19,18 +19,92 @@
  * So this runner executes each suite independently, never short-circuits, prints
  * a per-suite summary, and exits non-zero if ANY suite failed.
  *
+ * It also keeps every suite's output in `.test-logs/`. That is the other half
+ * of the same problem: a result line tells you rex failed, and by the time
+ * anyone looks the assertion that failed is gone with the scrollback. See
+ * {@link runSuite}.
+ *
  * Usage:
  *   node scripts/run-all-tests.mjs            # root + every package
  *   node scripts/run-all-tests.mjs root       # root suites only
  *   node scripts/run-all-tests.mjs packages   # workspace packages only
  */
 
-import { readdirSync, readFileSync, existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { readdirSync, readFileSync, existsSync, mkdirSync, createWriteStream } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFileSyncCli } from "../packages/core/win-spawn.js";
+import { spawnCli } from "../packages/core/win-spawn.js";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+
+/**
+ * Where each suite's output is kept.
+ *
+ * Gitignored, and deliberately not `.run-logs/` — hench already owns that for
+ * per-run agent logs, and two unrelated things in one directory is how you end
+ * up unable to tell which produced a file.
+ */
+const LOG_DIR = join(ROOT, ".test-logs");
+
+/** `@n-dx/rex` -> `n-dx-rex`, `root (tests/**)` -> `root-tests`. */
+function logFileFor(label) {
+  const slug = label.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
+  return join(LOG_DIR, `${slug}.log`);
+}
+
+/**
+ * Run one suite, streaming its output to the terminal and to a file at once.
+ *
+ * WHY THE FILE. An intermittently failing suite is only diagnosable if its
+ * output outlives the terminal. The rex suite has failed four times under this
+ * runner and passed standalone every time afterwards, and the failing assertion
+ * has never once been seen — each time it was lost to scrollback, because the
+ * only copy went to a terminal nobody was redirecting. Asking the operator to
+ * remember `> run.log 2>&1` has now failed four times, so the runner keeps it.
+ *
+ * WHY STREAMED RATHER THAN BUFFERED. Suites run for 25s and up. Collecting the
+ * output and printing it at exit would make every run look hung, so each chunk
+ * is written through as it arrives and copied to the log on the way past.
+ *
+ * WHY stdin IS INHERITED. So Ctrl-C still reaches the child the way it did
+ * under `stdio: "inherit"`, and anything that prompts still can.
+ *
+ * @returns {Promise<boolean>} true when the suite passed.
+ */
+function runSuite(label, binary, args) {
+  return new Promise((resolvePromise) => {
+    const logPath = logFileFor(label);
+    const log = createWriteStream(logPath);
+    const child = spawnCli(binary, args, {
+      cwd: ROOT,
+      stdio: ["inherit", "pipe", "pipe"],
+    });
+
+    for (const [stream, sink] of [
+      [child.stdout, process.stdout],
+      [child.stderr, process.stderr],
+    ]) {
+      stream?.on("data", (chunk) => {
+        sink.write(chunk);
+        log.write(chunk);
+      });
+    }
+
+    // A spawn that never starts is a failed suite, not an absent one — the
+    // behaviour `execFileSync` used to give us by throwing.
+    child.on("error", (err) => {
+      const message = `\nFailed to start ${label}: ${err.message}\n`;
+      process.stderr.write(message);
+      log.end(message);
+      resolvePromise(false);
+    });
+
+    child.on("close", (code) => {
+      log.end();
+      resolvePromise(code === 0);
+    });
+  });
+}
 
 /** Workspace packages that define a `test` script, in a stable order. */
 function discoverPackageSuites() {
@@ -55,11 +129,9 @@ function discoverPackageSuites() {
       label: manifest.name,
       // Delegated to pnpm so each package keeps its own test script semantics
       // (web and sourcevision wrap vitest in the bind-aware runner). pnpm is a
-      // .cmd shim on Windows, hence execFileSyncCli rather than a raw spawn.
-      run: () => execFileSyncCli("pnpm", ["--filter", manifest.name, "run", "test"], {
-        cwd: ROOT,
-        stdio: "inherit",
-      }),
+      // .cmd shim on Windows, hence spawnCli rather than a raw spawn.
+      binary: "pnpm",
+      args: ["--filter", manifest.name, "run", "test"],
     });
   }
   return suites;
@@ -70,10 +142,8 @@ function rootSuite() {
   return {
     label: "root (tests/**)",
     // process.execPath avoids the shim question entirely for this one.
-    run: () => execFileSyncCli(process.execPath, [resolve(ROOT, "scripts/run-vitest-bind-aware.mjs"), "root"], {
-      cwd: ROOT,
-      stdio: "inherit",
-    }),
+    binary: process.execPath,
+    args: [resolve(ROOT, "scripts/run-vitest-bind-aware.mjs"), "root"],
   };
 }
 
@@ -88,24 +158,27 @@ const suites = [
   ...(scope === "root" ? [] : discoverPackageSuites()),
 ];
 
+mkdirSync(LOG_DIR, { recursive: true });
+
 const results = [];
 for (const suite of suites) {
   console.log(`\n──────── ${suite.label} ────────\n`);
-  try {
-    suite.run();
-    results.push({ label: suite.label, ok: true });
-  } catch {
-    // Keep going: the whole point is that one red suite must not hide the rest.
-    results.push({ label: suite.label, ok: false });
-  }
+  // Keep going even when one fails: the whole point is that one red suite must
+  // not hide the rest.
+  const ok = await runSuite(suite.label, suite.binary, suite.args);
+  results.push({ label: suite.label, ok, logPath: logFileFor(suite.label) });
 }
 
 const failed = results.filter((r) => !r.ok);
 const width = Math.max(...results.map((r) => r.label.length), 0);
 
 console.log(`\n──────── summary ────────\n`);
-for (const { label, ok } of results) {
-  console.log(`  ${ok ? "PASS" : "FAIL"}  ${label.padEnd(width)}`);
+for (const { label, ok, logPath } of results) {
+  // The path only earns its line on a failure — that is when someone needs it,
+  // and printing six of them on a green run is noise that trains people to
+  // skip the summary.
+  const where = ok ? "" : `  → ${relative(ROOT, logPath)}`;
+  console.log(`  ${ok ? "PASS" : "FAIL"}  ${label.padEnd(width)}${where}`);
 }
 console.log(
   `\n${results.length - failed.length}/${results.length} suites passed` +

@@ -16,6 +16,8 @@ import { z } from "zod";
 import type { PRDItem } from "../schema/index.js";
 import { spawnClaude, resolveConfiguredModel, extractJson } from "./reason.js";
 import { withEscalation } from "./escalate.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import { section, rexPromptEnvelope, rexPrompt } from "./prompt-envelope.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -60,27 +62,49 @@ function formatItemSection(label: string, item: PRDItem): string {
  *
  * @public — exported for testing.
  */
+export function buildRenameEnvelope(
+  itemA: PRDItem,
+  itemB: PRDItem,
+): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "Two PRD items are siblings in the same project plan. They share an identical title " +
+        "but describe different work. Propose a distinct, descriptive title for each item that " +
+        "accurately reflects what it covers and differentiates it from the other.",
+    ),
+    // One section, not two: a duplicate section name would split this
+    // prompt's input cost across two identically-labelled report rows.
+    section(
+      "input",
+      [formatItemSection("Item A", itemA), formatItemSection("Item B", itemB)].join("\n\n"),
+    ),
+    section(
+      "input-rules",
+      [
+        "Rules:",
+        "- Both new titles must be different from each other.",
+        `- Neither new title should be identical to the shared original title "${itemA.title}".`,
+        "- Titles should be concise (ideally 3-8 words) and capture the specific scope of each item.",
+        "- Base the titles on the descriptions and acceptance criteria provided above.",
+      ].join("\n"),
+    ),
+    section(
+      "output",
+      [
+        "Respond with JSON only (no markdown wrapper, no prose):",
+        "{",
+        '  "titleA": "<new title for Item A>",',
+        '  "titleB": "<new title for Item B>",',
+        '  "reasoning": "<brief explanation of why these titles distinguish the two items>"',
+        "}",
+      ].join("\n"),
+    ),
+  ]);
+}
+
 export function buildRenamePrompt(itemA: PRDItem, itemB: PRDItem): string {
-  return `Two PRD items are siblings in the same project plan. They share an identical title \
-but describe different work. Propose a distinct, descriptive title for each item that \
-accurately reflects what it covers and differentiates it from the other.
-
-${formatItemSection("Item A", itemA)}
-
-${formatItemSection("Item B", itemB)}
-
-Rules:
-- Both new titles must be different from each other.
-- Neither new title should be identical to the shared original title "${itemA.title}".
-- Titles should be concise (ideally 3-8 words) and capture the specific scope of each item.
-- Base the titles on the descriptions and acceptance criteria provided above.
-
-Respond with JSON only (no markdown wrapper, no prose):
-{
-  "titleA": "<new title for Item A>",
-  "titleB": "<new title for Item B>",
-  "reasoning": "<brief explanation of why these titles distinguish the two items>"
-}`;
+  return rexPrompt(buildRenameEnvelope(itemA, itemB));
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────

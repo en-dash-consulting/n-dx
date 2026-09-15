@@ -7,6 +7,7 @@ import {
   RunRecordSchema,
 } from "../../../src/schema/validate.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
+import { DEFAULT_TEST_GATE_TIMEOUT_MS } from "../../../src/tools/test-runner.js";
 
 describe("validateConfig", () => {
   it("accepts valid default config", () => {
@@ -148,6 +149,55 @@ describe("validateConfig", () => {
       const config = { ...DEFAULT_HENCH_CONFIG(), maxFailedAttempts: -1 };
       const result = validateConfig(config);
       expect(result.ok).toBe(false);
+    });
+  });
+
+  describe("fullTestTimeoutMs defaults and validation", () => {
+    it("is optional in schema and defaults to the gate's own budget", () => {
+      // A config written before the field existed must keep working, and get
+      // the same ceiling the gate uses when the field is absent.
+      //
+      // Asserted against DEFAULT_TEST_GATE_TIMEOUT_MS rather than a literal.
+      // schema/validate.ts cannot import from tools/ without inverting the
+      // layering, so it mirrors the number instead — and a mirror drifts
+      // silently. It already had: two docblocks shipped claiming a 300000
+      // default against a schema default of 900000, and a third copy of the
+      // literal here meant no test could tell. A test sits above both modules
+      // and can hold them to each other, which is the only place this check
+      // can live.
+      const result = validateConfig(DEFAULT_HENCH_CONFIG());
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.fullTestTimeoutMs).toBe(DEFAULT_TEST_GATE_TIMEOUT_MS);
+      }
+    });
+
+    it("can be raised for a suite that legitimately runs long", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestTimeoutMs: 1_800_000 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.fullTestTimeoutMs).toBe(1_800_000);
+      }
+    });
+
+    it("accepts 0, which disables the limit", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestTimeoutMs: 0 };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.fullTestTimeoutMs).toBe(0);
+      }
+    });
+
+    it("rejects a negative timeout", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestTimeoutMs: -1 };
+      expect(validateConfig(config).ok).toBe(false);
+    });
+
+    it("rejects a fractional timeout", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), fullTestTimeoutMs: 1500.5 };
+      expect(validateConfig(config).ok).toBe(false);
     });
   });
 
@@ -308,6 +358,30 @@ describe("validateConfig", () => {
     it("rejects negative loopPauseMs", () => {
       const config = { ...DEFAULT_HENCH_CONFIG(), loopPauseMs: -1 };
       const result = validateConfig(config);
+      expect(result.ok).toBe(false);
+    });
+  });
+
+  describe("autonomous field", () => {
+    it("survives validateConfig — not stripped as unknown key", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), autonomous: true };
+      const result = validateConfig(config);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.autonomous).toBe(true);
+      }
+    });
+
+    it("is optional (backward compat)", () => {
+      const result = validateConfig(DEFAULT_HENCH_CONFIG());
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.autonomous).toBeUndefined();
+      }
+    });
+
+    it("rejects a non-boolean value", () => {
+      const result = validateConfig({ ...DEFAULT_HENCH_CONFIG(), autonomous: "yes" });
       expect(result.ok).toBe(false);
     });
   });
@@ -604,6 +678,34 @@ describe("validateRunRecord", () => {
     it("rejects a non-string actor", () => {
       const run = { ...validRun, actor: 42 };
       const result = validateRunRecord(run);
+      expect(result.ok).toBe(false);
+    });
+  });
+
+  describe("toolchain attribution", () => {
+    // The schema strips keys it does not declare, so an undeclared field would
+    // survive the write and vanish on the next load.
+    it("preserves ndxVersion and cliPath through validation", () => {
+      const run = { ...validRun, ndxVersion: "0.6.0", cliPath: "/opt/n-dx/cli.js" };
+      const result = validateRunRecord(run);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.ndxVersion).toBe("0.6.0");
+        expect(result.data.cliPath).toBe("/opt/n-dx/cli.js");
+      }
+    });
+
+    it("accepts a legacy run record carrying neither field", () => {
+      const result = validateRunRecord(validRun);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.ndxVersion).toBeUndefined();
+        expect(result.data.cliPath).toBeUndefined();
+      }
+    });
+
+    it("rejects a non-string ndxVersion", () => {
+      const result = validateRunRecord({ ...validRun, ndxVersion: 6 });
       expect(result.ok).toBe(false);
     });
   });

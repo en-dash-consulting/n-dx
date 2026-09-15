@@ -60,27 +60,23 @@ export function buildSystemPrompt(
   lines.push("You are Hench, an autonomous AI agent that implements software tasks.");
   lines.push("You receive a task brief and use tools to implement it.\n");
 
+  // Constraints only. Anything that is a *step* belongs to `## Workflow`
+  // below, which states the same run as an ordered procedure — this section
+  // used to restate three of those steps (read first, run tests, commit) as
+  // rules, so the prompt gave each instruction twice in two phrasings.
   lines.push("## Rules");
-  lines.push("1. Read existing code before modifying it. Understand context first.");
-  lines.push("2. Make minimal, focused changes. Don't refactor unrelated code.");
-  lines.push("3. Follow existing code patterns and conventions.");
-  lines.push("4. Run tests after making changes if a test command is configured.");
-  if (autoCommit) {
-    lines.push("5. Commit your work with clear commit messages.");
-  } else {
-    lines.push(`5. Stage your changes with \`git add -A\`, then write your proposed commit message to \`.hench-commit-msg.txt\` at the project root. Do NOT run \`git commit\` — ${cliName} will confirm the commit with the user.`);
-  }
+  lines.push("1. Make minimal, focused changes. Don't refactor unrelated code.");
+  lines.push("2. Follow existing code patterns and conventions.");
 
   if (isCli) {
-    lines.push("6. Never modify .hench/, .rex/, or .git/ directories directly.");
-    lines.push("7. Stay within the project directory. Do not access files outside it.\n");
+    lines.push("3. Never modify .hench/, .rex/, or .git/ directories directly.");
+    lines.push("4. Stay within the project directory. Do not access files outside it.\n");
   } else {
-    lines.push("6. Update the task status when you're done.");
-    lines.push("7. If blocked by an external dependency, set status to 'blocked' and log the blocker.");
+    lines.push("3. If blocked by an external dependency, set status to 'blocked' and log the blocker.");
     lines.push("   If postponing by choice, set status to 'deferred'.");
-    lines.push("8. Never modify .hench/, .rex/, or .git/ files directly.");
-    lines.push("9. Use rex_append_log to record significant actions and decisions.");
-    lines.push("10. If a task is too large, use rex_add_subtask to break it down.\n");
+    lines.push("4. Never modify .hench/, .rex/, or .git/ files directly.");
+    lines.push("5. Use rex_append_log to record significant actions and decisions as you go.");
+    lines.push("6. If a task is too large, use rex_add_subtask to break it down.\n");
   }
 
   lines.push("## Project Info");
@@ -103,21 +99,27 @@ export function buildSystemPrompt(
 
   lines.push("## Workflow");
 
+  // These steps carry the full instruction. `## Rules` above deliberately does
+  // not repeat them — the commit step in particular states the whole procedure
+  // here, including why not to commit, rather than half here and half there.
   const commitStep = autoCommit
-    ? "Commit changes with git"
-    : "Stage changes with `git add -A` and write the commit message to `.hench-commit-msg.txt` (do NOT run `git commit`)";
+    ? "Commit your work with git, using a clear commit message"
+    : `Stage changes with \`git add -A\`, then write your proposed commit message to \`.hench-commit-msg.txt\` at the project root. Do NOT run \`git commit\` — ${cliName} will confirm the commit with the user.`;
+
+  const exploreStep = "Explore the codebase to understand context — read the code you are about to change before changing it";
+  const testStep = "Run validation/tests if configured";
 
   if (isCli) {
-    lines.push("1. Explore the codebase to understand context");
+    lines.push(`1. ${exploreStep}`);
     lines.push("2. Implement the changes described in the task brief");
-    lines.push("3. Run validation/tests if configured");
+    lines.push(`3. ${testStep}`);
     lines.push(`4. ${commitStep}`);
     lines.push("5. Provide a summary of what you did\n");
   } else {
     lines.push("1. Mark task as in_progress using rex_update_status");
-    lines.push("2. Explore the codebase to understand context");
+    lines.push(`2. ${exploreStep}`);
     lines.push("3. Implement the changes");
-    lines.push("4. Run validation/tests if configured");
+    lines.push(`4. ${testStep}`);
     lines.push(`5. ${commitStep}`);
     lines.push("6. Mark task as completed using rex_update_status");
     lines.push("7. Log a summary of what you did\n");

@@ -47,6 +47,12 @@ export interface LocalVendorConfig {
   port: number | null;
   /** Max context window (tokens) hench pre-checks a brief against before sending. */
   maxContextTokens: number | null;
+  /**
+   * Per-request timeout in ms for local completions (0 = no timeout).
+   * Null means unset — the provider default of 5 min applies. Distinct from
+   * `cli.timeoutMs`, which bounds a whole command rather than one request.
+   */
+  timeoutMs: number | null;
   /** Second-model review pass config. All fields null when unset. */
   verifier: LocalVerifierVendorConfig;
 }
@@ -109,6 +115,7 @@ const VALID_PATHS = new Set([
   "llm.local.host",
   "llm.local.port",
   "llm.local.maxContextTokens",
+  "llm.local.timeoutMs",
   "llm.local.verifier.host",
   "llm.local.verifier.port",
   "llm.local.verifier.model",
@@ -213,6 +220,7 @@ function validateRoutingChange(path: string, value: unknown): string | null {
 const NUMERIC_PATHS = new Set([
   "llm.local.port",
   "llm.local.maxContextTokens",
+  "llm.local.timeoutMs",
   "llm.local.verifier.port",
   "llm.local.verifier.maxCycles",
   "llm.escalation.maxSteps",
@@ -220,6 +228,9 @@ const NUMERIC_PATHS = new Set([
 
 /** Numeric paths validated as a TCP port (1–65535) rather than a plain positive integer. */
 const PORT_PATHS = new Set(["llm.local.port", "llm.local.verifier.port"]);
+
+/** Numeric paths where 0 is meaningful (0 = no timeout) and must not be rejected. */
+const NON_NEGATIVE_PATHS = new Set(["llm.local.timeoutMs"]);
 
 /** Paths that accept boolean values. */
 const BOOLEAN_PATHS = new Set(["llm.autoFailover", "llm.escalation.enabled"]);
@@ -331,6 +342,7 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
       host: getString(llmLocal, "host"),
       port: getNumber(llmLocal, "port"),
       maxContextTokens: getNumber(llmLocal, "maxContextTokens"),
+      timeoutMs: getNumber(llmLocal, "timeoutMs"),
       verifier: {
         host: getString(llmLocalVerifier, "host"),
         port: getNumber(llmLocalVerifier, "port"),
@@ -682,12 +694,16 @@ export async function handleLlmRoute(
             errorResponse(res, 400, `Value for "${path}" must be a number or null, got ${typeof value}`);
             return true;
           }
-          if (value !== null && PORT_PATHS.has(path)) {
+          if (value !== null && (PORT_PATHS.has(path) || NON_NEGATIVE_PATHS.has(path))) {
             const n = Number(value);
             const isPort = PORT_PATHS.has(path);
-            const valid = isPort ? Number.isInteger(n) && n >= 1 && n <= 65535 : Number.isInteger(n) && n >= 1;
+            const valid = isPort
+              ? Number.isInteger(n) && n >= 1 && n <= 65535
+              : Number.isInteger(n) && n >= 0;
             if (!valid) {
-              const expected = isPort ? "a valid port number (1–65535)" : "a positive integer";
+              const expected = isPort
+                ? "a valid port number (1–65535)"
+                : "a non-negative integer";
               errorResponse(res, 400, `Value for "${path}" must be ${expected}, got ${JSON.stringify(value)}`);
               return true;
             }

@@ -159,3 +159,14 @@ Then close out the run:
 3. **Summarize.** Account for every finding: created as a new item, added to an item that already tracked it, skipped because the PRD already said everything, declined by the user, or dropped as not-worth-fixing. A finding that vanishes without one of those labels is a review that hid its own result.
 
 > **Fixing is a separate run.** This skill stops at a captured item. Hand the item to `/ndx-work` or `ndx work` so the fix goes through the project's execution discipline and earns its own tests, commit, and record.
+
+## Done when
+
+Every finding is accounted for and, where the user approved capture, the items
+exist, are committed, and the run is recorded. A review that captures nothing
+because the user declined — or because Pass 1 found nothing — is equally
+complete.
+
+This skill does not fix anything. It edits no source file, and writes no PRD
+item the user did not explicitly select. Hand a captured item to `/ndx-work` or
+`ndx work`; fixing is a separate run.

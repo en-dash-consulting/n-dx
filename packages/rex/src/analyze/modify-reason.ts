@@ -31,6 +31,8 @@ import {
 import { validateModificationRequest } from "./validate-modification.js";
 import { withEscalation } from "./escalate.js";
 import { info } from "@n-dx/llm-client";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import { section, rexPromptEnvelope, rexPrompt } from "./prompt-envelope.js";
 
 // ── Types ──
 
@@ -66,6 +68,55 @@ export interface ModifyProposalResult extends ReasonResult {
  *
  * Exported for testability.
  */
+export function buildModifyEnvelope(
+  proposals: Proposal[],
+  modificationRequest: string,
+  options?: {
+    existingSummary?: string;
+    projectContext?: string;
+  },
+): PromptEnvelope {
+  return rexPromptEnvelope([
+    section(
+      "role",
+      "You are a product requirements analyst. You have an existing set of PRD proposals and a user's modification request. Revise the proposals to incorporate the requested changes.",
+    ),
+    section("input", `## Current Proposals\n${JSON.stringify(proposals)}`),
+    section("input-rules", `## Modification Request\n${modificationRequest}`),
+    section("schema", `## Output Format\n${PRD_SCHEMA}`),
+    section("example", FEW_SHOT_EXAMPLE),
+    section(
+      "structure",
+      [
+        "## Rules",
+        "- Apply the user's modification request to the proposals above.",
+        "- Preserve the overall epic/feature/task hierarchy unless the request explicitly asks to restructure.",
+        "- Keep all metadata (descriptions, acceptance criteria, priorities, tags) that the modification does not affect.",
+        "- If the request asks to remove items, omit them from the output.",
+        "- If the request asks to add items, include them in the appropriate position in the hierarchy.",
+        "- If the request asks to change specific items, modify only those items and leave the rest unchanged.",
+        "- If the request is ambiguous, interpret it in the way that makes the most practical sense for a software project.",
+        "- Do NOT invent changes beyond what the request asks for.",
+      ].join("\n"),
+    ),
+    section("quality", TASK_QUALITY_RULES),
+    section("anti-patterns", ANTI_PATTERNS),
+    section(
+      "existing-prd",
+      options?.existingSummary
+        ? `Existing PRD (for deduplication — do NOT include these items):\n${options.existingSummary}`
+        : "",
+    ),
+    section(
+      "project-context",
+      options?.projectContext
+        ? `Project context (from documentation):\n${options.projectContext}`
+        : "",
+    ),
+    section("output", OUTPUT_INSTRUCTION),
+  ]);
+}
+
 export function buildModifyPrompt(
   proposals: Proposal[],
   modificationRequest: string,
@@ -74,44 +125,7 @@ export function buildModifyPrompt(
     projectContext?: string;
   },
 ): string {
-  const proposalJson = JSON.stringify(proposals);
-
-  const existingBlock = options?.existingSummary
-    ? `\nExisting PRD (for deduplication — do NOT include these items):\n${options.existingSummary}\n`
-    : "";
-
-  const contextBlock = options?.projectContext
-    ? `\nProject context (from documentation):\n${options.projectContext}\n`
-    : "";
-
-  return `You are a product requirements analyst. You have an existing set of PRD proposals and a user's modification request. Revise the proposals to incorporate the requested changes.
-
-## Current Proposals
-${proposalJson}
-
-## Modification Request
-${modificationRequest}
-
-## Output Format
-${PRD_SCHEMA}
-
-${FEW_SHOT_EXAMPLE}
-
-## Rules
-- Apply the user's modification request to the proposals above.
-- Preserve the overall epic/feature/task hierarchy unless the request explicitly asks to restructure.
-- Keep all metadata (descriptions, acceptance criteria, priorities, tags) that the modification does not affect.
-- If the request asks to remove items, omit them from the output.
-- If the request asks to add items, include them in the appropriate position in the hierarchy.
-- If the request asks to change specific items, modify only those items and leave the rest unchanged.
-- If the request is ambiguous, interpret it in the way that makes the most practical sense for a software project.
-- Do NOT invent changes beyond what the request asks for.
-
-${TASK_QUALITY_RULES}
-
-${ANTI_PATTERNS}
-${existingBlock}${contextBlock}
-${OUTPUT_INSTRUCTION}`;
+  return rexPrompt(buildModifyEnvelope(proposals, modificationRequest, options));
 }
 
 // ── Summarization ──

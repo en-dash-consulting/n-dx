@@ -39,3 +39,10 @@ This rule does NOT apply to:
 - Interactive user-initiated CLI commands where the user is present
 - Design-phase tasks explicitly marked as planning-only
 - Codex or other assistants working in non-autonomous modes
+
+## Done when
+
+There is no run to finish: this skill is a standing rule, not a procedure. It is
+satisfied by the agent not entering plan mode in the contexts listed above. It
+produces no output, writes no file, and requires no record — if you invoked it
+expecting an action, none is needed.

@@ -22,6 +22,7 @@
 import { join } from "node:path";
 import { stat, readFile, copyFile, rename } from "node:fs/promises";
 import { withLock } from "./file-lock.js";
+import { treeMetaContents } from "./tree-meta.js";
 import { validateDocument, PRDDocumentSchema } from "../schema/validate.js";
 import { serializeFolderTree } from "./index.js";
 import { atomicWriteJSON } from "./atomic-write.js";
@@ -244,7 +245,7 @@ export async function ensureLegacyPrdMigrated(dir: string): Promise<LegacyPrdMig
     // Persist the document title alongside the tree. Without this,
     // `FileStore.loadDocument()` defaults the title to "PRD" after migration.
     try {
-      await atomicWriteJSON(join(rexDir, "tree-meta.json"), { title: doc.title });
+      await atomicWriteJSON(join(rexDir, "tree-meta.json"), treeMetaContents(doc));
     } catch (err) {
       throw new LegacyPrdMigrationError(
         `Failed to write tree-meta.json: ${String(err)}`,

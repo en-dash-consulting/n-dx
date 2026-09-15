@@ -28,6 +28,8 @@ import { sortClassifications } from "../util/sort.js";
 import { callClaude, ClaudeClientError } from "./claude-client.js";
 import { emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./token-usage.js";
 import { startSpinner } from "../cli/output.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import { section, svPromptEnvelope, svPrompt } from "./prompt-envelope.js";
 
 /** Minimum accumulated score for a primary classification. */
 const PRIMARY_THRESHOLD = 0.4;
@@ -488,11 +490,11 @@ async function classifyBatchWithLLM(
 /**
  * Build the LLM prompt for file classification.
  */
-function buildLLMClassifyPrompt(
+export function buildLLMClassifyEnvelope(
   files: FileClassification[],
   archetypes: { id: string; name: string; description: string }[],
   includeDescriptions: boolean,
-): string {
+): PromptEnvelope {
   const archetypeLines = archetypes.map((a) =>
     includeDescriptions
       ? `- ${a.id}: ${a.name} — ${a.description}`
@@ -512,16 +514,33 @@ function buildLLMClassifyPrompt(
     return parts.join("");
   }).join("\n");
 
-  return `Classify these source files. Assign each the best-fit archetype by path and likely purpose. Omit files with no clear fit.
+  return svPromptEnvelope([
+    section(
+      "role",
+      "Classify these source files. Assign each the best-fit archetype by path and likely purpose. Omit files with no clear fit.",
+    ),
+    // The catalog is the reason this prompt has a compact mode at all: with
+    // descriptions on it dominates the token cost, which is now a number the
+    // report states rather than an assumption behind `includeDescriptions`.
+    section("catalog", `Archetypes:\n${archetypeLines}`),
+    section("input", `Files:\n${fileLines}`),
+    section(
+      "output",
+      [
+        "Respond with ONLY a JSON array (no markdown, no explanation):",
+        '[{"path":"<file path>","archetype":"<archetype id>","reason":"<brief reason>"}]',
+      ].join("\n"),
+    ),
+  ]);
+}
 
-Archetypes:
-${archetypeLines}
-
-Files:
-${fileLines}
-
-Respond with ONLY a JSON array (no markdown, no explanation):
-[{"path":"<file path>","archetype":"<archetype id>","reason":"<brief reason>"}]`;
+/** Assembled form of {@link buildLLMClassifyEnvelope}. */
+export function buildLLMClassifyPrompt(
+  files: FileClassification[],
+  archetypes: { id: string; name: string; description: string }[],
+  includeDescriptions: boolean,
+): string {
+  return svPrompt(buildLLMClassifyEnvelope(files, archetypes, includeDescriptions));
 }
 
 /**

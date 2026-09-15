@@ -79,3 +79,11 @@ Notes for Windows:
 - After switching to local, remember to `pnpm --filter "@n-dx/core..." build` after code changes for them to take effect via the global link
 - The link registers these binaries: `ndx`, `n-dx`, `rex`, `hench`, `sourcevision`, `sv`
 - **Never invoke via `npx` while testing a local build.** `npx ndx` ignores the global pnpm link — there is no `node_modules/.bin/ndx` in this repo, so npx resolves a registry copy and caches it. That copy silently goes stale: with 0.5.1 linked, `npx ndx --version` still reported `0.4.6`, and behavior differed enough to produce a wrong bug report (a "token usage is not captured" message that no longer exists in current source). Call the bare `ndx` / `rex` / `hench` binaries so the link is what runs. If a version or a message looks wrong, check `ndx --version` against `packages/core/package.json` before believing it.
+
+## Done when
+
+The requested link state is in effect and verified — `ndx` resolves to the
+intended build, reported back to the user. Stop there. Do not build, test, or
+run n-dx commands beyond the one check that confirms resolution: this skill
+switches which binary is on `PATH`, and what the user does with it afterwards is
+a separate run.

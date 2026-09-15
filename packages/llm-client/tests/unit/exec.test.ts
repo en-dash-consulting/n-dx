@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, buildShellInvocation, getCurrentHead, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, buildShellInvocation, getCurrentHead, getWorktreeRoot, getGitCommonDir, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
 import { resolve } from "node:path";
 import { fakeSpawn } from "../helpers/fake-spawn.js";
 
@@ -402,7 +402,9 @@ describe("getCurrentHead", () => {
     expect(mockExecFileSync).toHaveBeenCalledWith(
       "git",
       ["rev-parse", "HEAD"],
-      { cwd: "/project", encoding: "utf-8" },
+      // stderr is captured, not inherited: probing a directory that may not be
+      // a repository must not print `fatal: not a git repository` to the user.
+      { cwd: "/project", encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
     );
   });
 
@@ -412,6 +414,87 @@ describe("getCurrentHead", () => {
     });
 
     expect(getCurrentHead("/tmp")).toBeUndefined();
+  });
+});
+
+/**
+ * Argv and null-path behaviour only. What these helpers do against real
+ * repositories, linked worktrees and non-repo directories — the part a mocked
+ * git cannot tell us — is covered in
+ * tests/integration/git-worktree-helpers.test.ts.
+ *
+ * The cwd values here are deliberately paths that do not exist, so the
+ * realpath step falls through to the unresolved absolute path and the
+ * assertions stay independent of the host filesystem.
+ */
+describe("getWorktreeRoot", () => {
+  it("asks git for the worktree toplevel", () => {
+    mockExecFileSync.mockReturnValue("/does/not/exist/project\n");
+
+    expect(getWorktreeRoot("/does/not/exist/project/src")).toBe(
+      "/does/not/exist/project",
+    );
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      "git",
+      ["rev-parse", "--show-toplevel"],
+      {
+        cwd: "/does/not/exist/project/src",
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+  });
+
+  it("returns null when git fails", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not a git repository");
+    });
+
+    expect(getWorktreeRoot("/tmp")).toBeNull();
+  });
+
+  it("returns null on empty output", () => {
+    mockExecFileSync.mockReturnValue("\n");
+
+    expect(getWorktreeRoot("/tmp")).toBeNull();
+  });
+});
+
+describe("getGitCommonDir", () => {
+  it("asks git for the common git dir", () => {
+    mockExecFileSync.mockReturnValue("/does/not/exist/project/.git\n");
+
+    expect(getGitCommonDir("/does/not/exist/project")).toBe(
+      "/does/not/exist/project/.git",
+    );
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      "git",
+      ["rev-parse", "--git-common-dir"],
+      {
+        cwd: "/does/not/exist/project",
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+  });
+
+  // `--git-common-dir` reports a bare `.git` in a main checkout. Returning
+  // that verbatim would give callers a path that only means anything while
+  // the process happens to be in that directory.
+  it("resolves a cwd-relative answer against cwd", () => {
+    mockExecFileSync.mockReturnValue(".git\n");
+
+    expect(getGitCommonDir("/does/not/exist/project")).toBe(
+      resolve("/does/not/exist/project", ".git"),
+    );
+  });
+
+  it("returns null when git fails", () => {
+    mockExecFileSync.mockImplementation(() => {
+      throw new Error("not a git repository");
+    });
+
+    expect(getGitCommonDir("/tmp")).toBeNull();
   });
 });
 

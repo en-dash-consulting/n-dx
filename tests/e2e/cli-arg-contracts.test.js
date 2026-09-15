@@ -101,6 +101,8 @@ const REX_COMMANDS = [
   "recommend",
   "analyze",
   "import",
+  "export",
+  "import-bundle",
   "reorganize",
   "health",
   "sync",

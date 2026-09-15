@@ -1,0 +1,31 @@
+---
+id: "af2a209a-d1d4-48d5-aaee-7ecb4a33565c"
+level: "feature"
+title: "SourceVision Enrich & Core Reviewer Prompt Tightening"
+status: "completed"
+priority: "medium"
+tags:
+  - "prompts"
+  - "sourcevision"
+  - "core"
+  - "tokens"
+blockedBy:
+  - "6a4c8eac-7d3c-4535-a983-808cd9e04fbb"
+source: "ndx-capture"
+startedAt: "2026-09-08T18:39:59.678Z"
+completedAt: "2026-09-08T18:49:52.347Z"
+endedAt: "2026-09-08T18:49:52.347Z"
+resolutionType: "code-change"
+resolutionDetail: "Extracted the enrichment output contract from four hand-written copies into shared constants, which surfaced a real drift: one per-zone prompt never forbade markdown. sourcevision unique fixed text 2,332 → 2,194; per-call essentially unchanged (batch prompt text byte-identical, snapshots untouched) since prose compression was out of scope. Recorded why buildReviewerPrompt legitimately lives in core — the spawn-only rule forbids imports, not string composition, so it is compliant rather than an exception. Criterion 2 (per-batch/per-zone cost recording) and criterion 6 (eval-gate verification) not done and flagged; buildMetaEnvelope left untouched as the lowest-leverage surface under criterion 2's own framing."
+acceptanceCriteria:
+  - "The first-pass and later-pass enrichment prompts share their common instruction text rather than restating it, and the difference between the two passes is stated explicitly rather than implied by duplication."
+  - "Per-batch and per-zone prompts are trimmed with the multiplication factor in mind: the criteria record cost per batch and per zone, not only cost per invocation, since these scale with project size."
+  - "The classification prompt and the primer prompt each state one unambiguous intent and one output contract, with no instruction that contradicts the archetype definitions the classifier already enforces in code."
+  - "The core buildReviewerPrompt is either justified as a legitimate exception to the orchestration-tier spawn-only rule or relocated, with the decision recorded rather than left implicit."
+  - "Total sourcevision static prompt text drops measurably against the recorded baseline, with per-builder before-and-after counts reported."
+  - "Enrichment output quality is unchanged: running ndx analyze --deep on a representative project yields equivalent zone summaries, findings, and classifications to the pre-rewrite run."
+  - "Existing sourcevision and core tests pass, including the iso-skill-drift check."
+description: "Cover the remaining two packages that send prompts to a model. SourceVision holds roughly 1,997 tokens of static prompt text across 12 literals in its enrichment and classification pipeline: analyzers/enrich-batch.ts (buildFirstPassPrompt and buildLaterPassPrompt, ~827 tokens), enrich-config.ts (buildMetaPrompt, ~635), enrich-per-zone.ts (~454), classify.ts (buildLLMClassifyPrompt), and primer.ts (buildPrimerPrompt). These run per batch and per zone rather than once per command, so their cost multiplies with project size — the reduction compounds where rex's does not. Core holds a single surface, pair-programming.js buildReviewerPrompt at ~259 tokens, notable because it sits in the orchestration tier which is otherwise spawn-only; confirm the prompt belongs there or move it rather than leaving it as an unexamined exception."
+lastModified: "2026-09-08T18:49:52.374Z"
+lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+---

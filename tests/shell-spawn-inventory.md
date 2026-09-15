@@ -49,9 +49,8 @@ PowerShell (no `sh`) and from Git Bash (`sh` at `/usr/bin/sh`), same commit.
 | `packages/hench/tests/unit/tools/shell.test.ts` | under test | 14 of 34 | 13 false failures + **1 false pass** | `describeNeedsPosixShell` ×4, `itNeedsPosixShell` ×2 |
 | `packages/hench/tests/unit/tools/test-runner.test.ts` | under test | 4 of 58 | 2 false failures + **2 false passes** | `itNeedsPosixShell` ×4 |
 | `packages/hench/tests/unit/tools/git.test.ts` | under test | 7 of 25 | 7 false failures (`expected 'Exit code: 1' to contain 'branch'` etc.) | `itNeedsPosixShell` ×7 |
-| `packages/hench/tests/integration/gate-changed-files.test.ts` | under test | 2 of 3 | 2 false failures — both assert the gate `ran`, which a failed `sh` launch makes false | `itNeedsPosixShell` ×2 |
 
-Totals: 35 guarded cases across 6 files — 28 were failing, 5 were passing
+Totals: 33 guarded cases across 5 files — 26 were failing, 5 were passing
 vacuously, and 2 are the POSIX-only interrupt cases that skip on Windows for a
 separate, already-stated reason. (The `git.test.ts` row was measured 2026-08-25;
 it was missed by the original hand audit, which is why the completeness scan
@@ -73,12 +72,14 @@ exercised.
 | `packages/hench/tests/unit/tools/go-test-runner.test.ts` | Passes from PowerShell — verified, no shell-dependent assertion |
 | `runTestGate` cases in `test-runner.test.ts` | Assert shape only (`typeof passed === "boolean"`, `duration >= 0`), so they neither fail nor pass *because of* the shell. Weak, but not shell-dependent |
 | `packages/hench/tests/integration/test-gate.test.ts` | Same shape-only rationale as the `runTestGate` cases above — asserts result structure, never shell output |
-| `still skips when the run genuinely changed nothing` in `gate-changed-files.test.ts` | An empty changed set makes `runTestGate` return before spawning, so the case never reaches `sh` |
+| `packages/hench/tests/integration/test-gate-timeout-config.test.ts` | The one spawning case runs `node -e "setTimeout(...)"` — node is on PATH by definition of running the suite, and the command is shell-syntax-free, so it launches identically through `sh` and cmd.exe. The case asserts the timeout kill, not shell output |
+| `packages/hench/tests/integration/gate-changed-files.test.ts` | Guards removed 2026-09-09: `execShellCmd` now resolves a shell the platform actually has (`sh` where present, else cmd.exe), and `exit 0` is a builtin in both — so the gate cases run everywhere. The empty-changed-set case never spawned at all |
 | 4 cases in `packages/hench/tests/unit/tools/git.test.ts` (`runs git branch`, `properly handles quoted args…`, `handles args with special characters…`, `records git operations in policy audit log`) | Assert shape (`typeof result === "string"`) or guard bookkeeping that happens before the spawn — verified passing from PowerShell without `sh` |
 | Files writing `#!/bin/sh` shims (`cli-auth`, `cli-config`, `cli-stale-check`, `codex-integration`, `assistant-parity-smoke`, `llm-client/tests/helpers/fake-cli.ts`) | Write a script; execution is either POSIX-only (where `/bin/sh` exists by definition) or routed through cmd.exe on Windows |
 | Unit tests asserting the resolved shell (`llm-client/tests/unit/exec.test.ts`, `hench/tests/unit/process/exec.test.ts`, `hench/tests/unit/agent/completion.test.ts`) | Inspect a fake spawn's arguments; no process is created. All three now pass `_platform`/`_posixShellAvailable` explicitly, or accept either shell — the earlier unconditional `cmd === "sh"` assertions passed from Git Bash and failed from PowerShell once `execShellCmd` became platform-aware |
 | `packages/llm-client/tests/integration/exec-shell-windows.test.ts` | Runs real commands, but only through `cmd.exe`, and the whole suite is `describe.skip` off win32. It is the inverse of every other row here: it needs the *absence* of a POSIX shell, which it arranges by forcing the cmd.exe branch and scrubbing Git/MSYS/Cygwin directories from the child's PATH. Nothing to guard — a host with `sh` still runs it |
 | `tests/e2e/architecture-policy.test.js` | Spawns nothing. The flagged `"sh", ["-c"` text is the POSIX_SHELL_SPAWN_RE detector and its exemption prose — the guard that keeps production code from spawning a shell by name |
+| `packages/hench/tests/unit/schema/validate.test.ts` | Spawns nothing. Imports exactly one binding from `tools/test-runner.js` — the numeric constant `DEFAULT_TEST_GATE_TIMEOUT_MS` — to hold the zod default to the gate's own budget rather than to a third copy of the literal. `runTestGate` is never called; the detector flags the module edge, not a spawn |
 
 ## Helpers
 

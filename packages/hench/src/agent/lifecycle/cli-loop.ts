@@ -1411,6 +1411,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     testCommand: ctx.testCommand,
     startingHead: ctx.startingHead,
     selfHeal: ctx.selfHeal,
+    baselineUntracked: ctx.baselineUntracked,
   });
 
   syncRunFromAccumulated(run, accumulated, attempt);
@@ -1554,6 +1555,10 @@ async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
 
 export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const { config, store, projectDir, henchDir, dryRun } = opts;
+
+  // Merge CLI flag with config file, giving precedence to CLI flags
+  const autonomous = opts.autonomous === true || config.autonomous === true;
+
   const model = opts.model ?? config.model;
   const llmConfig = await loadLLMConfig(henchDir);
   const vendor = resolveLLMVendor(llmConfig);
@@ -1647,7 +1652,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // posture chosen for the work spawn — a reviewer that can only
         // describe a fix is the interactive workflow, not this one.
         permissionMode: "acceptEdits",
-        autonomous: opts.autonomous === true || opts.yes === true || process.stdin.isTTY !== true,
+        autonomous: autonomous || opts.yes === true || process.stdin.isTTY !== true,
         taskTitle: brief.task.title,
       }
     : undefined;
@@ -1682,7 +1687,12 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // (timeout, crash), the timer fires and auto-commits the staged changes.
   // The watcher is cancelled before finalizeRun so the two paths cannot race.
   const commitMsgTimeoutMs = config.commitMsgTimeoutMs ?? 300_000;
-  const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher({ projectDir, timeoutMs: commitMsgTimeoutMs });
+  const commitWatcher: CommitMsgWatcher = startCommitMsgWatcher({
+    projectDir,
+    timeoutMs: commitMsgTimeoutMs,
+    // RunRecord carries worktreeRoot/branch/startHead under those exact names.
+    origin: run,
+  });
 
   // Prompt section diagnostics — captured on first attempt, stored on run record.
   let promptSectionDiagnostics: PromptSectionDiagnostic[] | undefined;
@@ -2011,7 +2021,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           selfHeal: config.selfHeal,
           rollbackOnFailure: opts.rollbackOnFailure,
           yes: opts.yes,
-          autonomous: opts.autonomous,
+          autonomous,
           baselineUntracked,
           attemptAccumulator,
           runAccumulator,
@@ -2085,7 +2095,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     selfHeal: config.selfHeal,
     rollbackOnFailure: opts.rollbackOnFailure,
     yes: opts.yes,
-    autonomous: opts.autonomous,
+    autonomous,
     store,
     autoCommit: config.autoCommit === true,
     skipFullTestGate: config.skipFullTestGate,

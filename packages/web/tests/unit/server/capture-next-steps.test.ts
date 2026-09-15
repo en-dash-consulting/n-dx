@@ -88,12 +88,21 @@ describe("POST /api/rex/capture-next-steps", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  function capture(steps: unknown) {
-    return fetch(`http://127.0.0.1:${port}/api/rex/capture-next-steps`, {
+  /**
+   * POST steps and return the status alongside the raw body. The body is the
+   * only diagnostic a failing run leaves behind (the route folds any thrown
+   * error into a 400 body), so status assertions pass it as their message —
+   * this flake has been sighted under the full suite with nothing but a bare
+   * "expected 400 to be 200" to show for it.
+   */
+  async function capture(steps: unknown): Promise<{ status: number; text: string; json: () => Record<string, unknown> }> {
+    const res = await fetch(`http://127.0.0.1:${port}/api/rex/capture-next-steps`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ steps }),
     });
+    const text = await res.text();
+    return { status: res.status, text, json: () => JSON.parse(text) as Record<string, unknown> };
   }
 
   async function loadPRD() {
@@ -119,8 +128,8 @@ describe("POST /api/rex/capture-next-steps", () => {
       { title: "Fix circular dependency in hench", description: "Break the cycle", priority: "high", category: "fix" },
       { title: "Extract shared view helpers", description: "Reduce duplication", priority: "medium", category: "extract" },
     ]);
-    expect(res.status).toBe(200);
-    const data = await res.json();
+    expect(res.status, res.text).toBe(200);
+    const data = res.json();
     expect(data.ok).toBe(true);
     expect(data.created).toBe(2);
     expect(data.skipped).toBe(0);
@@ -145,8 +154,8 @@ describe("POST /api/rex/capture-next-steps", () => {
       { title: "Reduce coupling in web-shared", priority: "medium" }, // exists in fixture
       { title: "A genuinely new step", priority: "low" },
     ]);
-    expect(res.status).toBe(200);
-    const data = await res.json();
+    expect(res.status, res.text).toBe(200);
+    const data = res.json();
     expect(data.created).toBe(1);
     expect(data.skipped).toBe(1);
 
@@ -160,8 +169,8 @@ describe("POST /api/rex/capture-next-steps", () => {
     const res = await capture([
       { title: "  reduce COUPLING in   web-shared " },
     ]);
-    expect(res.status).toBe(200);
-    const data = await res.json();
+    expect(res.status, res.text).toBe(200);
+    const data = res.json();
     expect(data.created).toBe(0);
     expect(data.skipped).toBe(1);
   });
@@ -171,14 +180,17 @@ describe("POST /api/rex/capture-next-steps", () => {
       { title: "Same step twice" },
       { title: "same step twice" },
     ]);
-    const data = await res.json();
+    expect(res.status, res.text).toBe(200);
+    const data = res.json();
     expect(data.created).toBe(1);
     expect(data.skipped).toBe(1);
   });
 
   it("reuses the existing capture epic on subsequent calls", async () => {
-    await capture([{ title: "Step one" }]);
-    await capture([{ title: "Step two" }]);
+    const first = await capture([{ title: "Step one" }]);
+    expect(first.status, first.text).toBe(200);
+    const second = await capture([{ title: "Step two" }]);
+    expect(second.status, second.text).toBe(200);
 
     const prd = await loadPRD();
     const epics = prd.items.filter((i: { title: string }) => i.title === "SourceVision Next Steps");
@@ -188,7 +200,7 @@ describe("POST /api/rex/capture-next-steps", () => {
 
   it("ignores invalid priorities instead of failing", async () => {
     const res = await capture([{ title: "Odd priority step", priority: "urgent" }]);
-    expect(res.status).toBe(200);
+    expect(res.status, res.text).toBe(200);
     const prd = await loadPRD();
     const epic = prd.items.find((i: { title: string }) => i.title === "SourceVision Next Steps");
     expect(epic.children[0].priority).toBeUndefined();

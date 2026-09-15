@@ -6,6 +6,66 @@ export interface DAGResult {
   errors: string[];
 }
 
+/**
+ * Find `blockedBy` cycles, as the id paths that close them.
+ *
+ * Split out of {@link validateDAG} because a cycle is the one dependency fault
+ * that is unconditionally wrong wherever the items came from, while the others
+ * are contextual. `rex import-bundle` needs exactly this check and must *not*
+ * apply the orphan-reference one: a bundle's edge may point at an id that
+ * lives in the destination tree rather than in the bundle, which a merge
+ * resolves and a scoped export deliberately prunes.
+ *
+ * A self-reference (`x` blocked by `x`) is reported here as the one-element
+ * cycle `x → x`. {@link validateDAG} still reports it separately as well, for
+ * the clearer message.
+ *
+ * Traversal matches the original: the walk from a given start id stops at the
+ * first cycle it closes, so a tangle reports one path rather than every
+ * rotation of it.
+ *
+ * @returns one id path per cycle found, each ending where it began.
+ */
+export function findDependencyCycles(items: PRDItem[]): string[][] {
+  const allIds = collectAllIds(items);
+
+  const adjacency = new Map<string, string[]>();
+  for (const { item } of walkTree(items)) {
+    if (item.blockedBy && item.blockedBy.length > 0) {
+      adjacency.set(item.id, item.blockedBy.filter((d) => allIds.has(d)));
+    }
+  }
+
+  const cycles: string[][] = [];
+  const visited = new Set<string>();
+  const inStack = new Set<string>();
+
+  function dfs(node: string, path: string[]): boolean {
+    if (inStack.has(node)) {
+      const cycleStart = path.indexOf(node);
+      cycles.push(path.slice(cycleStart).concat(node));
+      return true;
+    }
+    if (visited.has(node)) return false;
+
+    visited.add(node);
+    inStack.add(node);
+
+    for (const dep of adjacency.get(node) ?? []) {
+      if (dfs(dep, [...path, node])) return true;
+    }
+
+    inStack.delete(node);
+    return false;
+  }
+
+  for (const id of allIds) {
+    if (!visited.has(id)) dfs(id, []);
+  }
+
+  return cycles;
+}
+
 export function validateDAG(items: PRDItem[]): DAGResult {
   const errors: string[] = [];
 
@@ -40,41 +100,8 @@ export function validateDAG(items: PRDItem[]): DAGResult {
   }
 
   // DFS cycle detection on the blockedBy graph
-  const adjacency = new Map<string, string[]>();
-  for (const { item } of walkTree(items)) {
-    if (item.blockedBy && item.blockedBy.length > 0) {
-      adjacency.set(item.id, item.blockedBy.filter((d) => allIds.has(d)));
-    }
-  }
-
-  const visited = new Set<string>();
-  const inStack = new Set<string>();
-
-  function dfs(node: string, path: string[]): boolean {
-    if (inStack.has(node)) {
-      const cycleStart = path.indexOf(node);
-      const cycle = path.slice(cycleStart).concat(node);
-      errors.push(`Cycle detected: ${cycle.join(" → ")}`);
-      return true;
-    }
-    if (visited.has(node)) return false;
-
-    visited.add(node);
-    inStack.add(node);
-
-    const deps = adjacency.get(node) ?? [];
-    for (const dep of deps) {
-      if (dfs(dep, [...path, node])) return true;
-    }
-
-    inStack.delete(node);
-    return false;
-  }
-
-  for (const id of allIds) {
-    if (!visited.has(id)) {
-      dfs(id, []);
-    }
+  for (const cycle of findDependencyCycles(items)) {
+    errors.push(`Cycle detected: ${cycle.join(" → ")}`);
   }
 
   return {

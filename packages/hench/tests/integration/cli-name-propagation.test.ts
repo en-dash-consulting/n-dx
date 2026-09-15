@@ -39,7 +39,11 @@ describe("cli.name propagation into prompt context", () => {
     const briefText = formatTaskBrief(brief);
     expect(system).toContain("myapp");
     expect(system).not.toContain("CLI command: `n-dx`");
-    expect(briefText).toContain("CLI: `myapp`");
+
+    // The CLI name reaches the model through the system prompt only. The brief
+    // used to repeat it — along with the project name and both commands — and
+    // the pair went out in the same call, so the duplicate was pure cost.
+    expect(briefText).not.toContain("CLI:");
   });
 
   it("defaults to n-dx when the project has no cli.name", async () => {

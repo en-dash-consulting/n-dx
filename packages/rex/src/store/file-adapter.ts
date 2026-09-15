@@ -16,6 +16,7 @@ import { resolveActor } from "../core/identity.js";
 import { loadProjectOverrides, mergeWithOverrides } from "./project-config.js";
 import { atomicWrite } from "./atomic-write.js";
 import { withLock } from "./file-lock.js";
+import { parseTreeMeta, treeMetaContents } from "./tree-meta.js";
 import { discoverPRDFiles } from "./prd-discovery.js";
 import {
   PRD_MARKDOWN_FILENAME,
@@ -40,6 +41,11 @@ export class FileStore implements PRDStore {
    * than this. Zero means "never loaded" — such a save may delete nothing.
    */
   private loadedAt = 0;
+  /**
+   * Load-time identity (resolved path → content digest) of the item files the
+   * last load or save left on disk — see FolderTreeStore.loadedFiles.
+   */
+  private loadedFiles: ReadonlyMap<string, string> = new Map();
   private itemToFile: Map<string, string> = new Map();
   private fileMetadata: Map<string, { schema: string; title: string }> = new Map();
   private ownershipLoaded = false;
@@ -268,11 +274,15 @@ export class FileStore implements PRDStore {
       await mkdir(this.treeRoot, { recursive: true });
       await atomicWrite(
         this.path("tree-meta.json"),
-        JSON.stringify({ title: doc.title }),
+        JSON.stringify(treeMetaContents(doc)),
       );
-      await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+      const written = await serializeFolderTree(doc.items, this.treeRoot, {
+        loadedAt: this.loadedAt,
+        loadedFiles: this.loadedFiles,
+      });
       // A completed save makes this instance's view current again — see writeFolderTree.
       this.loadedAt = Date.now();
+      this.loadedFiles = written.fileDigests;
       this.rebuildOwnershipFromItems(doc);
       return result;
     });
@@ -402,7 +412,8 @@ export class FileStore implements PRDStore {
    * (`prd.md`, then `prd.json`/branch JSON files) so pre-migration projects and
    * tests can still be inspected. Mutations still persist only to `.rex/prd_tree/`.
    *
-   * Document title is read from `tree-meta.json` if present; defaults to "PRD".
+   * Document title and schema version are read from `tree-meta.json` if
+   * present; the title defaults to "PRD" and the schema to the running version.
    */
   async loadDocument(): Promise<PRDDocument> {
     // Taken before the read starts, so an entry written during or after the
@@ -417,15 +428,19 @@ export class FileStore implements PRDStore {
       this.warnPrdMdIgnored();
     }
 
-    // Read document title from tree-meta.json. Its presence also signals the
-    // folder tree has been initialised — if it's there we trust the tree as
-    // canonical and do not silently fall back to a legacy prd.md/prd.json.
+    // Read document title and schema from tree-meta.json. Its presence also
+    // signals the folder tree has been initialised — if it's there we trust the
+    // tree as canonical and do not silently fall back to a legacy prd.md/prd.json.
     let title = "PRD";
+    // The version the tree was *written* at, not the one reading it. Absent on
+    // any tree older than the marker, which then reads as the running version.
+    let schema = SCHEMA_VERSION;
     let treeMetaPresent = false;
     try {
       const raw = await readFile(this.path("tree-meta.json"), "utf-8");
-      const meta = JSON.parse(raw) as Record<string, unknown>;
-      if (typeof meta["title"] === "string") title = meta["title"];
+      const meta = parseTreeMeta(raw);
+      if (meta.title !== undefined) title = meta.title;
+      if (meta.schema !== undefined) schema = meta.schema;
       treeMetaPresent = true;
     } catch (err) {
       if (!this.isMissingFileError(err)) {
@@ -435,12 +450,13 @@ export class FileStore implements PRDStore {
 
     // Parse items from the folder tree
     try {
-      const { items } = await parseFolderTree(this.treeRoot);
+      const { items, fileDigests } = await parseFolderTree(this.treeRoot);
+      this.loadedFiles = fileDigests;
       if (items.length === 0 && !treeMetaPresent && (await this.hasLegacySource())) {
         return this.loadLegacyDocument();
       }
-      this.rebuildOwnershipFromItems({ schema: SCHEMA_VERSION, title, items });
-      return { schema: SCHEMA_VERSION, title, items };
+      this.rebuildOwnershipFromItems({ schema, title, items });
+      return { schema, title, items };
     } catch (error) {
       // Check if the tree directory is missing
       if (this.isMissingFileError(error)) {
@@ -483,12 +499,17 @@ export class FileStore implements PRDStore {
     await mkdir(this.treeRoot, { recursive: true });
     await atomicWrite(
       this.path("tree-meta.json"),
-      JSON.stringify({ title: doc.title }),
+      JSON.stringify(treeMetaContents(doc)),
     );
-    await serializeFolderTree(doc.items, this.treeRoot, { loadedAt: this.loadedAt });
+    const written = await serializeFolderTree(doc.items, this.treeRoot, {
+      loadedAt: this.loadedAt,
+      loadedFiles: this.loadedFiles,
+    });
     // A completed save makes this instance's view of the tree current again:
-    // its own writes must not read as "another writer's work" on the next save.
+    // its own writes must not read as "another writer's work" on the next save,
+    // and the files it just wrote are the ones it can vouch for relocating.
     this.loadedAt = Date.now();
+    this.loadedFiles = written.fileDigests;
     this.rebuildOwnershipFromItems(doc);
   }
 

@@ -298,7 +298,8 @@ describe("baseline prompt output for regression comparison", () => {
       "## Context (Parent Chain)",
       "## Requirements",
       "## Sibling Tasks",
-      "## Project",
+      // No "## Project" — the system prompt carries it, and the two halves
+      // reach the model in the same call.
       "## Workflow",
       "## Recent Activity",
     ];

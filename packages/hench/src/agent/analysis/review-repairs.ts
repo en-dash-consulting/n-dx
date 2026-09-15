@@ -22,6 +22,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execStdout } from "../../process/exec.js";
+import { checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
 
 const GIT_TIMEOUT = 30_000;
 
@@ -97,6 +98,12 @@ export interface CommitReviewRepairsOptions {
   taskId: string;
   /** Co-authorship trailer line, supplied by the caller to avoid a lifecycle import. */
   trailer: string;
+  /**
+   * Checkout the run started in. When the working tree has since moved to
+   * another branch or worktree this commit is refused. Omitted means there is
+   * nothing to enforce (non-git project, or a run record predating the field).
+   */
+  origin?: RunGitOrigin;
   timeout?: number;
 }
 
@@ -112,8 +119,16 @@ export async function commitReviewRepairs(
   projectDir: string,
   opts: CommitReviewRepairsOptions,
 ): Promise<string | undefined> {
-  const { paths, runId, taskId, trailer, timeout = GIT_TIMEOUT } = opts;
+  const { paths, runId, taskId, trailer, origin, timeout = GIT_TIMEOUT } = opts;
   if (paths.length === 0) return undefined;
+
+  // Checked before anything is staged so a refusal leaves the tree untouched.
+  // Thrown rather than returned: the caller already reports a failed repair
+  // commit and tells the operator the files are still in the working tree.
+  const drift = checkRunGitOrigin(projectDir, origin);
+  if (drift) {
+    throw new Error(`refusing to commit review repairs — ${drift}`);
+  }
 
   const head = (
     await execStdout("git", ["rev-parse", "HEAD"], { cwd: projectDir, timeout })

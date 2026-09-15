@@ -960,6 +960,15 @@ const LLM_VALIDATORS = {
       throw new Error(`Invalid local.maxContextTokens "${v}". Expected a positive integer (e.g. 32768).`);
     }
   },
+  "local.timeoutMs": (v) => {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0) {
+      throw new Error(
+        `Invalid local.timeoutMs "${v}". Expected a non-negative integer in milliseconds ` +
+        `(e.g. 7200000 for 2 hours), or 0 for no timeout.`,
+      );
+    }
+  },
   "local.verifier.host": (v) => {
     if (typeof v !== "string" || !v.trim()) {
       throw new Error(`Invalid local.verifier.host "${v}". Expected a non-empty hostname.`);
@@ -1619,6 +1628,18 @@ Hench settings (.hench/config.json):
                                      multiplying. Hitting it fails the task with the breakdown
                                      instead of continuing to spend.
 
+Hench test-gate settings (mandatory full-suite gate before commit):
+  hench.fullTestCommand    string    Command that runs the whole suite. Resolved from this key,
+                                     then .n-dx.json hench.fullTestCommand, then auto-detected
+                                     from the project (Makefile validate target, package.json
+                                     test:all/test, swift/cargo/go/pytest), then prompted for.
+  hench.fullTestTimeoutMs  number    How long that command may run before it is killed and the
+                                     run fails (default: 900000 — 15 minutes; 0 means no limit).
+                                     Raise it for a large monorepo: the gate runs while an agent
+                                     is also using the machine, and a timeout aborts a task whose
+                                     work is already done. Prefer raising this over skipping the
+                                     gate.
+
 Hench git-safety settings (pre-run commit gate):
   hench.git.checkpointThreshold  number    Lines-changed threshold at/above which the pre-run
                                            commit gate escalates: the interactive prompt warns
@@ -1714,6 +1735,12 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     When set, hench checks the assembled brief fits before
                                     sending it — failing fast instead of a cryptic HTTP 400.
                                     Match your local server's "Context Length" setting.
+  llm.local.timeoutMs      number    Per-request timeout in ms for local completions
+                                    (default: 300000 = 5 min; 0 = no timeout)
+                                    Raise this when the model is slow to generate or load,
+                                    e.g. 7200000 for 2 hours. This is separate from
+                                    cli.timeoutMs / the "CLI Timeouts" settings page, which
+                                    bound the whole command rather than one HTTP request.
   llm.local.verifier.host  string    Hostname of a second local server used to review the
                                     primary model's output before finalizing a run (optional)
   llm.local.verifier.port  number    Port of the verifier server (optional)
@@ -1760,6 +1787,7 @@ Task routing (which model serves which kind of call):
                  prd.restructure (standard)
     sourcevision code.classify (light)         zone.enrich-scan (light)
                  zone.enrich-deep (standard)   zone.meta-eval (standard)
+    web          sourcevision.ask (standard)
   Setting a route for a class not listed here still works — it may be a glob, or a
   class a newer n-dx defines — but ndx says so, and suggests the closest match.
 
@@ -1802,10 +1830,14 @@ Feature toggles (.n-dx.json — managed via web UI or ndx config):
   features.hench.guardRails         boolean   Security guard rails (default: true)
   features.hench.adaptiveWorkflow   boolean   Adaptive workflow adjustment (default: false)
 
-Sourcevision zone overrides (.n-dx.json):
+Sourcevision settings (.n-dx.json):
   sourcevision.zones.pins  object    Override zone assignments: {"file/path.ts": "zone-id"}
   sourcevision.zones.mergeThreshold
                            number    Min zone size for small-zone merge (default: 3)
+  sourcevision.ask.timeoutMs
+                           number    Wall-clock budget for one dashboard Ask request,
+                                     in ms (default: 120000). A request that exceeds
+                                     it fails as a named timeout rather than hanging.
 
 CLI settings (.n-dx.json):
   cli.name                 string    The project's installed CLI command name.
@@ -1946,6 +1978,7 @@ Examples:
   n-dx config llm.local.host 192.168.1.10      Set local server host (default: localhost)
   n-dx config llm.local.port 1234              Set local server port (default: 1234)
   n-dx config llm.local.model qwen2.5-14b      Set local model ID (optional)
+  n-dx config llm.local.timeoutMs 7200000      Allow 2 hours per local request (0 = no limit)
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
   n-dx config llm.claude.model claude-opus-5   Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex

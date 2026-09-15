@@ -26,6 +26,7 @@ export * from "./use-project-status.js";
 export * from "./use-refresh-throttle.js";
 export * from "./use-route-state.js";
 export * from "./use-subzone-edges.js";
+export * from "./use-sv-analyze.js";
 export * from "./use-tab-visibility.js";
 export * from "./use-tick.js";
 export * from "./use-toast.js";

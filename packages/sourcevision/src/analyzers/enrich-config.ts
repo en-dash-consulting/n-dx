@@ -8,6 +8,8 @@ import type {
   Finding,
   FindingType,
 } from "../schema/index.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import { section, svPromptEnvelope, svPrompt } from "./prompt-envelope.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -122,12 +124,12 @@ function formatAnnotatedFinding(f: Finding, index: number): string {
  * Build a meta-evaluation prompt that sends accumulated findings
  * instead of zone structure, for pass 5+.
  */
-export function buildMetaPrompt(
+export function buildMetaEnvelope(
   zones: Zone[],
   findings: Finding[],
   crossings: ZoneCrossing[],
   hints?: string,
-): string {
+): PromptEnvelope {
   // Group findings by zone
   const findingsByZone = new Map<string, Finding[]>();
   const globalFindings: Finding[] = [];
@@ -153,17 +155,25 @@ export function buildMetaPrompt(
     formatAnnotatedFinding(f, i)
   ).join("\n");
 
-  return `META-EVALUATION: Review all ${findings.length} findings from previous analysis passes.
+  const zonePairs = new Set(
+    crossings.map((c) => c.fromZone + "\u2192" + c.toZone),
+  ).size;
 
-Zone Summaries with Findings:
-${zonesSummary}
-
-Global Findings:
-${globalStr || "  (none)"}
-
-Cross-zone crossings: ${crossings.length} total across ${new Set(crossings.map(c => c.fromZone + "\u2192" + c.toZone)).size} zone pairs.
-${hints ? `\nProject context from the developer:\n${hints}\n` : ""}
-Constraints:
+  return svPromptEnvelope([
+    section(
+      "role",
+      `META-EVALUATION: Review all ${findings.length} findings from previous analysis passes.`,
+    ),
+    section("input", `Zone Summaries with Findings:\n${zonesSummary}`),
+    section("prior-pass", `Global Findings:\n${globalStr || "  (none)"}`),
+    section(
+      "crossings",
+      `Cross-zone crossings: ${crossings.length} total across ${zonePairs} zone pairs.`,
+    ),
+    section("hints", hints ? `Project context from the developer:\n${hints}` : ""),
+    section(
+      "rules",
+      `Constraints:
 - Never escalate "pass 0: automated heuristic" findings to "critical" without multiple corroborating findings.
 - Do NOT escalate their severity unless corroborated by MULTIPLE independent findings.
 - No decomposition suggestions unless metric exceeds 2× threshold.
@@ -179,14 +189,28 @@ Tasks:
 1. Reassess severities from cumulative evidence; upgrade to "critical" only with multiple corroborating findings.
 2. Find meta-patterns across all findings (systemic issues, architectural concerns).
 3. Make suggestions concrete — name files/zones; decomposition only if metric exceeds 2× threshold.
-4. Flag contradictory findings.
-
-Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
+4. Flag contradictory findings.`,
+    ),
+    section(
+      "output",
+      `Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
 
 Respond with ONLY a JSON object (no markdown, no explanation):
 {"severityUpdates":[{"findingIndex":0,"newSeverity":"warning"}],"zones":[{"id":"zone-id","newInsights":[],"findings":[{"type":"suggestion","scope":"zone-id","text":"...","severity":"warning","category":"code"}]}],"insights":["meta-observation"],"findings":[{"type":"pattern","scope":"global","text":"...","severity":"info","category":"code"}]}
 
-Empty arrays are fine. Do NOT repeat existing findings.`;
+Empty arrays are fine. Do NOT repeat existing findings.`,
+    ),
+  ]);
+}
+
+/** Assembled form of {@link buildMetaEnvelope}. */
+export function buildMetaPrompt(
+  zones: Zone[],
+  findings: Finding[],
+  crossings: ZoneCrossing[],
+  hints?: string,
+): string {
+  return svPrompt(buildMetaEnvelope(zones, findings, crossings, hints));
 }
 
 // ── Attempt configuration ────────────────────────────────────────────────────

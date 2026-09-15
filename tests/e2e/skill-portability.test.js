@@ -12,16 +12,33 @@
  *      so naming it alone strands Windows users — and n-dx is developed on
  *      Windows.
  *
- * The skill list is derived from the manifest, so a NEW skill is covered the
- * moment it is added.
+ * The skill list covers both the manifest skills and the repo-local ones, and
+ * is derived rather than written down, so a NEW skill of either kind is covered
+ * the moment it is added. Repo-local skills matter here even though `ndx init`
+ * does not install them: the repo is developed on Windows, so a POSIX-only
+ * instruction strands its own authors.
  *
- * @see packages/core/assistant-assets/skills/ — the bodies under test
+ * @see packages/core/assistant-assets/skills/ — the shipped bodies under test
+ * @see tests/helpers/all-skills.js — how both kinds are enumerated
  */
 
 import { describe, it, expect } from "vitest";
-import { getSkillNames, getSkillBody } from "../../packages/core/assistant-assets.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { allSkills } from "../helpers/all-skills.js";
 
-const SKILLS = getSkillNames();
+const ROOT = join(import.meta.dirname, "../..");
+
+/**
+ * Every skill, not just the ten in the manifest.
+ *
+ * This suite used to derive its list from `getSkillNames()`, which exempted the
+ * three repo-local skills (`iso-map`, `triage`, `dev-link`) from every guard
+ * below — silently, because the suite still passed. The rules here exist
+ * because bad assumptions shipped twice already; there is no reason a
+ * repo-local skill should be free to ship a third.
+ */
+const SKILLS = allSkills();
 
 // ── Default branch must be resolved, not named ───────────────────────────────
 
@@ -39,9 +56,8 @@ describe("skills resolve the default branch instead of hardcoding it", () => {
     expect(SKILLS.length).toBeGreaterThan(0);
   });
 
-  for (const name of SKILLS) {
+  for (const { name, body } of SKILLS) {
     it(`${name}: names no default branch inside a git command`, () => {
-      const body = getSkillBody(name);
       const match = body.match(HARDCODED_BRANCH_IN_GIT_CMD);
       expect(
         match?.[0] ?? null,
@@ -58,9 +74,8 @@ describe("skills resolve the default branch instead of hardcoding it", () => {
 // ── Timestamp instructions must not be POSIX-only ────────────────────────────
 
 describe("timestamp instructions are platform-neutral", () => {
-  for (const name of SKILLS) {
+  for (const { name, body } of SKILLS) {
     it(`${name}: does not prescribe a POSIX-only timestamp command`, () => {
-      const body = getSkillBody(name);
       if (!body.includes("date -Is")) return; // nothing to check
 
       // `date -Is` does not exist in PowerShell. Naming it is fine as one
@@ -78,9 +93,8 @@ describe("timestamp instructions are platform-neutral", () => {
 // ── Commit steps must not be POSIX-only ──────────────────────────────────────
 
 describe("commit-message construction is shell-neutral", () => {
-  for (const name of SKILLS) {
+  for (const { name, body } of SKILLS) {
     it(`${name}: builds no commit message with a heredoc or command substitution`, () => {
-      const body = getSkillBody(name);
 
       // `cat <<'EOF'` and `$(...)` do not exist in PowerShell or cmd.exe, and
       // Git Bash is not part of Windows — it arrives only with Git for
@@ -104,4 +118,48 @@ describe("commit-message construction is shell-neutral", () => {
       ).not.toMatch(/\$\(cat/);
     });
   }
+});
+
+// ── The authoring reference must teach the rule it is enforcing ──────────────
+
+describe("SKILLS.md prescribes the commit pattern the guard allows", () => {
+  /**
+   * The reference every new skill is written from.
+   *
+   * Checking the skills alone left a gap wide enough to reintroduce the bug on
+   * the next skill anyone wrote: `SKILLS.md` documented the required commit
+   * step as `git commit -m "$(cat <<'EOF' ... EOF)"` — exactly the construction
+   * the assertions above reject — so following the documentation produced a
+   * skill that failed CI, and the two disagreed with no test able to notice.
+   */
+  const REFERENCE = join(ROOT, "packages/core/assistant-assets/SKILLS.md");
+  const body = readFileSync(REFERENCE, "utf-8");
+
+  it("does not teach a heredoc commit step", () => {
+    expect(
+      body,
+      "SKILLS.md prescribes a heredoc for the commit message, which the rule " +
+        "above forbids in the skills themselves. A skill author following the " +
+        "reference writes a skill that fails this suite.",
+    ).not.toMatch(/cat <</);
+  });
+
+  it("does not teach command substitution in a commit step", () => {
+    expect(body).not.toMatch(/\$\(cat/);
+  });
+
+  it("teaches the file-based form the skills actually use", () => {
+    expect(
+      body,
+      "SKILLS.md should prescribe writing the message to a scratch file and " +
+        "committing with 'git commit -F <file>'.",
+    ).toMatch(/git commit -F/);
+  });
+
+  it("still requires both trailer lines", () => {
+    // The reason the commit step is prescribed at all: a commit missing
+    // Co-Authored-By lands fine and vanishes from the dashboard merge graph.
+    expect(body).toContain("N-DX:");
+    expect(body).toContain("Co-Authored-By:");
+  });
 });

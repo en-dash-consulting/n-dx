@@ -28,8 +28,18 @@ describe("buildSystemPrompt", () => {
   it("includes rules", () => {
     const config = DEFAULT_HENCH_CONFIG();
     const prompt = buildSystemPrompt(project, config);
-    expect(prompt).toContain("Read existing code");
     expect(prompt).toContain("minimal, focused changes");
+    expect(prompt).toContain("Follow existing code patterns");
+  });
+
+  it("states read-before-changing once, as a workflow step", () => {
+    // It was a rule *and* a workflow step, so the prompt said it twice in two
+    // phrasings. `## Rules` now holds constraints only; steps live in
+    // `## Workflow`.
+    const prompt = buildSystemPrompt(project, DEFAULT_HENCH_CONFIG());
+    const matches = prompt.match(/read the code you are about to change/gi) ?? [];
+    expect(matches).toHaveLength(1);
+    expect(prompt).not.toContain("Read existing code before modifying");
   });
 
   it("handles project without commands", () => {

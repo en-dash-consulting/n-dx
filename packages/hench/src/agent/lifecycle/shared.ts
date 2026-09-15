@@ -22,8 +22,10 @@ import { DEFAULT_CHECKPOINT_THRESHOLD } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
 import type { ChangeMagnitude } from "../analysis/change-magnitude.js";
 import { getCurrentHead, execStdout } from "../../process/exec.js";
+import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
+import { resolveCliPath, resolveNdxVersion } from "../../process/toolchain-identity.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
@@ -35,11 +37,11 @@ import { buildRunSummary } from "../analysis/summary.js";
 import { captureCommitChanges, extractPaths, formatChanges } from "../analysis/git-changed-files.js";
 import { collectReviewDiff, promptReview, revertChanges, listUntrackedPaths } from "../analysis/review.js";
 import { commitReviewRepairs } from "../analysis/review-repairs.js";
-import { discoverChangedFiles } from "../analysis/changed-files.js";
+import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
-import { runPostTaskTests, runTestGate } from "../../tools/test-runner.js";
+import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines } from "../../types/output.js";
@@ -387,6 +389,12 @@ export interface MemoryContext {
  * Both loops create identical initial records.
  */
 export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRecord; memoryCtx: MemoryContext }> {
+  // Which checkout this run belongs to. Every automatic commit below re-checks
+  // against these three values, so a run whose HEAD is moved mid-run (the
+  // agent's git allowlist includes checkout and stash) refuses to commit
+  // rather than landing its work on the wrong branch.
+  const gitOrigin = captureRunGitOrigin(opts.projectDir ?? ".");
+
   const run: RunRecord = {
     id: randomUUID(),
     taskId: opts.taskId,
@@ -403,6 +411,9 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     weight: opts.weight ?? "standard",
     actor: await resolveActor(opts.projectDir ?? "."),
     host: resolveHost(),
+    ndxVersion: resolveNdxVersion(),
+    cliPath: resolveCliPath(),
+    ...gitOrigin,
   };
 
   // Emit invocation context to the output stream for CLI and dashboard visibility
@@ -558,6 +569,12 @@ export async function runReviewGate(
 // Test suite gate failure handler (mandatory full test validation)
 // ---------------------------------------------------------------------------
 
+/**
+ * Test gate failure actions.
+ * - "rerun": Re-run the test command (retry)
+ * - "abort": Mark run as failed and revert changes (roll back)
+ * - "skip": Continue to commit without test gate (user override)
+ */
 export type TestGateFailureAction = "rerun" | "abort" | "skip";
 
 /**
@@ -574,7 +591,10 @@ async function promptTestGateFailure(
   yes?: boolean,
   autonomous?: boolean,
 ): Promise<TestGateFailureAction> {
-  // In non-interactive mode (CI, --yes, --auto), default to abort
+  // In non-interactive mode (CI, --yes, --auto), default to abort. A gate that
+  // could not launch never reaches this handler (it reports as inconclusive),
+  // so by the time we are here the suite genuinely ran and genuinely failed —
+  // completing and committing anyway would record a false success in the PRD.
   if (!process.stdin.isTTY || yes || autonomous) {
     return "abort";
   }
@@ -858,23 +878,31 @@ export interface FinalizeRunOptions {
 const FAILURE_STATUSES = new Set(["failed", "timeout", "budget_exceeded", "error_transient", "cancelled"]);
 
 /**
- * Return the operator-authored entries reported by `git status --porcelain`.
+ * Return the list of entries reported by `git status --porcelain`.
  * Each non-blank line represents a modified, staged, or untracked path.
  * Returns an empty array when the working tree is clean or git is unavailable.
  *
- * Hench's own runtime artifacts are discounted (see
- * {@link excludeHenchRuntimeArtifacts}). `.hench/locks/` is created at process
- * startup, before the pre-run gate fires, so counting it made an autonomous
- * run on a project without those `.gitignore` entries refuse to start against
- * a lock it had just created itself.
+ * Hench's own runtime artifacts are discounted by the callers via
+ * {@link excludeHenchRuntimeArtifacts} rather than in here, because that is a
+ * policy about what counts as operator work, not a detail of how the paths
+ * were obtained — and this function is an injectable seam, so a filter hidden
+ * inside the default implementation would silently not apply wherever a
+ * caller supplied its own.
+ *
+ * `--untracked-files=all` matters twice over. By default git collapses a
+ * wholly-untracked directory to a single entry — a fresh project reports
+ * `?? .hench/`, never `?? .hench/locks/` — so
+ * {@link excludeHenchRuntimeArtifacts} could not see what was inside and the
+ * run blocked on its own lock file anyway. It also makes the count honest: a
+ * directory of forty new files was being reported as "1 uncommitted file(s)".
  */
 async function listDirtyPaths(projectDir: string): Promise<string[]> {
   try {
-    const output = await execStdout("git", ["status", "--porcelain"], {
+    const output = await execStdout("git", ["status", "--porcelain", "--untracked-files=all"], {
       cwd: projectDir,
       timeout: 15_000,
     });
-    return excludeHenchRuntimeArtifacts(output.trim().split("\n").filter(Boolean));
+    return output.trim().split("\n").filter(Boolean);
   } catch {
     return [];
   }
@@ -1045,7 +1073,12 @@ async function performRollbackIfNeeded(
   projectDir: string,
   options: PerformRollbackOptions = {},
 ): Promise<void> {
-  const dirtyPaths = await listDirtyPaths(projectDir);
+  // Same exclusion as the pre-run gate: hench's own lock and run files are not
+  // the agent's work, so they must not make a rollback look necessary.
+  const dirtyPaths = await excludeHenchRuntimeArtifacts(
+    await listDirtyPaths(projectDir),
+    projectDir,
+  );
   if (dirtyPaths.length === 0) {
     return;
   }
@@ -1255,6 +1288,10 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
       runId: run.id,
       taskId: run.taskId,
       trailer: buildCoAuthoredByTrailerLine(),
+      // A moved checkout makes commitReviewRepairs throw, which the catch
+      // below reports — the repairs stay in the tree, as for any other
+      // commit failure here.
+      origin: run,
     });
     if (sha) {
       review.repairCommit = sha;
@@ -1281,12 +1318,25 @@ export async function commitReviewRepairsIfNeeded(projectDir: string, run: RunRe
 async function commitCompletionMetadata(
   projectDir: string,
   taskId: string,
+  origin?: RunGitOrigin,
 ): Promise<void> {
   const { join } = await import("node:path");
   const { existsSync } = await import("node:fs");
   const prdTreePath = join(".rex", PRD_TREE_DIRNAME);
 
   if (!existsSync(join(projectDir, prdTreePath))) {
+    return;
+  }
+
+  // Checked before anything is staged, so a moved checkout leaves the tree
+  // exactly as it was. Reported, never thrown — the metadata staying dirty is
+  // an inspection burden, not a broken run.
+  const drift = checkRunGitOrigin(projectDir, origin);
+  if (drift) {
+    info(
+      `⚠ Refusing to commit completion metadata: ${drift}. ` +
+        `The PRD changes remain in the working tree.`,
+    );
     return;
   }
 
@@ -1352,6 +1402,13 @@ export interface PreRunCommitGateOptions {
    * `--allow-dirty` (allowDirty) takes precedence.
    */
   requireCleanTree?: boolean;
+  /**
+   * Checkout the invocation started in, captured by the caller immediately
+   * before this gate runs. The gate refuses to commit when the working tree
+   * has moved to another branch or worktree since. Omitted (or empty, outside
+   * a git repository) means there is nothing to enforce.
+   */
+  origin?: RunGitOrigin;
   /** Test seams — default to the real implementations. */
   deps?: {
     listDirty?: (dir: string) => Promise<string[]>;
@@ -1360,6 +1417,7 @@ export interface PreRunCommitGateOptions {
     proposeMessage?: (diff: ReviewDiff, henchDir: string, model?: string) => Promise<string>;
     promptChoice?: (promptOpts: PreRunPromptOptions) => Promise<PreRunCommitChoice>;
     commit?: (dir: string, message: string) => Promise<void>;
+    checkOrigin?: (dir: string, origin: RunGitOrigin | undefined) => string | undefined;
     isTTY?: boolean;
   };
 }
@@ -1397,6 +1455,7 @@ export async function performPreRunCommitGateIfNeeded(
   const proposeMessage = deps.proposeMessage ?? proposePreRunCommitMessage;
   const promptChoice = deps.promptChoice ?? promptPreRunCommitChoice;
   const commit = deps.commit ?? commitPreRunChanges;
+  const checkOrigin = deps.checkOrigin ?? checkRunGitOrigin;
   const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
   const checkpointThreshold = opts.checkpointThreshold ?? DEFAULT_CHECKPOINT_THRESHOLD;
   // --allow-dirty takes precedence over config: it suppresses both
@@ -1406,7 +1465,7 @@ export async function performPreRunCommitGateIfNeeded(
   // Dry runs never touch the working tree; skip the gate entirely.
   if (dryRun) return "proceed";
 
-  const dirty = await listDirty(projectDir);
+  const dirty = await excludeHenchRuntimeArtifacts(await listDirty(projectDir), projectDir);
   if (dirty.length === 0) return "proceed"; // Clean tree → start immediately, no prompt.
 
   const magnitude = await measureMagnitude(projectDir);
@@ -1462,6 +1521,17 @@ export async function performPreRunCommitGateIfNeeded(
   const choice = await promptChoice({ escalate, allowProceed: !requireCleanTree });
   if (choice === "stop") return "stop";
   if (choice === "commit") {
+    // Between capture and here the operator answered a prompt, which is long
+    // enough for another process to move the checkout. Refusing is non-fatal,
+    // matching the commit-failure branch below: the changes stay in the tree.
+    const drift = checkOrigin(projectDir, opts.origin);
+    if (drift) {
+      info(
+        `⚠ Refusing to commit pre-existing changes: ${drift}. ` +
+          `They remain in the working tree.`,
+      );
+      return "proceed";
+    }
     try {
       await commit(projectDir, proposed);
       info("Committed pre-existing changes. Starting run…");
@@ -1987,6 +2057,15 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   let testGateSkipped = false;
   let resolvedTestCommand: string | undefined;
 
+  // Whenever a completed run bypasses the gate, say so explicitly — a silently
+  // absent gate looks identical to a gate that never should have run, which
+  // hides misconfiguration. Both bypass conditions are covered, not just the flag.
+  if (run.status === "completed" && skipFullTestGate) {
+    stream("Test Gate", "Skipped (--skip-test-gate / hench.skipFullTestGate)");
+  } else if (run.status === "completed" && !run.structuredSummary) {
+    stream("Test Gate", "Skipped (run has no structured summary to gate against)");
+  }
+
   if (run.status === "completed" && !skipFullTestGate && run.structuredSummary) {
     // Resolve test command first (before attempting gate)
     // This will prompt the user if no command is configured
@@ -2013,6 +2092,20 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       info(`\n${run.error}`);
     }
 
+    // How long the full suite may take is a property of the project, not of
+    // this gate: a monorepo running every package can legitimately exceed the
+    // default, and a timeout aborts a task whose work is already done.
+    // Undefined (a config predating the field, or a caller that supplies no
+    // config at all) keeps the gate's own default.
+    const testGateTimeoutMs = config?.fullTestTimeoutMs;
+    if (testGateTimeoutMs != null && testGateTimeoutMs !== DEFAULT_TEST_GATE_TIMEOUT_MS) {
+      detail(
+        testGateTimeoutMs === 0
+          ? "Test gate timeout: none (hench.fullTestTimeoutMs = 0)"
+          : `Test gate timeout: ${formatDurationMs(testGateTimeoutMs)} (hench.fullTestTimeoutMs)`,
+      );
+    }
+
     // Rerun loop: gate can fail and be retried multiple times
     let testGateAttempt = 0;
     let gateComplete = false;
@@ -2025,6 +2118,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         projectDir,
         filesChanged: run.structuredSummary.filesChanged,
         testCommand: resolvedTestCommand,
+        timeout: testGateTimeoutMs,
       });
 
       run.testGate = testGate;
@@ -2107,7 +2201,9 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
       }
     }
 
-    if (testGateAttempt >= 5) {
+    // Only a gate that never completed exhausts the attempt cap — a pass (or
+    // skip/context resolution) on the final attempt is still a success.
+    if (!gateComplete && testGateAttempt >= 5) {
       info("\nTest gate max attempts reached");
       run.status = "failed";
       run.error = "Test gate max retry attempts exceeded";
@@ -2164,7 +2260,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // and swept into whatever commit happens next.
   if (opts.autoCommit === true && run.status === "completed" && run.taskId) {
     await commitReviewRepairsIfNeeded(projectDir, run);
-    await commitCompletionMetadata(projectDir, run.taskId);
+    await commitCompletionMetadata(projectDir, run.taskId, run);
   }
 
   // Rollback uncommitted changes when the run failed (unless suppressed).

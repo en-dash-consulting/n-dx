@@ -192,6 +192,60 @@ rex analyze --format=json myproject
 
 **Flags:** `--lite`, `--accept`, `--format=json`
 
+### `rex export [dir]` / `rex import-bundle [dir]`
+
+Carry the PRD between machines as a single JSON bundle, without sharing the repo or configuring a remote adapter.
+
+```bash
+rex export --out=./prd-bundle.json myproject          # write the bundle
+rex import-bundle --in=./prd-bundle.json other        # merge it into another project
+rex import-bundle --in=./prd-bundle.json --replace --yes other
+```
+
+The bundle preserves item ids, hierarchy, level, status, priority, description, acceptance criteria, tags, `blockedBy` edges, source, and attribution metadata, and carries the PRD `SCHEMA_VERSION` so a bundle written by a newer rex is refused rather than imported partially.
+
+It is a transport artifact, not storage: it must be written outside `.rex/` entirely, and nothing in rex reads it as a PRD backend. Import rebuilds the folder tree through the normal store write path inside `store.withTransaction`, so it holds the PRD lock and cannot interleave with another writer.
+
+`--merge` (the default) is additive — local items keep their content and placement, new bundle items are grafted on, and ids that already exist with differing content are reported rather than overwritten. `--replace` discards the local tree and requires confirmation, or `--yes` when not attached to a terminal.
+
+Named `import-bundle` because `rex import` is an alias for `rex analyze`. From the orchestrator these are `ndx prd export` and `ndx prd import` (`ndx export` is the unrelated static-dashboard exporter).
+
+**Flags:** `--out=<path>` (export), `--in=<path>` (import), `--item=<id-or-slug>` (export), `--replace`, `--yes`, `--format=json`
+
+#### Scoped export
+
+`--item=<id-or-slug>` scopes the bundle to one epic, feature or task, so a single initiative can be carried between machines without the rest of the PRD:
+
+```bash
+rex export --item=checkout-overhaul --out=./checkout.json myproject
+```
+
+The scope is a closure, not a filter — a filtered subtree is not importable. The named item arrives with **every descendant** beneath it (including the subtask sections inside a task), with the **transitive `blockedBy` closure** so a task blocked by an item in another epic brings that item along, and with the **ancestor containers** of everything selected so import reconstructs the subtree at its original depth rather than re-parenting it to the root. Ancestors are pulled for closure-selected items too, so a blocker from another epic brings its own chain of containers.
+
+Blockers are carried without their own descendants: a blocker is needed as a dependency target, not as a body of work, and expanding it downward would make a scoped export unbounded in practice.
+
+Every `blockedBy` id in a scoped bundle resolves to an item in the same bundle. An edge whose target is missing from the source PRD — already broken before the export — is dropped rather than carried, and reported with the item that held it.
+
+Because a closure can reach well past what was asked for, the summary counts the requested subtree and the closure's contribution separately, and `--format=json` reports the same breakdown under a `scope` key.
+
+#### Narrative export
+
+`--format=narrative` renders the same PRD as prose Markdown, for a stakeholder rather than a machine:
+
+```bash
+rex export --format=narrative --out=./prd.md myproject
+rex export --format=narrative --item=checkout-overhaul --out=./checkout.md myproject
+rex export --format=narrative --include-completed --out=./retro.md myproject
+```
+
+Epics become sections with a goal and a rationale, features become described capabilities, and acceptance criteria become sentences under a "How we'll know it's done" heading. Dependencies read as sequencing prose ("This follows on from …") rather than id lists. No item ids, folder slugs or raw status and priority values are emitted anywhere in the document — a uuid pasted into a description is resolved to the title it names, or dropped.
+
+Finished and deleted work is left out by default; `--include-completed` keeps finished items for a retrospective-style document, and deleted items stay out regardless. `--item=<id-or-slug>` narrows the document to one subtree, resolved exactly as for a scoped bundle: an item id, its exact title, its folder path, or the directory name from `.rex/prd_tree/`; an ambiguous reference lists the candidates instead of guessing. Prose has no dependency edges, so the narrative scope is the subtree alone — the `blockedBy` closure applies to bundles only.
+
+> **Narrative output is one-way.** It cannot be imported back — `rex import-bundle` reads the JSON bundle only. Export the bundle whenever the PRD has to make a round trip.
+
+**Flags:** `--format=narrative`, `--out=<path>`, `--item=<id-or-slug>`, `--include-completed`
+
 ### `rex mcp [dir]`
 
 Start an MCP (Model Context Protocol) server on stdio. This is how AI agents interact with rex programmatically.

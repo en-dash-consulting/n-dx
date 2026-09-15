@@ -38,7 +38,7 @@ export {
   info, result, verbose, debug, warn,
 } from "../prd/llm-gateway.js";
 
-import { isQuiet, isVerbose, verbose, bold, dim, yellow, colorDim, colorWarn, colorPink, isColorEnabled } from "../prd/llm-gateway.js";
+import { isQuiet, isVerbose, verbose, bold, dim, yellow, red, colorDim, colorWarn, colorPink, isColorEnabled } from "../prd/llm-gateway.js";
 
 /**
  * Await a long-running operation, printing a periodic "still running" tick
@@ -280,16 +280,29 @@ const STREAM_TEXT_COLORS: Readonly<Record<string, (text: string) => string>> = {
  * In non-TTY or NO_COLOR mode: the line is printed directly via console.log
  * preserving the existing label-color behaviour.
  *
+ * `opts.tone` overrides the body color for state-of-the-run signalling —
+ * "warn" renders the text yellow, "critical" red — and exempts the line from
+ * the rolling window's dimming so the highlight stays visible. Used by the
+ * local loop to tint the model's own text as its context window fills. Tone
+ * affects the terminal only: the captured line (and therefore the run log)
+ * stays plain text.
+ *
  *   [Agent]   Some agent text…
  *   [Tool]    read_file({"path":"…"})
  *   [Result]  contents of file…
  */
-export function stream(label: string, text: string): void {
+export function stream(
+  label: string,
+  text: string,
+  opts?: { tone?: "warn" | "critical" },
+): void {
   if (isQuiet()) return;
   const bracket = `[${label}]`;
   const colorFn = STREAM_LABEL_COLORS[label];
   const coloredBracket = colorFn ? colorFn(bracket) : bracket;
-  const textColorFn = STREAM_TEXT_COLORS[label];
+  const toneFn =
+    opts?.tone === "critical" ? red : opts?.tone === "warn" ? yellow : undefined;
+  const textColorFn = toneFn ?? STREAM_TEXT_COLORS[label];
   // Apply text color per physical line so each line carries its own complete
   // open+close ANSI pair. Wrapping the whole multi-line string in a single
   // color call leaves the color code open across embedded newlines, causing
@@ -303,10 +316,11 @@ export function stream(label: string, text: string): void {
 
   if (isRollingMode()) {
     // Agent lines keep their normal colors (yellow bracket, cyan body) so agent
-    // voice remains readable during live streaming. Other labels are dimmed to
-    // form the muted grey background band for tool noise.
+    // voice remains readable during live streaming, and toned lines keep their
+    // warn/critical color. Other labels are dimmed to form the muted grey
+    // background band for tool noise.
     const displayLine =
-      label === "Agent"
+      label === "Agent" || toneFn
         ? `  ${coloredBracket}${padding} ${coloredText}`
         : colorDim(`  ${coloredBracket}${padding} ${coloredText}`);
     _pushWindowLine(displayLine, rawLine);

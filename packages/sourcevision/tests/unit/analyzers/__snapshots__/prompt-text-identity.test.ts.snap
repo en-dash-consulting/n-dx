@@ -1,0 +1,234 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sourcevision prompt text is unchanged by the envelope migration > buildLLMClassifyPrompt — compact (no descriptions) 1`] = `
+"Classify these source files. Assign each the best-fit archetype by path and likely purpose. Omit files with no clear fit.
+
+Archetypes:
+- route-handler: Route handler
+- domain-service: Domain service
+
+Files:
+1. src/api/routes.ts
+
+Respond with ONLY a JSON array (no markdown, no explanation):
+[{"path":"<file path>","archetype":"<archetype id>","reason":"<brief reason>"}]"
+`;
+
+exports[`sourcevision prompt text is unchanged by the envelope migration > buildLLMClassifyPrompt — with archetype descriptions 1`] = `
+"Classify these source files. Assign each the best-fit archetype by path and likely purpose. Omit files with no clear fit.
+
+Archetypes:
+- route-handler: Route handler — Maps an HTTP request to a domain call.
+- domain-service: Domain service — Holds business rules, no transport concerns.
+
+Files:
+1. src/api/routes.ts
+2. src/core/billing.ts
+
+Respond with ONLY a JSON array (no markdown, no explanation):
+[{"path":"<file path>","archetype":"<archetype id>","reason":"<brief reason>"}]"
+`;
+
+exports[`sourcevision prompt text is unchanged by the envelope migration > buildMetaPrompt 1`] = `
+"META-EVALUATION: Review all 2 findings from previous analysis passes.
+
+Zone Summaries with Findings:
+Zone "api" (Api, 2 files, cohesion: 0.8, coupling: 0.2)
+  (no findings)
+
+Zone "core" (Core, 2 files, cohesion: 0.8, coupling: 0.2)
+  (no findings)
+
+Global Findings:
+  0: [low] (observation) [source: pass undefined: LLM analysis; method: LLM analysis] undefined
+
+Cross-zone crossings: 1 total across 1 zone pairs.
+
+Constraints:
+- Never escalate "pass 0: automated heuristic" findings to "critical" without multiple corroborating findings.
+- Do NOT escalate their severity unless corroborated by MULTIPLE independent findings.
+- No decomposition suggestions unless metric exceeds 2× threshold.
+- Do NOT generate specific file decomposition suggestions unless a metric exceeds 2x its detection threshold.
+- Preserve exact metric values from existing findings; do not round or modify.
+- When referencing heuristic findings, preserve the exact numeric values as written.
+- Good architecture → "info". Problems/risks → "warning"/"critical".
+- Positive findings describing good architecture, clean patterns, or successful design choices must have severity "info".
+- Test-to-implementation coupling is expected; do not flag it.
+- Test files coupling to implementation internals is expected by design.
+
+Tasks:
+1. Reassess severities from cumulative evidence; upgrade to "critical" only with multiple corroborating findings.
+2. Find meta-patterns across all findings (systemic issues, architectural concerns).
+3. Make suggestions concrete — name files/zones; decomposition only if metric exceeds 2× threshold.
+4. Flag contradictory findings.
+
+Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{"severityUpdates":[{"findingIndex":0,"newSeverity":"warning"}],"zones":[{"id":"zone-id","newInsights":[],"findings":[{"type":"suggestion","scope":"zone-id","text":"...","severity":"warning","category":"code"}]}],"insights":["meta-observation"],"findings":[{"type":"pattern","scope":"global","text":"...","severity":"info","category":"code"}]}
+
+Empty arrays are fine. Do NOT repeat existing findings."
+`;
+
+exports[`sourcevision prompt text is unchanged by the envelope migration > buildMetaPrompt — with hints 1`] = `
+"META-EVALUATION: Review all 2 findings from previous analysis passes.
+
+Zone Summaries with Findings:
+Zone "api" (Api, 2 files, cohesion: 0.8, coupling: 0.2)
+  (no findings)
+
+Zone "core" (Core, 2 files, cohesion: 0.8, coupling: 0.2)
+  (no findings)
+
+Global Findings:
+  0: [low] (observation) [source: pass undefined: LLM analysis; method: LLM analysis] undefined
+
+Cross-zone crossings: 1 total across 1 zone pairs.
+
+Project context from the developer:
+Prefer transport/domain split.
+
+Constraints:
+- Never escalate "pass 0: automated heuristic" findings to "critical" without multiple corroborating findings.
+- Do NOT escalate their severity unless corroborated by MULTIPLE independent findings.
+- No decomposition suggestions unless metric exceeds 2× threshold.
+- Do NOT generate specific file decomposition suggestions unless a metric exceeds 2x its detection threshold.
+- Preserve exact metric values from existing findings; do not round or modify.
+- When referencing heuristic findings, preserve the exact numeric values as written.
+- Good architecture → "info". Problems/risks → "warning"/"critical".
+- Positive findings describing good architecture, clean patterns, or successful design choices must have severity "info".
+- Test-to-implementation coupling is expected; do not flag it.
+- Test files coupling to implementation internals is expected by design.
+
+Tasks:
+1. Reassess severities from cumulative evidence; upgrade to "critical" only with multiple corroborating findings.
+2. Find meta-patterns across all findings (systemic issues, architectural concerns).
+3. Make suggestions concrete — name files/zones; decomposition only if metric exceeds 2× threshold.
+4. Flag contradictory findings.
+
+Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{"severityUpdates":[{"findingIndex":0,"newSeverity":"warning"}],"zones":[{"id":"zone-id","newInsights":[],"findings":[{"type":"suggestion","scope":"zone-id","text":"...","severity":"warning","category":"code"}]}],"insights":["meta-observation"],"findings":[{"type":"pattern","scope":"global","text":"...","severity":"info","category":"code"}]}
+
+Empty arrays are fine. Do NOT repeat existing findings."
+`;
+
+exports[`sourcevision prompt text is unchanged by the envelope migration > buildPrimerPrompt 1`] = `
+"Below is an automated analysis of a codebase. Distil it into a short primer for an
+engineer about to make a change in this repository. Target 300–600 words.
+
+Cover exactly these, in this order, as prose or short lists:
+1. Layout — the top-level structure, and which directories hold production code
+   versus tests.
+2. Build and test commands — state them verbatim as commands.
+3. Conventions — language and module style, test framework, and any repository
+   rules that constrain how code is written here.
+4. Anything that would waste a newcomer's first hour.
+
+Do not include: zone cohesion or coupling numbers, finding lists, route tables,
+import statistics, or file inventories. Those are available elsewhere and are the
+bulk this primer exists to replace. Do not speculate — if the analysis does not
+say something, leave it out. Output the primer only, with no preamble.
+
+## Analysis
+# Project Context
+
+## Overview
+TypeScript monorepo, 3 packages, pnpm workspaces.
+
+## Zones
+- \`api\` — 12 files, cohesion 0.90, coupling 0.10. HTTP handlers.
+- \`core\` — 8 files, cohesion 0.95, coupling 0.05. Domain logic."
+`;
+
+exports[`sourcevision prompts built inline at the call site > buildFirstPassPrompt — via enrichBatch, pass 1 1`] = `
+"Analyze this codebase's zone structure. Each zone groups related files discovered by import-graph community detection.
+
+Name each zone by its domain role (avoid "utilities", "misc", numeric suffixes). Provide:
+1. A descriptive name
+2. A one-sentence architectural purpose
+3. 2-3 actionable observations
+
+'-tests' suffix: reserved for zones with ONLY test files; mixed zones use their production name.
+Severity: most are "info"; cohesion <0.4 or coupling >0.6 → "warning"; positive architecture → always "info".
+
+Zones:
+- algorithmicId: "api" (cohesion: 0.8, coupling: 0.2, 2 files)
+  files: "src/api/routes.ts", "src/api/server.ts"
+  entryPoints: "src/api/routes.ts"
+- algorithmicId: "core" (cohesion: 0.8, coupling: 0.2, 2 files)
+  files: "src/core/billing.ts", "src/core/period.ts"
+  entryPoints: "src/core/billing.ts"
+
+Cross-zone imports:
+  api→core: 4 imports
+
+Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{"zones":[{"algorithmicId":"...","id":"kebab-case-id","name":"Title Case","description":"One sentence.","insights":["actionable insight"],"findings":[{"type":"observation","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["cross-zone observation"],"findings":[{"type":"observation","scope":"global","text":"finding text","severity":"info","category":"code"}]}
+
+Return exactly 2 zone entries. Use finding types: observation."
+`;
+
+exports[`sourcevision prompts built inline at the call site > buildLaterPassPrompt — via enrichBatch, pass 2 1`] = `
+"You previously analyzed this codebase. Here is the current state:
+
+Zones:
+- "api" (cohesion: 0.8, coupling: 0.2, 2 files)
+  files: "src/api/routes.ts", "src/api/server.ts"
+  known insights: (none)
+- "core" (cohesion: 0.8, coupling: 0.2, 2 files)
+  files: "src/core/billing.ts", "src/core/period.ts"
+  known insights: (none)
+
+Cross-zone imports:
+  api→core: 4 imports
+
+Previous architecture insights:
+(none yet)
+
+This is enrichment pass 2. Focus on inter-zone relationships:
+- Architectural patterns (layered, hub-and-spoke, circular)
+- Clean boundaries and well-defined interfaces → "info"
+- Leaky abstractions or missing interfaces → "warning"
+- Circular dependencies → "critical"
+
+Add ONLY NEW insights not already captured above. Do not repeat or rephrase existing observations.
+
+Findings: severity ("info"|"warning"|"critical"), category ("structural"|"code"|"documentation").
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{"zones":[{"id":"existing-zone-id","newInsights":["new insight"],"findings":[{"type":"pattern","scope":"zone-id","text":"finding text","severity":"info","category":"code"}]}],"insights":["new cross-zone observation"],"findings":[{"type":"pattern","scope":"global","text":"finding text","severity":"info","category":"code"}]}
+
+Return one entry per zone. Use finding types: pattern, relationship. Empty arrays are fine if nothing new to add."
+`;
+
+exports[`sourcevision prompts built inline at the call site > enrichSingleZone — via enrichZonesPerZone 1`] = `
+"Analyze this code zone. It was discovered by import-graph community detection.
+
+Name each zone by its domain role (avoid "utilities", "misc", numeric suffixes). Provide:
+1. A descriptive name
+2. A one-sentence architectural purpose
+3. 2-3 actionable observations
+
+'-tests' suffix: reserved for zones with ONLY test files; mixed zones use their production name.
+Severity: most are "info"; cohesion <0.4 or coupling >0.6 → "warning"; positive architecture → always "info".
+
+Zone: "api" (cohesion: 0.8, coupling: 0.2, 2 files)
+Files: "src/api/routes.ts", "src/api/server.ts"
+Entry points: "src/api/routes.ts"
+
+Other zones in this codebase: "Core" (2 files, cohesion: 0.8)
+
+Boundary crossings:
+  (none)
+
+Findings: severity ("info"|"warning"|"critical").
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{"id":"kebab-case-id","name":"Title Case Name","description":"One sentence describing the zone's purpose.","insights":["actionable insight about this zone"],"findings":[{"type":"observation","scope":"api","text":"finding text","severity":"info"}]}
+
+Use finding types: observation."
+`;

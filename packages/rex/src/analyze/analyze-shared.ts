@@ -395,13 +395,22 @@ Include all three LoE fields on every task.`;
  * Shared task-quality guidelines that every PRD prompt should include.
  * Extracted so that improvements to task quality expectations propagate
  * everywhere at once.
+ *
+ * Deliberately says nothing about how large a task should be. It used to —
+ * "a single unit of work completable in one focused session (1-4 hours)" —
+ * which contradicted every other statement of scale in the same prompt:
+ * {@link PRD_SCHEMA} asks for `loe` in engineer-weeks, the few-shot example
+ * shows `loe: 2`, `CONSOLIDATION_INSTRUCTION` asks for 0.5–4 engineer-week
+ * tasks, and decomposition splits anything over `taskThresholdWeeks: 2`. Nine
+ * builders carried the hours figure and eight of them also carried the weeks
+ * one. Sizing belongs to `CONSOLIDATION_INSTRUCTION` and the LoE fields, which
+ * agree with each other.
  */
 export const TASK_QUALITY_RULES = `Task quality:
 - Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
 - Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
 - Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
 - Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
-- Each task should represent a single unit of work completable in one focused session (1-4 hours).
 - Assign priority based on: blocking dependencies → user-facing impact → technical debt.`;
 
 /**

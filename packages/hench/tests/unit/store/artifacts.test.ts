@@ -1,10 +1,19 @@
 import { describe, it, expect } from "vitest";
+import { tmpdir } from "node:os";
 import {
   HENCH_RUNTIME_GITIGNORE_ENTRIES,
   excludeHenchRuntimeArtifacts,
   isHenchRuntimeArtifact,
   parsePorcelainPath,
 } from "../../../src/store/artifacts.js";
+
+/**
+ * A directory that is not inside any git repository, so the repo-relative
+ * prefix resolves to "" and the porcelain lines below compare as-is. The
+ * nested-project behaviour (a non-empty prefix) is covered end-to-end in
+ * tests/unit/agent/pre-run-gate-own-state.test.ts against real repositories.
+ */
+const OUTSIDE_ANY_REPO = tmpdir();
 
 describe("isHenchRuntimeArtifact", () => {
   it("matches the artifact directories as git collapses them", () => {
@@ -50,6 +59,15 @@ describe("isHenchRuntimeArtifact", () => {
     expect(isHenchRuntimeArtifact(".hench\\locks\\12345.lock")).toBe(true);
     expect(isHenchRuntimeArtifact("./.hench/locks/")).toBe(true);
   });
+
+  it("applies the repo-relative prefix to the pattern, not the path", () => {
+    // A project in `sub/` sees `?? sub/.hench/locks/…` — repo-root-relative.
+    expect(isHenchRuntimeArtifact("sub/.hench/locks/run.lock", "sub/")).toBe(true);
+    // A sibling project's runtime state is somebody else's uncommitted work.
+    expect(isHenchRuntimeArtifact("other/.hench/runs/r.json", "sub/")).toBe(false);
+    // With a prefix, a root-level artifact path belongs to a different project.
+    expect(isHenchRuntimeArtifact(".hench/locks/run.lock", "sub/")).toBe(false);
+  });
 });
 
 describe("parsePorcelainPath", () => {
@@ -81,14 +99,16 @@ describe("parsePorcelainPath", () => {
 });
 
 describe("excludeHenchRuntimeArtifacts", () => {
-  it("drops a lock directory created by the run itself", () => {
+  it("drops a lock directory created by the run itself", async () => {
     // The reported failure: a freshly-initialized project reads as
     // "1 uncommitted file(s), 0 line(s) changed" and the autonomous run
     // refuses to start against dirt it produced.
-    expect(excludeHenchRuntimeArtifacts(["?? .hench/locks/"])).toEqual([]);
+    await expect(
+      excludeHenchRuntimeArtifacts(["?? .hench/locks/"], OUTSIDE_ANY_REPO),
+    ).resolves.toEqual([]);
   });
 
-  it("keeps genuine operator changes alongside hench artifacts", () => {
+  it("keeps genuine operator changes alongside hench artifacts", async () => {
     const lines = [
       "?? .hench/locks/",
       " M src/app.ts",
@@ -96,17 +116,20 @@ describe("excludeHenchRuntimeArtifacts", () => {
       "A  README.md",
       "?? .hench-commit-msg.txt",
     ];
-    expect(excludeHenchRuntimeArtifacts(lines)).toEqual([" M src/app.ts", "A  README.md"]);
-  });
-
-  it("keeps an uncommitted hench config change", () => {
-    expect(excludeHenchRuntimeArtifacts([" M .hench/config.json"])).toEqual([
-      " M .hench/config.json",
+    await expect(excludeHenchRuntimeArtifacts(lines, OUTSIDE_ANY_REPO)).resolves.toEqual([
+      " M src/app.ts",
+      "A  README.md",
     ]);
   });
 
-  it("leaves a clean tree clean", () => {
-    expect(excludeHenchRuntimeArtifacts([])).toEqual([]);
+  it("keeps an uncommitted hench config change", async () => {
+    await expect(
+      excludeHenchRuntimeArtifacts([" M .hench/config.json"], OUTSIDE_ANY_REPO),
+    ).resolves.toEqual([" M .hench/config.json"]);
+  });
+
+  it("leaves a clean tree clean", async () => {
+    await expect(excludeHenchRuntimeArtifacts([], OUTSIDE_ANY_REPO)).resolves.toEqual([]);
   });
 });
 

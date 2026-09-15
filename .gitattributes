@@ -37,6 +37,15 @@ CLAUDE.md               text eol=lf
 *.sh                        text eol=lf
 *.mjs                       text eol=lf
 *.py                        text eol=lf
+
+# Prompt and skill SOURCES, measured byte-for-byte by scripts/prompt-census.mjs
+# and stamped into docs/analysis/prompt-token-baseline.md. `.claude/skills/**`
+# above pins the generated copies; without the matching pin on the sources a
+# Windows checkout (core.autocrlf=true) adds one CR per line, which inflated
+# every shipped skill body and failed the baseline guard with a 140-token drift
+# no commit had caused — while CI, on LF, stayed green. Token counts must not
+# depend on which OS checked the repo out.
+packages/core/assistant-assets/**/*.md  text eol=lf
 packages/*/bin/*.js         text eol=lf
 packages/*/src/cli/index.ts text eol=lf
 packages/core/cli.js        text eol=lf

@@ -15,6 +15,7 @@ export {
   execShellCmd,
   getCurrentHead,
   getCurrentBranch,
+  getWorktreeRoot,
   isExecutableOnPath,
   spawnTool,
   spawnManaged,

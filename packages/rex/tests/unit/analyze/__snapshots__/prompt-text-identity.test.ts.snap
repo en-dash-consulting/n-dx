@@ -1,0 +1,1148 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`rex prompt text is unchanged by the envelope migration > buildAddPrompt — empty PRD, no project docs 1`] = `
+"You are a product requirements analyst. Given the following natural-language description, create a structured PRD breakdown as a JSON array.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+## Consolidation
+Prefer consolidated, sprint-sized work packages over many small tasks.
+For broad input covering multiple areas, aim for 3–7 top-level proposals
+(epics) rather than 10+ micro-items. Each task should represent a
+meaningful deliverable — not a single function or file change.
+
+Guidelines:
+- Merge related scan findings into a single task when they address the
+  same concern (e.g. "add input validation" across multiple routes →
+  one task covering the validation pattern).
+- Prefer one well-scoped task with clear acceptance criteria over three
+  trivially small tasks that would be completed together anyway.
+- If a broad description covers an entire feature area, create 1–2
+  features with 2–5 tasks each, not a flat list of 15 micro-tasks.
+- Each task should still be completable in a single focused sprint
+  (roughly 0.5–4 engineer-weeks), not so large it becomes vague.
+
+Structuring guidelines:
+- Break the description into a logical hierarchy of epics, features, and tasks.
+- If the description is broad or covers multiple distinct areas, create multiple epics rather than forcing everything under one.
+- Group related work into features under appropriate epics.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Deduplication:
+- Do NOT create duplicate tasks within your own response — if two aspects of the description overlap, merge them into a single task with combined criteria.
+- Use the project context to understand terminology and architecture.
+
+Avoid these common mistakes:
+- Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
+- Do NOT duplicate tasks already in the existing PRD (check the summary below).
+
+Existing PRD:
+(empty PRD)
+
+Description to add:
+Add dunning emails.
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildAddPrompt — scoped to an explicit parent 1`] = `
+"You are a product requirements analyst. Given the following natural-language description, create a structured PRD breakdown as a JSON array.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+## Consolidation
+Prefer consolidated, sprint-sized work packages over many small tasks.
+For broad input covering multiple areas, aim for 3–7 top-level proposals
+(epics) rather than 10+ micro-items. Each task should represent a
+meaningful deliverable — not a single function or file change.
+
+Guidelines:
+- Merge related scan findings into a single task when they address the
+  same concern (e.g. "add input validation" across multiple routes →
+  one task covering the validation pattern).
+- Prefer one well-scoped task with clear acceptance criteria over three
+  trivially small tasks that would be completed together anyway.
+- If a broad description covers an entire feature area, create 1–2
+  features with 2–5 tasks each, not a flat list of 15 micro-tasks.
+- Each task should still be completable in a single focused sprint
+  (roughly 0.5–4 engineer-weeks), not so large it becomes vague.
+
+Structuring guidelines:
+- Break the description into a logical hierarchy of epics, features, and tasks.
+- If the description is broad or covers multiple distinct areas, create multiple epics rather than forcing everything under one.
+- Group related work into features under appropriate epics.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Deduplication:
+- Do NOT create duplicate tasks within your own response — if two aspects of the description overlap, merge them into a single task with combined criteria.
+- Use the project context to understand terminology and architecture.
+
+Avoid these common mistakes:
+- Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
+- Do NOT duplicate tasks already in the existing PRD (check the summary below).
+
+IMPORTANT: Scope your response to fit under this existing parent item:
+  ID: feat-1
+  Level: feature
+  Title: Invoice generation
+
+Only create children appropriate for a feature. For example, if the parent is an epic, create features and tasks. If the parent is a feature, create only tasks.
+Do NOT create a new epic — instead use the parent's title as the epic title in your response.
+
+Project context (from documentation):
+--- README.md ---
+# Widget Service
+
+A billing service for widget subscriptions. Node, TypeScript, Postgres.
+
+Existing PRD:
+- [epic] Billing (in_progress)
+  - [feature] Invoice generation (pending)
+    - [task] Render invoice PDF (completed)
+
+Description to add:
+Add dunning emails.
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildAddPrompt — with auto-placement 1`] = `
+"You are a product requirements analyst. Given the following natural-language description, create a structured PRD breakdown as a JSON array.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+## Consolidation
+Prefer consolidated, sprint-sized work packages over many small tasks.
+For broad input covering multiple areas, aim for 3–7 top-level proposals
+(epics) rather than 10+ micro-items. Each task should represent a
+meaningful deliverable — not a single function or file change.
+
+Guidelines:
+- Merge related scan findings into a single task when they address the
+  same concern (e.g. "add input validation" across multiple routes →
+  one task covering the validation pattern).
+- Prefer one well-scoped task with clear acceptance criteria over three
+  trivially small tasks that would be completed together anyway.
+- If a broad description covers an entire feature area, create 1–2
+  features with 2–5 tasks each, not a flat list of 15 micro-tasks.
+- Each task should still be completable in a single focused sprint
+  (roughly 0.5–4 engineer-weeks), not so large it becomes vague.
+
+Structuring guidelines:
+- Break the description into a logical hierarchy of epics, features, and tasks.
+- If the description is broad or covers multiple distinct areas, create multiple epics rather than forcing everything under one.
+- Group related work into features under appropriate epics.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Deduplication:
+- Do NOT create duplicate tasks within your own response — if two aspects of the description overlap, merge them into a single task with combined criteria.
+- Use the project context to understand terminology and architecture.
+
+Avoid these common mistakes:
+- Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
+- Do NOT duplicate tasks already in the existing PRD (check the summary below).
+
+## Placement
+Only create new epics/features when the items genuinely represent new work
+areas not covered by the existing tree.
+
+If an existing parent's title needs to expand to accommodate the new scope,
+keep its "existingId" and set the title to the updated version.
+
+Project context (from documentation):
+--- README.md ---
+# Widget Service
+
+A billing service for widget subscriptions. Node, TypeScript, Postgres.
+
+Existing PRD:
+- [epic] Billing (in_progress) (id: epic-1)
+  - [feature] Invoice generation (pending) (id: feat-1)
+    - [task] Render invoice PDF (completed)
+
+Description to add:
+Add dunning emails for failed payments.
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildAssessmentPrompt 1`] = `
+"You are a product requirements analyst specializing in task sizing. Assess whether each proposal's tasks are at the right granularity.
+
+Proposals to assess:
+[{"proposalIndex":0,"epic":{"title":"Subscription Lifecycle"},"features":[{"title":"Trial handling","description":"Let a customer start and convert a free trial.","tasks":[{"title":"Implement trial start endpoint","description":"Create a trial subscription with an explicit expiry.","acceptanceCriteria":["POST /trials creates a subscription in trial state","Expiry is exactly 14 days from creation"],"priority":"high","tags":["billing","api"],"loe":1,"loeRationale":"One endpoint plus state transition and tests.","loeConfidence":"high"},{"title":"Implement trial conversion job","description":"Convert or expire trials on their expiry date.","acceptanceCriteria":["Expired trials move to cancelled"],"priority":"medium","tags":["billing"],"loe":2,"loeRationale":"Scheduled job with idempotency requirements.","loeConfidence":"medium"}]}]}]
+
+For EACH proposal (by proposalIndex), provide:
+1. "recommendation": "break_down" | "consolidate" | "keep"
+   - "break_down": tasks are too large/broad — split into smaller units
+   - "consolidate": tasks are too fine-grained — merge into larger units
+   - "keep": tasks are appropriately sized
+2. "reasoning": concise explanation (1-2 sentences)
+3. "issues": specific problems found (empty array if "keep")
+
+Assessment criteria — a well-sized task is:
+- Sized at roughly 0.5–4 engineer-weeks, consistent with its "loe"
+- Independently testable and deployable where possible
+- Specific enough that the implementer knows exactly what to do
+
+Red flags for TOO BROAD:
+- More than 3 acceptance criteria
+- Vague titles like "implement the feature" or "add API endpoints"
+- Covers multiple distinct components or concerns
+
+Red flags for TOO FINE-GRAINED:
+- Single line change or trivial config tweak
+- Feature has more than 6 tasks
+- Multiple tasks that would naturally be done in the same edit session
+
+Red flags for MISSING SUBSTANCE:
+- Feature has only 1 task (should be broken down or merged)
+- Tasks lack description or acceptance criteria
+
+Respond with ONLY a valid, minified JSON array of assessment objects, one per proposal — no whitespace between tokens, no indentation, no line breaks:
+[{"proposalIndex":0,"recommendation":"break_down","reasoning":"Several tasks cover broad functionality that spans multiple components.","issues":["Task 'Implement authentication system' covers login, signup, password reset, and session management — should be separate tasks","Task 'Add API endpoints' is vague and likely involves multiple distinct endpoints"]}]
+
+Key each object by proposalIndex; do not restate the proposal. No explanation, no markdown fences — ONLY the JSON array."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildBreakdownPrompt 1`] = `
+"You are a product requirements analyst. Break down the following PRD proposals into finer-grained, more detailed tasks.
+
+Current proposals:
+[{"epic":{"title":"Subscription Lifecycle"},"features":[{"title":"Trial handling","description":"Let a customer start and convert a free trial.","tasks":[{"title":"Implement trial start endpoint","description":"Create a trial subscription with an explicit expiry.","acceptanceCriteria":["POST /trials creates a subscription in trial state","Expiry is exactly 14 days from creation"],"priority":"high","tags":["billing","api"],"loe":1,"loeRationale":"One endpoint plus state transition and tests.","loeConfidence":"high"},{"title":"Implement trial conversion job","description":"Convert or expire trials on their expiry date.","acceptanceCriteria":["Expired trials move to cancelled"],"priority":"medium","tags":["billing"],"loe":2,"loeRationale":"Scheduled job with idempotency requirements.","loeConfidence":"medium"}]}]}]
+
+Rules:
+- Split each task into 2-4 smaller, more specific subtasks.
+- If a feature has only 1 task, expand it into 2-3 tasks covering distinct aspects.
+- Preserve the epic and feature structure — do NOT change epic or feature titles.
+- Each new task MUST have a verb-first title AND both a description and acceptanceCriteria.
+- Distribute the original acceptance criteria among the subtasks — do not lose any.
+- Keep priorities consistent with the originals.
+- Do NOT add entirely new functionality — only decompose what exists.
+- Do NOT produce tasks with only a title — every task needs both description and criteria.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildConsolidatePrompt 1`] = `
+"You are a product requirements analyst. Consolidate the following PRD proposals into coarser-grained, higher-level tasks.
+
+Current proposals:
+[{"epic":{"title":"Subscription Lifecycle"},"features":[{"title":"Trial handling","description":"Let a customer start and convert a free trial.","tasks":[{"title":"Implement trial start endpoint","description":"Create a trial subscription with an explicit expiry.","acceptanceCriteria":["POST /trials creates a subscription in trial state","Expiry is exactly 14 days from creation"],"priority":"high","tags":["billing","api"],"loe":1,"loeRationale":"One endpoint plus state transition and tests.","loeConfidence":"high"},{"title":"Implement trial conversion job","description":"Convert or expire trials on their expiry date.","acceptanceCriteria":["Expired trials move to cancelled"],"priority":"medium","tags":["billing"],"loe":2,"loeRationale":"Scheduled job with idempotency requirements.","loeConfidence":"medium"}]}]}]
+
+Rules:
+- Merge related tasks within each feature into broader, higher-level tasks.
+- Aim to reduce the total task count by roughly half.
+- If a feature has many tasks, combine related ones with merged acceptance criteria.
+- If multiple features are closely related, merge them into one feature.
+- Preserve the epic structure — do NOT change epic titles.
+- Each resulting task MUST have a verb-first title AND both a description and acceptanceCriteria.
+- Preserve the original intent — the consolidated tasks should cover the same scope as the originals.
+- Keep the highest priority among merged tasks.
+- Do NOT remove functionality — only consolidate what exists.
+- Do NOT produce tasks with only a title — every task needs both description and criteria.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildConsolidationGuardPrompt 1`] = `
+"You are a product requirements analyst. The following PRD proposals contain 12 tasks, which exceeds the project's consolidation ceiling of 5 tasks. Consolidate them into fewer, larger work packages.
+
+Current proposals:
+[{"epic":{"title":"Subscription Lifecycle"},"features":[{"title":"Trial handling","description":"Let a customer start and convert a free trial.","tasks":[{"title":"Implement trial start endpoint","description":"Create a trial subscription with an explicit expiry.","acceptanceCriteria":["POST /trials creates a subscription in trial state","Expiry is exactly 14 days from creation"],"priority":"high","tags":["billing","api"],"loe":1,"loeRationale":"One endpoint plus state transition and tests.","loeConfidence":"high"},{"title":"Implement trial conversion job","description":"Convert or expire trials on their expiry date.","acceptanceCriteria":["Expired trials move to cancelled"],"priority":"medium","tags":["billing"],"loe":2,"loeRationale":"Scheduled job with idempotency requirements.","loeConfidence":"medium"}]}]}]
+
+Target: Reduce to at most 5 tasks total while preserving all scope.
+
+Rules:
+- Merge closely related tasks within each feature into broader tasks with combined acceptance criteria.
+- If a feature has many small tasks, consolidate them into 1–3 well-scoped tasks.
+- If multiple features overlap significantly, merge them into one feature.
+- Preserve the epic structure — do NOT change epic titles unless features are merged across epics.
+- Preserve ALL original intent — consolidation must not drop functionality or acceptance criteria.
+- Keep the highest priority among merged tasks.
+- Preserve LoE fields: when merging tasks with "loe", sum the LoE values and update "loeRationale" to reflect the combined scope. Keep the lower confidence level.
+- Do NOT add new functionality — only consolidate what exists.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildDecompositionPrompt 1`] = `
+"You are a product requirements analyst. The following task has a level-of-effort (LoE) estimate that exceeds the project's threshold of 1 engineer-week. Break it down into smaller, independently deliverable child tasks.
+
+Task to decompose:
+{"title":"Implement trial conversion job","description":"Convert or expire trials on their expiry date.","acceptanceCriteria":["Expired trials move to cancelled"],"priority":"medium","tags":["billing"],"loe":2,"loeRationale":"Scheduled job with idempotency requirements.","loeConfidence":"medium"}
+
+Rules:
+- Each child task MUST have an LoE at or below 1 engineer-week.
+- Each child task MUST include "loe" (number, in engineer-weeks), "loeRationale" (string explaining the estimate), and "loeConfidence" ("low"|"medium"|"high").
+- The sum of child LoE values should approximate the parent's LoE (2 weeks).
+- Distribute the parent's acceptance criteria among children — do not lose any.
+- Keep priorities consistent with the parent (medium).
+- Preserve tags from the parent where relevant.
+- Do NOT add entirely new functionality — only decompose what exists.
+- Produce 2-5 child tasks.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Respond with ONLY a valid, minified JSON array of task objects — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, and do not restate the input task — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildDisambiguationPrompt 1`] = `
+"You are a product requirements analyst. The following document contains requirements but its structure is ambiguous. Analyze the content and organize it into a hierarchical PRD structure.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Guidelines for disambiguation:
+- Group related requirements under coherent epics and features.
+- Identify implicit groupings from context (e.g., authentication-related items belong together).
+- Separate distinct concerns into different epics.
+- Convert prose requirements into actionable task titles.
+- Extract acceptance criteria from detailed descriptions.
+- Do NOT include items that duplicate existing ones listed below.
+
+Existing items to avoid duplicating:
+- Billing
+- Invoice generation
+
+Document to analyze:
+---
+Some prose about billing with no clear heading structure.
+---
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildDisambiguationPrompt — no existing titles 1`] = `
+"You are a product requirements analyst. The following document contains requirements but its structure is ambiguous. Analyze the content and organize it into a hierarchical PRD structure.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Guidelines for disambiguation:
+- Group related requirements under coherent epics and features.
+- Identify implicit groupings from context (e.g., authentication-related items belong together).
+- Separate distinct concerns into different epics.
+- Convert prose requirements into actionable task titles.
+- Extract acceptance criteria from detailed descriptions.
+- Do NOT include items that duplicate existing ones listed below.
+
+Document to analyze:
+---
+Some prose about billing.
+---
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildGroupRenamePrompt 1`] = `
+"2 sibling PRD items were grouped under a parent because they all shared the base title "Billing" — the only differences were trailing machine-generated hash suffixes. Propose a distinct, descriptive title for each item that captures what makes it uniquely different from the others.
+
+Item 1:
+  ID: a-1
+  Current title: Billing 1
+  Description: Invoice generation and delivery.
+  Acceptance Criteria: (none)
+
+Item 2:
+  ID: a-2
+  Current title: Billing 2
+  Description: Dunning and retries.
+  Acceptance Criteria: (none)
+
+Rules:
+- Propose a new title for every item (one entry per ID: "a-1", "a-2").
+- All proposed titles must be different from each other.
+- No proposed title may equal the shared base title "Billing".
+- Titles should be concise (3–8 words) and grounded in the descriptions above.
+- If an item has no description, use the base title as-is — there is no content to differentiate it.
+
+Respond with JSON only (no markdown wrapper, no prose):
+{
+  "renames": [
+    {"id": "<item-id>", "title": "<new title>"},
+    ...
+  ],
+  "reasoning": "<brief explanation>"
+}"
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildIdeasPrompt 1`] = `
+"You are a product requirements analyst reading raw brainstorming notes. These are NOT formal specs — they are rough ideas, bullet points, half-formed thoughts, and informal shorthand. Distill every idea into a well-structured PRD as a JSON array.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+## Consolidation
+Prefer consolidated, sprint-sized work packages over many small tasks.
+For broad input covering multiple areas, aim for 3–7 top-level proposals
+(epics) rather than 10+ micro-items. Each task should represent a
+meaningful deliverable — not a single function or file change.
+
+Guidelines:
+- Merge related scan findings into a single task when they address the
+  same concern (e.g. "add input validation" across multiple routes →
+  one task covering the validation pattern).
+- Prefer one well-scoped task with clear acceptance criteria over three
+  trivially small tasks that would be completed together anyway.
+- If a broad description covers an entire feature area, create 1–2
+  features with 2–5 tasks each, not a flat list of 15 micro-tasks.
+- Each task should still be completable in a single focused sprint
+  (roughly 0.5–4 engineer-weeks), not so large it becomes vague.
+
+Interpreting rough notes:
+- Capture EVERY idea, no matter how brief or fragmentary. A single word like "caching" is still an idea worth structuring.
+- Questions ("what about dark mode?") are feature requests in disguise — treat them as such.
+- Expand shorthand and abbreviations ("auth" → "authentication", "perf" → "performance") using the project context to infer meaning.
+- When an idea is ambiguous, pick the most likely interpretation given the project context and note your assumption in the task description.
+- Contradictory notes (e.g. "use Redis" and "keep it simple, no external deps") should both be captured as separate options with a note about the trade-off.
+- Problems without solutions ("login is slow") become investigative tasks (e.g. "Profile and optimize login flow").
+- Vague ideas ("make it better") should be fleshed out into concrete tasks based on the project context.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Deduplication:
+- Use the project context to understand terminology, architecture, and domain-specific jargon in the notes.
+
+Avoid these common mistakes:
+- Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
+- Do NOT duplicate tasks already in the existing PRD (check the summary below).
+
+## Placement
+Only create new epics/features when the items genuinely represent new work
+areas not covered by the existing tree.
+
+If an existing parent's title needs to expand to accommodate the new scope,
+keep its "existingId" and set the title to the updated version.
+
+Project context (from documentation):
+--- README.md ---
+# Widget Service
+
+A billing service for widget subscriptions. Node, TypeScript, Postgres.
+
+Existing PRD:
+- [epic] Billing (in_progress) (id: epic-1)
+  - [feature] Invoice generation (pending) (id: feat-1)
+    - [task] Render invoice PDF (completed)
+
+Brainstorming notes:
+- dunning emails
+- audit log
+- maybe usage-based pricing?
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildModifyPrompt 1`] = `
+"You are a product requirements analyst. You have an existing set of PRD proposals and a user's modification request. Revise the proposals to incorporate the requested changes.
+
+## Current Proposals
+[{"epic":{"title":"Subscription Lifecycle"},"features":[{"title":"Trial handling","description":"Let a customer start and convert a free trial.","tasks":[{"title":"Implement trial start endpoint","description":"Create a trial subscription with an explicit expiry.","acceptanceCriteria":["POST /trials creates a subscription in trial state","Expiry is exactly 14 days from creation"],"priority":"high","tags":["billing","api"],"loe":1,"loeRationale":"One endpoint plus state transition and tests.","loeConfidence":"high"},{"title":"Implement trial conversion job","description":"Convert or expire trials on their expiry date.","acceptanceCriteria":["Expired trials move to cancelled"],"priority":"medium","tags":["billing"],"loe":2,"loeRationale":"Scheduled job with idempotency requirements.","loeConfidence":"medium"}]}]}]
+
+## Modification Request
+Split the conversion job into two tasks.
+
+## Output Format
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+## Rules
+- Apply the user's modification request to the proposals above.
+- Preserve the overall epic/feature/task hierarchy unless the request explicitly asks to restructure.
+- Keep all metadata (descriptions, acceptance criteria, priorities, tags) that the modification does not affect.
+- If the request asks to remove items, omit them from the output.
+- If the request asks to add items, include them in the appropriate position in the hierarchy.
+- If the request asks to change specific items, modify only those items and leave the rest unchanged.
+- If the request is ambiguous, interpret it in the way that makes the most practical sense for a software project.
+- Do NOT invent changes beyond what the request asks for.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Avoid these common mistakes:
+- Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
+- Do NOT duplicate tasks already in the existing PRD (check the summary below).
+
+Existing PRD (for deduplication — do NOT include these items):
+- [epic] Billing (in_progress)
+
+Project context (from documentation):
+# Widget Service
+
+A billing service for widget subscriptions. Node, TypeScript, Postgres.
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildModifyPrompt — no context options 1`] = `
+"You are a product requirements analyst. You have an existing set of PRD proposals and a user's modification request. Revise the proposals to incorporate the requested changes.
+
+## Current Proposals
+[{"epic":{"title":"Subscription Lifecycle"},"features":[{"title":"Trial handling","description":"Let a customer start and convert a free trial.","tasks":[{"title":"Implement trial start endpoint","description":"Create a trial subscription with an explicit expiry.","acceptanceCriteria":["POST /trials creates a subscription in trial state","Expiry is exactly 14 days from creation"],"priority":"high","tags":["billing","api"],"loe":1,"loeRationale":"One endpoint plus state transition and tests.","loeConfidence":"high"},{"title":"Implement trial conversion job","description":"Convert or expire trials on their expiry date.","acceptanceCriteria":["Expired trials move to cancelled"],"priority":"medium","tags":["billing"],"loe":2,"loeRationale":"Scheduled job with idempotency requirements.","loeConfidence":"medium"}]}]}]
+
+## Modification Request
+Split the conversion job into two tasks.
+
+## Output Format
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+## Rules
+- Apply the user's modification request to the proposals above.
+- Preserve the overall epic/feature/task hierarchy unless the request explicitly asks to restructure.
+- Keep all metadata (descriptions, acceptance criteria, priorities, tags) that the modification does not affect.
+- If the request asks to remove items, omit them from the output.
+- If the request asks to add items, include them in the appropriate position in the hierarchy.
+- If the request asks to change specific items, modify only those items and leave the rest unchanged.
+- If the request is ambiguous, interpret it in the way that makes the most practical sense for a software project.
+- Do NOT invent changes beyond what the request asks for.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Avoid these common mistakes:
+- Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
+- Do NOT duplicate tasks already in the existing PRD (check the summary below).
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildMultiAddPrompt 1`] = `
+"You are a product requirements analyst. You have been given 2 feature descriptions at once. Analyze ALL of them and create a unified, coherent PRD breakdown as a JSON array.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+## Consolidation
+Prefer consolidated, sprint-sized work packages over many small tasks.
+For broad input covering multiple areas, aim for 3–7 top-level proposals
+(epics) rather than 10+ micro-items. Each task should represent a
+meaningful deliverable — not a single function or file change.
+
+Guidelines:
+- Merge related scan findings into a single task when they address the
+  same concern (e.g. "add input validation" across multiple routes →
+  one task covering the validation pattern).
+- Prefer one well-scoped task with clear acceptance criteria over three
+  trivially small tasks that would be completed together anyway.
+- If a broad description covers an entire feature area, create 1–2
+  features with 2–5 tasks each, not a flat list of 15 micro-tasks.
+- Each task should still be completable in a single focused sprint
+  (roughly 0.5–4 engineer-weeks), not so large it becomes vague.
+
+Structuring guidelines:
+- Treat each description as a distinct piece of work.
+- Group related descriptions under the same epic when they naturally belong together.
+- Keep unrelated descriptions in separate epics.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Deduplication:
+- Do NOT create duplicate items across descriptions — if two descriptions overlap, merge them into a single task with combined criteria.
+- Use the project context to understand terminology and architecture.
+
+Avoid these common mistakes:
+- Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
+- Do NOT duplicate tasks already in the existing PRD (check the summary below).
+
+## Placement
+Only create new epics/features when the items genuinely represent new work
+areas not covered by the existing tree.
+
+If an existing parent's title needs to expand to accommodate the new scope,
+keep its "existingId" and set the title to the updated version.
+
+Project context (from documentation):
+--- README.md ---
+# Widget Service
+
+A billing service for widget subscriptions. Node, TypeScript, Postgres.
+
+Existing PRD:
+- [epic] Billing (in_progress) (id: epic-1)
+  - [feature] Invoice generation (pending) (id: feat-1)
+    - [task] Render invoice PDF (completed)
+
+Descriptions to add:
+1. Add dunning emails.
+2. Add a billing audit log.
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildRenamePrompt 1`] = `
+"Two PRD items are siblings in the same project plan. They share an identical title but describe different work. Propose a distinct, descriptive title for each item that accurately reflects what it covers and differentiates it from the other.
+
+Item A:
+  ID: r-1
+  Title: Billing
+  Level: feature
+  Description: Invoice generation.
+  Acceptance Criteria: (none)
+
+Item B:
+  ID: r-2
+  Title: Billing
+  Level: feature
+  Description: Dunning emails.
+  Acceptance Criteria: (none)
+
+Rules:
+- Both new titles must be different from each other.
+- Neither new title should be identical to the shared original title "Billing".
+- Titles should be concise (ideally 3-8 words) and capture the specific scope of each item.
+- Base the titles on the descriptions and acceptance criteria provided above.
+
+Respond with JSON only (no markdown wrapper, no prose):
+{
+  "titleA": "<new title for Item A>",
+  "titleB": "<new title for Item B>",
+  "reasoning": "<brief explanation of why these titles distinguish the two items>"
+}"
+`;
+
+exports[`rex prompt text is unchanged by the envelope migration > buildValidationFeedback 1`] = `
+"ORIGINAL PROMPT BODY
+
+---
+ATTEMPT 2: your previous response was rejected.
+
+Reason:
+tasks[0].loe: expected number
+
+Return a corrected response that fixes exactly this problem. Do not
+explain the correction or apologize — return only the response in the
+format originally requested.
+---"
+`;
+
+exports[`rex prompts built inline at the call site > buildClarifyPrompt — via clarify 1`] = `
+"You are a product specification assistant helping a user define their project requirements.
+
+The user is building a new project and has provided the following description:
+<description>A billing service for widget subscriptions.</description>
+
+Previous clarifications:
+Q: Which providers?
+A: Stripe only.
+
+Project context:
+# Widget Service
+
+A billing service for widget subscriptions. Node, TypeScript, Postgres.
+
+Your task: Evaluate whether you have enough information to generate a comprehensive product spec (epics, features, and tasks).
+
+Key areas to probe (only ask about what's missing):
+- Target users and their primary use cases
+- Core features vs nice-to-haves (priorities)
+- Technical constraints or preferences (language, framework, infra)
+- Success criteria (what does "done" look like?)
+- Integrations, data models, or workflows that need defining
+
+If you need more information, respond with:
+{ "status": "clarifying", "questions": ["question1", "question2", ...] }
+Ask 2-4 focused, specific questions. Don't repeat questions already answered. Avoid generic questions — each should unlock concrete requirements.
+
+If you have enough information, respond with:
+{ "status": "ready", "summary": "Brief summary of what you understand the project to be" }
+
+Respond with ONLY the JSON object. No markdown fences, no explanation."
+`;
+
+exports[`rex prompts built inline at the call site > buildSpecPrompt — via generateSpecFromContext 1`] = `
+"You are a product requirements analyst. Create a comprehensive PRD breakdown as a JSON array from the following project specification.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+Structuring guidelines:
+- Create a complete initial PRD covering ALL aspects discussed — do not leave gaps.
+- Group related work into epics, break epics into features, features into tasks.
+- Assign priority: critical for blocking/foundational, high for core features, medium for enhancements, low for nice-to-haves.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Project description:
+A billing service for widget subscriptions.
+
+Clarifications:
+Q: Which providers?
+A: Stripe only.
+
+Project context:
+# Widget Service
+
+A billing service for widget subscriptions. Node, TypeScript, Postgres.
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompts built inline at the call site > reasonForBodyMerge 1`] = `
+"You are a product manager merging duplicate PRD items that refer to the same feature or task.
+Given the following items (with titles and descriptions), write a single combined description
+that covers the full scope of all items. The description should be concise, clear, and complete.
+Return only the plain-text description — no JSON, no markdown, no labels.
+## Items to merge
+1. Title: Invoice generation
+   Description: Render and deliver invoices.
+
+2. Title: Invoice generation
+   Description: Email invoices to the billing contact."
+`;
+
+exports[`rex prompts built inline at the call site > reasonForReshape 1`] = `
+"You are a PRD architect reviewing an existing Product Requirements Document (PRD) for structural quality. Your job is to identify opportunities to improve the PRD through specific restructuring actions.
+
+Analyze the PRD and propose actions from these types:
+
+1. **merge** — Combine overlapping/duplicate items into one. Specify which item survives and which are absorbed.
+2. **update** — Revise title, description, or acceptance criteria of items that are stale, vague, or could be clearer.
+3. **reparent** — Move items to a better-fitting parent in the hierarchy (e.g., a task under the wrong feature).
+4. **obsolete** — Mark items that are no longer relevant (they'll be set to "deferred" status).
+5. **split** — Break overly broad items into focused children.
+
+Guidelines:
+- Reference items by their exact IDs from the PRD.
+- Only propose changes that materially improve the PRD structure or clarity.
+- Do NOT propose changes to items that are already completed.
+- Provide a clear "reason" for every action explaining why it improves the PRD.
+- For merges: pick the most descriptive/complete item as the survivor.
+- For splits: ensure child items are at the appropriate hierarchy level.
+- For updates: only propose when there's a meaningful improvement (not cosmetic rewording).
+
+Respond with ONLY a valid, minified JSON array of action objects — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON.
+## Current PRD
+- [epic] "Billing" (id: epic-1, status: in_progress)
+  - [feature] "Invoice generation" (id: feat-1, status: pending)
+    - [task] "Render invoice PDF" (id: task-1, status: completed)
+## Project Context
+--- README.md ---
+# Widget Service
+
+A billing service for widget subscriptions. Node, TypeScript, Postgres.
+Example output (for reference — do NOT include this in your response):
+[{"action":"merge","survivorId":"abc-123","mergedIds":["def-456"],"title":"Implement user authentication with OAuth2","reason":"Both items describe OAuth2 authentication setup with overlapping acceptance criteria"},{"action":"update","itemId":"ghi-789","updates":{"description":"Handle rate limiting for external API calls with exponential backoff","acceptanceCriteria":["Returns 429 with retry-after header","Implements exponential backoff up to 60s"]},"reason":"Original description was too vague — added specific retry strategy and verifiable criteria"},{"action":"split","sourceId":"mno-345","children":[{"title":"Validate form inputs on submit","level":"task","acceptanceCriteria":["Required fields rejected with clear error","Email format validated against RFC 5322"]},{"title":"Show inline error messages on validation failure","level":"task"}],"reason":"Original task bundled validation logic and error UX — splitting clarifies scope and ownership"},{"action":"reparent","itemId":"pqr-678","newParentId":"stu-901","reason":"Belongs under the auth epic, not the dashboard epic"},{"action":"obsolete","itemId":"jkl-012","reason":"This migration task was for the old database schema which has been replaced by the v2 schema"}]"
+`;
+
+exports[`rex prompts built inline at the call site > reasonFromFile — markdown document 1`] = `
+"You are a product requirements analyst. Read the following document and extract a structured PRD (Product Requirements Document) as a JSON array.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+Structuring guidelines:
+- Group related items into epics and features logically.
+- Derive tasks from actionable items in the document.
+- If the document covers multiple distinct areas, create separate epics for each.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Avoid these common mistakes:
+- Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
+- Do NOT duplicate tasks already in the existing PRD (check the summary below).
+
+The document is in Markdown format. Pay attention to headings, bullet points, and structured sections.
+
+Existing PRD:
+- [epic] Billing (in_progress)
+  - [feature] Invoice generation (pending)
+    - [task] Render invoice PDF (completed)
+
+Document to analyze:
+# Requirements
+
+- Trials must expire after 14 days.
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompts built inline at the call site > reasonFromScanResults — baseline mode (empty PRD) 1`] = `
+"You are a product requirements analyst. Given the following raw scan results from automated code analysis, organize them into a clean, well-structured PRD as a JSON array.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+## Consolidation
+Prefer consolidated, sprint-sized work packages over many small tasks.
+For broad input covering multiple areas, aim for 3–7 top-level proposals
+(epics) rather than 10+ micro-items. Each task should represent a
+meaningful deliverable — not a single function or file change.
+
+Guidelines:
+- Merge related scan findings into a single task when they address the
+  same concern (e.g. "add input validation" across multiple routes →
+  one task covering the validation pattern).
+- Prefer one well-scoped task with clear acceptance criteria over three
+  trivially small tasks that would be completed together anyway.
+- If a broad description covers an entire feature area, create 1–2
+  features with 2–5 tasks each, not a flat list of 15 micro-tasks.
+- Each task should still be completable in a single focused sprint
+  (roughly 0.5–4 engineer-weeks), not so large it becomes vague.
+
+IMPORTANT — Baseline mode:
+This is the first scan of an existing codebase. The PRD is empty, but the code already exists.
+You MUST include a "status" field on every epic, feature, and task:
+- "completed" — the code already implements this functionality (the scan found evidence it exists)
+- "pending" — this is a gap, improvement, or missing feature that should be built
+
+Most items from an existing codebase scan should be "completed". Only mark items as "pending" if
+they represent genuinely missing functionality, TODOs, or improvements identified in the scan results.
+
+Structuring guidelines:
+- Near-duplicate items have already been merged. Focus on semantic grouping and structure.
+- If any remaining items are clearly about the same thing, merge them into a single item.
+- Create meaningful epic groupings that reflect the project's domain (not generic names like "Tests" or "Documentation").
+- Group related work into features under appropriate epics.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Scan-specific rules:
+- Preserve priority levels from the scan results where they exist.
+- Rewrite vague scan-generated titles to be clear and actionable.
+- Use the project context below to align epic/feature names with the project's domain terminology.
+
+Avoid these common mistakes:
+- Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
+- Do NOT duplicate tasks already in the existing PRD (check the summary below).
+
+Project context (from documentation):
+--- README.md ---
+# Widget Service
+
+A billing service for widget subscriptions. Node, TypeScript, Postgres.
+
+Existing PRD:
+(empty PRD)
+
+Scan results:
+[task] Extract billing period helper (source: sourcevision, file: src/billing/period.ts)
+  description: Duplicated date arithmetic in three call sites.
+  priority: medium
+
+[task] Add input validation to /trials (source: sourcevision, file: src/routes/trials.ts)
+  description: Route accepts unvalidated body.
+  priority: high
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;
+
+exports[`rex prompts built inline at the call site > reasonFromScanResults — populated PRD 1`] = `
+"You are a product requirements analyst. Given the following raw scan results from automated code analysis, organize them into a clean, well-structured PRD as a JSON array.
+
+Each element must be an object with:
+- "epic": { "title": string, "existingId"?: string, "status"?: "completed"|"pending" }
+- "features": array of { "title": string, "description"?: string, "existingId"?: string, "status"?: "completed"|"pending", "tasks": array of { "title": string, "description"?: string, "acceptanceCriteria"?: string[], "priority"?: "critical"|"high"|"medium"|"low", "tags"?: string[], "status"?: "completed"|"pending", "loe"?: number, "loeRationale"?: string, "loeConfidence"?: "low"|"medium"|"high" } }
+The optional "existingId" on epics and features references an existing PRD item by ID — use it to place new items under existing containers instead of creating duplicates.
+The optional "status" field defaults to "pending". Set to "completed" when the code already implements the described functionality (used during baseline scans of existing codebases).
+
+Level-of-Effort (LoE) fields on tasks:
+- "loe": estimated effort in engineer-weeks (positive number, e.g. 0.5, 1, 2, 4).
+- "loeRationale": one-sentence explanation justifying the estimate (mention key cost drivers).
+- "loeConfidence": your confidence in the estimate — "low" (novel domain, many unknowns), "medium" (some unknowns but bounded scope), or "high" (well-understood, similar work done before).
+Include all three LoE fields on every task.
+
+Example output (for reference — do NOT include this example in your response):
+[{"epic":{"title":"User Authentication"},"features":[{"title":"OAuth2 Integration","description":"Support third-party OAuth2 providers for user login","tasks":[{"title":"Implement OAuth2 callback handler","description":"Handle the authorization code exchange and token storage after provider redirects back to our app. Covers Google and GitHub providers with a pluggable adapter pattern for future providers.","acceptanceCriteria":["Handles Google and GitHub OAuth2 flows end-to-end","Stores refresh token securely in encrypted session storage","Returns meaningful error on provider rejection","Provider adapter interface documented with at least one example"],"priority":"high","tags":["auth","backend"],"loe":2,"loeRationale":"Two providers with shared adapter pattern, plus token storage and error handling — bounded by well-documented OAuth2 spec.","loeConfidence":"high"}]}]},{"epic":{"title":"API Infrastructure","existingId":"abc-123"},"features":[{"title":"Rate Limiting","description":"Protect API endpoints from abuse with configurable rate limits","tasks":[{"title":"Implement token bucket rate limiter middleware","description":"Add per-endpoint rate limiting using a token bucket algorithm with configurable burst and sustained rates","acceptanceCriteria":["Returns 429 with Retry-After header when limit exceeded","Configurable per-route limits via middleware options","Supports both IP-based and API-key-based limiting"],"priority":"high","tags":["api","security"],"loe":1.5,"loeRationale":"Standard middleware pattern with token bucket algorithm; main effort is the configuration surface and tests.","loeConfidence":"medium"}]}]}]
+
+## Consolidation
+Prefer consolidated, sprint-sized work packages over many small tasks.
+For broad input covering multiple areas, aim for 3–7 top-level proposals
+(epics) rather than 10+ micro-items. Each task should represent a
+meaningful deliverable — not a single function or file change.
+
+Guidelines:
+- Merge related scan findings into a single task when they address the
+  same concern (e.g. "add input validation" across multiple routes →
+  one task covering the validation pattern).
+- Prefer one well-scoped task with clear acceptance criteria over three
+  trivially small tasks that would be completed together anyway.
+- If a broad description covers an entire feature area, create 1–2
+  features with 2–5 tasks each, not a flat list of 15 micro-tasks.
+- Each task should still be completable in a single focused sprint
+  (roughly 0.5–4 engineer-weeks), not so large it becomes vague.
+
+Structuring guidelines:
+- Near-duplicate items have already been merged. Focus on semantic grouping and structure.
+- If any remaining items are clearly about the same thing, merge them into a single item.
+- Create meaningful epic groupings that reflect the project's domain (not generic names like "Tests" or "Documentation").
+- Group related work into features under appropriate epics.
+
+Task quality:
+- Task titles MUST be specific and actionable, verb-first (e.g. "Implement OAuth2 callback handler", NOT "OAuth2" or "Authentication stuff").
+- Every task MUST have BOTH a description AND acceptanceCriteria. Omit neither.
+- Descriptions explain the "why" and expected outcome — not just restating the title. Give enough context for someone unfamiliar with the codebase to understand the intent.
+- Acceptance criteria MUST be concrete, verifiable pass/fail checks. Avoid subjective criteria like "works well" or "is fast".
+- Assign priority based on: blocking dependencies → user-facing impact → technical debt.
+
+Scan-specific rules:
+- Preserve priority levels from the scan results where they exist.
+- Rewrite vague scan-generated titles to be clear and actionable.
+- Use the project context below to align epic/feature names with the project's domain terminology.
+
+Avoid these common mistakes:
+- Do NOT create single-task features — if a feature has only one task, either break the task down or merge it into a related feature.
+- Do NOT duplicate tasks already in the existing PRD (check the summary below).
+
+Project context (from documentation):
+--- README.md ---
+# Widget Service
+
+A billing service for widget subscriptions. Node, TypeScript, Postgres.
+
+Existing PRD:
+- [epic] Billing (in_progress)
+  - [feature] Invoice generation (pending)
+    - [task] Render invoice PDF (completed)
+
+Scan results:
+[task] Extract billing period helper (source: sourcevision, file: src/billing/period.ts)
+  description: Duplicated date arithmetic in three call sites.
+  priority: medium
+
+[task] Add input validation to /trials (source: sourcevision, file: src/routes/trials.ts)
+  description: Route accepts unvalidated body.
+  priority: high
+
+Respond with ONLY a valid, minified JSON array — no whitespace between tokens, no indentation, no line breaks. No explanation, no markdown fences, no commentary, and do not restate the input — just the JSON."
+`;

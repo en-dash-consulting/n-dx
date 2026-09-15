@@ -382,6 +382,37 @@ export function assemblePrompt(envelope: PromptEnvelope): {
 }
 
 /**
+ * Assemble an envelope into a single prompt string, sections in array order.
+ *
+ * This is the single-channel counterpart to {@link assemblePrompt}. A vendor
+ * that takes one prompt string — a one-shot `complete({ prompt })` call, which
+ * is how rex and sourcevision reach a model — has no separate system channel to
+ * route a `system` section into, so grouping would only reorder the prompt.
+ * Sections are therefore emitted in the order the builder declared them.
+ *
+ * Each section's content is trimmed and empty results are dropped before the
+ * join, so a conditionally-included section costs exactly one separator when
+ * present and nothing at all when absent. That is what lets a builder replace
+ * the hand-rolled `\n${maybeBlock}` padding idiom without changing its output:
+ * a block that used to carry its own leading and trailing newline now carries
+ * neither, and the separator supplies both.
+ *
+ * @param envelope - Sections to assemble
+ * @param options.separator - Text between sections (default: a blank line)
+ */
+export function assemblePromptText(
+  envelope: PromptEnvelope,
+  options?: { readonly separator?: string },
+): string {
+  const separator = options?.separator ?? "\n\n";
+
+  return envelope.sections
+    .map((section) => section.content.trim())
+    .filter((content) => content.length > 0)
+    .join(separator);
+}
+
+/**
  * Map the legacy `ErrorReason` (from `types.ts`) to the normalized
  * {@link FailureCategory}.
  *

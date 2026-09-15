@@ -86,6 +86,25 @@ export function SuggestionsView({ data, navigateTo, askEnabled = false }: Sugges
   const { zones } = data;
   const enrichmentPass = zones?.enrichmentPass ?? 0;
 
+  // ── Every hook, before the enrichment gate ────────────────────────────────
+  // The gate below returns early, and `enrichmentPass` comes from analysis data
+  // that arrives after the first render and changes again when an analysis
+  // finishes with the dashboard open. A hook called after the gate is therefore
+  // called on some renders and not others, and Preact matches hooks by
+  // position — so the slots shift under whatever state is already there.
+  const findings = useMemo(
+    () => (zones?.findings ?? []).filter((f: Finding) => f.type === "suggestion"),
+    [zones?.findings],
+  );
+
+  const zonesAffected = useMemo(() => {
+    const set = new Set<string>();
+    for (const f of findings) {
+      if (f.scope !== "global") set.add(f.scope);
+    }
+    return set.size;
+  }, [findings]);
+
   if (enrichmentPass < ENRICHMENT_THRESHOLDS.suggestions) {
     return h(EnrichmentGate, {
       title: "Suggestions",
@@ -94,10 +113,8 @@ export function SuggestionsView({ data, navigateTo, askEnabled = false }: Sugges
     });
   }
 
-  const findings = (zones?.findings ?? []).filter(
-    (f: Finding) => f.type === "suggestion"
-  );
-
+  // Plain derivations — not hooks, so they stay next to the render that uses
+  // them and cost nothing on a gated render.
   const legacyInsights = findings.length === 0
     ? (zones?.insights ?? []).filter(
         (s) => /suggest|refactor|improv|consider|opportunity|extract/i.test(s)
@@ -107,13 +124,6 @@ export function SuggestionsView({ data, navigateTo, askEnabled = false }: Sugges
   // Count suggestions per scope
   const globalCount = findings.filter((f) => f.scope === "global").length;
   const zoneCount = findings.filter((f) => f.scope !== "global").length;
-  const zonesAffected = useMemo(() => {
-    const set = new Set<string>();
-    for (const f of findings) {
-      if (f.scope !== "global") set.add(f.scope);
-    }
-    return set.size;
-  }, [findings]);
 
   return h("div", null,
     h("div", { class: "view-header" },

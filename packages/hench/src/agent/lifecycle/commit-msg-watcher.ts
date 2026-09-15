@@ -20,7 +20,8 @@ import { watch as fsWatch } from "node:fs";
 import { readFileSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { execStdout } from "../../process/exec.js";
-import { detail } from "../../types/output.js";
+import { checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
+import { detail, info } from "../../types/output.js";
 
 /** The sentinel file the agent writes its proposed commit message to. */
 const PENDING_COMMIT_FILE = ".hench-commit-msg.txt";
@@ -50,6 +51,15 @@ export interface CommitMsgWatcherOptions {
    * content before auto-committing. 0 disables the timer entirely.
    */
   timeoutMs: number;
+  /**
+   * Checkout the run started in. This timer fires precisely when the run went
+   * abnormal (timeout, crash), so the checkout is at its least trustworthy —
+   * a mismatch here refuses the commit and leaves both the staged changes and
+   * the message file for the operator. Omitted means nothing to enforce.
+   */
+  origin?: RunGitOrigin;
+  /** Test seam — defaults to the real git-backed check. */
+  checkOrigin?: (dir: string, origin: RunGitOrigin | undefined) => string | undefined;
 }
 
 /**
@@ -66,7 +76,8 @@ export interface CommitMsgWatcherOptions {
  * timer is never set, making the function a no-op for the commit path.
  */
 export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgWatcher {
-  const { projectDir, timeoutMs } = opts;
+  const { projectDir, timeoutMs, origin } = opts;
+  const checkOrigin = opts.checkOrigin ?? checkRunGitOrigin;
   const msgPath = join(projectDir, PENDING_COMMIT_FILE);
 
   let cancelled = false;
@@ -127,6 +138,18 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
       // File exists but is empty or whitespace-only — clean up without committing.
       detail("Auto-commit: skipped — commit message file was empty or whitespace-only (file removed).");
       try { unlinkSync(msgPath); } catch { /* ignore */ }
+      return;
+    }
+
+    // Refusing keeps the message file too: the staged changes and the agent's
+    // proposed message are both still there for the operator to land by hand
+    // once the checkout is back where the run started.
+    const drift = checkOrigin(projectDir, origin);
+    if (drift) {
+      info(
+        `⚠ Auto-commit refused: ${drift}. ` +
+          `The staged changes and ${PENDING_COMMIT_FILE} were left untouched.`,
+      );
       return;
     }
 

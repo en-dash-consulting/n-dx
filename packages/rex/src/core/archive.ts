@@ -94,7 +94,7 @@ export interface GroupAuditEntry {
 
 export interface ArchiveBatch {
   timestamp: string;
-  source: "prune" | "reshape" | "reorganize" | "rename";
+  source: "prune" | "reshape" | "reorganize" | "rename" | "import";
   items: PRDItem[];
   count: number;
   reason?: string;

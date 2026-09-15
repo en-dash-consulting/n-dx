@@ -42,6 +42,8 @@
 import { spawnClaude } from "./llm-bridge.js";
 import { MAX_RETRIES, emptyAnalyzeTokenUsage, accumulateTokenUsage } from "./analyze-shared.js";
 import type { AnalyzeTokenUsage } from "../schema/index.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import { section, rexPromptEnvelope, rexPrompt } from "./prompt-envelope.js";
 
 /** Per-class escalation tallies, for spotting a class routed too cheaply. */
 const escalationStats = new Map<string, { calls: number; escalated: number }>();
@@ -86,25 +88,40 @@ function recordAttempt(taskClass: string, escalated: boolean): void {
  * The attempt number is included so consecutive attempts differ even when the
  * error text is identical — the property the old loop violated.
  */
+export function buildValidationFeedbackEnvelope(
+  prompt: string,
+  error: string,
+  attempt: number,
+): PromptEnvelope {
+  return rexPromptEnvelope([
+    // The prior attempt's prompt arrives already assembled — this wrapper sits
+    // above every builder and cannot know which one produced it. It is carried
+    // as one section so the retry block's own cost stays separately measurable.
+    section("input", prompt),
+    section(
+      "retry",
+      [
+        "---",
+        `ATTEMPT ${attempt}: your previous response was rejected.`,
+        "",
+        "Reason:",
+        error,
+        "",
+        "Return a corrected response that fixes exactly this problem. Do not",
+        "explain the correction or apologize — return only the response in the",
+        "format originally requested.",
+        "---",
+      ].join("\n"),
+    ),
+  ]);
+}
+
 export function buildValidationFeedback(
   prompt: string,
   error: string,
   attempt: number,
 ): string {
-  return [
-    prompt,
-    "",
-    "---",
-    `ATTEMPT ${attempt}: your previous response was rejected.`,
-    "",
-    "Reason:",
-    error,
-    "",
-    "Return a corrected response that fixes exactly this problem. Do not",
-    "explain the correction or apologize — return only the response in the",
-    "format originally requested.",
-    "---",
-  ].join("\n");
+  return rexPrompt(buildValidationFeedbackEnvelope(prompt, error, attempt));
 }
 
 export interface EscalationOptions<T> {

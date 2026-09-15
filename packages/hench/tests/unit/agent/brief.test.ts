@@ -32,7 +32,9 @@ describe("formatTaskBrief", () => {
     expect(output).toContain("Implement login form");
     expect(output).toContain("task-1");
     expect(output).toContain("pending");
-    expect(output).toContain("my-app");
+    // The project block lives in the system prompt, not here — both halves go
+    // out in one call, so stating it in both was a duplicate bill.
+    expect(output).not.toContain("my-app");
   });
 
   it("includes description when present", () => {
@@ -117,7 +119,10 @@ describe("formatTaskBrief", () => {
     expect(output).toContain("1. Read code");
   });
 
-  it("includes project commands", () => {
+  it("leaves the project commands to the system prompt", () => {
+    // buildSystemPrompt emits validate and test commands under `## Project
+    // Info`, and the two halves reach the model together. The brief repeating
+    // them bought nothing and cost tokens on every autonomous run.
     const brief: TaskBrief = {
       ...minimalBrief,
       project: {
@@ -127,8 +132,8 @@ describe("formatTaskBrief", () => {
       },
     };
     const output = formatTaskBrief(brief);
-    expect(output).toContain("`npm run typecheck`");
-    expect(output).toContain("`npm test`");
+    expect(output).not.toContain("`npm run typecheck`");
+    expect(output).not.toContain("`npm test`");
   });
 
   it("includes recent log entries", () => {
@@ -171,13 +176,18 @@ describe("formatTaskBrief", () => {
       },
     };
     const output = formatTaskBrief(brief);
-    expect(output).toContain("## PREVIOUS FAILURE");
+    expect(output).toContain("Previous attempt failed");
     expect(output).toContain("Tests broken: login form validation fails");
+    // The evidence alone invites repeating the approach that produced it, so
+    // the section must also direct a change of approach.
+    expect(output).toMatch(/do not repeat|different approach/i);
   });
 
   it("omits PREVIOUS FAILURE when failureReason is not present", () => {
     const output = formatTaskBrief(minimalBrief);
-    expect(output).not.toContain("PREVIOUS FAILURE");
+    // Matches the current heading — the old all-caps "PREVIOUS FAILURE" string
+    // no longer appears anywhere, so asserting its absence proved nothing.
+    expect(output).not.toContain("Previous attempt failed");
   });
 });
 

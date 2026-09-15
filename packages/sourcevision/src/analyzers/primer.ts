@@ -32,6 +32,8 @@
 
 import { createHash } from "node:crypto";
 import type { Manifest } from "../schema/index.js";
+import type { PromptEnvelope } from "@n-dx/llm-client";
+import { section, svPromptEnvelope, svPrompt } from "./prompt-envelope.js";
 
 /** Artifact filename, written beside CONTEXT.md. */
 export const PRIMER_FILE = "PRIMER.md";
@@ -97,27 +99,43 @@ export function isPrimerFresh(
  * CONTEXT.md already carries — metrics, findings, exhaustive listings — since
  * reproducing those would defeat the purpose of distilling.
  */
+export function buildPrimerEnvelope(contextMd: string): PromptEnvelope {
+  return svPromptEnvelope([
+    section(
+      "role",
+      [
+        "Below is an automated analysis of a codebase. Distil it into a short primer for an",
+        "engineer about to make a change in this repository. Target 300–600 words.",
+      ].join("\n"),
+    ),
+    section(
+      "rules",
+      [
+        "Cover exactly these, in this order, as prose or short lists:",
+        "1. Layout — the top-level structure, and which directories hold production code",
+        "   versus tests.",
+        "2. Build and test commands — state them verbatim as commands.",
+        "3. Conventions — language and module style, test framework, and any repository",
+        "   rules that constrain how code is written here.",
+        "4. Anything that would waste a newcomer's first hour.",
+      ].join("\n"),
+    ),
+    section(
+      "output",
+      [
+        "Do not include: zone cohesion or coupling numbers, finding lists, route tables,",
+        "import statistics, or file inventories. Those are available elsewhere and are the",
+        "bulk this primer exists to replace. Do not speculate — if the analysis does not",
+        "say something, leave it out. Output the primer only, with no preamble.",
+      ].join("\n"),
+    ),
+    section("input", `## Analysis\n${contextMd}`),
+  ]);
+}
+
+/** Assembled form of {@link buildPrimerEnvelope}. */
 export function buildPrimerPrompt(contextMd: string): string {
-  return [
-    "Below is an automated analysis of a codebase. Distil it into a short primer for an",
-    "engineer about to make a change in this repository. Target 300–600 words.",
-    "",
-    "Cover exactly these, in this order, as prose or short lists:",
-    "1. Layout — the top-level structure, and which directories hold production code",
-    "   versus tests.",
-    "2. Build and test commands — state them verbatim as commands.",
-    "3. Conventions — language and module style, test framework, and any repository",
-    "   rules that constrain how code is written here.",
-    "4. Anything that would waste a newcomer's first hour.",
-    "",
-    "Do not include: zone cohesion or coupling numbers, finding lists, route tables,",
-    "import statistics, or file inventories. Those are available elsewhere and are the",
-    "bulk this primer exists to replace. Do not speculate — if the analysis does not",
-    "say something, leave it out. Output the primer only, with no preamble.",
-    "",
-    "## Analysis",
-    contextMd,
-  ].join("\n");
+  return svPrompt(buildPrimerEnvelope(contextMd));
 }
 
 /**

@@ -286,3 +286,73 @@ describe("iso map escaping", () => {
     dom.window.close();
   });
 });
+
+/**
+ * A declared seam the call graph cannot corroborate must not be drawn as
+ * though the analysis proved it. These assert the rendered difference, not
+ * just the model field — the class is rebuilt on every redraw, so a static
+ * class is easy to lose.
+ */
+describe("unverified seam rendering", () => {
+  const CORROBORATED = {
+    fromZone: "core", toZone: "api", callbacks: ["broadcast"],
+    verification: {
+      status: "verified" as const,
+      corroborated: [{ callback: "broadcast", file: "src/api/a.ts", expression: "broadcast" }],
+      missing: [],
+    },
+  };
+  const STALE = {
+    fromZone: "core", toZone: "db", callbacks: ["onDone", "onFail"],
+    verification: {
+      status: "unverified" as const,
+      corroborated: [],
+      missing: ["onDone", "onFail"],
+    },
+  };
+
+  it("marks the unverified seam and not the corroborated one", () => {
+    const dom = mount(makeInput({ seams: [CORROBORATED, STALE] }));
+    const doc = dom.window.document;
+    expect(doc.querySelectorAll("#iso .wire.seam").length).toBe(2);
+    const unverified = doc.querySelectorAll("#iso .wire.seam.unver");
+    expect(unverified.length).toBe(1);
+    // Distinct stroke pattern, so the two do not read identically.
+    expect(unverified[0].getAttribute("stroke-dasharray")).toBe("1 8");
+    dom.window.close();
+  });
+
+  it("keeps the unverified class through a redraw", () => {
+    const dom = mount(makeInput({ seams: [STALE] }));
+    const doc = dom.window.document;
+    // Selecting a zone triggers the redraw that rebuilds every edge class.
+    const node = doc.querySelector("#iso .node[role=button]")!;
+    realClick(dom.window, node);
+    expect(doc.querySelectorAll("#iso .wire.seam.unver").length).toBe(1);
+    dom.window.close();
+  });
+
+  it("says the seam is unverified in its panel and names the callback", () => {
+    const dom = mount(makeInput({ seams: [STALE] }));
+    const doc = dom.window.document;
+    const group = [...doc.querySelectorAll("#iso .edge")].find((g) =>
+      (g.getAttribute("aria-label") ?? "").startsWith("Unverified runtime seam"),
+    )!;
+    expect(group).toBeDefined();
+    realClick(dom.window, group);
+    const panel = doc.querySelector("#dossier")!.textContent ?? "";
+    expect(panel).toContain("unverified");
+    expect(panel).toContain("onFail");
+    // Per-callback evidence line for a callback the call graph never saw.
+    expect(panel).toContain("not called anywhere in");
+    dom.window.close();
+  });
+
+  it("does not call a seam unverified when there was no call graph to check", () => {
+    const dom = mount(makeInput({ seams: [{ fromZone: "core", toZone: "api", callbacks: ["broadcast"] }] }));
+    const doc = dom.window.document;
+    expect(doc.querySelectorAll("#iso .wire.seam").length).toBe(1);
+    expect(doc.querySelectorAll("#iso .wire.seam.unver").length).toBe(0);
+    dom.window.close();
+  });
+});
