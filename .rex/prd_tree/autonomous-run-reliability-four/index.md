@@ -33,6 +33,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Completion must not cascade over an explicit in_progress parent, or outside the run's subtree](./completion-must-not-cascade-over-an.md) | completed |
 | [Do not auto-complete an epic that still has deferred, blocked or failing children](./do-not-auto-complete-an-epic-that.md) | completed |
 | [Finalize gate must discount only what the commit prompt will actually commit: staged work only with a pending message, reviewer repairs on both paths](./finalize-gate-must-discount-only-what.md) | completed |
+| [Git helper failures must not be reported as successful staging or commits](./git-helper-failures-must-not-be.md) | pending |
 | [Late-arrival child kill is proven only against a fake, and the e2e guard that would catch it only trips under load](./late-arrival-child-kill-is-proven-only.md) | completed |
 | [Livelock detector must see Codex file edits as progress](./livelock-detector-must-see-codex-file.md) | completed |
 | [Livelock intercept does not kill its child on Windows, failing CLI Smoke (Windows)](./livelock-intercept-does-not-kill-its.md) | completed |
@@ -48,6 +49,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [SIGINT rollback-prompt integration tests are flaky and leak Windows handles](./sigint-rollback-prompt-integration.md) | completed |
 | [Stop a run that repeats an identical tool call instead of letting it loop forever](./stop-a-run-that-repeats-an-identical.md) | completed |
 | [Synchronize CLI cleanup E2E on spawned-child readiness](./synchronize-cli-cleanup-e2e-on-spawned.md) | completed |
+| [Task selection must use the shared completed-child predicate](./task-selection-must-use-the-shared.md) | pending |
 | [Tree-kill late Windows children and their descendants](./tree-kill-late-windows-children-and.md) | completed |
 | [Windows orphan-child E2E fixture can start without its grandchild](./windows-orphan-child-e2e-fixture-can.md) | in_progress |
 | [Windows stale-lock contention regression test can deadlock](./windows-stale-lock-contention.md) | completed |
