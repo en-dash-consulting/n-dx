@@ -5,15 +5,15 @@
     "perCallTokens": 21688,
     "uniqueTokens": 13201,
     "skills": 13,
-    "skillTokens": 17217
+    "skillTokens": 17422
   },
   "skills": [
     {
       "name": "ndx-adversarial-review",
       "file": "packages/core/assistant-assets/skills/ndx-adversarial-review.md",
       "shipped": true,
-      "chars": 20512,
-      "tokens": 5128
+      "chars": 20552,
+      "tokens": 5138
     },
     {
       "name": "iso-map",
@@ -33,8 +33,8 @@
       "name": "ndx-reshape",
       "file": "packages/core/assistant-assets/skills/ndx-reshape.md",
       "shipped": true,
-      "chars": 5816,
-      "tokens": 1454
+      "chars": 5941,
+      "tokens": 1486
     },
     {
       "name": "dev-link",
@@ -44,32 +44,32 @@
       "tokens": 1264
     },
     {
-      "name": "ndx-plan",
-      "file": "packages/core/assistant-assets/skills/ndx-plan.md",
-      "shipped": true,
-      "chars": 4437,
-      "tokens": 1110
-    },
-    {
       "name": "ndx-capture",
       "file": "packages/core/assistant-assets/skills/ndx-capture.md",
       "shipped": true,
-      "chars": 4407,
-      "tokens": 1102
+      "chars": 4639,
+      "tokens": 1160
+    },
+    {
+      "name": "ndx-plan",
+      "file": "packages/core/assistant-assets/skills/ndx-plan.md",
+      "shipped": true,
+      "chars": 4553,
+      "tokens": 1139
     },
     {
       "name": "ndx-config",
       "file": "packages/core/assistant-assets/skills/ndx-config.md",
       "shipped": true,
-      "chars": 3322,
-      "tokens": 831
+      "chars": 3444,
+      "tokens": 861
     },
     {
       "name": "ndx-work",
       "file": "packages/core/assistant-assets/skills/ndx-work.md",
       "shipped": true,
-      "chars": 2954,
-      "tokens": 739
+      "chars": 3140,
+      "tokens": 785
     },
     {
       "name": "ndx-feedback",
@@ -985,8 +985,8 @@
       }
     ]
   },
-  "contentHash": "e10365e5d95f379b",
-  "recordedAt": "2026-09-11T12:15:04.131Z",
-  "commit": "1ce09a26728b",
+  "contentHash": "8513342e3f6bd311",
+  "recordedAt": "2026-09-16T19:03:15.366Z",
+  "commit": "e1e7a8837feb",
   "dirty": false
 }

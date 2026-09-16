@@ -512,7 +512,12 @@ export async function runExport(args) {
   console.log("[export] pre-rendering PRD data...");
   let prdDoc;
   try {
-    const statusJson = execFileSyncCli("rex", ["status", "--format=json", dir], {
+    // The rex CLI is resolved from the package, not looked up on PATH: a bare
+    // `rex` exists only where someone has linked the binaries globally, so
+    // relying on it made `ndx export` fail at this step (spawn rex ENOENT)
+    // in every clean install and in CI, before any run record was published.
+    const rexCli = resolvePackagePath("packages/rex", "@n-dx/rex", "dist/cli/index.js");
+    const statusJson = execFileSyncCli(process.execPath, [rexCli, "status", "--format=json", dir], {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });

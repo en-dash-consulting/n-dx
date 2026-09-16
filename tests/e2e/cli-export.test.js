@@ -127,9 +127,14 @@ describe("ndx export", () => {
       }));
     }
 
+    /** Fail on the CLI's own error rather than on a missing output file. */
+    function expectExported(result) {
+      expect(result.status, `ndx export exited ${result.status}\n${result.stderr}`).toBe(0);
+    }
+
     it("strip every free-text field from the per-run file and the index", async () => {
       await writeLeakyRun();
-      ndx(["export", dir], dir);
+      expectExported(ndx(["export", dir], dir));
 
       const outDir = join(dir, "ndx-export", "api", "hench");
       const detail = await readFile(join(outDir, "runs", "run-1.json"), "utf-8");
@@ -149,7 +154,7 @@ describe("ndx export", () => {
 
     it("publish the full record under --include-transcripts", async () => {
       await writeLeakyRun();
-      ndx(["export", "--include-transcripts", dir], dir);
+      expectExported(ndx(["export", "--include-transcripts", dir], dir));
 
       const outDir = join(dir, "ndx-export", "api", "hench");
       expect(await readFile(join(outDir, "runs", "run-1.json"), "utf-8")).toContain(SENTINEL);
