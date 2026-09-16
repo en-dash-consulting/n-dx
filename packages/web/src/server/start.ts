@@ -30,6 +30,7 @@ import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
 import { handleWorktreesRoute } from "./routes-worktrees.js";
 import { handleWorkspacesRoute } from "./routes-workspaces.js";
+import { invalidatePrdDelta } from "./prd-delta.js";
 import { WorkspaceRegistry } from "./workspaces.js";
 import type { WatcherHandles, WorkspaceHooks, WorkspaceResources } from "./workspaces.js";
 import { handleStatusRoute, clearStatusCache, buildServerInfo } from "./routes-status.js";
@@ -367,6 +368,9 @@ function registerRexWatcher(
 ): FSWatcher[] {
   if (!isInScope(scope, "rex") || !existsSync(rexDir)) return [];
   const debouncedRefresh = debounce(() => {
+    // A changed tree stales every PRD delta it takes part in, as anchor or
+    // as the compared worktree.
+    invalidatePrdDelta(rexDir);
     void refreshPRDCache(rexDir).then(() => {
       watcher.refresh();
       ws.broadcast({
