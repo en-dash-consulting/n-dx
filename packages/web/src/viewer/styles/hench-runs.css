@@ -1044,6 +1044,12 @@
   border-left: 3px solid var(--yellow, #f59e0b);
 }
 
+/* Worktree chip: a directory name, so set in mono like every other path in the UI. */
+.hench-run-chip-mono,
+.hench-filter-select-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .hench-run-chip-warning {
   color: var(--yellow, #f59e0b);
   font-weight: 500;

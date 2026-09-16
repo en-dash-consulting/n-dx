@@ -3,8 +3,11 @@
  *
  * All endpoints are under /api/hench/.
  *
- * GET    /api/hench/runs                  — list runs with summary (newest first, ?limit=N)
- * GET    /api/hench/runs/:id              — full run detail with transcript
+ * GET    /api/hench/runs                  — list runs with summary (newest first, ?limit=N;
+ *                                            ?scope=repo merges every worktree's runs, each
+ *                                            annotated with its worktree)
+ * GET    /api/hench/runs/:id              — full run detail with transcript (?scope=repo
+ *                                            searches every worktree)
  * GET    /api/hench/runs/health           — staleness health check for running runs
  * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
  * GET    /api/hench/task-usage            — incremental per-task token usage aggregation
@@ -34,12 +37,14 @@
  * POST   /api/hench/throttle/emergency-stop — terminate all running executions immediately
  */
 
-import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
-import {writeFile} from "node:fs/promises";import { join } from "node:path";
+import { readFileSync, readdirSync, writeFileSync, existsSync, watch } from "node:fs";
+import type { FSWatcher } from "node:fs";
+import { writeFile } from "node:fs/promises";
+import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
 import { totalmem, freemem, loadavg, cpus } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
+import { spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import {
@@ -129,6 +134,22 @@ interface RunSummary {
   tokenDiagnosticStatus?: "complete" | "partial" | "unavailable";
   /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
+  /**
+   * The worktree whose `.hench/runs/` this run was read from. Present only
+   * for `?scope=repo` responses; the default (served-directory) listing is
+   * unchanged and carries no worktree field.
+   */
+  worktree?: RunWorktree;
+}
+
+/** Where a run file lives, for a dashboard serving one worktree of a repository. */
+export interface RunWorktree {
+  /** Directory basename — short enough for a chip. */
+  name: string;
+  /** Realpath-resolved absolute path of the worktree root. */
+  path: string;
+  /** Checked-out branch, or null when detached or bare. */
+  branch: string | null;
 }
 
 /** Default config values for detecting non-default settings. */
@@ -235,6 +256,160 @@ function toRunSummary(run: Record<string, unknown>): RunSummary {
     tokenDiagnosticStatus: diagnostics?.tokenDiagnosticStatus as RunSummary["tokenDiagnosticStatus"],
     invocationContext: run.invocationContext as RunSummary["invocationContext"],
   };
+}
+
+// ── Repo-scope runs (worktree aggregation) ──────────────────────────────────
+// `GET /api/hench/runs?scope=repo` merges every worktree's `.hench/runs/`.
+// The default scope stays the served directory so existing callers see no
+// change; only the viewer's Runs view opts in.
+
+/** One worktree's runs directory, with the annotation its runs will carry. */
+interface WorktreeRunsSource {
+  runsDir: string;
+  worktree: RunWorktree;
+  /** The worktree this server serves — its runs dir is already watched by start.ts. */
+  served: boolean;
+}
+
+/**
+ * Every worktree of the served repository as a runs source. Empty outside a
+ * git repository, in which case callers fall back to the served directory.
+ */
+async function resolveRunSources(ctx: ServerContext): Promise<WorktreeRunsSource[]> {
+  const worktrees = await listWorktrees(ctx.projectDir);
+  if (worktrees.length === 0) return [];
+  const servedRoot = getWorktreeRoot(ctx.projectDir);
+  return worktrees
+    .filter((wt) => !wt.bare)
+    .map((wt) => ({
+      runsDir: join(wt.path, ".hench", "runs"),
+      worktree: { name: basename(wt.path), path: wt.path, branch: wt.branch },
+      served: servedRoot !== null && wt.path === servedRoot,
+    }));
+}
+
+/**
+ * Lazily registered `fs.watch` per non-served worktree runs directory, so a
+ * run written in another worktree fires `hench:run-changed` exactly as one in
+ * the served directory does (start.ts's registerHenchWatcher covers that one).
+ *
+ * Lazy — registered on the first `?scope=repo` request that sees the
+ * directory — rather than at startup, because worktrees and their
+ * `.hench/runs/` come and go while the server is up. Each poll re-checks, so
+ * a worktree added later is picked up without a restart.
+ */
+const worktreeRunWatchers = new Map<string, FSWatcher>();
+const WORKTREE_WATCH_DEBOUNCE_MS = 500;
+
+function ensureWorktreeRunWatcher(
+  runsDir: string,
+  broadcast: WebSocketBroadcaster | undefined,
+  onStatusInvalidate: (() => void) | undefined,
+): void {
+  if (worktreeRunWatchers.has(runsDir) || !existsSync(runsDir)) return;
+
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const fire = (): void => {
+    timer = null;
+    onStatusInvalidate?.();
+    broadcast?.({ type: "hench:run-changed", timestamp: new Date().toISOString() });
+  };
+
+  try {
+    const watcher = watch(runsDir, (_eventType, filename) => {
+      if (!filename || !String(filename).endsWith(".json")) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(fire, WORKTREE_WATCH_DEBOUNCE_MS);
+    });
+    // A watcher on a directory that disappears (worktree removed) errors
+    // rather than closing; drop it so the next poll can re-register.
+    watcher.on("error", () => {
+      watcher.close();
+      worktreeRunWatchers.delete(runsDir);
+    });
+    worktreeRunWatchers.set(runsDir, watcher);
+  } catch {
+    // fs.watch unavailable here — polling still works, just without the push.
+  }
+}
+
+/** Close every lazily registered worktree watcher. Called on server shutdown and by tests. */
+export function closeWorktreeRunWatchers(): void {
+  for (const watcher of worktreeRunWatchers.values()) watcher.close();
+  worktreeRunWatchers.clear();
+}
+
+interface RunsListQuery {
+  limit: number;
+  offset: number;
+  filterTaskId: string | null;
+}
+
+/** Read every run summary in one runs directory (missing directory is empty). */
+function loadRunSummaries(runsDir: string, filterTaskId: string | null): RunSummary[] {
+  let files: string[];
+  try {
+    files = readdirSync(runsDir);
+  } catch {
+    return [];
+  }
+  const summaries: RunSummary[] = [];
+  for (const file of files) {
+    if (!file.endsWith(".json")) continue;
+    const run = loadRunFile(runsDir, file.replace(/\.json$/, ""));
+    if (!run || !run.id || !run.startedAt) continue;
+    if (filterTaskId && run.taskId !== filterTaskId) continue;
+    summaries.push(toRunSummary(run));
+  }
+  return summaries;
+}
+
+/**
+ * GET /api/hench/runs?scope=repo — runs from every worktree, newest first,
+ * each annotated with its worktree. Pagination applies to the merged list.
+ */
+async function handleRunsRepoScope(rc: RouteContext, query: RunsListQuery): Promise<boolean> {
+  const sources = await resolveRunSources(rc.ctx);
+  if (sources.length === 0) {
+    // Not a repository: the served directory is the only source, unannotated.
+    const summaries = loadRunSummaries(rc.runsDir, query.filterTaskId);
+    summaries.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+    jsonResponse(rc.res, 200, { runs: paginate(summaries, query), total: summaries.length });
+    return true;
+  }
+
+  const merged: RunSummary[] = [];
+  for (const source of sources) {
+    if (!source.served) ensureWorktreeRunWatcher(source.runsDir, rc.broadcast, rc.onStatusInvalidate);
+    for (const summary of loadRunSummaries(source.runsDir, query.filterTaskId)) {
+      merged.push({ ...summary, worktree: source.worktree });
+    }
+  }
+  merged.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  jsonResponse(rc.res, 200, { runs: paginate(merged, query), total: merged.length });
+  return true;
+}
+
+function paginate<T>(items: T[], query: RunsListQuery): T[] {
+  if (query.limit <= 0 && query.offset <= 0) return items;
+  return items.slice(query.offset, query.limit > 0 ? query.offset + query.limit : undefined);
+}
+
+/** GET /api/hench/runs/:id?scope=repo — find the run in whichever worktree holds it. */
+async function handleRunDetailRepoScope(rc: RouteContext, runId: string): Promise<boolean> {
+  const sources = await resolveRunSources(rc.ctx);
+  const candidates = sources.length > 0
+    ? sources
+    : [{ runsDir: rc.runsDir, worktree: null as RunWorktree | null }];
+  for (const source of candidates) {
+    const run = loadRunFile(source.runsDir, runId);
+    if (run) {
+      jsonResponse(rc.res, 200, source.worktree ? { ...run, worktree: source.worktree } : run);
+      return true;
+    }
+  }
+  errorResponse(rc.res, 404, `Run "${runId}" not found`);
+  return true;
 }
 
 // ── Sub-routers ─────────────────────────────────────────────────────────────
@@ -379,7 +554,7 @@ function routeExecute(rc: RouteContext): boolean | Promise<boolean> | null {
 }
 
 /** Routes: runs, runs/:id, runs/health, runs/:id/mark-stuck */
-function routeRuns(rc: RouteContext): boolean | null {
+function routeRuns(rc: RouteContext): boolean | Promise<boolean> | null {
   if (!rc.path.startsWith("runs")) return null;
 
   if (rc.path === "runs/health" && rc.method === "GET") {
@@ -390,8 +565,26 @@ function routeRuns(rc: RouteContext): boolean | null {
     return handleMarkStuck(markStuckMatch[1], rc.res, rc.runsDir, rc.onStatusInvalidate);
   }
 
-  // GET /api/hench/runs — list runs with summary (?limit=N&offset=N)
+  // GET /api/hench/runs — list runs with summary (?limit=N&offset=N&taskId=&scope=repo)
   if (rc.path === "runs" && rc.method === "GET") {
+    let limit = 0;
+    let offset = 0;
+    let filterTaskId: string | null = null;
+    let repoScope = false;
+    if (rc.qIdx !== -1) {
+      const params = new URLSearchParams(rc.fullPath.slice(rc.qIdx));
+      const limitStr = params.get("limit");
+      const offsetStr = params.get("offset");
+      const taskIdStr = params.get("taskId");
+      if (limitStr) limit = Math.max(0, parseInt(limitStr, 10) || 0);
+      if (offsetStr) offset = Math.max(0, parseInt(offsetStr, 10) || 0);
+      if (taskIdStr) filterTaskId = taskIdStr;
+      repoScope = params.get("scope") === "repo";
+    }
+
+    // Opt-in: merge every worktree's runs. The default below is untouched.
+    if (repoScope) return handleRunsRepoScope(rc, { limit, offset, filterTaskId });
+
     let files: string[];
     try {
       files = readdirSync(rc.runsDir);
@@ -402,19 +595,6 @@ function routeRuns(rc: RouteContext): boolean | null {
 
     const jsonFiles = files.filter((f) => f.endsWith(".json"));
     const total = jsonFiles.length;
-
-    let limit = 0;
-    let offset = 0;
-    let filterTaskId: string | null = null;
-    if (rc.qIdx !== -1) {
-      const params = new URLSearchParams(rc.fullPath.slice(rc.qIdx));
-      const limitStr = params.get("limit");
-      const offsetStr = params.get("offset");
-      const taskIdStr = params.get("taskId");
-      if (limitStr) limit = Math.max(0, parseInt(limitStr, 10) || 0);
-      if (offsetStr) offset = Math.max(0, parseInt(offsetStr, 10) || 0);
-      if (taskIdStr) filterTaskId = taskIdStr;
-    }
 
     jsonFiles.sort((a, b) => b.localeCompare(a));
 
@@ -448,6 +628,9 @@ function routeRuns(rc: RouteContext): boolean | null {
   const runsMatch = rc.path.match(/^runs\/([^/?]+)$/);
   if (runsMatch && rc.method === "GET") {
     const runId = runsMatch[1];
+    if (rc.qIdx !== -1 && new URLSearchParams(rc.fullPath.slice(rc.qIdx)).get("scope") === "repo") {
+      return handleRunDetailRepoScope(rc, runId);
+    }
     const run = loadRunFile(rc.runsDir, runId);
     if (!run) {
       errorResponse(rc.res, 404, `Run "${runId}" not found`);

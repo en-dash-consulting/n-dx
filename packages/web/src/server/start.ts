@@ -17,7 +17,7 @@ import { handleSourcevisionAskRoute } from "./routes-sourcevision-ask.js";
 import { handleIsoMapRoute } from "./routes-iso-map.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
-import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
+import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, closeWorktreeRunWatchers, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
 import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
 import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_TREE_DIRNAME, SCHEMA_VERSION } from "./rex-gateway.js";
@@ -127,6 +127,8 @@ export function registerShutdownHandlers(
     if (watcherHandles) {
       closeWatchers(watcherHandles);
     }
+    // Lazily registered per-worktree runs watchers (GET /api/hench/runs?scope=repo).
+    closeWorktreeRunWatchers();
 
     // Step 1 — terminate hench child processes (highest priority: avoids orphaned agents)
     // Covers both hench-route executions and the rex epic-by-epic execution engine.
