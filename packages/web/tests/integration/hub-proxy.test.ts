@@ -133,4 +133,27 @@ describe("hub reverse proxy", () => {
     expect((await (await fetch(`http://127.0.0.1:${hub.port}/p/beta/api/status`)).json()).projectDir).toBe(repoB);
     expect((await (await fetch(`http://127.0.0.1:${hub.port}/p/alpha/api/status`)).json()).projectDir).toBe(repoA);
   }, 60_000);
+
+  it("forwards the reload signal to the project that contains the directory in the body", async () => {
+    const post = (body: unknown) => fetch(`http://127.0.0.1:${hub.port}/api/reload`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    // `ndx refresh --live-server` from a subdirectory of beta reaches beta's server.
+    const toBeta = await post({ source: "ndx refresh", dir: join(repoB, "packages", "x") });
+    expect(toBeta.status).toBe(200);
+    expect(await toBeta.json()).toMatchObject({ ok: true });
+
+    // No directory: the root is ambiguous.
+    const ambiguous = await post({ source: "ndx refresh" });
+    expect(ambiguous.status).toBe(409);
+    expect((await ambiguous.json()).projects).toEqual(["alpha", "beta"]);
+
+    // A directory nobody registered.
+    expect((await post({ dir: "/nowhere/at/all" })).status).toBe(404);
+    // Not JSON.
+    expect((await fetch(`http://127.0.0.1:${hub.port}/api/reload`, { method: "POST", body: "{ nope" })).status).toBe(400);
+  });
 });

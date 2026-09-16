@@ -67,6 +67,20 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
   let hubPort;
   let canBindPorts = true;
 
+  function runCli(args) {
+    try {
+      const stdout = execFileSync("node", [CLI_PATH, ...args], {
+        encoding: "utf-8",
+        timeout: 120_000,
+        stdio: "pipe",
+        ...withSandboxedClaudeConfig({ env: { ...process.env, N_DX_HOME: home } }),
+      });
+      return { stdout, stderr: "", code: 0 };
+    } catch (err) {
+      return { stdout: err.stdout ?? "", stderr: err.stderr ?? "", code: err.status ?? 1 };
+    }
+  }
+
   function runStart(args) {
     try {
       const stdout = execFileSync("node", [CLI_PATH, "start", ...args], {
@@ -177,6 +191,36 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
     const after = (await getJson(`http://127.0.0.1:${hubPort}/api/hub/projects`)).body.projects.find((p) => p.id === "alpha-app");
     expect(after.pid).toBe(before.pid);
     expect(after.worktrees).toEqual([repoA, worktreeA]);
+  });
+
+  it("writes hub marker files so refresh --live-server, stop and status recognise the registration", async () => {
+    if (!canBindPorts) return;
+    // Marker files in the directory that was started (the worktree).
+    expect((await readFile(join(worktreeA, ".n-dx-web.port"), "utf-8")).trim()).toBe(String(hubPort));
+    const marker = JSON.parse(await readFile(join(worktreeA, ".n-dx-web.pid"), "utf-8"));
+    expect(marker).toMatchObject({ via: "hub", port: hubPort, projectId: "alpha-app" });
+    const hubHealth = await getJson(`http://127.0.0.1:${hubPort}/api/hub/health`);
+    expect(marker.pid).toBe(hubHealth.body.pid);
+
+    // refresh --live-server posts /api/reload to the hub, which forwards to alpha's server.
+    const live = runCli(["refresh", "--ui-only", "--no-build", "--live-server", worktreeA]);
+    expect(live.code, live.stderr + live.stdout).toBe(0);
+    expect(live.stdout).toContain(`Live reload: attempted on :${hubPort} and succeeded`);
+
+    // refresh without --live-server must not stop the hub through the marker.
+    const plain = runCli(["refresh", "--ui-only", "--no-build", worktreeA]);
+    expect(plain.code, plain.stderr + plain.stdout).toBe(0);
+    expect(plain.stdout).toContain("served through the n-dx hub");
+    expect((await getJson(`http://127.0.0.1:${hubPort}/api/hub/health`)).status).toBe(200);
+
+    // stop and status recognise the marker and leave the hub alone.
+    const stop = runStart(["stop", worktreeA]);
+    expect(stop.code).toBe(0);
+    expect(stop.stdout).toContain("served through the n-dx hub");
+    expect((await getJson(`http://127.0.0.1:${hubPort}/api/hub/health`)).status).toBe(200);
+    const status = runStart(["status", worktreeA]);
+    expect(status.stdout).toContain("registered with the n-dx hub");
+    expect(status.stdout).toContain(`/p/alpha-app/`);
   });
 
   it("--here still starts the single-project server on the requested port", async () => {

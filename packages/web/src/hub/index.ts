@@ -26,5 +26,5 @@ export {
 } from "./registry.js";
 export type { HubRegistry, ProjectRecord, HubPidFile } from "./registry.js";
 export { parseRegisterInput, handleHubRoute } from "./routes.js";
-export { decideProxy, renderProjectList, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
+export { decideProxy, matchProjectByDir, renderProjectList, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 export type { ProxyDecision } from "./proxy.js";

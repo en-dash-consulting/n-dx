@@ -54,6 +54,7 @@ import {
   runWeb,
   isProcessRunning,
   readPidFile,
+  isHubMarker,
   removePidFile,
   removePortFile,
 } from "./web.js";
@@ -773,12 +774,19 @@ function showCommandHelp(command) {
  * race against a live server that is serving the files being rebuilt.
  *
  * @param {string} absDir  Absolute project directory (contains `.n-dx-web.pid`)
- * @returns {Promise<{status:"none"|"stale"|"stopped"|"stop-failed", pid?: number, port?: number}>}
+ * @returns {Promise<{status:"none"|"stale"|"hub"|"stopped"|"stop-failed", pid?: number, port?: number, projectId?: string}>}
  */
 async function detectAndCleanConflictingDashboard(absDir) {
   const info = await readPidFile(absDir);
   if (!info) {
     return { status: "none" };
+  }
+
+  // A hub registration: the pid is the hub's, which serves every registered
+  // project. It is not this directory's server to stop, and it does not
+  // rebuild this directory's assets, so there is no race to avoid.
+  if (isHubMarker(info)) {
+    return { status: "hub", pid: info.pid, port: info.port, projectId: info.projectId };
   }
 
   if (!isProcessRunning(info.pid)) {
@@ -891,7 +899,10 @@ async function signalLiveReload(dir) {
     const res = await fetch(`http://127.0.0.1:${port}/api/reload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: "ndx refresh" }),
+      // `dir` lets the hub, which serves several projects on one port, forward
+      // the signal to the server for this directory. A single-project server
+      // ignores it.
+      body: JSON.stringify({ source: "ndx refresh", dir: resolve(dir) }),
       signal: controller.signal,
     });
 
@@ -1643,6 +1654,10 @@ async function handleRefresh(rest) {
     if (conflict.status === "stopped") {
       console.log(
         `Pre-refresh: detected running dashboard (PID ${conflict.pid}, port ${conflict.port}); stopped.`,
+      );
+    } else if (conflict.status === "hub") {
+      console.log(
+        `Pre-refresh: this directory is served through the n-dx hub (project "${conflict.projectId}", port ${conflict.port}); leaving it running.`,
       );
     } else if (conflict.status === "stop-failed") {
       console.error(

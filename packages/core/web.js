@@ -510,6 +510,34 @@ async function writePidFile(dir, pid, port) {
 }
 
 /**
+ * Write the marker files a hub-served directory keeps for compatibility.
+ *
+ * `.n-dx-web.port` carries the HUB's port, so `ndx refresh --live-server`
+ * (which reads only that file and POSTs /api/reload to it) keeps working: the
+ * hub forwards the signal to this project's server. `.n-dx-web.pid` records
+ * the hub's pid tagged `via: "hub"` so every reader of that file — `stop`,
+ * `status`, refresh's conflict detection — can tell a hub registration from a
+ * single-project server and must not kill the hub for it.
+ */
+export async function writeHubMarkerFiles(dir, { hubPid, hubPort, projectId }) {
+  await writeFile(
+    join(dir, PID_FILE),
+    JSON.stringify(
+      { pid: hubPid, port: hubPort, startedAt: new Date().toISOString(), via: "hub", projectId },
+      null,
+      2,
+    ) + "\n",
+    "utf-8",
+  );
+  await writeFile(join(dir, PORT_FILE), String(hubPort) + "\n", "utf-8");
+}
+
+/** True when a pid file records a hub registration rather than a server of its own. */
+export function isHubMarker(info) {
+  return Boolean(info) && info.via === "hub";
+}
+
+/**
  * Remove PID file.
  */
 export async function removePidFile(dir) {
@@ -562,6 +590,17 @@ async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(pro
     return true;
   }
 
+  // A hub marker names the hub's pid, and the hub serves every registered
+  // project. Killing it here would take the other dashboards down too.
+  if (isHubMarker(info)) {
+    log(
+      `This directory is served through the n-dx hub (project "${info.projectId}" at ` +
+        `http://localhost:${info.port}/p/${encodeURIComponent(info.projectId)}/). ` +
+        `Unregistering with 'ndx start stop' is not available yet; the hub keeps running.`,
+    );
+    return true;
+  }
+
   if (!isProcessRunning(info.pid)) {
     log("Server process is no longer running (stale PID file).");
     await removePidFile(dir);
@@ -605,6 +644,22 @@ async function showStatus(dir, port, label = "n-dx server") {
     // Still check if something is on the port
     if (await isPortInUse(port)) {
       log(`Note: Port ${port} is in use by another process.`);
+    }
+    return;
+  }
+
+  if (isHubMarker(info)) {
+    const health = await hubRequest(info.port, "GET", "/api/hub/health");
+    const base = `http://localhost:${info.port}/p/${encodeURIComponent(info.projectId)}`;
+    if (health.status === 200) {
+      const project = await hubRequest(info.port, "GET", `/api/hub/projects/${encodeURIComponent(info.projectId)}`);
+      const state = project.body?.project?.status?.state ?? "unknown";
+      log(`${label}: registered with the n-dx hub (PID ${health.body?.pid ?? info.pid}, port ${info.port}); project "${info.projectId}" is ${state}.`);
+      log(`  URL: ${base}/`);
+      log(`  MCP (rex):          ${base}/mcp/rex`);
+      log(`  MCP (sourcevision): ${base}/mcp/sourcevision`);
+    } else {
+      log(`${label}: registered with the n-dx hub on port ${info.port}, but the hub is not answering. Run 'ndx start --hub' to start it.`);
     }
     return;
   }
@@ -907,6 +962,16 @@ async function runHubMode(absDir, flags, { tools, __dir, label }) {
     return 1;
   }
 
+  // Marker files: the port file points refresh --live-server at the hub, and
+  // the pid file lets stop/status/refresh recognise a hub registration.
+  const health = await hubRequest(hubPort, "GET", "/api/hub/health");
+  const hubPid = typeof health.body?.pid === "number" ? health.body.pid : (hub.pid ?? process.pid);
+  try {
+    await writeHubMarkerFiles(absDir, { hubPid, hubPort, projectId: id });
+  } catch {
+    // Non-fatal: the marker files are a convenience for other commands.
+  }
+
   const base = `http://localhost:${hubPort}/p/${encodeURIComponent(id)}`;
   log(`${label}: project "${id}" registered with the hub${status === 200 ? " (already known)" : ""}.`);
   log(`  Repository: ${repo.repoRoot}${repo.worktree !== repo.repoRoot ? `\n  Worktree:   ${repo.worktree}` : ""}${repo.branch ? ` (${repo.branch})` : ""}`);
@@ -1009,7 +1074,13 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
 
   // --- Check for stale PID / already running ---
   const existing = await readPidFile(absDir);
-  if (existing && isProcessRunning(existing.pid)) {
+  if (existing && isHubMarker(existing)) {
+    // The marker points at the hub, which keeps serving the other projects.
+    // A single-project server here just takes the marker files over.
+    log(`This directory was registered with the n-dx hub (project "${existing.projectId}"); starting a single-project server here instead.`);
+    await removePidFile(absDir);
+    await removePortFile(absDir);
+  } else if (existing && isProcessRunning(existing.pid)) {
     // Auto-restart: stop the old server so ndx start is idempotent.
     log(`Stopping previous ${label} (PID ${existing.pid}, port ${existing.port})…`);
     await stopServer(absDir, label);

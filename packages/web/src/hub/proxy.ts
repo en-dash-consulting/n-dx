@@ -27,11 +27,16 @@
 import { request as httpRequest } from "node:http";
 import type { IncomingMessage, OutgoingHttpHeaders, ServerResponse } from "node:http";
 import { connect } from "node:net";
+import { realpathSync } from "node:fs";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import type { Duplex } from "node:stream";
 import { detectBasePath, projectIdFromBasePath, stripBasePath } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 
 const UPSTREAM_HOST = "127.0.0.1";
+/** `ndx refresh --live-server` posts here; with several projects the body's `dir` picks one. */
+const RELOAD_PATH = "/api/reload";
+const MAX_RELOAD_BODY_BYTES = 64 * 1024;
 /** Header telling the project server which prefix the client used, for anything that builds absolute links. */
 const FORWARDED_PREFIX_HEADER = "x-forwarded-prefix";
 
@@ -95,6 +100,116 @@ function projectIds(hub: Hub): string[] {
   return hub.listProjects().map((p) => p.id);
 }
 
+/**
+ * Realpath a path that may not exist yet: the deepest existing ancestor is
+ * resolved and the missing tail re-appended, so `/var/…/repo/new-dir` and
+ * `/private/var/…/repo` still compare as the same tree.
+ */
+function canonical(path: string): string {
+  const absolute = resolve(path);
+  let probe = absolute;
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      return join(realpathSync.native(probe), ...tail);
+    } catch {
+      const parent = dirname(probe);
+      if (parent === probe) return absolute;
+      tail.unshift(basename(probe));
+      probe = parent;
+    }
+  }
+}
+
+/**
+ * The project whose repository root or a registered worktree contains `dir`.
+ *
+ * `ndx refresh --live-server` runs in some checkout of some repository and
+ * knows only its own directory; the hub knows which registered project that
+ * directory belongs to. Deepest match wins so a worktree registered inside
+ * another project's tree resolves to itself. Pure over the project list.
+ */
+export function matchProjectByDir(projects: ProjectView[], dir: string): ProjectView | null {
+  const target = canonical(dir);
+  let best: { project: ProjectView; depth: number } | null = null;
+  for (const project of projects) {
+    for (const root of [project.repoRoot, ...project.worktrees]) {
+      const rootPath = canonical(root);
+      if (target === rootPath || target.startsWith(rootPath + sep)) {
+        const depth = rootPath.length;
+        if (!best || depth > best.depth) best = { project, depth };
+      }
+    }
+  }
+  return best?.project ?? null;
+}
+
+function readBody(req: IncomingMessage, limit: number): Promise<Buffer> {
+  return new Promise((resolvePromise, reject) => {
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    req.on("data", (chunk: Buffer) => {
+      bytes += chunk.length;
+      if (bytes > limit) {
+        reject(new Error(`request body exceeds ${limit} bytes`));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolvePromise(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
+/**
+ * The reload signal when several projects are registered: the caller says
+ * which directory it refreshed, and the hub forwards to that project's server
+ * with the body it already consumed. Returns false when this request is not
+ * such a signal and the general routing should proceed.
+ */
+async function handleReloadSignal(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<boolean> {
+  const pathname = (req.url || "/").split("?")[0];
+  if (pathname !== RELOAD_PATH || (req.method || "GET") !== "POST") return false;
+  const projects = hub.listProjects();
+  // Zero or one project: the general rules (404, or the root alias) apply.
+  if (projects.length < 2) return false;
+
+  let body: Buffer;
+  try {
+    body = await readBody(req, MAX_RELOAD_BODY_BYTES);
+  } catch (err) {
+    writeJson(res, 400, { error: (err as Error).message });
+    return true;
+  }
+  let dir: string | null = null;
+  try {
+    const parsed = JSON.parse(body.toString("utf-8") || "{}") as { dir?: unknown };
+    if (typeof parsed.dir === "string" && parsed.dir) dir = parsed.dir;
+  } catch {
+    writeJson(res, 400, { error: "reload body is not valid JSON" });
+    return true;
+  }
+  if (!dir) {
+    writeJson(res, 409, {
+      error: "Several projects are registered; send { dir } so the hub can pick one, or address /p/<id>/api/reload",
+      projects: projects.map((p) => p.id),
+    });
+    return true;
+  }
+  const project = matchProjectByDir(projects, dir);
+  if (!project) {
+    writeJson(res, 404, { error: `No registered project contains ${dir}`, projects: projects.map((p) => p.id) });
+    return true;
+  }
+  if (project.port === null) {
+    writeJson(res, 503, { error: `Project "${project.id}" has no running server`, status: project.status });
+    return true;
+  }
+  proxyHttp(req, res, project.port, RELOAD_PATH, "", body);
+  return true;
+}
+
 function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] ?? ch);
 }
@@ -109,10 +224,26 @@ export function renderProjectList(projects: ProjectView[]): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>n-dx hub</title></head><body><h1>n-dx hub</h1>${items}</body></html>`;
 }
 
-/** Stream one HTTP request to a project server and its response back. */
-export function proxyHttp(req: IncomingMessage, res: ServerResponse, port: number, path: string, prefix: string): void {
+/**
+ * Stream one HTTP request to a project server and its response back.
+ *
+ * @param body When the hub already consumed the request body (to route on it),
+ *   it is sent upstream in place of piping the request.
+ */
+export function proxyHttp(
+  req: IncomingMessage,
+  res: ServerResponse,
+  port: number,
+  path: string,
+  prefix: string,
+  body?: Buffer,
+): void {
   const headers: OutgoingHttpHeaders = { ...req.headers, host: `${UPSTREAM_HOST}:${port}` };
   if (prefix) headers[FORWARDED_PREFIX_HEADER] = prefix;
+  if (body) {
+    headers["content-length"] = String(body.length);
+    delete headers["transfer-encoding"];
+  }
 
   const upstream = httpRequest(
     { host: UPSTREAM_HOST, port, method: req.method, path, headers },
@@ -139,7 +270,8 @@ export function proxyHttp(req: IncomingMessage, res: ServerResponse, port: numbe
     }
   });
   req.on("aborted", () => upstream.destroy());
-  req.pipe(upstream);
+  if (body) upstream.end(body);
+  else req.pipe(upstream);
 }
 
 /** Forward a WebSocket upgrade: replay the request head upstream, then pipe both sockets. */
@@ -189,7 +321,8 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
 }
 
 /** Handle any request that is not `/api/hub/*`. Always responds. */
-export function handleProxyRequest(req: IncomingMessage, res: ServerResponse, hub: Hub): void {
+export async function handleProxyRequest(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<void> {
+  if (await handleReloadSignal(req, res, hub)) return;
   const decision = decideProxy(hub, req.url || "/");
   switch (decision.kind) {
     case "proxy":

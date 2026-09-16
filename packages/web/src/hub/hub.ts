@@ -222,7 +222,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     void handleHubRoute(req, res, hub).then((handled) => {
       // Everything that is not the hub's own API belongs to a project server:
       // /p/<id>/… explicitly, or the root alias when one project is registered.
-      if (!handled) handleProxyRequest(req, res, hub);
+      if (!handled) void handleProxyRequest(req, res, hub);
     });
   });
   server.on("upgrade", (req, socket, head) => handleProxyUpgrade(req, socket, head, hub));
