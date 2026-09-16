@@ -13,13 +13,27 @@
  * cannot drift, and `validateConfigKeyValue` gives them one gate.
  */
 
-/** Config field metadata for the UI and for write validation. */
+/**
+ * Config field metadata for the UI and for write validation.
+ *
+ * `integer` and `positive` mirror the `.int()` / `.positive()` refinements on
+ * the matching field of hench's `HenchConfigSchema`. They exist because this
+ * gate and that schema must agree: a value accepted here is written to
+ * `.hench/config.json` verbatim, and hench refuses to start on a file its own
+ * schema rejects. `tests/e2e/hench-config-gate-contract.test.js` pins the
+ * agreement, so a new field with a refinement hench has and this metadata
+ * lacks fails there rather than at the next `ndx work`.
+ */
 export interface ConfigFieldInfo {
   path: string;
   label: string;
   description: string;
   type: "string" | "number" | "boolean" | "enum" | "array";
   enumValues?: string[];
+  /** Mirrors `.int()` — a fractional value is refused. */
+  integer?: true;
+  /** Mirrors `.positive()` — zero is refused, not just negatives. */
+  positive?: true;
   category: string;
 }
 
@@ -27,19 +41,19 @@ export interface ConfigFieldInfo {
 export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
   { path: "provider", label: "Provider", description: "Claude provider: 'cli' (Claude Code) or 'api' (direct API)", type: "enum", enumValues: ["cli", "api"], category: "execution" },
   { path: "model", label: "Model", description: "Claude model to use (e.g. sonnet, opus, haiku)", type: "string", category: "execution" },
-  { path: "maxTurns", label: "Max Turns", description: "Maximum conversation turns per run", type: "number", category: "execution" },
-  { path: "maxTokens", label: "Max Tokens per Request", description: "Maximum tokens per API request", type: "number", category: "execution" },
-  { path: "tokenBudget", label: "Token Budget", description: "Total token budget per run (input+output). 0 = unlimited", type: "number", category: "execution" },
-  { path: "loopPauseMs", label: "Loop Pause (ms)", description: "Pause between loop/iteration runs in milliseconds", type: "number", category: "execution" },
-  { path: "maxFailedAttempts", label: "Max Failed Attempts", description: "Consecutive failures before a task is considered stuck", type: "number", category: "task-selection" },
+  { path: "maxTurns", label: "Max Turns", description: "Maximum conversation turns per run", type: "number", positive: true, category: "execution" },
+  { path: "maxTokens", label: "Max Tokens per Request", description: "Maximum tokens per API request", type: "number", positive: true, category: "execution" },
+  { path: "tokenBudget", label: "Token Budget", description: "Total token budget per run (input+output). 0 = unlimited", type: "number", integer: true, category: "execution" },
+  { path: "loopPauseMs", label: "Loop Pause (ms)", description: "Pause between loop/iteration runs in milliseconds", type: "number", integer: true, category: "execution" },
+  { path: "maxFailedAttempts", label: "Max Failed Attempts", description: "Consecutive failures before a task is considered stuck", type: "number", integer: true, positive: true, category: "task-selection" },
   { path: "rexDir", label: "Rex Directory", description: "Path to the .rex directory for task data", type: "string", category: "task-selection" },
-  { path: "retry.maxRetries", label: "Max Retries", description: "Number of retry attempts for transient API errors", type: "number", category: "retry" },
-  { path: "retry.baseDelayMs", label: "Base Retry Delay (ms)", description: "Initial delay before first retry (doubles each attempt)", type: "number", category: "retry" },
-  { path: "retry.maxDelayMs", label: "Max Retry Delay (ms)", description: "Maximum delay between retries (caps exponential backoff)", type: "number", category: "retry" },
+  { path: "retry.maxRetries", label: "Max Retries", description: "Number of retry attempts for transient API errors", type: "number", integer: true, category: "retry" },
+  { path: "retry.baseDelayMs", label: "Base Retry Delay (ms)", description: "Initial delay before first retry (doubles each attempt)", type: "number", positive: true, category: "retry" },
+  { path: "retry.maxDelayMs", label: "Max Retry Delay (ms)", description: "Maximum delay between retries (caps exponential backoff)", type: "number", positive: true, category: "retry" },
   { path: "guard.blockedPaths", label: "Blocked Paths", description: "Glob patterns for paths the agent cannot modify", type: "array", category: "guard" },
   { path: "guard.allowedCommands", label: "Allowed Commands", description: "Shell commands the agent is permitted to execute", type: "array", category: "guard" },
-  { path: "guard.commandTimeout", label: "Command Timeout (ms)", description: "Maximum time for a single command execution", type: "number", category: "guard" },
-  { path: "guard.maxFileSize", label: "Max File Size (bytes)", description: "Maximum file size the agent can write", type: "number", category: "guard" },
+  { path: "guard.commandTimeout", label: "Command Timeout (ms)", description: "Maximum time for a single command execution", type: "number", positive: true, category: "guard" },
+  { path: "guard.maxFileSize", label: "Max File Size (bytes)", description: "Maximum file size the agent can write", type: "number", positive: true, category: "guard" },
   { path: "apiKeyEnv", label: "API Key Env Var", description: "Environment variable name for Anthropic API key", type: "string", category: "general" },
 ];
 
@@ -49,22 +63,41 @@ export const FORBIDDEN_CONFIG_SEGMENTS = new Set(["__proto__", "constructor", "p
 /**
  * Validate a single field value against its declared type.
  * Returns an error message, or null when the value is acceptable.
+ *
+ * Every check here is at least as strict as hench's `HenchConfigSchema` for the
+ * same field, because whatever this accepts is written to `.hench/config.json`
+ * and hench refuses to load a file its schema rejects — a 200 response that
+ * bricks the next `ndx work` until the file is hand-edited. The three checks
+ * that look redundant are the ones that used to let that happen:
+ * `typeof value === "string"` before the enum lookup (`String(["cli"])` is
+ * `"cli"`, so an array passed a `z.enum` check), the element test on arrays
+ * (`z.array(z.string())` rejects `[1, null]`), and `Number.isFinite` (JSON
+ * `1e999` parses to `Infinity`, which `JSON.stringify` then writes as `null`).
  */
 export function validateFieldValue(field: ConfigFieldInfo, value: unknown): string | null {
   switch (field.type) {
     case "number":
-      if (typeof value !== "number" || isNaN(value)) return `${field.label} must be a number`;
-      if (value < 0) return `${field.label} must be non-negative`;
+      if (typeof value !== "number" || !Number.isFinite(value))
+        return `${field.label} must be a finite number`;
+      if (field.positive) {
+        if (value <= 0) return `${field.label} must be greater than zero`;
+      } else if (value < 0) {
+        return `${field.label} must be non-negative`;
+      }
+      if (field.integer && !Number.isInteger(value))
+        return `${field.label} must be a whole number`;
       return null;
     case "boolean":
       if (typeof value !== "boolean") return `${field.label} must be a boolean`;
       return null;
     case "enum":
-      if (field.enumValues && !field.enumValues.includes(String(value)))
-        return `${field.label} must be one of: ${field.enumValues.join(", ")}`;
+      if (typeof value !== "string" || (field.enumValues && !field.enumValues.includes(value)))
+        return `${field.label} must be one of: ${field.enumValues?.join(", ") ?? "the allowed values"}`;
       return null;
     case "array":
       if (!Array.isArray(value)) return `${field.label} must be an array`;
+      if (!value.every((entry) => typeof entry === "string"))
+        return `${field.label} must be an array of strings`;
       return null;
     case "string":
       if (typeof value !== "string" || value.length === 0) return `${field.label} must be a non-empty string`;
