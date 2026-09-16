@@ -140,6 +140,7 @@ import {
   getCurrentBranch,
   getWorktreeRoot,
   getGitCommonDir,
+  listWorktrees,
   isExecutableOnPath,
   spawnTool,
   spawnManaged,
@@ -358,6 +359,10 @@ describe("public API — process execution exports", () => {
 
   it("exports getGitCommonDir as a function", () => {
     expect(typeof getGitCommonDir).toBe("function");
+  });
+
+  it("exports listWorktrees as a function", () => {
+    expect(typeof listWorktrees).toBe("function");
   });
 
   it("exports isExecutableOnPath as a function", () => {

@@ -1037,8 +1037,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 166,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token accumulation, and model catalogs). The combined branch exposes both terminateProcessTree for complete Windows CLI-tree cleanup and resolveLocalTimeoutMs for the local-provider timeout configuration; both are consumed only through this gateway.",
+    maxExports: 168,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token accumulation, and model catalogs). The combined branch exposes both terminateProcessTree for complete Windows CLI-tree cleanup and resolveLocalTimeoutMs for the local-provider timeout configuration; both are consumed only through this gateway. Raised from 166 to 168 for listWorktrees and its GitWorktree type (0.6.0 PR 5, worktree awareness): the async sibling of getWorktreeRoot, so hench's cross-worktree run views read the same realpath-resolved worktree list the dashboard does rather than shelling out to git themselves.",
   },
 ];
 

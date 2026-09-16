@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, buildShellInvocation, getCurrentHead, getWorktreeRoot, getGitCommonDir, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, buildShellInvocation, getCurrentHead, getWorktreeRoot, getGitCommonDir, listWorktrees, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
 import { resolve } from "node:path";
 import { fakeSpawn } from "../helpers/fake-spawn.js";
 
@@ -495,6 +495,125 @@ describe("getGitCommonDir", () => {
     });
 
     expect(getGitCommonDir("/tmp")).toBeNull();
+  });
+});
+
+/**
+ * Porcelain parsing and the empty-list paths. The shape of real output —
+ * which entry git lists first, what a detached or bare entry looks like —
+ * is pinned against real repositories in
+ * tests/integration/git-worktree-helpers.test.ts.
+ *
+ * Paths do not exist, so realpath falls through and the assertions stay
+ * independent of the host filesystem.
+ */
+describe("listWorktrees", () => {
+  const MAIN = "/does/not/exist/project";
+  const LINKED = "/does/not/exist/project-side";
+
+  it("asks git for the porcelain worktree list with a short timeout", async () => {
+    const spawned = fakeSpawn({ stdout: `worktree ${MAIN}\nHEAD aaa111\nbranch refs/heads/main\n\n` });
+    mockSpawn.mockImplementation(spawned.impl);
+
+    await listWorktrees(MAIN);
+
+    expect(spawned.calls).toHaveLength(1);
+    expect(spawned.calls[0].cmd).toBe("git");
+    expect(spawned.calls[0].args).toEqual(["worktree", "list", "--porcelain"]);
+    expect(spawned.calls[0].opts.cwd).toBe(MAIN);
+    // Captured, never inherited: probing a non-repository must not print
+    // `fatal: not a git repository` onto the user's terminal.
+    expect(spawned.calls[0].opts.stdio).toEqual(["pipe", "pipe", "pipe"]);
+  });
+
+  it("main checkout only", async () => {
+    mockSpawn.mockImplementation(
+      fakeSpawn({ stdout: `worktree ${MAIN}\nHEAD aaa111\nbranch refs/heads/main\n\n` }).impl,
+    );
+
+    expect(await listWorktrees(MAIN)).toEqual([
+      { path: MAIN, branch: "main", head: "aaa111", isMain: true, detached: false, bare: false },
+    ]);
+  });
+
+  it("main checkout plus a linked worktree, main first", async () => {
+    mockSpawn.mockImplementation(
+      fakeSpawn({
+        stdout: [
+          `worktree ${MAIN}`, "HEAD aaa111", "branch refs/heads/main", "",
+          `worktree ${LINKED}`, "HEAD bbb222", "branch refs/heads/side", "",
+        ].join("\n"),
+      }).impl,
+    );
+
+    expect(await listWorktrees(LINKED)).toEqual([
+      { path: MAIN, branch: "main", head: "aaa111", isMain: true, detached: false, bare: false },
+      { path: LINKED, branch: "side", head: "bbb222", isMain: false, detached: false, bare: false },
+    ]);
+  });
+
+  it("detached worktree has no branch", async () => {
+    mockSpawn.mockImplementation(
+      fakeSpawn({
+        stdout: [
+          `worktree ${MAIN}`, "HEAD aaa111", "branch refs/heads/main", "",
+          `worktree ${LINKED}`, "HEAD bbb222", "detached", "",
+        ].join("\n"),
+      }).impl,
+    );
+
+    const [, detached] = await listWorktrees(MAIN);
+    expect(detached).toEqual({
+      path: LINKED, branch: null, head: "bbb222", isMain: false, detached: true, bare: false,
+    });
+  });
+
+  it("bare repository has neither branch nor HEAD", async () => {
+    mockSpawn.mockImplementation(
+      fakeSpawn({ stdout: `worktree ${MAIN}.git\nbare\n\n` }).impl,
+    );
+
+    expect(await listWorktrees(MAIN)).toEqual([
+      { path: `${MAIN}.git`, branch: null, head: null, isMain: true, detached: false, bare: true },
+    ]);
+  });
+
+  // `locked` and `prunable` exist today; a future git may add more. None of
+  // them should empty the list or attach to the wrong entry.
+  it("skips attribute lines it does not know", async () => {
+    mockSpawn.mockImplementation(
+      fakeSpawn({
+        stdout: [
+          `worktree ${MAIN}`, "HEAD aaa111", "branch refs/heads/main", "",
+          `worktree ${LINKED}`, "HEAD bbb222", "detached", "locked reason with spaces", "prunable gitdir file points to non-existent location", "",
+        ].join("\n"),
+      }).impl,
+    );
+
+    const list = await listWorktrees(MAIN);
+    expect(list.map((w) => w.path)).toEqual([MAIN, LINKED]);
+    expect(list[1].detached).toBe(true);
+  });
+
+  it("returns [] outside a repository", async () => {
+    mockSpawn.mockImplementation(
+      fakeSpawn({ stderr: "fatal: not a git repository (or any of the parent directories): .git\n", code: 128 }).impl,
+    );
+
+    expect(await listWorktrees("/does/not/exist/plain-dir")).toEqual([]);
+  });
+
+  it("returns [] when git is not installed", async () => {
+    const failure = Object.assign(new Error("spawn git ENOENT"), { code: "ENOENT" });
+    mockSpawn.mockImplementation(fakeSpawn({ spawnError: failure }).impl);
+
+    expect(await listWorktrees(MAIN)).toEqual([]);
+  });
+
+  it("returns [] when git produces no entries", async () => {
+    mockSpawn.mockImplementation(fakeSpawn({ stdout: "" }).impl);
+
+    expect(await listWorktrees(MAIN)).toEqual([]);
   });
 });
 

@@ -274,6 +274,7 @@ export {
   getCurrentBranch,
   getWorktreeRoot,
   getGitCommonDir,
+  listWorktrees,
   sanitizeBranchName,
   isExecutableOnPath,
   spawnTool,
@@ -293,6 +294,7 @@ export {
 export type {
   ExecResult,
   ExecOptions,
+  GitWorktree,
   ShellInvocation,
   SpawnToolOptions,
   SpawnToolResult,

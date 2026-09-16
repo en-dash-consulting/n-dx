@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { getWorktreeRoot, getGitCommonDir } from "../../src/exec.js";
+import { getWorktreeRoot, getGitCommonDir, listWorktrees } from "../../src/exec.js";
 
 /**
  * getWorktreeRoot / getGitCommonDir against real repositories.
@@ -47,6 +47,8 @@ let tmpRoot: string;
 let repo: string;
 /** Linked worktree of `repo`, created with `git worktree add`. */
 let linked: string;
+/** Linked worktree of `repo` with a detached HEAD. */
+let detached: string;
 /** Plain directory, never a repository. */
 let outside: string;
 
@@ -62,6 +64,9 @@ beforeAll(() => {
 
   linked = join(tmpRoot, "linked");
   git(repo, "worktree", "add", "--quiet", "-b", "side", linked);
+
+  detached = join(tmpRoot, "detached");
+  git(repo, "worktree", "add", "--quiet", "--detach", detached);
 
   outside = join(tmpRoot, "outside");
   mkdirSync(outside);
@@ -90,6 +95,81 @@ describe("getWorktreeRoot against real repositories", () => {
 
   it("returns null outside a repository", () => {
     expect(getWorktreeRoot(outside)).toBeNull();
+  });
+});
+
+describe("listWorktrees against real repositories", () => {
+  // Only the main checkout's position is git's contract; the linked ones
+  // follow in whatever order git chooses (by path in current versions).
+  it("lists the main checkout first, then every linked worktree", async () => {
+    const list = await listWorktrees(repo);
+
+    expect(list[0]).toMatchObject({ path: repo, isMain: true });
+    expect(list.slice(1).map((w) => w.path).sort()).toEqual([linked, detached].sort());
+    expect(list.slice(1).every((w) => !w.isMain)).toBe(true);
+  });
+
+  it("reports each worktree's branch and HEAD", async () => {
+    const list = await listWorktrees(repo);
+    const head = git(repo, "rev-parse", "HEAD").trim();
+
+    expect(list.find((w) => w.path === repo)).toMatchObject({ branch: "main", head, detached: false, bare: false });
+    expect(list.find((w) => w.path === linked)).toMatchObject({ branch: "side", head, detached: false, bare: false });
+  });
+
+  it("a detached worktree has no branch", async () => {
+    const wt = (await listWorktrees(repo)).find((w) => w.path === detached);
+
+    expect(wt).toMatchObject({ branch: null, detached: true, isMain: false });
+    expect(wt?.head).toBe(git(detached, "rev-parse", "HEAD").trim());
+  });
+
+  // The list describes the repository, not the caller's position in it.
+  it("is the same from a linked worktree and from a subdirectory", async () => {
+    const fromMain = await listWorktrees(repo);
+    const nested = join(repo, "a", "b");
+    mkdirSync(nested, { recursive: true });
+
+    expect(await listWorktrees(linked)).toEqual(fromMain);
+    expect(await listWorktrees(nested)).toEqual(fromMain);
+  });
+
+  it("paths compare equal to getWorktreeRoot for the same directory", async () => {
+    const list = await listWorktrees(linked);
+
+    expect(list.find((w) => w.path === getWorktreeRoot(linked))).toBeDefined();
+  });
+
+  it("a repository with no linked worktrees lists only itself", async () => {
+    const solo = join(tmpRoot, "solo");
+    mkdirSync(solo);
+    git(solo, "init", "--quiet", "--initial-branch=main");
+    git(solo, "commit", "--allow-empty", "--quiet", "-m", "root");
+
+    expect(await listWorktrees(solo)).toEqual([
+      {
+        path: solo,
+        branch: "main",
+        head: git(solo, "rev-parse", "HEAD").trim(),
+        isMain: true,
+        detached: false,
+        bare: false,
+      },
+    ]);
+  });
+
+  it("a bare repository is a single bare entry", async () => {
+    const bare = join(tmpRoot, "bare.git");
+    mkdirSync(bare);
+    git(bare, "init", "--quiet", "--bare");
+
+    expect(await listWorktrees(bare)).toEqual([
+      { path: bare, branch: null, head: null, isMain: true, detached: false, bare: true },
+    ]);
+  });
+
+  it("returns [] outside a repository", async () => {
+    expect(await listWorktrees(outside)).toEqual([]);
   });
 });
 
