@@ -158,6 +158,12 @@ describe("ndx export", () => {
 
       const outDir = join(dir, "ndx-export", "api", "hench");
       expect(await readFile(join(outDir, "runs", "run-1.json"), "utf-8")).toContain(SENTINEL);
+
+      // The index is a summary either way, but its one transcript-bearing
+      // field — `error` — comes back with the opt-in.
+      const index = JSON.parse(await readFile(join(outDir, "runs.json"), "utf-8"));
+      expect(index.runs[0].error).toBe(`ENOENT while reading ${SENTINEL}`);
+      expect(index.runs[0].transcriptOmitted).toBeUndefined();
     });
   });
 

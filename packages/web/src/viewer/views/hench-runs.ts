@@ -70,6 +70,12 @@ interface RunSummary {
   invocationContext?: "cli" | "api";
   /** Worktree this run was recorded in — present when the list was fetched with `scope=repo`. */
   worktree?: RunWorktree;
+  /**
+   * Set by `ndx export` when the record was published without its transcript.
+   * `error` is stripped along with it, so a failed run arrives with no failure
+   * text — see {@link runErrorDisplay}. Never set by the live server.
+   */
+  transcriptOmitted?: boolean;
 }
 
 /** Worktree annotation on a run, as GET /api/hench/runs?scope=repo returns it. */
@@ -111,6 +117,37 @@ export function collectWorktreeOptions(runs: ReadonlyArray<{ worktree?: RunWorkt
     }
   }
   return Array.from(byPath.values()).sort((a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
+}
+
+/** What the run detail puts under its "Error" heading, if anything. */
+export interface RunErrorDisplay {
+  /** True when the text is this view's own notice, not the run's failure body. */
+  omitted: boolean;
+  text: string;
+}
+
+/**
+ * Decide what a run's Error section shows.
+ *
+ * A record published by `ndx export` without `--include-transcripts` has no
+ * `error`: a failure body echoes whatever the agent read, so the exporter
+ * strips it from both the per-run file and the `runs.json` index and stamps
+ * `transcriptOmitted`. Rendering nothing would leave a failed run looking like
+ * it failed for no reason, so the flag earns a neutral notice naming the flag
+ * that would have published the text.
+ */
+export function runErrorDisplay(
+  run: { status: string; error?: string; transcriptOmitted?: boolean },
+  cliName: string,
+): RunErrorDisplay | null {
+  if (run.error) return { omitted: false, text: run.error };
+  if (!run.transcriptOmitted) return null;
+  if (run.status !== "failed" && run.status !== "error") return null;
+  return {
+    omitted: true,
+    text: `The failure text was not published in this export — an error body can echo whatever the agent read. `
+      + `Re-run \`${cliName} export --include-transcripts\` (or open this run in the live dashboard) to see it.`,
+  };
 }
 
 interface RunDiagnosticsData {
@@ -499,6 +536,8 @@ function FileChangesList({ fileChangesWithStatus }: { fileChangesWithStatus?: st
 /** Detail panel for the selected run. */
 export function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: () => void; navigateTo?: NavigateTo }) {
   const status = getStatusConfig(run.status);
+  const cliName = useCliName();
+  const errorDisplay = runErrorDisplay(run, cliName);
   const totalTokens = (run.tokenUsage.input ?? 0)
     + (run.tokenUsage.output ?? 0)
     + (run.tokenUsage.cacheCreationInput ?? 0)
@@ -745,11 +784,13 @@ export function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onB
         )
       : null,
 
-    // Error message
-    run.error
+    // Error message — or, for an export without transcripts, why it is missing.
+    errorDisplay
       ? h("div", { class: "hench-detail-section" },
           h("h3", null, "Error"),
-          h("pre", { class: "hench-error-box" }, run.error),
+          errorDisplay.omitted
+            ? h("p", { class: "hench-error-omitted" }, errorDisplay.text)
+            : h("pre", { class: "hench-error-box" }, errorDisplay.text),
         )
       : null,
 

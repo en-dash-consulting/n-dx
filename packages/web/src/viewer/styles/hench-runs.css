@@ -801,6 +801,18 @@
   margin: 0;
 }
 
+/* Notice shown in place of an error body stripped by `ndx export` */
+.hench-error-omitted {
+  background: var(--bg-surface);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  margin: 0;
+}
+
 /* Rex task section in detail view */
 .hench-detail-task-section {
   margin-bottom: 20px;
