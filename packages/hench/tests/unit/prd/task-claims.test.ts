@@ -12,6 +12,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { openClaimsStore } from "../../../src/prd/rex-gateway.js";
+import { getWorktreeRoot } from "../../../src/prd/llm-gateway.js";
 import {
   claimTask,
   releaseTask,
@@ -55,6 +56,14 @@ describe("task claims", () => {
 
     const holder = await claimTask(repo, "task-1");
     expect(holder?.worktreeRoot).toBe("/elsewhere/checkout");
+  });
+
+  it("names another live process in this worktree", async () => {
+    const repo = await makeRepo();
+    await openClaimsStore(repo).claim("task-1", { pid: LIVE_FOREIGN_PID });
+
+    const holder = await claimTask(repo, "task-1");
+    expect(holder?.worktreeRoot).toBe(getWorktreeRoot(repo) ?? repo);
   });
 
   it("releases a single claim", async () => {

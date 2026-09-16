@@ -3,7 +3,7 @@ import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, SCHEMA_VERSION, SELF_HEAL_TAG } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore } from "../../prd/rex-gateway.js";
-import { claimTask, releaseAllTaskClaims } from "../../prd/task-claims.js";
+import { claimTask, describeTaskClaimHolder, releaseAllTaskClaims } from "../../prd/task-claims.js";
 import type { PermissionMode, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { PERMISSION_MODES, isPermissionMode } from "../../schema/index.js";
 import { classifyChangedFiles } from "../../store/file-classifier.js";
@@ -1535,9 +1535,10 @@ export async function cmdRun(
       const holder = await claimTask(dir, flags.task);
       if (holder) {
         info(colorWarn(
-          `Task ${flags.task} is being worked on by another worktree: ${holder.worktreeRoot}`,
+          `Task ${flags.task} is being worked on by ${describeTaskClaimHolder(dir, holder)}`,
         ));
         info("Wait for that run to finish, or pick a different task.");
+        process.exitCode = 1;
         return;
       }
     }
@@ -1603,6 +1604,9 @@ export async function cmdRun(
     // completion, a thrown failure, and a loop unwound by Ctrl-C alike — the
     // alternative is each of those paths remembering which task it was on, and
     // the one that forgets blocks the task for every worktree until it expires.
+    // TODO(cbc45de5): Preserve a recoverable claim when completion was refused
+    // solely because this task's work remains uncommitted. Releasing it here
+    // currently lets another worktree repeat work that is still present here.
     await releaseAllTaskClaims(dir);
     await limiter.release();
   }

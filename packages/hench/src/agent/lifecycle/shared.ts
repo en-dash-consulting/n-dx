@@ -29,7 +29,7 @@ import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../..
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 import { resolveCliPath, resolveNdxVersion } from "../../process/toolchain-identity.js";
-import { claimTask } from "../../prd/task-claims.js";
+import { claimTask, describeTaskClaimHolder } from "../../prd/task-claims.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
@@ -225,7 +225,7 @@ export async function prepareBrief(
     const holder = await claimTask(options.projectDir, resolvedTaskId);
     if (holder) {
       throw new Error(
-        `Task ${resolvedTaskId} was claimed by another worktree (${holder.worktreeRoot}) while it was being prepared. ` +
+        `Task ${resolvedTaskId} was claimed by ${describeTaskClaimHolder(options.projectDir, holder)} while it was being prepared. ` +
         `Re-run to pick a different task.`,
       );
     }

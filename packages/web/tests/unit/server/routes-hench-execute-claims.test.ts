@@ -92,13 +92,14 @@ describe("POST /api/hench/execute — claimed elsewhere", () => {
     expect(body.claimedBy).toMatchObject({ worktreeRoot: OTHER_WORKTREE, pid: LIVE_FOREIGN_PID });
   });
 
-  it("does not block on a claim this worktree holds", async () => {
-    // Re-running a task this checkout already claimed — after a crash, say — is
-    // the operator's own work, not a collision.
+  it("rejects a claim held by another live process in this worktree", async () => {
     await openClaimsStore(tmpDir).claim("task-1", { pid: LIVE_FOREIGN_PID });
 
     const res = await execute("task-1");
-    expect(res.status).not.toBe(409);
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.claimedBy).toMatchObject({ pid: LIVE_FOREIGN_PID });
+    expect(body.claimedBy.worktreeRoot).toContain(tmpDir.split("/").at(-1));
   });
 
   it("does not block on a claim whose owning process is gone", async () => {

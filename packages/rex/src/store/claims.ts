@@ -115,24 +115,22 @@ export interface ClaimsStore {
   /** Is a *different* process holding this task right now? */
   isClaimedByOther(taskId: string, identity?: ClaimIdentity): Promise<boolean>;
   /**
-   * Live claims held by a *different worktree*, keyed by task id.
+   * Live claims held by a *different process*, keyed by task id.
    *
-   * This is the predicate task selection uses, and it is deliberately coarser
-   * than {@link ClaimsStore.isClaimedByOther}: it compares worktree roots only,
-   * so a second process in the worktree that already holds a claim can still
-   * pick the task up. That is the crash-retry case — the operator re-runs in the
-   * same checkout, and a claim their own worktree left behind must not lock them
-   * out of their own work. Across worktrees there is no such excuse, and the
-   * claim stands.
+   * This is the predicate task selection uses. It has the same identity rule as
+   * {@link ClaimsStore.isClaimedByOther}: a claim is ours only when both its PID
+   * and worktree root match. A dead process already fails the liveness check, so
+   * a live foreign PID in the same checkout is an active collision, not a crash
+   * retry — letting it select the task would put two agents in one worktree.
    *
    * A map rather than a set because the caller has to be able to say *which*
    * worktree is holding the task: "skipped" with no explanation is the kind of
    * silence that gets debugged as a bug in task selection.
    */
-  claimedElsewhere(worktreeRoot?: string): Promise<Map<string, TaskClaim>>;
+  claimedElsewhere(identity?: ClaimIdentity): Promise<Map<string, TaskClaim>>;
 }
 
-/** What task selection passed over because another worktree holds it. */
+/** What task selection passed over because another live process holds it. */
 export interface SkippedClaim {
   taskId: string;
   worktreeRoot: string;
@@ -355,13 +353,14 @@ export function openClaimsStore(projectDir: string): ClaimsStore {
       return claims.some((c) => c.taskId === taskId && isLive(c, now) && !isOurs(c, pid, worktreeRoot));
     },
 
-    async claimedElsewhere(worktreeRoot) {
-      const ours = worktreeRoot ?? defaultWorktreeRoot;
+    async claimedElsewhere(identity) {
+      const pid = identity?.pid ?? process.pid;
+      const worktreeRoot = identity?.worktreeRoot ?? defaultWorktreeRoot;
       const now = Date.now();
       const claims = await readAll(claimsPath);
       const byTask = new Map<string, TaskClaim>();
       for (const claim of claims) {
-        if (claim.worktreeRoot === ours) continue;
+        if (isOurs(claim, pid, worktreeRoot)) continue;
         if (!isLive(claim, now)) continue;
         byTask.set(claim.taskId, claim);
       }

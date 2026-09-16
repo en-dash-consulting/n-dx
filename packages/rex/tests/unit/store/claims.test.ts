@@ -220,15 +220,15 @@ describe("claims", () => {
         expect(await store.claimedElsewhere()).toEqual(new Map());
       });
 
-      it("ignores our worktree even when a different process holds the claim", async () => {
-        // Worktree-scoped, not process-scoped — deliberately coarser than
-        // isClaimedByOther, which compares the pid too.
+      it("reports a claim from another process in our worktree", async () => {
+        // A dead owner is already ignored by liveness. A live foreign PID in
+        // this checkout is therefore an active collision, not a crash retry.
         const repo = await makeRepo();
         const store = openClaimsStore(repo);
         const ours = "/wt/ours";
         await store.claim("task-1", { pid: LIVE_FOREIGN_PID, worktreeRoot: ours });
 
-        expect(await store.claimedElsewhere(ours)).toEqual(new Map());
+        expect([...((await store.claimedElsewhere({ worktreeRoot: ours })).keys())]).toEqual(["task-1"]);
         expect(await store.isClaimedByOther("task-1", { worktreeRoot: ours })).toBe(true);
       });
 

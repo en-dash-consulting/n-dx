@@ -26,6 +26,7 @@
 
 import { openClaimsStore } from "./rex-gateway.js";
 import type { TaskClaim } from "./rex-gateway.js";
+import { getWorktreeRoot } from "./llm-gateway.js";
 
 /**
  * Task ids this process is holding, per project directory.
@@ -74,7 +75,22 @@ export async function claimTask(projectDir: string, taskId: string): Promise<Tas
   };
 }
 
-/** Hand one task back. Safe to call for a task that was never claimed. */
+/** Render the holder accurately for same-worktree and cross-worktree collisions. */
+export function describeTaskClaimHolder(projectDir: string, holder: TaskClaim): string {
+  const worktreeRoot = getWorktreeRoot(projectDir) ?? projectDir;
+  return holder.worktreeRoot === worktreeRoot
+    ? `another process in this worktree (${holder.worktreeRoot})`
+    : `another worktree (${holder.worktreeRoot})`;
+}
+
+/**
+ * Hand one task back. Safe to call for a task that was never claimed.
+ *
+ * TODO(PR #371 follow-up): call this after each loop iteration once its
+ * terminal outcome is known. A claim retained for an uncommitted-work refusal
+ * must remain recoverable; completed and ordinary failed iterations should not
+ * stay reserved until the entire loop exits.
+ */
 export async function releaseTask(projectDir: string, taskId: string): Promise<void> {
   ledgerFor(projectDir).delete(taskId);
   await openClaimsStore(projectDir).release(taskId);

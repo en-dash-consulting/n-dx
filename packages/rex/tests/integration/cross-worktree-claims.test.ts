@@ -86,7 +86,7 @@ describe("cross-worktree task claims", () => {
     return match[1].trim();
   }
 
-  it("hands worktree B the next unclaimed task while worktree A holds the first", async () => {
+  it("hands every competing process the next unclaimed task while a live holder owns the first", async () => {
     const { repo, linked, first, second } = await makeRepoWithWorktree();
 
     // Both checkouts agree on the pick before anyone claims anything.
@@ -97,9 +97,11 @@ describe("cross-worktree task claims", () => {
     const claimed = await openClaimsStore(repo).claim(first, { pid: LIVE_FOREIGN_PID });
     expect(claimed).toBe(true);
 
-    // B moves on to the next one; A, which holds the claim, still sees its own task.
+    // Both checkouts move on. The claim's live PID is different from this rex
+    // process even in A, so selecting the first task there would race the
+    // running holder in the same worktree.
     expect(nextTask(linked).item?.id).toBe(second);
-    expect(nextTask(repo).item?.id).toBe(first);
+    expect(nextTask(repo).item?.id).toBe(second);
   });
 
   it("reports what it skipped, and who is holding it", async () => {

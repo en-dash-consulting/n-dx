@@ -1,0 +1,25 @@
+---
+id: "acbdff7e-d784-456c-a72a-5c0dcffa4523"
+level: "task"
+title: "Harden task claim collisions and refused explicit runs"
+status: "completed"
+priority: "high"
+tags:
+  - "pr-06"
+  - "claims"
+  - "adversarial-review"
+  - "must-fix"
+source: "PR #371 adversarial review"
+startedAt: "2026-09-16T02:37:01.779Z"
+completedAt: "2026-09-16T02:48:28.225Z"
+endedAt: "2026-09-16T02:48:28.225Z"
+acceptanceCriteria:
+  - "A live claim owned by another process in the same worktree is excluded from automatic task selection and the displayed holder identifies it as a process in this worktree."
+  - "A dead same-worktree claim does not block a crash retry."
+  - "The dashboard execute route rejects a live same-worktree claim and names its holder, while continuing to ignore dead claims."
+  - "An explicitly requested task that is already claimed exits non-zero, and the CLI lifecycle test asserts that status."
+  - "Rex, hench, web, and cross-package contract tests cover the changed claim-selection behavior."
+description: "PR #371 adversarial-review must-fixes. A live claim held by another hench process in the same worktree is excluded from selection only by worktree root, then rejected by the atomic claim step and reported as another worktree; a second run therefore repeatedly selects and aborts. Also, an explicitly requested task rejected because it is already claimed returns normally with exit code 0, so shell automation treats the run as successful. Make selection and messages identity-aware (PID plus worktree), and fail the explicit refusal path non-zero. Recommended approach: make claimed-task selection use the same identity predicate as atomic claiming, then distinguish same-worktree holders in messages."
+lastModified: "2026-09-16T02:48:28.571Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

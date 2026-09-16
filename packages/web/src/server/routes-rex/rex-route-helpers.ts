@@ -63,7 +63,14 @@ export function updateInTree(
   return rexUpdateInTree(items, id, updates);
 }
 
-/** Find the next actionable task, returning just the item (or null). */
+/**
+ * Find the next actionable task, returning just the item (or null).
+ *
+ * TODO(f9e70688): accept the live claim ids for this project and exclude them
+ * here. The dashboard's next-task reads currently can offer work that Execute
+ * then safely rejects with 409; the deferred claimed-task UI should make both
+ * surfaces agree.
+ */
 export function findNextTask(items: PRDItem[], completedIds: Set<string>): PRDItem | null {
   const entry = rexFindNextTask(items, completedIds);
   return entry ? entry.item : null;

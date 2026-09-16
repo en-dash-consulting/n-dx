@@ -225,6 +225,11 @@ function renderPaths(paths: string[]): string {
  * disappearing without anyone being told which work.
  */
 export function formatUncommittedWorkRefusal(paths: string[]): string {
+  // TODO(db80edad): Once the caller can prove these are validated,
+  // task-owned paths, append a safely quoted, path-scoped recovery sequence
+  // (`git diff --check`, `git add -- <paths>`, `git diff --cached --check`).
+  // Do not offer it for failed validation, unresolved review findings, or
+  // paths that cannot be attributed to this run.
   return (
     `⚠ Refusing to mark this task completed: ${paths.length} path(s) of its work are still uncommitted.\n` +
     `${renderPaths(paths)}\n` +

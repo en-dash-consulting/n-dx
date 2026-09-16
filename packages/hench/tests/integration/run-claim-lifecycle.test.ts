@@ -73,11 +73,15 @@ try {
 `;
 
 function node(cli: string, args: string[], cwd: string): string {
+  return nodeResult(cli, args, cwd).output;
+}
+
+function nodeResult(cli: string, args: string[], cwd: string): { output: string; status: number } {
   try {
-    return execFileSync("node", [cli, ...args], { cwd, encoding: "utf-8", timeout: 60_000 });
+    return { output: execFileSync("node", [cli, ...args], { cwd, encoding: "utf-8", timeout: 60_000 }), status: 0 };
   } catch (err) {
-    const e = err as { stdout?: string; stderr?: string };
-    return (e.stdout ?? "") + (e.stderr ?? "");
+    const e = err as { stdout?: string; stderr?: string; status?: number };
+    return { output: (e.stdout ?? "") + (e.stderr ?? ""), status: e.status ?? 1 };
   }
 }
 
@@ -147,10 +151,11 @@ describe("hench run task claims", () => {
       worktreeRoot: "/elsewhere/checkout",
     });
 
-    const out = node(henchCli, ["run", `--task=${taskId}`, "--auto", repo], repo);
+    const result = nodeResult(henchCli, ["run", `--task=${taskId}`, "--auto", repo], repo);
 
-    expect(out).toContain("another worktree");
-    expect(out).toContain("/elsewhere/checkout");
+    expect(result.output).toContain("another worktree");
+    expect(result.output).toContain("/elsewhere/checkout");
+    expect(result.status).not.toBe(0);
     // And it left the holder's claim exactly as it found it.
     expect(await claimsIn(repo)).toHaveLength(1);
   }, 90_000);
