@@ -31,7 +31,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Make cross-worktree claim lifecycle tests self-contained in CI](./make-cross-worktree-claim-lifecycle.md) | pending |
 | [Make Windows exec-timeout tree-kill start proof deterministic](./make-windows-exec-timeout-tree-kill.md) | pending |
 | [ndx work claims the task before starting and releases on finish; get_next_task and hench selection skip live claims](./ndx-work-claims-the-task-before.md) | completed |
-| [Pass claim context through API-provider autoselection](./pass-claim-context-through-api.md) | pending |
+| [Pass claim context through API-provider autoselection](./pass-claim-context-through-api.md) | completed |
 | [Print safe recovery commands when a run leaves task-owned work uncommitted](./print-safe-recovery-commands-when-a.md) | blocked |
-| [Renew task claims throughout a live run](./renew-task-claims-throughout-a-live-run.md) | pending |
+| [Renew task claims throughout a live run](./renew-task-claims-throughout-a-live-run.md) | completed |
 | [Retain task claims when uncommitted-work completion is refused](./retain-task-claims-when-uncommitted.md) | blocked |
