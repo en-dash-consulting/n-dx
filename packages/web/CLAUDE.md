@@ -78,3 +78,21 @@ When `ndx start` is running, the web server holds in-process caches (aggregation
 **General rule for HTTP:** most routes treat disk files as read-only. The exception is the PRD: the routes that mutate `.rex/prd_tree/` (item CRUD, merge, prune, reorganize, restore, and the Ask panel's `apply-refinements`) go through `rex-gateway`'s `resolveStore` and hold the PRD file lock for the span of `withTransaction`. That makes the server a first-class PRD writer alongside `ndx work` and the MCP tools, and it is why those routes surface a lock-acquisition failure — which names the holder's PID — rather than retrying or writing anyway.
 
 The folder tree watcher refreshes `.rex/.cache/prd.json` automatically for most PRD mutations; routes that write also call `refreshPRDCache` so their own change is visible to the next read without a restart. Any command that bulk-rewrites `.sourcevision/` (ci, refresh) should be followed by a server restart to flush stale caches.
+
+## hub zone (`src/hub/`)
+
+`src/hub/` is the 0.7.0 hub daemon (`web hub`): one process per user that owns
+`~/.n-dx/hub.json` (project registry) and `~/.n-dx/hub.pid`, serves `/api/hub/*`,
+and runs one `web serve` child per registered repository on an ephemeral loopback
+port. It is its own zone with a deliberately small import surface:
+
+- node built-ins, and `@n-dx/llm-client` exec helpers **only** through
+  `src/hub/exec-gateway.ts` (re-export only, no logic).
+- Nothing from `src/server/` or `src/viewer/`. The project servers it spawns are
+  today's `web serve` unchanged; the hub talks to them over HTTP (`GET /api/status`),
+  never by import. The two JSON response helpers in `hub/routes.ts` are local for
+  that reason rather than shared with `server/response-utils.ts`.
+- Consumers import from `src/hub/index.ts`, the barrel.
+
+`$N_DX_HOME` overrides the `~/.n-dx` directory; tests pass `homeDir` explicitly.
+Core's `web.js` spawns the hub (PR 10) — the orchestration tier still never imports it.

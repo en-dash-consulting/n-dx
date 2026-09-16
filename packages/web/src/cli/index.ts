@@ -5,11 +5,13 @@
  *
  * Commands:
  *   serve [dir]   - Start the web dashboard server
+ *   hub           - Start the machine-wide hub (registry + one server per repo)
  */
 
 import { resolve } from "node:path";
 import { suppressKnownDeprecations, setVerbose, setDebug } from "@n-dx/llm-client";
 import { startServer } from "../server/start.js";
+import { startHub, DEFAULT_HUB_PORT } from "../hub/index.js";
 import type { ViewerScope } from "../shared/view-routing.js";
 
 suppressKnownDeprecations();
@@ -19,7 +21,7 @@ const VALID_SCOPES = new Set<ViewerScope>(["sourcevision", "rex", "hench"]);
 const args = process.argv.slice(2);
 const command = args[0];
 
-let port = 3117;
+let port = DEFAULT_HUB_PORT;
 let scope: ViewerScope | undefined;
 
 for (const a of args.slice(1)) {
@@ -56,11 +58,32 @@ if (command === "serve") {
   const dir = resolve(targetArg || ".");
   const dev = args.includes("--dev");
   await startServer(dir, port, { dev, scope });
+} else if (command === "hub") {
+  // Same reasoning as "serve": the hub is long-running and spawns a server
+  // per project, all of which would otherwise inherit NDX_DEBUG.
+  delete process.env.NDX_DEBUG;
+
+  const hub = await startHub({ port, log: (message) => console.log(message) });
+  console.log(`n-dx hub listening on http://127.0.0.1:${hub.port} (registry: ${hub.registryPath})`);
+
+  let shuttingDown = false;
+  const shutdown = (signal: string): void => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[hub] ${signal} — stopping project servers`);
+    hub.close({ stopChildren: true }).then(
+      () => process.exit(0),
+      () => process.exit(1),
+    );
+  };
+  process.once("SIGINT", () => shutdown("SIGINT"));
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
 } else {
   console.log(`n-dx web dashboard
 
 Commands:
   serve [dir]   Start the web dashboard server
+  hub           Start the machine-wide hub: project registry, one dashboard server per repository
 
 Options:
   --port=N                  Port to listen on (default: 3117)
