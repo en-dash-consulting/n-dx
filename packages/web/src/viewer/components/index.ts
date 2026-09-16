@@ -123,3 +123,5 @@ export {
   DecoLargeNumeral,
   type DecoLargeNumeralProps,
 } from "./decorations.js";
+export { WorkspaceSwitcher, buildWorkspaceOptions, workspaceUrl, fmtElapsed } from "./workspace-switcher.js";
+export type { WorkspaceSwitcherProps, WorkspaceOption } from "./workspace-switcher.js";

@@ -12,7 +12,7 @@
  * - Visual indicators (color-coded) for approaching resource limits
  */
 
-import { getWebSocketUrl } from "../base-path.js";
+import { getWebSocketUrl, acceptsFrame } from "../base-path.js";
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 
@@ -121,6 +121,8 @@ export function ConcurrencyPanel() {
         if (!mounted) return;
         try {
           const msg = JSON.parse(event.data);
+          // Another worktree's frame on the shared socket — not ours to react to.
+          if (!acceptsFrame(msg)) return;
           if (msg.type === "hench:concurrency-status") {
             setStatus((prev) => ({
               processCount: msg.processCount,

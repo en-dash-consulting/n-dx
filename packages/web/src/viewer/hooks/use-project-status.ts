@@ -15,7 +15,7 @@
  * presentation component.
  */
 
-import { getWebSocketUrl } from "../base-path.js";
+import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { usePolling } from "../views/use-polling.js";
 import {
@@ -137,6 +137,7 @@ export function useProjectStatus(): ProjectStatus | null {
     let ws: WebSocket | null = null;
 
     const pipeline = createWSPipeline({
+      workspace: getWorkspaceKey(),
       onFlush: (batch) => {
         if (!mountedRef.current) return;
         const needsRefresh =

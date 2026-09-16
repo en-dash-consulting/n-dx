@@ -40,6 +40,7 @@
 
 export {
   createWSPipeline,
+  frameIsForWorkspace,
   type WSPipeline,
   type WSPipelineConfig,
 } from "./ws-pipeline.js";

@@ -99,10 +99,12 @@ describe("workspace registry with two worktrees", () => {
     writeFileSync(join(linked, ".rex", "prd.md"), prdMd("B-edited"));
 
     await vi.waitFor(() => expect(cachedTitle(linked)).toBe("B-edited"), { timeout: 5_000, interval: 50 });
+    // …and the frame is tagged for B, so an anchor tab ignores it.
     await vi.waitFor(
-      () => expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: "rex:prd-changed" })),
+      () => expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ type: "rex:prd-changed", workspace: "app-feature" })),
       { timeout: 5_000, interval: 50 },
     );
+    expect(broadcast).not.toHaveBeenCalledWith(expect.objectContaining({ type: "rex:prd-changed", workspace: "app" }));
     expect(cachedTitle(repo)).toBe("A");
   });
 

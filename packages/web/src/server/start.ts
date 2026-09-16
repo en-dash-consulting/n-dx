@@ -5,7 +5,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type FSWatcher } from "node:fs";
 import { writeFile, unlink } from "node:fs/promises";
-import { resolve, join, dirname } from "node:path";
+import { resolve, join, dirname, basename } from "node:path";
 import { isVerbose, verbose } from "@n-dx/llm-client";
 import type { ServerContext, ViewerScope } from "./types.js";
 import { ensureLegacyPrdMigrated } from "./rex-gateway.js";
@@ -43,7 +43,8 @@ import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
-import { createWebSocketManager, WsHealthTracker } from "./websocket.js";
+import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
+import type { WebSocketBroadcaster } from "./websocket.js";
 import { ALL_DATA_FILES, stripWorkspaceSlot } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
 import { handleRequestSecurity } from "./request-security.js";
@@ -256,6 +257,20 @@ function isInScope(scope: ViewerScope | undefined, pkg: ViewerScope): boolean {
   return !scope || scope === pkg;
 }
 
+/** The subset of the WebSocket manager the watchers need — lets a tagged broadcaster stand in. */
+interface Broadcasting {
+  broadcast: WebSocketBroadcaster;
+}
+
+/**
+ * The workspace tag for frames about `ctx`. The anchor's context predates the
+ * registry (which copies it with `workspace` set), so it falls back to the
+ * key the registry gives the anchor: its directory's basename.
+ */
+function workspaceTagOf(ctx: ServerContext): string {
+  return ctx.workspace ?? basename(ctx.projectDir);
+}
+
 /**
  * Regenerate `.rex/.cache/prd.json` from the folder-tree backend (preferred)
  * or legacy `prd.md`. Called at server boot and whenever the rex watcher fires.
@@ -322,7 +337,7 @@ function registerSourcevisionWatcher(
   scope: ViewerScope | undefined,
   svDir: string,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
+  ws: Broadcasting,
 ): FSWatcher | null {
   if (!isInScope(scope, "sourcevision") || !existsSync(svDir)) return null;
   const debouncedRefresh = debounce(() => {
@@ -348,7 +363,7 @@ function registerRexWatcher(
   scope: ViewerScope | undefined,
   rexDir: string,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
+  ws: Broadcasting,
 ): FSWatcher[] {
   if (!isInScope(scope, "rex") || !existsSync(rexDir)) return [];
   const debouncedRefresh = debounce(() => {
@@ -396,7 +411,7 @@ function registerRexWatcher(
 function registerHenchWatcher(
   scope: ViewerScope | undefined,
   henchRunsDir: string,
-  ws: ReturnType<typeof createWebSocketManager>,
+  ws: Broadcasting,
 ): FSWatcher | null {
   if (!isInScope(scope, "hench") || !existsSync(henchRunsDir)) return null;
   const debouncedBroadcast = debounce(() => {
@@ -422,7 +437,7 @@ function registerDevViewerWatcher(
   dev: boolean,
   viewerPath: string,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
+  ws: Broadcasting,
 ): FSWatcher | null {
   if (!dev || !viewerPath) return null;
   const debouncedRefresh = debounce(() => {
@@ -447,9 +462,11 @@ function registerDevViewerWatcher(
 function registerWatchers(
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
+  wsManager: Broadcasting,
   viewerPath: string,
 ): WatcherHandles {
+  // Every frame these watchers emit is about this workspace.
+  const ws: Broadcasting = { broadcast: tagBroadcaster(wsManager.broadcast, workspaceTagOf(ctx)) };
   const henchRunsDir = join(ctx.projectDir, ".hench", "runs");
   const watchers: FSWatcher[] = [];
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
@@ -490,9 +507,10 @@ function registerWatchers(
 function reregisterProjectWatchers(
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
+  wsManager: Broadcasting,
   handles: WatcherHandles,
 ): void {
+  const ws: Broadcasting = { broadcast: tagBroadcaster(wsManager.broadcast, workspaceTagOf(ctx)) };
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
   if (sv) handles.watchers.push(sv);
   for (const w of registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws)) {
@@ -587,6 +605,8 @@ function handleReloadSignalEndpoint(
   req: IncomingMessage,
   res: ServerResponse,
   ws: ReturnType<typeof createWebSocketManager>,
+  /** Tagged for the workspace the request addressed. */
+  broadcast: WebSocketBroadcaster = ws.broadcast,
 ): boolean {
   const path = (req.url || "/").split("?")[0];
   if (path !== "/api/reload") return false;
@@ -598,17 +618,17 @@ function handleReloadSignalEndpoint(
   }
 
   const timestamp = new Date().toISOString();
-  ws.broadcast({
+  broadcast({
     type: "viewer:reload",
     source: "ndx-refresh",
     timestamp,
   });
-  ws.broadcast({
+  broadcast({
     type: "sv:data-changed",
     source: "ndx-refresh",
     timestamp,
   });
-  ws.broadcast({
+  broadcast({
     type: "rex:prd-changed",
     source: "ndx-refresh",
     timestamp,
@@ -660,6 +680,8 @@ async function handleApiRoutes(
   wsHealthTracker: WsHealthTracker,
   watcherHandles: WatcherHandles,
   registry: WorkspaceRegistry,
+  /** Tagged for the workspace the request addressed. */
+  broadcast: WebSocketBroadcaster,
 ): Promise<boolean> {
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
   if (await handleWorkspacesRoute(req, res, registry)) return true;
@@ -675,7 +697,7 @@ async function handleApiRoutes(
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
   if (await handleLlmRoute(req, res, ctx)) return true;
   if (await handleProjectSettingsRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(true, () => handleCommandsRoute(req, res, ctx, ws.broadcast, {
+  if (await handleScopedRoute(true, () => handleCommandsRoute(req, res, ctx, broadcast, {
     onProjectInitialized: () => {
       clearStatusCache();
       reregisterProjectWatchers(ctx, watcher, ws, watcherHandles);
@@ -687,8 +709,8 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, ws.broadcast))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, ws.broadcast, { onStatusInvalidate: clearStatusCache }))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, broadcast))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, broadcast, { onStatusInvalidate: clearStatusCache }))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleWorkflowRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleAdaptiveRoute(req, res, ctx))) return true;
   if (isInScope(ctx.scope, "rex") && handleValidationRoute(req, res, ctx)) return true;
@@ -742,9 +764,11 @@ function createHttpServer(
       workspace = registry.resolveWorkspace(req);
     }
     const { ctx, watcher, handles: watcherHandles } = workspace;
+    // Frames this request causes are about its workspace.
+    const broadcast = tagBroadcaster(ws.broadcast, workspace.key);
     if (handleConfigEndpoint(req, res, ctx)) return;
-    if (handleReloadSignalEndpoint(req, res, ws)) return;
-    if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles, registry)) return;
+    if (handleReloadSignalEndpoint(req, res, ws, broadcast)) return;
+    if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles, registry, broadcast)) return;
     res.writeHead(404);
     res.end("Not found");
   });
@@ -900,17 +924,22 @@ export async function startServer(
 
   // Start heartbeat monitor — periodically checks for unresponsive tasks and
   // broadcasts alerts via WebSocket.
+  // Monitors run once per process. Heartbeat and concurrency read the anchor's
+  // runs, so their frames are the anchor's; memory is the machine's, so every
+  // workspace's viewer should see it.
+  const anchorBroadcast = tagBroadcaster(ws.broadcast, workspaceTagOf(ctx));
+  const everyWorkspaceBroadcast = tagBroadcaster(ws.broadcast, BROADCAST_ALL_WORKSPACES);
   if (isInScope(scope, "hench")) {
-    startHeartbeatMonitor(watcherHandles.henchRunsDir, ws.broadcast);
-    startConcurrencyMonitor(ctx, ws.broadcast);
-    startMemoryMonitor(ws.broadcast, watcherHandles.henchRunsDir);
+    startHeartbeatMonitor(watcherHandles.henchRunsDir, anchorBroadcast);
+    startConcurrencyMonitor(ctx, anchorBroadcast);
+    startMemoryMonitor(everyWorkspaceBroadcast, watcherHandles.henchRunsDir);
 
     // Start periodic usage cleanup — prunes orphaned aggregation entries
     // for tasks that no longer exist in the PRD (configurable, default weekly).
     const cleanupInterval = registerUsageScheduler({
       ctx,
       getAggregator: () => getAggregator(watcherHandles.henchRunsDir),
-      broadcast: ws.broadcast,
+      broadcast: anchorBroadcast,
       collectAllIds: collectAllIds as CollectAllIdsFn,
       loadPRD: loadPRDSync,
     } satisfies RegisterSchedulerOptions);
@@ -919,7 +948,7 @@ export async function startServer(
 
   // Start WS health broadcast — periodically sends connection health
   // metrics to all connected dashboard clients.
-  const wsHealthInterval = startWsHealthBroadcast(ws.broadcast, wsHealthTracker, ws.clientCount);
+  const wsHealthInterval = startWsHealthBroadcast(everyWorkspaceBroadcast, wsHealthTracker, ws.clientCount);
   watcherHandles.monitorIntervals.push(wsHealthInterval);
 
   // Under --verbose, periodically confirm the server is still alive — it's

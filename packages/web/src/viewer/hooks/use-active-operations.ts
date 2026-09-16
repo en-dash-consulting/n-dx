@@ -22,7 +22,7 @@
  * instead (elapsed time, last output line, phase, iteration count).
  */
 
-import { getWebSocketUrl } from "../base-path.js";
+import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { usePolling } from "../views/use-polling.js";
 import { createWSPipeline } from "./use-gateway.js";
@@ -219,6 +219,7 @@ export function useActiveOperations(): ActiveOperation[] {
 
     let ws: WebSocket | null = null;
     const pipeline = createWSPipeline({
+      workspace: getWorkspaceKey(),
       onMessage: (msg) => {
         if (!mountedRef.current) return;
         if (msg.type !== "hench:task-execution-progress" || !msg.state) return;

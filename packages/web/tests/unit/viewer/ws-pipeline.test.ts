@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createWSPipeline,
+  frameIsForWorkspace,
   type WSPipeline,
   type CoalescedBatch,
   type ParsedWSMessage,
@@ -142,5 +143,64 @@ describe("createWSPipeline", () => {
       pipeline.dispose();
       pipeline.dispose();
     }).not.toThrow();
+  });
+});
+
+describe("frameIsForWorkspace", () => {
+  it("untagged frames belong to the anchor only", () => {
+    expect(frameIsForWorkspace({ type: "x" }, null)).toBe(true);
+    expect(frameIsForWorkspace({ type: "x" }, "feature")).toBe(false);
+  });
+
+  it("tagged frames match their workspace; '*' matches every viewer", () => {
+    expect(frameIsForWorkspace({ type: "x", workspace: "feature" }, "feature")).toBe(true);
+    expect(frameIsForWorkspace({ type: "x", workspace: "feature" }, "other")).toBe(false);
+    expect(frameIsForWorkspace({ type: "x", workspace: "feature" }, null)).toBe(false);
+    expect(frameIsForWorkspace({ type: "x", workspace: "*" }, null)).toBe(true);
+    expect(frameIsForWorkspace({ type: "x", workspace: "*" }, "feature")).toBe(true);
+  });
+});
+
+describe("createWSPipeline workspace filtering", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("drops frames tagged for another workspace before throttling and batching", () => {
+    const onMessage = vi.fn();
+    const onFlush = vi.fn();
+    const pipeline = createWSPipeline({ onMessage, onFlush, workspace: "feature", throttledTypes: [] });
+
+    pipeline.push(msg("rex:prd-changed", { workspace: "feature" }));
+    pipeline.push(msg("rex:prd-changed", { workspace: "main" }));
+    pipeline.push(msg("rex:prd-changed"));               // untagged → anchor's, not ours
+    pipeline.push(msg("ws:health-status", { workspace: "*" }));
+    vi.runAllTimers();
+
+    expect(onMessage).toHaveBeenCalledTimes(2);
+    const flushed = onFlush.mock.calls.flatMap((c) => (c[0] as CoalescedBatch).messages.map((m) => m.workspace));
+    expect(flushed.sort()).toEqual(["*", "feature"]);
+    pipeline.dispose();
+  });
+
+  it("an anchor viewer accepts untagged and anchor-tagged frames but not another worktree's", () => {
+    const onFlush = vi.fn();
+    const pipeline = createWSPipeline({ onFlush, workspace: null, throttledTypes: [] });
+    pipeline.push(msg("rex:prd-changed"));
+    pipeline.push(msg("rex:prd-changed", { workspace: "feature" }));
+    vi.runAllTimers();
+    const flushed = onFlush.mock.calls.flatMap((c) => (c[0] as CoalescedBatch).messages);
+    expect(flushed).toHaveLength(1);
+    expect(flushed[0].workspace).toBeUndefined();
+    pipeline.dispose();
+  });
+
+  it("accepts everything when no workspace is configured (older consumers)", () => {
+    const onFlush = vi.fn();
+    const pipeline = createWSPipeline({ onFlush, throttledTypes: [] });
+    pipeline.push(msg("a", { workspace: "x" }));
+    pipeline.push(msg("b"));
+    vi.runAllTimers();
+    expect(onFlush.mock.calls.flatMap((c) => (c[0] as CoalescedBatch).messages)).toHaveLength(2);
+    pipeline.dispose();
   });
 });

@@ -29,7 +29,7 @@
  * @see ../performance/response-buffer-gate.ts
  */
 
-import { getWebSocketUrl } from "../base-path.js";
+import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { useEffect } from "preact/hooks";
 import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
 import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";
@@ -67,6 +67,7 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
 
     // Composed throttle → coalescer pipeline for WebSocket messages.
     const pipeline = createWSPipeline({
+      workspace: getWorkspaceKey(),
       // Immediate per-message handler — optimistic UI updates are gated
       // by tab visibility and batched into the next animation frame.
       onMessage: (msg) => {

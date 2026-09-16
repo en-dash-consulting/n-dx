@@ -60,6 +60,14 @@ export interface WSPipelineConfig {
   maxPendingPerType?: number | undefined;
 
   /**
+   * The workspace this consumer shows: a worktree key, or `null` for the
+   * anchor. When set, frames tagged for another workspace are dropped before
+   * throttling (see {@link frameIsForWorkspace}). Leave undefined to accept
+   * every frame.
+   */
+  workspace?: string | null | undefined;
+
+  /**
    * Coalescer trailing-edge debounce window in milliseconds.
    * Default: 150ms.
    */
@@ -97,6 +105,22 @@ export interface WSPipeline {
  * };
  * ```
  */
+/**
+ * Whether a frame is meant for the workspace a viewer shows.
+ *
+ * One socket carries every worktree's frames; the server tags each with the
+ * workspace it is about (`"*"` for process-wide frames such as socket health).
+ * An untagged frame comes from a server that predates tags and meant the
+ * anchor. So: no tag → anchor only; `"*"` → everyone; otherwise the keys must
+ * match.
+ */
+export function frameIsForWorkspace(frame: Readonly<Record<string, unknown>>, current: string | null): boolean {
+  const tag = frame["workspace"];
+  if (tag === undefined || tag === null) return current === null;
+  if (tag === "*") return true;
+  return tag === current;
+}
+
 export function createWSPipeline(config: WSPipelineConfig): WSPipeline {
   const coalescer: MessageCoalescer = createMessageCoalescer({
     onMessage: config.onMessage,
@@ -112,8 +136,11 @@ export function createWSPipeline(config: WSPipelineConfig): WSPipeline {
     maxPendingPerType: config.maxPendingPerType,
   });
 
+  const workspace = config.workspace;
+
   return {
     push(msg: ParsedWSMessage): void {
+      if (workspace !== undefined && !frameIsForWorkspace(msg, workspace)) return;
       throttle.push(msg);
     },
 

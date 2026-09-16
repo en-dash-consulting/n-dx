@@ -301,6 +301,33 @@ export class WsHealthTracker {
 /** A broadcast function that sends a message to all connected clients. */
 export type WebSocketBroadcaster = (data: unknown) => void;
 
+/**
+ * Workspace tag meaning "every workspace": for frames about the process as a
+ * whole (socket health, machine memory) rather than one worktree's data.
+ */
+export const BROADCAST_ALL_WORKSPACES = "*";
+
+/**
+ * A broadcaster that stamps every object frame with `{ workspace }` unless
+ * the frame already carries one.
+ *
+ * One socket serves every worktree of a repository, so a viewer showing
+ * worktree A must be able to ignore frames about worktree B — a PRD change
+ * in B must not make A refetch. Watchers and route handlers get a tagged
+ * broadcaster for the workspace they act on; the viewer filters on the tag
+ * (see messaging/ws-pipeline.ts). Untagged frames are read as the anchor's,
+ * which is what an older server would have meant.
+ */
+export function tagBroadcaster(broadcast: WebSocketBroadcaster, workspace: string): WebSocketBroadcaster {
+  return (data: unknown) => {
+    if (data && typeof data === "object" && !Array.isArray(data) && !("workspace" in data)) {
+      broadcast({ ...(data as Record<string, unknown>), workspace });
+      return;
+    }
+    broadcast(data);
+  };
+}
+
 /** Options for the WebSocket manager. */
 export interface WebSocketManagerOptions {
   /** Optional health tracker for connection lifecycle metrics. */

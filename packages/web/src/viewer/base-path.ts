@@ -22,7 +22,7 @@
  * module adds the browser-bound state.
  */
 
-import { detectViewerBasePath, webSocketUrl, withBasePath, workspaceKeyFromBasePath } from "./external.js";
+import { detectViewerBasePath, frameIsForWorkspace, webSocketUrl, withBasePath, workspaceKeyFromBasePath } from "./external.js";
 
 let cachedBasePath: string | null = null;
 
@@ -40,6 +40,15 @@ export function getBasePath(): string {
 /** The workspace this viewer addresses, or null for the anchor. */
 export function getWorkspaceKey(): string | null {
   return workspaceKeyFromBasePath(getBasePath());
+}
+
+/**
+ * Whether a WebSocket frame concerns this viewer's workspace. Raw socket
+ * consumers call this right after parsing; pipeline consumers pass
+ * `workspace: getWorkspaceKey()` instead and the pipeline filters.
+ */
+export function acceptsFrame(frame: Readonly<Record<string, unknown>>): boolean {
+  return frameIsForWorkspace(frame, getWorkspaceKey());
 }
 
 /** @internal Test seam — clears or fixes the memoised base path. */

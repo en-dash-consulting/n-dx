@@ -13,7 +13,7 @@
  * - Memory pressure warnings when usage is high
  */
 
-import { getWebSocketUrl } from "../base-path.js";
+import { getWebSocketUrl, acceptsFrame } from "../base-path.js";
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 
@@ -141,6 +141,8 @@ export function MemoryPanel() {
         if (!mounted) return;
         try {
           const msg = JSON.parse(event.data);
+          // Another worktree's frame on the shared socket — not ours to react to.
+          if (!acceptsFrame(msg)) return;
           if (msg.type === "hench:memory-status") {
             setStatus({
               system: msg.system,

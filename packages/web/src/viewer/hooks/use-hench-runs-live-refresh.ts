@@ -26,7 +26,7 @@
  * events this view cares about.
  */
 
-import { getWebSocketUrl } from "../base-path.js";
+import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { useEffect, useRef } from "preact/hooks";
 import { createWSPipeline } from "./use-gateway.js";
 
@@ -64,6 +64,7 @@ export function useHenchRunsLiveRefresh(
     let ws: WebSocket | null = null;
 
     const pipeline = createWSPipeline({
+      workspace: getWorkspaceKey(),
       onMessage: (msg) => {
         if (!mountedRef.current) return;
         if (msg.type === "hench:task-execution-progress" && msg.state && onExecutionProgress) {

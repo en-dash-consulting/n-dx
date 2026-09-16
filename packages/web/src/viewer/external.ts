@@ -44,3 +44,6 @@ export * as V1 from "../schema/v1.js";
 export type { FeatureToggle, FeaturesResponse, ViewId, ViewerScope, SourcevisionScopeViewId } from "../shared/index.js";
 export { DATA_FILES, ALL_DATA_FILES, SUPPLEMENTARY_FILES, buildValidViews } from "../shared/index.js";
 export { detectBasePath, detectViewerBasePath, workspaceKeyFromBasePath, withBasePath, stripBasePath, webSocketUrl } from "../shared/index.js";
+
+// ── Messaging (via barrel) ───────────────────────────────────────────────────
+export { frameIsForWorkspace } from "./messaging/index.js";
