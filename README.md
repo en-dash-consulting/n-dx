@@ -310,16 +310,22 @@ If `ndx` isn't on `PATH`, run the CLI through npx instead: `npx -y @n-dx/core re
 
 Codex reads `.codex/config.toml` automatically — no manual registration required.
 
-### HTTP transport — single project only
+### HTTP transport — through the hub
+
+The hub runs one dashboard server per registered repository and exposes each project's MCP endpoints under its id:
 
 ```sh
-ndx start .
-# Claude example:
-claude mcp add --transport http rex http://localhost:3117/mcp/rex
-claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
+n-dx-web hub                    # one per user, port 3117 (ndx start will register projects here in 0.7.0)
+# Claude example, for the project registered as <id>:
+claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex
+claude mcp add --transport http sourcevision http://localhost:3117/p/<id>/mcp/sourcevision
 ```
 
-`http://localhost:3117/mcp/rex` isn't scoped to a project — it points at whichever `ndx start` currently holds port 3117. Registering it is only safe when you have one n-dx project running at a time: a second `ndx start` on the same port redirects both registrations to the newer project. Prefer stdio (above) if you work across multiple n-dx projects; a multi-project hub landing in 0.7.0 will make HTTP registration safe to share.
+Sessions (`Mcp-Session-Id`), SSE responses and `DELETE` for session close are handled by the project's own server; the hub only proxies. Two registered projects have independent sessions, and a tool call on `/p/A/mcp/rex` writes to A's tree only. `GET /api/hub/projects` lists the registered ids.
+
+While exactly one project is registered, the root `http://localhost:3117/mcp/rex` still aliases to it, so a single-project registration keeps working unchanged. With several registered, root MCP calls answer `409` with the list of ids — register the `/p/<id>/` URL instead.
+
+The tracked `.mcp.json` (stdio, above) remains the recommended path: it needs no running server and resolves the project from the directory Claude Code launched in. Use HTTP when you want one long-lived server shared by several assistant sessions.
 
 ### Tools
 

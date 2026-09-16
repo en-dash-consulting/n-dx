@@ -20,6 +20,7 @@ import {
   removeTmpDir,
   setupRexDir,
   setupSourcevisionDir,
+  mcpJsonRpc as jsonRpc,
 } from "./e2e-helpers.js";
 
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
@@ -44,52 +45,6 @@ async function waitForServer(port, timeoutMs = 8000) {
     }
   }
   throw new Error(`Server did not start within ${timeoutMs}ms`);
-}
-
-/**
- * Send a JSON-RPC 2.0 request to the MCP endpoint.
- *
- * The Streamable HTTP transport requires:
- * - Content-Type: application/json
- * - Accept: application/json, text/event-stream
- */
-async function jsonRpc(url, method, params = {}, sessionId = null) {
-  const headers = {
-    "Content-Type": "application/json",
-    "Accept": "application/json, text/event-stream",
-  };
-  if (sessionId) headers["Mcp-Session-Id"] = sessionId;
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method,
-      params,
-    }),
-  });
-
-  // MCP responses may come as SSE or JSON depending on the transport.
-  // Parse accordingly based on content-type.
-  const contentType = res.headers.get("content-type") || "";
-  let body;
-  if (contentType.includes("text/event-stream")) {
-    // Parse SSE: extract JSON from "data:" lines
-    const text = await res.text();
-    const dataLines = text.split("\n").filter((l) => l.startsWith("data: "));
-    const lastData = dataLines[dataLines.length - 1];
-    body = lastData ? JSON.parse(lastData.slice(6)) : {};
-  } else {
-    body = await res.json();
-  }
-
-  return {
-    status: res.status,
-    sessionId: res.headers.get("mcp-session-id"),
-    body,
-  };
 }
 
 describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {

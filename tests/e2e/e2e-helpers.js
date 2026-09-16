@@ -343,3 +343,46 @@ export async function setupFullProject(dir) {
     setupSourcevisionDir(dir),
   ]);
 }
+
+/**
+ * Send a JSON-RPC 2.0 request to an MCP Streamable HTTP endpoint.
+ *
+ * The transport requires `Content-Type: application/json` and
+ * `Accept: application/json, text/event-stream`; the response may be plain
+ * JSON or an SSE stream, and the body is parsed accordingly. Shared by the
+ * direct (`ndx start`) and through-the-hub MCP transport tests so the two
+ * exercise the protocol identically.
+ *
+ * @param {string} url
+ * @param {string} method
+ * @param {object} [params]
+ * @param {string|null} [sessionId]
+ * @returns {Promise<{ status: number, sessionId: string|null, body: any }>}
+ */
+export async function mcpJsonRpc(url, method, params = {}, sessionId = null) {
+  const headers = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream",
+  };
+  if (sessionId) headers["Mcp-Session-Id"] = sessionId;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+
+  const contentType = res.headers.get("content-type") || "";
+  let body;
+  if (contentType.includes("text/event-stream")) {
+    const text = await res.text();
+    const dataLines = text.split("\n").filter((l) => l.startsWith("data: "));
+    const lastData = dataLines[dataLines.length - 1];
+    body = lastData ? JSON.parse(lastData.slice(6)) : {};
+  } else {
+    const text = await res.text();
+    body = text ? JSON.parse(text) : {};
+  }
+
+  return { status: res.status, sessionId: res.headers.get("mcp-session-id"), body };
+}
