@@ -872,7 +872,7 @@ export async function startServer(
   if (isInScope(scope, "hench")) {
     startHeartbeatMonitor(watcherHandles.henchRunsDir, ws.broadcast);
     startConcurrencyMonitor(ctx, ws.broadcast);
-    startMemoryMonitor(ws.broadcast);
+    startMemoryMonitor(ws.broadcast, watcherHandles.henchRunsDir);
 
     // Start periodic usage cleanup — prunes orphaned aggregation entries
     // for tasks that no longer exist in the PRD (configurable, default weekly).

@@ -89,21 +89,46 @@ export function getAggregator(runsDir: string): IncrementalTaskUsageAggregator {
 }
 
 /**
- * Module-level process memory tracker singleton.
+ * Per-workspace execution state — the memory tracker, execution metrics and
+ * active-execution map that used to be process-wide singletons.
  *
- * Records per-process RSS samples during each memory broadcast cycle
- * and provides historical data + leak detection via the API.
+ * Keyed by the workspace's runs directory (`<projectDir>/.hench/runs`), which
+ * every handler already has in hand as `rc.runsDir` or derives from its
+ * context, so a task started from worktree A neither blocks nor reports in
+ * worktree B. Process-wide sweeps (shutdown, the memory monitor) iterate
+ * every workspace.
  */
-const processMemoryTracker = new ProcessMemoryTracker();
+interface HenchWorkspaceState {
+  /** Active task executions, keyed by task id — prevents concurrent runs on one task. */
+  activeExecutions: Map<string, ActiveExecution>;
+  /** Per-process RSS samples for historical data and leak detection. */
+  processMemoryTracker: ProcessMemoryTracker;
+  /** Time-series snapshots of concurrent process counts and per-task resource metrics. */
+  executionMetrics: ConcurrentExecutionMetrics;
+}
 
-/**
- * Module-level concurrent execution metrics singleton.
- *
- * Records time-series snapshots of concurrent process counts, total memory
- * utilization, and per-task resource metrics during each monitoring cycle.
- * Provides aggregate patterns (peak, average) for dashboard consumption.
- */
-const executionMetrics = new ConcurrentExecutionMetrics();
+const workspaceStates = new Map<string, HenchWorkspaceState>();
+
+function stateFor(runsDir: string): HenchWorkspaceState {
+  let state = workspaceStates.get(runsDir);
+  if (!state) {
+    state = {
+      activeExecutions: new Map(),
+      processMemoryTracker: new ProcessMemoryTracker(),
+      executionMetrics: new ConcurrentExecutionMetrics(),
+    };
+    workspaceStates.set(runsDir, state);
+  }
+  return state;
+}
+
+function runsDirOf(ctx: ServerContext): string {
+  return join(ctx.projectDir, ".hench", "runs");
+}
+
+function stateForCtx(ctx: ServerContext): HenchWorkspaceState {
+  return stateFor(runsDirOf(ctx));
+}
 
 /** Minimal run shape for listing (avoids loading full toolCalls/transcript). */
 interface RunSummary {
@@ -482,10 +507,10 @@ function routeUsage(rc: RouteContext): boolean | Promise<boolean> | null {
 /** Routes: metrics, metrics/snapshots */
 function routeMetrics(rc: RouteContext): boolean | null {
   if (rc.path === "metrics/snapshots" && rc.method === "GET") {
-    return handleMetricsSnapshots(rc.res);
+    return handleMetricsSnapshots(rc.res, rc.runsDir);
   }
   if (rc.path === "metrics" && rc.method === "GET") {
-    return handleMetrics(rc.res);
+    return handleMetrics(rc.res, rc.runsDir);
   }
   return null;
 }
@@ -499,13 +524,13 @@ function routeMemory(rc: RouteContext): boolean | null {
   }
   const historyMatch = rc.path.match(/^memory\/history\/([^/?]+)$/);
   if (historyMatch && rc.method === "GET") {
-    return handleMemoryHistoryByTask(historyMatch[1]!, rc.res);
+    return handleMemoryHistoryByTask(historyMatch[1]!, rc.res, rc.runsDir);
   }
   if (rc.path === "memory/history" && rc.method === "GET") {
-    return handleMemoryHistory(rc.res);
+    return handleMemoryHistory(rc.res, rc.runsDir);
   }
   if (rc.path === "memory/leaks" && rc.method === "GET") {
-    return handleMemoryLeaks(rc.res);
+    return handleMemoryLeaks(rc.res, rc.runsDir);
   }
   return null;
 }
@@ -544,11 +569,11 @@ function routeExecute(rc: RouteContext): boolean | Promise<boolean> | null {
     return handleExecute(rc.req, rc.res, rc.ctx, rc.broadcast);
   }
   if (rc.path === "execute/status" && rc.method === "GET") {
-    return handleExecuteStatus(rc.res);
+    return handleExecuteStatus(rc.res, rc.runsDir);
   }
   const statusMatch = rc.path.match(/^execute\/status\/([^/?]+)$/);
   if (statusMatch && rc.method === "GET") {
-    return handleExecuteStatusForTask(statusMatch[1], rc.res);
+    return handleExecuteStatusForTask(statusMatch[1], rc.res, rc.runsDir);
   }
   return null;
 }
@@ -1114,12 +1139,12 @@ const TOK_PER_SEC_RE = /⚡\s*([\d.]+)\s*tok\/s/g;
 /** Regex (non-global) to test whether a single line is a tok/s metric line. */
 const TOK_PER_SEC_LINE_RE = /⚡\s*[\d.]+\s*tok\/s/;
 
-/** Track active task executions to prevent concurrent runs on the same task. */
-const activeExecutions = new Map<string, {
+/** One dashboard-started task execution. */
+interface ActiveExecution {
   runId: string;
   handle: ManagedChild;
   state: TaskExecutionStatus;
-}>();
+}
 
 /** Load and parse prd.json from disk. */
 function loadPRDForExecute(ctx: ServerContext): Record<string, unknown> | null {
@@ -1231,6 +1256,7 @@ async function handleExecute(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
+  const { activeExecutions, executionMetrics, processMemoryTracker } = stateForCtx(ctx);
   // Parse request body
   let body: Record<string, unknown>;
   try {
@@ -1459,9 +1485,9 @@ async function handleExecute(
 }
 
 /** GET /api/hench/execute/status — return status of all active executions. */
-function handleExecuteStatus(res: ServerResponse): boolean {
+function handleExecuteStatus(res: ServerResponse, runsDir: string): boolean {
   const executions: TaskExecutionStatus[] = [];
-  for (const entry of activeExecutions.values()) {
+  for (const entry of stateFor(runsDir).activeExecutions.values()) {
     executions.push({ ...entry.state });
   }
   jsonResponse(res, 200, { executions });
@@ -1469,8 +1495,8 @@ function handleExecuteStatus(res: ServerResponse): boolean {
 }
 
 /** GET /api/hench/execute/status/:taskId — return status of a specific task execution. */
-function handleExecuteStatusForTask(taskId: string, res: ServerResponse): boolean {
-  const entry = activeExecutions.get(taskId);
+function handleExecuteStatusForTask(taskId: string, res: ServerResponse, runsDir: string): boolean {
+  const entry = stateFor(runsDir).activeExecutions.get(taskId);
   if (!entry) {
     jsonResponse(res, 200, { execution: null });
     return true;
@@ -1719,6 +1745,7 @@ export function startConcurrencyMonitor(
   ctx: ServerContext,
   broadcast: WebSocketBroadcaster,
 ): void {
+  const { activeExecutions } = stateForCtx(ctx);
   const CONCURRENCY_BROADCAST_MS = 10_000; // 10 seconds
 
   const timer = setInterval(() => {
@@ -1884,7 +1911,11 @@ function getProcessRss(pid: number): number | null {
 }
 
 /** Collect full memory status snapshot. */
+/** Which workspace's tracker each sampled dashboard process belongs to (taskId → runsDir). */
+const processOwners = new Map<string, string>();
+
 function collectMemoryStatus(): MemoryStatus {
+  processOwners.clear();
   const totalBytes = totalmem();
   const freeBytes = freemem();
   const usedBytes = totalBytes - freeBytes;
@@ -1894,20 +1925,24 @@ function collectMemoryStatus(): MemoryStatus {
   const load = loadavg() as [number, number, number];
   const cpuCount = cpus().length;
 
-  // Collect per-process memory for active executions
+  // Collect per-process memory for active executions in every workspace —
+  // memory is a property of the machine, not of one worktree.
   const processes: ProcessMemoryEntry[] = [];
-  for (const [taskId, entry] of activeExecutions.entries()) {
-    const pid = entry.handle.pid;
-    if (pid == null) continue;
-    const rssBytes = getProcessRss(pid);
-    if (rssBytes != null) {
-      processes.push({
-        taskId,
-        taskTitle: entry.state.taskTitle,
-        pid,
-        rssBytes,
-        source: "dashboard",
-      });
+  for (const [runsDir, wsState] of workspaceStates) {
+    for (const [taskId, entry] of wsState.activeExecutions.entries()) {
+      const pid = entry.handle.pid;
+      if (pid == null) continue;
+      const rssBytes = getProcessRss(pid);
+      if (rssBytes != null) {
+        processes.push({
+          taskId,
+          taskTitle: entry.state.taskTitle,
+          pid,
+          rssBytes,
+          source: "dashboard",
+        });
+        processOwners.set(taskId, runsDir);
+      }
     }
   }
 
@@ -1929,14 +1964,15 @@ function collectMemoryStatus(): MemoryStatus {
 }
 
 /** GET /api/hench/metrics — concurrent execution metrics and resource utilization. */
-function handleMetrics(res: ServerResponse): boolean {
-  const summary = executionMetrics.getSummary();
+function handleMetrics(res: ServerResponse, runsDir: string): boolean {
+  const summary = stateFor(runsDir).executionMetrics.getSummary();
   jsonResponse(res, 200, summary);
   return true;
 }
 
 /** GET /api/hench/metrics/snapshots — time-series execution metrics snapshots. */
-function handleMetricsSnapshots(res: ServerResponse): boolean {
+function handleMetricsSnapshots(res: ServerResponse, runsDir: string): boolean {
+  const { executionMetrics } = stateFor(runsDir);
   const snapshots = executionMetrics.getSnapshots();
   jsonResponse(res, 200, {
     snapshots,
@@ -1955,7 +1991,8 @@ function handleMemory(res: ServerResponse): boolean {
 }
 
 /** GET /api/hench/memory/history — per-process memory history for all tracked processes. */
-function handleMemoryHistory(res: ServerResponse): boolean {
+function handleMemoryHistory(res: ServerResponse, runsDir: string): boolean {
+  const { processMemoryTracker } = stateFor(runsDir);
   const histories = processMemoryTracker.getAllHistories();
   jsonResponse(res, 200, {
     histories,
@@ -1967,8 +2004,8 @@ function handleMemoryHistory(res: ServerResponse): boolean {
 }
 
 /** GET /api/hench/memory/history/:taskId — memory history for a specific task. */
-function handleMemoryHistoryByTask(taskId: string, res: ServerResponse): boolean {
-  const history = processMemoryTracker.getHistory(taskId);
+function handleMemoryHistoryByTask(taskId: string, res: ServerResponse, runsDir: string): boolean {
+  const history = stateFor(runsDir).processMemoryTracker.getHistory(taskId);
   if (!history) {
     jsonResponse(res, 404, {
       error: "not_found",
@@ -1981,8 +2018,8 @@ function handleMemoryHistoryByTask(taskId: string, res: ServerResponse): boolean
 }
 
 /** GET /api/hench/memory/leaks — leak detection summary for all active processes. */
-function handleMemoryLeaks(res: ServerResponse): boolean {
-  const summary = processMemoryTracker.detectLeaks();
+function handleMemoryLeaks(res: ServerResponse, runsDir: string): boolean {
+  const summary = stateFor(runsDir).processMemoryTracker.detectLeaks();
   jsonResponse(res, 200, summary);
   return true;
 }
@@ -1994,48 +2031,45 @@ function handleMemoryLeaks(res: ServerResponse): boolean {
  * Also records per-process RSS samples into the process memory tracker
  * for historical analysis and leak detection.
  */
-export function startMemoryMonitor(broadcast: WebSocketBroadcaster): void {
+export function startMemoryMonitor(broadcast: WebSocketBroadcaster, anchorRunsDir: string): void {
   const MEMORY_BROADCAST_MS = 10_000;
 
   const timer = setInterval(() => {
     const status = collectMemoryStatus();
 
-    // Record per-process samples for historical tracking + leak detection
+    // Record per-process samples into the tracker of the workspace that owns
+    // the process, and one metrics snapshot per workspace over its own processes.
+    const byWorkspace = new Map<string, ProcessMemoryEntry[]>();
     for (const proc of status.processes) {
-      processMemoryTracker.recordSample(
-        proc.taskId,
-        proc.taskTitle,
-        proc.pid,
-        proc.rssBytes,
-      );
+      const owner = processOwners.get(proc.taskId);
+      if (!owner) continue;
+      stateFor(owner).processMemoryTracker.recordSample(proc.taskId, proc.taskTitle, proc.pid, proc.rssBytes);
+      const list = byWorkspace.get(owner) ?? [];
+      list.push(proc);
+      byWorkspace.set(owner, list);
     }
-
-    // Record execution metrics snapshot (concurrent count, total RSS, per-task)
-    const totalRssBytes = status.processes.reduce((sum, p) => sum + p.rssBytes, 0);
-    executionMetrics.recordSnapshot({
-      concurrentCount: status.processes.length,
-      totalRssBytes,
-      systemMemoryPercent: status.system.usedPercent,
-      loadAvg1m: status.loadAvg[0],
-      perTaskRss: status.processes.map((p) => ({
-        taskId: p.taskId,
-        rssBytes: p.rssBytes,
-      })),
-    });
-
-    // Prune tracker entries for processes that are no longer active
-    // (the activeExecutions map is the source of truth)
-    for (const history of processMemoryTracker.getActiveHistories()) {
-      if (!activeExecutions.has(history.taskId)) {
-        processMemoryTracker.markCompleted(history.taskId);
+    for (const [runsDir, wsState] of workspaceStates) {
+      const own = byWorkspace.get(runsDir) ?? [];
+      wsState.executionMetrics.recordSnapshot({
+        concurrentCount: own.length,
+        totalRssBytes: own.reduce((sum, p) => sum + p.rssBytes, 0),
+        systemMemoryPercent: status.system.usedPercent,
+        loadAvg1m: status.loadAvg[0],
+        perTaskRss: own.map((p) => ({ taskId: p.taskId, rssBytes: p.rssBytes })),
+      });
+      // Prune tracker entries for processes that are no longer active
+      // (the workspace's activeExecutions map is the source of truth)
+      for (const history of wsState.processMemoryTracker.getActiveHistories()) {
+        if (!wsState.activeExecutions.has(history.taskId)) {
+          wsState.processMemoryTracker.markCompleted(history.taskId);
+        }
       }
     }
 
-    // Include leak alerts in the broadcast when detected
-    const leakAlerts = processMemoryTracker.getLeakAlerts();
-
-    // Include execution metrics summary in the broadcast
-    const metricsSummary = executionMetrics.getSummary();
+    // Leak alerts from every workspace; the metrics summary is the anchor's —
+    // the broadcast is one frame for one dashboard (PR 12 tags frames per workspace).
+    const leakAlerts = Array.from(workspaceStates.values()).flatMap((w) => w.processMemoryTracker.getLeakAlerts());
+    const metricsSummary = stateFor(anchorRunsDir).executionMetrics.getSummary();
 
     broadcast({
       type: "hench:memory-status",
@@ -2119,7 +2153,8 @@ const throttleState: ThrottleState = {
  * this in `beforeEach` so every route test starts from a known state.
  */
 export function resetHenchRouteStateForTests(): void {
-  activeExecutions.clear();
+  workspaceStates.clear();
+  processOwners.clear();
   aggregatorCache.clear();
   throttleState.paused = false;
   throttleState.pausedAt = null;
@@ -2155,6 +2190,7 @@ function getEffectiveMaxConcurrent(projectDir: string): number {
  * a utilization level for visual indicators.
  */
 function handleConcurrency(res: ServerResponse, ctx: ServerContext): boolean {
+  const { activeExecutions } = stateForCtx(ctx);
   const henchDir = join(ctx.projectDir, ".hench");
   const locksDir = join(henchDir, "locks");
   const runsDir = join(henchDir, "runs");
@@ -2316,6 +2352,7 @@ interface AuditEntry {
 
 /** GET /api/hench/audit — aggregate audit info for all active tasks. */
 function handleAudit(res: ServerResponse, runsDir: string): boolean {
+  const { activeExecutions } = stateFor(runsDir);
   const now = Date.now();
   const entries: AuditEntry[] = [];
 
@@ -2410,6 +2447,7 @@ async function handleTerminate(
   broadcast?: WebSocketBroadcaster,
   onStatusInvalidate?: () => void,
 ): Promise<boolean> {
+  const { activeExecutions, executionMetrics, processMemoryTracker } = stateFor(runsDir);
   const entry = activeExecutions.get(taskId);
 
   if (!entry) {
@@ -2524,16 +2562,20 @@ export interface ShutdownExecutionsResult {
 export async function shutdownActiveExecutions(
   gracePeriodMs: number = Number(process.env["HENCH_SHUTDOWN_TIMEOUT_MS"] ?? 5_000),
 ): Promise<ShutdownExecutionsResult> {
-  if (activeExecutions.size === 0) return { terminated: 0, failed: 0 };
+  const all: Array<[string, ActiveExecution, HenchWorkspaceState]> = [];
+  for (const wsState of workspaceStates.values()) {
+    for (const [taskId, entry] of wsState.activeExecutions) all.push([taskId, entry, wsState]);
+  }
+  if (all.length === 0) return { terminated: 0, failed: 0 };
 
-  const count = activeExecutions.size;
+  const count = all.length;
   console.log(`[shutdown] terminating ${count} active execution(s)`);
 
   let terminated = 0;
   let failed = 0;
 
-  const terminations = Array.from(activeExecutions.entries()).map(
-    async ([taskId, entry]) => {
+  const terminations = all.map(
+    async ([taskId, entry, wsState]) => {
       const pid = entry.handle.pid;
       const pidInfo = pid != null ? ` (pid ${pid})` : "";
       try {
@@ -2545,9 +2587,9 @@ export async function shutdownActiveExecutions(
         console.error(`[shutdown] execution ${taskId}${pidInfo} failed to terminate: ${error.message}`);
         failed++;
       } finally {
-        processMemoryTracker.markCompleted(taskId);
-        executionMetrics.taskCompleted(taskId);
-        activeExecutions.delete(taskId);
+        wsState.processMemoryTracker.markCompleted(taskId);
+        wsState.executionMetrics.taskCompleted(taskId);
+        wsState.activeExecutions.delete(taskId);
       }
     },
   );
@@ -2572,6 +2614,7 @@ export async function shutdownActiveExecutions(
  * about the config-file default for UI comparison.
  */
 function handleThrottleGet(res: ServerResponse, ctx: ServerContext): boolean {
+  const { activeExecutions } = stateForCtx(ctx);
   const config = loadHenchConfig(ctx.projectDir);
   const guard = config?.guard as Record<string, unknown> | undefined;
   const configMax = typeof guard?.maxConcurrentProcesses === "number"
@@ -2720,7 +2763,12 @@ async function handleEmergencyStop(
     return true;
   }
 
-  const count = activeExecutions.size;
+  const targets = ctx ? [stateForCtx(ctx)] : Array.from(workspaceStates.values());
+  const all: Array<[string, ActiveExecution, HenchWorkspaceState]> = [];
+  for (const wsState of targets) {
+    for (const [taskId, entry] of wsState.activeExecutions) all.push([taskId, entry, wsState]);
+  }
+  const count = all.length;
 
   if (count === 0) {
     jsonResponse(res, 200, {
@@ -2742,8 +2790,8 @@ async function handleEmergencyStop(
   let terminated = 0;
   let failed = 0;
 
-  const terminations = Array.from(activeExecutions.entries()).map(
-    async ([taskId, entry]) => {
+  const terminations = all.map(
+    async ([taskId, entry, wsState]) => {
       const pid = entry.handle.pid;
       const pidInfo = pid != null ? ` (pid ${pid})` : "";
       try {
@@ -2760,9 +2808,9 @@ async function handleEmergencyStop(
         entry.state.finishedAt = new Date().toISOString();
         entry.state.error = "Terminated via emergency stop";
         broadcastExecState(broadcast, { ...entry.state });
-        processMemoryTracker.markCompleted(taskId);
-        executionMetrics.taskCompleted(taskId);
-        activeExecutions.delete(taskId);
+        wsState.processMemoryTracker.markCompleted(taskId);
+        wsState.executionMetrics.taskCompleted(taskId);
+        wsState.activeExecutions.delete(taskId);
       }
     },
   );
@@ -2792,6 +2840,7 @@ function broadcastThrottleState(
   broadcast: WebSocketBroadcaster,
   ctx: ServerContext,
 ): void {
+  const { activeExecutions } = stateForCtx(ctx);
   const config = loadHenchConfig(ctx.projectDir);
   const guard = config?.guard as Record<string, unknown> | undefined;
   const configMax = typeof guard?.maxConcurrentProcesses === "number"

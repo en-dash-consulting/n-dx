@@ -17,6 +17,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { LLM_VENDOR } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
+import { WorkspaceScoped } from "./workspace-scoped.js";
 import {jsonResponse} from "./response-utils.js";
 
 // ---------------------------------------------------------------------------
@@ -55,11 +56,12 @@ interface ConfigCache {
 /** Config cache TTL — 10 seconds. */
 const CONFIG_CACHE_TTL_MS = 10_000;
 
-let configCache: ConfigCache | null = null;
+/** One cache slot per workspace. */
+const configCaches = new WorkspaceScoped<{ entry: ConfigCache | null }>(() => ({ entry: null }));
 
-/** Clear caches (exposed for testing). */
+/** Clear caches for every workspace (exposed for testing). */
 export function clearConfigCaches(): void {
-  configCache = null;
+  configCaches.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +179,7 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
             (llm.local as Record<string, unknown>).model = liveModel;
             writeFileSync(ndxConfigPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
             // Invalidate cache so next request re-reads from disk
-            configCache = null;
+            configCaches.clear();
           } catch {
             // Write failure is non-fatal — still return the live model
           }
@@ -263,17 +265,14 @@ export async function handleConfigRoute(
   // GET /api/ndx-config — configuration summary
   if (method === "GET" && url === CONFIG_PREFIX) {
     const now = Date.now();
-    if (
-      configCache &&
-      configCache.projectDir === ctx.projectDir &&
-      now - configCache.timestamp < CONFIG_CACHE_TTL_MS
-    ) {
-      jsonResponse(res, 200, configCache.config);
+    const slot = configCaches.get(ctx);
+    if (slot.entry && slot.entry.projectDir === ctx.projectDir && now - slot.entry.timestamp < CONFIG_CACHE_TTL_MS) {
+      jsonResponse(res, 200, slot.entry.config);
       return true;
     }
 
     const config = await extractConfig(ctx);
-    configCache = { config, projectDir: ctx.projectDir, timestamp: now };
+    slot.entry = { config, projectDir: ctx.projectDir, timestamp: now };
     jsonResponse(res, 200, config);
     return true;
   }

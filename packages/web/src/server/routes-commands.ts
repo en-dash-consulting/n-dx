@@ -33,6 +33,7 @@ import { createRequire } from "node:module";
 import { exec as foundationExec, spawnManaged, isVerbose, isDebug } from "@n-dx/llm-client";
 import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
+import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import { readCliName } from "./cli-name.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
@@ -73,19 +74,19 @@ interface SelfHealStatus {
  * Kept outside the wire status (a process handle is not serialisable) so the
  * stop endpoint can signal the child without the status carrying it.
  */
-let selfHealChild: ManagedChild | null = null;
-let selfHealStopRequested = false;
+interface SelfHealSlot {
+  status: SelfHealStatus;
+  child: ManagedChild | null;
+  stopRequested: boolean;
+}
 
-// Module-level singleton — one self-heal at a time per server process.
-const selfHealStatus: SelfHealStatus = {
-  running: false,
-  startedAt: null,
-  finishedAt: null,
-  iterations: 0,
-  output: "",
-  error: null,
-  stopped: false,
-};
+// One self-heal at a time per WORKSPACE — worktree A's loop must not block or
+// report in worktree B.
+const selfHealSlots = new WorkspaceScoped<SelfHealSlot>(() => ({
+  status: { running: false, startedAt: null, finishedAt: null, iterations: 0, output: "", error: null, stopped: false },
+  child: null,
+  stopRequested: false,
+}));
 
 // ── Setup-wizard init state tracking ──────────────────────────────────
 
@@ -104,13 +105,13 @@ interface InitStatus {
 // dashboard's setup wizard only ever appears pre-init (the landing page is
 // only served when the project is uninitialized), so this never races with
 // any other command trigger.
-const initStatus: InitStatus = {
+const initStatuses = new WorkspaceScoped<InitStatus>(() => ({
   running: false,
   startedAt: null,
   finishedAt: null,
   output: "",
   error: null,
-};
+}));
 
 // ── Binary resolution helpers ─────────────────────────────────────────
 
@@ -239,23 +240,24 @@ function managedChildError(
  * concurrent writers. One shared lock covers them all, so a second writer
  * gets a 409 naming whatever is actually running instead of clobbering it.
  */
-let svWriteJob: string | null = null;
+const svWriteJobs = new WorkspaceScoped<{ job: string | null }>(() => ({ job: null }));
 
-/** Take the lock or answer 409 naming the in-flight job. */
-function acquireSvWriteLock(res: ServerResponse, jobName: string): boolean {
-  if (svWriteJob) {
+/** Take the workspace's lock or answer 409 naming the in-flight job. */
+function acquireSvWriteLock(res: ServerResponse, ctx: ServerContext, jobName: string): boolean {
+  const lock = svWriteJobs.get(ctx);
+  if (lock.job) {
     jsonResponse(res, 409, {
-      error: `Cannot start ${jobName}: ${svWriteJob} is already running`,
-      runningJob: svWriteJob,
+      error: `Cannot start ${jobName}: ${lock.job} is already running`,
+      runningJob: lock.job,
     });
     return false;
   }
-  svWriteJob = jobName;
+  lock.job = jobName;
   return true;
 }
 
-function releaseSvWriteLock(): void {
-  svWriteJob = null;
+function releaseSvWriteLock(ctx: ServerContext): void {
+  svWriteJobs.get(ctx).job = null;
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────
@@ -272,13 +274,13 @@ interface SvAnalyzeStatus {
 }
 
 // Module-level singleton — one full analysis at a time per server process.
-const svAnalyzeStatus: SvAnalyzeStatus = {
+const svAnalyzeStatuses = new WorkspaceScoped<SvAnalyzeStatus>(() => ({
   running: false,
   startedAt: null,
   finishedAt: null,
   recentOutput: "",
   error: null,
-};
+}));
 
 /**
  * POST /api/commands/sv-analyze — re-run sourcevision analyze.
@@ -298,6 +300,7 @@ async function handleSvAnalyze(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
+  const svAnalyzeStatus = svAnalyzeStatuses.get(ctx);
   let lite = false;
   let full = false;
   let deep = false;
@@ -345,7 +348,7 @@ async function handleSvAnalyze(
       return true;
     }
     const jobLabel = full ? "full analysis" : "targeted analysis";
-    if (!acquireSvWriteLock(res, jobLabel)) return true;
+    if (!acquireSvWriteLock(res, ctx, jobLabel)) return true;
 
     svAnalyzeStatus.running = true;
     svAnalyzeStatus.startedAt = new Date().toISOString();
@@ -395,12 +398,12 @@ async function handleSvAnalyze(
           timestamp: svAnalyzeStatus.finishedAt,
         });
       }
-      releaseSvWriteLock();
+      releaseSvWriteLock(ctx);
     }).catch((err: unknown) => {
       svAnalyzeStatus.running = false;
       svAnalyzeStatus.finishedAt = new Date().toISOString();
       svAnalyzeStatus.error = String(err);
-      releaseSvWriteLock();
+      releaseSvWriteLock(ctx);
     });
 
     return true;
@@ -409,7 +412,7 @@ async function handleSvAnalyze(
   // The quick path is synchronous but still rewrites .sourcevision/, so it
   // takes the same lock — a quick re-analyze on top of a full run corrupts
   // the analysis exactly like any other overlapping writer.
-  if (!acquireSvWriteLock(res, "quick analysis")) return true;
+  if (!acquireSvWriteLock(res, ctx, "quick analysis")) return true;
   try {
     const result = await foundationExec(bin, cmdArgs, {
       cwd: ctx.projectDir,
@@ -433,7 +436,7 @@ async function handleSvAnalyze(
   } catch (err) {
     errorResponse(res, 500, String(err));
   } finally {
-    releaseSvWriteLock();
+    releaseSvWriteLock(ctx);
   }
   return true;
 }
@@ -442,8 +445,9 @@ async function handleSvAnalyze(
 function handleSvAnalyzeStatus(
   _req: IncomingMessage,
   res: ServerResponse,
+  ctx: ServerContext,
 ): boolean {
-  jsonResponse(res, 200, { ...svAnalyzeStatus });
+  jsonResponse(res, 200, { ...svAnalyzeStatuses.get(ctx) });
   return true;
 }
 
@@ -698,6 +702,8 @@ async function handleSelfHeal(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
+  const slot = selfHealSlots.get(ctx);
+  const selfHealStatus = slot.status;
   if (selfHealStatus.running) {
     jsonResponse(res, 409, {
       error: "Self-heal is already running",
@@ -731,7 +737,7 @@ async function handleSelfHeal(
   selfHealStatus.output = "";
   selfHealStatus.error = null;
   selfHealStatus.stopped = false;
-  selfHealStopRequested = false;
+  slot.stopRequested = false;
 
   if (broadcast) {
     broadcast({ type: "commands:self-heal-started", timestamp: selfHealStatus.startedAt });
@@ -758,11 +764,11 @@ async function handleSelfHeal(
       selfHealStatus.output = (selfHealStatus.output + chunk).slice(-5000);
     },
   });
-  selfHealChild = child;
+  slot.child = child;
   child.done.then((result) => {
     // An operator-requested stop is a normal outcome, not a failure: the
     // kill it triggers must not be reported as an error.
-    const wasStopped = selfHealStopRequested;
+    const wasStopped = slot.stopRequested;
     selfHealStatus.running = false;
     selfHealStatus.finishedAt = new Date().toISOString();
     // --verbose/--debug output writes to stderr (see llm-client's output.ts
@@ -776,8 +782,8 @@ async function handleSelfHeal(
     selfHealStatus.error = wasStopped
       ? null
       : managedChildError(result, selfHealTimeout);
-    selfHealChild = null;
-    selfHealStopRequested = false;
+    slot.child = null;
+    slot.stopRequested = false;
 
     if (broadcast) {
       broadcast({
@@ -788,13 +794,13 @@ async function handleSelfHeal(
       });
     }
   }).catch((err: unknown) => {
-    const wasStopped = selfHealStopRequested;
+    const wasStopped = slot.stopRequested;
     selfHealStatus.running = false;
     selfHealStatus.finishedAt = new Date().toISOString();
     selfHealStatus.stopped = wasStopped;
     selfHealStatus.error = wasStopped ? null : String(err);
-    selfHealChild = null;
-    selfHealStopRequested = false;
+    slot.child = null;
+    slot.stopRequested = false;
 
     if (broadcast) {
       broadcast({
@@ -819,13 +825,16 @@ async function handleSelfHeal(
 function handleSelfHealStop(
   _req: IncomingMessage,
   res: ServerResponse,
+  ctx: ServerContext,
 ): boolean {
-  if (!selfHealStatus.running || !selfHealChild) {
+  const slot = selfHealSlots.get(ctx);
+  const selfHealStatus = slot.status;
+  if (!selfHealStatus.running || !slot.child) {
     jsonResponse(res, 409, { error: "Self-heal is not running" });
     return true;
   }
-  selfHealStopRequested = true;
-  selfHealChild.kill("SIGTERM");
+  slot.stopRequested = true;
+  slot.child.kill("SIGTERM");
   jsonResponse(res, 200, { ok: true, message: "Stop requested; the loop will halt after the current step." });
   return true;
 }
@@ -834,8 +843,9 @@ function handleSelfHealStop(
 function handleSelfHealStatus(
   _req: IncomingMessage,
   res: ServerResponse,
+  ctx: ServerContext,
 ): boolean {
-  jsonResponse(res, 200, { ...selfHealStatus });
+  jsonResponse(res, 200, { ...selfHealSlots.get(ctx).status });
   return true;
 }
 
@@ -861,6 +871,7 @@ async function handleInit(
   ctx: ServerContext,
   onProjectInitialized?: () => void,
 ): Promise<boolean> {
+  const initStatus = initStatuses.get(ctx);
   if (initStatus.running) {
     jsonResponse(res, 409, { error: "Init is already running", startedAt: initStatus.startedAt });
     return true;
@@ -989,8 +1000,9 @@ async function handleInit(
 function handleInitStatus(
   _req: IncomingMessage,
   res: ServerResponse,
+  ctx: ServerContext,
 ): boolean {
-  jsonResponse(res, 200, { ...initStatus });
+  jsonResponse(res, 200, { ...initStatuses.get(ctx) });
   return true;
 }
 
@@ -1008,7 +1020,7 @@ interface RefreshStatus {
 }
 
 // Module-level singleton — one refresh at a time per server process.
-const refreshStatus: RefreshStatus = {
+const refreshStatuses = new WorkspaceScoped<RefreshStatus>(() => ({
   running: false,
   startedAt: null,
   finishedAt: null,
@@ -1016,7 +1028,7 @@ const refreshStatus: RefreshStatus = {
   phases: [],
   output: "",
   error: null,
-};
+}));
 
 /** Extract the `[refresh] …` phase lines from CLI output (ANSI stripped). */
 function parseRefreshPhases(stdout: string): string[] {
@@ -1044,6 +1056,7 @@ async function handleRefresh(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
+  const refreshStatus = refreshStatuses.get(ctx);
   if (refreshStatus.running) {
     jsonResponse(res, 409, {
       error: "A refresh is already running",
@@ -1071,7 +1084,7 @@ async function handleRefresh(
   cmdArgs.push(ctx.projectDir);
 
   // Refresh runs sourcevision analyze under the hood — same writer lock.
-  if (!acquireSvWriteLock(res, "refresh")) return true;
+  if (!acquireSvWriteLock(res, ctx, "refresh")) return true;
 
   refreshStatus.running = true;
   refreshStatus.startedAt = new Date().toISOString();
@@ -1130,12 +1143,12 @@ async function handleRefresh(
         timestamp: refreshStatus.finishedAt,
       });
     }
-    releaseSvWriteLock();
+    releaseSvWriteLock(ctx);
   }).catch((err: unknown) => {
     refreshStatus.running = false;
     refreshStatus.finishedAt = new Date().toISOString();
     refreshStatus.error = String(err);
-    releaseSvWriteLock();
+    releaseSvWriteLock(ctx);
   });
 
   return true;
@@ -1145,8 +1158,9 @@ async function handleRefresh(
 function handleRefreshStatus(
   _req: IncomingMessage,
   res: ServerResponse,
+  ctx: ServerContext,
 ): boolean {
-  jsonResponse(res, 200, { ...refreshStatus });
+  jsonResponse(res, 200, { ...refreshStatuses.get(ctx) });
   return true;
 }
 
@@ -1173,8 +1187,8 @@ export function newJobStatus(): AsyncJobStatus {
   return { running: false, startedAt: null, finishedAt: null, report: null, output: "", error: null };
 }
 
-const ciStatus = newJobStatus();
-const reshapeStatus = newJobStatus();
+const ciStatuses = new WorkspaceScoped<AsyncJobStatus>(newJobStatus);
+const reshapeStatuses = new WorkspaceScoped<AsyncJobStatus>(newJobStatus);
 
 /**
  * Start a background CLI job that reports through `status`, or answer 409 when
@@ -1197,7 +1211,7 @@ export function startAsyncJob(
     jsonResponse(res, 409, { error: `${label} is already running`, startedAt: status.startedAt });
     return true;
   }
-  if (svWriteLockLabel && !acquireSvWriteLock(res, svWriteLockLabel)) {
+  if (svWriteLockLabel && !acquireSvWriteLock(res, ctx, svWriteLockLabel)) {
     return true;
   }
 
@@ -1232,15 +1246,38 @@ export function startAsyncJob(
     if (broadcast && broadcastType) {
       broadcast({ type: broadcastType, ok: !result.error, timestamp: status.finishedAt });
     }
-    if (svWriteLockLabel) releaseSvWriteLock();
+    if (svWriteLockLabel) releaseSvWriteLock(ctx);
   }).catch((err: unknown) => {
     status.running = false;
     status.finishedAt = new Date().toISOString();
     status.error = String(err);
-    if (svWriteLockLabel) releaseSvWriteLock();
+    if (svWriteLockLabel) releaseSvWriteLock(ctx);
   });
 
   return true;
+}
+
+/**
+ * The job trackers of one workspace, for tests that need to observe or drive
+ * them without spawning the real CLIs. Mirrors `resetHenchRouteStateForTests`.
+ * @internal
+ */
+export function getCommandJobStatusesForTests(ctx: ServerContext): {
+  ci: AsyncJobStatus;
+  reshape: AsyncJobStatus;
+  svAnalyze: SvAnalyzeStatus;
+  refresh: RefreshStatus;
+  selfHeal: SelfHealStatus;
+  init: InitStatus;
+} {
+  return {
+    ci: ciStatuses.get(ctx),
+    reshape: reshapeStatuses.get(ctx),
+    svAnalyze: svAnalyzeStatuses.get(ctx),
+    refresh: refreshStatuses.get(ctx),
+    selfHeal: selfHealSlots.get(ctx).status,
+    init: initStatuses.get(ctx),
+  };
 }
 
 // ── Validation actions: rex fix, ndx ci, rex reshape ──────────────────
@@ -1306,7 +1343,7 @@ function handleCi(
 ): boolean {
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
   return startAsyncJob(
-    res, ciStatus, "CI check", bin,
+    res, ciStatuses.get(ctx), "CI check", bin,
     [...prefixArgs, "ci", "--format=json", ctx.projectDir],
     ctx, 900_000, // 15 minutes — runs the full analysis pipeline
     broadcast, "commands:ci-finished",
@@ -1343,7 +1380,7 @@ async function handleReshape(
   cmdArgs.push(ctx.projectDir);
 
   return startAsyncJob(
-    res, reshapeStatus, "Reshape", bin, cmdArgs, ctx,
+    res, reshapeStatuses.get(ctx), "Reshape", bin, cmdArgs, ctx,
     900_000, // 15 minutes — LLM restructuring pass
     broadcast, accept ? "rex:prd-changed" : undefined,
   );
@@ -1674,13 +1711,13 @@ export function handleCommandsRoute(
     return handleInit(req, res, ctx, options?.onProjectInitialized);
   }
   if (path === "init/status" && method === "GET") {
-    return handleInitStatus(req, res);
+    return handleInitStatus(req, res, ctx);
   }
   if (path === "sv-analyze" && method === "POST") {
     return handleSvAnalyze(req, res, ctx, broadcast);
   }
   if (path === "sv-analyze/status" && method === "GET") {
-    return handleSvAnalyzeStatus(req, res);
+    return handleSvAnalyzeStatus(req, res, ctx);
   }
   if (path === "sync" && method === "POST") {
     return handleSync(req, res, ctx, broadcast);
@@ -1704,16 +1741,16 @@ export function handleCommandsRoute(
     return handleSelfHeal(req, res, ctx, broadcast);
   }
   if (path === "self-heal/status" && method === "GET") {
-    return handleSelfHealStatus(req, res);
+    return handleSelfHealStatus(req, res, ctx);
   }
   if (path === "self-heal/stop" && method === "POST") {
-    return handleSelfHealStop(req, res);
+    return handleSelfHealStop(req, res, ctx);
   }
   if (path === "refresh" && method === "POST") {
     return handleRefresh(req, res, ctx, broadcast);
   }
   if (path === "refresh/status" && method === "GET") {
-    return handleRefreshStatus(req, res);
+    return handleRefreshStatus(req, res, ctx);
   }
   if (path === "manifest" && method === "GET") {
     return handleManifest(req, res, ctx);
@@ -1734,14 +1771,14 @@ export function handleCommandsRoute(
     return handleCi(req, res, ctx, broadcast);
   }
   if (path === "ci/status" && method === "GET") {
-    jsonResponse(res, 200, { ...ciStatus });
+    jsonResponse(res, 200, { ...ciStatuses.get(ctx) });
     return true;
   }
   if (path === "reshape" && method === "POST") {
     return handleReshape(req, res, ctx, broadcast);
   }
   if (path === "reshape/status" && method === "GET") {
-    jsonResponse(res, 200, { ...reshapeStatus });
+    jsonResponse(res, 200, { ...reshapeStatuses.get(ctx) });
     return true;
   }
 

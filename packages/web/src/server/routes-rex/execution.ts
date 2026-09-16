@@ -10,6 +10,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "../types.js";
+import { WorkspaceScoped } from "../workspace-scoped.js";
 import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { findItemById, appendLog } from "./rex-route-helpers.js";
@@ -49,40 +50,45 @@ interface ExecutionState {
 }
 
 // ---------------------------------------------------------------------------
-// Singleton state
+// Per-workspace state
 // ---------------------------------------------------------------------------
 
-/** Singleton execution state. Reset on server restart. */
-let executionState: ExecutionState = {
-  status: "idle",
-  currentEpicIndex: -1,
-  epics: [],
-};
+/** Everything one workspace's epic-by-epic execution owns. Reset on server restart. */
+interface ExecutionSlot {
+  state: ExecutionState;
+  /** The current hench child process (if any). */
+  henchProcess: ManagedChild | null;
+  /** Context and broadcast saved during execution for resume. */
+  savedCtx: ServerContext | null;
+  savedBroadcast: WebSocketBroadcaster | undefined;
+}
 
-/** Reference to the current hench child process (if any). */
-let henchProcess: ManagedChild | null = null;
-
-/** Context and broadcast saved during execution for resume. */
-let savedCtx: ServerContext | null = null;
-let savedBroadcast: WebSocketBroadcaster | undefined;
+// One execution at a time per WORKSPACE: worktree A's epic run neither blocks
+// nor reports in worktree B.
+const executionSlots = new WorkspaceScoped<ExecutionSlot>(() => ({
+  state: { status: "idle", currentEpicIndex: -1, epics: [] },
+  henchProcess: null,
+  savedCtx: null,
+  savedBroadcast: undefined,
+}));
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
 /** Broadcast the current execution state over WebSocket. */
-function broadcastExecutionState(broadcast?: WebSocketBroadcaster): void {
+function broadcastExecutionState(slot: ExecutionSlot, broadcast?: WebSocketBroadcaster): void {
   if (!broadcast) return;
   broadcast({
     type: "rex:execution-progress",
-    state: getExecutionStatusPayload(),
+    state: getExecutionStatusPayload(slot),
     timestamp: new Date().toISOString(),
   });
 }
 
 /** Build the status payload returned by the status endpoint and broadcasts. */
-function getExecutionStatusPayload() {
-  const { status, startedAt, finishedAt, currentEpicId, currentEpicIndex, epics, error } = executionState;
+function getExecutionStatusPayload(slot: ExecutionSlot) {
+  const { status, startedAt, finishedAt, currentEpicId, currentEpicIndex, epics, error } = slot.state;
   const totalEpics = epics.length;
   const completedEpics = epics.filter((e) => e.status === "completed").length;
   const totalTasks = epics.reduce((s, e) => s + e.tasksTotal, 0);
@@ -105,9 +111,10 @@ function getExecutionStatusPayload() {
 
 /** Refresh epic task counts from the PRD on disk. */
 function refreshEpicProgress(ctx: ServerContext): void {
+  const slot = executionSlots.get(ctx);
   const doc = loadPRDSync(ctx.rexDir);
   if (!doc) return;
-  for (const ep of executionState.epics) {
+  for (const ep of slot.state.epics) {
     const epicItem = findItemById(doc.items, ep.id);
     if (!epicItem) continue;
     const stats = computeStats(epicItem.children ?? []);
@@ -121,6 +128,7 @@ function refreshEpicProgress(ctx: ServerContext): void {
  * Returns a promise that resolves when hench exits.
  */
 async function runHenchForEpic(ctx: ServerContext, epicId: string): Promise<{ code: number | null; signal: string | null }> {
+  const slot = executionSlots.get(ctx);
   const henchBin = join(ctx.projectDir, "node_modules", ".bin", "hench");
   const henchFallback = join(ctx.projectDir, "packages", "hench", "dist", "cli", "index.js");
   const args = ["run", "--epic=" + epicId, "--loop", "--auto", ctx.projectDir];
@@ -135,10 +143,10 @@ async function runHenchForEpic(ctx: ServerContext, epicId: string): Promise<{ co
     env: { ...process.env },
   });
 
-  henchProcess = handle;
+  slot.henchProcess = handle;
 
   const result = await handle.done;
-  if (henchProcess === handle) henchProcess = null;
+  if (slot.henchProcess === handle) slot.henchProcess = null;
   return { code: result.exitCode, signal: null };
 }
 
@@ -147,32 +155,33 @@ async function runHenchForEpic(ctx: ServerContext, epicId: string): Promise<{ co
  * Respects pause state and broadcasts progress.
  */
 async function executeEpicSequence(ctx: ServerContext, broadcast?: WebSocketBroadcaster): Promise<void> {
-  while (executionState.currentEpicIndex < executionState.epics.length) {
+  const slot = executionSlots.get(ctx);
+  while (slot.state.currentEpicIndex < slot.state.epics.length) {
     // Check for pause
-    if (executionState.status === "paused") return;
-    if (executionState.status !== "running") return;
+    if (slot.state.status === "paused") return;
+    if (slot.state.status !== "running") return;
 
-    const epicIdx = executionState.currentEpicIndex;
-    const epic = executionState.epics[epicIdx];
+    const epicIdx = slot.state.currentEpicIndex;
+    const epic = slot.state.epics[epicIdx];
 
     // Refresh task counts before starting
     refreshEpicProgress(ctx);
-    broadcastExecutionState(broadcast);
+    broadcastExecutionState(slot, broadcast);
 
     // Skip epics with no actionable tasks
     if (epic.tasksTotal === 0 || epic.tasksCompleted >= epic.tasksTotal) {
       epic.status = epic.tasksTotal === 0 ? "skipped" : "completed";
       epic.finishedAt = new Date().toISOString();
-      executionState.currentEpicIndex++;
-      broadcastExecutionState(broadcast);
+      slot.state.currentEpicIndex++;
+      broadcastExecutionState(slot, broadcast);
       continue;
     }
 
     // Start this epic
     epic.status = "running";
     epic.startedAt = new Date().toISOString();
-    executionState.currentEpicId = epic.id;
-    broadcastExecutionState(broadcast);
+    slot.state.currentEpicId = epic.id;
+    broadcastExecutionState(slot, broadcast);
 
     // Run hench for this epic
     const result = await runHenchForEpic(ctx, epic.id);
@@ -182,11 +191,11 @@ async function executeEpicSequence(ctx: ServerContext, broadcast?: WebSocketBroa
 
     // Check if we were paused/stopped while hench was running
     // (status can change via pause endpoint during the await above)
-    const currentStatus = executionState.status as ExecutionState["status"];
+    const currentStatus = slot.state.status as ExecutionState["status"];
     if (currentStatus === "paused") {
       epic.status = "pending"; // Revert to pending — will resume later
       epic.startedAt = undefined;
-      broadcastExecutionState(broadcast);
+      broadcastExecutionState(slot, broadcast);
       return;
     }
 
@@ -202,23 +211,23 @@ async function executeEpicSequence(ctx: ServerContext, broadcast?: WebSocketBroa
     }
     epic.finishedAt = new Date().toISOString();
 
-    executionState.currentEpicIndex++;
-    broadcastExecutionState(broadcast);
+    slot.state.currentEpicIndex++;
+    broadcastExecutionState(slot, broadcast);
   }
 
   // All epics processed
-  if (executionState.status === "running") {
-    executionState.status = "completed";
-    executionState.finishedAt = new Date().toISOString();
-    executionState.currentEpicId = undefined;
+  if (slot.state.status === "running") {
+    slot.state.status = "completed";
+    slot.state.finishedAt = new Date().toISOString();
+    slot.state.currentEpicId = undefined;
 
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
       event: "epic_by_epic_completed",
-      detail: `Epic-by-epic execution completed. ${executionState.epics.filter((e) => e.status === "completed").length}/${executionState.epics.length} epics processed.`,
+      detail: `Epic-by-epic execution completed. ${slot.state.epics.filter((e) => e.status === "completed").length}/${slot.state.epics.length} epics processed.`,
     });
 
-    broadcastExecutionState(broadcast);
+    broadcastExecutionState(slot, broadcast);
   }
 }
 
@@ -239,12 +248,12 @@ export function routeExecution(
 
   // GET /api/rex/execute/status — current execution state
   if (path === "execute/status" && method === "GET") {
-    return handleExecutionStatus(res);
+    return handleExecutionStatus(res, ctx);
   }
 
   // POST /api/rex/execute/pause — pause execution
   if (path === "execute/pause" && method === "POST") {
-    return handleExecutionPause(res, broadcast);
+    return handleExecutionPause(res, ctx, broadcast);
   }
 
   // POST /api/rex/execute/resume — resume execution
@@ -266,9 +275,10 @@ async function handleStartEpicByEpic(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
+  const slot = executionSlots.get(ctx);
   // Don't allow starting if already running
-  if (executionState.status === "running" || executionState.status === "paused") {
-    errorResponse(res, 409, `Execution already ${executionState.status}. Use pause/resume or wait for completion.`);
+  if (slot.state.status === "running" || slot.state.status === "paused") {
+    errorResponse(res, 409, `Execution already ${slot.state.status}. Use pause/resume or wait for completion.`);
     return true;
   }
 
@@ -307,7 +317,7 @@ async function handleStartEpicByEpic(
     }
 
     // Initialize execution state
-    executionState = {
+    slot.state = {
       status: "running",
       startedAt: new Date().toISOString(),
       currentEpicIndex: 0,
@@ -323,8 +333,8 @@ async function handleStartEpicByEpic(
       }),
     };
 
-    savedCtx = ctx;
-    savedBroadcast = broadcast;
+    slot.savedCtx = ctx;
+    slot.savedBroadcast = broadcast;
 
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
@@ -332,21 +342,21 @@ async function handleStartEpicByEpic(
       detail: `Started epic-by-epic execution with ${epicsToRun.length} epics: ${epicsToRun.map((e) => e.title).join(", ")}`,
     });
 
-    broadcastExecutionState(broadcast);
+    broadcastExecutionState(slot, broadcast);
 
     // Respond immediately — execution runs in the background
     jsonResponse(res, 200, {
       ok: true,
       epicCount: epicsToRun.length,
-      epics: executionState.epics.map((e) => ({ id: e.id, title: e.title })),
+      epics: slot.state.epics.map((e) => ({ id: e.id, title: e.title })),
     });
 
     // Start execution asynchronously (don't await)
     executeEpicSequence(ctx, broadcast).catch((err) => {
-      executionState.status = "failed";
-      executionState.error = String(err);
-      executionState.finishedAt = new Date().toISOString();
-      broadcastExecutionState(broadcast);
+      slot.state.status = "failed";
+      slot.state.error = String(err);
+      slot.state.finishedAt = new Date().toISOString();
+      broadcastExecutionState(slot, broadcast);
     });
   } catch (err) {
     errorResponse(res, 400, String(err));
@@ -355,34 +365,37 @@ async function handleStartEpicByEpic(
 }
 
 /** Handle GET /api/rex/execute/status — return current execution state. */
-function handleExecutionStatus(res: ServerResponse): boolean {
+function handleExecutionStatus(res: ServerResponse, ctx: ServerContext): boolean {
+  const slot = executionSlots.get(ctx);
   // Refresh epic progress if running
-  if (savedCtx && (executionState.status === "running" || executionState.status === "paused")) {
-    refreshEpicProgress(savedCtx);
+  if (slot.savedCtx && (slot.state.status === "running" || slot.state.status === "paused")) {
+    refreshEpicProgress(slot.savedCtx);
   }
-  jsonResponse(res, 200, getExecutionStatusPayload());
+  jsonResponse(res, 200, getExecutionStatusPayload(slot));
   return true;
 }
 
 /** Handle POST /api/rex/execute/pause — pause the current execution. */
 function handleExecutionPause(
   res: ServerResponse,
+  ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): boolean {
-  if (executionState.status !== "running") {
-    errorResponse(res, 409, `Cannot pause: execution is ${executionState.status}`);
+  const slot = executionSlots.get(ctx);
+  if (slot.state.status !== "running") {
+    errorResponse(res, 409, `Cannot pause: execution is ${slot.state.status}`);
     return true;
   }
 
-  executionState.status = "paused";
+  slot.state.status = "paused";
 
   // Kill the current hench process if running
-  if (henchProcess) {
-    henchProcess.kill("SIGINT");
-    henchProcess = null;
+  if (slot.henchProcess) {
+    slot.henchProcess.kill("SIGINT");
+    slot.henchProcess = null;
   }
 
-  broadcastExecutionState(broadcast);
+  broadcastExecutionState(slot, broadcast);
   jsonResponse(res, 200, { ok: true, status: "paused" });
   return true;
 }
@@ -393,24 +406,25 @@ function handleExecutionResume(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): boolean {
-  if (executionState.status !== "paused") {
-    errorResponse(res, 409, `Cannot resume: execution is ${executionState.status}`);
+  const slot = executionSlots.get(ctx);
+  if (slot.state.status !== "paused") {
+    errorResponse(res, 409, `Cannot resume: execution is ${slot.state.status}`);
     return true;
   }
 
-  executionState.status = "running";
-  savedCtx = ctx;
-  savedBroadcast = broadcast;
+  slot.state.status = "running";
+  slot.savedCtx = ctx;
+  slot.savedBroadcast = broadcast;
 
-  broadcastExecutionState(broadcast);
+  broadcastExecutionState(slot, broadcast);
   jsonResponse(res, 200, { ok: true, status: "running" });
 
   // Continue execution asynchronously
   executeEpicSequence(ctx, broadcast).catch((err) => {
-    executionState.status = "failed";
-    executionState.error = String(err);
-    executionState.finishedAt = new Date().toISOString();
-    broadcastExecutionState(broadcast);
+    slot.state.status = "failed";
+    slot.state.error = String(err);
+    slot.state.finishedAt = new Date().toISOString();
+    broadcastExecutionState(slot, broadcast);
   });
 
   return true;
@@ -449,32 +463,32 @@ export interface ShutdownRexResult {
 export async function shutdownRexExecution(
   gracePeriodMs: number = Number(process.env["HENCH_SHUTDOWN_TIMEOUT_MS"] ?? 5_000),
 ): Promise<ShutdownRexResult> {
-  if (!henchProcess) return { hadActiveProcess: false, terminated: false };
+  const running = Array.from(executionSlots.values()).filter((slot) => slot.henchProcess !== null);
+  if (running.length === 0) return { hadActiveProcess: false, terminated: false };
 
-  const handle = henchProcess;
-  const pid = handle.pid;
-  const pidInfo = pid != null ? ` (pid ${pid})` : "";
-  henchProcess = null;
+  let allTerminated = true;
+  for (const slot of running) {
+    const handle = slot.henchProcess!;
+    const pid = handle.pid;
+    const pidInfo = pid != null ? ` (pid ${pid})` : "";
+    slot.henchProcess = null;
 
-  console.log(`[shutdown] terminating rex epic-by-epic execution${pidInfo}`);
+    console.log(`[shutdown] terminating rex epic-by-epic execution${pidInfo}`);
+    try {
+      await killWithFallback(handle, gracePeriodMs);
+      console.log(`[shutdown] rex epic-by-epic execution${pidInfo} terminated`);
+    } catch (err) {
+      const error = err as Error;
+      console.error(`[shutdown] rex epic-by-epic execution${pidInfo} failed to terminate: ${error.message}`);
+      allTerminated = false;
+    }
 
-  let terminated = false;
-  try {
-    await killWithFallback(handle, gracePeriodMs);
-    console.log(`[shutdown] rex epic-by-epic execution${pidInfo} terminated`);
-    terminated = true;
-  } catch (err) {
-    const error = err as Error;
-    console.error(`[shutdown] rex epic-by-epic execution${pidInfo} failed to terminate: ${error.message}`);
+    if (slot.state.status === "running" || slot.state.status === "paused") {
+      slot.state.status = "failed";
+      slot.state.error = "Server shutting down";
+      slot.state.finishedAt = new Date().toISOString();
+    }
   }
 
-  // Mark execution as failed so callers (status endpoint, WebSocket) see a
-  // clean terminal state rather than a stale "running" after restart.
-  if (executionState.status === "running" || executionState.status === "paused") {
-    executionState.status = "failed";
-    executionState.error = "Server shutting down";
-    executionState.finishedAt = new Date().toISOString();
-  }
-
-  return { hadActiveProcess: true, terminated };
+  return { hadActiveProcess: true, terminated: allTerminated };
 }
