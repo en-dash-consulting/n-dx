@@ -25,8 +25,12 @@ import { GuardError } from "./paths.js";
  * active — command separators/background (`; & |`), substitution (`` ` `` `$`),
  * redirection (`< >`), and subshells (`( )`). A run_command string is executed
  * through `sh -c`, so any *unquoted* occurrence can chain a second command or
- * redirect to a file. They are permitted inside quotes because a legitimate
+ * redirect to a file. Most are permitted inside quotes because a legitimate
  * single command routinely carries them there — e.g. `node -e "console.log('x')"`.
+ *
+ * `$` and `` ` `` are the exception: sh performs command substitution and
+ * parameter expansion inside *double* quotes, so they are active there too and
+ * only a single-quoted occurrence is literal. See {@link findActiveShellOperator}.
  */
 const ACTIVE_SHELL_OPERATORS = new Set([";", "&", "|", "`", "$", "<", ">", "(", ")"]);
 
@@ -35,6 +39,10 @@ const ACTIVE_SHELL_OPERATORS = new Set([";", "&", "|", "`", "$", "<", ">", "(", 
  *
  * Tracks POSIX single/double-quote state so an operator inside quotes is
  * ignored (it is a literal to the shell) while an unquoted one is reported.
+ * Double quotes are not a blanket pass: sh still expands `$(…)`, `${…}` and
+ * `` `…` `` there, so `$` and `` ` `` are reported inside double quotes unless
+ * backslash-escaped — `node -e "$(curl … | sh)"` would otherwise run the pipe
+ * before `node` started. Only single quotes are wholly literal.
  * A raw newline or carriage return is always reported: `sh -c` treats it as a
  * command separator, and a single-line tool invocation has no need for one —
  * this is what closed the `"npm --version\nrm -rf ~"` bypass, which the old
@@ -66,6 +74,9 @@ export function findActiveShellOperator(command: string): string | null {
     if (quote === '"') {
       if (ch === "\\") escaped = true;
       else if (ch === '"') quote = null;
+      // sh expands `$(…)`, `${…}` and `` `…` `` *inside* double quotes, so these
+      // stay active here; only `; & | < > ( )` are literal between "".
+      else if (ch === "$" || ch === "`") return ch;
       continue;
     }
 
@@ -110,17 +121,19 @@ export function validateCommand(
     throw new GuardError("Empty command");
   }
 
-  // Block shell operators the shell would act on (outside quotes, plus any raw
-  // newline). Commands run via sh -c, so an unquoted `;`, `|`, `>` or newline
-  // could chain a second command or redirect to a file — bypassing the
-  // executable allowlist below.
+  // Block shell operators the shell would act on (outside quotes, plus `$` and
+  // backtick inside double quotes, plus any raw newline). Commands run via
+  // sh -c, so an unquoted `;`, `|`, `>` or newline could chain a second command
+  // or redirect to a file, and a double-quoted `$(…)` would substitute —
+  // bypassing the executable allowlist below.
   const operator = findActiveShellOperator(trimmed);
   if (operator) {
     const shown = operator === "newline" ? "a newline" : `"${operator}"`;
     throw new GuardError(
       `Command contains shell operator ${shown}. Commands must be a single invocation ` +
-      `with no chaining, redirection, substitution, or subshells (metacharacters inside ` +
-      `quotes are allowed): ${trimmed}`,
+      `with no chaining, redirection, substitution, or subshells. Metacharacters are ` +
+      `allowed inside quotes, except "$" and "\`", which the shell still expands inside ` +
+      `double quotes — single-quote them instead: ${trimmed}`,
     );
   }
 
