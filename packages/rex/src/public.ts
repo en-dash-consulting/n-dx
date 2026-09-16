@@ -49,6 +49,18 @@
 // ---- Store ------------------------------------------------------------------
 
 export { resolveStore, PRD_FILENAME, PRD_TREE_DIRNAME, TREE_META_FILENAME, SELF_HEAL_TAG } from "./store/index.js";
+
+// Cross-worktree task claims (git common dir)
+export {
+  openClaimsStore,
+  claimsStorePath,
+  defaultIsPidAlive,
+  NOOP_CLAIMS_STORE,
+  DEFAULT_CLAIM_TTL_MS,
+  CLAIMS_DIRNAME,
+  CLAIMS_FILENAME,
+} from "./store/claims.js";
+export type { ClaimsStore, ClaimsStoreOptions, ClaimOptions, ClaimResult, TaskClaim } from "./store/claims.js";
 export type { PRDStore } from "./store/contracts.js";
 
 // ---- Markdown serializer / parser ------------------------------------------
