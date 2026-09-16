@@ -44,6 +44,7 @@ export const HENCH_SCOPE_VIEWS: readonly ViewId[] = [
 ];
 
 export const CROSS_CUTTING_VIEWS: readonly ViewId[] = [
+  "workspaces",
   "token-usage",
   "feature-toggles",
   "cli-timeouts",

@@ -51,6 +51,12 @@ interface SectionGroup {
 }
 
 const NAV_ENTRIES: NavEntry[] = [
+  // First because it is the "which checkout am I looking at" question, which
+  // comes before anything a single checkout can tell you. Sections are an
+  // accordion — exactly one is open — so putting it here also means HENCH is
+  // collapsed while the board is showing, without a special rule for it.
+  { type: "section", label: "WORKSPACES" },
+  { type: "item", id: "workspaces", icon: "◱", label: "Overview", minPass: 0, requiresServer: true },
   { type: "section", label: "SOURCEVISION", product: "sourcevision" },
   ...SOURCEVISION_TABS.map((tab) => ({ type: "item" as const, ...tab })),
   { type: "section", label: "REX", product: "rex" },
@@ -101,6 +107,12 @@ function buildSections(): SectionGroup[] {
 
 const SECTIONS = buildSections();
 
+/**
+ * Section expanded when the active view belongs to none — named rather than
+ * positional so inserting a section at the top does not silently move it.
+ */
+const FALLBACK_SECTION = "SOURCEVISION";
+
 /** Find which section label owns the given view */
 function sectionForView(view: ViewId): string {
   for (const section of SECTIONS) {
@@ -108,7 +120,7 @@ function sectionForView(view: ViewId): string {
       return section.label;
     }
   }
-  return SECTIONS[0].label;
+  return FALLBACK_SECTION;
 }
 
 /** Expand the section that owns the active view so the highlighted item is always visible on load */
@@ -151,18 +163,22 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
       ? SECTIONS.filter((s) => s.product === scope || !s.product)
       : SECTIONS;
     // Filter out feature-gated items that are disabled, then resolve the
-    // {cli} placeholder in command-reference labels.
-    return scopeFiltered.map((s) => ({
-      ...s,
-      items: s.items
-        .filter((item) => {
-          // Server-rendered views have nothing to show in a static export.
-          if (item.requiresServer && isDeployedMode()) return false;
-          if (!item.featureGate) return true;
-          return enabledGates.get(item.featureGate) ?? false;
-        })
-        .map((item) => ({ ...item, label: resolveCliLabel(item.label, cliName) })),
-    }));
+    // {cli} placeholder in command-reference labels. A section left with no
+    // items — WORKSPACES in a static export, where its one item needs a
+    // server — is dropped rather than rendered as a header over nothing.
+    return scopeFiltered
+      .map((s) => ({
+        ...s,
+        items: s.items
+          .filter((item) => {
+            // Server-rendered views have nothing to show in a static export.
+            if (item.requiresServer && isDeployedMode()) return false;
+            if (!item.featureGate) return true;
+            return enabledGates.get(item.featureGate) ?? false;
+          })
+          .map((item) => ({ ...item, label: resolveCliLabel(item.label, cliName) })),
+      }))
+      .filter((s) => s.items.length > 0);
   }, [scope, enabledGates, cliName]);
 
   const [expandedSection, setExpandedSection] = useState<string>(() =>

@@ -22,6 +22,7 @@
 @import "./token-usage.css";
 @import "./validation.css";
 @import "./hench-runs.css";
+@import "./workspaces.css";
 @import "./hench-config.css";
 @import "./hench-templates.css";
 @import "./workflow-optimization.css";

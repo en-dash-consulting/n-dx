@@ -39,4 +39,5 @@ export type ViewId =
   | "command-reference"
   | "llm-provider"
   | "project-settings"
-  | "merge-graph";
+  | "merge-graph"
+  | "workspaces";

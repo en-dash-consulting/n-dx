@@ -14,10 +14,33 @@ function flush(): Promise<void> {
     .then(() => new Promise((r) => setTimeout(r, 0)));
 }
 
+/** Every section the unscoped sidebar renders, in order. */
+const ALL_SECTIONS = ["WORKSPACES", "SOURCEVISION", "REX", "HENCH", "COMMANDS", "TOKEN USAGE", "SETTINGS"];
+
 describe("Sidebar", () => {
   let root: HTMLDivElement;
   const onNavigate = vi.fn();
   const onToggleSidebar = vi.fn();
+
+  /**
+   * A section header by its label.
+   *
+   * Addressed by label rather than by index on purpose: these assertions used
+   * to index into the header list, so inserting one section at the top broke
+   * twenty unrelated tests at once.
+   */
+  function headerFor(label: string): HTMLElement {
+    const header = Array.from(root.querySelectorAll<HTMLElement>(".nav-section-header")).find(
+      (el) => el.querySelector(".nav-section-label")?.textContent === label,
+    );
+    if (!header) throw new Error(`No sidebar section labelled "${label}"`);
+    return header;
+  }
+
+  /** The labels of every rendered section, in render order. */
+  function sectionLabels(): string[] {
+    return Array.from(root.querySelectorAll(".nav-section-label")).map((el) => el.textContent ?? "");
+  }
 
   function renderSidebar(props: Partial<Parameters<typeof Sidebar>[0]> = {}) {
     root = document.createElement("div");
@@ -52,8 +75,7 @@ describe("Sidebar", () => {
   describe("section collapse", () => {
     it("renders section headers as clickable buttons", () => {
       renderSidebar();
-      const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(6); // SOURCEVISION, REX, HENCH, COMMANDS, TOKEN USAGE, SETTINGS
+      expect(sectionLabels()).toEqual(ALL_SECTIONS);
     });
 
     it("section headers have aria-expanded attribute", () => {
@@ -66,54 +88,59 @@ describe("Sidebar", () => {
 
     it("clicking a section header toggles its expanded state", async () => {
       renderSidebar();
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
       // SOURCEVISION is expanded by default (owns "overview" view)
-      expect(headers[0].getAttribute("aria-expanded")).toBe("true");
+      expect(headerFor("SOURCEVISION").getAttribute("aria-expanded")).toBe("true");
 
       // Click to collapse
-      headers[0].click();
+      headerFor("SOURCEVISION").click();
       await flush();
-      expect(headers[0].getAttribute("aria-expanded")).toBe("false");
+      expect(headerFor("SOURCEVISION").getAttribute("aria-expanded")).toBe("false");
     });
 
     it("expanding one section collapses others (accordion behavior)", async () => {
       renderSidebar({ view: "overview" as const });
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
-      expect(headers[0].getAttribute("aria-expanded")).toBe("true");
-      expect(headers[1].getAttribute("aria-expanded")).toBe("false");
+      expect(headerFor("SOURCEVISION").getAttribute("aria-expanded")).toBe("true");
+      expect(headerFor("REX").getAttribute("aria-expanded")).toBe("false");
 
-      // Click REX section
-      headers[1].click();
+      headerFor("REX").click();
       await flush();
-      expect(headers[1].getAttribute("aria-expanded")).toBe("true");
-      expect(headers[0].getAttribute("aria-expanded")).toBe("false");
+      expect(headerFor("REX").getAttribute("aria-expanded")).toBe("true");
+      expect(headerFor("SOURCEVISION").getAttribute("aria-expanded")).toBe("false");
     });
 
     it("collapsed section hides its nav items", async () => {
       renderSidebar({ view: "overview" as const });
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
-      // Collapse SOURCEVISION
-      headers[0].click();
+      headerFor("SOURCEVISION").click();
       await flush();
-      const sectionGroup = headers[0].nextElementSibling;
+      const sectionGroup = headerFor("SOURCEVISION").nextElementSibling;
       expect(sectionGroup?.classList.contains("nav-section-items-collapsed")).toBe(true);
     });
 
     it("expanded section shows its nav items", () => {
       renderSidebar({ view: "overview" as const });
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
-      // SOURCEVISION should be expanded
-      const sectionGroup = headers[0].nextElementSibling;
+      const sectionGroup = headerFor("SOURCEVISION").nextElementSibling;
       expect(sectionGroup?.classList.contains("nav-section-items-collapsed")).toBe(false);
+    });
+
+    it("WORKSPACES sits above SOURCEVISION and holds one Overview item", () => {
+      renderSidebar({ view: "workspaces" as const });
+      expect(sectionLabels().indexOf("WORKSPACES")).toBeLessThan(sectionLabels().indexOf("SOURCEVISION"));
+      const items = headerFor("WORKSPACES").nextElementSibling?.querySelectorAll(".nav-item");
+      expect(items?.length).toBe(1);
+      expect(items?.[0].textContent).toContain("Overview");
+    });
+
+    it("HENCH is collapsed while the workspaces board is showing", () => {
+      renderSidebar({ view: "workspaces" as const });
+      expect(headerFor("WORKSPACES").getAttribute("aria-expanded")).toBe("true");
+      expect(headerFor("HENCH").getAttribute("aria-expanded")).toBe("false");
     });
   });
 
   describe("collapse state persistence", () => {
     it("saves expanded section to localStorage on toggle", async () => {
       renderSidebar({ view: "overview" as const });
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
-      // Click REX
-      headers[1].click();
+      headerFor("REX").click();
       await flush();
       const stored = localStorage.getItem("sidebar-expanded-section");
       expect(stored).toBe("REX");
@@ -122,18 +149,16 @@ describe("Sidebar", () => {
     it("expands the section owning the active view regardless of localStorage", () => {
       localStorage.setItem("sidebar-expanded-section", "REX");
       renderSidebar({ view: "overview" as const });
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
-      // SOURCEVISION (index 0) owns "overview", so it should be expanded even
-      // though localStorage had "REX" — the active view always wins on load.
-      expect(headers[0].getAttribute("aria-expanded")).toBe("true");
-      expect(headers[1].getAttribute("aria-expanded")).toBe("false");
+      // SOURCEVISION owns "overview", so it should be expanded even though
+      // localStorage had "REX" — the active view always wins on load.
+      expect(headerFor("SOURCEVISION").getAttribute("aria-expanded")).toBe("true");
+      expect(headerFor("REX").getAttribute("aria-expanded")).toBe("false");
     });
 
     it("saves empty string when collapsing all sections", async () => {
       renderSidebar({ view: "overview" as const });
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
       // Collapse the currently expanded SOURCEVISION section
-      headers[0].click();
+      headerFor("SOURCEVISION").click();
       await flush();
       const stored = localStorage.getItem("sidebar-expanded-section");
       expect(stored).toBe("");
@@ -243,37 +268,31 @@ describe("Sidebar", () => {
   describe("navigation", () => {
     it("calls onNavigate when nav item is clicked", () => {
       renderSidebar();
-      const navItems = root.querySelectorAll<HTMLElement>(".nav-item");
-      // Find a nav item in the expanded section and click it
-      const overviewItem = Array.from(navItems).find((el) =>
-        el.textContent?.includes("Overview")
-      );
+      // Scoped to SOURCEVISION: WORKSPACES has an "Overview" item too, and the
+      // two are only told apart by the section they sit in.
+      const navItems = headerFor("SOURCEVISION").nextElementSibling!.querySelectorAll<HTMLElement>(".nav-item");
+      const overviewItem = Array.from(navItems).find((el) => el.textContent?.includes("Overview"));
       overviewItem?.click();
       expect(onNavigate).toHaveBeenCalledWith("overview");
     });
 
     it("expands the section containing the active view on initial render", () => {
       renderSidebar({ view: "prd" as const });
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
-      // REX section (index 1) should be expanded
-      expect(headers[1].getAttribute("aria-expanded")).toBe("true");
+      expect(headerFor("REX").getAttribute("aria-expanded")).toBe("true");
     });
 
     it("hench section expands when hench view is active", () => {
       renderSidebar({ view: "hench-runs" as const });
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
-      // HENCH section (index 2) should be expanded
-      expect(headers[2].getAttribute("aria-expanded")).toBe("true");
+      expect(headerFor("HENCH").getAttribute("aria-expanded")).toBe("true");
     });
 
     it("deep-linking to a rex view expands rex section even with stale localStorage", () => {
       // Simulate a previous session that left SOURCEVISION expanded
       localStorage.setItem("sidebar-expanded-section", "SOURCEVISION");
       renderSidebar({ view: "prd" as const });
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
-      // REX section (index 1) must be expanded so the active "prd" item is visible
-      expect(headers[1].getAttribute("aria-expanded")).toBe("true");
-      expect(headers[0].getAttribute("aria-expanded")).toBe("false");
+      // REX must be expanded so the active "prd" item is visible
+      expect(headerFor("REX").getAttribute("aria-expanded")).toBe("true");
+      expect(headerFor("SOURCEVISION").getAttribute("aria-expanded")).toBe("false");
     });
 
     it("active nav item is highlighted on initial render", () => {
@@ -320,8 +339,7 @@ describe("Sidebar", () => {
     it("collapsed items have tabIndex -1 to remove from tab order", () => {
       renderSidebar({ view: "overview" as const });
       // REX section is collapsed, its items should have tabIndex -1
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
-      const rexItemsContainer = headers[1].nextElementSibling;
+      const rexItemsContainer = headerFor("REX").nextElementSibling;
       const rexNavItems = rexItemsContainer?.querySelectorAll<HTMLElement>(".nav-item");
       rexNavItems?.forEach((item) => {
         expect(item.getAttribute("tabindex")).toBe("-1");
@@ -420,11 +438,11 @@ describe("Sidebar", () => {
       expect(onNavigate).toHaveBeenCalledWith("rex-dashboard");
     });
 
-    it("clicking the n-dx logo navigates to overview", () => {
+    it("clicking the n-dx logo navigates to the first section's first view", () => {
       renderSidebar({ sidebarCollapsed: true, view: "prd" as const });
       const logo = root.querySelector<HTMLElement>(".sidebar-rail-logo");
       logo?.click();
-      expect(onNavigate).toHaveBeenCalledWith("overview");
+      expect(onNavigate).toHaveBeenCalledWith("workspaces");
     });
 
     it("rail expand button calls onToggleSidebar when clicked", () => {
@@ -453,14 +471,15 @@ describe("Sidebar", () => {
     it("shows chevron on section headers", () => {
       renderSidebar();
       const chevrons = root.querySelectorAll(".nav-section-chevron");
-      expect(chevrons.length).toBe(6);
+      expect(chevrons.length).toBe(ALL_SECTIONS.length);
     });
 
     it("expanded section has open chevron class", () => {
       renderSidebar({ view: "overview" as const });
-      const chevrons = root.querySelectorAll(".nav-section-chevron");
-      expect(chevrons[0].classList.contains("nav-section-chevron-open")).toBe(true);
-      expect(chevrons[1].classList.contains("nav-section-chevron-open")).toBe(false);
+      const open = (label: string) =>
+        headerFor(label).querySelector(".nav-section-chevron")!.classList.contains("nav-section-chevron-open");
+      expect(open("SOURCEVISION")).toBe(true);
+      expect(open("REX")).toBe(false);
     });
   });
 
@@ -547,9 +566,7 @@ describe("Sidebar", () => {
 
     it("progress indicator collapses with the SourceVision section", async () => {
       renderSidebar({ manifest: mockManifest, view: "overview" as const });
-      const headers = root.querySelectorAll<HTMLElement>(".nav-section-header");
-      // Collapse SOURCEVISION section
-      headers[0].click();
+      headerFor("SOURCEVISION").click();
       await flush();
       const svSection = root.querySelector("#nav-section-SOURCEVISION");
       expect(svSection?.classList.contains("nav-section-items-collapsed")).toBe(true);
@@ -560,43 +577,38 @@ describe("Sidebar", () => {
   });
 
   describe("scope filtering", () => {
-    it("shows all six sections when no scope is set", () => {
+    it("shows every section when no scope is set", () => {
       renderSidebar({ scope: null });
-      const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(6); // SOURCEVISION, REX, HENCH, COMMANDS, TOKEN USAGE, SETTINGS
+      expect(sectionLabels()).toEqual(ALL_SECTIONS);
     });
 
-    it("shows sourcevision + token usage + settings sections when scope=sourcevision", () => {
+    // A section without a `product` is cross-cutting and survives scope
+    // filtering — WORKSPACES, COMMANDS, TOKEN USAGE and SETTINGS all do.
+    const CROSS_CUTTING = ["WORKSPACES", "COMMANDS", "TOKEN USAGE", "SETTINGS"];
+
+    it("shows sourcevision + the cross-cutting sections when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
-      const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(4);
-      const label = sectionHeaders[0].querySelector(".nav-section-label");
-      expect(label?.textContent).toBe("SOURCEVISION");
+      expect(sectionLabels()).toEqual(["WORKSPACES", "SOURCEVISION", "COMMANDS", "TOKEN USAGE", "SETTINGS"]);
     });
 
-    it("shows rex + token usage + settings sections when scope=rex", () => {
+    it("shows rex + the cross-cutting sections when scope=rex", () => {
       renderSidebar({ scope: "rex", view: "rex-dashboard" as const });
-      const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(4);
-      const label = sectionHeaders[0].querySelector(".nav-section-label");
-      expect(label?.textContent).toBe("REX");
+      expect(sectionLabels()).toEqual(["WORKSPACES", "REX", "COMMANDS", "TOKEN USAGE", "SETTINGS"]);
     });
 
-    it("shows hench + token usage + settings sections when scope=hench", () => {
+    it("shows hench + the cross-cutting sections when scope=hench", () => {
       renderSidebar({ scope: "hench", view: "hench-runs" as const });
-      const sectionHeaders = root.querySelectorAll(".nav-section-header");
-      expect(sectionHeaders.length).toBe(4);
-      const label = sectionHeaders[0].querySelector(".nav-section-label");
-      expect(label?.textContent).toBe("HENCH");
+      expect(sectionLabels()).toEqual([...CROSS_CUTTING.slice(0, 1), "HENCH", ...CROSS_CUTTING.slice(1)]);
     });
 
-    it("shows sourcevision nav items + token usage + settings when scope=sourcevision", () => {
+    it("shows sourcevision nav items + the cross-cutting ones when scope=sourcevision", () => {
       renderSidebar({ scope: "sourcevision", view: "overview" as const });
       const navItems = root.querySelectorAll(".nav-item");
-      // 9 sourcevision items (PR Markdown is feature-gated off by default) + 1 commands item + 1 token usage item
-      // + 6 settings items (General, ndx analyze/plan, ndx work, ndx export, Feature Flags, CLI Timeouts).
+      // 1 workspaces item + 9 sourcevision items (PR Markdown is feature-gated off by default)
+      // + 1 commands item + 1 token usage item + 6 settings items (General, ndx analyze/plan,
+      // ndx work, ndx export, Feature Flags, CLI Timeouts).
       // ndx sync (notion-config) is feature-gated (rex.notionSync=false by default) so not counted.
-      expect(navItems.length).toBe(17);
+      expect(navItems.length).toBe(18);
     });
 
     it("does not show rex or hench nav items when scope=sourcevision", () => {

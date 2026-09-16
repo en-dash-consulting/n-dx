@@ -63,6 +63,19 @@ describe("token usage sidebar navigation", () => {
     return root;
   }
 
+  /**
+   * A section's `aria-expanded`, found by label. By label rather than by index:
+   * the sidebar gains sections over time and a positional lookup silently
+   * starts asserting about a different one.
+   */
+  function sectionExpanded(root: Element, label: string): string | null {
+    const header = Array.from(root.querySelectorAll<HTMLElement>(".nav-section-header")).find(
+      (el) => el.querySelector(".nav-section-label")?.textContent === label,
+    );
+    if (!header) throw new Error(`No sidebar section labelled "${label}"`);
+    return header.getAttribute("aria-expanded");
+  }
+
   function findNavItem(root: Element, label: string): HTMLElement | null {
     return Array.from(root.querySelectorAll<HTMLElement>(".nav-item")).find((item) =>
       item.textContent?.includes(label),
@@ -78,12 +91,11 @@ describe("token usage sidebar navigation", () => {
 
     const tokenUsageItem = findNavItem(root, "Token Usage");
     const settingsItem = findNavItem(root, "Feature Flags");
-    const sectionHeaders = root.querySelectorAll<HTMLElement>(".nav-section-header");
     expect(tokenUsageItem?.classList.contains("active")).toBe(true);
     expect(tokenUsageItem?.getAttribute("aria-current")).toBe("page");
     expect(settingsItem?.classList.contains("active")).toBe(false);
-    expect(sectionHeaders[4].getAttribute("aria-expanded")).toBe("true"); // TOKEN USAGE
-    expect(sectionHeaders[5].getAttribute("aria-expanded")).toBe("false"); // SETTINGS
+    expect(sectionExpanded(root, "TOKEN USAGE")).toBe("true");
+    expect(sectionExpanded(root, "SETTINGS")).toBe("false");
   });
 
   it("keeps Token Usage highlighted after in-app navigation from Settings", () => {
@@ -114,10 +126,9 @@ describe("token usage sidebar navigation", () => {
     const root = renderSidebar(parsed!.view);
     const tokenUsageItem = findNavItem(root, "Token Usage");
     const settingsItem = findNavItem(root, "Feature Flags");
-    const sectionHeaders = root.querySelectorAll<HTMLElement>(".nav-section-header");
     expect(tokenUsageItem?.classList.contains("active")).toBe(true);
     expect(settingsItem?.classList.contains("active")).toBe(false);
-    expect(sectionHeaders[4].getAttribute("aria-expanded")).toBe("true"); // TOKEN USAGE
-    expect(sectionHeaders[5].getAttribute("aria-expanded")).toBe("false"); // SETTINGS
+    expect(sectionExpanded(root, "TOKEN USAGE")).toBe("true");
+    expect(sectionExpanded(root, "SETTINGS")).toBe("false");
   });
 });

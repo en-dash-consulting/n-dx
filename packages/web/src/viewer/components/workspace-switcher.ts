@@ -266,7 +266,7 @@ export function WorkspaceSwitcher({ view, branch, navigate, fetcher }: Workspace
           ),
           h("a", {
             class: "breadcrumb-workspace-footer",
-            href: workspaceUrl({ key: "", isAnchor: true }, "workspaces" as ViewId, window.location.pathname),
+            href: workspaceUrl({ key: "", isAnchor: true }, "workspaces", window.location.pathname),
           }, "Open Workspaces overview"),
         )
       : null,

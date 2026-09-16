@@ -108,6 +108,35 @@ Two rules follow, and both are load-bearing:
 `tests/integration/workspace-scoped-prd-writes.test.ts` pins this by hashing both
 trees around each write; a route that wrote both would fail it.
 
+### The Workspaces board is the one cross-workspace reader
+
+`viewer/views/workspaces.ts` is the exception to both rules above, deliberately
+and in one direction only. It is *about* the set of worktrees, so it addresses
+each one explicitly with the `X-Ndx-Workspace` header rather than the `/w/<key>/`
+slot — the slot is already spent on whichever workspace the viewer itself is
+mounted under, and the server reads the header first (`resolveWorkspace`). Three
+endpoints answer for the whole repository and are fetched plainly
+(`/api/workspaces`, `/api/worktrees`, `/api/hench/memory`); the rest are per
+workspace.
+
+Two constraints keep this from eroding the rules:
+
+- **No route gained a workspace parameter.** The header is the existing
+  addressing mechanism, not a new one. A request made with it *is* that
+  workspace's request — `ctx` resolves the same way it does for a `/w/<key>/`
+  navigation, so the run it starts has that worktree as its cwd and writes that
+  worktree's tree. Nothing writes across a boundary.
+- **The only cross-workspace action is Start working / Stop.** Starting an agent
+  in another worktree names the worktree on the button
+  (`StartTaskButton`'s `workspace` prop, which sets the header). Editing a PRD
+  item still requires navigating there — the board links, it does not edit.
+
+Because it is about every worktree, it is also the one socket consumer that must
+**not** call `acceptsFrame`: a run progressing in worktree B is exactly what
+should move B's card while the viewer sits on A. It reads the `workspace` tag
+itself (`frameWorkspace`) and refreshes only that workspace's slice, falling back
+to a whole-board reload for a `"*"` frame or an unrecognised key.
+
 ## hub zone (`src/hub/`)
 
 `src/hub/` is the 0.7.0 hub daemon (`web hub`): one process per user that owns

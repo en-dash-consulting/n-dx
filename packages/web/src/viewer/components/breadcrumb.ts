@@ -45,6 +45,7 @@ const PRODUCT_DEFAULT_VIEW: Record<string, ViewId> = {
 };
 
 const VIEW_META: Record<ViewId, ViewMeta> = {
+  workspaces:            { product: "global",       label: "Overview",        productLabel: "Workspaces" },
   overview:              { product: "sourcevision", label: "Overview",        productLabel: "SourceVision" },
   graph:                 { product: "sourcevision", label: "Map",             productLabel: "SourceVision" },
   "iso-map":             { product: "sourcevision", label: "Isometric Map",   productLabel: "SourceVision" },

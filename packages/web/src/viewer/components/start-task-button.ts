@@ -17,9 +17,19 @@ export interface StartTaskButtonProps {
   onStarted: () => void;
   /** Button label while idle. Defaults to "Start Task". */
   label?: string;
+  /**
+   * Run in this workspace instead of the one the viewer is mounted under.
+   *
+   * Sent as `X-Ndx-Workspace`, which the server reads ahead of the `/w/<key>/`
+   * URL slot, so the run's cwd is that worktree. Left unset the request is the
+   * viewer's own workspace, which is what every other caller wants.
+   */
+  workspace?: string;
+  /** Accessible name. Defaults to a generic one; set it when several buttons share a page. */
+  ariaLabel?: string;
 }
 
-export function StartTaskButton({ taskId, onStarted, label = "Start Task" }: StartTaskButtonProps) {
+export function StartTaskButton({ taskId, onStarted, label = "Start Task", workspace, ariaLabel }: StartTaskButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,9 +38,11 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task" }: Sta
     setLoading(true);
     setError(null);
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (workspace) headers["X-Ndx-Workspace"] = workspace;
       const res = await fetch("/api/hench/execute", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ taskId }),
       });
       if (!res.ok) {
@@ -44,14 +56,14 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task" }: Sta
     } finally {
       setLoading(false);
     }
-  }, [taskId, onStarted]);
+  }, [taskId, onStarted, workspace]);
 
   return h("div", { class: "start-task-wrapper" },
     h("button", {
       class: "start-task-btn",
       onClick: handleStart,
       disabled: loading,
-      "aria-label": "Run this task with the agent",
+      "aria-label": ariaLabel ?? "Run this task with the agent",
     }, loading ? "Starting…" : label),
     error
       ? h("div", { class: "start-task-error", role: "alert" }, error)
