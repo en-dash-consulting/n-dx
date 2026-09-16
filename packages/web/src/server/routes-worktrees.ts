@@ -3,8 +3,9 @@
  *
  * GET /api/worktrees — every git worktree of the served repository, each with
  * its branch and HEAD, whether the working tree is dirty, a summary of the
- * hench runs recorded under it, and whether an n-dx web server is (or was)
- * serving it.
+ * hench runs recorded under it (including the one run worth showing — what it
+ * is doing now, else what it did last), and whether an n-dx web server is (or
+ * was) serving it.
  *
  * The list comes from `git worktree list` via llm-client's `listWorktrees`, so
  * it is the repository's own registry — a checkout that was `git worktree
@@ -36,6 +37,24 @@ import { jsonResponse } from "./response-utils.js";
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * The one run a worktree is represented by in the Sessions panel: what it is
+ * doing now, or what it did last.
+ *
+ * Enough to render a row and link to the run — the Runs view fetches the rest
+ * with `GET /api/hench/runs/:id?scope=repo`, which searches every worktree, so
+ * the id is resolvable from a dashboard serving a different checkout.
+ */
+export interface WorktreeLatestRun {
+  id: string;
+  /** Run status verbatim (`running`, `completed`, `failed`, …). */
+  status: string;
+  /** Task title, or null when the run file has none. */
+  taskTitle: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
 /** Hench run history recorded under one worktree's `.hench/runs/`. */
 export interface WorktreeRunsSummary {
   /** Run files that parsed. */
@@ -44,6 +63,12 @@ export interface WorktreeRunsSummary {
   running: number;
   /** Latest `finishedAt` across finished runs, or null when none has finished. */
   lastFinishedAt: string | null;
+  /**
+   * The running run that started most recently, or — when none is running —
+   * the run that finished (or failing that, started) most recently. Null when
+   * the worktree has no parseable run.
+   */
+  latest: WorktreeLatestRun | null;
 }
 
 /** Whether an n-dx web server is serving this worktree, per its marker files. */
@@ -106,7 +131,10 @@ let worktreesCache: WorktreesCache | null = null;
 interface RunFileDigest {
   mtimeMs: number;
   size: number;
+  id: string | null;
   status: string | null;
+  taskTitle: string | null;
+  startedAt: string | null;
   finishedAt: string | null;
 }
 
@@ -151,22 +179,40 @@ function digestRunFile(path: string): RunFileDigest | null {
   const cached = runDigestCache.get(path);
   if (cached && cached.mtimeMs === mtimeMs && cached.size === size) return cached;
 
+  const str = (value: unknown): string | null => (typeof value === "string" ? value : null);
+
   let digest: RunFileDigest;
   try {
     const run = JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
     digest = {
       mtimeMs,
       size,
-      status: typeof run.status === "string" ? run.status : null,
-      finishedAt: typeof run.finishedAt === "string" ? run.finishedAt : null,
+      id: str(run.id),
+      status: str(run.status),
+      taskTitle: str(run.taskTitle),
+      startedAt: str(run.startedAt),
+      finishedAt: str(run.finishedAt),
     };
   } catch {
     // Unparseable (mid-write, corrupt): remember that so it is not re-read on
     // every poll, but count it as no run.
-    digest = { mtimeMs, size, status: null, finishedAt: null };
+    digest = { mtimeMs, size, id: null, status: null, taskTitle: null, startedAt: null, finishedAt: null };
   }
   runDigestCache.set(path, digest);
   return digest;
+}
+
+/**
+ * How recent a run is, for picking the one the Sessions panel shows.
+ *
+ * A running run outranks every finished one regardless of timestamps — the
+ * panel's job is to say what a worktree is doing now — and within each group
+ * the most recent wins. ISO-8601 UTC timestamps compare correctly as strings,
+ * which is how `lastFinishedAt` has always been computed here.
+ */
+function latestRank(digest: RunFileDigest): [number, string] {
+  const running = digest.status === "running";
+  return [running ? 1 : 0, (running ? digest.startedAt : digest.finishedAt) ?? digest.startedAt ?? ""];
 }
 
 /** Summarise `<worktree>/.hench/runs/*.json`. Missing directory is zero runs. */
@@ -176,12 +222,13 @@ function summariseRuns(worktreePath: string): WorktreeRunsSummary {
   try {
     files = readdirSync(runsDir).filter((f) => f.endsWith(".json"));
   } catch {
-    return { total: 0, running: 0, lastFinishedAt: null };
+    return { total: 0, running: 0, lastFinishedAt: null, latest: null };
   }
 
   let total = 0;
   let running = 0;
   let lastFinishedAt: string | null = null;
+  let best: RunFileDigest | null = null;
   for (const file of files) {
     const digest = digestRunFile(join(runsDir, file));
     if (!digest || digest.status === null) continue;
@@ -190,8 +237,24 @@ function summariseRuns(worktreePath: string): WorktreeRunsSummary {
     if (digest.finishedAt && (lastFinishedAt === null || digest.finishedAt > lastFinishedAt)) {
       lastFinishedAt = digest.finishedAt;
     }
+    // A run with no id cannot be linked to, so it is never the shown run.
+    if (digest.id === null) continue;
+    if (best === null) { best = digest; continue; }
+    const [rank, key] = latestRank(digest);
+    const [bestRank, bestKey] = latestRank(best);
+    if (rank > bestRank || (rank === bestRank && key > bestKey)) best = digest;
   }
-  return { total, running, lastFinishedAt };
+
+  const latest: WorktreeLatestRun | null = best === null || best.status === null
+    ? null
+    : {
+        id: best.id as string,
+        status: best.status,
+        taskTitle: best.taskTitle,
+        startedAt: best.startedAt,
+        finishedAt: best.finishedAt,
+      };
+  return { total, running, lastFinishedAt, latest };
 }
 
 /** Read the server marker files `ndx start` leaves in a served directory. */

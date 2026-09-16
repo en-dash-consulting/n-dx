@@ -15,6 +15,7 @@ import {
   PollingSuspensionIndicator,
   ActiveOperationsTray,
   GitStatusBanner,
+  SessionsPanel,
   SearchOverlay,
   useSearchOverlay,
   NeolithicOverlay,
@@ -32,6 +33,7 @@ import {
   useRefreshThrottle,
   useActiveOperations,
   useGitStatus,
+  useWorktrees,
   useFeatureToggle,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
@@ -106,6 +108,7 @@ function App({ scope }: { scope: string | null }) {
   const { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount } = usePollingSuspension();
   const activeOperations = useActiveOperations();
   const { status: gitStatus, refetch: refetchGitStatus } = useGitStatus();
+  const { worktrees } = useWorktrees();
   const [searchOpen, , closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const handleTripleClick = useMemo(
@@ -230,6 +233,7 @@ function App({ scope }: { scope: string | null }) {
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
     h(ActiveOperationsTray, { operations: activeOperations, navigateTo }),
     h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
+    h(SessionsPanel, { worktrees, navigateTo }),
     (showDrop && !hasData)
       ? h("div", { class: "drop-overlay", role: "dialog", "aria-label": "File drop zone" },
           h("div", { class: "drop-box" },

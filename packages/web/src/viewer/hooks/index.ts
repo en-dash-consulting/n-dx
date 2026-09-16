@@ -11,6 +11,7 @@ export * from "./use-graph-arrow-nav.js";
 export * from "./use-active-operations.js";
 export * from "./use-git-status.js";
 export * from "./use-hench-runs-live-refresh.js";
+export * from "./use-worktrees.js";
 export * from "./use-index-md.js";
 export * from "./use-item-selection.js";
 export * from "./use-memory-monitor.js";

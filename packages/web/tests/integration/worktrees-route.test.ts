@@ -28,7 +28,13 @@ function git(cwd: string, ...args: string[]): string {
   );
 }
 
-function writeRun(worktree: string, id: string, status: string, finishedAt?: string): void {
+function writeRun(
+  worktree: string,
+  id: string,
+  status: string,
+  finishedAt?: string,
+  startedAt = "2026-09-16T10:00:00.000Z",
+): void {
   const runsDir = join(worktree, ".hench", "runs");
   mkdirSync(runsDir, { recursive: true });
   writeFileSync(
@@ -36,8 +42,8 @@ function writeRun(worktree: string, id: string, status: string, finishedAt?: str
     JSON.stringify({
       id,
       taskId: "task-1",
-      taskTitle: "t",
-      startedAt: "2026-09-16T10:00:00.000Z",
+      taskTitle: `title for ${id}`,
+      startedAt,
       ...(finishedAt ? { finishedAt } : {}),
       status,
       turns: 1,
@@ -141,12 +147,46 @@ describe("GET /api/worktrees", () => {
       total: 2,
       running: 0,
       lastFinishedAt: "2026-09-16T11:00:00.000Z",
+      // No run is in flight, so the most recently finished one is shown.
+      latest: {
+        id: "run-b",
+        status: "completed",
+        taskTitle: "title for run-b",
+        startedAt: "2026-09-16T10:00:00.000Z",
+        finishedAt: "2026-09-16T11:00:00.000Z",
+      },
     });
     expect(list.find((w) => w.path === linked)!.runs).toEqual({
       total: 1,
       running: 1,
       lastFinishedAt: null,
+      latest: {
+        id: "run-c",
+        status: "running",
+        taskTitle: "title for run-c",
+        startedAt: "2026-09-16T10:00:00.000Z",
+        finishedAt: null,
+      },
     });
+    await server.close();
+  });
+
+  it("shows a running run over a newer finished one", async () => {
+    // The linked worktree's only run is already running; give the anchor one
+    // too, started before both of its finished runs.
+    writeRun(repo, "run-live", "running", undefined, "2026-09-16T09:00:00.000Z");
+    clearWorktreesCache();
+    server = await startRouteTestServer((req, res) => handleWorktreesRoute(req, res, ctxFor(repo)));
+    const list = await fetchWorktrees(server);
+
+    const main = list.find((w) => w.path === repo)!;
+    expect(main.runs.running).toBe(1);
+    expect(main.runs.latest).toMatchObject({ id: "run-live", status: "running" });
+    // The finished-run watermark is unaffected by the running run.
+    expect(main.runs.lastFinishedAt).toBe("2026-09-16T11:00:00.000Z");
+
+    rmSync(join(repo, ".hench", "runs", "run-live.json"));
+    clearWorktreesCache();
     await server.close();
   });
 

@@ -40,6 +40,7 @@ import type { ViewId } from "../types.js";
 import { detectBasePath } from "../external.js";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { ElapsedTime, StartTaskButton } from "../components/index.js";
+import { formatSince } from "../utils/format.js";
 
 // ---------------------------------------------------------------------------
 // Wire types
@@ -248,19 +249,6 @@ export function formatElapsed(startedAt: string): string {
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-}
-
-/** "3m ago" — how long since the last run finished. */
-export function formatSince(iso: string | null): string | null {
-  if (!iso) return null;
-  const ms = Date.now() - Date.parse(iso);
-  if (!Number.isFinite(ms) || ms < 0) return null;
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
 }
 
 /** The card's one-word state, and the tone class that colours it. */

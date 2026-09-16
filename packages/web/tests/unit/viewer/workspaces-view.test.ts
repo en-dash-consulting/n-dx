@@ -24,12 +24,12 @@ import {
   workspaceViewUrl,
   cardStatus,
   formatBytes,
-  formatSince,
   type WorkspaceSummary,
   type WorktreeEntry,
   type ExecutionStatus,
   type PrdDeltaCounts,
 } from "../../../src/viewer/views/workspaces.js";
+import { formatSince } from "../../../src/viewer/utils/format.js";
 import { setBasePathForTests } from "../../../src/viewer/base-path.js";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
 
