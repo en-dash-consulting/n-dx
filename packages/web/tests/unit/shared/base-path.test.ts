@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   detectBasePath,
+  detectViewerBasePath,
   projectIdFromBasePath,
   stripBasePath,
+  stripWorkspaceSlot,
   webSocketUrl,
   withBasePath,
+  workspaceKeyFromBasePath,
 } from "../../../src/shared/index.js";
 
 describe("base-path", () => {
@@ -58,5 +61,42 @@ describe("base-path", () => {
   it("builds the socket URL under the base path", () => {
     expect(webSocketUrl("http:", "localhost:3117", "")).toBe("ws://localhost:3117");
     expect(webSocketUrl("https:", "host", "/p/a")).toBe("wss://host/p/a");
+  });
+});
+
+describe("workspace slot", () => {
+  it("detectViewerBasePath composes the project prefix and the workspace slot", () => {
+    expect(detectViewerBasePath("/prd/1")).toBe("");
+    expect(detectViewerBasePath("/w/feature/prd/1")).toBe("/w/feature");
+    expect(detectViewerBasePath("/w/feature")).toBe("/w/feature");
+    expect(detectViewerBasePath("/p/app/prd")).toBe("/p/app");
+    expect(detectViewerBasePath("/p/app/w/feature/prd")).toBe("/p/app/w/feature");
+    // A /w/ that is not the leading slot is a view path, not a workspace.
+    expect(detectViewerBasePath("/prd/w/feature")).toBe("");
+    expect(detectViewerBasePath("/workspaces")).toBe("");
+  });
+
+  it("workspaceKeyFromBasePath reads the key, decoded, or null for the anchor", () => {
+    expect(workspaceKeyFromBasePath("")).toBeNull();
+    expect(workspaceKeyFromBasePath("/p/app")).toBeNull();
+    expect(workspaceKeyFromBasePath("/w/feature")).toBe("feature");
+    expect(workspaceKeyFromBasePath("/p/app/w/my%20tree")).toBe("my tree");
+  });
+
+  it("stripWorkspaceSlot splits the server-side URL and keeps the query", () => {
+    expect(stripWorkspaceSlot("/api/status")).toEqual({ key: null, url: "/api/status" });
+    expect(stripWorkspaceSlot("/w/feature/api/status")).toEqual({ key: "feature", url: "/api/status" });
+    expect(stripWorkspaceSlot("/w/feature")).toEqual({ key: "feature", url: "/" });
+    expect(stripWorkspaceSlot("/w/feature/")).toEqual({ key: "feature", url: "/" });
+    expect(stripWorkspaceSlot("/w/feature?x=1")).toEqual({ key: "feature", url: "/?x=1" });
+    expect(stripWorkspaceSlot("/w/feature/data/prd.json?t=2")).toEqual({ key: "feature", url: "/data/prd.json?t=2" });
+    expect(stripWorkspaceSlot("/w/my%20tree/prd")).toEqual({ key: "my tree", url: "/prd" });
+    expect(stripWorkspaceSlot("/workspaces")).toEqual({ key: null, url: "/workspaces" });
+  });
+
+  it("the viewer base round-trips through withBasePath and stripBasePath with the slot", () => {
+    const base = detectViewerBasePath("/p/app/w/feature/hench-runs/run-1");
+    expect(withBasePath(base, "/api/hench/runs")).toBe("/p/app/w/feature/api/hench/runs");
+    expect(stripBasePath(base, "/p/app/w/feature/hench-runs/run-1")).toBe("/hench-runs/run-1");
   });
 });

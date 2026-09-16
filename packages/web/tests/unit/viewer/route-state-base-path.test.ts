@@ -26,3 +26,14 @@ describe("route-state under a hub base path", () => {
     expect(resolveLocationRoute("/p/alpha/prd/t", "#token-usage", VIEWS, "/p/alpha")).toEqual({ view: "token-usage", subId: null });
   });
 });
+
+describe("route-state under a workspace slot", () => {
+  it("parses views and deep links identically with the /w/<key> base and without", () => {
+    expect(parsePathnameRoute("/w/feature/prd/task-1", VIEWS, "/w/feature")).toEqual({ view: "prd", subId: "task-1" });
+    expect(parsePathnameRoute("/w/feature/overview", VIEWS, "/w/feature")).toEqual(parsePathnameRoute("/overview", VIEWS));
+    expect(parsePathnameRoute("/p/app/w/feature/hench-runs/r1", VIEWS, "/p/app/w/feature")).toEqual({ view: "hench-runs", subId: "r1" });
+    expect(parsePathnameRoute("/w/feature", VIEWS, "/w/feature")).toBeNull();
+    // Slot-less deep links keep resolving.
+    expect(parsePathnameRoute("/prd/task-1", VIEWS)).toEqual({ view: "prd", subId: "task-1" });
+  });
+});

@@ -109,3 +109,11 @@ hand-built URLs (history entries, share links, the logo). Both sides use
 `src/shared/base-path.ts`, so where the prefix ends is defined once. New viewer
 code must not build `ws://…${location.host}` or `location.origin + "/api/…"` by
 hand — go through those helpers.
+
+**Workspace slot.** The viewer's base path also carries `/w/<key>` when it
+addresses a worktree other than the anchor (`detectViewerBasePath`), so
+`/p/app/w/feature/prd` and `/w/feature/prd` deep-link to that worktree's tree.
+The project server strips the slot in `start.ts` before dispatch
+(`stripWorkspaceSlot`), resolves the workspace in the registry, and answers an
+unknown key with a 404 page linking to the anchor; `X-Ndx-Workspace` does the
+same for non-browser clients. Routes never see the slot.

@@ -12,8 +12,12 @@ export type { FeatureToggle, FeaturesResponse } from "./features.js";
 export type { ViewerScope, SourcevisionScopeViewId } from "./view-routing.js";
 export {
   PROJECT_PATH_PREFIX,
+  WORKSPACE_PATH_PREFIX,
   detectBasePath,
+  detectViewerBasePath,
   projectIdFromBasePath,
+  workspaceKeyFromBasePath,
+  stripWorkspaceSlot,
   withBasePath,
   stripBasePath,
   webSocketUrl,

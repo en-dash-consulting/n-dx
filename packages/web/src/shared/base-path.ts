@@ -14,8 +14,11 @@
 
 /** Path prefix under which the hub exposes one project's dashboard. */
 export const PROJECT_PATH_PREFIX = "/p/";
+/** Path slot under which a project server exposes one worktree ("workspace"). */
+export const WORKSPACE_PATH_PREFIX = "/w/";
 
 const PROJECT_BASE_PATTERN = /^\/p\/([^/?#]+)/;
+const WORKSPACE_SLOT_PATTERN = /^\/w\/([^/?#]+)/;
 
 /**
  * The base path a pathname is served under: `/p/<id>` when the pathname
@@ -24,6 +27,41 @@ const PROJECT_BASE_PATTERN = /^\/p\/([^/?#]+)/;
 export function detectBasePath(pathname: string): string {
   const match = PROJECT_BASE_PATTERN.exec(pathname);
   return match ? `${PROJECT_PATH_PREFIX}${match[1]}` : "";
+}
+
+/**
+ * The base path the VIEWER is served under: the hub's `/p/<id>` (if any)
+ * followed by the workspace slot `/w/<key>` (if any). Both are optional and
+ * independent — `/w/feature/prd`, `/p/app/prd`, `/p/app/w/feature/prd` and
+ * `/prd` are all valid — and the viewer puts the whole thing back on every
+ * URL it builds, so a deep link keeps both the project and the worktree.
+ */
+export function detectViewerBasePath(pathname: string): string {
+  const project = detectBasePath(pathname);
+  const rest = project ? pathname.slice(project.length) : pathname;
+  const slot = WORKSPACE_SLOT_PATTERN.exec(rest);
+  return `${project}${slot ? `${WORKSPACE_PATH_PREFIX}${slot[1]}` : ""}`;
+}
+
+/** The workspace key inside a viewer base path, or null when it names the anchor. */
+export function workspaceKeyFromBasePath(basePath: string): string | null {
+  const project = detectBasePath(basePath);
+  const slot = WORKSPACE_SLOT_PATTERN.exec(project ? basePath.slice(project.length) : basePath);
+  return slot ? decodeURIComponent(slot[1]) : null;
+}
+
+/**
+ * Split a server-side URL into its workspace slot and the rest. The project
+ * server sees paths with the hub prefix already stripped, so `/w/<key>` is
+ * the leading segment when present; the remainder keeps its query string and
+ * is `/` for the bare slot. No slot → `key: null`, url unchanged.
+ */
+export function stripWorkspaceSlot(url: string): { key: string | null; url: string } {
+  const slot = WORKSPACE_SLOT_PATTERN.exec(url);
+  if (!slot) return { key: null, url };
+  const rest = url.slice(slot[0].length);
+  const stripped = rest === "" || rest.startsWith("?") || rest.startsWith("#") ? `/${rest}` : rest;
+  return { key: decodeURIComponent(slot[1]), url: stripped };
 }
 
 /** The project id inside a base path, or null for the root base path. */

@@ -44,7 +44,7 @@ import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { createWebSocketManager, WsHealthTracker } from "./websocket.js";
-import { ALL_DATA_FILES } from "../shared/index.js";
+import { ALL_DATA_FILES, stripWorkspaceSlot } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
 import { handleRequestSecurity } from "./request-security.js";
 
@@ -699,6 +699,22 @@ async function handleApiRoutes(
   return false;
 }
 
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] ?? ch);
+}
+
+/** 404 for a `/w/<key>/` that names no known worktree, linking back to the anchor. */
+function respondUnknownWorkspace(res: ServerResponse, key: string, registry: WorkspaceRegistry): void {
+  const known = registry.list().map((w) => `<li><a href="/w/${encodeURIComponent(w.key)}/">${escapeHtml(w.key)}</a>${w.isAnchor ? " (anchor)" : ""}</li>`).join("");
+  const html =
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Unknown workspace</title></head><body>` +
+    `<h1>No workspace named &ldquo;${escapeHtml(key)}&rdquo;</h1>` +
+    `<p>This server knows these worktrees:</p><ul>${known}</ul>` +
+    `<p><a href="/">Open the anchor workspace</a></p></body></html>`;
+  res.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+  res.end(html);
+}
+
 function createHttpServer(
   registry: WorkspaceRegistry,
   ws: ReturnType<typeof createWebSocketManager>,
@@ -707,9 +723,24 @@ function createHttpServer(
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     if (handleRequestSecurity(req, res)) return;
-    // Request-scoped context: the workspace the request addresses (header or
-    // /w/<key>/ slot), which is the anchor for every request until PR 12.
-    const workspace = registry.resolveWorkspace(req);
+    // Request-scoped context. A leading /w/<key>/ names a worktree: strip it
+    // so every route below sees root-relative paths, and refuse an unknown key
+    // with a page that points back at the anchor rather than serving the wrong
+    // tree. Without a slot the X-Ndx-Workspace header may name one; otherwise
+    // the request is the anchor's, exactly as before.
+    const slot = stripWorkspaceSlot(req.url || "/");
+    let workspace;
+    if (slot.key !== null) {
+      const named = registry.get(slot.key);
+      if (!named) {
+        respondUnknownWorkspace(res, slot.key, registry);
+        return;
+      }
+      workspace = named;
+      req.url = slot.url;
+    } else {
+      workspace = registry.resolveWorkspace(req);
+    }
     const { ctx, watcher, handles: watcherHandles } = workspace;
     if (handleConfigEndpoint(req, res, ctx)) return;
     if (handleReloadSignalEndpoint(req, res, ws)) return;

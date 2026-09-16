@@ -2,10 +2,12 @@
  * Where this viewer is mounted, and how to address the server from there.
  *
  * Standalone the dashboard is served at `/`; behind the hub it is served at
- * `/p/<id>/` and proxied to the project server with that prefix stripped.
- * The prefix is derived once from `location.pathname` at boot — the hub
- * serves the SPA for every path under the prefix, so the first segment pair
- * is always `/p/<id>` when there is one.
+ * `/p/<id>/` and proxied to the project server with that prefix stripped; a
+ * worktree other than the anchor is addressed under `/w/<key>/`, which the
+ * project server strips itself. The base is derived once from
+ * `location.pathname` at boot — both servers serve the SPA for every path
+ * under their prefix, so the leading `/p/<id>` and `/w/<key>` segments are
+ * always where they were on the first load.
  *
  * Three ways the prefix reaches the wire:
  *
@@ -20,16 +22,24 @@
  * module adds the browser-bound state.
  */
 
-import { detectBasePath, webSocketUrl, withBasePath } from "./external.js";
+import { detectViewerBasePath, webSocketUrl, withBasePath, workspaceKeyFromBasePath } from "./external.js";
 
 let cachedBasePath: string | null = null;
 
-/** `/p/<id>` when served through the hub, `""` at the root. Memoised. */
+/**
+ * `/p/<id>` when served through the hub, `/w/<key>` when addressing a worktree
+ * other than the anchor, both when both — `""` at the root. Memoised.
+ */
 export function getBasePath(): string {
   if (cachedBasePath === null) {
-    cachedBasePath = typeof location !== "undefined" ? detectBasePath(location.pathname) : "";
+    cachedBasePath = typeof location !== "undefined" ? detectViewerBasePath(location.pathname) : "";
   }
   return cachedBasePath;
+}
+
+/** The workspace this viewer addresses, or null for the anchor. */
+export function getWorkspaceKey(): string | null {
+  return workspaceKeyFromBasePath(getBasePath());
 }
 
 /** @internal Test seam — clears or fixes the memoised base path. */
