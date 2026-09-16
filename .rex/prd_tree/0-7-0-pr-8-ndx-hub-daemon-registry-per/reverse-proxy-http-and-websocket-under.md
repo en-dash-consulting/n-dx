@@ -2,7 +2,7 @@
 id: "f7a6d344-fe86-4cff-b003-e1d2e1057330"
 level: "task"
 title: "Reverse proxy HTTP and WebSocket under /p/:id/ with viewer base-path support; root routes alias the sole registered project"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "pr-08"
@@ -10,11 +10,16 @@ tags:
 blockedBy:
   - "e879c6ba-bcfe-4c76-821c-5972112bc49d"
 source: "parallel-development roadmap, 2026-09-10 discovery session"
+startedAt: "2026-09-16T15:39:51.258Z"
+completedAt: "2026-09-16T15:47:52.602Z"
+endedAt: "2026-09-16T15:47:52.602Z"
+resolutionType: "code-change"
+resolutionDetail: "hub/proxy.ts forwards /p/:id/* (HTTP + WebSocket) with the prefix stripped and aliases the root to the sole project (409 with ids when several); viewer derives its base path at boot and routes fetch, sockets and history through shared base-path helpers; web serve at / unchanged."
 acceptanceCriteria:
   - "Every dashboard view works at /p/<id>/<view> including deep links and WebSocket live updates."
   - "With one registered project the existing e2e suites (cli-dev, mcp-transport, scheduler-startup) pass with the hub in front, unchanged."
   - "The viewer served directly by `web serve` (no hub) still works at /."
 description: "In the hub: proxy every request under /p/:id/* to the project's child (strip the prefix, forward headers, stream bodies, handle the WebSocket upgrade by piping sockets both ways; use node:http/net directly, no new dependency). Viewer: the SPA must work under a base path: derive it from location.pathname at boot (packages/web/src/viewer/main.ts, route-state.ts, use-route-state.ts pushState), and rewrite fetch(\"/api/...\") and WebSocket URLs through one helper (packages/web/src/viewer/external.ts is the boundary gateway; add a basePath util in src/shared and use it in the messaging pipeline). Root alias: when exactly one project is registered, requests to / and /api/*, /data/*, /mcp/* are proxied to it; when several are registered, / serves the home page (PR 9) and root API calls return 409 with the list of project ids."
-lastModified: "2026-09-10T20:12:10.835Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-09-16T15:47:52.977Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
