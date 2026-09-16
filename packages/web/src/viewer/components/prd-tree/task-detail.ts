@@ -6,6 +6,7 @@
  * controls for updating status, priority, and tags.
  */
 
+import { getWebSocketUrl } from "../../base-path.js";
 import { h, Fragment } from "preact";
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, ItemStatus, Priority, ItemLevel, RequirementData, RequirementCategory, RequirementValidationType, TaskUsageSummary, WeeklyBudgetResolution } from "./types.js";
@@ -1075,8 +1076,7 @@ function ExecuteTaskButton({
   useEffect(() => {
     if (!executing) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = getWebSocketUrl();
     let ws: WebSocket;
 
     try {

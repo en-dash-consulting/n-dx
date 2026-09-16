@@ -13,6 +13,7 @@
  * health status (stale detection).
  */
 
+import { getWebSocketUrl } from "../base-path.js";
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { RexTaskLink } from "./rex-task-link.js";
@@ -260,8 +261,7 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
     let mounted = true;
     fetchExecutions();
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = getWebSocketUrl();
 
     let reconnectDelay = 1000; // ms; doubles on each failure, capped at 30 s
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;

@@ -26,6 +26,7 @@
  * events this view cares about.
  */
 
+import { getWebSocketUrl } from "../base-path.js";
 import { useEffect, useRef } from "preact/hooks";
 import { createWSPipeline } from "./use-gateway.js";
 
@@ -85,8 +86,7 @@ export function useHenchRunsLiveRefresh(
     });
 
     try {
-      const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${proto}//${location.host}`);
+      ws = new WebSocket(getWebSocketUrl());
       ws.onmessage = (event) => {
         if (!mountedRef.current) return;
         try {

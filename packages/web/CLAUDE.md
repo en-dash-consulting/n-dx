@@ -86,7 +86,8 @@ The folder tree watcher refreshes `.rex/.cache/prd.json` automatically for most 
 and runs one `web serve` child per registered repository on an ephemeral loopback
 port. It is its own zone with a deliberately small import surface:
 
-- node built-ins, and `@n-dx/llm-client` exec helpers **only** through
+- node built-ins, `src/shared/` through its barrel (the base-path helpers the hub
+  shares with the viewer), and `@n-dx/llm-client` exec helpers **only** through
   `src/hub/exec-gateway.ts` (re-export only, no logic).
 - Nothing from `src/server/` or `src/viewer/`. The project servers it spawns are
   today's `web serve` unchanged; the hub talks to them over HTTP (`GET /api/status`),
@@ -96,3 +97,15 @@ port. It is its own zone with a deliberately small import surface:
 
 `$N_DX_HOME` overrides the `~/.n-dx` directory; tests pass `homeDir` explicitly.
 Core's `web.js` spawns the hub (PR 10) — the orchestration tier still never imports it.
+
+**Proxy and base path.** `hub/proxy.ts` forwards `/p/<id>/…` to that project's
+server with the prefix stripped (HTTP streamed, WebSocket upgrades piped over
+`node:net`), and aliases the root to the sole registered project; with several
+registered, `/` is a project list and other root paths answer 409 with the ids.
+The viewer derives the same prefix from `location.pathname` at boot
+(`viewer/base-path.ts`): `installBasePathFetch()` prefixes every root-relative
+`fetch`, `getWebSocketUrl()` is the one socket endpoint, and `appUrl()` covers
+hand-built URLs (history entries, share links, the logo). Both sides use
+`src/shared/base-path.ts`, so where the prefix ends is defined once. New viewer
+code must not build `ws://…${location.host}` or `location.origin + "/api/…"` by
+hand — go through those helpers.

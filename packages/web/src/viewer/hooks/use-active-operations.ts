@@ -22,6 +22,7 @@
  * instead (elapsed time, last output line, phase, iteration count).
  */
 
+import { getWebSocketUrl } from "../base-path.js";
 import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import { usePolling } from "../views/use-polling.js";
 import { createWSPipeline } from "./use-gateway.js";
@@ -234,8 +235,7 @@ export function useActiveOperations(): ActiveOperation[] {
     });
 
     try {
-      const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${proto}//${location.host}`);
+      ws = new WebSocket(getWebSocketUrl());
       ws.onmessage = (event) => {
         if (!mountedRef.current) return;
         try {

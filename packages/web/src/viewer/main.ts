@@ -38,12 +38,17 @@ import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
 import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
 import { bootstrap } from "./bootstrap.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
+import { installBasePathFetch } from "./base-path.js";
 import { renderActiveView, buildValidViews } from "./views/view-registry.js";
 import { initScrollReveal } from "./scroll-reveal.js";
 
 if (isDeployedMode()) {
   installFetchAdapter();
   document.body.classList.add("ndx-deployed");
+} else {
+  // Served through the hub at /p/<id>/: prefix every root-relative fetch.
+  // At the root this is a no-op.
+  installBasePathFetch();
 }
 
 initTheme();

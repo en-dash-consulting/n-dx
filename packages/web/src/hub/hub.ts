@@ -5,13 +5,15 @@
  * proxy. See the epic "0.7.0 / PR 8 · ndx hub daemon".
  *
  * This module is the composition root: it loads the registry, adopts or
- * respawns each project's server, serves `/api/hub/*`, runs the health loop,
- * and tears everything down on `close()`. Route handling is in routes.ts and
- * per-child process control in children.ts.
+ * respawns each project's server, serves `/api/hub/*`, proxies everything
+ * else to a project server (proxy.ts), runs the health loop, and tears
+ * everything down on `close()`. Route handling is in routes.ts and per-child
+ * process control in children.ts.
  *
  * Orchestration rule: core's `web.js` will spawn this (`web hub`, PR 10). The
  * hub itself is web-package code and stays inside `src/hub/` — it imports
- * node built-ins and the exec helpers through `exec-gateway.ts`, nothing from
+ * node built-ins, `src/shared/` (the base-path helpers it shares with the
+ * viewer) and the exec helpers through `exec-gateway.ts`, nothing from
  * `src/server/` or `src/viewer/`.
  *
  * @module web/hub/hub
@@ -34,6 +36,7 @@ import {
 } from "./registry.js";
 import type { HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute } from "./routes.js";
+import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 
 export const DEFAULT_HUB_PORT = 3117;
 const LOOPBACK_HOST = "127.0.0.1";
@@ -217,12 +220,12 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
 
   const server: Server = createServer((req: IncomingMessage, res: ServerResponse) => {
     void handleHubRoute(req, res, hub).then((handled) => {
-      if (!handled) {
-        res.writeHead(404, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Not found" }));
-      }
+      // Everything that is not the hub's own API belongs to a project server:
+      // /p/<id>/… explicitly, or the root alias when one project is registered.
+      if (!handled) handleProxyRequest(req, res, hub);
     });
   });
+  server.on("upgrade", (req, socket, head) => handleProxyUpgrade(req, socket, head, hub));
 
   const port = await new Promise<number>((resolve, reject) => {
     server.once("error", reject);

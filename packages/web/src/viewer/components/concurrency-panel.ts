@@ -12,6 +12,7 @@
  * - Visual indicators (color-coded) for approaching resource limits
  */
 
+import { getWebSocketUrl } from "../base-path.js";
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 
@@ -109,8 +110,7 @@ export function ConcurrencyPanel() {
     fetchConcurrency();
 
     // Connect to WebSocket for real-time updates
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = getWebSocketUrl();
     let ws: WebSocket | null = null;
 
     try {

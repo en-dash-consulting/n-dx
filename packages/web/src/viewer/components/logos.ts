@@ -5,6 +5,7 @@
  * HenchLogo) were replaced by PNG versions for better visual fidelity.
  */
 
+import { appUrl } from "../base-path.js";
 import { h } from "preact";
 
 interface LogoProps {
@@ -23,7 +24,7 @@ const PRODUCT_PNG: Record<string, string> = {
 /** PNG logo for n-dx brand mark */
 export function NdxLogoPng({ size = 36, class: cls }: LogoProps) {
   return h("img", {
-    src: "/n-dx.png",
+    src: appUrl("/n-dx.png"),
     width: size,
     height: size,
     alt: "",

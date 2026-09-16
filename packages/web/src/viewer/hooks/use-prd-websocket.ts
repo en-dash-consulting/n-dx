@@ -29,6 +29,7 @@
  * @see ../performance/response-buffer-gate.ts
  */
 
+import { getWebSocketUrl } from "../base-path.js";
 import { useEffect } from "preact/hooks";
 import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
 import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";
@@ -129,8 +130,7 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
     });
 
     try {
-      const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${proto}//${location.host}`);
+      ws = new WebSocket(getWebSocketUrl());
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
