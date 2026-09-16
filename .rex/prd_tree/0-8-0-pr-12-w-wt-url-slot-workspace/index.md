@@ -23,5 +23,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [/w/:wt/ URL slot in viewer routing and server dispatch; default workspace is the anchor; slot-less deep links still resolve](./w-wt-url-slot-in-viewer-routing-and.md) | pending |
+| [/w/:wt/ URL slot in viewer routing and server dispatch; default workspace is the anchor; slot-less deep links still resolve](./w-wt-url-slot-in-viewer-routing-and.md) | completed |
 | [Workspace-tagged WebSocket frames with client-side filtering, and the breadcrumb workspace switcher](./workspace-tagged-websocket-frames-with.md) | pending |
