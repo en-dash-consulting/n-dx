@@ -24,6 +24,24 @@ function bestAncestorPriority(parents: PRDItem[]): number {
  * feature completion before starting new work.
  *
  * Returns 0 for root-level items (no parent) or only-children.
+ *
+ * ## Why this is NOT `SUCCESSFUL_CHILD_STATUSES`
+ *
+ * This is the one status set in this module that deliberately still counts
+ * `deferred` alongside `completed`, and it must stay that way. It answers
+ * "how much of this feature has stopped needing attention?" — a *tiebreak
+ * ordering* signal — not "is this parent done?". A deferred sibling will not
+ * be worked again this pass, so it genuinely does make the feature closer to
+ * quiet, which is what the heuristic rewards.
+ *
+ * The completion question is answered by {@link allChildrenSuccessful}, where
+ * `deferred` must not count (#364). The two must not be unified in either
+ * direction: feeding this ratio into an actionability check would resurrect
+ * #364, and narrowing it to `{completed}` would silently reorder selection
+ * away from features whose remaining work is parked.
+ *
+ * Nothing here can make a parent *selectable* — this value only breaks ties
+ * between candidates `collectActionable` has already approved.
  */
 export function siblingCompletionRatio(entry: TreeEntry): number {
   const parent = entry.parents[entry.parents.length - 1];

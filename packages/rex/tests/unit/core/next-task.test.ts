@@ -390,29 +390,35 @@ describe("explainSelection", () => {
     expect(explanation.summary).toContain("all children completed, ready to finalize");
   });
 
-  it("does not call a parent ready to finalize when a child is deferred", () => {
-    // GH #364: `SUCCESSFUL_CHILD_STATUSES` was narrowed to `{completed}`
-    // precisely so a deferred child stops counting as done. A local
-    // `completed || deferred` copy here survived that change and announced
-    // "all children completed" over a subtree that still has open work in it.
-    const items: PRDItem[] = [
-      makeItem({
-        id: "e1",
-        title: "Epic One",
-        level: "epic",
-        priority: "high",
-        children: [
-          makeItem({ id: "t1", title: "Task 1", status: "completed" }),
-          makeItem({ id: "t2", title: "Task 2", status: "deferred" }),
-        ],
-      }),
-    ];
-    const completedIds = new Set(["t1"]);
-    const explanation = explainSelection(items, { item: items[0]!, parents: [] }, completedIds);
+  it.each(["deferred", "cancelled"] as const)(
+    "does not call a parent ready to finalize when a child is %s",
+    (unsuccessfulStatus) => {
+      // GH #364: `SUCCESSFUL_CHILD_STATUSES` was narrowed to `{completed}`
+      // precisely so a deferred child stops counting as done. A local
+      // `completed || deferred` copy here survived that change and announced
+      // "all children completed" over a subtree that still has open work in it.
+      // `cancelled` is covered alongside it because selection and presentation
+      // must agree: `collectActionable` refuses to offer such a parent, so the
+      // explanation must not describe it as finalizable either.
+      const items: PRDItem[] = [
+        makeItem({
+          id: "e1",
+          title: "Epic One",
+          level: "epic",
+          priority: "high",
+          children: [
+            makeItem({ id: "t1", title: "Task 1", status: "completed" }),
+            makeItem({ id: "t2", title: "Task 2", status: unsuccessfulStatus }),
+          ],
+        }),
+      ];
+      const completedIds = new Set(["t1"]);
+      const explanation = explainSelection(items, { item: items[0]!, parents: [] }, completedIds);
 
-    expect(explanation.summary).not.toContain("all children completed");
-    expect(explanation.summary).toContain("high");
-  });
+      expect(explanation.summary).not.toContain("all children completed");
+      expect(explanation.summary).toContain("high");
+    },
+  );
 
   it("explains depth-first traversal path", () => {
     const items: PRDItem[] = [
