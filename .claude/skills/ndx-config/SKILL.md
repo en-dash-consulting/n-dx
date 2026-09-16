@@ -6,7 +6,7 @@ argument-hint: "[key] [value]"
 
 View or change n-dx configuration with guided assistance.
 
-**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Iseconds` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
+**Before anything else, mark where this run's token usage starts:** run `ndx hench usage mark --task=skill:ndx-config .`. The CLI snapshots the session transcript's cumulative usage and position under that id; the record step at the end computes this run's spend as the difference between that snapshot and the transcript then — arithmetic done by code, not a timestamp typed by hand. If the command reports no session or transcript, continue; the record will say it fell back.
 
 Available configuration areas:
 - LLM settings: vendor (claude/codex), model, API keys, CLI paths
@@ -44,10 +44,10 @@ After applying any configuration change, commit the modified files:
 After committing, record this run so both the work and the tokens it spent are auditable alongside `ndx work` runs:
 
 ```sh
-ndx hench record --task=<id> --status=completed --startedAt=<the time you noted>   --title="ndx-config: set <key>"   --summary="<one-line summary>"
+ndx hench record --task=skill:ndx-config --status=completed   --title="ndx-config: set <key>"   --summary="<one-line summary>" .
 ```
 
-Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. Use `--task=skill:ndx-config`. A config change belongs to no PRD item, so it is recorded against a synthetic id that `get_token_usage` reports in its `orphans` bucket.
+Token usage is computed by the CLI as the difference between the `skill:ndx-config` mark taken at the start and the session transcript now — several skill runs in one session each get exactly their own slice. Use `--task=skill:ndx-config`. A config change belongs to no PRD item, so it is recorded against a synthetic id that `get_token_usage` reports in its `orphans` bucket.
 
 Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.
 

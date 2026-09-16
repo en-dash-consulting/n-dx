@@ -4,9 +4,13 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   readUsageDelta,
+  readUsageSinceMark,
   resolveTranscriptPath,
   loadUsageCursor,
   saveUsageCursor,
+  saveUsageMark,
+  snapshotTranscriptUsage,
+  takeUsageMark,
   EMPTY_CURSOR,
 } from "../../../src/store/session-usage.js";
 
@@ -402,5 +406,104 @@ describe("usage cursor persistence", () => {
       /session id/i,
     );
     await expect(loadUsageCursor(henchDir, "../escape")).rejects.toThrow(/session id/i);
+  });
+});
+
+describe("usage marks", () => {
+  const u = (output: number, cacheRead = 0) => ({
+    input_tokens: 1, output_tokens: output, cache_creation_input_tokens: 2, cache_read_input_tokens: cacheRead,
+  });
+
+  it("snapshotTranscriptUsage sums the whole transcript and reports its end", () => {
+    const transcript = [assistantLine("a", u(100, 5000)), userLine("x"), assistantLine("b", u(50))].join("\n");
+    expect(snapshotTranscriptUsage(transcript)).toEqual({
+      totals: { input: 2, output: 150, cacheCreationInput: 4, cacheReadInput: 5000 },
+      messages: 2,
+      lastUuid: "b",
+      model: "claude-opus-5",
+    });
+    expect(snapshotTranscriptUsage("")).toEqual({ totals: { input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0 }, messages: 0, lastUuid: undefined, model: undefined });
+  });
+
+  it("takeUsageMark records the position and cumulative totals under the task", () => {
+    const mark = takeUsageMark([assistantLine("a", u(100))].join("\n"), "T1", "2026-09-16T09:00:00Z");
+    expect(mark).toEqual({
+      task: "T1", at: "2026-09-16T09:00:00Z", lastUuid: "a", consumed: 1,
+      totals: { input: 1, output: 100, cacheCreationInput: 2, cacheReadInput: 0 },
+    });
+  });
+
+  it("readUsageSinceMark is exact when the marked message is still there", () => {
+    const before = [assistantLine("a", u(100, 9000)), assistantLine("b", u(50, 9000))].join("\n");
+    const mark = takeUsageMark(before, "T1");
+    const after = [before, assistantLine("c", u(7, 500)), assistantLine("d", u(3, 500))].join("\n");
+
+    const delta = readUsageSinceMark(after, mark);
+    expect(delta.tokenUsage).toEqual({ input: 2, output: 10, cacheCreationInput: 4, cacheReadInput: 1000 });
+    expect(delta.messages).toBe(2);
+    expect(delta.resynced).toBe(false);
+    expect(delta.from).toEqual({ lastUuid: "b", consumed: 2 });
+    expect(delta.to).toEqual({ lastUuid: "d", consumed: 4 });
+    expect(delta.cursor).toEqual({ lastUuid: "d", consumed: 4 });
+  });
+
+  it("readUsageSinceMark is zero, not negative, when nothing followed the mark", () => {
+    const transcript = [assistantLine("a", u(100))].join("\n");
+    const delta = readUsageSinceMark(transcript, takeUsageMark(transcript, "T1"));
+    expect(delta.tokenUsage).toEqual({ input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0 });
+    expect(delta.messages).toBe(0);
+  });
+
+  it("a mark on an empty transcript claims everything that followed", () => {
+    const mark = takeUsageMark("", "T1");
+    const delta = readUsageSinceMark([assistantLine("a", u(5)), assistantLine("b", u(6))].join("\n"), mark);
+    expect(delta.tokenUsage.output).toBe(11);
+    expect(delta.messages).toBe(2);
+    expect(delta.resynced).toBe(false);
+  });
+
+  it("falls back to snapshot arithmetic, clamped at zero, when the marked message is gone", () => {
+    const mark = takeUsageMark([assistantLine("a", u(100, 700)), assistantLine("b", u(50, 700))].join("\n"), "T1");
+    // Rewritten: fewer cache reads than at mark time, more output.
+    const rewritten = [assistantLine("z", u(160, 100)), assistantLine("c", u(7, 100))].join("\n");
+    const delta = readUsageSinceMark(rewritten, mark);
+    expect(delta.resynced).toBe(true);
+    expect(delta.tokenUsage).toEqual({ input: 0, output: 17, cacheCreationInput: 0, cacheReadInput: 0 });
+    expect(delta.messages).toBe(0);
+  });
+
+  describe("persistence", () => {
+    let henchDir: string;
+    beforeEach(async () => { henchDir = await mkdtemp(join(tmpdir(), "hench-marks-")); });
+    afterEach(async () => { await rm(henchDir, { recursive: true, force: true }); });
+
+    it("saveUsageMark keeps the watermark and other marks, and overwrites the same task", async () => {
+      await saveUsageCursor(henchDir, "s1", { lastUuid: "w", consumed: 3 });
+      await saveUsageMark(henchDir, "s1", takeUsageMark(assistantLine("a", u(1)), "T1", "t1"));
+      await saveUsageMark(henchDir, "s1", takeUsageMark(assistantLine("a", u(1)), "T2", "t2"));
+      await saveUsageMark(henchDir, "s1", takeUsageMark([assistantLine("a", u(1)), assistantLine("b", u(1))].join("\n"), "T1", "t1b"));
+
+      const cursor = await loadUsageCursor(henchDir, "s1");
+      expect(cursor.lastUuid).toBe("w");
+      expect(cursor.consumed).toBe(3);
+      expect(Object.keys(cursor.marks!).sort()).toEqual(["T1", "T2"]);
+      expect(cursor.marks!.T1).toMatchObject({ at: "t1b", consumed: 2, lastUuid: "b" });
+    });
+
+    it("a cursor file written before marks existed loads without them", async () => {
+      await mkdir(join(henchDir, "usage-cursors"), { recursive: true });
+      await writeFile(join(henchDir, "usage-cursors", "old.json"), JSON.stringify({ lastUuid: "q", consumed: 9 }), "utf-8");
+      expect(await loadUsageCursor(henchDir, "old")).toEqual({ lastUuid: "q", consumed: 9 });
+    });
+
+    it("drops malformed marks rather than failing the load", async () => {
+      await mkdir(join(henchDir, "usage-cursors"), { recursive: true });
+      await writeFile(join(henchDir, "usage-cursors", "bad.json"), JSON.stringify({
+        consumed: 1, marks: { good: { task: "good", at: "x", consumed: 1, totals: { output: 5 } }, junk: "nope" },
+      }), "utf-8");
+      const cursor = await loadUsageCursor(henchDir, "bad");
+      expect(Object.keys(cursor.marks!)).toEqual(["good"]);
+      expect(cursor.marks!.good.totals).toEqual({ input: 0, output: 5, cacheCreationInput: 0, cacheReadInput: 0 });
+    });
   });
 });

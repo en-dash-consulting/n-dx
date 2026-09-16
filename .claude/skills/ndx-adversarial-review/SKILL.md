@@ -15,9 +15,9 @@ Two passes, in this order:
 
 The necessity pass is not optional and is not a formality. A review that lists ten real-but-irrelevant defects costs more than it returns: it buries the one that matters and fills the PRD with work nobody should do.
 
-## Step 1 — Note the time, then resolve the target
+## Step 1 — Mark the usage start, then resolve the target
 
-**Before reading anything, record the current time in ISO-8601.** Use whatever your shell provides — `date -Iseconds` on POSIX shells, `Get-Date -Format o` in PowerShell, or a timestamp your environment already exposes. Step 7 passes it as `--startedAt`, which is what stops the run record from claiming every token the session spent before the review began.
+**Before reading anything, mark where this review's token usage starts:** run `ndx hench usage mark --task=skill:ndx-adversarial-review .`. The CLI snapshots the session transcript's cumulative usage and position; Step 7's record computes the review's spend as the difference between that snapshot and the transcript then — arithmetic done by code, not a timestamp typed by hand. If the command reports no session or transcript, continue; the record will say it fell back.
 
 Then read the argument, if any:
 
@@ -155,7 +155,7 @@ Then close out the run:
    Then run `git commit -F .git/NDX_COMMIT_MSG` and delete the scratch file.
 
    Substitute `<n>` with the number of items created and `<target>` with what was reviewed. Keep the `N-DX:` and `Co-Authored-By:` trailer lines exactly as shown — they form the audit trail used by downstream tooling.
-2. **Record.** Run `ndx hench record --task=skill:ndx-adversarial-review --status=completed --startedAt=<the time from Step 1> --title="Adversarial review: <target>" --summary="<n findings, m captured>"`. The `skill:` form puts the cost in the orphans bucket of `get_token_usage`, which is right for a review that produced several items rather than advancing one. `--startedAt` is not optional: without it the first record in a session has no watermark to work back from, so it claims everything the session spent before the review started.
+2. **Record.** Run `ndx hench record --task=skill:ndx-adversarial-review --status=completed --title="Adversarial review: <target>" --summary="<n findings, m captured>" .`. The `skill:` form puts the cost in the orphans bucket of `get_token_usage`, which is right for a review that produced several items rather than advancing one. The record measures from the mark taken in Step 1; without that mark it falls back to the session's previous record and says so.
 3. **Summarize.** Account for every finding: created as a new item, added to an item that already tracked it, skipped because the PRD already said everything, declined by the user, or dropped as not-worth-fixing. A finding that vanishes without one of those labels is a review that hid its own result.
 
 > **Fixing is a separate run.** This skill stops at a captured item. Hand the item to `/ndx-work` or `ndx work` so the fix goes through the project's execution discipline and earns its own tests, commit, and record.

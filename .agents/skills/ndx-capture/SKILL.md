@@ -6,7 +6,7 @@ argument-hint: "[description]"
 
 Capture a requirement, feature idea, or task from conversation context.
 
-**Before anything else, note the current time in ISO-8601.** Use whatever your shell provides — `date -Iseconds` on POSIX shells, `Get-Date -Format o` in PowerShell. The record step at the end passes it as `--startedAt`, which is what stops this run from claiming every token the session spent before it began.
+**Before anything else, mark where this run's token usage starts:** run `ndx hench usage mark --task=skill:ndx-capture .`. The CLI snapshots the session transcript's cumulative usage and position under that id; the record step at the end computes this run's spend as the difference between that snapshot and the transcript then — arithmetic done by code, not a timestamp typed by hand. If the command reports no session or transcript, continue; the record will say it fell back.
 
 1. If a description is provided, use it. Otherwise, review recent conversation for feature requests, requirements, or product decisions
 2. Call `get_prd_status` (rex MCP) to understand current PRD structure
@@ -43,10 +43,10 @@ Capture a requirement, feature idea, or task from conversation context.
 After committing, record this run so both the work and the tokens it spent are auditable alongside `ndx work` runs:
 
 ```sh
-ndx hench record --task=<id> --status=completed --startedAt=<the time you noted>   --title="ndx-capture: <captured item title>"   --summary="<one-line summary>"
+ndx hench record --task=<id> --mark=skill:ndx-capture --status=completed   --title="ndx-capture: <captured item title>"   --summary="<one-line summary>" .
 ```
 
-Token usage is read automatically from this Claude Code session's transcript, counting only the spend since the previous record — so several skill runs in one session each get their own slice instead of all claiming the session total. `<id>` is the id of the item you just created, so the cost of capturing it lands on that item in the PRD rollup.
+Token usage is computed by the CLI as the difference between the `skill:ndx-capture` mark taken at the start and the session transcript now, per token class — several skill runs in one session each get exactly their own slice. `<id>` is the id of the item you just created, so the cost of capturing it lands on that item in the PRD rollup; `--mark` names the mark because the item id did not exist when the run began.
 
 Skip this only if you changed nothing at all. If no transcript is found the record is still written with zero usage; the command reports which happened.
 

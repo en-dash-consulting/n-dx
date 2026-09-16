@@ -87,7 +87,7 @@ async function main(): Promise<void> {
     return process.cwd();
   };
 
-  const HENCH_COMMANDS = ["init", "run", "record", "status", "show", "config", "template"];
+  const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template"];
 
   // Orchestration commands that belong to ndx, not hench directly
   const NDX_ONLY_COMMANDS: Record<string, string> = {
@@ -119,9 +119,13 @@ async function main(): Promise<void> {
       );
     }
 
+    // `usage <sub> [dir]`: the subcommand is a positional, not a directory.
+    const usageDir = (): string =>
+      positional.length > 1 ? resolve(positional[positional.length - 1]) : process.cwd();
+
     // Ensure .hench/ exists for all known commands except init
     if (command !== "init") {
-      requireHenchDir(resolveDir());
+      requireHenchDir(command === "usage" ? usageDir() : resolveDir());
     }
 
     switch (command) {
@@ -138,6 +142,11 @@ async function main(): Promise<void> {
       case "record": {
         const { cmdRecord } = await import("./commands/record.js");
         await cmdRecord(resolveDir(), flags);
+        break;
+      }
+      case "usage": {
+        const { cmdUsage } = await import("./commands/usage.js");
+        await cmdUsage(usageDir(), positional, flags);
         break;
       }
       case "status": {
@@ -199,7 +208,7 @@ async function main(): Promise<void> {
           );
         }
 
-        const HENCH_COMMANDS = ["init", "run", "record", "status", "show", "config", "template", "validate-tokens"];
+        const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template", "validate-tokens"];
         const typoHint = formatTypoSuggestion(command, HENCH_COMMANDS, "hench ");
         throw new CLIError(
           `Unknown command: ${command}`,

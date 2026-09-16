@@ -25,12 +25,26 @@
  * double-count everything already recorded, so the count is used instead and the
  * caller is told the cursor was resynced.
  *
+ * ## Marks: the start of a task, written by code
+ *
+ * A watermark says where the LAST record ended, which is the wrong boundary for
+ * the first task in a session and for any task that began after unrelated
+ * conversation. The skills used to close that gap by asking the model to type
+ * the current time and pass it as `--startedAt`, and the delta filtered
+ * messages by timestamp. That made the measurement depend on free text a model
+ * produced. A {@link UsageMark} replaces it: `hench usage mark --task=<id>`
+ * snapshots the transcript's cumulative usage and position at the moment the
+ * task starts, and `hench record` computes the task's spend as the difference
+ * between that snapshot and the transcript now — in code, from two positions
+ * in the same file. Marks live beside the watermark in the session's cursor
+ * file, keyed by task.
+ *
  * ## What this deliberately does not do
  *
  * It does not price the tokens, and it does not try to split one message's usage
- * across concurrent work. A record claims the spend that happened between it and
- * the record before it — which is the honest granularity available from an
- * append-only transcript.
+ * across concurrent work. A record claims the spend that happened between two
+ * positions in an append-only transcript — which is the honest granularity
+ * available from one.
  *
  * @module hench/store/session-usage
  */
@@ -55,10 +69,45 @@ export interface SessionUsageCursor {
   lastUuid?: string;
   /** How many usage-bearing messages have been attributed. The fallback. */
   consumed: number;
+  /**
+   * Start-of-task snapshots not yet consumed by a record, keyed by the task id
+   * they were taken for. Absent in cursor files written before marks existed.
+   */
+  marks?: Record<string, UsageMark>;
+}
+
+/**
+ * Where a task started, as a position in the session transcript plus the
+ * cumulative usage up to it. Written by `hench usage mark`, consumed by
+ * `hench record`, which reports the difference between it and the transcript
+ * at record time.
+ */
+export interface UsageMark {
+  /** The task (or `skill:<name>`) this mark was taken for. */
+  task: string;
+  /** When the mark was taken (ISO-8601). Metadata — never used to filter usage. */
+  at: string;
+  /** uuid of the last usage-bearing message at mark time. The exact boundary. */
+  lastUuid?: string;
+  /** Usage-bearing messages up to and including the boundary. The fallback. */
+  consumed: number;
+  /** Cumulative usage of the whole transcript at mark time, per token class. */
+  totals: Required<TokenUsage>;
 }
 
 /** A session that has had nothing attributed yet. */
 export const EMPTY_CURSOR: SessionUsageCursor = { consumed: 0 };
+
+/** Cumulative usage of a whole transcript, plus where it currently ends. */
+export interface TranscriptUsageSnapshot {
+  totals: Required<TokenUsage>;
+  /** Usage-bearing messages in the transcript. */
+  messages: number;
+  /** uuid of the last usage-bearing message, when it has one. */
+  lastUuid?: string;
+  /** Model of the last usage-bearing message. */
+  model?: string;
+}
 
 export interface SessionUsageDelta {
   /** Usage accumulated since the cursor, in hench's own shape. */
@@ -76,6 +125,13 @@ export interface SessionUsageDelta {
   resynced: boolean;
 }
 
+/** What `hench record` reports when it consumed a mark. */
+export interface MarkedUsageDelta extends SessionUsageDelta {
+  /** The two positions the delta was taken between. */
+  from: { lastUuid?: string; consumed: number };
+  to: { lastUuid?: string; consumed: number };
+}
+
 interface TranscriptEntry {
   uuid?: string;
   timestamp?: string;
@@ -84,6 +140,111 @@ interface TranscriptEntry {
 
 function numeric(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+/** Every usage-bearing transcript line, parsed. A half-written tail line is skipped. */
+function parseUsageEntries(transcript: string): TranscriptEntry[] {
+  const entries: TranscriptEntry[] = [];
+  for (const line of transcript.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    let parsed: TranscriptEntry;
+    try {
+      parsed = JSON.parse(line) as TranscriptEntry;
+    } catch {
+      // The transcript is appended to while the session runs, so a read can
+      // land mid-write; the partial line is the next read's problem.
+      continue;
+    }
+    if (parsed?.message?.usage) entries.push(parsed);
+  }
+  return entries;
+}
+
+function zeroUsage(): Required<TokenUsage> {
+  return { input: 0, output: 0, cacheCreationInput: 0, cacheReadInput: 0 };
+}
+
+/** Sum the usage of some entries, and note the last model seen. */
+function sumUsage(entries: TranscriptEntry[]): { totals: Required<TokenUsage>; model?: string } {
+  const totals = zeroUsage();
+  let model: string | undefined;
+  for (const entry of entries) {
+    const usage = entry.message?.usage ?? {};
+    totals.input += numeric(usage.input_tokens);
+    totals.output += numeric(usage.output_tokens);
+    totals.cacheCreationInput += numeric(usage.cache_creation_input_tokens);
+    totals.cacheReadInput += numeric(usage.cache_read_input_tokens);
+    if (entry.message?.model) model = entry.message.model;
+  }
+  return { totals, model };
+}
+
+/**
+ * The whole transcript's cumulative usage and its current end. This is what a
+ * mark records, and what a record compares against.
+ */
+export function snapshotTranscriptUsage(transcript: string): TranscriptUsageSnapshot {
+  const entries = parseUsageEntries(transcript);
+  const { totals, model } = sumUsage(entries);
+  const last = entries.length > 0 ? entries[entries.length - 1] : undefined;
+  return { totals, messages: entries.length, lastUuid: last?.uuid, model };
+}
+
+/** Build a mark for `task` from the transcript as it stands now. */
+export function takeUsageMark(transcript: string, task: string, at = new Date().toISOString()): UsageMark {
+  const snapshot = snapshotTranscriptUsage(transcript);
+  return { task, at, lastUuid: snapshot.lastUuid, consumed: snapshot.messages, totals: snapshot.totals };
+}
+
+/**
+ * The usage that appeared after `mark`.
+ *
+ * Exact when the mark's uuid is still in the transcript: the messages after it
+ * are summed directly. When it is not (compaction rewrote the file, or the mark
+ * was taken on an empty transcript), the fallback is arithmetic on the two
+ * snapshots — now minus then, per class, clamped at zero — and `resynced`
+ * says the number is approximate. Either way the result is computed from two
+ * positions in the same file; no timestamp is consulted.
+ */
+export function readUsageSinceMark(transcript: string, mark: UsageMark): MarkedUsageDelta {
+  const entries = parseUsageEntries(transcript);
+  const now = snapshotTranscriptUsage(transcript);
+
+  let tokenUsage: Required<TokenUsage>;
+  let messages: number;
+  let model: string | undefined;
+  let resynced = false;
+
+  const boundary = mark.lastUuid ? entries.findIndex((e) => e.uuid === mark.lastUuid) : -1;
+  if (boundary !== -1) {
+    const tail = entries.slice(boundary + 1);
+    ({ totals: tokenUsage, model } = sumUsage(tail));
+    messages = tail.length;
+  } else if (!mark.lastUuid && mark.consumed === 0) {
+    // Marked on an empty transcript: everything since is the task's.
+    ({ totals: tokenUsage, model } = sumUsage(entries));
+    messages = entries.length;
+  } else {
+    resynced = true;
+    tokenUsage = {
+      input: Math.max(0, now.totals.input - mark.totals.input),
+      output: Math.max(0, now.totals.output - mark.totals.output),
+      cacheCreationInput: Math.max(0, now.totals.cacheCreationInput - mark.totals.cacheCreationInput),
+      cacheReadInput: Math.max(0, now.totals.cacheReadInput - mark.totals.cacheReadInput),
+    };
+    messages = Math.max(0, now.messages - mark.consumed);
+    model = now.model;
+  }
+
+  return {
+    tokenUsage,
+    messages,
+    model,
+    cursor: { lastUuid: now.lastUuid, consumed: now.messages },
+    resynced,
+    from: { lastUuid: mark.lastUuid, consumed: mark.consumed },
+    to: { lastUuid: now.lastUuid, consumed: now.messages },
+  };
 }
 
 /**
@@ -111,20 +272,7 @@ export function readUsageDelta(
    */
   since?: string,
 ): SessionUsageDelta {
-  const entries: TranscriptEntry[] = [];
-
-  for (const line of transcript.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    let parsed: TranscriptEntry;
-    try {
-      parsed = JSON.parse(line) as TranscriptEntry;
-    } catch {
-      // A half-written final line is normal: the transcript is appended to while
-      // the session runs, so a read can land mid-write.
-      continue;
-    }
-    if (parsed?.message?.usage) entries.push(parsed);
-  }
+  const entries = parseUsageEntries(transcript);
 
   // Sidechain (subagent) messages are included deliberately — a subagent's tokens
   // are spend, and the task that launched it is what caused them.
@@ -154,22 +302,7 @@ export function readUsageDelta(
         return Number.isNaN(at) || at >= sinceMs;
       });
 
-  const tokenUsage: Required<TokenUsage> = {
-    input: 0,
-    output: 0,
-    cacheCreationInput: 0,
-    cacheReadInput: 0,
-  };
-  let model: string | undefined;
-
-  for (const entry of fresh) {
-    const usage = entry.message?.usage ?? {};
-    tokenUsage.input += numeric(usage.input_tokens);
-    tokenUsage.output += numeric(usage.output_tokens);
-    tokenUsage.cacheCreationInput += numeric(usage.cache_creation_input_tokens);
-    tokenUsage.cacheReadInput += numeric(usage.cache_read_input_tokens);
-    if (entry.message?.model) model = entry.message.model;
-  }
+  const { totals: tokenUsage, model } = sumUsage(fresh);
 
   // The watermark follows everything SCANNED, not just what was claimed: a
   // message excluded by `since` has been dealt with, and leaving it behind the
@@ -191,6 +324,8 @@ export function readUsageDelta(
       // after it would be re-claimed.) With no uuid, `consumed` governs.
       lastUuid: lastScanned ? lastScanned.uuid : cursor.lastUuid,
       consumed: startAt + scanned.length,
+      // Marks are the caller's to keep or consume; the delta does not touch them.
+      marks: cursor.marks,
     },
     resynced,
   };
@@ -277,15 +412,53 @@ export async function loadUsageCursor(
   const path = cursorPath(henchDir, sessionId);
   try {
     const parsed = JSON.parse(await readFile(path, "utf-8")) as Partial<SessionUsageCursor>;
+    const marks = readMarks(parsed.marks);
     return {
       lastUuid: typeof parsed.lastUuid === "string" ? parsed.lastUuid : undefined,
       consumed: numeric(parsed.consumed),
+      ...(marks ? { marks } : {}),
     };
   } catch {
     // Losing a watermark costs accuracy on one record; throwing would cost the
     // record, which is the thing being audited.
     return EMPTY_CURSOR;
   }
+}
+
+/** Validate the marks map of a cursor file; malformed entries are dropped, not fatal. */
+function readMarks(raw: unknown): Record<string, UsageMark> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const marks: Record<string, UsageMark> = {};
+  for (const [task, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!value || typeof value !== "object") continue;
+    const m = value as Partial<UsageMark>;
+    const totals = (m.totals ?? {}) as Partial<Required<TokenUsage>>;
+    marks[task] = {
+      task,
+      at: typeof m.at === "string" ? m.at : "",
+      lastUuid: typeof m.lastUuid === "string" ? m.lastUuid : undefined,
+      consumed: numeric(m.consumed),
+      totals: {
+        input: numeric(totals.input),
+        output: numeric(totals.output),
+        cacheCreationInput: numeric(totals.cacheCreationInput),
+        cacheReadInput: numeric(totals.cacheReadInput),
+      },
+    };
+  }
+  return Object.keys(marks).length > 0 ? marks : undefined;
+}
+
+/**
+ * Record a start-of-task mark in the session's cursor file. Re-marking the same
+ * task overwrites — a restarted task starts where it restarted.
+ */
+export async function saveUsageMark(henchDir: string, sessionId: string, mark: UsageMark): Promise<void> {
+  const cursor = await loadUsageCursor(henchDir, sessionId);
+  await saveUsageCursor(henchDir, sessionId, {
+    ...cursor,
+    marks: { ...(cursor.marks ?? {}), [mark.task]: mark },
+  });
 }
 
 /** Persist a session's watermark. */
