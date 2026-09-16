@@ -34,7 +34,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Do not auto-complete an epic that still has deferred, blocked or failing children](./do-not-auto-complete-an-epic-that.md) | completed |
 | [Finalize gate must discount only what the commit prompt will actually commit: staged work only with a pending message, reviewer repairs on both paths](./finalize-gate-must-discount-only-what.md) | completed |
 | [Git-derived completion gate must recognize API-loop writes](./git-derived-completion-gate-must.md) | completed |
-| [Git helper failures must not be reported as successful staging or commits](./git-helper-failures-must-not-be.md) | pending |
+| [Git helper failures must not be reported as successful staging or commits](./git-helper-failures-must-not-be.md) | completed |
 | [Late-arrival child kill is proven only against a fake, and the e2e guard that would catch it only trips under load](./late-arrival-child-kill-is-proven-only.md) | completed |
 | [Livelock detector must see Codex file edits as progress](./livelock-detector-must-see-codex-file.md) | completed |
 | [Livelock intercept does not kill its child on Windows, failing CLI Smoke (Windows)](./livelock-intercept-does-not-kill-its.md) | completed |

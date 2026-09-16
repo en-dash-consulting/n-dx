@@ -2,7 +2,7 @@
 id: "08d050ce-f4ca-451e-9bb5-fd423f17c994"
 level: "task"
 title: "Git helper failures must not be reported as successful staging or commits"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "hench"
@@ -10,6 +10,8 @@ tags:
   - "ndx-capture"
 source: "ndx-capture"
 startedAt: "2026-09-15T02:10:45.018Z"
+completedAt: "2026-09-16T21:06:24.010Z"
+endedAt: "2026-09-16T21:06:24.010Z"
 acceptanceCriteria:
   - "A failed Git add or commit returns a non-success result to the Hench lifecycle and no success message is printed."
   - "A rejected signing request, failing hook, or Git identity error cannot be reported as a completed stage or commit operation."
@@ -20,6 +22,6 @@ acceptanceCriteria:
   - "Regression tests force non-zero Git outcomes for the affected helpers and assert the user-facing result and working-tree safety."
   - "Focused Hench tests and typecheck pass, with a patch changeset for @n-dx/hench."
 description: "P2 follow-up approved for PR #370. The Hench lifecycle uses execStdout for git add and git commit helpers even though it resolves an empty result on command failure. A rejected signing prompt, pre-commit hook, or Git identity error can therefore print Staged or Committed despite no Git mutation. Preserve the original failure, do not claim success, and prevent a later task from absorbing the previous task's PRD write. Review evidence: packages/hench/src/agent/lifecycle/shared.ts helper paths around stageReviewRepairs and commitResetDeferredChanges, backed by execStdout behavior in the shared execution helper.\n\nCompletion was disproved by the latest PR #370 review. P1: an existing pre-run-gate unit test still asserts the old swallowed-failure behavior, so the Hench package suite fails after the initial repair. Update the expectation to the explicit failure contract rather than weakening the new behavior. P2: packages/hench/src/agent/analysis/review-repairs.ts around line 137 still stages reviewer-applied repairs through execStdout on the autonomous/auto-commit path. If git add fails (for example index lock or permissions), the repair is treated as though nothing needs committing and the run can falsely report completion. Route this path through the same checked Git-result handling and add a non-zero Git staging regression test."
-lastModified: "2026-09-15T15:31:21.720Z"
-lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+lastModified: "2026-09-16T21:06:24.389Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
