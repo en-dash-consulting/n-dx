@@ -18,7 +18,7 @@ lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Dashboard config validator accepts values hench's schema rejects, leaving `.hench/config.json` unloadable](./dashboard-config-validator-accepts.md) | pending |
+| [Dashboard config validator accepts values hench's schema rejects, leaving `.hench/config.json` unloadable](./dashboard-config-validator-accepts.md) | completed |
 | [hench command guard passes `$(…)` and backticks inside double quotes, which `sh` expands](./hench-command-guard-passes-and.md) | completed |
 | [hench command guard's POSIX quote model lets `&`, `|`, `<`, `>` through on the cmd.exe fallback](./hench-command-guard-s-posix-quote.md) | completed |
 | [`ndx ci` config-secrets step never fails on a git-tracked `.n-dx.local.json`](./ndx-ci-config-secrets-step-never-fails.md) | pending |

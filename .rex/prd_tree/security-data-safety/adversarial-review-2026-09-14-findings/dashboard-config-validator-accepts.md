@@ -2,7 +2,7 @@
 id: "0a85aec1-4503-4bb0-bbe5-644b6668ad46"
 level: "task"
 title: "Dashboard config validator accepts values hench's schema rejects, leaving `.hench/config.json` unloadable"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -10,6 +10,11 @@ tags:
   - "severity:medium"
   - "web"
 source: "ndx-adversarial-review"
+startedAt: "2026-09-16T21:32:38.359Z"
+completedAt: "2026-09-16T21:39:59.894Z"
+endedAt: "2026-09-16T21:39:59.894Z"
+resolutionType: "code-change"
+resolutionDetail: "Tightened validateFieldValue (string-before-enum, all-string array elements, Number.isFinite, new positive/integer flags mirroring hench's .positive()/.int()), plus a cross-package contract test that pins the gate against HenchConfigSchema so the two cannot drift again."
 acceptanceCriteria:
   - "`validateFieldValue` rejects a non-string value for an enum field (`provider: [\"cli\"]` → 400, file unchanged)"
   - "`validateFieldValue` rejects an array field whose elements are not all strings (`guard.allowedCommands: [1, null]` → 400, file unchanged)"
@@ -17,6 +22,6 @@ acceptanceCriteria:
   - "A unit test for `packages/web/src/server/hench-config-fields.ts` feeds each rejected shape through `validateConfigKeyValue`, and route tests send them to `POST /api/hench/adaptive/override`, `POST /api/hench/adaptive/apply`, and `PUT /api/hench/config`, asserting 400 and a byte-identical config file"
   - "A test loads a config written through the dashboard gate with hench's `HenchConfigSchema` (or an equivalent fixture) and asserts it parses"
 description: "**Severity:** medium · **Verdict:** should-fix · **Gate introduced in commits 2380fd34 / 76aefb11 (this branch); the validator body predates it in `routes-hench.ts`** · Found by `/ndx-adversarial-review` 2026-09-15.\n\n**Failure scenario.** `validateFieldValue` (`packages/web/src/server/hench-config-fields.ts:53-75`) is now the single gate for three write routes, but it accepts shapes hench's zod schema (`packages/hench/src/schema/validate.ts`) rejects: (a) enum check uses `String(value)`, so `provider: [\"cli\"]` passes and an array is written where `z.enum([\"cli\",\"api\"])` expects a string; (b) `array` checks only `Array.isArray`, so `guard.allowedCommands: [1, null]` is written where `z.array(z.string())` is required; (c) `number` allows `0` for `guard.commandTimeout` (`z.number().positive()`) and allows `Infinity` (JSON `1e999`), which `JSON.stringify` writes as `null`. Each write returns 200 and produces a `.hench/config.json` that fails validation, so the next `ndx work` refuses to start until the file is hand-edited. The failure is loud, not silent — hence medium rather than high.\n\n**Refutation attempted.** Looked for schema validation on the write path (`routes-hench.ts:606-619`, `routes-adaptive.ts:708`, `:828`) — only `validateFieldValue`. Checked whether hench repairs an invalid config on load — it rejects.\n\n**Reachability.** `POST /api/hench/adaptive/override` and `/apply` (new gate) and `PUT /api/hench/config` (config editor, pre-existing) from the dashboard or any same-origin caller.\n\n**Not covered.** `routes-adaptive.test.ts` and `routes-hench` tests check wrong *primitive* types (string for number, string for array) but not array-for-enum, non-string elements, zero, or non-finite.\n\n**Solution options.**\n1. *(Recommended)* Tighten `validateFieldValue` locally: `typeof value === \"string\"` before the enum lookup; `Array.isArray(value) && value.every(v => typeof v === \"string\")`; `Number.isFinite(value)`; add a `positive?: true` flag to `ConfigFieldInfo` for `guard.commandTimeout`, `retry.*DelayMs`, and any other field hench marks positive, and enforce it. Cheap; risk is drifting from hench's schema again.\n2. Validate the written document against hench's `HenchConfigSchema` before saving. Removes drift, but web has no hench gateway today (`web/src/server/` has gateways for rex and sourcevision only) — adding one is an architecture decision, and hench is execution tier above the domain packages web currently imports."
-lastModified: "2026-09-15T20:55:30.538Z"
+lastModified: "2026-09-16T21:40:00.275Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
