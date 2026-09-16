@@ -1037,8 +1037,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 168,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token accumulation, and model catalogs). The combined branch exposes both terminateProcessTree for complete Windows CLI-tree cleanup and resolveLocalTimeoutMs for the local-provider timeout configuration; both are consumed only through this gateway. Raised from 166 to 168 for listWorktrees and its GitWorktree type (0.6.0 PR 5, worktree awareness): the async sibling of getWorktreeRoot, so hench's cross-worktree run views read the same realpath-resolved worktree list the dashboard does rather than shelling out to git themselves.",
+    maxExports: 170,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token accumulation, and model catalogs). The combined branch exposes both terminateProcessTree for complete Windows CLI-tree cleanup and resolveLocalTimeoutMs for the local-provider timeout configuration; both are consumed only through this gateway. Raised from 166 to 168 for listWorktrees and its GitWorktree type (0.6.0 PR 5, worktree awareness): the async sibling of getWorktreeRoot, so hench's cross-worktree run views read the same realpath-resolved worktree list the dashboard does rather than shelling out to git themselves. Raised from 168 to 170 for hasPosixShell and resolveShellKind: the command guard must know whether run_command will be interpreted by sh or cmd.exe, and that decision has to come from the same function execShellCmd uses (a copy in hench would drift and re-open the cmd.exe bypass).",
   },
 ];
 

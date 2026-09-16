@@ -136,6 +136,8 @@ import {
   exec,
   execStdout,
   execShellCmd,
+  hasPosixShell,
+  resolveShellKind,
   getCurrentHead,
   getCurrentBranch,
   getWorktreeRoot,
@@ -363,6 +365,14 @@ describe("public API — process execution exports", () => {
 
   it("exports listWorktrees as a function", () => {
     expect(typeof listWorktrees).toBe("function");
+  });
+
+  it("exports hasPosixShell as a function", () => {
+    expect(typeof hasPosixShell).toBe("function");
+  });
+
+  it("exports resolveShellKind as a function", () => {
+    expect(typeof resolveShellKind).toBe("function");
   });
 
   it("exports isExecutableOnPath as a function", () => {

@@ -116,6 +116,8 @@ export {
   exec,
   execStdout,
   execShellCmd,
+  hasPosixShell,
+  resolveShellKind,
   getCurrentHead,
   getCurrentBranch,
   getWorktreeRoot,

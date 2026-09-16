@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateCommand } from "../../../src/guard/commands.js";
+import { validateCommand, findActiveShellOperator } from "../../../src/guard/commands.js";
 import { GuardError } from "../../../src/guard/paths.js";
 
 const allowedCommands = ["npm", "npx", "node", "git", "tsc", "vitest", "pnpm"];
@@ -158,6 +158,70 @@ describe("validateCommand", () => {
       // as literal — the scanner's escape handling must agree.
       expect(() => validateCommand('node -e "\\$(id)"', allowedCommands)).not.toThrow();
       expect(() => validateCommand('node -e "\\`id\\`"', allowedCommands)).not.toThrow();
+    });
+  });
+
+  // Pure-function: the shell kind is injected, so the cmd.exe branch is
+  // exercised on every platform — including the Linux runner that CI uses.
+  describe("cmd.exe shell semantics (shellKind = \"cmd\")", () => {
+    const cmd = (command: string) => () => validateCommand(command, allowedCommands, "cmd");
+    const sh = (command: string) => () => validateCommand(command, allowedCommands, "posix");
+
+    it("rejects an operator a single quote would protect only under sh", () => {
+      // cmd.exe: a single quote is an ordinary character, so the & separates commands.
+      expect(cmd("npm test 'x & echo pwned'")).toThrow("cmd.exe shell operator");
+      expect(cmd("npm test 'x | more'")).toThrow("cmd.exe shell operator");
+      // sh: one quoted argument — must still pass.
+      expect(sh("npm test 'x & echo pwned'")).not.toThrow();
+    });
+
+    it("rejects an operator a backslash-escaped quote would protect only under sh", () => {
+      // cmd.exe: `\"` does not escape — the quote closes the string and & is live.
+      expect(cmd('npm test "foo\\" & echo pwned"')).toThrow("cmd.exe shell operator");
+      expect(sh('npm test "foo\\" & echo pwned"')).not.toThrow();
+    });
+
+    it("rejects redirection and grouping outside double quotes", () => {
+      expect(cmd("npm test > out.txt")).toThrow('">"');
+      expect(cmd("npm test < in.txt")).toThrow('"<"');
+      expect(cmd("npm test (x)")).toThrow('"("');
+    });
+
+    it("rejects the cmd.exe escape character outside double quotes", () => {
+      // `^"` would neutralise the quote this scanner relies on, and `^&` is a
+      // literal & to cmd only because ^ escaped it — either way, refuse.
+      expect(cmd('npm test ^" & echo pwned')).toThrow('"^"');
+    });
+
+    it("rejects %VAR% expansion anywhere, even inside double quotes", () => {
+      // Expansion is cmd's first parsing phase and ignores quotes.
+      expect(cmd("npm test %PATH%")).toThrow('"%"');
+      expect(cmd('npm test "%PATH%"')).toThrow('"%"');
+      // sh: % means nothing.
+      expect(sh("npm test %PATH%")).not.toThrow();
+    });
+
+    it("still rejects a raw newline", () => {
+      expect(cmd("npm --version\nrmdir /s /q x")).toThrow("a newline");
+    });
+
+    it("allows metacharacters inside double quotes, which cmd.exe does protect", () => {
+      expect(cmd('node -e "console.log(1 && 2)"')).not.toThrow();
+      expect(cmd('npm test "a & b | c"')).not.toThrow();
+      expect(cmd('vitest run "src/a b/x.test.ts"')).not.toThrow();
+    });
+
+    it("does not treat sh-only metacharacters as active", () => {
+      // `$`, backtick and `;` mean nothing to cmd.exe — `;` is an argument
+      // delimiter like a space, not a separator.
+      expect(cmd("npm test $HOME")).not.toThrow();
+      expect(cmd("npm test a;b")).not.toThrow();
+      expect(cmd("node -e \"`x`\"")).not.toThrow();
+    });
+
+    it("defaults to the POSIX model when no shell kind is given", () => {
+      expect(findActiveShellOperator("npm test 'x & y'")).toBeNull();
+      expect(findActiveShellOperator("npm test 'x & y'", "cmd")).toBe("&");
     });
   });
 

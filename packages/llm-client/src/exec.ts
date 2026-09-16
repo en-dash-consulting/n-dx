@@ -475,10 +475,28 @@ let posixShellProbe: boolean | undefined;
  * cmd.exe, the default shells, do not. Probed at most once per process
  * because the answer cannot change under us and `where` costs a subprocess.
  */
-function hasPosixShell(platform: NodeJS.Platform): boolean {
+export function hasPosixShell(platform: NodeJS.Platform): boolean {
   if (platform !== "win32") return true;
   posixShellProbe ??= isExecutableOnPath("sh");
   return posixShellProbe;
+}
+
+/**
+ * Which shell semantics {@link execShellCmd} will interpret a command under.
+ *
+ * The single source of the sh-vs-cmd.exe decision: {@link buildShellInvocation}
+ * derives its `kind` from this, and a caller that validates a command string
+ * *before* handing it to `execShellCmd` (hench's command guard) must ask the
+ * same question the same way, or it models one shell while another runs.
+ *
+ * Defaults resolve for the current process; pass both arguments to make the
+ * decision a pure function for tests.
+ */
+export function resolveShellKind(
+  platform: NodeJS.Platform = process.platform as NodeJS.Platform,
+  posixShellAvailable: boolean = hasPosixShell(platform),
+): ShellInvocation["kind"] {
+  return platform === "win32" && !posixShellAvailable ? "cmd" : "posix";
 }
 
 /**
@@ -528,7 +546,7 @@ export function buildShellInvocation(
   platform: NodeJS.Platform,
   posixShellAvailable: boolean,
 ): ShellInvocation {
-  if (platform === "win32" && !posixShellAvailable) {
+  if (resolveShellKind(platform, posixShellAvailable) === "cmd") {
     return { cmd: "cmd.exe", args: ["/d", "/s", "/c", `"${command}"`], kind: "cmd" };
   }
   return { cmd: "sh", args: ["-c", command], kind: "posix" };

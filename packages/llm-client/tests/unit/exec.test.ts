@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { exec, execStdout, execShellCmd, buildShellInvocation, getCurrentHead, getWorktreeRoot, getGitCommonDir, listWorktrees, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
+import { exec, execStdout, execShellCmd, buildShellInvocation, hasPosixShell, resolveShellKind, getCurrentHead, getWorktreeRoot, getGitCommonDir, listWorktrees, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
 import { resolve } from "node:path";
 import { fakeSpawn } from "../helpers/fake-spawn.js";
 
@@ -300,6 +300,38 @@ describe("buildShellInvocation", () => {
     // the caller put around a spaced path must survive untouched.
     const { args } = buildShellInvocation('vitest run "src/a b/x.test.ts"', "win32", false);
     expect(args[3]).toBe('"vitest run "src/a b/x.test.ts""');
+  });
+});
+
+describe("resolveShellKind", () => {
+  // Pure when both arguments are given — the guard's tests inject the kind, so
+  // the decision itself must be assertable from any CI runner.
+  it("is posix off win32 regardless of the probe", () => {
+    for (const platform of ["linux", "darwin"] as const) {
+      expect(resolveShellKind(platform, true)).toBe("posix");
+      expect(resolveShellKind(platform, false)).toBe("posix");
+    }
+  });
+
+  it("is posix on win32 when sh is resolvable, cmd when it is not", () => {
+    expect(resolveShellKind("win32", true)).toBe("posix");
+    expect(resolveShellKind("win32", false)).toBe("cmd");
+  });
+
+  it("agrees with buildShellInvocation's kind", () => {
+    for (const platform of ["linux", "win32"] as const) {
+      for (const sh of [true, false]) {
+        expect(resolveShellKind(platform, sh)).toBe(buildShellInvocation("x", platform, sh).kind);
+      }
+    }
+  });
+});
+
+describe("hasPosixShell", () => {
+  it("is true off win32 without probing PATH", () => {
+    expect(hasPosixShell("linux")).toBe(true);
+    expect(hasPosixShell("darwin")).toBe(true);
+    expect(mockExecFileSync).not.toHaveBeenCalled();
   });
 });
 
