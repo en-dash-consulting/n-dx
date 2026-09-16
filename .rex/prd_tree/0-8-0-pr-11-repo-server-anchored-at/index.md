@@ -24,4 +24,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Per-workspace job singletons: analyze, refresh, self-heal, ci, reshape, execution state and active executions keyed by workspace](./per-workspace-job-singletons-analyze.md) | pending |
-| [Workspace registry: one ServerContext, watcher set and PRD cache per worktree, lazily created, refreshed from git worktree list](./workspace-registry-one-servercontext.md) | pending |
+| [Workspace registry: one ServerContext, watcher set and PRD cache per worktree, lazily created, refreshed from git worktree list](./workspace-registry-one-servercontext.md) | completed |
