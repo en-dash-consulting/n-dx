@@ -26,5 +26,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Add listWorktrees(cwd) to llm-client and re-export it through the web and hench gateways](./add-listworktrees-cwd-to-llm-client.md) | completed |
 | [GET /api/worktrees: the served repo's worktrees with branch, head, dirty, run counts and server presence](./get-api-worktrees-the-served-repo-s.md) | completed |
-| [Hench Runs view aggregates .hench/runs across worktrees with a worktree badge](./hench-runs-view-aggregates-hench-runs.md) | pending |
+| [Hench Runs view aggregates .hench/runs across worktrees with a worktree badge](./hench-runs-view-aggregates-hench-runs.md) | completed |
 | [Sessions panel: each worktree with branch, dirty state, and running or last run](./sessions-panel-each-worktree-with.md) | pending |
