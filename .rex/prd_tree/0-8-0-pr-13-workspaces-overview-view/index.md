@@ -24,5 +24,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Dashboard writes go to the selected workspace's tree; editing the anchor while viewing a branch requires an explicit switch](./dashboard-writes-go-to-the-selected.md) | pending |
-| [PRD delta versus the anchor computed server-side and exposed at /api/workspaces/:wt/prd-delta](./prd-delta-versus-the-anchor-computed.md) | pending |
+| [PRD delta versus the anchor computed server-side and exposed at /api/workspaces/:wt/prd-delta](./prd-delta-versus-the-anchor-computed.md) | completed |
 | [Workspaces Overview view: machine strip, one card per worktree with live run, PRD delta count and Open / Start working / Stop; new WORKSPACES sidebar section](./workspaces-overview-view-machine-strip.md) | pending |
