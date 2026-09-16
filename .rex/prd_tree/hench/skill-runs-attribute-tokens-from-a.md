@@ -2,7 +2,7 @@
 id: "347d501b-b8d8-4076-8e85-4b5fe3ab5fce"
 level: "feature"
 title: "Skill runs attribute tokens from a code-written usage mark taken when the task starts, not from a model-typed --startedAt window"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "hench"
@@ -10,6 +10,11 @@ tags:
   - "token-usage"
   - "record"
 source: "ndx-capture"
+startedAt: "2026-09-16T16:02:26.716Z"
+completedAt: "2026-09-16T16:12:47.530Z"
+endedAt: "2026-09-16T16:12:47.530Z"
+resolutionType: "code-change"
+resolutionDetail: "hench usage mark snapshots the transcript at task start; hench record claims the code-computed difference from that mark per token class (approximate + flagged after compaction), --startedAt is metadata only, unmarked records warn naming the command; all recording skills mark at their first step; tests at every layer."
 acceptanceCriteria:
   - "`hench usage mark --task=<id>` writes a named mark (task, at, lastUuid, consumed, cumulative totals) into `.hench/usage-cursors/<session>.json`; running it twice for the same task overwrites rather than appends."
   - "`hench record --task=<id>` with a mark present computes the delta per token class as totalsNow − totals@mark in code, prints both endpoints, and stores exactly that delta on the run record; unit test over a fixture transcript with a mark placed mid-way asserts the numbers."
@@ -19,6 +24,6 @@ acceptanceCriteria:
   - "Every skill under .claude/skills/ that runs `hench record` calls the mark command at its start step and no longer instructs the model to pass a noted time as `--startedAt`; a test greps the skill files for the old instruction."
   - "Compaction fallback: when the marked uuid is absent from the transcript, the count-based fallback is used and the output says the delta is approximate (existing resync semantics preserved)."
 description: "**Problem.** Every skill that ends in `ndx hench record` (ndx-work step 7/12, ndx-capture, ndx-config, ndx-reshape, ndx-plan, ndx-adversarial-review) asks the model to \"note the current time\" and later pass it as `--startedAt`. `record.ts` then uses that string as the usage window: `readUsageDelta(transcript, cursor, window)` in `packages/hench/src/store/session-usage.ts` filters transcript messages by timestamp ≥ the typed time and sums their `usage` objects. Two things make the resulting number untrustworthy: (1) the window is free text produced by the model, so any slip (wrong zone, wrong minute, forgotten flag) silently moves the boundary, and the fallback watermark only applies when no window is given; (2) each assistant message's `usage` carries the whole cached context as `cache_read_input_tokens`, so the sum grows with context length and message count rather than with work done — in one session on 2026-09-16, nine consecutive skill runs recorded 5.1M, 1.7M, 3.8M, 6.9M, 7.9M, 13.3M, 17.5M, 8.9M and 18.2M tokens, the later figures being mostly the same context re-read on every turn. Nothing in that chain is a deterministic measurement of \"what this task cost\".\n\n**Fix.** Make the start of a task a *code-written mark*, and make the delta *computed by code from that mark*:\n\n1. `hench usage mark --task=<id> [--session=<id>]` (name open; `hench record --mark` is the alternative): at the moment a skill would \"note the time\", it reads the session transcript, and writes into `.hench/usage-cursors/<session>.json` a named mark `{ task, at: ISO, lastUuid, consumed, totals: {input, output, cacheCreationInput, cacheReadInput} }` — the cumulative usage up to that message. Idempotent per task (re-marking the same task overwrites).\n2. `hench record --task=<id>` looks up the mark for that task in the session cursor file and computes `delta = totalsNow − totals@mark` per token class, plus `messages = consumedNow − consumed@mark`, with the uuid as the exact boundary and the count as the compaction fallback (same resync rule as today). Both endpoints are printed: \"marked at <uuid>/<n> … now <uuid>/<m>\". `--startedAt` remains on the run record as the start time only; it is never again used to filter usage. `--since` stays as an explicit override.\n3. No mark for the task in this session → fall back to the previous-record watermark (today's behaviour) and print a warning naming the missing mark command, so a skill that skipped step 1 is visible in the output rather than silently claiming the session.\n4. Report the four token classes separately in the record output and store them separately (already the `tokenUsage` shape); print the fresh-work figure (`input + output + cacheCreationInput`) beside the total so context re-reads no longer read as the cost of the task.\n5. Update every skill's \"note the time\" step to run the mark command instead (ndx-work step 7 immediately after `update_task_status in_progress`; the others at their first step), and step 12 / the record step to drop `--startedAt=<time you noted>` in favour of the mark. `startedAt` for the run record is taken from the mark's `at` when the flag is absent.\n6. The arithmetic lives only in code (`session-usage.ts`) with unit tests over a fixture transcript; the skill text must not ask the model to compute or compare token counts."
-lastModified: "2026-09-16T16:01:21.282Z"
+lastModified: "2026-09-16T16:12:47.907Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
