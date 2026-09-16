@@ -6,7 +6,7 @@
  * by any route — and that losing the race names the worktree that won it.
  */
 
-import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -31,6 +31,7 @@ describe("task claims", () => {
 
   afterEach(async () => {
     resetTaskClaimLedger();
+    vi.useRealTimers();
     await Promise.all(tmpDirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
   });
 
@@ -83,6 +84,69 @@ describe("task claims", () => {
 
     await releaseAllTaskClaims(repo);
     expect(await openClaimsStore(repo).readClaims()).toEqual([]);
+  });
+
+  it("keeps a linked worktree from taking a live claim past its original ttl", async () => {
+    const repo = await makeRepo();
+    execFileSync(
+      "git",
+      ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "--allow-empty", "-m", "init", "--quiet"],
+      { cwd: repo, stdio: "ignore" },
+    );
+    const linkedParent = await mkdtemp(join(tmpdir(), "hench-claims-wt-"));
+    tmpDirs.push(linkedParent);
+    const linked = join(linkedParent, "wt");
+    execFileSync("git", ["worktree", "add", "--quiet", "--detach", linked], {
+      cwd: repo,
+      stdio: "ignore",
+    });
+
+    const startedAt = new Date("2026-09-16T12:00:00.000Z");
+    const ttlMs = 90;
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(startedAt);
+
+    try {
+      await claimTask(repo, "task-1", { ttlMs });
+      const originalExpiry = Date.parse((await openClaimsStore(repo).readClaims())[0]!.expiresAt);
+
+      await vi.advanceTimersByTimeAsync(ttlMs / 3 + 1);
+      let renewed = (await openClaimsStore(linked).readClaims())[0];
+      for (let attempt = 0; attempt < 20 && Date.parse(renewed?.expiresAt ?? "") <= originalExpiry; attempt += 1) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        renewed = (await openClaimsStore(linked).readClaims())[0];
+      }
+      expect(Date.parse(renewed!.expiresAt)).toBeGreaterThan(originalExpiry);
+
+      await vi.advanceTimersByTimeAsync(ttlMs - ttlMs / 3);
+      expect(await openClaimsStore(linked).claim("task-1")).toBe(false);
+    } finally {
+      await releaseAllTaskClaims(repo);
+    }
+  });
+
+  it("stops renewal when a claim is released or the run finalizes", async () => {
+    const repo = await makeRepo();
+    const ttlMs = 90;
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(new Date("2026-09-16T12:00:00.000Z"));
+
+    await claimTask(repo, "released", { ttlMs });
+    await claimTask(repo, "finalized", { ttlMs });
+    await releaseTask(repo, "released");
+    await releaseAllTaskClaims(repo);
+
+    await vi.advanceTimersByTimeAsync(ttlMs * 2);
+
+    const competitor = openClaimsStore(repo);
+    expect(await competitor.claim("released", {
+      pid: LIVE_FOREIGN_PID,
+      worktreeRoot: "/elsewhere/checkout",
+    })).toBe(true);
+    expect(await competitor.claim("finalized", {
+      pid: LIVE_FOREIGN_PID,
+      worktreeRoot: "/elsewhere/checkout",
+    })).toBe(true);
   });
 
   it("leaves another worktree's claims alone when releasing ours", async () => {

@@ -12,9 +12,10 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initGitFixtureRepoSync } from "../helpers/index.js";
+import { openClaimsStore } from "../../src/prd/rex-gateway.js";
 import { defaultRegistry } from "../../src/prd/llm-gateway.js";
 import type { LLMProvider } from "../../src/prd/llm-gateway.js";
-import { releaseAllTaskClaims, resetTaskClaimLedger } from "../../src/prd/task-claims.js";
+import { claimTask, releaseAllTaskClaims, resetTaskClaimLedger } from "../../src/prd/task-claims.js";
 import { initConfig } from "../../src/store/config.js";
 
 describe("API-provider cross-worktree task claims", () => {
@@ -28,6 +29,7 @@ describe("API-provider cross-worktree task claims", () => {
     if (repo) await releaseAllTaskClaims(repo);
     if (linked) await releaseAllTaskClaims(linked);
     resetTaskClaimLedger();
+    vi.useRealTimers();
     if (sandbox) await rm(sandbox, { recursive: true, force: true });
     sandbox = undefined;
     repo = undefined;
@@ -116,6 +118,27 @@ describe("API-provider cross-worktree task claims", () => {
     };
 
     const first = await runIn(repo, henchDir);
+
+    // Re-take the first run's claim with a tiny deterministic TTL. Advancing
+    // beyond that original lease proves the heartbeat, rather than a generous
+    // production timeout, is what keeps the second worktree off task-1.
+    await releaseAllTaskClaims(repo);
+    const realNow = Date.now();
+    const ttlMs = 900;
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(realNow);
+    await claimTask(repo, "task-1", { ttlMs });
+    const originalExpiry = Date.parse((await openClaimsStore(repo).readClaims())[0]!.expiresAt);
+
+    await vi.advanceTimersByTimeAsync(ttlMs / 3 + 1);
+    let renewed = (await openClaimsStore(linked).readClaims())[0];
+    for (let attempt = 0; attempt < 20 && Date.parse(renewed?.expiresAt ?? "") <= originalExpiry; attempt += 1) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      renewed = (await openClaimsStore(linked).readClaims())[0];
+    }
+    expect(Date.parse(renewed!.expiresAt)).toBeGreaterThan(originalExpiry);
+    await vi.advanceTimersByTimeAsync(ttlMs - ttlMs / 3);
+
     const second = await runIn(linked, linkedHenchDir);
 
     expect(first.run.taskId).toBe("task-1");
