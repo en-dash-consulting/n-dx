@@ -29,6 +29,9 @@ import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
 import { handleWorktreesRoute } from "./routes-worktrees.js";
+import { handleWorkspacesRoute } from "./routes-workspaces.js";
+import { WorkspaceRegistry } from "./workspaces.js";
+import type { WatcherHandles, WorkspaceHooks, WorkspaceResources } from "./workspaces.js";
 import { handleStatusRoute, clearStatusCache, buildServerInfo } from "./routes-status.js";
 import { handleConfigRoute } from "./routes-config.js";
 import { handleSearchRoute } from "./routes-search.js";
@@ -96,6 +99,8 @@ export function registerShutdownHandlers(
   timeoutMs: number = Number(process.env["N_DX_SHUTDOWN_TIMEOUT_MS"] ?? DEFAULT_SHUTDOWN_TIMEOUT_MS),
   deps: ShutdownDeps = {},
   watcherHandles?: WatcherHandles,
+  /** Workspace registry whose non-anchor resources are released with the anchor's. */
+  registry?: { closeAll(): void },
 ): void {
   const doExit = deps.exit ?? ((code: number) => process.exit(code));
 
@@ -127,6 +132,8 @@ export function registerShutdownHandlers(
     if (watcherHandles) {
       closeWatchers(watcherHandles);
     }
+    // Every lazily created worktree workspace: its watchers and PRD cache.
+    registry?.closeAll();
     // Lazily registered per-worktree runs watchers (GET /api/hench/runs?scope=repo).
     closeWorktreeRunWatchers();
 
@@ -437,16 +444,6 @@ function registerDevViewerWatcher(
   }
 }
 
-/** Collected file system watchers and monitor intervals for cleanup during shutdown. */
-interface WatcherHandles {
-  watchers: FSWatcher[];
-  henchRunsDir: string;
-  /** Monitor intervals to clear on shutdown. */
-  monitorIntervals: ReturnType<typeof setInterval>[];
-  /** Ephemeral PRD JSON cache directory to delete on shutdown (if set). */
-  prdCacheDir?: string;
-}
-
 function registerWatchers(
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,
@@ -503,6 +500,32 @@ function reregisterProjectWatchers(
   }
   const hench = registerHenchWatcher(ctx.scope, handles.henchRunsDir, ws);
   if (hench) handles.watchers.push(hench);
+}
+
+/**
+ * How a non-anchor workspace gets its watchers and PRD cache — the setup and
+ * teardown half of the seam declared as `WorkspaceHooks` in workspaces.ts.
+ *
+ * Same helpers as the anchor, minus the dev-viewer watcher (one per process is
+ * enough — the built HTML is shared) and minus the hench/heartbeat monitors,
+ * which stay per process until PR 11's job-singleton task.
+ *
+ * @internal exported for integration testing only
+ */
+export function createWorkspaceHooks(
+  ws: ReturnType<typeof createWebSocketManager>,
+): WorkspaceHooks {
+  return {
+    setup(ctx: ServerContext): WorkspaceResources {
+      const watcher = createDataWatcher(ctx);
+      const handles = registerWatchers(ctx, watcher, ws, "");
+      if (isInScope(ctx.scope, "rex") && existsSync(ctx.rexDir)) {
+        void refreshPRDCache(ctx.rexDir);
+      }
+      return { watcher, handles };
+    },
+    teardown: closeWatchers,
+  };
 }
 
 /** Close all file system watchers, monitor intervals, and ephemeral cache on shutdown. */
@@ -636,8 +659,10 @@ async function handleApiRoutes(
   assets: ReturnType<typeof resolveStaticAssets>,
   wsHealthTracker: WsHealthTracker,
   watcherHandles: WatcherHandles,
+  registry: WorkspaceRegistry,
 ): Promise<boolean> {
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
+  if (await handleWorkspacesRoute(req, res, registry)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;
   if (await handleProjectRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
@@ -675,18 +700,20 @@ async function handleApiRoutes(
 }
 
 function createHttpServer(
-  ctx: ServerContext,
-  watcher: ReturnType<typeof createDataWatcher>,
+  registry: WorkspaceRegistry,
   ws: ReturnType<typeof createWebSocketManager>,
   assets: ReturnType<typeof resolveStaticAssets>,
   wsHealthTracker: WsHealthTracker,
-  watcherHandles: WatcherHandles,
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     if (handleRequestSecurity(req, res)) return;
+    // Request-scoped context: the workspace the request addresses (header or
+    // /w/<key>/ slot), which is the anchor for every request until PR 12.
+    const workspace = registry.resolveWorkspace(req);
+    const { ctx, watcher, handles: watcherHandles } = workspace;
     if (handleConfigEndpoint(req, res, ctx)) return;
     if (handleReloadSignalEndpoint(req, res, ws)) return;
-    if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles)) return;
+    if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles, registry)) return;
     res.writeHead(404);
     res.end("Not found");
   });
@@ -882,7 +909,16 @@ export async function startServer(
   const mcpSchemaWatchers = startMcpSchemaWatcher();
   for (const w of mcpSchemaWatchers) watcherHandles.watchers.push(w);
 
-  const server = createHttpServer(ctx, watcher, ws, assets, wsHealthTracker, watcherHandles);
+  // Workspaces: the anchor is what was set up above, eagerly, exactly as
+  // before; any other worktree of this repository is created on first use.
+  const registry = new WorkspaceRegistry({
+    anchor: { ctx, watcher, handles: watcherHandles },
+    hooks: createWorkspaceHooks(ws),
+    log: isVerbose() ? verbose : () => {},
+  });
+  registry.start();
+
+  const server = createHttpServer(registry, ws, assets, wsHealthTracker);
 
   return new Promise<StartResult>((resolvePromise, rejectPromise) => {
     server.once("error", (err: NodeJS.ErrnoException) => {
@@ -931,7 +967,7 @@ export async function startServer(
       //   3. HTTP server                (drain in-flight requests)
       //   4. Port file                  (orchestrator discovery)
       // A second signal forces immediate exit; overall timeout prevents hangs.
-      registerShutdownHandlers(server, ws, portFilePath, actualPort, undefined, {}, watcherHandles);
+      registerShutdownHandlers(server, ws, portFilePath, actualPort, undefined, {}, watcherHandles, registry);
       // Last-resort safety net: remove PRD cache even if graceful shutdown never runs.
       if (watcherHandles.prdCacheDir) {
         const cacheToRemove = watcherHandles.prdCacheDir;
