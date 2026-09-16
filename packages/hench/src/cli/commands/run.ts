@@ -20,6 +20,7 @@ import {
   listUncommittedPrdPaths,
 } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
+import { TaskClaims } from "../../process/task-claims.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
@@ -682,7 +683,9 @@ async function selectTask(
   epicId?: string,
 ): Promise<string> {
   const store = await resolveStore(rexDir);
-  let tasks = await getActionableTasks(store);
+  // Tasks another worktree is working on are left off the menu.
+  const claims = TaskClaims.forProject(dir);
+  let tasks = await getActionableTasks(store, undefined, claims);
 
   // Filter to tasks within the specified epic if provided
   if (epicId) {
@@ -703,7 +706,7 @@ async function selectTask(
       if (answer.toLowerCase() === "y" || answer.toLowerCase() === "yes") {
         await resetDeferredTasks(store);
         // Reload tasks after reset
-        tasks = await getActionableTasks(store);
+        tasks = await getActionableTasks(store, undefined, claims);
         if (epicId) {
           const freshDoc = await store.loadDocument();
           const epicTaskIds = collectEpicTaskIds(freshDoc.items, epicId);
@@ -846,7 +849,14 @@ async function runOne(
     ...(skipTestGate ? { skipFullTestGate: true } : {}),
   };
 
-  const result = provider === "cli"
+  // Cross-worktree claims: the loop claims the task it selects (before the
+  // brief and any LLM turn) so other worktrees pass over it, and this run
+  // releases it on the way out — completed, failed, cancelled by SIGINT, or
+  // thrown. A hard kill skips the release; the claim then dies with the pid.
+  const claims = TaskClaims.forProject(dir);
+  let result: Awaited<ReturnType<typeof cliLoop>> | Awaited<ReturnType<typeof agentLoop>>;
+  try {
+  result = provider === "cli"
     ? await cliLoop({
         config: effectiveConfig as typeof config & { provider: "cli" },
         store,
@@ -870,6 +880,7 @@ async function runOne(
         extraContext,
         runNumber,
         permissionMode,
+        claims,
       })
     : await agentLoop({
         config: effectiveConfig as typeof config & { provider: "api" },
@@ -893,7 +904,11 @@ async function runOne(
         autonomous,
         extraContext,
         runNumber,
+        claims,
       });
+  } finally {
+    await claims.releaseAll();
+  }
 
   const { run } = result;
 

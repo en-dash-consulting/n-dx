@@ -59,6 +59,8 @@ import {
   collectAllIds,
   aggregateItemTokenUsage,
   aggregateItemDurations,
+  openClaimsStore,
+  resolveClaimHolder,
 } from "./rex-gateway.js";
 import type {
   PRDDocument,
@@ -1312,6 +1314,26 @@ async function handleExecute(
       error: "Task is already being executed",
       runId: active.runId,
       taskId,
+    });
+    return true;
+  }
+
+  // Another worktree of this repository may hold the task. The spawned run
+  // would refuse it too; answering here names the worktree instead of
+  // surfacing a failed process. Outside a git repo the store is a no-op.
+  const claimedBy = await openClaimsStore(ctx.projectDir)
+    .isClaimedByOther(taskId, resolveClaimHolder(ctx.projectDir));
+  if (claimedBy) {
+    jsonResponse(res, 409, {
+      error: `Task is being worked on in another worktree: ${claimedBy.worktreeRoot}`,
+      taskId,
+      claimedBy: {
+        worktreeRoot: claimedBy.worktreeRoot,
+        pid: claimedBy.pid,
+        host: claimedBy.host,
+        claimedAt: claimedBy.claimedAt,
+        expiresAt: claimedBy.expiresAt,
+      },
     });
     return true;
   }

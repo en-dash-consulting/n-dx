@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
@@ -121,6 +122,51 @@ describe("POST /api/hench/execute", () => {
 
     const body = await res.json();
     expect(body.error).toContain("not found in PRD");
+  });
+
+  it("returns 409 naming the worktree when another worktree holds the task", async () => {
+    await writeFile(
+      join(rexDir, "prd.json"),
+      JSON.stringify(makePRD([
+        { id: "task-1", title: "Shared Task", status: "pending", level: "task" },
+      ]), null, 2),
+    );
+    // The claims store lives in the git common dir, so the project must be a
+    // repository; a claim from a live process in a different worktree.
+    execFileSync("git", ["init", "--quiet"], { cwd: tmpDir, stdio: "ignore" });
+    const holder: ChildProcess = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], { stdio: "ignore" });
+    try {
+      await mkdir(join(tmpDir, ".git", "ndx"), { recursive: true });
+      await writeFile(join(tmpDir, ".git", "ndx", "claims.json"), JSON.stringify({
+        version: 1,
+        claims: {
+          "task-1": {
+            taskId: "task-1",
+            worktreeRoot: "/somewhere/else/feature-x",
+            pid: holder.pid,
+            host: "test",
+            claimedAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          },
+        },
+      }));
+
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: "task-1" }),
+      });
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.error).toContain("another worktree");
+      expect(body.error).toContain("/somewhere/else/feature-x");
+      expect(body.claimedBy).toMatchObject({ worktreeRoot: "/somewhere/else/feature-x", pid: holder.pid });
+      // Nothing was spawned.
+      const status = await fetch(`http://127.0.0.1:${port}/api/hench/execute/status`);
+      expect(await status.json()).toEqual(expect.not.objectContaining({ "task-1": expect.anything() }));
+    } finally {
+      holder.kill();
+    }
   });
 
   it("rejects completed task with 409", async () => {

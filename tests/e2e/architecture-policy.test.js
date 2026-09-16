@@ -1022,8 +1022,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/web/src/server/rex-gateway.ts",
-    maxExports: 66,
-    description: "web→rex gateway (domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser, folder-tree parser/slug resolver, legacy PRD migration, PRD tree backup snapshots for the dashboard's Restore panel — isValidSnapshotId added to reject a path-traversal id in POST /api/rex/restore before it reaches restoreFromBackup's fs.rm)",
+    maxExports: 68,
+    description: "web→rex gateway (raised from 66 to 68 for openClaimsStore and resolveClaimHolder, 0.6.0 PR 6: the execute route answers 409 naming the worktree that holds a task, and the claims file lives in the git common dir that only rex's store knows how to find; domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser, folder-tree parser/slug resolver, legacy PRD migration, PRD tree backup snapshots for the dashboard's Restore panel — isValidSnapshotId added to reject a path-traversal id in POST /api/rex/restore before it reaches restoreFromBackup's fs.rm)",
   },
   {
     file: "packages/web/src/server/domain-gateway.ts",
@@ -1032,8 +1032,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/rex-gateway.ts",
-    maxExports: 32,
-    description: "hench→rex gateway (schema, store, tree, task selection, timestamps). Raised from 30 to carry TREE_META_FILENAME: `.rex/tree-meta.json` is rewritten by every folder-tree save, so hench has to stage and discount it wherever it stages and discounts the tree, and hardcoding the name at those three sites is exactly the drift that left it in nobody's list and refused every task completion. Raised from 31 to carry findParentResets: withdrawing a completion claim has to reopen the ancestors the same run's cascade closed, and rex already owns that computation — reimplementing the ancestor walk in hench would be a second definition of which parents are inconsistent, free to drift from the add path's.",
+    maxExports: 37,
+    description: "hench→rex gateway (schema, store, tree, task selection, timestamps). Raised from 32 to 37 for the cross-worktree claims surface (0.6.0 PR 6): openClaimsStore and resolveClaimHolder plus the ClaimsStore, ClaimHolder and TaskClaim types — the run claims the task it selects so other worktrees pass over it, and the store lives in the git common dir that only rex knows how to locate; a hench copy would be a second definition of where claims live. Raised from 30 to carry TREE_META_FILENAME: `.rex/tree-meta.json` is rewritten by every folder-tree save, so hench has to stage and discount it wherever it stages and discounts the tree, and hardcoding the name at those three sites is exactly the drift that left it in nobody's list and refused every task completion. Raised from 31 to carry findParentResets: withdrawing a completion claim has to reopen the ancestors the same run's cascade closed, and rex already owns that computation — reimplementing the ancestor walk in hench would be a second definition of which parents are inconsistent, free to drift from the add path's.",
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",

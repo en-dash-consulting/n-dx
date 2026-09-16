@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { join } from "node:path";
-import { resolveStore, resolveRemoteStore, SyncEngine, ensureLegacyPrdMigrated } from "../store/index.js";
+import { resolveStore, resolveRemoteStore, SyncEngine, ensureLegacyPrdMigrated, openClaimsStore, resolveClaimHolder } from "../store/index.js";
 import { REX_DIR, TOOL_VERSION } from "./commands/constants.js";
 import { getAllLevels } from "../schema/index.js";
 import { formatMigrationBanner, getMigrationMcpWarning } from "./migration-notification.js";
@@ -57,6 +57,9 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
   }
 
   const store = await resolveStore(rexDir);
+  // Cross-worktree claims: selection skips tasks another worktree is working
+  // on. Outside a repository this is the no-op store and nothing is skipped.
+  const claims = { store: openClaimsStore(dir), worktreeRoot: resolveClaimHolder(dir).worktreeRoot };
 
   const server = new McpServer({
     name: "rex",
@@ -94,7 +97,7 @@ export async function createRexMcpServer(dir: string): Promise<McpServer> {
     {
       tags: z.array(z.string()).optional().describe("Only return tasks that have at least one of these tags. Omit to return any task regardless of tags."),
     },
-    withMigrationWarning((args) => handleGetNextTask(store, args)),
+    withMigrationWarning((args) => handleGetNextTask(store, args, claims)),
   );
 
   server.tool(

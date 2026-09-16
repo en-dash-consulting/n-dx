@@ -56,6 +56,8 @@
  * - Store factory (open a PRDStore for reading/writing)
  * - Tree traversal (findItem, walkTree — locate items in the tree)
  * - Task selection (findNextTask, findActionableTasks, collectCompletedIds)
+ * - Cross-worktree task claims (openClaimsStore, resolveClaimHolder — the
+ *   run claims the task it selected so other worktrees pass over it)
  * - Timestamp computation (status change timestamps)
  * - Parent auto-completion (bubble-up completion when children finish)
  * - Parent reset (reopen completed ancestors when a descendant reopens —
@@ -101,6 +103,9 @@ export { findItem, walkTree } from "@n-dx/rex";
 // ---- Task selection ---------------------------------------------------------
 export { findNextTask, findActionableTasks, collectCompletedIds, explainSelection } from "@n-dx/rex";
 
+// ---- Cross-worktree task claims ---------------------------------------------
+export { openClaimsStore, resolveClaimHolder } from "@n-dx/rex";
+
 // ---- Self-heal tag scoping --------------------------------------------------
 export { SELF_HEAL_TAG } from "@n-dx/rex";
 
@@ -133,4 +138,4 @@ export { loadAcknowledged, saveAcknowledged, acknowledgeFinding } from "@n-dx/re
 // All type imports from rex must flow through this gateway to prevent
 // type-import promotion erosion (a type import can be promoted to a
 // runtime import during refactoring, silently bypassing the gateway).
-export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation } from "@n-dx/rex";
+export type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor, TreeEntry, SelectionExplanation, ClaimsStore, ClaimHolder, TaskClaim } from "@n-dx/rex";

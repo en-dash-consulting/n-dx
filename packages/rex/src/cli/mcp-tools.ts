@@ -39,7 +39,7 @@ import { TOOL_VERSION, REX_DIR } from "./commands/constants.js";
 import { FileStore, resolvePRDFile } from "../store/index.js";
 import { syncFolderTree } from "./commands/folder-tree-sync.js";
 import type { PRDItem, ItemLevel, ItemStatus, Priority } from "../schema/index.js";
-import type { PRDStore } from "../store/index.js";
+import type { PRDStore, ClaimsStore, TaskClaim } from "../store/index.js";
 
 /** Standard MCP text response. */
 type McpResult = {
@@ -76,17 +76,64 @@ export async function handleGetPrdStatus(store: PRDStore): Promise<McpResult> {
   }
 }
 
+/**
+ * Where the caller's claims live and which worktree it is: selection passes
+ * over tasks another worktree holds a live claim on. Omit outside a
+ * repository (or in tests) to select without looking at claims.
+ */
+export interface ClaimsContext {
+  store: ClaimsStore;
+  worktreeRoot: string;
+}
+
+/** Wire shape for a claim that made selection skip a task. */
+export interface SkippedClaim {
+  taskId: string;
+  worktreeRoot: string;
+  pid: number;
+  expiresAt: string;
+}
+
+/** Live claims held by other worktrees, as the set `findNextTask` excludes and the list callers report. */
+export async function collectForeignClaims(
+  claims: ClaimsContext | undefined,
+): Promise<{ excludeIds: Set<string>; skipped: SkippedClaim[] }> {
+  if (!claims) return { excludeIds: new Set(), skipped: [] };
+  const elsewhere = await claims.store.claimedElsewhere(claims.worktreeRoot);
+  const skipped = [...elsewhere.values()].map((c: TaskClaim) => ({
+    taskId: c.taskId,
+    worktreeRoot: c.worktreeRoot,
+    pid: c.pid,
+    expiresAt: c.expiresAt,
+  }));
+  return { excludeIds: new Set(elsewhere.keys()), skipped };
+}
+
 export async function handleGetNextTask(
   store: PRDStore,
   args?: { tags?: string[] },
+  claims?: ClaimsContext,
 ): Promise<McpResult> {
   try {
     const doc = await store.loadDocument();
     const completedIds = collectCompletedIds(doc.items);
-    const options = args?.tags?.length ? { tags: args.tags } : undefined;
+    const { excludeIds, skipped } = await collectForeignClaims(claims);
+    const options = {
+      ...(args?.tags?.length ? { tags: args.tags } : {}),
+      ...(excludeIds.size > 0 ? { excludeIds } : {}),
+    };
     const result = findNextTask(doc.items, completedIds, options);
+    // Only claims on tasks that would otherwise have been candidates matter to
+    // the caller; a claim on a completed task is noise.
+    const skippedClaimed = skipped.filter((c) => !completedIds.has(c.taskId));
     if (!result) {
-      return textResult(JSON.stringify({ next: null, message: "No actionable tasks remaining" }));
+      return textResult(JSON.stringify({
+        next: null,
+        message: skippedClaimed.length > 0
+          ? `No actionable tasks remaining that are not claimed by another worktree (${skippedClaimed.length} claimed elsewhere)`
+          : "No actionable tasks remaining",
+        ...(skippedClaimed.length > 0 ? { skippedClaimed } : {}),
+      }));
     }
     const explanation = explainSelection(doc.items, result, completedIds);
     return textResult(
@@ -99,6 +146,7 @@ export async function handleGetNextTask(
             level: p.level,
           })),
           explanation,
+          ...(skippedClaimed.length > 0 ? { skippedClaimed } : {}),
         },
         null,
         2,

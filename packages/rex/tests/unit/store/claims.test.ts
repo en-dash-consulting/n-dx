@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   openClaimsStore,
   claimsStorePath,
+  resolveClaimHolder,
   NOOP_CLAIMS_STORE,
   DEFAULT_CLAIM_TTL_MS,
 } from "../../../src/store/claims.js";
@@ -76,6 +77,18 @@ describe("claimsStorePath", () => {
   });
 });
 
+describe("resolveClaimHolder", () => {
+  it("names the worktree root git reports and this process", () => {
+    mkdirSync(join(linked, "sub", "dir"), { recursive: true });
+    expect(resolveClaimHolder(join(linked, "sub", "dir"))).toEqual({ worktreeRoot: linked, pid: process.pid });
+    expect(resolveClaimHolder(repo).worktreeRoot).toBe(repo);
+  });
+
+  it("falls back to the directory itself outside a repository", () => {
+    expect(resolveClaimHolder(plain)).toEqual({ worktreeRoot: plain, pid: process.pid });
+  });
+});
+
 describe("no-op store outside a repository", () => {
   it("claims always succeed, nothing is recorded, nothing is ever claimed by another", async () => {
     const store = openClaimsStore(plain);
@@ -85,6 +98,7 @@ describe("no-op store outside a repository", () => {
     expect(result.ok).toBe(true);
     expect(await store.readClaims()).toEqual([]);
     expect(await store.isClaimedByOther("T1", { worktreeRoot: "/elsewhere", pid: 1 })).toBeNull();
+    expect(await store.claimedElsewhere("/elsewhere")).toEqual(new Map());
     expect(await store.release("T1")).toBe(true);
     expect(existsSync(join(plain, ".git"))).toBe(false);
   });
@@ -104,8 +118,12 @@ describe("file store", () => {
     // The linked worktree reads the same file.
     expect((await theirs.readClaims()).map((c) => c.taskId)).toEqual(["T1"]);
     expect(await theirs.isClaimedByOther("T1", { worktreeRoot: linked, pid: 424242 })).toMatchObject({ pid: process.pid });
-    // From the holder's own point of view it is not "another".
+    // From the holder's own point of view it is not "another" — nor from
+    // another process in the same worktree (a retry there is not a conflict).
     expect(await mine.isClaimedByOther("T1", { worktreeRoot: repo })).toBeNull();
+    expect(await mine.isClaimedByOther("T1", { worktreeRoot: repo, pid: 424242 })).toBeNull();
+    expect([...(await theirs.claimedElsewhere(linked)).keys()]).toEqual(["T1"]);
+    expect(await mine.claimedElsewhere(repo)).toEqual(new Map());
 
     // Only the holder can release; a stranger's release is a no-op.
     expect(await theirs.release("T1", 424242)).toBe(false);
@@ -161,7 +179,19 @@ describe("file store", () => {
     expect(mine.ok).toBe(true);
   });
 
-  it("a live claim by another process is refused and names the holder", async () => {
+  it("a live claim from the same worktree by another process is taken over, not refused", async () => {
+    const other = sleeper();
+    children.push(other);
+    const store = openClaimsStore(repo);
+    const first = await store.claim("T1", { worktreeRoot: repo, pid: other.pid! });
+    const second = await store.claim("T1", { worktreeRoot: repo });
+    expect(first.ok && second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+    expect(second.claim.pid).toBe(process.pid);
+    expect(second.claim.claimedAt).toBe(first.claim.claimedAt);
+  });
+
+  it("a live claim from another worktree is refused and names the holder", async () => {
     const other = sleeper();
     children.push(other);
     const store = openClaimsStore(repo);

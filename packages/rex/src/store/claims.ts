@@ -25,8 +25,8 @@
 
 import { mkdir, readFile } from "node:fs/promises";
 import { hostname } from "node:os";
-import { join } from "node:path";
-import { getGitCommonDir } from "@n-dx/llm-client";
+import { join, resolve } from "node:path";
+import { getGitCommonDir, getWorktreeRoot } from "@n-dx/llm-client";
 import { atomicWriteJSON } from "./atomic-write.js";
 import { withLock, type LockOptions } from "./file-lock.js";
 
@@ -68,21 +68,43 @@ export type ClaimResult =
   | { ok: true; claim: TaskClaim }
   | { ok: false; heldBy: TaskClaim };
 
+/** Who is asking: the worktree a process runs in, and the process itself. */
+export interface ClaimHolder {
+  worktreeRoot: string;
+  pid: number;
+}
+
+/**
+ * The holder identity for a process working in `projectDir`: the worktree
+ * root git reports (realpath-resolved, so it compares equal to what the
+ * dashboard and other worktrees record), or the directory itself outside a
+ * repository — where the store is a no-op and the value is only informational.
+ */
+export function resolveClaimHolder(projectDir: string): ClaimHolder {
+  return { worktreeRoot: getWorktreeRoot(projectDir) ?? resolve(projectDir), pid: process.pid };
+}
+
 export interface ClaimsStore {
   /** Where claims are kept, or null for the no-op store outside a repository. */
   readonly path: string | null;
   /** Every live claim — dead pids and expired entries are filtered out. */
   readClaims(): Promise<TaskClaim[]>;
   /**
-   * Claim a task. Succeeds when no live claim exists or the live claim is
-   * this holder's (same pid), in which case it is refreshed. Otherwise
-   * reports who holds it.
+   * Claim a task. Succeeds when no live claim exists, or when the live claim
+   * belongs to this holder — same pid (refreshed) or same worktree (taken
+   * over: a retry in the checkout that already holds the task is not a
+   * conflict). Otherwise reports who holds it.
    */
   claim(taskId: string, options: ClaimOptions): Promise<ClaimResult>;
   /** Release a claim this pid holds. False when no such claim exists. */
   release(taskId: string, pid?: number): Promise<boolean>;
-  /** The live claim held by another process, or null when the task is free or ours. */
+  /**
+   * The live claim held from another worktree by another process, or null
+   * when the task is free or held by this worktree / this pid.
+   */
   isClaimedByOther(taskId: string, holder: { worktreeRoot: string; pid?: number }): Promise<TaskClaim | null>;
+  /** Live claims held by worktrees other than `worktreeRoot`, keyed by task id. */
+  claimedElsewhere(worktreeRoot: string): Promise<Map<string, TaskClaim>>;
 }
 
 export interface ClaimsStoreOptions {
@@ -136,6 +158,9 @@ export const NOOP_CLAIMS_STORE: ClaimsStore = {
   },
   async isClaimedByOther() {
     return null;
+  },
+  async claimedElsewhere() {
+    return new Map();
   },
 };
 
@@ -214,7 +239,7 @@ class FileClaimsStore implements ClaimsStore {
     const ttlMs = options.ttlMs ?? DEFAULT_CLAIM_TTL_MS;
     return this.update((claims) => {
       const existing = claims[taskId];
-      if (existing && existing.pid !== pid) {
+      if (existing && !sameHolder(existing, options.worktreeRoot, pid)) {
         return { ok: false, heldBy: existing };
       }
       const nowMs = this.now();
@@ -223,7 +248,8 @@ class FileClaimsStore implements ClaimsStore {
         worktreeRoot: options.worktreeRoot,
         pid,
         host: hostname(),
-        // A refresh keeps the original claim time; the expiry moves.
+        // A refresh or same-worktree takeover keeps the original claim time;
+        // the expiry moves.
         claimedAt: existing?.claimedAt ?? new Date(nowMs).toISOString(),
         expiresAt: new Date(nowMs + ttlMs).toISOString(),
       };
@@ -246,8 +272,21 @@ class FileClaimsStore implements ClaimsStore {
     const file = await this.load();
     const claim = file.claims[taskId];
     if (!claim || !this.isLive(claim)) return null;
-    return claim.pid === pid ? null : claim;
+    return sameHolder(claim, holder.worktreeRoot, pid) ? null : claim;
   }
+
+  async claimedElsewhere(worktreeRoot: string): Promise<Map<string, TaskClaim>> {
+    const out = new Map<string, TaskClaim>();
+    for (const claim of await this.readClaims()) {
+      if (claim.worktreeRoot !== worktreeRoot) out.set(claim.taskId, claim);
+    }
+    return out;
+  }
+}
+
+/** Same pid, or same worktree: either way the task is already "ours". */
+function sameHolder(claim: TaskClaim, worktreeRoot: string, pid: number): boolean {
+  return claim.pid === pid || claim.worktreeRoot === worktreeRoot;
 }
 
 function isClaim(value: unknown): value is TaskClaim {

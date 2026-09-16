@@ -29,6 +29,7 @@ import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../..
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 import { resolveCliPath, resolveNdxVersion } from "../../process/toolchain-identity.js";
+import type { TaskClaims } from "../../process/task-claims.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
@@ -139,6 +140,12 @@ export interface SharedLoopOptions {
   epicId?: string;
   /** Only select tasks with at least one of these tags (e.g. ["self-heal"]). */
   tags?: string[];
+  /**
+   * Cross-worktree claims for this run: selection passes over tasks other
+   * worktrees hold and claims the one it picks. The caller (`runOne`)
+   * releases them when the run ends. See `process/task-claims.ts`.
+   */
+  claims?: TaskClaims;
   /** Prior attempt history for the selected task (shown in task card). */
   priorAttempts?: PriorAttemptInfo;
   /** Run records for computing prior attempts when task is auto-selected. */

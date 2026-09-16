@@ -152,6 +152,12 @@ export interface PrioritizationOptions {
    * When empty or undefined, no tag filtering is applied.
    */
   tags?: string[];
+  /**
+   * Task ids to pass over without treating them as completed — e.g. tasks a
+   * different worktree currently holds a live claim on. Unlike folding ids
+   * into `completedIds`, this never makes a parent look finished.
+   */
+  excludeIds?: ReadonlySet<string>;
 }
 
 /**
@@ -335,6 +341,12 @@ function resolveFeatureSubtree(
   return entry.item.children ?? [];
 }
 
+/** Drop entries whose id is in `excludeIds`. */
+function filterExcluded(entries: TreeEntry[], excludeIds?: ReadonlySet<string>): TreeEntry[] {
+  if (!excludeIds || excludeIds.size === 0) return entries;
+  return entries.filter((e) => !excludeIds.has(e.item.id));
+}
+
 /** Filter entries to those with at least one tag in the allowed list. */
 function filterByTags(entries: TreeEntry[], tags: string[]): TreeEntry[] {
   if (tags.length === 0) return entries;
@@ -359,6 +371,7 @@ export function findActionableTasks(
   if (options?.tags?.length) {
     results = filterByTags(results, options.tags);
   }
+  results = filterExcluded(results, options?.excludeIds);
   results.sort(makeComparator(items, options));
   return results.slice(0, limit);
 }
@@ -378,6 +391,7 @@ export function findNextTask(
   if (options?.tags?.length) {
     results = filterByTags(results, options.tags);
   }
+  results = filterExcluded(results, options?.excludeIds);
   if (results.length === 0) return null;
   results.sort(makeComparator(items, options));
   return results[0];

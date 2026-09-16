@@ -1,5 +1,6 @@
 import { join } from "node:path";
-import { resolveStore, ensureLegacyPrdMigrated } from "../../store/index.js";
+import { resolveStore, ensureLegacyPrdMigrated, openClaimsStore, resolveClaimHolder } from "../../store/index.js";
+import { collectForeignClaims } from "../mcp-tools.js";
 import { loadItemsPreferFolderTree } from "./folder-tree-sync.js";
 import { findNextTask, collectCompletedIds, explainSelection } from "../../core/next-task.js";
 import { REX_DIR } from "./constants.js";
@@ -37,10 +38,24 @@ export async function cmdNext(
   }
 
   const completedIds = collectCompletedIds(doc.items);
-  const nextResult = findNextTask(doc.items, completedIds);
+  // Tasks another worktree holds a live claim on are passed over, not treated
+  // as done: `ndx work` there will finish or release them.
+  const { excludeIds, skipped } = await collectForeignClaims({
+    store: openClaimsStore(dir),
+    worktreeRoot: resolveClaimHolder(dir).worktreeRoot,
+  });
+  const skippedClaimed = skipped.filter((c) => !completedIds.has(c.taskId));
+  const nextResult = findNextTask(doc.items, completedIds, excludeIds.size > 0 ? { excludeIds } : undefined);
 
   if (!nextResult) {
-    result("COMPLETE — no actionable tasks remaining");
+    if (flags.format === "json") {
+      result(JSON.stringify({ item: null, skippedClaimed }, null, 2));
+      return;
+    }
+    result(skippedClaimed.length > 0
+      ? `COMPLETE — no actionable tasks remaining that are not claimed by another worktree (${skippedClaimed.length} claimed elsewhere)`
+      : "COMPLETE — no actionable tasks remaining");
+    printSkippedClaims(skippedClaimed, flags.verbose === "true");
     return;
   }
 
@@ -48,7 +63,7 @@ export async function cmdNext(
   const explanation = explainSelection(doc.items, nextResult, completedIds);
 
   if (flags.format === "json") {
-    result(JSON.stringify({ item, parents, explanation }, null, 2));
+    result(JSON.stringify({ item, parents, explanation, skippedClaimed }, null, 2));
     return;
   }
 
@@ -84,5 +99,19 @@ export async function cmdNext(
     if (explanation.skipped.blocked > 0) parts.push(`${explanation.skipped.blocked} blocked`);
     if (explanation.skipped.unresolvedDeps > 0) parts.push(`${explanation.skipped.unresolvedDeps} awaiting deps`);
     info(`  Skipped: ${parts.join(", ")}`);
+  }
+  printSkippedClaims(skippedClaimed, flags.verbose === "true");
+}
+
+/** One line per worktree-claimed task under --verbose; a count otherwise. */
+function printSkippedClaims(
+  skipped: Array<{ taskId: string; worktreeRoot: string; pid: number }>,
+  verbose: boolean,
+): void {
+  if (skipped.length === 0) return;
+  info(`  Claimed elsewhere: ${skipped.length} task(s) held by another worktree${verbose ? "" : dim(" (--verbose lists them)")}`);
+  if (!verbose) return;
+  for (const c of skipped) {
+    info(`    ${dim(c.taskId)} — ${c.worktreeRoot} (pid ${c.pid})`);
   }
 }
