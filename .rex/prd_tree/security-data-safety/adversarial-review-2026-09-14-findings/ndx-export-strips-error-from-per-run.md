@@ -2,7 +2,7 @@
 id: "3d15abc9-0605-482d-98e7-31f55c1ef430"
 level: "task"
 title: "`ndx export` strips `error` from per-run files but still publishes it in the `runs.json` index"
-status: "pending"
+status: "completed"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
@@ -10,12 +10,17 @@ tags:
   - "severity:medium"
   - "core"
 source: "ndx-adversarial-review"
+startedAt: "2026-09-16T21:23:17.566Z"
+completedAt: "2026-09-16T21:31:43.700Z"
+endedAt: "2026-09-16T21:31:43.700Z"
+resolutionType: "code-change"
+resolutionDetail: "The leak itself was already closed by the allowlist commit (08686bc1): summarizeRunForExport publishes error only under --include-transcripts and stamps transcriptOmitted, and tests/e2e/cli-export.test.js asserts on the bytes written to api/hench/runs.json. Closed the two ACs that were still open: the static run detail now renders a neutral notice (runErrorDisplay) for a failed run whose transcript was stripped instead of showing nothing, and the e2e --include-transcripts test now asserts the index carries error back."
 acceptanceCriteria:
   - "A default `ndx export` of a fixture run whose `error` contains a secret-shaped string produces an `api/hench/runs.json` that does not contain that string"
   - "With `--include-transcripts`, `api/hench/runs.json` entries carry `error` as before"
   - "The static Task Audit / runs list shows a neutral marker (e.g. `hasError: true` or the `transcriptOmitted` flag) instead of the error text for stripped runs"
   - "`tests/unit/export-sanitize.test.js` (or a sibling) asserts on the written `runs.json`, not only on `sanitizeRunForExport`'s return value"
 description: "**Severity:** medium · **Verdict:** must-fix · **Incomplete fix in commit 796be400 (this branch)**\n\n**Failure scenario.** `runExport` (`packages/core/export.js:445-470`) writes each run's detail file through `sanitizeRunForExport`, which deletes `toolCalls`, `events`, `error`, `diagnostics.promptSections`, and `testGate.error` by default. Immediately after, it pushes a summary object into `runs` that copies `error: run.error` verbatim, and that array is written to `api/hench/runs.json` — the index the static dashboard loads first. The branch's own classification (sanitizer doc comment, the PRD item `ndx-export-deploy-github-publish-full`, and the test fixture `error: \"ENOENT while reading sk-ant-…\"`) treats `error` as transcript-bearing. So a run whose error body echoes tool output or an API error response is still published, and `--deploy=github` force-pushes it. `tests/unit/export-sanitize.test.js` checks only the sanitizer's return value, never the written index, which is why it is green.\n\n**Refutation attempted.** Looked for a second sanitization pass over `runs` before `writeJSON(... \"runs.json\")` — none. Checked whether `error` is a bounded/structured field — it is free text set by the agent loop.\n\n**Evidence.** `packages/core/export.js:466` (`error: run.error`), `:476` (`writeJSON(... \"runs.json\")`), `:171-190` (`sanitizeRunForExport`).\n\n**Reachability.** Every `ndx export` and every dashboard Export click; any project with at least one failed run.\n\n**Solution options.**\n1. *(Recommended)* `error: includeTranscripts ? run.error : undefined` in the summary, and add `transcriptOmitted: !includeTranscripts` so the runs list can explain the absence. Extend the unit test to run the summary-building code (extract it to a pure `summarizeRunForExport(run, opts)` next to `sanitizeRunForExport`) and assert the secret is absent from the result. Cost: trivial.\n2. Keep `error` but truncate/redact — rejected: the whole point of the fix was that error bodies are unbounded transcript content."
-lastModified: "2026-09-14T19:00:53.307Z"
+lastModified: "2026-09-16T21:31:44.080Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
