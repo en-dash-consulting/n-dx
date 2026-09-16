@@ -78,6 +78,7 @@
     "self-heal-confirm.js",
     "stale-check.js",
     "commit-trailers.js",
+    "install-identity.js",
     "resolve-existing-dir.js"
   ],
   "scripts": {

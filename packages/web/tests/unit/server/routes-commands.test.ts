@@ -1047,9 +1047,29 @@ describe("commands route — manifest (command reference)", () => {
       }
     }
     const allNames = body.groups.flatMap((g: { commands: Array<{ name: string }> }) => g.commands.map((c) => c.name));
-    for (const expected of ["init", "analyze", "plan", "work", "config"]) {
+    for (const expected of ["init", "which", "analyze", "plan", "work", "config"]) {
       expect(allNames).toContain(expected);
     }
+  });
+
+  it("lists which as always available and not dashboard-triggerable", async () => {
+    // tmpDir is an empty directory, so anything gated on init reports
+    // needs-init here. `ndx which` must not be gated: identifying the CLI is
+    // most useful on a project that is not set up yet. And it carries no
+    // trigger — run from the dashboard it would describe the server's own
+    // install, which the footer already reports.
+    const body = await getManifest();
+    const all = body.groups.flatMap((g: { commands: Array<Record<string, any>> }) => g.commands);
+
+    const which = all.find((c: Record<string, any>) => c.name === "which");
+    expect(which.status).toBe("available");
+    expect(which.trigger).toBeUndefined();
+    expect(which.invocation).toBe(`${body.cliName} which`);
+
+    // Sanity check that the fixture really is uninitialized, so the assertion
+    // above is testing the absence of a gate rather than an initialized dir.
+    const analyze = all.find((c: Record<string, any>) => c.name === "analyze");
+    expect(analyze.status).toBe("needs-init");
   });
 
   it("resolves invocations with cli.name from .n-dx.json", async () => {

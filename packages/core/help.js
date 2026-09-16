@@ -196,6 +196,13 @@ const COMMAND_REGISTRY = [
     related: ["plan", "status"],
   },
   {
+    name: "which",
+    category: "Orchestration",
+    summary: "Show which n-dx is running — version, path, install kind, git",
+    keywords: ["which", "version", "path", "install", "identity", "checkout", "worktree", "link", "global", "debug"],
+    related: ["config", "init"],
+  },
+  {
     name: "config",
     category: "Orchestration",
     summary: "View and edit settings across all packages",
@@ -1180,6 +1187,46 @@ const ORCHESTRATOR_HELP_DEFS = {
     ],
     related: ["config", "init"],
   },
+  which: {
+    summary: "show which n-dx is running",
+    description:
+      "Reports the identity of the CLI executing right now, not just its version.\n" +
+      "\n" +
+      "The package version is the same string in every checkout and every\n" +
+      "install, so it cannot distinguish a globally installed ndx from the\n" +
+      "worktree you are standing in. When a terminal, a dashboard tab and a run\n" +
+      "record disagree, this is the command that says why.\n" +
+      "\n" +
+      "Five fields are printed:\n" +
+      "\n" +
+      "  version   the @n-dx/core version\n" +
+      "  cli       absolute path of the cli.js actually running\n" +
+      "  install   npm registry install, pnpm global link, or workspace checkout\n" +
+      "  git       branch and short SHA, or detached@<sha>, of the install\n" +
+      "  project   the resolved project directory\n" +
+      "\n" +
+      "'install' distinguishes a linked checkout from one invoked directly by\n" +
+      "comparing the invoked path against the resolved one — a global shim is a\n" +
+      "symlink, so the two differ.\n" +
+      "\n" +
+      "Always exits 0. A missing git binary, or an install that is not a git\n" +
+      "working tree, reports no git identity rather than failing — this command\n" +
+      "is for use when something is already confusing, so it never adds a new\n" +
+      "way to fail.\n" +
+      "\n" +
+      "'ndx --version --verbose' prints exactly this report.",
+    usage: "ndx which [dir]",
+    options: [
+      { flag: "--json", description: "Emit the report as a single JSON object" },
+    ],
+    examples: [
+      { command: "ndx which", description: "Identify the ndx on PATH" },
+      { command: "node packages/core/cli.js which", description: "Identify a specific checkout" },
+      { command: "ndx which --json", description: "Machine-readable identity record" },
+      { command: "ndx --version --verbose", description: "Same report via the version flag" },
+    ],
+    related: ["config", "init"],
+  },
   validate: {
     summary: "check PRD integrity",
     description: "Validates the PRD structure: checks DAG integrity, schema conformance,\nparent-child references, and ID uniqueness. Delegates to 'rex validate'.",
@@ -1560,6 +1607,7 @@ export function formatMainHelp() {
 
   section("SETUP", [
     ["init [dir]", "Initialize project"],
+    ["which [dir]", "Show which n-dx is running (version, path, install, git)"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],
     ["install-sample [dir]", "Install a safe, destroyable sample webapp"],

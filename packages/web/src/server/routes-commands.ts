@@ -1581,6 +1581,11 @@ const COMMAND_MANIFEST: ManifestGroup[] = [
   {
     id: "setup", label: "Setup", commands: [
       { name: "init", description: "Initialize project — sourcevision, rex, and hench directories plus LLM model selection" },
+      // No `requires`: identifying which CLI is running is most useful when the
+      // project is *not* set up, so gating it on init would hide it exactly when
+      // it is needed. No trigger either — the answer would describe the server's
+      // own install, which the dashboard footer already reports.
+      { name: "which", description: "Show which n-dx is running — version, cli path, install kind, and git identity" },
       { name: "auth", description: "Verify LLM provider credentials" },
     ],
   },

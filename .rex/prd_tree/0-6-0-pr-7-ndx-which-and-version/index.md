@@ -26,5 +26,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Dashboard footer shows server version, install path and served project directory](./dashboard-footer-shows-server-version.md) | pending |
-| [ndx which: version, resolved cli.js path, install kind, install checkout branch and SHA, project dir; --json; --version --verbose alias](./ndx-which-version-resolved-cli-js-path.md) | pending |
+| [ndx which: version, resolved cli.js path, install kind, install checkout branch and SHA, project dir; --json; --version --verbose alias](./ndx-which-version-resolved-cli-js-path.md) | completed |
 | [ndx work prints an identity line at start: version, cli path, project dir, branch](./ndx-work-prints-an-identity-line-at.md) | pending |

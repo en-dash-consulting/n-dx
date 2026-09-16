@@ -99,6 +99,11 @@ const ALLOWED = new Set([
   // needed — removed rather than left as a permitted-but-unused entry.
   // Git preflight — invokes `git init` when the user consents during `ndx init`
   "packages/core/git-preflight.js",
+  // Install identity (`ndx which`) — reads the install checkout's branch and
+  // short SHA with `git rev-parse`. Orchestration tier, and it must answer even
+  // when nothing is initialized, so it cannot route through llm-client's exec
+  // helpers (a Foundation-tier dependency the report does not otherwise need).
+  "packages/core/install-identity.js",
   // Codex integration — writes .codex/config.toml, .agents/skills, AGENTS.md
   "packages/core/codex-integration.js",
   // Assistant integration — runs `git check-ignore` to detect gitignored
