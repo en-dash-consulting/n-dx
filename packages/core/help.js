@@ -1046,12 +1046,16 @@ const ORCHESTRATOR_HELP_DEFS = {
       },
     ],
     options: [
-      { flag: "--port=<N>", description: "Server port (default: 3117)" },
+      { flag: "--port=<N>", description: "Server port (default: 3117); with --hub, the hub's port" },
       { flag: "--background", description: "Run as a background daemon" },
+      { flag: "--hub", description: "Register this repository with the per-user hub and serve it at /p/<id>/ (also: web.mode \"hub\" in .n-dx.json)" },
+      { flag: "--here", description: "Force the single-project server, ignoring web.mode" },
+      { flag: "--open", description: "With --hub, open the project URL in the browser" },
     ],
     examples: [
       { command: "ndx start .", description: "Start server in foreground" },
       { command: "ndx start --background .", description: "Start as background daemon" },
+      { command: "ndx start --hub .", description: "Register with the hub; several repos share port 3117" },
       { command: "ndx start status .", description: "Check if server is running" },
       { command: "ndx start stop .", description: "Stop background server" },
     ],
@@ -1597,7 +1601,7 @@ export function formatMainHelp() {
   ], pad);
 
   section("SERVE", [
-    ["start [dir]", "Start dashboard + MCP server (--port=N, --background)"],
+    ["start [dir]", "Start dashboard + MCP server (--port=N, --background, --hub)"],
     ["dev [dir]", "Start dev server with live reload"],
     ["refresh [dir]", "Refresh dashboard artifacts (--ui-only, --data-only)"],
     ["export [dir]", "Export static deployable dashboard (--deploy=github)"],

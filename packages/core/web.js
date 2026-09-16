@@ -18,14 +18,33 @@
  *   ndx start --background [dir]     Start detached (daemon mode)
  *   ndx start stop [dir]             Stop a background server
  *   ndx start status [dir]           Check if server is running
+ *   ndx start --hub [dir]            Register with the per-user hub (0.7.0) and
+ *                                    serve at http://localhost:3117/p/<id>/
+ *   ndx start --here [dir]           Force the single-project server above
+ *
+ * ## Hub mode (0.7.0)
+ *
+ * `--hub` (or `web.mode: "hub"` in .n-dx.json) resolves the repository through
+ * git's worktree list, derives a stable project id, starts the hub daemon if
+ * it is not already answering, registers this repository (and this worktree)
+ * with it, and prints the project's URL and MCP endpoints. The hub runs one
+ * `web serve` child per repository on an ephemeral port, so two repositories
+ * never collide on 3117. The orchestration rule holds: the hub is spawned
+ * (`tools.web hub`) and talked to over node:http, never imported.
+ *
+ * The default stays the single-project server until `stop`/`status` learn
+ * hub mode (the next PR 10 task) — flipping it earlier would leave
+ * `ndx start stop` unable to find the server it just started.
  */
 
-import { spawn } from "child_process";
-import { get as httpGet } from "http";
+import { spawn, execFileSync } from "child_process";
+import { get as httpGet, request as httpRequest } from "http";
 import { createConnection } from "net";
+import { createHash } from "crypto";
+import { homedir } from "os";
 import { readFile, writeFile, unlink, access } from "fs/promises";
 import { realpathSync } from "fs";
-import { join, resolve } from "path";
+import { basename, join, resolve } from "path";
 import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
 
@@ -611,6 +630,298 @@ async function showStatus(dir, port, label = "n-dx server") {
   }
 }
 
+// ── Hub mode (0.7.0) ─────────────────────────────────────────────────────────
+
+const HUB_DEFAULT_PORT = 3117;
+const HUB_REGISTRY_FILE = "hub.json";
+const HUB_PID_FILE = "hub.pid";
+const HUB_CONFIG_FILE = "config.json";
+/** How long a freshly spawned hub gets to answer /api/hub/health. */
+const HUB_START_TIMEOUT_MS = 15_000;
+/** Registering spawns the project server; the hub waits for its port before answering. */
+const HUB_REGISTER_TIMEOUT_MS = 60_000;
+
+/** `$N_DX_HOME`, else `~/.n-dx` — the same resolution the hub itself uses. */
+export function hubHome() {
+  return process.env.N_DX_HOME ?? join(homedir(), ".n-dx");
+}
+
+/** Hub port: `~/.n-dx/config.json` → `{ "hub": { "port": N } }`, default 3117. */
+export async function loadHubPort(home = hubHome()) {
+  try {
+    const raw = await readFile(join(home, HUB_CONFIG_FILE), "utf-8");
+    const port = JSON.parse(raw)?.hub?.port;
+    if (Number.isInteger(port) && port > 0 && port <= MAX_PORT) return port;
+  } catch {
+    // absent or malformed — default
+  }
+  return HUB_DEFAULT_PORT;
+}
+
+/** The hub's registry, read-only. Empty when absent or unreadable. */
+export async function readHubRegistry(home = hubHome()) {
+  try {
+    const parsed = JSON.parse(await readFile(join(home, HUB_REGISTRY_FILE), "utf-8"));
+    return parsed && typeof parsed.projects === "object" && parsed.projects ? parsed.projects : {};
+  } catch {
+    return {};
+  }
+}
+
+/** `web.mode` from the project's .n-dx.json: "hub" or "here"; undefined when unset. */
+async function loadConfigMode(dir) {
+  const configPath = join(dir, ".n-dx.json");
+  if (!(await fileExists(configPath))) return undefined;
+  try {
+    const mode = JSON.parse(await readFile(configPath, "utf-8"))?.web?.mode;
+    return mode === "hub" || mode === "here" ? mode : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The main worktree's path from `git worktree list --porcelain` output — git
+ * lists it first. Pure, so the parse is testable without a repository.
+ */
+export function parseMainWorktree(porcelain) {
+  for (const line of porcelain.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      const path = line.slice("worktree ".length).trim();
+      if (path) return path;
+    }
+  }
+  return null;
+}
+
+function gitOutput(cwd, args) {
+  try {
+    return execFileSync("git", args, { cwd, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function realpathOrSelf(path) {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return path;
+  }
+}
+
+/**
+ * Where this directory sits in its repository.
+ *
+ * `repoRoot` is the main worktree (first entry of `git worktree list`) —
+ * the thing the hub registers once per repository — falling back to the
+ * checkout root, and to the directory itself outside git. `worktree` is the
+ * root of the checkout containing `dir`, which is what gets listed under the
+ * project. Paths are realpath-resolved so they compare equal to what the hub
+ * and the project server report.
+ */
+export function resolveRepo(dir) {
+  const absDir = resolve(dir);
+  const toplevel = gitOutput(absDir, ["rev-parse", "--show-toplevel"]);
+  if (!toplevel) {
+    return { repoRoot: realpathOrSelf(absDir), worktree: realpathOrSelf(absDir), branch: null, remoteUrl: null, isRepo: false };
+  }
+  const worktree = realpathOrSelf(toplevel);
+  const porcelain = gitOutput(absDir, ["worktree", "list", "--porcelain"]);
+  const main = porcelain ? parseMainWorktree(porcelain) : null;
+  const repoRoot = main ? realpathOrSelf(main) : worktree;
+  const branchOut = gitOutput(absDir, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  const branch = branchOut && branchOut !== "HEAD" ? branchOut : null;
+  const remoteUrl = gitOutput(absDir, ["remote", "get-url", "origin"]) || null;
+  return { repoRoot, worktree, branch, remoteUrl, isRepo: true };
+}
+
+/** URL- and path-safe slug for a project id. */
+export function slugifyProjectId(name) {
+  const slug = String(name ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+  return slug || "project";
+}
+
+/**
+ * The project's display name: `.rex/config.json` "project", else the
+ * repository directory's basename.
+ */
+async function loadProjectName(repoRoot) {
+  try {
+    const raw = await readFile(join(repoRoot, ".rex", "config.json"), "utf-8");
+    const project = JSON.parse(raw)?.project;
+    if (typeof project === "string" && project.trim()) return project.trim();
+  } catch {
+    // no rex config — basename below
+  }
+  return basename(repoRoot);
+}
+
+/**
+ * A stable id for the repository. The slug of its name, with a 6-hex hash of
+ * the origin URL (or the path, without a remote) appended only when the
+ * registry already holds that id for a *different* repository — two clones
+ * named "app" stay distinct without every project carrying a hash.
+ */
+export function deriveProjectId(name, { repoRoot, remoteUrl, registryProjects }) {
+  const slug = slugifyProjectId(name);
+  const existing = registryProjects?.[slug];
+  if (!existing || existing.repoRoot === repoRoot) return slug;
+  const hash = createHash("sha1").update(remoteUrl || repoRoot).digest("hex").slice(0, 6);
+  return `${slug}-${hash}`;
+}
+
+/** One JSON request to the hub. Resolves `{ status, body }`; status 0 when unreachable. */
+export function hubRequest(port, method, path, body, timeoutMs = PROBE_TIMEOUT_MS) {
+  return new Promise((res) => {
+    const payload = body === undefined ? null : JSON.stringify(body);
+    const req = httpRequest(
+      {
+        host: "127.0.0.1",
+        port,
+        method,
+        path,
+        headers: payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {},
+      },
+      (response) => {
+        let text = "";
+        response.setEncoding("utf-8");
+        response.on("data", (chunk) => { text += chunk; });
+        response.on("end", () => {
+          let parsed = null;
+          try { parsed = text ? JSON.parse(text) : null; } catch { parsed = null; }
+          res({ status: response.statusCode ?? 0, body: parsed });
+        });
+      },
+    );
+    req.setTimeout(timeoutMs, () => req.destroy(new Error("timeout")));
+    req.on("error", () => res({ status: 0, body: null }));
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+/** Whether a hub answers on `port`. */
+async function hubIsHealthy(port) {
+  const { status, body } = await hubRequest(port, "GET", "/api/hub/health");
+  return status === 200 && body?.ok === true;
+}
+
+/**
+ * Make sure a hub is answering on `port`, spawning one detached if not.
+ * Same CLAUDECODE-stripping, detached, unref'd pattern as background mode.
+ */
+async function ensureHub(port, { tools, __dir, home }) {
+  if (await hubIsHealthy(port)) return { spawned: false, pid: null };
+
+  const script = resolve(__dir, tools.web);
+  const { CLAUDECODE: _cc, ...env } = process.env;
+  const child = spawn(process.execPath, [script, "hub", `--port=${port}`], {
+    stdio: "ignore",
+    detached: true,
+    windowsHide: true,
+    env: { ...env, N_DX_HOME: home },
+  });
+  child.unref();
+
+  const deadline = Date.now() + HUB_START_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (await hubIsHealthy(port)) return { spawned: true, pid: child.pid };
+    if (!isProcessRunning(child.pid)) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error(`n-dx hub did not start on port ${port} within ${HUB_START_TIMEOUT_MS}ms`);
+}
+
+/** Open a URL in the default browser, best-effort. */
+function openBrowser(url) {
+  const [cmd, args] = process.platform === "darwin"
+    ? ["open", [url]]
+    : process.platform === "win32"
+      ? ["cmd.exe", ["/d", "/s", "/c", `start "" "${url}"`]]
+      : ["xdg-open", [url]];
+  try {
+    const child = spawn(cmd, args, {
+      stdio: "ignore",
+      detached: true,
+      ...(process.platform === "win32" ? { windowsVerbatimArguments: true } : {}),
+    });
+    child.on("error", () => {});
+    child.unref();
+  } catch {
+    // No opener — the URL was printed anyway.
+  }
+}
+
+/**
+ * `ndx start --hub`: register this repository with the per-user hub and print
+ * where it is served. Returns an exit code.
+ */
+async function runHubMode(absDir, flags, { tools, __dir, label }) {
+  const home = hubHome();
+  let hubPort = await loadHubPort(home);
+  if (flags.port) {
+    const parsed = parseInt(flags.port, 10);
+    if (isNaN(parsed) || parsed < 1 || parsed > MAX_PORT) {
+      console.error(`Invalid port: ${flags.port}`);
+      return 1;
+    }
+    hubPort = parsed;
+  }
+
+  const repo = resolveRepo(absDir);
+  const name = await loadProjectName(repo.repoRoot);
+  const id = deriveProjectId(name, {
+    repoRoot: repo.repoRoot,
+    remoteUrl: repo.remoteUrl,
+    registryProjects: await readHubRegistry(home),
+  });
+
+  let hub;
+  try {
+    hub = await ensureHub(hubPort, { tools, __dir, home });
+  } catch (err) {
+    console.error(err.message);
+    return 1;
+  }
+  if (hub.spawned) log(`n-dx hub started on http://localhost:${hubPort} (PID ${hub.pid}).`);
+
+  const { status, body } = await hubRequest(
+    hubPort,
+    "POST",
+    "/api/hub/projects",
+    { id, name, repoRoot: repo.repoRoot, worktree: repo.worktree, ndxBin: resolve(__dir, tools.web) },
+    HUB_REGISTER_TIMEOUT_MS,
+  );
+  if (status !== 200 && status !== 201) {
+    console.error(`Registering with the n-dx hub failed (${status || "unreachable"})${body?.error ? `: ${body.error}` : ""}`);
+    return 1;
+  }
+  const state = body?.project?.status?.state;
+  if (state !== "healthy") {
+    console.error(`Project "${id}" registered but its server is ${state ?? "in an unknown state"}${body?.project?.status?.lastError ? `: ${body.project.status.lastError}` : ""}`);
+    return 1;
+  }
+
+  const base = `http://localhost:${hubPort}/p/${encodeURIComponent(id)}`;
+  log(`${label}: project "${id}" registered with the hub${status === 200 ? " (already known)" : ""}.`);
+  log(`  Repository: ${repo.repoRoot}${repo.worktree !== repo.repoRoot ? `\n  Worktree:   ${repo.worktree}` : ""}${repo.branch ? ` (${repo.branch})` : ""}`);
+  log(`  URL: ${base}/`);
+  log(`  MCP (rex):          ${base}/mcp/rex`);
+  log(`  MCP (sourcevision): ${base}/mcp/sourcevision`);
+  log("");
+  log("MCP setup:");
+  log(`  Claude:  claude mcp add --transport http rex ${base}/mcp/rex`);
+  log(`           claude mcp add --transport http sourcevision ${base}/mcp/sourcevision`);
+  log("  Codex:   configured automatically via .codex/config.toml (stdio)");
+  if (flags.open) openBrowser(`${base}/`);
+  return 0;
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -687,6 +998,13 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     console.error(`Unknown ${commandName} subcommand: ${subcommand}`);
     console.error("Available: stop, status");
     return 1;
+  }
+
+  // --- Hub mode (0.7.0) ---
+  // --here always wins; otherwise --hub or web.mode "hub" opts in. Everything
+  // below this point is the single-project server, unchanged.
+  if (!flags.here && (flags.hub || (await loadConfigMode(absDir)) === "hub")) {
+    return runHubMode(absDir, flags, { tools, __dir, label });
   }
 
   // --- Check for stale PID / already running ---
