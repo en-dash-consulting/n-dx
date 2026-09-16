@@ -125,3 +125,5 @@ export {
 } from "./decorations.js";
 export { WorkspaceSwitcher, buildWorkspaceOptions, workspaceUrl, fmtElapsed } from "./workspace-switcher.js";
 export type { WorkspaceSwitcherProps, WorkspaceOption } from "./workspace-switcher.js";
+export { WorkspaceWriteStrip, workspaceWriteNotice } from "./workspace-write-strip.js";
+export type { WorkspaceWriteStripProps } from "./workspace-write-strip.js";

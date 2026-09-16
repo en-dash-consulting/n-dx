@@ -79,6 +79,35 @@ When `ndx start` is running, the web server holds in-process caches (aggregation
 
 The folder tree watcher refreshes `.rex/.cache/prd.json` automatically for most PRD mutations; routes that write also call `refreshPRDCache` so their own change is visible to the next read without a restart. Any command that bulk-rewrites `.sourcevision/` (ci, refresh) should be followed by a server restart to flush stale caches.
 
+### Writes are workspace-scoped
+
+Every PRD-writing route resolves its target from `ctx.rexDir` — through
+`resolveStore(ctx.rexDir)` in `routes-rex/items.ts`, `prune.ts`, `health.ts`,
+`refinements.ts` (which is where the Ask panel's accepted proposals land, via
+`POST /api/rex/apply-refinements`), `requirements.ts` and `routes-rex-analysis.ts`;
+and by path in `restore.ts`, which restores from that workspace's `.rex/.backups`.
+Since PR 12 that ctx is whichever workspace the request addressed —
+the `/w/<key>/` slot or `X-Ndx-Workspace` — so a write made while viewing a branch
+worktree rewrites **that worktree's** `.rex/prd_tree/` and leaves the anchor's
+untouched. The PRD lock is per `rexDir` (`prdLockPath`), one per workspace: two
+worktrees write concurrently without contending, and equally, the lock does not
+serialize them against each other. Nothing needs it to — they are different trees.
+
+Two rules follow, and both are load-bearing:
+
+- **No cross-workspace write action.** No route takes a workspace as a parameter,
+  and no UI offers "apply to the anchor instead". Editing the anchor's PRD while
+  viewing a branch requires switching workspace through the breadcrumb switcher,
+  which is a full navigation. A cross-workspace affordance would make the write
+  target a thing the reader has to check rather than a thing the URL states.
+- **The write target is stated, not inferred.** `WorkspaceWriteStrip`
+  (`viewer/components/workspace-write-strip.ts`) renders a one-line strip in the
+  PRD view for a non-anchor workspace only. On the anchor it renders nothing —
+  a permanent banner on the common case is noise.
+
+`tests/integration/workspace-scoped-prd-writes.test.ts` pins this by hashing both
+trees around each write; a route that wrote both would fail it.
+
 ## hub zone (`src/hub/`)
 
 `src/hub/` is the 0.7.0 hub daemon (`web hub`): one process per user that owns

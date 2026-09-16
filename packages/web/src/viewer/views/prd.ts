@@ -23,7 +23,7 @@ import { BulkActions } from "../components/prd-tree/bulk-actions.js";
 import { MergePreview } from "../components/prd-tree/merge-preview.js";
 import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js";
 import { DeleteConfirmation } from "../components/prd-tree/delete-confirmation.js";
-import { BrandedHeader } from "../components/index.js";
+import { BrandedHeader, WorkspaceWriteStrip } from "../components/index.js";
 import { CompletionTimeline } from "../components/prd-tree/completion-timeline.js";
 import type { PRDDocumentData, ItemStatus } from "../components/prd-tree/index.js";
 import type { DetailItem, NavigateTo } from "../types.js";
@@ -240,6 +240,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       h(BrandedHeader, { product: "rex", title: "Rex", class: "branded-header-rex" }),
       h("h2", { class: "section-header" }, "Tasks"),
     ),
+
+    // Which tree an edit here lands in — shown only off the anchor.
+    h(WorkspaceWriteStrip, null),
 
     // Deep-link error banner
     deepLinkError

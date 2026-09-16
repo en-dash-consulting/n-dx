@@ -508,6 +508,20 @@
   }
 }
 
+/* Workspace write-target strip — non-anchor worktrees only */
+.workspace-write-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+}
+
 /* Deep-link error banner */
 .prd-deep-link-error {
   display: flex;
