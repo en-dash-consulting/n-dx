@@ -24,5 +24,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Keep writing .n-dx-web.port in the project directory pointing at the hub so refresh --live-server and the reload signal work unchanged](./keep-writing-n-dx-web-port-in-the.md) | pending |
-| [ndx start resolves the repo via the git common dir, derives the project id, starts the hub if absent, registers and opens /p/:id/](./ndx-start-resolves-the-repo-via-the.md) | pending |
+| [ndx start resolves the repo via the git common dir, derives the project id, starts the hub if absent, registers and opens /p/:id/](./ndx-start-resolves-the-repo-via-the.md) | completed |
 | [ndx start stop unregisters the project; hub exits with its last project unless hub.keepAlive; status reports hub and project state](./ndx-start-stop-unregisters-the-project.md) | pending |
