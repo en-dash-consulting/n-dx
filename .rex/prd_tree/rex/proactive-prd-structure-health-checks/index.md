@@ -27,6 +27,6 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Add structure health gate to rex ci / ndx ci](./add-structure-health-gate-to-rex-ci.md) | completed |
 | [Define structure health thresholds and add to rex config schema](./define-structure-health-thresholds-and.md) | completed |
 | [Implement structure health check function](./implement-structure-health-check.md) | completed |
-| [rex fix needs two runs to repair a misalignment nested under another completed parent](./rex-fix-needs-two-runs-to-repair-a.md) | pending |
+| [rex fix needs two runs to repair a misalignment nested under another completed parent](./rex-fix-needs-two-runs-to-repair-a.md) | completed |
 | [rex status tells the operator to run rex fix for parents rex fix will not touch](./rex-status-tells-the-operator-to-run.md) | pending |
 | [Wire health warnings into rex add, analyze, and plan write paths](./wire-health-warnings-into-rex-add.md) | completed |
