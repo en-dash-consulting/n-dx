@@ -9,6 +9,8 @@
  *   - Peer detection on a busy port: another project's dashboard is left alone
  *     and this one relocates near the requested port (falling back to
  *     3117–3200 only if that neighbourhood is full), rather than being killed
+ *   - Preview mode (--preview): a static UI layout document on its own port and
+ *     its own pid/port files, made to run alongside a real dashboard
  *
  * Used by both `ndx start` (unified: dashboard + MCP) and `ndx web` (alias).
  *
@@ -18,6 +20,8 @@
  *   ndx start --background [dir]     Start detached (daemon mode)
  *   ndx start stop [dir]             Stop a background server
  *   ndx start status [dir]           Check if server is running
+ *   ndx start --preview [dir]        Serve the UI layout preview (:3118, live reload)
+ *   ndx start --preview stop [dir]   Stop a background preview server
  *   ndx start [dir]                  Register with the per-user hub (0.7.0) and
  *                                    serve at http://localhost:3117/p/<id>/
  *   ndx start --here [dir]           Force the single-project server above
@@ -38,6 +42,9 @@
  * while another worktree is registered, and the hub exits with its last
  * project unless `hub.keepAlive` is set in `~/.n-dx/config.json`. `ndx hub
  * status` and `ndx hub stop` address the hub itself.
+ *
+ * Preview mode is orthogonal to all of that: it never registers with the hub
+ * and owns its own pid/port files, so it runs alongside either server.
  */
 
 import { spawn, execFileSync } from "child_process";
@@ -54,6 +61,21 @@ import { execFileSyncCli } from "./win-spawn.js";
 const DEFAULT_PORT = 3117;
 const PID_FILE = ".n-dx-web.pid";
 const PORT_FILE = ".n-dx-web.port";
+
+// ── Preview mode ─────────────────────────────────────────────────────────────
+// `ndx start --preview` runs a second, stateless server that serves a static UI
+// layout document (packages/web/src/preview/index.html) with live reload. It is
+// meant to run *alongside* a real dashboard, so it keeps its own port and its own
+// pid/port files: sharing `.n-dx-web.pid` would make either server's stop command
+// kill the other one.
+const DEFAULT_PREVIEW_PORT = 3118;
+const PREVIEW_PID_FILE = ".n-dx-preview.pid";
+const PREVIEW_PORT_FILE = ".n-dx-preview.port";
+
+/** State-file names for the dashboard server. */
+const DASHBOARD_FILES = { pid: PID_FILE, port: PORT_FILE };
+/** State-file names for the preview server — deliberately disjoint from the above. */
+const PREVIEW_FILES = { pid: PREVIEW_PID_FILE, port: PREVIEW_PORT_FILE };
 
 // Mirrors the server's own fallback allocator (PORT_RANGE_START / PORT_RANGE_END
 // in packages/web/src/server/port.ts). Duplicated rather than imported: this is
@@ -476,8 +498,8 @@ export async function killPortOccupant(port) {
  * Read the port file written by the server process.
  * Returns the actual port number or null.
  */
-async function readPortFile(dir) {
-  const portPath = join(dir, PORT_FILE);
+async function readPortFile(dir, files = DASHBOARD_FILES) {
+  const portPath = join(dir, files.port);
   if (!(await fileExists(portPath))) return null;
   try {
     const raw = await readFile(portPath, "utf-8");
@@ -491,8 +513,8 @@ async function readPortFile(dir) {
 /**
  * Remove the port file.
  */
-export async function removePortFile(dir) {
-  const portPath = join(dir, PORT_FILE);
+export async function removePortFile(dir, files = DASHBOARD_FILES) {
+  const portPath = join(dir, files.port);
   try {
     await unlink(portPath);
   } catch {
@@ -504,10 +526,10 @@ export async function removePortFile(dir) {
  * Wait for the server process to write its port file, polling at intervals.
  * Returns the actual port or null if the timeout expires.
  */
-async function waitForPortFile(dir, timeoutMs = 5000, intervalMs = 100) {
+async function waitForPortFile(dir, timeoutMs = 5000, intervalMs = 100, files = DASHBOARD_FILES) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const port = await readPortFile(dir);
+    const port = await readPortFile(dir, files);
     if (port !== null) return port;
     await new Promise((r) => setTimeout(r, intervalMs));
   }
@@ -518,8 +540,8 @@ async function waitForPortFile(dir, timeoutMs = 5000, intervalMs = 100) {
  * Read the PID file for a given project directory.
  * Returns { pid, port } or null.
  */
-export async function readPidFile(dir) {
-  const pidPath = join(dir, PID_FILE);
+export async function readPidFile(dir, files = DASHBOARD_FILES) {
+  const pidPath = join(dir, files.pid);
   if (!(await fileExists(pidPath))) return null;
   try {
     const raw = await readFile(pidPath, "utf-8");
@@ -533,8 +555,8 @@ export async function readPidFile(dir) {
 /**
  * Write PID file with process info.
  */
-async function writePidFile(dir, pid, port) {
-  const pidPath = join(dir, PID_FILE);
+async function writePidFile(dir, pid, port, files = DASHBOARD_FILES) {
+  const pidPath = join(dir, files.pid);
   await writeFile(
     pidPath,
     JSON.stringify({ pid, port, startedAt: new Date().toISOString() }, null, 2) + "\n",
@@ -573,8 +595,8 @@ export function isHubMarker(info) {
 /**
  * Remove PID file.
  */
-export async function removePidFile(dir) {
-  const pidPath = join(dir, PID_FILE);
+export async function removePidFile(dir, files = DASHBOARD_FILES) {
+  const pidPath = join(dir, files.pid);
   try {
     await unlink(pidPath);
   } catch {
@@ -615,9 +637,10 @@ export function isProcessRunning(pid) {
  * @param {string} dir
  * @param {string} [label]
  * @param {number} [gracePeriodMs]  Grace period before SIGKILL. Default: 2 000 ms.
+ * @param {{pid: string, port: string}} [files]  State-file names. Preview mode passes its own pair.
  */
-async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(process.env.N_DX_STOP_GRACE_MS ?? 2_000)) {
-  const info = await readPidFile(dir);
+async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(process.env.N_DX_STOP_GRACE_MS ?? 2_000), files = DASHBOARD_FILES) {
+  const info = await readPidFile(dir, files);
   if (!info) {
     log("No background server found.");
     return true;
@@ -633,8 +656,8 @@ async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(pro
 
   if (!isProcessRunning(info.pid)) {
     log("Server process is no longer running (stale PID file).");
-    await removePidFile(dir);
-    await removePortFile(dir);
+    await removePidFile(dir, files);
+    await removePortFile(dir, files);
     return true;
   }
 
@@ -659,16 +682,19 @@ async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(pro
   });
 
   log(`Stopped ${label} (PID ${info.pid}, port ${info.port}).`);
-  await removePidFile(dir);
-  await removePortFile(dir);
+  await removePidFile(dir, files);
+  await removePortFile(dir, files);
   return true;
 }
 
 /**
  * Show status of a background server.
+ *
+ * @param {boolean} [showMcp]  Print the MCP endpoint URLs. False for the preview
+ *                             server, which serves one HTML document and no MCP.
  */
-async function showStatus(dir, port, label = "n-dx server") {
-  const info = await readPidFile(dir);
+async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FILES, showMcp = true) {
+  const info = await readPidFile(dir, files);
   if (!info) {
     log("No background server recorded.");
     // Still check if something is on the port
@@ -689,22 +715,24 @@ async function showStatus(dir, port, label = "n-dx server") {
 
   // The port file reflects the actual port the server bound to (may differ
   // from the PID file's port if dynamic allocation kicked in).
-  const actualPort = (await readPortFile(dir)) ?? info.port;
+  const actualPort = (await readPortFile(dir, files)) ?? info.port;
   const running = isProcessRunning(info.pid);
   const portActive = await isPortInUse(actualPort);
 
   if (running && portActive) {
     log(`${label} is running (PID ${info.pid}, port ${actualPort}).`);
     log(`  URL: http://localhost:${actualPort}`);
-    log(`  MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
-    log(`  MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
+    if (showMcp) {
+      log(`  MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
+      log(`  MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
+    }
     log(`  Started: ${info.startedAt}`);
   } else if (running) {
     log(`Server process is running (PID ${info.pid}) but port ${actualPort} is not responding.`);
   } else {
     log("Server process is no longer running (stale PID file).");
-    await removePidFile(dir);
-    await removePortFile(dir);
+    await removePidFile(dir, files);
+    await removePortFile(dir, files);
   }
 }
 
@@ -1323,8 +1351,17 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
 
   _quiet = !!(flags.quiet);
 
-  // Resolve port: --port flag > .n-dx.json config > default
-  let port = DEFAULT_PORT;
+  // Preview mode: serve the static UI layout document instead of the dashboard.
+  // It gets its own default port and its own pid/port files so it can run next
+  // to a real `ndx start` without either one stopping the other.
+  const isPreview = !!flags.preview;
+  const files = isPreview ? PREVIEW_FILES : DASHBOARD_FILES;
+
+  // Resolve port: --port flag > .n-dx.json config > default.
+  // `web.port` is the dashboard's port — applying it to the preview would put
+  // both servers on the same port, which is the one thing preview mode exists
+  // to avoid — so preview reads --port only.
+  let port = isPreview ? DEFAULT_PREVIEW_PORT : DEFAULT_PORT;
   if (flags.port) {
     const parsed = parseInt(flags.port, 10);
     if (isNaN(parsed) || parsed < 1 || parsed > 65535) {
@@ -1332,7 +1369,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       exit(1);
     }
     port = parsed;
-  } else {
+  } else if (!isPreview) {
     const configPort = await loadConfigPort(absDir);
     if (configPort) port = configPort;
   }
@@ -1340,18 +1377,20 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   const isBackground = flags.background || flags.daemon || flags.bg;
 
   // Labels for user-facing messages
-  const label = commandName === "start" ? "n-dx server" : "n-dx dashboard";
-  const stopCmd = `ndx ${commandName} stop`;
+  const label = isPreview
+    ? "n-dx UI preview"
+    : commandName === "start" ? "n-dx server" : "n-dx dashboard";
+  const stopCmd = isPreview ? `ndx ${commandName} --preview stop` : `ndx ${commandName} stop`;
 
   // --- Subcommand: stop ---
   if (subcommand === "stop") {
-    const ok = await stopServer(absDir, label);
+    const ok = await stopServer(absDir, label, undefined, files);
     return ok ? 0 : 1;
   }
 
   // --- Subcommand: status ---
   if (subcommand === "status") {
-    await showStatus(absDir, port, label);
+    await showStatus(absDir, port, label, files, !isPreview);
     return 0;
   }
 
@@ -1368,26 +1407,32 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   // Precedence, flags over config: --here wins outright, then --hub (still
   // accepted, and the way to override web.mode "here" for one run), then the
   // config, then the hub.
-  if (!flags.here && (flags.hub || (await loadConfigMode(absDir)) !== "here")) {
+  // --preview is never hub-registered: it serves a static document on its own
+  // port with its own pid/port files, so it has no project to register and
+  // must not be routed here — it would never reach the preview branch below.
+  if (!isPreview && !flags.here && (flags.hub || (await loadConfigMode(absDir)) !== "here")) {
     return runHubMode(absDir, flags, { tools, __dir, label, stopCmd });
   }
 
   // --- Check for stale PID / already running ---
-  const existing = await readPidFile(absDir);
+  const existing = await readPidFile(absDir, files);
   if (existing && isHubMarker(existing)) {
     // The marker points at the hub, which keeps serving the other projects.
-    // A single-project server here just takes the marker files over.
+    // A single-project server here just takes the marker files over. Only the
+    // dashboard is ever hub-registered, so this never fires for preview — but
+    // the file set is passed through regardless, since `files` selects which
+    // pid/port pair is being cleared.
     log(`This directory was registered with the n-dx hub (project "${existing.projectId}"); starting a single-project server here instead.`);
-    await removePidFile(absDir);
-    await removePortFile(absDir);
+    await removePidFile(absDir, files);
+    await removePortFile(absDir, files);
   } else if (existing && isProcessRunning(existing.pid)) {
     // Auto-restart: stop the old server so ndx start is idempotent.
     log(`Stopping previous ${label} (PID ${existing.pid}, port ${existing.port})…`);
-    await stopServer(absDir, label);
+    await stopServer(absDir, label, undefined, files);
   } else if (existing) {
     // Stale PID file — clean up
-    await removePidFile(absDir);
-    await removePortFile(absDir);
+    await removePidFile(absDir, files);
+    await removePortFile(absDir, files);
   }
 
   // If port is still occupied, wait briefly for the OS to release it after the
@@ -1399,7 +1444,21 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       await new Promise((r) => setTimeout(r, 200));
       if (!(await isPortInUse(port))) { portFree = true; break; }
     }
-    if (!portFree) {
+    if (!portFree && isPreview) {
+      // Preview mode never kills whatever is on the port. The most likely
+      // occupant is the dashboard this preview is meant to sit beside, and a
+      // design-time tool must not be able to take the real server down.
+      const next = await findRelocationPort(port);
+      if (next === null) {
+        console.error(
+          `Port ${port} is in use and no free port was found near it or in ` +
+          `${PORT_RANGE_START}–${PORT_RANGE_END}. Choose one with --port=N.`,
+        );
+        return 1;
+      }
+      log(`Port ${port} is in use; starting the preview on :${next}`);
+      port = next;
+    } else if (!portFree) {
       // Ask the occupant who it is before killing it. The PID file above only
       // knows about servers started for THIS directory, so a second project or
       // worktree used to look like a stranger squatting on 3117 and got
@@ -1453,14 +1512,15 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   // `ndx start`. Without this, `ndx start --background --debug` silently
   // ran a non-debug server — the flag was parsed into `flags` here, in this
   // process, and then dropped on the floor.
-  const serveArgs = ["serve", `--port=${port}`, absDir];
+  const serveArgs = [isPreview ? "preview" : "serve", `--port=${port}`, absDir];
+  if (isPreview && typeof flags.file === "string") serveArgs.push(`--file=${flags.file}`);
   if (flags.debug) serveArgs.push("--debug");
   else if (flags.verbose) serveArgs.push("--verbose");
 
   // --- Background mode ---
   if (isBackground) {
     // Remove stale port file before spawning so we can detect the fresh one
-    await removePortFile(absDir);
+    await removePortFile(absDir, files);
 
     const script = resolve(__dir, tools.web);
     // Strip CLAUDECODE so child processes (rex analyze, hench run) can
@@ -1477,7 +1537,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     // Wait for the server to write its port file with the actual bound port.
     // This handles dynamic port allocation — the actual port may differ from
     // the requested port if the requested port was already in use.
-    const actualPort = await waitForPortFile(absDir);
+    const actualPort = await waitForPortFile(absDir, undefined, undefined, files);
 
     if (actualPort === null) {
       // Server may have failed to start. Check if process is still running.
@@ -1486,14 +1546,14 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
         return 1;
       }
       // Process is alive but port file not written yet — use requested port as fallback
-      await writePidFile(absDir, child.pid, port);
+      await writePidFile(absDir, child.pid, port, files);
       log(`${label} started in background (PID ${child.pid}).`);
       log(`  URL: http://localhost:${port}`);
       log(`Use '${stopCmd}' to stop it.`);
       return 0;
     }
 
-    await writePidFile(absDir, child.pid, actualPort);
+    await writePidFile(absDir, child.pid, actualPort, files);
 
     if (actualPort !== port) {
       console.error(`Warning: requested port ${port} was taken; server bound to ${actualPort}.`);
@@ -1502,6 +1562,13 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
 
     log(`${label} started in background (PID ${child.pid}).`);
     log(`  URL: http://localhost:${actualPort}`);
+
+    // The preview serves one HTML document — no MCP endpoints to advertise.
+    if (isPreview) {
+      log(`Use '${stopCmd}' to stop it.`);
+      return 0;
+    }
+
     log(`  MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
     log(`  MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
     log("");
@@ -1517,8 +1584,8 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   // --- Foreground mode ---
   // Clean up PID and port files on exit (in case of SIGINT/SIGTERM)
   const cleanup = () => Promise.all([
-    removePidFile(absDir).catch(() => {}),
-    removePortFile(absDir).catch(() => {}),
+    removePidFile(absDir, files).catch(() => {}),
+    removePortFile(absDir, files).catch(() => {}),
   ]);
 
   process.on("SIGINT", async () => {

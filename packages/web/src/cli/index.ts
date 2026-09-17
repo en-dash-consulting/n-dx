@@ -4,14 +4,16 @@
  * n-dx web dashboard CLI
  *
  * Commands:
- *   serve [dir]   - Start the web dashboard server
- *   hub           - Start the machine-wide hub (registry + one server per repo)
+ *   serve [dir]     - Start the web dashboard server
+ *   hub             - Start the machine-wide hub (registry + one server per repo)
+ *   preview [dir]   - Serve the UI layout preview document (live reload)
  */
 
 import { resolve } from "node:path";
 import { suppressKnownDeprecations, setVerbose, setDebug } from "@n-dx/llm-client";
 import { startServer } from "../server/start.js";
 import { startHub, DEFAULT_HUB_PORT } from "../hub/index.js";
+import { startPreviewServer, DEFAULT_PREVIEW_PORT } from "../server/preview.js";
 import type { ViewerScope } from "../shared/view-routing.js";
 
 suppressKnownDeprecations();
@@ -21,11 +23,14 @@ const VALID_SCOPES = new Set<ViewerScope>(["sourcevision", "rex", "hench"]);
 const args = process.argv.slice(2);
 const command = args[0];
 
-let port = DEFAULT_HUB_PORT;
+let port = command === "preview" ? DEFAULT_PREVIEW_PORT : DEFAULT_HUB_PORT;
 let scope: ViewerScope | undefined;
+let previewFile: string | undefined;
 
 for (const a of args.slice(1)) {
-  if (a.startsWith("--port=")) {
+  if (a.startsWith("--file=")) {
+    previewFile = a.slice("--file=".length);
+  } else if (a.startsWith("--port=")) {
     port = parseInt(a.split("=")[1], 10);
   } else if (a.startsWith("--scope=")) {
     const val = a.split("=")[1] as ViewerScope;
@@ -78,16 +83,29 @@ if (command === "serve") {
   };
   process.once("SIGINT", () => shutdown("SIGINT"));
   process.once("SIGTERM", () => shutdown("SIGTERM"));
+} else if (command === "preview") {
+  // Layout preview: a static HTML document with live reload, no dashboard
+  // services. Safe to run next to `serve` — it owns no state on disk beyond
+  // its own port file.
+  const dir = resolve(targetArg || ".");
+  try {
+    await startPreviewServer(dir, port, { file: previewFile });
+  } catch (err) {
+    console.error((err as Error).message);
+    process.exit(1);
+  }
 } else {
   console.log(`n-dx web dashboard
 
 Commands:
-  serve [dir]   Start the web dashboard server
-  hub           Start the machine-wide hub: project registry, one dashboard server per repository
+  serve [dir]     Start the web dashboard server
+  hub             Start the machine-wide hub: project registry, one dashboard server per repository
+  preview [dir]   Serve the UI layout preview document (live reload)
 
 Options:
-  --port=N                  Port to listen on (default: 3117)
+  --port=N                  Port to listen on (default: 3117, preview: 3118)
   --scope=<package>         Restrict to a single package (sourcevision, rex, hench)
+  --file=<path.html>        preview only: document to serve instead of the default
   --dev                     Enable dev mode (live reload)
   --verbose                 Show periodic "still serving" heartbeat while running
   --debug                   Show verbose output plus stack traces on error
