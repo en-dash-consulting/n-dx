@@ -56,7 +56,13 @@ export interface QueueEntry {
 }
 
 export interface QueueSnapshot {
+  /**
+   * Queued entries. Narrowed to one project when the snapshot was asked for
+   * through `/p/<id>/`; `queuedTotal` then says how many there are in all.
+   */
   entries: QueueEntry[];
+  /** Entries queued across every project, when `entries` has been narrowed. */
+  queuedTotal?: number;
   running: number;
   freeMemoryBytes: number;
   limits: AdmissionLimits;

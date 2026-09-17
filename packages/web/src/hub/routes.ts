@@ -4,6 +4,15 @@
  *   GET    /api/hub/health          — hub liveness: pid, port, uptime, project count
  *   GET    /api/hub/projects        — registered projects with live child status
  *   GET    /api/hub/queue           — admission limits, what is running, what is waiting
+ *
+ * Also answered under a project prefix — `/p/<id>/api/hub/queue` — because
+ * that is the only address a viewer can reach. The dashboard is served by the
+ * project's own server through the proxy, so its base path is `/p/<id>/` and
+ * every root-relative fetch it makes is rewritten to sit under it
+ * (`installBasePathFetch`). Without this the hub's own API is unreachable
+ * from the page the hub is serving, and `/p/<id>/api/hub/queue` would be
+ * proxied to a child that has never heard of it. Addressed that way, `/queue`
+ * answers about that project rather than the whole machine.
  *   POST   /api/hub/projects        — register { id, repoRoot, ndxBin, worktree?, name? } and start its server
  *   DELETE /api/hub/projects/:id    — stop the server and forget the project
  *   DELETE /api/hub/projects/:id/worktrees/:path
@@ -21,6 +30,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute } from "node:path";
+import { detectBasePath, projectIdFromBasePath, stripBasePath } from "../shared/index.js";
 import type { Hub, RegisterProjectInput } from "./hub.js";
 
 const HUB_PREFIX = "/api/hub";
@@ -130,10 +140,24 @@ export function parseRegisterInput(body: unknown): { input: RegisterProjectInput
 
 /** Handle a `/api/hub/*` request. Returns false when the path is not the hub's. */
 export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<boolean> {
-  const url = (req.url || "/").split("?")[0];
+  const rawUrl = (req.url || "/").split("?")[0];
+
+  // A viewer's fetch arrives under its own base path; the hub's API is the
+  // same API either way, and the prefix says which project is asking.
+  const prefix = detectBasePath(rawUrl);
+  const url = prefix ? stripBasePath(prefix, rawUrl) : rawUrl;
+  const scopedProjectId = prefix ? projectIdFromBasePath(prefix) : null;
+
   if (url !== HUB_PREFIX && !url.startsWith(`${HUB_PREFIX}/`)) return false;
   const path = url.slice(HUB_PREFIX.length);
   const method = req.method || "GET";
+
+  // An unknown id under the prefix is the proxy's 404 to give, not a silent
+  // answer about some other project.
+  if (scopedProjectId !== null && !hub.getProject(scopedProjectId)) {
+    error(res, 404, `No project registered as "${scopedProjectId}"`);
+    return true;
+  }
 
   if (path === "/health" && method === "GET") {
     json(res, 200, {
@@ -157,7 +181,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   // last decision, which may be minutes old on an idle machine.
   if (path === "/queue" && method === "GET") {
     await hub.admission.measure();
-    json(res, 200, hub.queueSnapshot());
+    json(res, 200, hub.queueSnapshot(scopedProjectId ?? undefined));
     return true;
   }
 

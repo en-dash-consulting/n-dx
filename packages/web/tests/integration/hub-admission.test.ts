@@ -233,6 +233,57 @@ describe("hub admission gate", () => {
     expect((await res.json()).projectDir).toBe(beta.dir);
   });
 
+  it("answers its own queue endpoint under a project prefix — the only address a viewer has", async () => {
+    const h = await startTestHub(1);
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect((await execute(h.port, "/p/alpha/api/hench/execute", "task-2")).status).toBe(202);
+    expect((await execute(h.port, "/p/beta/api/hench/execute", "task-3")).status).toBe(202);
+
+    // What the viewer's fetch actually looks like: installBasePathFetch has
+    // rewritten /api/hub/queue to sit under the page's base path.
+    const res = await fetch(`http://127.0.0.1:${h.port}/p/alpha/api/hub/queue`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    // Scoped: alpha sees its own queued run, not beta's.
+    expect(body.entries.map((e: { taskId: string }) => e.taskId)).toEqual(["task-2"]);
+    // But the machine's numbers are the machine's — waiting behind another
+    // project's run is exactly what needs explaining.
+    expect(body).toMatchObject({ running: 1, queuedTotal: 2, limits: { maxSessions: 1 } });
+
+    // Unscoped, the whole machine's queue.
+    const all = await (await fetch(`http://127.0.0.1:${h.port}/api/hub/queue`)).json();
+    expect(all.entries.map((e: { taskId: string }) => e.taskId)).toEqual(["task-2", "task-3"]);
+    expect(all.queuedTotal).toBeUndefined();
+  });
+
+  it("the queue a viewer reads moves without it reloading anything", async () => {
+    const h = await startTestHub(1);
+    const read = async () => (await (await fetch(`http://127.0.0.1:${h.port}/p/beta/api/hub/queue`)).json());
+
+    await execute(h.port, "/p/alpha/api/hench/execute", "task-1");
+    expect((await read()).entries).toEqual([]);
+
+    await execute(h.port, "/p/beta/w/feature/api/hench/execute", "task-2");
+    const queued = await read();
+    expect(queued.entries).toHaveLength(1);
+    // The workspace rides along, so a strip showing one worktree can tell.
+    expect(queued.entries[0]).toMatchObject({ taskId: "task-2", workspace: "feature" });
+
+    // The run is released; the next read shows an empty queue. No reload, no
+    // socket — the same URL, answered again.
+    alpha.running.delete("task-1");
+    await waitFor(() => beta.received.length === 1, 4_000);
+    expect((await read()).entries).toEqual([]);
+  });
+
+  it("404s the hub API under an unknown project prefix", async () => {
+    const h = await startTestHub(1);
+    const res = await fetch(`http://127.0.0.1:${h.port}/p/nope/api/hub/queue`);
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toContain("nope");
+  });
+
   it("reports its limits and what is running on the queue endpoint", async () => {
     const h = await startTestHub(2);
     await execute(h.port, "/p/alpha/api/hench/execute", "task-1");

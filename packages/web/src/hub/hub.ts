@@ -223,9 +223,23 @@ export class Hub {
     }
   }
 
-  /** Current admission and queue state, for `GET /api/hub/queue`. */
-  queueSnapshot(): QueueSnapshot {
-    return this.admission.snapshot();
+  /**
+   * Current admission and queue state, for `GET /api/hub/queue`.
+   *
+   * The counts and limits are the machine's — that is what they measure, and
+   * a project waiting behind another project's run needs to see why. Only the
+   * entry list narrows: asked through `/p/<id>/`, a viewer gets its own
+   * project's queue, since it can neither act on nor identify another's.
+   */
+  queueSnapshot(projectId?: string): QueueSnapshot {
+    const snapshot = this.admission.snapshot();
+    if (projectId === undefined) return snapshot;
+    return {
+      ...snapshot,
+      entries: snapshot.entries.filter((entry) => entry.projectId === projectId),
+      /** Queued across every project, so "2 of 5 waiting" stays truthful. */
+      queuedTotal: snapshot.entries.length,
+    };
   }
 
   get listeningPort(): number {
