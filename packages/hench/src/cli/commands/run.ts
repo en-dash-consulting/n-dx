@@ -850,10 +850,16 @@ async function runOne(
   };
 
   // Cross-worktree claims: the loop claims the task it selects (before the
-  // brief and any LLM turn) so other worktrees pass over it, and this run
-  // releases it on the way out — completed, failed, cancelled by SIGINT, or
-  // thrown. A hard kill skips the release; the claim then dies with the pid.
-  const claims = TaskClaims.forProject(dir);
+  // brief and any LLM turn) so other worktrees pass over it, refreshes it for
+  // as long as the run lasts, and releases it on the way out — completed,
+  // failed, cancelled by SIGINT, or thrown. A hard kill skips the release;
+  // the claim then dies with the pid.
+  //
+  // A dry run observes but never writes. It does no work, so a claim would
+  // buy it nothing, and taking one would let a preview here refuse a real run
+  // starting in another worktree.
+  const claims = TaskClaims.forProject(dir, { readOnly: dryRun });
+  claims.startRenewal();
   let result: Awaited<ReturnType<typeof cliLoop>> | Awaited<ReturnType<typeof agentLoop>>;
   try {
   result = provider === "cli"
