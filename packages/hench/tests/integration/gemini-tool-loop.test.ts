@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { commitGitFixtureBaseline } from "../helpers/index.js";
 import { initConfig } from "../../src/store/config.js";
@@ -264,8 +264,13 @@ describe("Gemini agentic tool-use loop", () => {
     });
 
     // The handoff file really was written — the rejection is the gate's
-    // judgement about it, not the write failing.
-    expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(true);
+    // judgement about it, not the write failing. It is no longer at the repo
+    // root by the time the run ends: a run that does not commit has its
+    // proposed message moved beside the run record, so the next run's watcher
+    // cannot commit under it (see stale-commit-msg-quarantine.test.ts).
+    expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
+    expect(readFileSync(join(henchDir, "runs", `${result.run.id}.commit-msg.txt`), "utf-8"))
+      .toBe("feat: nothing at all\n");
     expect(result.run.status).toBe("failed");
     expect(result.run.error).toContain("No changes detected");
 
