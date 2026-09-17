@@ -9,15 +9,24 @@ import { startRouteTestServer, removeTestDir, type RouteTestServer } from "../..
 /**
  * Active executions are per workspace: a task started from worktree A shows
  * in A's status and audit, not in B's, and A's second start of the same task
- * is the only one refused. Spawns the real `ndx work` like the other execute
- * tests; the entry is registered before the 202 and lives until the child
- * exits, which is what the reads below rely on.
+ * is the only one refused.
+ *
+ * The route really spawns, so the entry lives exactly as long as the child —
+ * and a temp project resolves no `ndx`, so the child used to be `node
+ * <projectDir>/packages/core/cli.js`, which exits with MODULE_NOT_FOUND in
+ * tens of milliseconds. That deletes the entry, and the duplicate start below
+ * then gets a 202: the assertion was racing four HTTP round-trips against a
+ * failing node boot, and lost in CI. `NDX_CLI_PATH` (rung 1 of resolveNdxBin)
+ * points the spawn at a stub that just sleeps, so the child outlives the test
+ * by construction and `shutdownActiveExecutions` is what ends it.
  */
 describe("routes-hench per-workspace executions", () => {
   let dirA: string;
   let dirB: string;
+  let binDir: string;
   let serverA: RouteTestServer;
   let serverB: RouteTestServer;
+  let envBackup: Record<string, string | undefined>;
 
   async function project(dir: string): Promise<ServerContext> {
     const rexDir = join(dir, ".rex");
@@ -32,6 +41,15 @@ describe("routes-hench per-workspace executions", () => {
 
   beforeEach(async () => {
     resetHenchRouteStateForTests();
+    // Stand-in for `ndx work`: stays alive until SIGTERM (node's default
+    // handler ends it), so an execution entry is only removed by shutdown.
+    binDir = await mkdtemp(join(tmpdir(), "hench-ws-bin-"));
+    const stub = join(binDir, "ndx-stub.cjs");
+    await writeFile(stub, "setTimeout(() => process.exit(0), 60_000);\n");
+    envBackup = { NDX_CLI_PATH: process.env["NDX_CLI_PATH"], N_DX_CLI_PATH: process.env["N_DX_CLI_PATH"] };
+    process.env["NDX_CLI_PATH"] = stub;
+    delete process.env["N_DX_CLI_PATH"];
+
     dirA = await mkdtemp(join(tmpdir(), "hench-ws-a-"));
     dirB = await mkdtemp(join(tmpdir(), "hench-ws-b-"));
     const ctxA = await project(dirA);
@@ -46,6 +64,11 @@ describe("routes-hench per-workspace executions", () => {
     await shutdownActiveExecutions(500).catch(() => {});
     await removeTestDir(dirA);
     await removeTestDir(dirB);
+    await removeTestDir(binDir);
+    for (const [key, value] of Object.entries(envBackup)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   it("an execution started in A is visible only in A", async () => {
