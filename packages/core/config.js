@@ -24,7 +24,14 @@ import {
 export { quoteWindowsToken, buildWindowsCliCommandLine } from "./win-spawn.js";
 
 const PROJECT_CONFIG_FILE = ".n-dx.json";
-const LOCAL_CONFIG_FILE = ".n-dx.local.json";
+/**
+ * The untracked file every API key `ndx config` writes ends up in.
+ *
+ * Exported because `ndx ci` checks that git is not tracking it: its whole
+ * safety rests on being ignored, so the name has to be the same string in
+ * both places rather than two literals that can drift.
+ */
+export const LOCAL_CONFIG_FILE = ".n-dx.local.json";
 
 const LLM_VENDOR = {
   CLAUDE: "claude",

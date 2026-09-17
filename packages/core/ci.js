@@ -23,7 +23,7 @@ import { spawn, spawnSync } from "child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
-import { findSharedSecrets } from "./config.js";
+import { findSharedSecrets, LOCAL_CONFIG_FILE } from "./config.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -331,8 +331,11 @@ async function runBoundaryPhase(dir, info, isJSON) {
     detail: secretsResult.detail,
     ...(secretsResult.secrets.length > 0 ? { secrets: secretsResult.secrets } : {}),
   });
-  if (secretsResult.secrets.length === 0) {
-    info(`  ✓ config secrets (no API keys in .n-dx.json)`);
+  // Branching on `ok`, not on the secret count: a tracked .n-dx.local.json
+  // fails with no shared-file secrets to list, and the old condition printed
+  // a tick above a failing run.
+  if (secretsResult.ok && secretsResult.secrets.length === 0) {
+    info(`  ✓ config secrets (${secretsResult.detail})`);
   } else {
     info(`  ${secretsResult.ok ? "⚠" : "✗"} config secrets — ${secretsResult.detail}`);
     if (!isJSON) {
@@ -1196,35 +1199,59 @@ function isGitTracked(relPath, cwd) {
 }
 
 /**
- * Check that the shared `.n-dx.json` carries no API keys.
+ * Check that no API key is committed, in either config file.
  *
- * `ndx config *.api_key` writes to `.n-dx.local.json`, but a project
- * configured before that routing existed — or one edited by hand — can still
- * hold a key in the shared file. The severity depends on git: a key in a
- * *tracked* `.n-dx.json` is on (or about to be on) the remote, so the step
- * fails; an untracked one is a warning with the fix named. Outside a git
- * repository there is nothing to leak to, so the step passes with a note.
+ * Two different failures, because the two files are protected differently.
+ *
+ * `.n-dx.local.json` is where every key `ndx config` writes now lands, and
+ * nothing protects it but the `.gitignore` entry. Trim that line, add a
+ * negation, or `git add -f` once, and every vendor key is on the remote —
+ * while this step, which scanned only the shared file, reported "no API keys
+ * in .n-dx.json" and passed. So a tracked local file fails on the fact of
+ * being tracked, without reading it: it is wrong when empty too, because the
+ * next `ndx config` will fill it, and reading a file to decide whether to
+ * warn about it is not a check worth having when the answer is already no.
+ *
+ * `.n-dx.json` is shared on purpose, so it is judged by contents. A project
+ * configured before the routing existed — or edited by hand — can hold a key
+ * there. Tracked and holding one fails; untracked and holding one warns with
+ * the fix named. Outside a git repository there is nothing to leak to.
  *
  * @param {string} dir Project root
  * @returns {Promise<{ ok: boolean, detail: string, secrets: string[] }>}
  */
 async function checkConfigSecrets(dir) {
   const secrets = await findSharedSecrets(dir);
+  const list = secrets.join(", ");
+
+  // Checked first and reported alone: it is the file the keys are in, so it
+  // is the more urgent of the two even when the shared file is also wrong.
+  if (isGitTracked(LOCAL_CONFIG_FILE, dir)) {
+    const also = secrets.length > 0
+      ? ` .n-dx.json also contains ${list}.`
+      : "";
+    return {
+      ok: false,
+      detail:
+        `${LOCAL_CONFIG_FILE} is tracked by git — it holds every API key \`ndx config\` writes and must stay ignored. ` +
+        `Run \`git rm --cached ${LOCAL_CONFIG_FILE}\`, restore its \`.gitignore\` line, and rotate any key it has held.${also}`,
+      secrets,
+    };
+  }
+
   if (secrets.length === 0) {
     return { ok: true, detail: "no API keys in .n-dx.json", secrets };
   }
-  const tracked = isGitTracked(".n-dx.json", dir);
-  const list = secrets.join(", ");
-  if (tracked) {
+  if (isGitTracked(".n-dx.json", dir)) {
     return {
       ok: false,
-      detail: `.n-dx.json is committed to git and contains ${list} — rotate the key, then re-run \`ndx config <key> <value>\` so it is written to .n-dx.local.json`,
+      detail: `.n-dx.json is committed to git and contains ${list} — rotate the key, then re-run \`ndx config <key> <value>\` so it is written to ${LOCAL_CONFIG_FILE}`,
       secrets,
     };
   }
   return {
     ok: true,
-    detail: `.n-dx.json contains ${list} — re-run \`ndx config <key> <value>\` to move it to .n-dx.local.json before committing`,
+    detail: `.n-dx.json contains ${list} — re-run \`ndx config <key> <value>\` to move it to ${LOCAL_CONFIG_FILE} before committing`,
     secrets,
   };
 }

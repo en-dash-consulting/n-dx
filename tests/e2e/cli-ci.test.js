@@ -190,6 +190,64 @@ describe("n-dx ci", () => {
       expect(report.ok).toBe(false);
     });
 
+    it("fails when .n-dx.local.json is tracked by git, whatever it holds", async () => {
+      // The file every `ndx config` API key lands in. Its only protection is
+      // the gitignore entry, so tracking it at all is the failure — reading it
+      // would not change the answer, and the next config write fills it.
+      await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify({}) + "\n");
+      gitTrack(".n-dx.local.json");
+
+      const result = runResult(["--format=json", "--quiet", tmpDir]);
+      expect(result.code).toBe(1);
+      const report = JSON.parse(result.stdout);
+      const step = report.steps.find((s) => s.name === "config-secrets");
+
+      expect(step.ok).toBe(false);
+      expect(report.ok).toBe(false);
+      // Names the file, says it must stay ignored, and gives both remedies.
+      expect(step.detail).toContain(".n-dx.local.json");
+      expect(step.detail).toContain(".gitignore");
+      expect(step.detail).toContain("git rm --cached .n-dx.local.json");
+      expect(step.detail).toContain("rotate");
+    });
+
+    it("names both files when the shared one also holds a key", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ llm: { claude: { api_key: "sk-ant-shared" } } }) + "\n",
+      );
+      await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { claude: { api_key: "sk-ant-local" } } }) + "\n");
+      gitTrack(".");
+
+      const result = runResult(["--format=json", "--quiet", tmpDir]);
+      expect(result.code).toBe(1);
+      const step = JSON.parse(result.stdout).steps.find((s) => s.name === "config-secrets");
+      expect(step.ok).toBe(false);
+      // The local file leads — it is where the keys are — but the shared
+      // file's key is not lost from the report.
+      expect(step.detail).toContain(".n-dx.local.json is tracked");
+      expect(step.detail).toContain("llm.claude.api_key");
+      expect(step.secrets).toEqual(["llm.claude.api_key"]);
+    });
+
+    it("passes when .n-dx.local.json exists but is untracked", async () => {
+      // The ordinary state of a configured project: keys on disk, ignored.
+      await writeFile(
+        join(tmpDir, ".n-dx.local.json"),
+        JSON.stringify({ llm: { claude: { api_key: "sk-ant-local-only" } } }) + "\n",
+      );
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }) + "\n");
+      gitTrack(".n-dx.json");
+
+      const report = JSON.parse(run(["--format=json", "--quiet", tmpDir], { stdio: "pipe" }));
+      const step = report.steps.find((s) => s.name === "config-secrets");
+      expect(step.ok).toBe(true);
+      expect(report.ok).toBe(true);
+      // Nothing to report: the key is in the file it belongs in, unignored by
+      // nobody. (`secrets` is omitted entirely when empty.)
+      expect(step.detail).toBe("no API keys in .n-dx.json");
+    });
+
     it("warns but passes when an untracked .n-dx.json holds an api_key", async () => {
       await writeFile(
         join(tmpDir, ".n-dx.json"),
