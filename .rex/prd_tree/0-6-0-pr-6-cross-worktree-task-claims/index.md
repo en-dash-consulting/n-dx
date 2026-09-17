@@ -27,7 +27,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Claims store in the git common dir: .git/ndx/claims.json with pid, worktree, task id and expiry](./claims-store-in-the-git-common-dir-git.md) | completed |
 | [Dashboard shows claimed tasks with the claiming worktree in the PRD tree and the Sessions panel](./dashboard-shows-claimed-tasks-with-the.md) | pending |
 | [Harden task claim collisions and refused explicit runs](./harden-task-claim-collisions-and.md) | completed |
-| [Keep automatic dry runs from writing task claims](./keep-automatic-dry-runs-from-writing.md) | pending |
+| [Keep automatic dry runs from writing task claims](./keep-automatic-dry-runs-from-writing.md) | completed |
 | [Make cross-worktree claim lifecycle tests self-contained in CI](./make-cross-worktree-claim-lifecycle.md) | pending |
 | [Make Windows exec-timeout tree-kill start proof deterministic](./make-windows-exec-timeout-tree-kill.md) | pending |
 | [ndx work claims the task before starting and releases on finish; get_next_task and hench selection skip live claims](./ndx-work-claims-the-task-before.md) | completed |

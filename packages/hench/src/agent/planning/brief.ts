@@ -43,6 +43,12 @@ export interface AssembleBriefOptions {
    * "n-dx" when omitted.
    */
   projectDir?: string;
+  /**
+   * Read task claims for automatic selection without acquiring one. Dry runs
+   * use this so they retain cross-worktree filtering without mutating claim
+   * state.
+   */
+  dryRun?: boolean;
 }
 
 // ---------------------------------------------------------------------------

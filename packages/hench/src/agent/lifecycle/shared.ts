@@ -221,7 +221,7 @@ export async function prepareBrief(
   // already skipped tasks claimed elsewhere; this closes the gap between that
   // read and the work itself. Losing the race means another worktree claimed it
   // in between, and continuing would duplicate their run.
-  if (options?.projectDir) {
+  if (options?.projectDir && !options.dryRun) {
     const holder = await claimTask(options.projectDir, resolvedTaskId);
     if (holder) {
       throw new Error(

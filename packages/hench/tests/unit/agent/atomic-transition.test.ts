@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { toolRexUpdateStatus } from "../../../src/tools/rex.js";
 import { serializeDocument } from "@n-dx/rex";
 import { createStore } from "@n-dx/rex/dist/store/index.js";
-import { mockStore, setupProjectDir, cleanupProjectDir } from "../../helpers/index.js";
+import { initGitFixtureRepoSync, mockStore, setupProjectDir, cleanupProjectDir } from "../../helpers/index.js";
+import { openClaimsStore } from "../../../src/prd/rex-gateway.js";
 
 async function readPRDFromMarkdown(rexDir: string): Promise<{ items: Array<{ id: string; status: string; children?: unknown[] }> }> {
   return await createStore("file", rexDir).loadDocument() as {
@@ -224,6 +226,43 @@ describe("atomic task state transitions", () => {
       const prd = await readPRDFromMarkdown(rexDir);
       const task = prd.items.find((i: { id: string }) => i.id === "task-1");
       expect(task.status).toBe("pending");
+
+      vi.restoreAllMocks();
+    });
+
+    it("filters live claims without acquiring or rewriting them on an automatic dry run", async () => {
+      await writePRDToMarkdown(rexDir, {
+        schema: "rex/v1",
+        title: "Test",
+        items: [
+          { id: "task-1", title: "First task", status: "pending", level: "task", priority: "high" },
+          { id: "task-2", title: "Second task", status: "pending", level: "task", priority: "high" },
+        ],
+      });
+      initGitFixtureRepoSync(projectDir);
+
+      const { cliLoop } = await import("../../../src/agent/lifecycle/cli-loop.js");
+      const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+      const { loadConfig } = await import("../../../src/store/config.js");
+      const config = await loadConfig(henchDir);
+      const store = createStore("file", rexDir);
+      const claimsPath = join(projectDir, ".git", "ndx", "claims.json");
+
+      vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const unclaimed = await cliLoop({ config, store, projectDir, henchDir, dryRun: true });
+      expect(unclaimed.run.taskId).toBe("task-1");
+      expect(existsSync(claimsPath)).toBe(false);
+
+      await openClaimsStore(projectDir).claim("task-1", {
+        pid: process.ppid,
+        worktreeRoot: "/another/live/worktree",
+      });
+      const claimsBefore = await readFile(claimsPath, "utf-8");
+
+      const claimed = await cliLoop({ config, store, projectDir, henchDir, dryRun: true });
+      expect(claimed.run.taskId).toBe("task-2");
+      expect(await readFile(claimsPath, "utf-8")).toBe(claimsBefore);
 
       vi.restoreAllMocks();
     });
