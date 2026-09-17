@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Harden task claim collisions and refused explicit runs](./harden-task-claim-collisions-and.md) | completed |
 | [Keep automatic dry runs from writing task claims](./keep-automatic-dry-runs-from-writing.md) | completed |
 | [Make cross-worktree claim lifecycle tests self-contained in CI](./make-cross-worktree-claim-lifecycle.md) | pending |
-| [Make same-worktree claim assertion portable on Windows](./make-same-worktree-claim-assertion.md) | pending |
+| [Make same-worktree claim assertion portable on Windows](./make-same-worktree-claim-assertion.md) | in_progress |
 | [Make Windows exec-timeout tree-kill start proof deterministic](./make-windows-exec-timeout-tree-kill.md) | pending |
 | [ndx work claims the task before starting and releases on finish; get_next_task and hench selection skip live claims](./ndx-work-claims-the-task-before.md) | completed |
 | [Pass claim context through API-provider autoselection](./pass-claim-context-through-api.md) | completed |

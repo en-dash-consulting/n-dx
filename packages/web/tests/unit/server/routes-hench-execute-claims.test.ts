@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
@@ -99,7 +99,7 @@ describe("POST /api/hench/execute — claimed elsewhere", () => {
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.claimedBy).toMatchObject({ pid: LIVE_FOREIGN_PID });
-    expect(body.claimedBy.worktreeRoot).toContain(tmpDir.split("/").at(-1));
+    expect(body.claimedBy.worktreeRoot).toContain(basename(tmpDir));
   });
 
   it("does not block on a claim whose owning process is gone", async () => {
