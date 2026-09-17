@@ -30,13 +30,16 @@ import { connect } from "node:net";
 import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { Duplex } from "node:stream";
-import { detectBasePath, projectIdFromBasePath, stripBasePath } from "../shared/index.js";
+import { detectBasePath, projectIdFromBasePath, stripBasePath, stripWorkspaceSlot } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 
 const UPSTREAM_HOST = "127.0.0.1";
 /** `ndx refresh --live-server` posts here; with several projects the body's `dir` picks one. */
 const RELOAD_PATH = "/api/reload";
 const MAX_RELOAD_BODY_BYTES = 64 * 1024;
+/** The execute request the admission gate stands in front of. */
+const EXECUTE_PATH = "/api/hench/execute";
+const MAX_EXECUTE_BODY_BYTES = 64 * 1024;
 /** Header telling the project server which prefix the client used, for anything that builds absolute links. */
 const FORWARDED_PREFIX_HEADER = "x-forwarded-prefix";
 
@@ -326,6 +329,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
   const decision = decideProxy(hub, req.url || "/");
   switch (decision.kind) {
     case "proxy":
+      if (await handleExecuteAdmission(req, res, hub, decision)) return;
       proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix);
       return;
     case "html":
@@ -336,6 +340,75 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       writeJson(res, decision.status, decision.body);
       return;
   }
+}
+
+/**
+ * True when this is an execute request the gate has already answered.
+ *
+ * The body has to be read here to learn the task id, so it is handed to
+ * {@link proxyHttp} rather than streamed — the same thing
+ * {@link handleReloadSignal} does one call earlier, for the same reason.
+ *
+ * Anything unexpected (an unreadable body, no task id) is forwarded
+ * untouched: the project server owns the request's validity, and a gate that
+ * starts rejecting malformed requests is a second place for that answer to
+ * come from.
+ */
+async function handleExecuteAdmission(
+  req: IncomingMessage,
+  res: ServerResponse,
+  hub: Hub,
+  decision: Extract<ProxyDecision, { kind: "proxy" }>,
+): Promise<boolean> {
+  if ((req.method || "GET") !== "POST") return false;
+  // decision.path is already stripped of the project prefix; the workspace
+  // slot may still be on it, and it names the worktree the run executes in.
+  const slot = stripWorkspaceSlot(decision.path.split("?")[0]);
+  if (slot.url !== EXECUTE_PATH) return false;
+
+  let body: Buffer;
+  try {
+    body = await readBody(req, MAX_EXECUTE_BODY_BYTES);
+  } catch {
+    return false; // let the project server answer for its own request
+  }
+
+  let taskId: string | null = null;
+  try {
+    const parsed = JSON.parse(body.toString("utf-8") || "{}") as { taskId?: unknown };
+    if (typeof parsed.taskId === "string" && parsed.taskId) taskId = parsed.taskId;
+  } catch {
+    // not JSON — forward and let the server say so
+  }
+  if (!taskId) {
+    proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
+    return true;
+  }
+
+  const header = req.headers["x-ndx-workspace"];
+  const fromHeader = Array.isArray(header) ? header[0] : header;
+  const workspace = fromHeader || slot.key || null;
+
+  const result = await hub.admission.admit({ projectId: decision.project.id, workspace, taskId });
+  if (result.admitted) {
+    proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
+    return true;
+  }
+
+  const snapshot = hub.admission.snapshot();
+  writeJson(res, 202, {
+    queued: true,
+    position: result.position,
+    reason: result.reason,
+    taskId,
+    projectId: decision.project.id,
+    workspace,
+    queueLength: snapshot.entries.length,
+    running: snapshot.running,
+    limits: snapshot.limits,
+    memoryPaused: snapshot.memoryPaused,
+  });
+  return true;
 }
 
 /** Handle a WebSocket upgrade on the hub socket. */

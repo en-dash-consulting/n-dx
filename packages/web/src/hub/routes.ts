@@ -3,6 +3,7 @@
  *
  *   GET    /api/hub/health          — hub liveness: pid, port, uptime, project count
  *   GET    /api/hub/projects        — registered projects with live child status
+ *   GET    /api/hub/queue           — admission limits, what is running, what is waiting
  *   POST   /api/hub/projects        — register { id, repoRoot, ndxBin, worktree?, name? } and start its server
  *   DELETE /api/hub/projects/:id    — stop the server and forget the project
  *   DELETE /api/hub/projects/:id/worktrees/:path
@@ -148,6 +149,15 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
 
   if (path === "/projects" && method === "GET") {
     json(res, 200, { projects: hub.listProjects() });
+    return true;
+  }
+
+  // The Overview strip reads this for queue length and the low-memory pause.
+  // A GET so it re-measures: the gate's own numbers are only as fresh as its
+  // last decision, which may be minutes old on an idle machine.
+  if (path === "/queue" && method === "GET") {
+    await hub.admission.measure();
+    json(res, 200, hub.queueSnapshot());
     return true;
   }
 

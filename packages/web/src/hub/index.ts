@@ -18,7 +18,8 @@ export {
   registryPath,
   hubPidPath,
   hubConfigPath,
-  loadHubConfig,
+  readHubConfig,
+  HUB_CONFIG_DEFAULTS,
   loadRegistry,
   saveRegistry,
   emptyRegistry,
@@ -27,7 +28,24 @@ export {
   removeHubPidFile,
   isPidAlive,
 } from "./registry.js";
-export type { HubRegistry, ProjectRecord, HubPidFile, HubConfig } from "./registry.js";
+export type { HubRegistry, ProjectRecord, HubPidFile, HubConfig, HubConfigResult, HubConfigProblem } from "./registry.js";
 export { parseRegisterInput, handleHubRoute } from "./routes.js";
+export {
+  AdmissionGate,
+  AdmissionQueue,
+  decideAdmission,
+  sameQueueEntry,
+  countProjectExecutions,
+} from "./admission.js";
+export type {
+  AdmissionLimits,
+  AdmissionSnapshot,
+  AdmissionDecision,
+  AdmissionReason,
+  AdmissionGateOptions,
+  AdmitResult,
+  QueueEntry,
+  QueueSnapshot,
+} from "./admission.js";
 export { decideProxy, matchProjectByDir, renderProjectList, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 export type { ProxyDecision } from "./proxy.js";

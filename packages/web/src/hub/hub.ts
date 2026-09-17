@@ -25,10 +25,12 @@ import { mkdirSync } from "node:fs";
 import { basename } from "node:path";
 import { ProjectSupervisor } from "./children.js";
 import type { ChildStatus, SupervisorOptions } from "./children.js";
+import { AdmissionGate, countProjectExecutions } from "./admission.js";
+import type { AdmissionLimits, QueueEntry, QueueSnapshot } from "./admission.js";
 import {
   hubConfigPath,
   hubPidPath,
-  loadHubConfig,
+  readHubConfig,
   loadRegistry,
   registryPath,
   removeHubPidFile,
@@ -36,7 +38,7 @@ import {
   saveRegistry,
   writeHubPidFile,
 } from "./registry.js";
-import type { HubRegistry, ProjectRecord } from "./registry.js";
+import type { HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute } from "./routes.js";
 import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 
@@ -57,6 +59,15 @@ export interface HubOptions {
    * in `~/.n-dx/config.json`, which itself defaults to false.
    */
   keepAlive?: boolean;
+  /**
+   * Machine-wide admission limits. Default to `hub.maxSessions` and
+   * `hub.memoryFloorBytes` from the same file.
+   */
+  limits?: Partial<AdmissionLimits>;
+  /** Injectable for tests — the gate's view of free memory. */
+  freeMemory?: () => number;
+  /** How often the gate retries queued runs. Default 2 s. */
+  drainIntervalMs?: number;
   /**
    * Called once the registry has just become empty and `keepAlive` is off —
    * {@link startHub} closes the hub. Fired by {@link Hub.exitIfEmpty} rather
@@ -135,6 +146,10 @@ export class Hub {
   readonly startedAt = new Date().toISOString();
   /** Stay up with an empty registry. Resolved once, at construction. */
   readonly keepAlive: boolean;
+  /** Machine-wide admission control for dashboard-started runs. */
+  readonly admission: AdmissionGate;
+  /** Keys `~/.n-dx/config.json` got wrong, for {@link startHub} to report once. */
+  readonly configProblems: HubConfigProblem[];
   private readonly registry: HubRegistry;
   private readonly supervisors = new Map<string, ProjectSupervisor>();
   private readonly supervisorOptions: SupervisorOptions;
@@ -147,13 +162,70 @@ export class Hub {
     this.registryPath = registryPath(this.hubHome);
     this.log = options.log ?? (() => {});
     this.onEmpty = options.onEmpty;
-    this.keepAlive = options.keepAlive ?? loadHubConfig(hubConfigPath(this.hubHome)).keepAlive === true;
-    this.supervisorOptions = { log: this.log, ...options.supervisor };
     mkdirSync(this.hubHome, { recursive: true });
+    const { config, problems } = readHubConfig(hubConfigPath(this.hubHome));
+    this.configProblems = problems;
+    this.keepAlive = options.keepAlive ?? config.keepAlive;
+    this.supervisorOptions = { log: this.log, ...options.supervisor };
     this.registry = loadRegistry(this.registryPath);
     for (const record of Object.values(this.registry.projects)) {
       this.supervisors.set(record.id, new ProjectSupervisor(record, this.supervisorOptions));
     }
+    this.admission = new AdmissionGate({
+      limits: {
+        maxSessions: options.limits?.maxSessions ?? config.maxSessions,
+        memoryFloorBytes: options.limits?.memoryFloorBytes ?? config.memoryFloorBytes,
+      },
+      countRunning: () => this.countRunningExecutions(),
+      start: (entry) => this.startQueuedExecution(entry),
+      freeMemory: options.freeMemory,
+      drainIntervalMs: options.drainIntervalMs,
+      log: this.log,
+    });
+  }
+
+  /** Dashboard-started runs in flight across every project that has a server. */
+  private async countRunningExecutions(): Promise<number> {
+    const ports = this.listProjects()
+      .map((project) => project.status.port ?? project.port)
+      .filter((port): port is number => typeof port === "number");
+    const counts = await Promise.all(ports.map((port) => countProjectExecutions(port)));
+    return counts.reduce((total, n) => total + n, 0);
+  }
+
+  /**
+   * Start a queued run on its project's server, as the hub rather than as the
+   * client that queued it — that client got its 202 and is long gone.
+   */
+  private async startQueuedExecution(entry: QueueEntry): Promise<boolean> {
+    const project = this.getProject(entry.projectId);
+    const port = project?.status.port ?? project?.port ?? null;
+    if (port === null) return false;
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/execute`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(entry.workspace ? { "x-ndx-workspace": entry.workspace } : {}),
+        },
+        body: JSON.stringify({ taskId: entry.taskId }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!res.ok) {
+        this.log(`[hub] admission: ${entry.projectId}/${entry.taskId} refused by its server (HTTP ${res.status})`);
+        return false;
+      }
+      this.log(`[hub] admission: started queued ${entry.projectId}/${entry.taskId}`);
+      return true;
+    } catch (err) {
+      this.log(`[hub] admission: could not start ${entry.projectId}/${entry.taskId} — ${(err as Error).message}`);
+      return false;
+    }
+  }
+
+  /** Current admission and queue state, for `GET /api/hub/queue`. */
+  queueSnapshot(): QueueSnapshot {
+    return this.admission.snapshot();
   }
 
   get listeningPort(): number {
@@ -286,6 +358,8 @@ export class Hub {
     await sup.stop();
     this.supervisors.delete(id);
     delete this.registry.projects[id];
+    // Anything queued for it can never start now.
+    this.admission.forgetProject(id);
     this.persist();
     return true;
   }
@@ -346,6 +420,13 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
   writeHubPidFile(hubPidPath(hub.hubHome), { pid: process.pid, port, startedAt: hub.startedAt });
   log(`[hub] listening on http://${LOOPBACK_HOST}:${port}`);
 
+  // Once, at start, and never again: a settings key the operator got wrong is
+  // otherwise invisible — the hub runs on the default and the limit gets
+  // blamed for not working.
+  for (const problem of hub.configProblems) {
+    log(`[hub] ~/.n-dx/config.json: ${problem.key} — ${problem.message} (using the default)`);
+  }
+
   await hub.attachAll();
 
   const healthTimer = setInterval(() => {
@@ -363,6 +444,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       if (closed) return;
       closed = true;
       clearInterval(healthTimer);
+      hub.admission.stop();
       if (closeOptions.stopChildren ?? true) {
         await hub.stopAll();
       } else {

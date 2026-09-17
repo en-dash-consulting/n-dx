@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { Hub, normalizeWorktree, loadHubConfig, hubConfigPath, registryPath, loadRegistry } from "../../../src/hub/index.js";
+import { Hub, normalizeWorktree, readHubConfig, HUB_CONFIG_DEFAULTS, hubConfigPath, registryPath, loadRegistry } from "../../../src/hub/index.js";
 import type { ProjectRecord } from "../../../src/hub/index.js";
 
 /**
@@ -58,22 +58,79 @@ describe("normalizeWorktree", () => {
   });
 });
 
-describe("loadHubConfig", () => {
-  it("reads hub.port and hub.keepAlive, and ignores everything malformed", () => {
-    const path = hubConfigPath(home);
-    expect(loadHubConfig(path)).toEqual({});
+describe("readHubConfig", () => {
+  it("defaults every key when the file is absent, and reports no problem for it", () => {
+    const { config, problems } = readHubConfig(hubConfigPath(home));
+    expect(config).toEqual(HUB_CONFIG_DEFAULTS);
+    expect(config).toMatchObject({ port: 3117, keepAlive: false, maxSessions: 4, memoryFloorBytes: 2 * 1024 * 1024 * 1024 });
+    expect(problems).toEqual([]);
+  });
 
-    writeFileSync(path, JSON.stringify({ hub: { port: 4000, keepAlive: true } }));
-    expect(loadHubConfig(path)).toEqual({ port: 4000, keepAlive: true });
+  it("reads every key the hub understands", () => {
+    writeFileSync(hubConfigPath(home), JSON.stringify({
+      hub: { port: 4000, keepAlive: true, maxSessions: 1, memoryFloorBytes: 512 },
+    }));
+    const { config, problems } = readHubConfig(hubConfigPath(home));
+    expect(config).toEqual({ port: 4000, keepAlive: true, maxSessions: 1, memoryFloorBytes: 512 });
+    expect(problems).toEqual([]);
+  });
 
-    writeFileSync(path, JSON.stringify({ hub: { port: "4000", keepAlive: "yes" } }));
-    expect(loadHubConfig(path)).toEqual({});
+  it("names each unusable value and falls back to its default", () => {
+    writeFileSync(hubConfigPath(home), JSON.stringify({
+      hub: { port: 70000, keepAlive: "yes", maxSessions: 0, memoryFloorBytes: -1 },
+    }));
+    const { config, problems } = readHubConfig(hubConfigPath(home));
+    expect(config).toEqual(HUB_CONFIG_DEFAULTS);
+    expect(problems.map((p) => p.key).sort())
+      .toEqual(["hub.keepAlive", "hub.maxSessions", "hub.memoryFloorBytes", "hub.port"]);
+    expect(problems.find((p) => p.key === "hub.maxSessions")?.message).toContain("at least 1");
+  });
 
-    writeFileSync(path, JSON.stringify({ hub: { port: 0 } }));
-    expect(loadHubConfig(path)).toEqual({});
+  it("keeps the keys it can read when a neighbour is wrong", () => {
+    writeFileSync(hubConfigPath(home), JSON.stringify({ hub: { maxSessions: 8, memoryFloorBytes: "lots" } }));
+    const { config, problems } = readHubConfig(hubConfigPath(home));
+    expect(config.maxSessions).toBe(8);
+    expect(config.memoryFloorBytes).toBe(HUB_CONFIG_DEFAULTS.memoryFloorBytes);
+    expect(problems.map((p) => p.key)).toEqual(["hub.memoryFloorBytes"]);
+  });
 
-    writeFileSync(path, "{ not json");
-    expect(loadHubConfig(path)).toEqual({});
+  it("reports a malformed file once rather than per key", () => {
+    writeFileSync(hubConfigPath(home), "{ not json");
+    const { config, problems } = readHubConfig(hubConfigPath(home));
+    expect(config).toEqual(HUB_CONFIG_DEFAULTS);
+    expect(problems).toHaveLength(1);
+    expect(problems[0].key).toBe("(file)");
+  });
+
+  it("reports a hub section that is not an object", () => {
+    writeFileSync(hubConfigPath(home), JSON.stringify({ hub: [1, 2] }));
+    const { problems } = readHubConfig(hubConfigPath(home));
+    expect(problems).toEqual([{ key: "hub", message: "expected an object" }]);
+  });
+
+  it("is silent about a file with no hub section at all", () => {
+    writeFileSync(hubConfigPath(home), JSON.stringify({ something: "else" }));
+    expect(readHubConfig(hubConfigPath(home)).problems).toEqual([]);
+  });
+});
+
+describe("Hub admission limits", () => {
+  it("takes its limits from the config file", () => {
+    seed([]);
+    writeFileSync(hubConfigPath(home), JSON.stringify({ hub: { maxSessions: 1, memoryFloorBytes: 99 } }));
+    const hub = new Hub({ homeDir: home });
+    expect(hub.admission.limits).toEqual({ maxSessions: 1, memoryFloorBytes: 99 });
+    expect(hub.configProblems).toEqual([]);
+    hub.admission.stop();
+  });
+
+  it("lets an explicit option override the file, and surfaces the file's problems", () => {
+    seed([]);
+    writeFileSync(hubConfigPath(home), JSON.stringify({ hub: { maxSessions: "many" } }));
+    const hub = new Hub({ homeDir: home, limits: { maxSessions: 3 } });
+    expect(hub.admission.limits.maxSessions).toBe(3);
+    expect(hub.configProblems.map((p) => p.key)).toEqual(["hub.maxSessions"]);
+    hub.admission.stop();
   });
 });
 

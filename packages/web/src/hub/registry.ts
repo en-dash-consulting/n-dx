@@ -70,6 +70,31 @@ export interface HubConfig {
    * the next `ndx start` spawns one in well under a second.
    */
   keepAlive?: boolean;
+  /** Dashboard-started agent runs in flight across every registered project. */
+  maxSessions?: number;
+  /** Free system memory below which the hub queues runs instead of starting them. */
+  memoryFloorBytes?: number;
+}
+
+/** Applied wherever the file says nothing, or says something unusable. */
+export const HUB_CONFIG_DEFAULTS: Required<HubConfig> = {
+  port: 3117,
+  keepAlive: false,
+  // Four concurrent agent runs is what a 16 GB laptop carries without
+  // swapping, which is the machine this limit exists for.
+  maxSessions: 4,
+  memoryFloorBytes: 2 * 1024 * 1024 * 1024,
+};
+
+/** A key the file got wrong, named so the hub can say so once at start. */
+export interface HubConfigProblem {
+  key: string;
+  message: string;
+}
+
+export interface HubConfigResult {
+  config: Required<HubConfig>;
+  problems: HubConfigProblem[];
 }
 
 export function emptyRegistry(): HubRegistry {
@@ -94,26 +119,65 @@ export function hubConfigPath(hubHome: string): string {
 }
 
 /**
- * Read `~/.n-dx/config.json`. Absent, unreadable or malformed yields `{}` —
- * settings are a convenience, and refusing to start over a stray comma would
- * take every dashboard on the machine with it. Values of the wrong type are
- * dropped individually for the same reason.
+ * Read `~/.n-dx/config.json`, reporting what it got wrong.
+ *
+ * A bad value never stops the hub: settings are a convenience, and refusing
+ * to start over a stray comma would take every dashboard on the machine with
+ * it. Each unusable key falls back to its default and is named in `problems`,
+ * which {@link startHub} prints once — silently ignoring a `maxSessions` the
+ * operator meant is how a limit gets blamed for not working.
  */
-export function loadHubConfig(path: string): HubConfig {
+export function readHubConfig(path: string): HubConfigResult {
+  const config: Required<HubConfig> = { ...HUB_CONFIG_DEFAULTS };
+  const problems: HubConfigProblem[] = [];
+
+  let raw: string;
+  try {
+    raw = readFileSync(path, "utf-8");
+  } catch {
+    return { config, problems }; // absent is the normal case, not a problem
+  }
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf-8"));
-  } catch {
-    return {};
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    problems.push({ key: "(file)", message: `not valid JSON: ${(err as Error).message}` });
+    return { config, problems };
   }
+
   const hub = (parsed as { hub?: unknown })?.hub;
-  if (!hub || typeof hub !== "object") return {};
-  const { port, keepAlive } = hub as { port?: unknown; keepAlive?: unknown };
-  const config: HubConfig = {};
-  if (typeof port === "number" && Number.isInteger(port) && port > 0 && port <= 65535) config.port = port;
-  if (typeof keepAlive === "boolean") config.keepAlive = keepAlive;
-  return config;
+  if (hub === undefined) return { config, problems };
+  if (!hub || typeof hub !== "object" || Array.isArray(hub)) {
+    problems.push({ key: "hub", message: "expected an object" });
+    return { config, problems };
+  }
+
+  const { port, keepAlive, maxSessions, memoryFloorBytes } = hub as Record<string, unknown>;
+
+  if (port !== undefined) {
+    if (typeof port === "number" && Number.isInteger(port) && port > 0 && port <= 65535) config.port = port;
+    else problems.push({ key: "hub.port", message: "expected an integer between 1 and 65535" });
+  }
+  if (keepAlive !== undefined) {
+    if (typeof keepAlive === "boolean") config.keepAlive = keepAlive;
+    else problems.push({ key: "hub.keepAlive", message: "expected true or false" });
+  }
+  if (maxSessions !== undefined) {
+    if (typeof maxSessions === "number" && Number.isInteger(maxSessions) && maxSessions >= 1) config.maxSessions = maxSessions;
+    else problems.push({ key: "hub.maxSessions", message: "expected an integer of at least 1" });
+  }
+  if (memoryFloorBytes !== undefined) {
+    if (typeof memoryFloorBytes === "number" && Number.isFinite(memoryFloorBytes) && memoryFloorBytes >= 0) {
+      config.memoryFloorBytes = memoryFloorBytes;
+    } else {
+      problems.push({ key: "hub.memoryFloorBytes", message: "expected a non-negative number of bytes" });
+    }
+  }
+
+  return { config, problems };
 }
+
 
 /**
  * Read the registry. Missing, unreadable or malformed files yield an empty
