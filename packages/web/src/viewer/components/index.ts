@@ -39,7 +39,8 @@ export {
   buildShareableUrl,
   type CopyLinkButtonProps,
 } from "./copy-link-button.js";
-export { ConfigFooter } from "./config-footer.js";
+export { ConfigFooter, installRootLabel, identityLine, identityTooltip } from "./config-footer.js";
+export type { ConfigFooterProps, ServerIdentity } from "./config-footer.js";
 export { ElapsedTime } from "./elapsed-time.js";
 export { updateFavicon, resetFavicon, FAVICON_PNGS, VIEW_TO_PRODUCT } from "./favicon.js";
 export { SidebarThemeToggle, initTheme } from "./theme-toggle.js";

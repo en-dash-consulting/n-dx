@@ -16,6 +16,7 @@ import {
   ActiveOperationsTray,
   GitStatusBanner,
   SessionsPanel,
+  type ServerIdentity,
   SearchOverlay,
   useSearchOverlay,
   NeolithicOverlay,
@@ -60,15 +61,29 @@ bootstrap();
 startPollingRestart({ onDegradationChange, isFeatureDisabled });
 initScrollReveal();
 
-/** Fetch viewer scope from the server config endpoint. */
-async function fetchScope(): Promise<string | null> {
+/** What the one boot-time `/api/config` call yields. */
+interface BootConfig {
+  scope: string | null;
+  /** Server identity for the sidebar footer; null on a server too old to send it. */
+  server: ServerIdentity | null;
+}
+
+/**
+ * Read the server config endpoint once, before the first render.
+ *
+ * Both values it carries are needed before anything paints — the scope
+ * decides which views exist, and the identity line says which n-dx this
+ * window is — so the footer takes `server` as a prop from here rather than
+ * fetching the same endpoint again.
+ */
+async function fetchBootConfig(): Promise<BootConfig> {
   try {
     const res = await fetch("/api/config");
-    if (!res.ok) return null;
-    const config: { scope?: string | null } = await res.json();
-    return config.scope ?? null;
+    if (!res.ok) return { scope: null, server: null };
+    const config: { scope?: string | null; server?: ServerIdentity | null } = await res.json();
+    return { scope: config.scope ?? null, server: config.server ?? null };
   } catch {
-    return null;
+    return { scope: null, server: null };
   }
 }
 
@@ -82,7 +97,7 @@ function getInitialSidebarCollapsed(): boolean {
   }
 }
 
-function App({ scope }: { scope: string | null }) {
+function App({ scope, server = null }: { scope: string | null; server?: ServerIdentity | null }) {
   const validViews = useMemo(() => buildValidViews(scope), [scope]);
 
   const {
@@ -204,7 +219,7 @@ function App({ scope }: { scope: string | null }) {
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
-    h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar, scope }),
+    h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar, scope, server }),
     h("main", {
       id: "main-content",
       // The Tasks (prd) view manages its own internal scroll region, so the
@@ -251,8 +266,8 @@ function App({ scope }: { scope: string | null }) {
 
 const root = document.getElementById("app");
 if (root) {
-  // Fetch scope before first render to avoid flash of unscoped content
-  fetchScope().then((scope) => {
-    render(h(App, { scope }), root);
+  // Fetch config before first render to avoid a flash of unscoped content
+  fetchBootConfig().then(({ scope, server }) => {
+    render(h(App, { scope, server }), root);
   });
 }

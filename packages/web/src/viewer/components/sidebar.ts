@@ -13,6 +13,7 @@ import {
   HenchActivityIndicator,
 } from "../api.js";
 import { ConfigFooter } from "./config-footer.js";
+import type { ServerIdentity } from "./config-footer.js";
 import { useProjectMetadata, useFeatureToggle, useCliName } from "../api.js";
 import { resolveCliLabel } from "../hooks/index.js";
 import { SOURCEVISION_TABS } from "../api.js";
@@ -29,6 +30,8 @@ interface SidebarProps {
   onToggleSidebar: () => void;
   /** When set, restricts sidebar to a single package section. */
   scope?: string | null;
+  /** Server identity for the footer's identity line; null on an older server. */
+  server?: ServerIdentity | null;
 }
 
 type NavItem = {
@@ -137,7 +140,7 @@ for (const section of SECTIONS) {
 }
 
 
-export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, onToggleSidebar, scope }: SidebarProps) {
+export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, onToggleSidebar, scope, server = null }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const projectStatus = useProjectStatus();
   const projectMeta = useProjectMetadata();
@@ -467,7 +470,7 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
     !sidebarCollapsed
       ? h("div", { class: "sidebar-footer", role: "group", "aria-label": "Sidebar controls" },
           h("div", { class: "sidebar-footer-divider", "aria-hidden": "true" }),
-          h(ConfigFooter, null),
+          h(ConfigFooter, { server }),
           h("div", { class: "sidebar-footer-divider", "aria-hidden": "true" }),
           h("div", { class: "sidebar-footer-controls" },
             h(SidebarDensitySelector, null),
