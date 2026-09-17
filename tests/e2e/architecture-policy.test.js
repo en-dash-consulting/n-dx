@@ -49,6 +49,12 @@ const ALLOWED = new Set([
   "packages/core/cli-ink.js",
   "packages/core/ci.js",
   "packages/core/web.js",
+  // Spawns the sub-package's own stdio MCP server with `stdio: "inherit"`, so
+  // the editor's stdin and stdout reach it unmediated. Deliberately a direct
+  // spawn rather than win-spawn's spawnCli: that wraps in cmd.exe on Windows
+  // for `.cmd` shims, and an extra process between an editor and its MCP
+  // server is exactly what must not be in the way.
+  "packages/core/mcp-shim.js",
   "packages/core/config.js",
   "packages/core/export.js",
   "packages/core/pair-programming.js",

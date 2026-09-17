@@ -127,6 +127,7 @@ import {
   writeNdxContextFile,
   buildRemediationContext,
 } from "./pair-programming.js";
+import { runMcpShim } from "./mcp-shim.js";
 import {
   collectInstallIdentity,
   formatInstallIdentity,
@@ -378,7 +379,10 @@ let staleCheckResult = null;
  * mix a diagnosis of the project into an answer about the CLI, which is exactly
  * the confusion the command exists to remove.
  */
-const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "which", "auth", "hub"]);
+// `mcp` joins them for a different reason than the rest: it speaks a protocol
+// on stdout, and a stale-project notice printed there desynchronises the
+// editor's parser for the whole session.
+const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "which", "auth", "hub", "mcp"]);
 
 /**
  * Spawn options that make each child tree-killable by the tracker. Owned by
@@ -2015,6 +2019,32 @@ async function handleDev(rest) {
   exitWithCleanup(code);
 }
 
+/**
+ * `ndx mcp <server> [dir]` — the MCP entry an editor launches.
+ *
+ * Deliberately not a tool delegation: the shim decides per launch whether to
+ * bridge to a running hub (so the tool call lands in the worktree the editor
+ * is open on) or to serve MCP in this process exactly as `ndx rex mcp .`
+ * always has. See mcp-shim.js.
+ */
+async function handleMcpShim(rest) {
+  const [server] = rest.filter((arg) => !arg.startsWith("-"));
+  if (!server) {
+    console.error("Usage: ndx mcp <server> [dir]");
+    console.error("Servers: rex, sourcevision");
+    exitWithCleanup(1);
+    return;
+  }
+  const dir = resolveDir(rest.filter((arg) => arg !== server));
+  try {
+    exitWithCleanup(await runMcpShim(server, dir, { tools }));
+  } catch (err) {
+    if (err instanceof ExitRequest) throw err;
+    console.error(formatError(err));
+    exitWithCleanup(1);
+  }
+}
+
 async function handleHub(rest) {
   try {
     exitWithCleanup(await runHub(rest));
@@ -2863,6 +2893,7 @@ const COMMAND_DISPATCH = new Map([
   ["start",             (rest) => handleStart(rest, "start")],
   ["web",               (rest) => handleStart(rest, "web")],
   ["hub",               handleHub],
+  ["mcp",               handleMcpShim],
   ["export",            handleExport],
   ["install-sample",    handleInstallSample],
   ["destroy-sample",    handleDestroySample],

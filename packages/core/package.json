@@ -51,6 +51,7 @@
     "config.js",
     "ci.js",
     "web.js",
+    "mcp-shim.js",
     "help.js",
     "gateway-rules.json",
     "refresh-plan.js",
