@@ -6,16 +6,22 @@
  * disk on every request and served with a small polling snippet appended, so
  * editing the file and hitting save is immediately visible in the browser.
  *
- * Deliberately minimal — no PRD watchers, no MCP endpoints, no hench process
- * supervision, no writes to `.rex/` or `.sourcevision/`. That is what makes it
- * safe to run alongside `ndx start` on a second port: the preview process
- * touches nothing the real server owns except its own port file.
+ * The document is also an editor: it renders its structure from a sibling
+ * layout file (`<doc>.layout.json`) and saves the file back over
+ * `POST /__preview/layout`, so a shuffle survives a reload and can be reviewed
+ * as a diff. That is the *only* thing this process ever writes besides its own
+ * port file — see {@link layoutPathFor}, and note it is confined to the
+ * document's own directory.
+ *
+ * Deliberately minimal otherwise — no PRD watchers, no MCP endpoints, no hench
+ * process supervision, no writes to `.rex/` or `.sourcevision/`. That is what
+ * makes it safe to run alongside `ndx start` on a second port.
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { writeFile, unlink } from "node:fs/promises";
-import { dirname, extname, join, resolve, sep } from "node:path";
+import { writeFile, rename, unlink } from "node:fs/promises";
+import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Default port for the preview server — one above the dashboard's 3117. */
@@ -28,6 +34,15 @@ const LOOPBACK_HOST = "127.0.0.1";
 
 /** How often the browser asks whether the document changed on disk. */
 const DEFAULT_RELOAD_INTERVAL_MS = 600;
+
+/**
+ * Cap on a layout save.
+ *
+ * The layout is a few hundred nav nodes of text; a megabyte is already two
+ * orders of magnitude more than a real one. The cap exists so a runaway page
+ * script cannot fill the disk through an endpoint that exists for convenience.
+ */
+const MAX_LAYOUT_BYTES = 1_000_000;
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -89,14 +104,39 @@ export function resolvePreviewDoc(file?: string, cwd: string = process.cwd()): s
   return null;
 }
 
-/** Fingerprint used by the reload poller — changes whenever the file is saved. */
-function docFingerprint(docPath: string): string {
+/**
+ * Where the served document keeps its structure.
+ *
+ * `index.html` → `index.layout.json`, next to it. Derived from the document
+ * rather than fixed so `--file=proposal-b.html` gets its own layout instead of
+ * silently sharing one with every other mock-up in the directory.
+ */
+export function layoutPathFor(docPath: string): string {
+  const dir = dirname(docPath);
+  const stem = basename(docPath, extname(docPath));
+  return join(dir, `${stem}.layout.json`);
+}
+
+/** mtime+size of one file, or "missing". */
+function stamp(path: string): string {
   try {
-    const stat = statSync(docPath);
+    const stat = statSync(path);
     return `${stat.mtimeMs}:${stat.size}`;
   } catch {
     return "missing";
   }
+}
+
+/**
+ * Fingerprint used by the reload poller.
+ *
+ * Covers the layout file as well as the document, so hand-editing the JSON
+ * reloads the page too. The page's own saves would otherwise reload it on top
+ * of the editing session, so `POST /__preview/layout` returns the fingerprint
+ * it just produced and the page adopts it as the new baseline.
+ */
+function docFingerprint(docPath: string): string {
+  return `${stamp(docPath)}|${stamp(layoutPathFor(docPath))}`;
 }
 
 /** The polling reload snippet injected into the served document. */
@@ -152,6 +192,37 @@ function resolveSibling(docDir: string, urlPath: string): string | null {
   }
 }
 
+/**
+ * Read a request body, refusing anything over `limit`.
+ *
+ * Destroys the socket on overflow rather than draining it: the only client is
+ * this project's own preview page, and a body that large is a bug on its side.
+ */
+function readBody(req: IncomingMessage, limit: number): Promise<string> {
+  return new Promise((resolveBody, rejectBody) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > limit) {
+        req.destroy();
+        rejectBody(new Error(`Layout exceeds ${limit} bytes`));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolveBody(Buffer.concat(chunks).toString("utf-8")));
+    req.on("error", rejectBody);
+  });
+}
+
+/** Write via a temp file in the same directory, then rename — never a torn layout on disk. */
+async function writeAtomic(path: string, contents: string): Promise<void> {
+  const tmp = `${path}.${process.pid}.tmp`;
+  await writeFile(tmp, contents, "utf-8");
+  await rename(tmp, path);
+}
+
 function send(res: ServerResponse, status: number, body: string | Buffer, type: string): void {
   res.writeHead(status, {
     "Content-Type": type,
@@ -187,11 +258,53 @@ export async function startPreviewServer(
   const reloadIntervalMs = opts.reloadIntervalMs ?? DEFAULT_RELOAD_INTERVAL_MS;
   const portFilePath = join(absDir, PREVIEW_PORT_FILE);
 
+  const layoutPath = layoutPathFor(docPath);
+
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const urlPath = (req.url ?? "/").split("?")[0];
 
     if (urlPath === "/__preview/state") {
       send(res, 200, JSON.stringify({ fingerprint: docFingerprint(docPath) }), MIME_TYPES[".json"]);
+      return;
+    }
+
+    if (urlPath === "/__preview/layout") {
+      if (req.method === "GET") {
+        if (!existsSync(layoutPath)) {
+          // Not an error: a fresh document has no saved shuffle yet, and the
+          // page falls back to the inventory it ships with.
+          send(res, 404, JSON.stringify({ error: "no layout saved yet" }), MIME_TYPES[".json"]);
+          return;
+        }
+        try {
+          send(res, 200, readFileSync(layoutPath, "utf-8"), MIME_TYPES[".json"]);
+        } catch (err) {
+          send(res, 500, JSON.stringify({ error: (err as Error).message }), MIME_TYPES[".json"]);
+        }
+        return;
+      }
+
+      if (req.method === "POST" || req.method === "PUT") {
+        void readBody(req, MAX_LAYOUT_BYTES)
+          .then(async (body) => {
+            // Parse before writing: a layout file that is not JSON would break
+            // the page on its next load, with no way back except the shell.
+            const parsed: unknown = JSON.parse(body);
+            await writeAtomic(layoutPath, JSON.stringify(parsed, null, 2) + "\n");
+            send(
+              res,
+              200,
+              JSON.stringify({ ok: true, path: layoutPath, fingerprint: docFingerprint(docPath) }),
+              MIME_TYPES[".json"],
+            );
+          })
+          .catch((err: Error) => {
+            send(res, 400, JSON.stringify({ error: err.message }), MIME_TYPES[".json"]);
+          });
+        return;
+      }
+
+      send(res, 405, JSON.stringify({ error: `${req.method} not allowed` }), MIME_TYPES[".json"]);
       return;
     }
 
@@ -235,7 +348,8 @@ export async function startPreviewServer(
 
   console.log(`n-dx UI preview running at http://localhost:${boundPort}`);
   console.log(`  Document: ${docPath}`);
-  console.log(`  Edit that file and save — the browser reloads on its own.`);
+  console.log(`  Layout:   ${layoutPath}`);
+  console.log(`  Shuffle in the browser (saves to the layout file), or edit either file directly.`);
 
   const close = async (): Promise<void> => {
     await new Promise<void>((done) => server.close(() => done()));

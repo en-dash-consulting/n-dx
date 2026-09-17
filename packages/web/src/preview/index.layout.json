@@ -1,0 +1,531 @@
+{
+  "version": 1,
+  "meta": {
+    "title": "n-dx dashboard — layout v2",
+    "subtitle": "Draft · mock-up only, no live data"
+  },
+  "activeItemId": "overview",
+  "rationale": "",
+  "nav": [
+    {
+      "id": "grp-sourcevision",
+      "kind": "folder",
+      "label": "SOURCEVISION",
+      "children": [
+        {
+          "id": "overview",
+          "kind": "item",
+          "icon": "▣",
+          "label": "Overview",
+          "panels": [
+            {
+              "id": "pnl-arch-health",
+              "label": "Architecture Health",
+              "width": 8
+            },
+            {
+              "id": "pnl-next-steps",
+              "label": "Next Steps",
+              "width": 4
+            },
+            {
+              "id": "pnl-top-zones",
+              "label": "Top Zones",
+              "width": 4
+            },
+            {
+              "id": "pnl-languages",
+              "label": "Languages",
+              "width": 4
+            },
+            {
+              "id": "pnl-getting-started",
+              "label": "Getting Started",
+              "width": 4
+            },
+            {
+              "id": "pnl-recent-activity",
+              "label": "Recent Activity",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "graph",
+          "kind": "item",
+          "icon": "▧",
+          "label": "Map",
+          "panels": [
+            {
+              "id": "pnl-import-graph",
+              "label": "Import Graph",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "iso-map",
+          "kind": "item",
+          "icon": "◧",
+          "label": "Isometric Map",
+          "panels": [
+            {
+              "id": "pnl-iso-canvas",
+              "label": "Isometric Canvas",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "zones",
+          "kind": "item",
+          "icon": "⬢",
+          "label": "Zones",
+          "panels": [
+            {
+              "id": "pnl-zone-list",
+              "label": "Zone List",
+              "width": 6
+            },
+            {
+              "id": "pnl-zone-detail",
+              "label": "Zone Detail",
+              "width": 6
+            }
+          ]
+        },
+        {
+          "id": "files",
+          "kind": "item",
+          "icon": "☰",
+          "label": "Files",
+          "panels": [
+            {
+              "id": "pnl-file-table",
+              "label": "File Inventory",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "routes",
+          "kind": "item",
+          "icon": "◇",
+          "label": "Routes",
+          "panels": [
+            {
+              "id": "pnl-route-tree",
+              "label": "Route Tree",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "architecture",
+          "kind": "item",
+          "icon": "◨",
+          "label": "Architecture",
+          "panels": [
+            {
+              "id": "pnl-arch-summary",
+              "label": "Architecture Summary",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "problems",
+          "kind": "item",
+          "icon": "⚠",
+          "label": "Problems",
+          "panels": [
+            {
+              "id": "pnl-findings",
+              "label": "Findings",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "suggestions",
+          "kind": "item",
+          "icon": "✦",
+          "label": "Suggestions",
+          "panels": [
+            {
+              "id": "pnl-suggestion-list",
+              "label": "Suggestions",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "pr-markdown",
+          "kind": "item",
+          "icon": "✍",
+          "label": "PR Markdown",
+          "flag": true,
+          "panels": [
+            {
+              "id": "pnl-pr-preview",
+              "label": "PR Body Preview",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "ask",
+          "kind": "item",
+          "icon": "?",
+          "label": "Ask",
+          "flag": true,
+          "panels": [
+            {
+              "id": "pnl-ask-panel",
+              "label": "Ask SourceVision",
+              "width": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grp-rex",
+      "kind": "folder",
+      "label": "REX",
+      "children": [
+        {
+          "id": "rex-dashboard",
+          "kind": "item",
+          "icon": "▨",
+          "label": "Dashboard",
+          "panels": [
+            {
+              "id": "pnl-prd-progress",
+              "label": "PRD Progress",
+              "width": 8
+            },
+            {
+              "id": "pnl-active-tasks",
+              "label": "Active Tasks",
+              "width": 4
+            }
+          ]
+        },
+        {
+          "id": "prd",
+          "kind": "item",
+          "icon": "☑",
+          "label": "Tasks",
+          "panels": [
+            {
+              "id": "pnl-prd-tree",
+              "label": "PRD Tree",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "analysis",
+          "kind": "item",
+          "icon": "⌗",
+          "label": "Analyze & Import",
+          "panels": [
+            {
+              "id": "pnl-proposals",
+              "label": "Proposals",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "merge-graph",
+          "kind": "item",
+          "icon": "⧉",
+          "label": "Context Graph",
+          "panels": [
+            {
+              "id": "pnl-merge-graph",
+              "label": "Context Graph",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "validation",
+          "kind": "item",
+          "icon": "✔",
+          "label": "Validation",
+          "panels": [
+            {
+              "id": "pnl-validation-report",
+              "label": "Validation Report",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "requirements",
+          "kind": "item",
+          "icon": "⚖",
+          "label": "Requirements",
+          "panels": [
+            {
+              "id": "pnl-requirements",
+              "label": "Requirements Coverage",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "activity",
+          "kind": "item",
+          "icon": "⌚",
+          "label": "Activity",
+          "panels": [
+            {
+              "id": "pnl-activity-log",
+              "label": "Execution Log",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "integrations",
+          "kind": "item",
+          "icon": "🔗",
+          "label": "Integrations",
+          "flag": true,
+          "panels": [
+            {
+              "id": "pnl-integrations",
+              "label": "Connected Services",
+              "width": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grp-hench",
+      "kind": "folder",
+      "label": "HENCH",
+      "children": [
+        {
+          "id": "hench-runs",
+          "kind": "item",
+          "icon": "▶",
+          "label": "Runs",
+          "panels": [
+            {
+              "id": "pnl-run-history",
+              "label": "Run History",
+              "width": 8
+            },
+            {
+              "id": "pnl-live-output",
+              "label": "Live Output",
+              "width": 4
+            }
+          ]
+        },
+        {
+          "id": "hench-audit",
+          "kind": "item",
+          "icon": "☸",
+          "label": "Audit",
+          "panels": [
+            {
+              "id": "pnl-task-audit",
+              "label": "Task Audit",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "hench-templates",
+          "kind": "item",
+          "icon": "▦",
+          "label": "Templates",
+          "panels": [
+            {
+              "id": "pnl-templates",
+              "label": "Prompt Templates",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "hench-optimization",
+          "kind": "item",
+          "icon": "⚡",
+          "label": "Optimization",
+          "panels": [
+            {
+              "id": "pnl-workflow-opt",
+              "label": "Workflow Optimization",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "hench-adaptive",
+          "kind": "item",
+          "icon": "♻",
+          "label": "Adaptive",
+          "panels": [
+            {
+              "id": "pnl-adaptive",
+              "label": "Adaptive Thresholds",
+              "width": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grp-commands",
+      "kind": "folder",
+      "label": "COMMANDS",
+      "children": [
+        {
+          "id": "command-reference",
+          "kind": "item",
+          "icon": "⌘",
+          "label": "All Commands",
+          "panels": [
+            {
+              "id": "pnl-command-ref",
+              "label": "Command Reference",
+              "width": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grp-token-usage",
+      "kind": "folder",
+      "label": "TOKEN USAGE",
+      "children": [
+        {
+          "id": "token-usage",
+          "kind": "item",
+          "icon": "⊚",
+          "label": "Token Usage",
+          "panels": [
+            {
+              "id": "pnl-usage-summary",
+              "label": "Spend Summary",
+              "width": 4
+            },
+            {
+              "id": "pnl-usage-by-item",
+              "label": "Usage by PRD Item",
+              "width": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grp-settings",
+      "kind": "folder",
+      "label": "SETTINGS",
+      "children": [
+        {
+          "id": "llm-provider",
+          "kind": "item",
+          "icon": "🧠",
+          "label": "General",
+          "panels": [
+            {
+              "id": "pnl-llm-provider",
+              "label": "LLM Provider",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "project-settings",
+          "kind": "item",
+          "icon": "▣",
+          "label": "ndx analyze / plan",
+          "panels": [
+            {
+              "id": "pnl-analyze-settings",
+              "label": "Analysis Settings",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "hench-config",
+          "kind": "item",
+          "icon": "▶",
+          "label": "ndx work",
+          "panels": [
+            {
+              "id": "pnl-work-settings",
+              "label": "Agent Settings",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "notion-config",
+          "kind": "item",
+          "icon": "🔌",
+          "label": "ndx sync",
+          "flag": true,
+          "panels": [
+            {
+              "id": "pnl-sync-settings",
+              "label": "Remote Sync",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "commands",
+          "kind": "item",
+          "icon": "📤",
+          "label": "ndx export / refresh",
+          "panels": [
+            {
+              "id": "pnl-export-settings",
+              "label": "Export & Refresh",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "feature-toggles",
+          "kind": "item",
+          "icon": "📌",
+          "label": "Feature Flags",
+          "panels": [
+            {
+              "id": "pnl-feature-flags",
+              "label": "Feature Flags",
+              "width": 12
+            }
+          ]
+        },
+        {
+          "id": "cli-timeouts",
+          "kind": "item",
+          "icon": "⏱",
+          "label": "CLI Timeouts",
+          "panels": [
+            {
+              "id": "pnl-cli-timeouts",
+              "label": "CLI Timeouts",
+              "width": 12
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

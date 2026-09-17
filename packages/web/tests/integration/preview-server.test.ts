@@ -25,7 +25,8 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { startPreviewServer, resolvePreviewDoc, type PreviewServerHandle } from "../../src/server/preview.js";
+import { readFile } from "node:fs/promises";
+import { startPreviewServer, resolvePreviewDoc, layoutPathFor, type PreviewServerHandle } from "../../src/server/preview.js";
 
 let handle: PreviewServerHandle | null = null;
 const tempDirs: string[] = [];
@@ -98,5 +99,81 @@ describe("preview server", () => {
 
   it("ships a default document so --preview works with no arguments", () => {
     expect(resolvePreviewDoc()).toMatch(/preview[/\\]index\.html$/);
+  });
+});
+
+/**
+ * The layout endpoint is the only thing this server writes. The page is the
+ * editor and the JSON file is the artifact reviewers diff, so a save that does
+ * not land on disk loses the work silently — the page has nowhere else to keep
+ * it.
+ */
+describe("preview layout endpoint", () => {
+  async function serveDoc(): Promise<{ base: string; doc: string }> {
+    const dir = await scratch();
+    const doc = join(dir, "mock.html");
+    await writeFile(doc, "<html><body>doc</body></html>", "utf-8");
+    handle = await startPreviewServer(dir, 0, { file: doc });
+    return { base: `http://127.0.0.1:${handle.port}`, doc };
+  }
+
+  it("round-trips a layout through disk", async () => {
+    const { base, doc } = await serveDoc();
+
+    // Nothing saved yet — the page falls back to what it ships with.
+    expect((await fetch(base + "/__preview/layout")).status).toBe(404);
+
+    const layout = { nav: [{ id: "grp-1", kind: "folder", label: "GROUP", children: [] }] };
+    const saved = await fetch(base + "/__preview/layout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(layout),
+    });
+    expect(saved.status).toBe(200);
+    const body = await saved.json();
+    expect(body.ok).toBe(true);
+    expect(body.path).toBe(layoutPathFor(doc));
+
+    // On disk, and served back on the next load.
+    expect(JSON.parse(await readFile(layoutPathFor(doc), "utf-8"))).toEqual(layout);
+    expect(await (await fetch(base + "/__preview/layout")).json()).toEqual(layout);
+  });
+
+  it("reports the post-save fingerprint so the page does not reload over its own write", async () => {
+    const { base } = await serveDoc();
+
+    const before = await (await fetch(base + "/__preview/state")).json();
+    const res = await fetch(base + "/__preview/layout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nav: [] }),
+    });
+    const body = await res.json();
+
+    expect(body.fingerprint).not.toBe(before.fingerprint);
+    // The page adopts this value as its baseline, so it must be the same one
+    // the poller will read next.
+    expect(body.fingerprint).toBe((await (await fetch(base + "/__preview/state")).json()).fingerprint);
+  });
+
+  it("refuses a body that is not JSON rather than corrupting the layout", async () => {
+    const { base, doc } = await serveDoc();
+
+    const good = JSON.stringify({ nav: [{ id: "keep", kind: "folder", label: "KEEP", children: [] }] });
+    await fetch(base + "/__preview/layout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: good,
+    });
+
+    const bad = await fetch(base + "/__preview/layout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{ not json",
+    });
+    expect(bad.status).toBe(400);
+
+    // The previous good layout survived — a rejected write is not a write.
+    expect(JSON.parse(await readFile(layoutPathFor(doc), "utf-8"))).toEqual(JSON.parse(good));
   });
 });

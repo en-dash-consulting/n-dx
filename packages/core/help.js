@@ -1078,12 +1078,17 @@ const ORCHESTRATOR_HELP_DEFS = {
       {
         title: "Preview mode (--preview)",
         content:
-          "Serves a static UI layout document (packages/web/src/preview/index.html)\n" +
-          "instead of the dashboard, on port 3118, with live reload on save. It runs\n" +
-          "no analysis, opens no MCP endpoints and writes nothing under .rex/ or\n" +
-          ".sourcevision/, so it is safe to run alongside a real 'ndx start'. It keeps\n" +
-          "its own .n-dx-preview.pid/.port files, and never kills a port occupant —\n" +
-          "it relocates instead.",
+          "Serves an editable UI layout document (packages/web/src/preview/index.html)\n" +
+          "instead of the dashboard, on port 3118. Drag sections, tabs and panels\n" +
+          "around, rename them, group sections into named dropdowns; every change is\n" +
+          "saved to <document>.layout.json beside the document, which is also the file\n" +
+          "to hand-edit and to review as a diff. Renames render as\n" +
+          "'New name (previously Old name)', and moves/additions/removals are marked.\n" +
+          "\n" +
+          "It runs no analysis, opens no MCP endpoints and writes nothing under .rex/\n" +
+          "or .sourcevision/ — the layout file and its own .n-dx-preview.pid/.port are\n" +
+          "all it touches — so it is safe alongside a real 'ndx start'. It never kills\n" +
+          "a port occupant; it relocates instead.",
       },
     ],
     options: [
