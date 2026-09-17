@@ -43,8 +43,12 @@ describe("routes-commands per-workspace state", () => {
 
   afterEach(async () => {
     while (servers.length) await servers.pop()!.close();
-    await rm(dirA, { recursive: true, force: true });
-    await rm(dirB, { recursive: true, force: true });
+    // maxRetries/retryDelay: the fire-and-forget sleeper jobs hold these dirs
+    // as cwd for up to 1.5 s, so on Windows a bare rm races them and fails with
+    // EBUSY (same pattern as cli-ci-child-cleanup.test.js). 20 × 100 ms retries
+    // outlast the longest sleeper.
+    await rm(dirA, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    await rm(dirB, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
 
   it("the .sourcevision writer lock is held per workspace", () => {

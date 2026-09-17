@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { join } from "node:path";
 import type { GitWorktree } from "@n-dx/llm-client";
 import type { ServerContext } from "../../../src/server/types.js";
 import {
@@ -87,8 +88,10 @@ describe("WorkspaceRegistry", () => {
 
     const ws = registry.get("feature")!;
     expect(setup).toHaveBeenCalledTimes(1);
+    // join(), not literals: the registry composes these with path.join, so on
+    // Windows the fake POSIX root comes back with native separators.
     expect(ws.ctx).toMatchObject({
-      projectDir: "/wt/feature", svDir: "/wt/feature/.sourcevision", rexDir: "/wt/feature/.rex",
+      projectDir: "/wt/feature", svDir: join("/wt/feature", ".sourcevision"), rexDir: join("/wt/feature", ".rex"),
       port: 3117, workspace: "feature",
     });
     expect(registry.get("feature")).toBe(ws);

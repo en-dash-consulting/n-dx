@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFile, execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
@@ -33,20 +33,28 @@ function prdMd(title: string): string {
   return `---\nschema: rex/v1\ntitle: ${title}\nitems:\n  - id: e1\n    title: "${title} epic"\n    level: epic\n    status: pending\n---\n\n# ${title}\n`;
 }
 
-/** Boots on `repo`, waits for the worktree to be listed, probes, prints, exits. */
-function driverScript(repo: string, key: string): string {
+/** Boots on `repo`, waits for the worktree to be listed, probes, writes the result, exits. */
+function driverScript(repo: string, key: string, resultPath: string): string {
   return `
+import { writeFileSync } from "node:fs";
 import { startServer } from ${JSON.stringify(SERVER_ENTRY_URL)};
 const { port } = await startServer(${JSON.stringify(repo)}, 0, {});
 const base = "http://127.0.0.1:" + port;
 const key = ${JSON.stringify(key)};
+
+// The result travels by file, not stdout: process.exit(0) below tears the
+// server's live fs.watch handles down mid-flight, which on Windows can abort
+// the process inside libuv (UV_HANDLE_CLOSING, win/async.c) before stdout is
+// flushed. The sync file write is already durable when that happens, so the
+// test can treat the exit code as advisory and the result as the contract.
+const emit = (value) => writeFileSync(${JSON.stringify(resultPath)}, JSON.stringify(value));
 
 // The registry refreshes its worktree list in the background at boot.
 const deadline = Date.now() + 10_000;
 for (;;) {
   const list = await (await fetch(base + "/api/workspaces")).json();
   if (list.workspaces.some((w) => w.key === key)) break;
-  if (Date.now() > deadline) { console.log("NDX_RESULT=" + JSON.stringify({ error: "worktree never listed", list })); process.exit(0); }
+  if (Date.now() > deadline) { emit({ error: "worktree never listed", list }); process.exit(0); }
   await new Promise((r) => setTimeout(r, 100));
 }
 
@@ -68,7 +76,7 @@ out.slotBare = { status: bare.status, html: bare.type.includes("text/html") };
 const unknown = await probe("/w/nope/prd");
 out.unknown = { status: unknown.status, html: unknown.type.includes("text/html"), linksHome: unknown.text.includes('href="/"'), namesKey: unknown.text.includes("nope") };
 out.anchorPage = (await probe("/prd")).status;
-console.log("NDX_RESULT=" + JSON.stringify(out));
+emit(out);
 process.exit(0);
 `;
 }
@@ -93,17 +101,28 @@ beforeAll(async () => {
   writeFileSync(join(linked, ".rex", "prd.md"), prdMd("Feature PRD"));
 
   const script = join(root, "driver.mjs");
-  writeFileSync(script, driverScript(repo, "app-feature"), "utf-8");
-  let stdout = "";
+  const resultPath = join(root, "driver-result.json");
+  writeFileSync(script, driverScript(repo, "app-feature", resultPath), "utf-8");
+  // The driver's exit code is advisory: its process.exit races the server's
+  // live fs.watch handles and can abort inside libuv on Windows (see the
+  // driver script). The written result file is the contract — a failed exec
+  // matters only when no result made it to disk.
+  let execError: Error | null = null;
   try {
-    ({ stdout } = await execFileAsync(process.execPath, [script], { timeout: 90_000, maxBuffer: 10 * 1024 * 1024 }));
+    await execFileAsync(process.execPath, [script], { timeout: 90_000, maxBuffer: 10 * 1024 * 1024 });
   } catch (err) {
-    stdout = (err as { stdout?: string }).stdout ?? "";
-    throw new Error(`driver failed: ${(err as Error).message}\n${(err as { stderr?: string }).stderr ?? ""}`);
+    execError = err as Error;
   }
-  const match = /NDX_RESULT=(.+)/.exec(stdout);
-  if (!match) throw new Error(`driver printed no result:\n${stdout}`);
-  result = JSON.parse(match[1]);
+  try {
+    result = JSON.parse(readFileSync(resultPath, "utf-8"));
+  } catch {
+    const stderr = (execError as { stderr?: string } | null)?.stderr ?? "";
+    throw new Error(
+      execError
+        ? `driver failed before writing a result: ${execError.message}\n${stderr}`
+        : "driver exited cleanly but wrote no result",
+    );
+  }
   if (result.error) throw new Error(`${result.error}: ${JSON.stringify(result.list)}`);
 }, 120_000);
 

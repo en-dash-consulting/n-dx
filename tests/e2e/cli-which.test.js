@@ -14,6 +14,7 @@ import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { run, runResult, CLI_PATH, DEFAULT_TIMEOUT } from "./e2e-helpers.js";
+import { canCreateSymlinks } from "../helpers/symlink-support.js";
 
 const REPO_ROOT = resolve(import.meta.dirname, "../..");
 const CORE_PKG = JSON.parse(
@@ -103,7 +104,9 @@ describe("ndx which --json", () => {
 });
 
 describe("ndx which — install kind", () => {
-  it("reports a link when reached through a bin shim outside the checkout", () => {
+  // Skipped where the environment cannot create symlinks (Windows without
+  // Developer Mode/elevation) — the shim shape under test needs a real link.
+  it.skipIf(!canCreateSymlinks())("reports a link when reached through a bin shim outside the checkout", () => {
     // Node leaves argv[1] as the symlink path but realpaths import.meta.url.
     // A global `pnpm link` shim is exactly this shape, and it is the case that
     // makes a bare `ndx` run code from a checkout the user is not standing in.

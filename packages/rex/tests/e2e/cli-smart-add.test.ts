@@ -41,6 +41,25 @@ function runExpectFail(args: string[], timeout = 15000): { stdout: string; stder
 }
 
 /**
+ * Point the project's claude CLI at the node binary itself.
+ *
+ * These tests verify smart-mode *routing*, not LLM output, so the "claude"
+ * spawn must fail fast rather than launch a real session: node rejects the
+ * provider's `--output-format` flag immediately, which surfaces as the
+ * accepted "LLM analysis failed" branch. Without this stub, a machine with a
+ * real claude CLI installed launches a genuine LLM call per test; runQuick's
+ * SIGTERM only kills the rex process, so on Windows the claude grandchild
+ * survived — holding tmpDir handle-locked past cleanup (EBUSY) and leaking an
+ * orphan process per test.
+ */
+async function stubLLM(dir: string): Promise<void> {
+  await writeFile(
+    join(dir, ".n-dx.json"),
+    JSON.stringify({ claude: { cli_path: process.execPath } }),
+  );
+}
+
+/**
  * Run command with a very short timeout — used for tests that trigger LLM calls
  * where we just want to verify routing, not wait for the LLM response.
  */
@@ -61,10 +80,14 @@ describe("rex add (smart mode routing)", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-e2e-smart-add-"));
+    await stubLLM(tmpDir);
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    // maxRetries/retryDelay: the CLI children run with cwd inside tmpDir, so on
+    // Windows the directory can still be handle-locked when cleanup runs and a
+    // bare rm fails with EBUSY (same pattern as cli-ci-child-cleanup.test.js).
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("manual mode still works: rex add epic --title=X", async () => {
@@ -301,10 +324,11 @@ describe("rex add with multiple descriptions", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-e2e-multi-desc-"));
+    await stubLLM(tmpDir);
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("multiple positional descriptions trigger smart mode with multi label", async () => {
@@ -405,10 +429,11 @@ describe("rex add --file (idea import)", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-e2e-idea-import-"));
+    await stubLLM(tmpDir);
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("shows error without .rex/ for --file mode", async () => {
@@ -590,10 +615,11 @@ describe("rex add with piped stdin", () => {
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "rex-e2e-stdin-add-"));
+    await stubLLM(tmpDir);
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("accepts piped stdin as description", async () => {

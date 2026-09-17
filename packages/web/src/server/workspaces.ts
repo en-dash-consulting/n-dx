@@ -32,7 +32,7 @@
 import type { IncomingMessage } from "node:http";
 import type { FSWatcher } from "node:fs";
 import { realpathSync } from "node:fs";
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 import { listWorktrees as defaultListWorktrees } from "@n-dx/llm-client";
 import type { GitWorktree } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
@@ -203,8 +203,8 @@ export class WorkspaceRegistry {
     const anchorCtx = this.anchor.ctx;
     const ctx: ServerContext = {
       projectDir: known.path,
-      svDir: `${known.path}/.sourcevision`,
-      rexDir: `${known.path}/.rex`,
+      svDir: join(known.path, ".sourcevision"),
+      rexDir: join(known.path, ".rex"),
       dev: anchorCtx.dev,
       scope: anchorCtx.scope,
       port: anchorCtx.port,

@@ -23,6 +23,8 @@ import { realpathSync } from "node:fs";
 import { tmpdir, platform } from "node:os";
 import { join, resolve } from "node:path";
 
+import { canCreateSymlinks } from "../helpers/symlink-support.js";
+
 import {
   classifyPortOccupant,
   probeStatusEndpoint,
@@ -273,7 +275,9 @@ describe("classifyPortOccupant", () => {
       link = null;
     });
 
-    it("reports a dashboard as self when the same directory is reached through a symlink", async () => {
+    // Skipped where the environment cannot create symlinks (Windows without
+    // Developer Mode/elevation) — the aliasing under test needs a real link.
+    it.skipIf(!canCreateSymlinks())("reports a dashboard as self when the same directory is reached through a symlink", async () => {
       // Without resolving symlinks, the server's realpath'd projectDir and
       // this invocation's symlink-spelled absDir compare unequal and the
       // caller relocates instead of restarting — starting a second dashboard
