@@ -1,5 +1,280 @@
 # @n-dx/web
 
+## 0.7.0
+
+### Minor Changes
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Add the hub daemon skeleton (`web hub`, default port 3117): a per-user registry at `~/.n-dx/hub.json` with atomic writes, a `~/.n-dx/hub.pid` file, and `/api/hub/*` routes (`GET /health`, `GET|POST /projects`, `GET|DELETE /projects/:id`). Registering a project spawns `<ndxBin> serve --port=0 <repoRoot>`, reads the bound port from `<repoRoot>/.n-dx-web.port`, and records pid and port. Children are health-checked every 15 s via `GET /api/status`, marked unreachable when they stop answering, and respawned once. On restart the hub re-attaches to children whose recorded pid is alive and answering, and respawns the rest. `$N_DX_HOME` overrides the registry directory.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx start` now registers the repository with the per-user hub by default and serves it at `http://localhost:3117/p/<id>/`; `--here` (or `web.mode: "here"`) gets the single-project server that owns the port. `ndx start stop` unregisters the worktree it runs in through the new `DELETE /api/hub/projects/:id/worktrees/:path` — the project keeps being served while another worktree is registered, and the last one unregisters the project and stops its server. A hub left with no projects exits, unless `hub.keepAlive` is set in `~/.n-dx/config.json`. `ndx start status` reports the hub (pid, port, uptime), the project (id, state, server pid and port, repository, registered worktrees) and the URL. New `ndx hub status` and `ndx hub stop` address the hub itself from any directory.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Per-project MCP endpoints through the hub: `/p/<id>/mcp/rex` and `/p/<id>/mcp/sourcevision` are proxied to that project's server with `Mcp-Session-Id`, SSE responses, the GET event stream and `DELETE` session close carried through; the root `/mcp/*` aliases the sole registered project and answers 409 with the ids when several are registered. Two registered projects have independent sessions and write to their own trees. README's HTTP registration section now uses the per-project URL and keeps the tracked `.mcp.json` as the recommended path.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Hub reverse proxy and viewer base-path support. Requests under `/p/<id>/…` are proxied to that project's server with the prefix stripped — HTTP streamed both ways, WebSocket upgrades piped through — and root-relative redirects are re-prefixed. With exactly one project registered the root (`/`, `/api/*`, `/data/*`, `/mcp/*`, the socket) aliases to it unchanged; with several, `/` lists the projects and other root requests answer 409 with their ids. The viewer derives its base path from `location.pathname` at boot, prefixes every root-relative `fetch` through one adapter, connects its sockets through one URL helper, and writes prefixed history entries, so every view and deep link works at `/p/<id>/<view>` while `web serve` at `/` is unchanged.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Per-workspace job state. The trackers that were process-wide singletons are now keyed by the workspace a request addresses (`src/server/workspace-scoped.ts`): the sv-analyze, refresh, self-heal, init, ci and reshape statuses and the `.sourcevision` writer lock in routes-commands; the epic-by-epic execution state and its hench process in routes-rex/execution; the active executions, execution metrics and process-memory tracker in routes-hench; and the status, project-metadata and config caches. Starting an analysis in worktree A no longer blocks or reports in worktree B; shutdown, emergency stop without a context, and the memory monitor sweep every workspace. A single-workspace server behaves exactly as before.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - The hub now admits dashboard-started agent runs against machine-wide limits instead of letting every project start its own. A run is forwarded when fewer than `hub.maxSessions` are in flight across all registered projects and free memory is above `hub.memoryFloorBytes`; otherwise it is queued FIFO and answered `202 { queued: true, position }` rather than refused, and released when capacity frees. `~/.n-dx/config.json` gains `hub.maxSessions` (default 4) and `hub.memoryFloorBytes` (default 2 GiB), with every unusable key named once at hub start and falling back to its default rather than stopping the hub. `GET /api/hub/queue` reports the limits, what is running, what is waiting, and whether admission is paused for low memory.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - The hub root now serves a home page with one card per registered project instead of a bare list. Each card joins the registry onto that project's own server — branch, uncommitted files, agents running, PRD progress and the next task — through the new `GET /api/hub/overview`, which the page also re-reads every few seconds so a card that changes while you are looking at it updates without a reload. A project whose server is not answering still gets a card saying so. Cards carry a "Start working" link into that project's Runs view rather than a second execute route, follow the dashboard's own theme (same storage key, so the choice carries between them), and are reachable from the keyboard.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Workspace registry: the server is anchored at the directory it was started in and holds one `ServerContext`, watcher set and PRD cache per worktree of the repository (`src/server/workspaces.ts`). The anchor is set up eagerly exactly as before; any other worktree is created lazily the first time a request addresses it — via the `X-Ndx-Workspace` header or the `/w/<key>/` slot — and falls back to the anchor otherwise, so nothing observable changes for a single-worktree server. Keys are worktree basenames (`main` aliases the anchor); the list refreshes from `git worktree list` every 30 s and on `POST /api/workspaces/refresh`, releasing the resources of a worktree that disappeared (never the anchor). `GET /api/workspaces` lists them.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Workspace-tagged WebSocket frames and the breadcrumb workspace switcher. Every broadcast now carries `{ workspace: <key> }` — watchers and routes stamp the workspace they act on, process-wide monitors stamp `"*"` — and the viewer drops frames for another workspace (untagged frames read as the anchor's), so a change in one worktree no longer makes a tab on another refetch. The breadcrumb's branch chip is now a keyboard-accessible listbox of every worktree with the anchor starred, a pulse for running work, elapsed time since the last run and the dirty-file count; choosing one opens the same view under `/w/<key>/`, and a footer links to the Workspaces overview.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `/w/<key>/` URL slot for worktrees. The viewer's base path now carries the workspace slot alongside the hub's `/p/<id>` prefix, so `/w/feature/prd` (or `/p/app/w/feature/prd`) deep-links to that worktree's tree and every fetch, socket and history entry the viewer builds keeps the slot. The project server strips the slot before dispatch and resolves the workspace in the registry, accepts `X-Ndx-Workspace` for non-browser clients, answers an unknown key with a 404 page linking to the anchor, and serves slot-less paths from the anchor exactly as before.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Add the Workspaces Overview view: a new WORKSPACES sidebar section (above SOURCEVISION, one item "Overview") opening a board of one card per git worktree of the served repository, under a machine strip of four stat tiles — agents running, memory in use, uncommitted trees, and PRD items that exist only on branches.
+  
+  Each card carries the worktree's branch, its live hench run (task title linking into *that* worktree's PRD, elapsed time, tok/s and last output line) or when it last ran, an uncommitted-files or clean chip, a PRD-delta chip versus the anchor, and the actions Open workspace, Start working and Stop. The board addresses each worktree with the `X-Ndx-Workspace` header, and — uniquely among socket consumers — keeps frames about other workspaces rather than filtering them out, so a run progressing in one worktree moves its card while you are looking at another.
+  
+  `StartTaskButton` gains optional `workspace` and `ariaLabel` props; with `workspace` set the run starts in that worktree (cwd = worktree). Sidebar sections that end up with no visible items are no longer rendered as an empty header.
+
+### Patch Changes
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Allowlist the config keys the adaptive routes may write.
+  
+  `POST /api/hench/adaptive/override` and `/api/hench/adaptive/apply` read a
+  caller-supplied `key`/`configKey` and wrote it straight into `.hench/config.json`
+  via an unguarded `setNestedValue` — no allowlist, no value check, no protection
+  against a `__proto__` segment. A same-origin caller could set an invented key or
+  mistype a real one, and the next autonomous hench run would inherit it. This is
+  the sibling of the workflow-apply hole closed earlier.
+  
+  The config-field allowlist (`CONFIG_FIELD_META`), its value validation, and the
+  nested get/set helpers now live in one shared module,
+  `hench-config-fields.ts`, imported by both `routes-hench.ts` (the config editor,
+  already allowlisted — the reference pattern) and `routes-adaptive.ts`, so the
+  three config-write paths cannot drift. Both adaptive routes now reject (400)
+  before writing when the key is not an allowlisted field, contains a
+  prototype-poisoning segment, or carries a wrong-typed value; `setConfigValue`
+  drops forbidden segments as defense in depth.
+  
+  Found by the 2026-09-11 adversarial security review follow-up (task 0a778581).
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Write API keys to `.n-dx.local.json`, never to the shared `.n-dx.json`.
+  
+  `ndx config claude.api_key` (and `llm.claude/codex/google.api_key`) wrote the
+  key into `.n-dx.json` — the file that carries zone pins, the vendor and the
+  dashboard port, that the gitignore template calls safe to commit, and that
+  `ndx init` never gitignores. Only `*.cli_path` was routed to the gitignored
+  `.n-dx.local.json`; the help text itself said "stored in .n-dx.json — add to
+  .gitignore". One `git add -A` put the key on the remote. The 0600 chmod on the
+  file defends against other local users, not against git.
+  
+  `*.api_key` now joins `*.cli_path` in the local-only set. Every reader already
+  merged the local layer over the shared one (core `config.js`, `@n-dx/llm-client`
+  `loadClaudeConfig`/`loadLLMConfig`), so resolution is unchanged; the dashboard's
+  `/api/ndx-config` auth-method detection was the one reader that looked at
+  `.n-dx.json` alone and now merges too, so the footer keeps its ✓.
+  
+  For projects configured before this: every `ndx config` run warns on stderr
+  when `.n-dx.json` holds an `api_key`, naming the key and the fix. Re-setting the
+  key is the migration — it lands in the local file and the shared copy (and the
+  legacy `claude.*` mirror of an `llm.claude.*` key) is removed. `ndx ci` gains a
+  `config-secrets` step that fails when a git-tracked `.n-dx.json` contains an
+  `api_key` and warns when an untracked one does.
+  
+  Found by the 2026-09-11 adversarial security review (finding A).
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `GET /api/worktrees`: every git worktree of the served repository with branch, HEAD, anchor/served flags, dirty state, a summary of the hench runs recorded under it, and whether an `ndx start` server is present (pid/port marker files). Best-effort per worktree, cached for 5 s, `[]` outside a repository.
+  
+  Retire the half-built sibling-directory project scan (`GET /api/projects`, `detectProjects`): nothing in the viewer consumed it, and cross-project switching is the 0.7.0 hub registry's job.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix eight defects found reviewing this branch: the hub's API now checks the
+  browser origin before registering a project (registration spawns a process);
+  the hub restates the forwarded `Origin` so dashboard mutations and WebSocket
+  upgrades work through the proxy in hub mode; the anchor's frames go out
+  untagged so the single-worktree dashboard updates live again;
+  `X-Ndx-Workspace` outranks the `/w/<key>/` slot, so the Workspaces board acts
+  on the worktree it names; `ndx start --here` relocates rather than SIGKILLing
+  the hub; the rex MCP path writes task claims (`claim_task`, `release_task`, and
+  on `in_progress`) instead of only reading them; workflow-template config
+  overlays go through the same allowlist as every other config writer; and a
+  malformed percent-escape in a URL no longer ends either server.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Fix cross-worktree task claims under the dashboard and hub MCP endpoints. A
+  claim's owner is now its worktree alone; the pid is only a liveness check.
+  `ndx start` runs one rex MCP server per workspace inside a single process, so
+  every worktree's claim carried that one pid — and an ownership test that
+  accepted a matching pid let two worktrees hold the same task, let either
+  release the other's claim, and silenced the dashboard's own "another worktree
+  is working on this" refusal. `ClaimsStore.release` and `isClaimedByOther` now
+  take the asking worktree rather than a pid.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Task selection is claim-aware across worktrees. `hench run` (what `ndx work` spawns) claims the task it selects — before the brief and any LLM turn — and releases it when the run ends (completed, failed, cancelled by Ctrl-C, or thrown); an explicit `--task` another worktree holds is refused with the holder's worktree, and a retry in the worktree that already holds a task takes the claim over. `rex next`, the `get_next_task` MCP tool and hench's autoselection pass over tasks other worktrees hold (`skippedClaimed` in JSON output, one line per task under `--verbose`), and `findNextTask` / `findActionableTasks` accept `excludeIds`. The dashboard's execute route answers 409 with `claimedBy` when another worktree holds the task. Outside a git repository nothing changes.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - The static run detail now says why a failed run has no error text.
+  
+  `ndx export` strips `error` from both the per-run file and the `runs.json`
+  index unless `--include-transcripts` is passed — an error body can echo
+  whatever the agent read. The run detail rendered the Error section only when
+  `run.error` was present, so an exported failed run showed a "Failed" badge and
+  nothing else, indistinguishable from a run that failed for no recorded reason.
+  
+  `runErrorDisplay` now decides that section's contents: the failure body when the
+  record carries one, otherwise a neutral notice for a failed run stamped
+  `transcriptOmitted`, naming the flag that would have published the text. The
+  Task Audit log viewer already did this for tool calls; the runs view now
+  matches.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx export` no longer publishes agent transcripts by default, and `--deploy=github` confirms before pushing.
+  
+  Every `.hench/runs/*.json` was copied verbatim into the static site —
+  `toolCalls[].input/output`, `events`, `error` bodies — and `--deploy=github`
+  force-pushed the result to `origin/n-dx-dashboard` with no prompt. A run that
+  had `cat`'d a `.env` or printed `process.env` put that on the remote; the
+  project's own discovery notes had already called this a blocker. The default
+  out-dir `./ndx-export` sat inside the repo and was not gitignored either.
+  
+  - Exported run records are passed through `sanitizeRunForExport`, which drops
+    `toolCalls`, `events`, `error`, `diagnostics.promptSections` and
+    `testGate.error`, keeps summaries and token usage, and stamps
+    `transcriptOmitted: true` so the static Task Audit view can say why the
+    transcript is absent. `--include-transcripts` opts back in.
+  - `--deploy=github` builds a manifest (remote, branch, run count, PRD item
+    count, transcript inclusion) and asks before doing any work. Without a TTY
+    it stops with exit 1 unless `--yes` is passed — nothing is written or pushed.
+  - `ndx init` and `ndx export` both add `ndx-export/` to `.gitignore`; the
+    shipped template carries it too. `ensureGitignoreEntry` moved to
+    `packages/core/gitignore.js` so both callers share it.
+  - The dashboard's `POST /api/commands/export` forwards `--yes` only when the
+    body carries `confirmDeploy: true` (set by the viewer's confirmation step)
+    and refuses a deploy request without it; `includeTranscripts: true` maps to
+    `--include-transcripts`. The confirmation dialog now says what is published.
+  
+  Found by the 2026-09-11 adversarial security review (finding B).
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop the dashboard's hench-config gate accepting values hench's schema rejects.
+  
+  `validateFieldValue` (`hench-config-fields.ts`) is the single gate for the three
+  routes that write `.hench/config.json` — `PUT /api/hench/config`,
+  `POST /api/hench/adaptive/apply`, and `POST /api/hench/adaptive/override` — but
+  it was looser than hench's `HenchConfigSchema` in three ways. Enum fields were
+  checked via `String(value)`, so `provider: ["cli"]` coerced to `"cli"` and an
+  array was written where `z.enum` expects a string. Array fields were checked with
+  `Array.isArray` alone, so `guard.allowedCommands: [1, null]` passed a
+  `z.array(z.string())` field. Number fields rejected only negatives and `NaN`, so
+  `0` was written to `guard.commandTimeout` (`z.number().positive()`) and JSON
+  `1e999` was accepted as `Infinity`, which `JSON.stringify` then wrote as `null`.
+  Each case returned 200 and produced a config hench refuses to load, so the next
+  `ndx work` would not start until the file was hand-edited.
+  
+  The gate now requires a string before an enum lookup, requires every array
+  element to be a string, requires `Number.isFinite`, and honours two new
+  `ConfigFieldInfo` flags — `positive` and `integer` — that mirror the `.positive()`
+  and `.int()` refinements on the matching hench field. A new cross-package
+  contract test (`tests/e2e/hench-config-gate-contract.test.js`) probes every
+  writable field against both definitions and fails if the gate ever accepts
+  something `HenchConfigSchema` rejects, so the two cannot drift again silently.
+  
+  Found by the 2026-09-15 adversarial review (task 0a85aec1).
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Hench Runs view aggregates runs across worktrees. `GET /api/hench/runs` (and `/runs/:id`) accept `?scope=repo`, merging every worktree's `.hench/runs/` and tagging each run with `{ name, path, branch }`; the default scope is unchanged. A lazily registered `fs.watch` per other-worktree runs directory keeps `hench:run-changed` firing for runs written elsewhere. The viewer requests repo scope, shows a mono worktree chip on each card when runs span more than one worktree, and adds a worktree filter.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx start --hub` now writes `.n-dx-web.port` (the hub's port) and `.n-dx-web.pid` (`{ pid, port, startedAt, via: "hub", projectId }`) in the started directory, so `ndx refresh --live-server` keeps working unchanged: its reload signal reaches the hub, which forwards it to the project's own server. The reload body now carries `dir`; with several projects registered the hub matches it against each project's repository root and worktrees (deepest match wins), answering 409 without a directory and 404 for an unregistered one. `ndx start stop`, `ndx start status` and refresh's pre-flight recognise the hub marker and never stop the hub through it; `ndx start --here` over a marker takes the files over instead of killing the hub.
+
+- [#358](https://github.com/en-dash-consulting/n-dx/pull/358) [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the local (LM Studio) per-request timeout configurable via `llm.local.timeoutMs`
+  
+  Local completions were bounded by a hardcoded 5-minute abort in three places — the
+  local API provider, hench's local tool loop, and the second-model verifier (60 s) —
+  so a slow local model failed with `NDX_CLI_TIMEOUT` no matter what the CLI-timeout
+  settings said. `cli.timeoutMs` / the "CLI Timeouts" page bound a whole command, not
+  an individual HTTP request, so setting them to unlimited had no effect on this path.
+  
+  All three now read `llm.local.timeoutMs` (default 300000, `0` = no timeout), settable
+  via `ndx config llm.local.timeoutMs <ms>` or the LLM Provider settings page. The
+  timeout error message now names the key to change.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `ndx which [dir]` — report which copy of n-dx is actually running.
+  
+  The package version is the same string in every checkout and every install, so `ndx --version` cannot distinguish a globally installed `ndx` from the worktree you are standing in. `ndx which` prints five fields instead: the version, the absolute path of the `cli.js` executing, the install kind (npm registry install, pnpm global link, or workspace checkout), the branch and short SHA of the install checkout when it is a git working tree, and the resolved project directory. `--json` emits the same record as one object, and `ndx --version --verbose` prints the identical report.
+  
+  Install kind distinguishes a globally linked checkout from one invoked directly by comparing `process.argv[1]` against the realpathed entry point — Node leaves the former as the symlink, so a global bin shim makes the two disagree. The command always exits 0: a missing `git`, or an install that is not a working tree, reports no git identity rather than failing.
+  
+  `which` is registered in `ndx --help`, has its own `ndx which --help` page, and appears in the dashboard's All Commands view under Setup — ungated, since identifying the CLI is most useful on a project that is not initialized yet.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Cap request body size on the dashboard server.
+  
+  `readBody` concatenated every chunk with no limit, so a local process (the
+  server is loopback-only) could POST a multi-gigabyte body to any route and
+  drive it out of memory before the handler ran.
+  
+  A new `MAX_REQUEST_BODY_BYTES` (10 MB — the largest legitimate body is a PRD
+  bundle import) is enforced in two places: `handleRequestSecurity`, which runs
+  first for every request, answers `413` and destroys the connection when the
+  declared `Content-Length` exceeds the cap (before any buffering); and
+  `readBody`, which stops buffering, destroys the request, and rejects if a
+  chunked body with no declared length streams past the cap. `jsonResponse` is
+  now a no-op once the response is committed, so a route that already answered
+  cannot double-write.
+  
+  Found by the 2026-09-11 adversarial security review (finding H).
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Add the Sessions tray: a third bottom-right pill — "3 worktrees · 1 running" — expanding into a row per worktree with its name (anchor starred), branch, dirty count, and either the run in flight with a ticking elapsed time or the last one with its status, linking through to that run in the Runs view. Read-only: it does not switch the dashboard's workspace. Hidden outside a git repository and in a single-worktree one.
+  
+  `GET /api/worktrees` gains `runs.latest` — the running run that started most recently, else the most recently finished one — with the id, status, task title and timestamps the tray shows.
+  
+  Move `formatSince` from the Workspaces view to `viewer/utils/format.ts`, now that the tray is its second consumer.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard shows cross-worktree task claims. New read-only `GET /api/rex/claims` lists the live claims in the repository's shared store, with each task's title from the served PRD and the claiming worktree. PRD tree rows carry a "claimed · <worktree>" chip ("here" when this checkout holds it), and the Sessions tray lists the tasks each worktree has claimed under its row. Both refresh on the poll tick and on `hench:run-changed`, so a claim appears within one interval and disappears when released.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - The sidebar footer now shows which n-dx is running: `n-dx <version> · <install> · <project>`, with the full CLI and project paths in its tooltip. It reads the `server` object that `GET /api/config` already returns and that the viewer already fetches before its first render, so there is no extra request, and it renders on every view without waiting for the configuration panel's own fetch. A server too old to send the object renders no identity line.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - A dashboard can now see the hub's admission queue. `GET /api/hub/queue` is answered under a project prefix too (`/p/<id>/api/hub/queue`), which is the only address a viewer has — its fetches are rewritten to sit under the page's base path, so the hub's own API was previously unreachable from the page the hub serves. Asked that way, the queued entries are scoped to that project while the running count, limits and memory state stay machine-wide, since waiting behind another project's run is exactly what needs explaining. A new `useHubQueue` hook polls it, tolerating the single-project server where no hub answers.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - An over-cap chunked request body now gets an HTTP 413 instead of a reset connection. `readBody` used to destroy the request the moment the streamed cap was passed and leave the answering to the caller's `catch` — which could not work, because destroying the request destroys the socket, so the 400 was written into a closed connection and the client received zero bytes and an EPIPE. It now sends the same 413 the Content-Length guard sends, closes cleanly, and still rejects so callers keep their existing `catch` (which no-ops once the response is committed). Only clients that send chunked bodies without a Content-Length were affected; the dashboard always sends one.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Add `GET /api/workspaces/:key/prd-delta`: how a worktree's PRD differs from the anchor's, computed server-side by item id — `onlyHere`, `onlyAnchor`, `changed` (status, title, priority, description or lastModified differ) and `completedHere` — with exact counts, id lists capped at 500 (`truncated` flag), and `identical` for trees that match. Cached per (anchor, workspace) pair and invalidated by either tree's rex watcher.
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Reject cross-origin WebSocket upgrades on the dashboard server.
+  
+  A WebSocket handshake carries no CORS preflight, so the HTTP-side
+  `handleRequestSecurity` guard never saw it — the `upgrade` handler checked only
+  for a `Sec-WebSocket-Key`. While `ndx start` ran, any page open in the user's
+  browser could `new WebSocket("ws://localhost:<port>")` and receive every
+  broadcast: PRD changes, `hench:task-execution-progress` (which carries the
+  agent's last stdout line), execution and memory state. Inbound frames are
+  limited to close/ping/pong, so this was a passive read, but the only
+  cross-origin hole in an otherwise well-guarded server.
+  
+  `handleUpgrade` now applies the same origin check the HTTP guard uses
+  (`isTrustedBrowserOrigin`, exported for this): a present `Origin` must be this
+  loopback server's own (compared against the socket's local port, so a
+  DNS-rebinding Host cannot match), or the upgrade is answered `403 Forbidden`
+  and the socket destroyed before any client is registered. A missing `Origin`
+  (non-browser CLI/MCP clients) stays allowed, matching the HTTP guard's contract.
+  
+  Found by the 2026-09-11 adversarial security review (finding E).
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Allowlist the config keys `POST /api/hench/workflow/apply` may write.
+  
+  The endpoint applies machine-generated workflow suggestions, but
+  `handleApplySuggestion` wrote whatever keys the request named into
+  `.hench/config.json` with no allowlist and no value check. A same-origin caller
+  could set `guard.allowedCommands`, `guard.blockedPaths: []`, or
+  `permissionMode: "bypassPermissions"` — and the next hench run would inherit
+  them (arbitrary commands, no path sandbox, permissions bypassed) — or use a
+  `__proto__` path segment to poison the prototype chain.
+  
+  `apply` now validates `changes` against `APPLYABLE_SUGGESTION_KEYS` — the exact
+  set the suggestion generator emits (`tokenBudget`, `maxTurns`,
+  `retry.maxRetries`), each required to be a nonnegative integer — before preview
+  or any write, so a rejected request (400) leaves the config file untouched. Path
+  segments `__proto__`/`constructor`/`prototype` are refused, and the module's
+  `setNestedValue` drops them as defense in depth. A test pins the allowlist to
+  the keys the generator actually emits so the two cannot drift.
+  
+  Found by the 2026-09-11 adversarial security review (finding F).
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Build lazily-created workspace contexts' `svDir`/`rexDir` with `path.join` instead of `/` string concatenation, so non-anchor worktree paths use native separators on Windows (the PRD lock and store resolution key off `rexDir`, where a mixed-separator spelling risks cache and lock misses).
+
+- [#369](https://github.com/en-dash-consulting/n-dx/pull/369) [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3) Thanks [@endash-shal](https://github.com/endash-shal)! - Make the dashboard's workspace-scoped PRD writes explicit. The PRD view now shows a one-line strip naming the workspace whenever it is not the anchor ("Workspace <name> · writes go to this worktree's PRD"), so an edit made while viewing a branch worktree states its target rather than leaving it to be inferred from the URL. There is still no cross-workspace write action — switching to the anchor's PRD is a workspace switch. Adds an integration test that hashes both worktrees' trees around a write through `/w/<key>/api/rex/items` and a slot-less write, pinning that each lands in exactly one tree.
+- Updated dependencies [[`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`6e44977`](https://github.com/en-dash-consulting/n-dx/commit/6e44977a9984998a11587194ab8ad25e38a53b59), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d), [`f4ab3bb`](https://github.com/en-dash-consulting/n-dx/commit/f4ab3bbc072e1f99b860cfa0e3d306bf80d92fc3), [`9fd0ce7`](https://github.com/en-dash-consulting/n-dx/commit/9fd0ce7b388cffcd1d6f15fa10683756f363b44d)]:
+  - @n-dx/rex@0.7.0
+  - @n-dx/llm-client@0.7.0
+  - @n-dx/sourcevision@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes
