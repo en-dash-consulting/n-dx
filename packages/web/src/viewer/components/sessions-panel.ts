@@ -22,14 +22,16 @@
 
 import { h } from "preact";
 import { useState } from "preact/hooks";
-import type { WorktreeEntry, WorktreeLatestRun } from "../hooks/index.js";
-import { useTick } from "../hooks/index.js";
+import type { WorktreeEntry, WorktreeLatestRun, ClaimEntry } from "../hooks/index.js";
+import { useTick, claimsForWorktree } from "../hooks/index.js";
 import { fmtDuration, formatSince } from "../utils/format.js";
 import type { NavigateTo } from "../types.js";
 
 export interface SessionsPanelProps {
   /** null until the first fetch resolves. */
   worktrees: WorktreeEntry[] | null;
+  /** Live cross-worktree task claims; each row lists the tasks its worktree holds. */
+  claims?: ClaimEntry[] | null;
   navigateTo?: NavigateTo;
 }
 
@@ -62,6 +64,11 @@ export function dirtyLabel(entry: WorktreeEntry): { text: string; tone: "dirty" 
   if (entry.dirty === null || entry.dirtyFiles === null) return { text: "status unknown", tone: "unknown" };
   if (entry.dirtyFiles === 0) return { text: "clean", tone: "clean" };
   return { text: `${entry.dirtyFiles} uncommitted`, tone: "dirty" };
+}
+
+/** The claimed-task line: the task's title when this PRD knows it, else its id. */
+export function claimLabel(claim: ClaimEntry): string {
+  return claim.taskTitle ?? claim.taskId;
 }
 
 /** The branch cell. Detached and bare checkouts have no branch to name. */
@@ -111,7 +118,7 @@ function RunElapsed({ startedAt }: { startedAt: string }) {
   return h("span", { class: "sessions-run-elapsed" }, ` · ${useTick(startedAt, elapsedFormatter)}`);
 }
 
-function WorktreeRow({ entry, navigateTo }: { entry: WorktreeEntry; navigateTo?: NavigateTo }) {
+function WorktreeRow({ entry, claims, navigateTo }: { entry: WorktreeEntry; claims: ClaimEntry[]; navigateTo?: NavigateTo }) {
   const dirty = dirtyLabel(entry);
   const run = runLine(entry.runs.latest);
   const runId = entry.runs.latest?.id ?? null;
@@ -134,6 +141,21 @@ function WorktreeRow({ entry, navigateTo }: { entry: WorktreeEntry; navigateTo?:
           )
         : null,
     ),
+    // Tasks this worktree has claimed — what it is working on, from the
+    // shared claims store rather than from a run record it may not have
+    // written yet.
+    claims.length > 0
+      ? h("ul", { class: "sessions-claims", "aria-label": `Tasks claimed in ${worktreeName(entry.path)}` },
+          claims.map((claim) => h("li", {
+            key: claim.taskId,
+            class: "sessions-claim",
+            title: `Claimed ${claim.claimedAt} · expires ${claim.expiresAt}`,
+          },
+            h("span", { class: "sessions-claim-label" }, "claimed"),
+            h("span", { class: "sessions-claim-title" }, claimLabel(claim)),
+          )),
+        )
+      : null,
     runId && navigateTo
       ? h("button", {
           class: "sessions-run-link",
@@ -144,7 +166,7 @@ function WorktreeRow({ entry, navigateTo }: { entry: WorktreeEntry; navigateTo?:
   );
 }
 
-export function SessionsPanel({ worktrees, navigateTo }: SessionsPanelProps) {
+export function SessionsPanel({ worktrees, claims = null, navigateTo }: SessionsPanelProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (!shouldShowSessions(worktrees)) return null;
@@ -168,7 +190,12 @@ export function SessionsPanel({ worktrees, navigateTo }: SessionsPanelProps) {
     ),
     expanded
       ? h("ul", { class: "sessions-list", "aria-label": "Worktree sessions" },
-          worktrees.map((entry) => h(WorktreeRow, { key: entry.path, entry, navigateTo })),
+          worktrees.map((entry) => h(WorktreeRow, {
+            key: entry.path,
+            entry,
+            claims: claimsForWorktree(claims, entry.path),
+            navigateTo,
+          })),
         )
       : null,
   );

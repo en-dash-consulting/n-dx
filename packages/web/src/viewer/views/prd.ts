@@ -36,6 +36,7 @@ import {
   usePersistentFilter,
   useFeatureToggle,
   useFacetState,
+  useClaims,
 } from "../hooks/index.js";
 import { searchTree, collectAllTags, collectAllBranches } from "../components/prd-tree/tree-search.js";
 import { FacetFilter } from "../components/prd-tree/facet-filter.js";
@@ -67,6 +68,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
   // ── Feature toggles ────────────────────────────────────────────
   const showTokenBudget = useFeatureToggle("rex.showTokenBudget", false);
+
+  // ── Cross-worktree claims (read-only chips on claimed rows) ─────
+  const { claimsById } = useClaims();
 
   // ── WebSocket real-time updates ────────────────────────────────
   usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage });
@@ -347,6 +351,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     h(PRDTree, {
       key: "prd",
       document: data,
+      claimsById,
       taskUsageById,
       rollupById,
       weeklyBudget,

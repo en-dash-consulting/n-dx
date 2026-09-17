@@ -138,6 +138,53 @@ describe("PRDTree", () => {
     expect(root.textContent).toContain("frontend");
   });
 
+  describe("cross-worktree claim chip", () => {
+    const claim = {
+      taskId: "task-2",
+      taskTitle: "Add password reset",
+      worktreeRoot: "/repos/app/.claude/worktrees/feature-x",
+      worktree: "feature-x",
+      isServedHere: false,
+      pid: 4242,
+      host: "box",
+      claimedAt: "2026-09-16T10:00:00.000Z",
+      expiresAt: "2026-09-16T14:00:00.000Z",
+    };
+
+    it("shows 'claimed · <worktree>' on the claimed row only, as a tag-style chip naming the holder", () => {
+      const root = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3, claimsById: { "task-2": claim } }));
+      const chips = root.querySelectorAll(".prd-claim-chip");
+      expect(chips.length).toBe(1);
+      const chip = chips[0];
+      expect(chip.textContent).toBe("claimed · feature-x");
+      expect(chip.classList.contains("tag-chip")).toBe(true);
+      expect(chip.getAttribute("title")).toContain("/repos/app/.claude/worktrees/feature-x");
+      expect(chip.getAttribute("title")).toContain("pid 4242");
+      // It sits on task-2's row, not task-1's.
+      expect(chip.closest("[data-node-id]")!.getAttribute("data-node-id")).toBe("task-2");
+    });
+
+    it("says 'here' for a claim held from the served worktree", () => {
+      const root = renderToDiv(h(PRDTree, {
+        document: sampleDoc, defaultExpandDepth: 3,
+        claimsById: { "task-2": { ...claim, isServedHere: true } },
+      }));
+      expect(root.querySelector(".prd-claim-chip")!.textContent).toBe("claimed · here");
+    });
+
+    it("renders no chip without claims, and drops it when the claim is released", () => {
+      const rootA = renderToDiv(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3 }));
+      expect(rootA.querySelector(".prd-claim-chip")).toBeNull();
+
+      // Same mounted tree: claim present, then released (claimsById empties).
+      const div = document.createElement("div");
+      render(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3, claimsById: { "task-2": claim } }), div);
+      expect(div.querySelector(".prd-claim-chip")).not.toBeNull();
+      render(h(PRDTree, { document: sampleDoc, defaultExpandDepth: 3, claimsById: {} }), div);
+      expect(div.querySelector(".prd-claim-chip")).toBeNull();
+    });
+  });
+
   it("renders task usage chips from aggregated usage data", () => {
     const root = renderToDiv(h(PRDTree, {
       document: sampleDoc,

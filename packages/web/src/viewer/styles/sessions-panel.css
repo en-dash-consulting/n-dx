@@ -198,3 +198,37 @@
     animation: none;
   }
 }
+
+/* Tasks a worktree has claimed (shared claims store), one line each. */
+.sessions-claims {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.sessions-claim {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  min-width: 0;
+}
+
+.sessions-claim-label {
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.6rem;
+  color: var(--accent);
+}
+
+.sessions-claim-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

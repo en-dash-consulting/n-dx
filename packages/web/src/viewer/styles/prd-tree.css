@@ -747,6 +747,17 @@
   flex-shrink: 0;
 }
 
+/* Cross-worktree claim — inherits .tag-chip; accent so it reads at a glance. */
+.prd-claim-chip {
+  flex-shrink: 0;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.prd-claim-chip-here {
+  color: var(--text-dim);
+}
+
 /* Tags — visual properties come from .tag-chip / .tag-chip-list in badges.css.
    These selectors extend the base to keep existing markup working. */
 .prd-tag-list {

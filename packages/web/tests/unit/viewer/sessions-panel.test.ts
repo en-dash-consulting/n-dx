@@ -14,6 +14,7 @@ import { act } from "preact/test-utils";
 import {
   SessionsPanel,
   branchLabel,
+  claimLabel,
   dirtyLabel,
   runLine,
   sessionsPillLabel,
@@ -21,6 +22,23 @@ import {
   worktreeName,
 } from "../../../src/viewer/components/sessions-panel.js";
 import type { WorktreeEntry } from "../../../src/viewer/hooks/use-worktrees.js";
+import type { ClaimEntry } from "../../../src/viewer/hooks/use-claims.js";
+import { claimsForWorktree, indexClaims } from "../../../src/viewer/hooks/use-claims.js";
+
+function makeClaim(overrides: Partial<ClaimEntry> = {}): ClaimEntry {
+  return {
+    taskId: "task-9",
+    taskTitle: "Wire the thing",
+    worktreeRoot: "/repo/.claude/worktrees/feature",
+    worktree: "feature",
+    isServedHere: false,
+    pid: 4242,
+    host: "box",
+    claimedAt: "2026-09-16T10:00:00.000Z",
+    expiresAt: "2026-09-16T14:00:00.000Z",
+    ...overrides,
+  };
+}
 
 function makeWorktree(overrides: Partial<WorktreeEntry> = {}): WorktreeEntry {
   return {
@@ -132,6 +150,26 @@ describe("sessions-panel helpers", () => {
   });
 });
 
+describe("claims helpers", () => {
+  it("labels a claim by title, falling back to the task id", () => {
+    expect(claimLabel(makeClaim())).toBe("Wire the thing");
+    expect(claimLabel(makeClaim({ taskTitle: null }))).toBe("task-9");
+  });
+
+  it("selects the claims held from one worktree by its root path", () => {
+    const claims = [makeClaim(), makeClaim({ taskId: "x", worktreeRoot: "/repo/main" })];
+    expect(claimsForWorktree(claims, "/repo/.claude/worktrees/feature").map((c) => c.taskId)).toEqual(["task-9"]);
+    expect(claimsForWorktree(claims, "/nowhere")).toEqual([]);
+    expect(claimsForWorktree(null, "/repo/main")).toEqual([]);
+  });
+
+  it("indexes claims by task id", () => {
+    const byId = indexClaims([makeClaim(), makeClaim({ taskId: "x" })]);
+    expect(Object.keys(byId).sort()).toEqual(["task-9", "x"]);
+    expect(byId["x"].taskId).toBe("x");
+  });
+});
+
 describe("SessionsPanel", () => {
   let root: HTMLDivElement;
 
@@ -188,6 +226,31 @@ describe("SessionsPanel", () => {
     expect(linked.querySelector(".sessions-run-title")!.textContent).toBe("Sessions panel");
     // Elapsed time ticks alongside the "running" label.
     expect(linked.querySelector(".sessions-run-detail")!.textContent).toMatch(/^running · 1m \d+s$/);
+  });
+
+  it("lists each worktree's claimed tasks under its row, by title or by id, and none when released", () => {
+    const claims = [
+      makeClaim(),
+      makeClaim({ taskId: "task-10", taskTitle: null }),
+      makeClaim({ taskId: "task-11", taskTitle: "Anchor task", worktreeRoot: "/repo/main", worktree: "main", isServedHere: true }),
+    ];
+    render(h(SessionsPanel, { worktrees: [makeWorktree(), LINKED], claims }), root);
+    act(() => { (root.querySelector(".sessions-toggle") as HTMLButtonElement).click(); });
+
+    const [anchor, linked] = Array.from(root.querySelectorAll(".sessions-row"));
+    const anchorClaims = Array.from(anchor.querySelectorAll(".sessions-claim-title")).map((el) => el.textContent);
+    const linkedClaims = Array.from(linked.querySelectorAll(".sessions-claim-title")).map((el) => el.textContent);
+    expect(anchorClaims).toEqual(["Anchor task"]);
+    // Title when this PRD knows the task, id when it exists only over there.
+    expect(linkedClaims).toEqual(["Wire the thing", "task-10"]);
+    expect(linked.querySelector(".sessions-claims")!.getAttribute("aria-label")).toBe("Tasks claimed in feature");
+
+    // Released: the line goes.
+    render(h(SessionsPanel, { worktrees: [makeWorktree(), LINKED], claims: [] }), root);
+    expect(root.querySelector(".sessions-claim")).toBeNull();
+    // And before the first claims fetch nothing is asserted either way.
+    render(h(SessionsPanel, { worktrees: [makeWorktree(), LINKED], claims: null }), root);
+    expect(root.querySelector(".sessions-claim")).toBeNull();
   });
 
   it("links a worktree's run into the Runs view without switching workspace", () => {
