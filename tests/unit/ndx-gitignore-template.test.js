@@ -57,6 +57,14 @@ describe("ndx init ignore template", () => {
     expect(runtimeEntries(TEMPLATE)).toContain(".hench/reviews/");
   });
 
+  it("ignores the default `ndx export` output directory", () => {
+    // `ndx export` writes ./ndx-export inside the project by default, and the
+    // exported site carries PRD data and hench run summaries. Unignored, a
+    // `git add -A` commits a second copy of all of it.
+    const entries = readFileSync(TEMPLATE, "utf-8").split("\n").map((l) => l.trim());
+    expect(entries).toContain("ndx-export/");
+  });
+
   it("names no stale lock file", () => {
     // The folder-tree lock is `.rex/prd.lock`; `prd.json.lock` is a legacy
     // name FileStore no longer writes.

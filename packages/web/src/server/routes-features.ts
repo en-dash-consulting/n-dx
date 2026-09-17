@@ -283,7 +283,7 @@ export async function handleFeaturesRoute(
   // PUT /api/features — update one or more toggle values
   if (method === "PUT" && url === FEATURES_PREFIX) {
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, res);
       const parsed = JSON.parse(body) as { changes: Record<string, boolean> };
 
       if (!parsed.changes || typeof parsed.changes !== "object") {

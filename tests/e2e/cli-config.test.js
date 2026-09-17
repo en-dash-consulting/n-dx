@@ -648,14 +648,88 @@ describe("n-dx config", () => {
       expect(ndxConfig.claude.cli_path).toBe("/usr/local/bin/claude");
     });
 
-    it("sets claude.api_key in .n-dx.json", async () => {
+    it("sets claude.api_key in .n-dx.local.json, never in .n-dx.json", async () => {
       const output = run(["claude.api_key", "sk-ant-test-key", tmpDir]);
       expect(output).toContain("claude.api_key = sk-ant-test-key");
 
-      const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+      const localConfig = JSON.parse(
+        await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
       );
-      expect(ndxConfig.claude.api_key).toBe("sk-ant-test-key");
+      expect(localConfig.claude.api_key).toBe("sk-ant-test-key");
+
+      // The shared file is the one teammates commit — a key must never land there.
+      let shared = {};
+      try {
+        shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      } catch { /* not created — fine */ }
+      expect(shared.claude?.api_key).toBeUndefined();
+    });
+
+    it("routes every vendor api_key to .n-dx.local.json", async () => {
+      run(["llm.claude.api_key", "sk-ant-claude-key", tmpDir]);
+      run(["llm.codex.api_key", "sk-codex-key", "--force", tmpDir]);
+      run(["llm.google.api_key", "AIzaSyValidKey1234567890ABCDEF1234567", tmpDir]);
+
+      const localConfig = JSON.parse(
+        await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"),
+      );
+      expect(localConfig.llm.claude.api_key).toBe("sk-ant-claude-key");
+      expect(localConfig.llm.codex.api_key).toBe("sk-codex-key");
+      expect(localConfig.llm.google.api_key).toBe("AIzaSyValidKey1234567890ABCDEF1234567");
+
+      let shared = {};
+      try {
+        shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      } catch { /* not created — fine */ }
+      expect(JSON.stringify(shared)).not.toContain("api_key");
+    });
+
+    it("keeps non-secret claude settings in .n-dx.json", async () => {
+      run(["claude.model", "claude-sonnet-5", tmpDir]);
+
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.claude.model).toBe("claude-sonnet-5");
+    });
+
+    it("re-setting an api_key that lives in .n-dx.json moves it to the local file", async () => {
+      // A project configured before api keys were local-only has the key in the shared file.
+      await writeFile(
+        SHARED_CONFIG_PATH(tmpDir),
+        JSON.stringify({ claude: { api_key: "sk-ant-old", model: "claude-sonnet-5" } }, null, 2) + "\n",
+      );
+
+      run(["claude.api_key", "sk-ant-new", tmpDir]);
+
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.claude.api_key).toBeUndefined();
+      expect(shared.claude.model).toBe("claude-sonnet-5");
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.claude.api_key).toBe("sk-ant-new");
+    });
+
+    it("warns on stderr when .n-dx.json still holds an api_key", async () => {
+      await writeFile(
+        SHARED_CONFIG_PATH(tmpDir),
+        JSON.stringify({ llm: { claude: { api_key: "sk-ant-legacy" } } }, null, 2) + "\n",
+      );
+
+      const result = spawnSync("node", [CLI_PATH, "config", "claude.model", "claude-sonnet-5", tmpDir], {
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+      });
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain(".n-dx.json");
+      expect(result.stderr).toContain("llm.claude.api_key");
+      expect(result.stderr).toContain(".n-dx.local.json");
+    });
+
+    it("does not warn when the shared file has no secrets", () => {
+      const result = spawnSync("node", [CLI_PATH, "config", "claude.model", "claude-sonnet-5", tmpDir], {
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+      });
+      expect(result.status).toBe(0);
+      expect(result.stderr).not.toContain("api_key");
     });
 
     it("gets claude.cli_path after setting it", async () => {
@@ -719,7 +793,10 @@ describe("n-dx config", () => {
         await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
       );
       expect(ndxConfig.hench.model).toBe("opus");
-      expect(ndxConfig.claude.api_key).toBe("sk-ant-test");
+      // The key itself is local-only; the shared file is left otherwise intact.
+      expect(ndxConfig.claude).toBeUndefined();
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.claude.api_key).toBe("sk-ant-test");
     });
 
     it("does not write to package config files", async () => {
@@ -775,9 +852,11 @@ describe("n-dx config", () => {
       expect(output).toContain("shared across all packages");
     });
 
-    it("warns about .gitignore for api_key", () => {
+    it("states that api keys are stored in .n-dx.local.json", () => {
       const output = run(["--help"]);
-      expect(output).toContain(".gitignore");
+      expect(output).not.toContain("stored in .n-dx.json");
+      const apiKeyBlock = output.slice(output.indexOf("claude.api_key"), output.indexOf("claude.api_endpoint"));
+      expect(apiKeyBlock).toContain(".n-dx.local.json");
     });
 
     it("includes claude config examples", () => {
@@ -1094,10 +1173,10 @@ describe("n-dx config", () => {
       expect(inherited || foreign).toBe(true);
     }
 
-    it("restricts .n-dx.json to the owner when api_key is present", async () => {
+    it("restricts .n-dx.local.json to the owner when api_key is present", async () => {
       run(["claude.api_key", "sk-ant-test-key-123", tmpDir]);
 
-      await expectOwnerOnly(join(tmpDir, ".n-dx.json"));
+      await expectOwnerOnly(LOCAL_CONFIG_PATH(tmpDir));
     });
 
     it("does not restrict permissions when no api_key present", async () => {
@@ -1112,9 +1191,9 @@ describe("n-dx config", () => {
       run(["claude.cli_path", "/some/path", "--force", tmpDir]);
       await expectNotOwnerOnly(LOCAL_CONFIG_PATH(tmpDir));
 
-      // Now add an API key
+      // Now add an API key — same file as cli_path, now owner-only
       run(["claude.api_key", "sk-ant-secure-key", tmpDir]);
-      await expectOwnerOnly(SHARED_CONFIG_PATH(tmpDir));
+      await expectOwnerOnly(LOCAL_CONFIG_PATH(tmpDir));
     });
 
     it("describes the actual protection for this platform in help text", () => {
@@ -1348,7 +1427,7 @@ describe("n-dx config", () => {
       const out = run(["llm.google.api_key", key, tmpDir]);
       expect(out).toContain(`llm.google.api_key = ${key}`);
 
-      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      const config = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
       expect(config.llm.google.api_key).toBe(key);
     });
 
@@ -1393,10 +1472,10 @@ describe("n-dx config", () => {
       expect(stderr).toContain("--force");
     });
 
-    it("stores key in .n-dx.json under llm.google.api_key", async () => {
+    it("stores key in .n-dx.local.json under llm.google.api_key", async () => {
       const key = "AIzaSyValidKey1234567890ABCDEF1234567";
       run(["llm.google.api_key", key, tmpDir]);
-      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      const config = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
       expect(config.llm.google.api_key).toBe(key);
     });
 
@@ -1407,10 +1486,13 @@ describe("n-dx config", () => {
       );
       const key = "AIzaSyValidKey1234567890ABCDEF1234567";
       run(["llm.google.api_key", key, tmpDir]);
-      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
-      expect(config.llm.google.api_key).toBe(key);
-      expect(config.llm.google.model).toBe("gemini-2.5-pro");
-      expect(config.llm.vendor).toBe("google");
+      const shared = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(shared.llm.google.api_key).toBeUndefined();
+      expect(shared.llm.google.model).toBe("gemini-2.5-pro");
+      expect(shared.llm.vendor).toBe("google");
+      // The effective (merged) view still resolves the key.
+      const output = run(["llm.google.api_key", tmpDir]);
+      expect(output.trim()).toBe(key);
     });
 
     it("documents llm.google.api_key in --help output", () => {

@@ -147,6 +147,7 @@ const SOURCEVISION_SUBCOMMANDS = [
 
 const NDX_ORCHESTRATION_COMMANDS = [
   "init",
+  "which",
   "analyze",
   "recommend",
   "add",

@@ -24,6 +24,22 @@ describe("GuardRails integration", () => {
       expect(guard.sessionCounters.operationsTotal).toBe(2);
     });
 
+    it("validates commands under the injected shell kind", () => {
+      const config = DEFAULT_HENCH_CONFIG().guard;
+      const underCmd = new GuardRails(projectDir, config, { shellKind: "cmd" });
+      const underSh = new GuardRails(projectDir, config, { shellKind: "posix" });
+
+      // One quoted argument to sh; two commands to cmd.exe.
+      expect(() => underCmd.checkCommand("npm test 'x & echo pwned'")).toThrow(GuardError);
+      expect(() => underSh.checkCommand("npm test 'x & echo pwned'")).not.toThrow();
+      expect(underCmd.shellKind).toBe("cmd");
+    });
+
+    it("resolves a shell kind when none is injected", () => {
+      const guard = new GuardRails(projectDir, DEFAULT_HENCH_CONFIG().guard);
+      expect(["posix", "cmd"]).toContain(guard.shellKind);
+    });
+
     it("tracks git subcommands through checkGitSubcommand", () => {
       const guard = new GuardRails(projectDir, DEFAULT_HENCH_CONFIG().guard);
       guard.checkGitSubcommand("status");

@@ -9,6 +9,10 @@
  * case where the run terminates abnormally (timeout, crash) after the agent
  * staged its work but before n-dx could process the commit prompt.
  *
+ * A commit git refuses is reported as a refusal and claims nothing: the file
+ * and the staged changes are left for the normal commit path, and
+ * `didAutoCommit()` stays false so that path is not skipped.
+ *
  * Call `cancel()` to disarm both the watcher and any pending timer — the normal
  * run lifecycle always cancels before calling `performCommitPromptIfNeeded` so
  * the two mechanisms cannot double-commit.
@@ -19,7 +23,7 @@
 import { watch as fsWatch } from "node:fs";
 import { readFileSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { execStdout } from "../../process/exec.js";
+import { execGitMutation } from "../../process/git-mutation.js";
 import { checkRunGitOrigin, type RunGitOrigin } from "../../process/git-origin.js";
 import { detail, info } from "../../types/output.js";
 
@@ -153,18 +157,29 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
       return;
     }
 
+    // Checked, not `execStdout`: that helper resolves with whatever landed on
+    // stdout even when git exited non-zero, so a rejected signing request, a
+    // failing pre-commit hook or a missing Git identity printed "committed",
+    // set `autoCommitted`, and deleted the message file. didAutoCommit() then
+    // short-circuits performCommitPromptIfNeeded, so the run's work stayed
+    // uncommitted with nothing reporting it — and the next task's commit
+    // absorbed it.
     try {
-      await execStdout("git", ["commit", "-F", PENDING_COMMIT_FILE], {
-        cwd: projectDir,
-        timeout: 30_000,
-      });
-      detail("Auto-commit: committed staged changes (timer expiry).");
-      autoCommitted = true;
+      await execGitMutation(projectDir, ["commit", "-F", PENDING_COMMIT_FILE], 30_000);
     } catch (err) {
-      detail(`Auto-commit failed: ${(err as Error).message}`);
-    } finally {
-      try { unlinkSync(msgPath); } catch { /* ignore */ }
+      // Same disposition as the origin-drift refusal above: the staged changes
+      // and the agent's proposed message both stay put, so the normal commit
+      // path can still land them and the uncommitted-work gate still sees them.
+      info(
+        `⚠ Auto-commit failed: ${(err as Error).message}. ` +
+          `The staged changes and ${PENDING_COMMIT_FILE} were left in place.`,
+      );
+      return;
     }
+
+    detail("Auto-commit: committed staged changes (timer expiry).");
+    autoCommitted = true;
+    try { unlinkSync(msgPath); } catch { /* ignore */ }
   }
 
   function armTimerOnce(): void {

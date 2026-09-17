@@ -15,7 +15,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { PRDStore, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, findItem, findParentResets, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
@@ -29,6 +29,7 @@ import { captureRunGitOrigin, checkRunGitOrigin, type RunGitOrigin } from "../..
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import { resolveActor, resolveHost } from "../../process/actor-identity.js";
 import { resolveCliPath, resolveNdxVersion } from "../../process/toolchain-identity.js";
+import type { TaskClaims } from "../../process/task-claims.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
@@ -139,6 +140,12 @@ export interface SharedLoopOptions {
   epicId?: string;
   /** Only select tasks with at least one of these tags (e.g. ["self-heal"]). */
   tags?: string[];
+  /**
+   * Cross-worktree claims for this run: selection passes over tasks other
+   * worktrees hold and claims the one it picks. The caller (`runOne`)
+   * releases them when the run ends. See `process/task-claims.ts`.
+   */
+  claims?: TaskClaims;
   /** Prior attempt history for the selected task (shown in task card). */
   priorAttempts?: PriorAttemptInfo;
   /** Run records for computing prior attempts when task is auto-selected. */
@@ -1135,6 +1142,66 @@ export function pendingCommitMessageExists(projectDir: string): boolean {
     return readFileSync(msgPath, "utf-8").trim().length > 0;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Move a proposed commit message out of the way when its run never used it.
+ *
+ * The agent stages its work and writes the sentinel; anything that flips the
+ * run to failed after that point makes {@link performCommitPromptIfNeeded}
+ * return at its `status !== "completed"` guard, leaving the file on disk with
+ * content. The next run's {@link startCommitMsgWatcher} arms on *detection*
+ * rather than on a write during that run, so after `hench.commitMsgTimeoutMs`
+ * it commits whatever is staged under the previous task's message — including
+ * its `N-DX-Status` trailer, which then names the wrong item. Two runs in
+ * sequence is what `--loop` and `--auto` do.
+ *
+ * Renamed rather than deleted: the message is the agent's own account of work
+ * that really happened, and the operator may well want it after fixing
+ * whatever failed. It lands beside the run that produced it, in
+ * `.hench/runs/<id>.commit-msg.txt` — a directory `hench init` already
+ * gitignores and the pre-run gate already discounts, so the rescued file
+ * cannot become the next run's uncommitted-work refusal. An empty or
+ * whitespace-only sentinel is removed instead: there is nothing to rescue,
+ * and every other path treats it as no message at all.
+ *
+ * Best-effort and silent on failure — a run must not fail over its own
+ * housekeeping.
+ *
+ * @returns The path the message was moved to, or null when there was nothing
+ *   to move.
+ */
+export function quarantinePendingCommitMessage(
+  projectDir: string,
+  henchDir: string,
+  runId: string,
+): string | null {
+  const msgPath = join(projectDir, PENDING_COMMIT_FILE);
+  if (!existsSync(msgPath)) return null;
+
+  let message = "";
+  try {
+    message = readFileSync(msgPath, "utf-8").trim();
+  } catch {
+    return null;
+  }
+
+  if (!message) {
+    try { unlinkSync(msgPath); } catch { /* ignore */ }
+    return null;
+  }
+
+  const rescued = join(henchDir, "runs", `${runId}.commit-msg.txt`);
+  try {
+    mkdirSync(join(henchDir, "runs"), { recursive: true });
+    renameSync(msgPath, rescued);
+    return rescued;
+  } catch {
+    // A rename across devices, a locked file — whatever the reason, the
+    // sentinel must not survive to arm the next run's watcher.
+    try { unlinkSync(msgPath); } catch { /* ignore */ }
+    return null;
   }
 }
 
@@ -2649,6 +2716,22 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
           await withdrawCompletionClaim(opts.store, run, run.error);
         }
       }
+    }
+  }
+
+  // A proposed commit message this run never used must not be here when the
+  // next one starts: its watcher arms on finding the file, not on this run
+  // having written it, and would commit the next task's work under this
+  // task's message. See quarantinePendingCommitMessage.
+  //
+  // Only on a non-completed run. Every exit inside the commit prompt already
+  // removes the sentinel — including a declined prompt — so a completed run
+  // that still has one is a state this function did not create and should not
+  // quietly rearrange.
+  if (run.status !== "completed") {
+    const rescued = quarantinePendingCommitMessage(projectDir, henchDir, run.id);
+    if (rescued) {
+      info(`Proposed commit message kept at ${rescued} — this run did not commit.`);
     }
   }
 

@@ -7,9 +7,13 @@ import {
   EMPTY_CURSOR,
   loadUsageCursor,
   readUsageDelta,
+  readUsageSinceMark,
   resolveTranscriptPath,
   saveUsageCursor,
+  type MarkedUsageDelta,
   type SessionUsageCursor,
+  type SessionUsageDelta,
+  type UsageMark,
 } from "../../store/session-usage.js";
 import { HENCH_DIR } from "./constants.js";
 import { CLIError } from "../errors.js";
@@ -63,8 +67,13 @@ const ZERO_USAGE: Required<TokenUsage> = {
  *
  * Order of precedence:
  *   1. explicit `--input-tokens` / `--output-tokens` / `--cache-*-tokens`
- *   2. the session transcript (default)
+ *   2. the session transcript (default) — from the task's start mark when
+ *      `hench usage mark --task=<id>` was run, else from the session watermark
  *   3. zeros, when there is no session to read and nothing was passed
+ *
+ * `--startedAt` is metadata (the run's start time). It never selects usage: a
+ * typed timestamp is not a measurement, and the mark is. `--since` remains an
+ * explicit override for the rare case that needs a time window.
  *
  * Zeros remain a valid outcome rather than an error: an unrecorded run is worse
  * than one recorded without its tokens, and `assisted` already marks the record
@@ -80,7 +89,7 @@ export async function cmdRecord(
   if (!taskId) {
     throw new CLIError(
       "Missing --task.",
-      "Usage: hench record --task=<id> [--title=<title>] [--status=completed] [--summary=<text>] [--turns=N] [--no-tokens] [--session=<id>] [--transcript=<path>] [dir]",
+      "Usage: hench record --task=<id> [--mark=<id>] [--title=<title>] [--status=completed] [--summary=<text>] [--turns=N] [--no-tokens] [--session=<id>] [--transcript=<path>] [dir]",
     );
   }
 
@@ -92,9 +101,9 @@ export async function cmdRecord(
     );
   }
 
-  // Validate the usage window up front: an unparseable value used to be
-  // silently discarded, which made `--startedAt=25/08/2026` claim the whole
-  // session transcript — the exact spend the flag exists to fence off.
+  // Validate the timestamps up front: `--startedAt` is stored on the record and
+  // `--since` is a usage window, and an unparseable value in either used to be
+  // silently discarded.
   parseWindow(flags.startedAt, "--startedAt");
   parseWindow(flags.since, "--since");
 
@@ -110,7 +119,8 @@ export async function cmdRecord(
     id: randomUUID(),
     taskId,
     taskTitle: flags.title || taskId,
-    startedAt: flags.startedAt || now,
+    // The mark knows when the task began; a typed --startedAt still wins when given.
+    startedAt: flags.startedAt || usage.markedAt || now,
     finishedAt: now,
     status,
     // Each usage-bearing transcript message is one API call, which is what a turn
@@ -144,6 +154,7 @@ export async function cmdRecord(
           turns: run.turns,
           tokenUsage: run.tokenUsage,
           usageSource: usage.source,
+          ...(usage.span ? { span: usage.span } : {}),
         },
         null,
         2,
@@ -160,8 +171,27 @@ interface ResolvedUsage {
   tokenUsage: Required<TokenUsage>;
   messages: number;
   model?: string;
-  source: "flags" | "transcript" | "none";
+  source: "flags" | "mark" | "transcript" | "none";
   note: string;
+  /** When the consumed mark was taken, so the run's startedAt can come from code. */
+  markedAt?: string;
+  /** The two transcript positions a mark-based delta was taken between. */
+  span?: { from: { lastUuid?: string; consumed: number }; to: { lastUuid?: string; consumed: number } };
+}
+
+/** Per-class breakdown plus the fresh-work subtotal, for the record's output. */
+function describeUsage(usage: Required<TokenUsage>): string {
+  const fresh = usage.input + usage.output + usage.cacheCreationInput;
+  const total = fresh + usage.cacheReadInput;
+  return (
+    `${total.toLocaleString()} tokens ` +
+    `(fresh ${fresh.toLocaleString()}: input ${usage.input.toLocaleString()}, output ${usage.output.toLocaleString()}, ` +
+    `cache-creation ${usage.cacheCreationInput.toLocaleString()}; cache-read ${usage.cacheReadInput.toLocaleString()})`
+  );
+}
+
+function describePosition(pos: { lastUuid?: string; consumed: number }): string {
+  return pos.lastUuid ? `message ${pos.consumed} (${pos.lastUuid.slice(0, 8)})` : `message ${pos.consumed}`;
 }
 
 /**
@@ -216,26 +246,40 @@ async function resolveUsage(
   const cursor: SessionUsageCursor = sessionId
     ? await loadUsageCursor(henchDir, sessionId)
     : EMPTY_CURSOR;
-  // `--startedAt` doubles as the usage window: a record that says it started at a
-  // time cannot also claim what was spent before then. It matters for the FIRST
-  // record in a session, which has no watermark and would otherwise claim
-  // everything the session had spent before the work began.
-  const window = flags.since || flags.startedAt;
-  const delta = readUsageDelta(transcript.text, cursor, window);
 
-  // A record with no window and no watermark claims every usage-bearing
-  // message the transcript holds — legitimate when the whole session really
-  // was this task, wildly wrong otherwise. Say so before it is written.
+  // The task's start mark, if `hench usage mark` was run when the work began.
+  // `--mark` names a different one — a skill that marks before it knows the
+  // item id (capture, plan) marks under its own name and records against the
+  // item it created.
+  const markId = flags.mark || flags.task;
+  const mark: UsageMark | undefined = !flags.since ? cursor.marks?.[markId] : undefined;
+
+  const marked: MarkedUsageDelta | null = mark ? readUsageSinceMark(transcript.text, mark) : null;
+  const delta: SessionUsageDelta = marked ?? readUsageDelta(transcript.text, cursor, flags.since);
+
+  // Without a mark the record falls back to the session watermark, which is the
+  // previous record's end — not this task's start. Say so, and name the fix.
   const hasWatermark = Boolean(cursor.lastUuid) || cursor.consumed > 0;
-  if (!explicitUsage && !transcriptDisabled && !window && !hasWatermark && delta.messages > 0) {
+  if (!mark && !explicitUsage && !transcriptDisabled && !flags.since && delta.messages > 0) {
     warn(
-      `Warning: no --startedAt/--since and no prior record for this session — ` +
-        `claiming all ${delta.messages} usage-bearing message${delta.messages === 1 ? "" : "s"} in the transcript. ` +
-        `Pass --startedAt=<when the work began> to claim only this task's spend.`,
+      `Warning: no usage mark for "${markId}" in this session — ` +
+        (hasWatermark
+          ? `claiming everything since the previous record (${delta.messages} message${delta.messages === 1 ? "" : "s"}), which may include unrelated work. `
+          : `claiming all ${delta.messages} usage-bearing message${delta.messages === 1 ? "" : "s"} in the transcript. `) +
+        `Run 'hench usage mark --task=${markId}' when the work begins so the record measures only this task.`,
     );
   }
 
-  if (sessionId) await saveUsageCursor(henchDir, sessionId, delta.cursor);
+  if (sessionId) {
+    // The consumed mark is removed: a second record for the same task must not
+    // claim the same span again. Others stay for their own records.
+    const { [markId]: _consumed, ...remaining } = cursor.marks ?? {};
+    await saveUsageCursor(henchDir, sessionId, {
+      lastUuid: delta.cursor.lastUuid,
+      consumed: delta.cursor.consumed,
+      ...(Object.keys(remaining).length > 0 ? { marks: remaining } : {}),
+    });
+  }
 
   if (explicitUsage) {
     return {
@@ -262,14 +306,30 @@ async function resolveUsage(
     };
   }
 
-  const total =
-    delta.tokenUsage.input +
-    delta.tokenUsage.output +
-    delta.tokenUsage.cacheCreationInput +
-    delta.tokenUsage.cacheReadInput;
+  if (mark && marked) {
+    const notes = [
+      `Token usage measured from the "${markId}" mark: ${describeUsage(marked.tokenUsage)} across ` +
+        `${marked.messages} message${marked.messages === 1 ? "" : "s"}, from ${describePosition(marked.from)} to ${describePosition(marked.to)}.`,
+    ];
+    if (marked.resynced) {
+      notes.push(
+        "The mark's message was missing from the transcript (it was rewritten, likely by compaction), so the delta is the difference of the two snapshots and approximate.",
+      );
+    }
+    if (marked.messages === 0) notes.push("Nothing was spent since the mark.");
+    return {
+      tokenUsage: marked.tokenUsage,
+      messages: marked.messages,
+      model: marked.model,
+      source: "mark",
+      note: notes.join(" "),
+      markedAt: mark.at || undefined,
+      span: { from: marked.from, to: marked.to },
+    };
+  }
 
   const notes = [
-    `Token usage read from this session's transcript: ${total.toLocaleString()} tokens across ${delta.messages} message${delta.messages === 1 ? "" : "s"}.`,
+    `Token usage read from this session's transcript since the previous record: ${describeUsage(delta.tokenUsage)} across ${delta.messages} message${delta.messages === 1 ? "" : "s"}.`,
   ];
   if (delta.resynced) {
     notes.push(
@@ -340,13 +400,13 @@ function readExplicitUsage(flags: Record<string, string>): Required<TokenUsage> 
 }
 
 /**
- * Validate a usage-window timestamp flag, or pass when absent.
+ * Validate a timestamp flag, or pass when absent.
  *
- * `readUsageDelta` deliberately tolerates an unparseable window (dropping the
+ * `readUsageDelta` deliberately tolerates an unparseable `--since` (dropping the
  * filter is safer than dropping spend once the value is in flight), so the
  * rejection has to happen here — the same layer that already rejects
- * `--turns=abc` — before a malformed flag silently widens the claim to the
- * whole session.
+ * `--turns=abc`. `--startedAt` is validated for the same reason it always was:
+ * a value that is not a time should not be stored as one.
  */
 function parseWindow(raw: string | undefined, flagName: string): void {
   if (raw === undefined) return;

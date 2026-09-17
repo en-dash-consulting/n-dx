@@ -12,6 +12,7 @@
  *   3. zone health check            (cohesion/coupling threshold assertions)
  *   3a. zone ID consistency         (zones.json ↔ zone output directories)
  *   3b. gateway import boundary     (cross-package imports must use gateways)
+ *   3e. config secrets              (no api_key in a git-tracked .n-dx.json)
  *   4. rex validate --format=json   (PRD health checks)
  *   5. rex status --format=json     (completion stats)
  *
@@ -22,6 +23,8 @@ import { spawn, spawnSync } from "child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
+import { findSharedSecrets, LOCAL_CONFIG_FILE } from "./config.js";
+import { isGitTracked } from "./gitignore.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -203,10 +206,11 @@ async function runAnalysisPhase(dir, info, isJSON, tools, spawnTracked) {
 }
 
 /**
- * Phase: architectural boundary checks (synchronous).
- * Steps: zone health, zone ID consistency, gateway imports, architecture policy, data-layer contract.
+ * Phase: architectural boundary checks.
+ * Steps: zone health, zone ID consistency, gateway imports, architecture policy,
+ * data-layer contract, config secrets (the one async step — it reads .n-dx.json).
  */
-function runBoundaryPhase(dir, info, isJSON) {
+async function runBoundaryPhase(dir, info, isJSON) {
   const steps = [];
   let allOk = true;
 
@@ -315,6 +319,28 @@ function runBoundaryPhase(dir, info, isJSON) {
     info(`  ✗ data-layer contract`);
     if (!isJSON) {
       for (const v of dataLayerResult.violations) info(`    ✗ ${v.file}:${v.line} — ${v.message}`);
+    }
+  }
+
+  // Step 3e: config secrets
+  info("── config secrets ──");
+  const secretsResult = await checkConfigSecrets(dir);
+  if (!secretsResult.ok) allOk = false;
+  steps.push({
+    name: "config-secrets",
+    ok: secretsResult.ok,
+    detail: secretsResult.detail,
+    ...(secretsResult.secrets.length > 0 ? { secrets: secretsResult.secrets } : {}),
+  });
+  // Branching on `ok`, not on the secret count: a tracked .n-dx.local.json
+  // fails with no shared-file secrets to list, and the old condition printed
+  // a tick above a failing run.
+  if (secretsResult.ok && secretsResult.secrets.length === 0) {
+    info(`  ✓ config secrets (${secretsResult.detail})`);
+  } else {
+    info(`  ${secretsResult.ok ? "⚠" : "✗"} config secrets — ${secretsResult.detail}`);
+    if (!isJSON) {
+      for (const k of secretsResult.secrets) info(`    ${secretsResult.ok ? "⚠" : "✗"} ${k}`);
     }
   }
 
@@ -455,7 +481,7 @@ export async function runCI(dir, flags, { run, tools, spawnTracked = spawn }) {
 
   const docsPhase = await runDocsPhase(dir, info, isJSON, spawnTracked);
   const analysisPhase = await runAnalysisPhase(dir, info, isJSON, tools, spawnTracked);
-  const boundaryPhase = runBoundaryPhase(dir, info, isJSON);
+  const boundaryPhase = await runBoundaryPhase(dir, info, isJSON);
   const rexPhase = await runRexPhase(dir, info, isJSON, tools, spawnTracked);
 
   const allOk = docsPhase.ok && analysisPhase.ok && boundaryPhase.ok && rexPhase.ok;
@@ -1151,6 +1177,64 @@ const ARCHITECTURE_SOURCE_FILES = ["CLAUDE.md", "gateway-rules.json", "PACKAGE_G
  * or orchestration scripts should trigger guide doc review.
  */
 const GUIDE_SOURCE_FILES = ["cli.js", "help.js", "CLAUDE.md"];
+
+/**
+ * Check that no API key is committed, in either config file.
+ *
+ * Two different failures, because the two files are protected differently.
+ *
+ * `.n-dx.local.json` is where every key `ndx config` writes now lands, and
+ * nothing protects it but the `.gitignore` entry. Trim that line, add a
+ * negation, or `git add -f` once, and every vendor key is on the remote —
+ * while this step, which scanned only the shared file, reported "no API keys
+ * in .n-dx.json" and passed. So a tracked local file fails on the fact of
+ * being tracked, without reading it: it is wrong when empty too, because the
+ * next `ndx config` will fill it, and reading a file to decide whether to
+ * warn about it is not a check worth having when the answer is already no.
+ *
+ * `.n-dx.json` is shared on purpose, so it is judged by contents. A project
+ * configured before the routing existed — or edited by hand — can hold a key
+ * there. Tracked and holding one fails; untracked and holding one warns with
+ * the fix named. Outside a git repository there is nothing to leak to.
+ *
+ * @param {string} dir Project root
+ * @returns {Promise<{ ok: boolean, detail: string, secrets: string[] }>}
+ */
+async function checkConfigSecrets(dir) {
+  const secrets = await findSharedSecrets(dir);
+  const list = secrets.join(", ");
+
+  // Checked first and reported alone: it is the file the keys are in, so it
+  // is the more urgent of the two even when the shared file is also wrong.
+  if (isGitTracked(LOCAL_CONFIG_FILE, dir)) {
+    const also = secrets.length > 0
+      ? ` .n-dx.json also contains ${list}.`
+      : "";
+    return {
+      ok: false,
+      detail:
+        `${LOCAL_CONFIG_FILE} is tracked by git — it holds every API key \`ndx config\` writes and must stay ignored. ` +
+        `Run \`git rm --cached ${LOCAL_CONFIG_FILE}\`, restore its \`.gitignore\` line, and rotate any key it has held.${also}`,
+      secrets,
+    };
+  }
+
+  if (secrets.length === 0) {
+    return { ok: true, detail: "no API keys in .n-dx.json", secrets };
+  }
+  if (isGitTracked(".n-dx.json", dir)) {
+    return {
+      ok: false,
+      detail: `.n-dx.json is committed to git and contains ${list} — rotate the key, then re-run \`ndx config <key> <value>\` so it is written to ${LOCAL_CONFIG_FILE}`,
+      secrets,
+    };
+  }
+  return {
+    ok: true,
+    detail: `.n-dx.json contains ${list} — re-run \`ndx config <key> <value>\` to move it to ${LOCAL_CONFIG_FILE} before committing`,
+    secrets,
+  };
+}
 
 /**
  * Get the Unix timestamp of the most recent git commit that touched a file.

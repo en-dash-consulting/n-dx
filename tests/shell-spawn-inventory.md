@@ -43,7 +43,7 @@ PowerShell (no `sh`) and from Git Bash (`sh` at `/usr/bin/sh`), same commit.
 
 | Site | Kind | Cases needing `sh` | Before | Guard |
 |------|------|-----|--------|-------|
-| `tests/e2e/stop-orphan-children.test.js` | scaffolding | 1 of 2 | 1 false failure (`expected false to be true` after a 5s wait) | `itNeedsPosixShell` + spawn error surfaced |
+| `tests/e2e/stop-orphan-children.test.js` | scaffolding | 1 of 2 | 1 false failure (`expected false to be true` after a 5s wait) | `itNeedsPosixShell` + spawn error, shell exit status and shell stderr surfaced |
 | `tests/integration/exec-interrupt-forwarding.test.js` | scaffolding | 2 of 3 | 1 false failure, 10s burn | `describeNeedsPosixShell` (the listener-registration case spawns node directly and runs ungated on every host) |
 | `packages/llm-client/tests/integration/exec-timeout-tree-kill.test.ts` | scaffolding | 6 of 6 | 4 false failures + **2 false passes** | `describeEachNeedsPosixShell` |
 | `packages/hench/tests/unit/tools/shell.test.ts` | under test | 14 of 34 | 13 false failures + **1 false pass** | `describeNeedsPosixShell` ×4, `itNeedsPosixShell` ×2 |
@@ -107,6 +107,14 @@ process.
    output; a failed launch must stay observable, and when the spawn happens in a
    helper process, record it somewhere the assertion can read it back (see
    `stop-orphan-children.test.js`).
+   Three failures hide behind a shell, not one: spawn's `error` event covers only
+   the shell itself. What the shell *launches* fails on the shell's stderr, and
+   its status is lost unless you ask for it — `wait` with no operand exits 0 no
+   matter how its jobs died, so background a job as `cmd & pid=$!` and
+   `wait "$pid"`. A grandchild that cannot start (Windows `sh` from Git for
+   Windows, whose PATH need not contain Node) otherwise presents as a silent
+   readiness timeout. Pass absolute, `/`-separated executable paths for the same
+   reason.
 3. Check whether your assertion can pass *without* the shell. If it can, it is a
    false pass waiting to happen — guard it even though it is green today.
 4. Add a row here. This step is enforced:

@@ -28,7 +28,6 @@ function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: nu
 }
 
 describe("Config API routes", () => {
-  let parentDir: string;
   let tmpDir: string;
   let ctx: ServerContext;
   let server: Server;
@@ -36,10 +35,7 @@ describe("Config API routes", () => {
 
   beforeEach(async () => {
     clearConfigCaches();
-    // Nest tmpDir inside a dedicated parent so detectProjects' parent-dir scan
-    // stays bounded — scanning the system tmpdir directly can have 30k+ entries.
-    parentDir = await mkdtemp(join(tmpdir(), "config-api-parent-"));
-    tmpDir = join(parentDir, "project");
+    tmpDir = await mkdtemp(join(tmpdir(), "config-api-"));
     const svDir = join(tmpDir, ".sourcevision");
     const rexDir = join(tmpDir, ".rex");
     await mkdir(svDir, { recursive: true });
@@ -51,7 +47,7 @@ describe("Config API routes", () => {
 
   afterEach(async () => {
     await closeRouteTestServer(server);
-    await rm(parentDir, { recursive: true, force: true });
+    await rm(tmpDir, { recursive: true, force: true });
   });
 
   // ── GET /api/ndx-config ──────────────────────────────────────────────
@@ -122,6 +118,25 @@ describe("Config API routes", () => {
       expect(data.authMethod).toBe("api-key");
     });
 
+    it("detects api-key auth when the key lives only in .n-dx.local.json", async () => {
+      // `ndx config *.api_key` writes to the gitignored local file; the shared
+      // file may exist without the key. The footer must still show ✓.
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "claude" } }),
+      );
+      await writeFile(
+        join(tmpDir, ".n-dx.local.json"),
+        JSON.stringify({ claude: { api_key: "sk-ant-local" } }),
+      );
+
+      clearConfigCaches();
+      const res = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
+      const data = await res.json();
+
+      expect(data.authMethod).toBe("api-key");
+    });
+
     it("detects cli auth method from provider", async () => {
       const henchDir = join(tmpDir, ".hench");
       await mkdir(henchDir, { recursive: true });
@@ -170,58 +185,6 @@ describe("Config API routes", () => {
       // Second request should use cache (no need to clear)
       const res2 = await fetch(`http://127.0.0.1:${port}/api/ndx-config`);
       expect(res2.status).toBe(200);
-    });
-  });
-
-  // ── GET /api/projects ────────────────────────────────────────────────
-
-  describe("GET /api/projects", () => {
-    it("returns the active project", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/projects`);
-      expect(res.status).toBe(200);
-
-      const data = await res.json();
-      expect(Array.isArray(data)).toBe(true);
-      expect(data.length).toBeGreaterThanOrEqual(1);
-
-      const active = data.find((p: { active: boolean }) => p.active);
-      expect(active).toBeDefined();
-      expect(active.path).toBe(tmpDir);
-      expect(active.tools.sourcevision).toBe(true);
-      expect(active.tools.rex).toBe(true);
-    });
-
-    it("detects sibling projects", async () => {
-      // Create a sibling project directory
-      const parentDir = join(tmpDir, "..");
-      const siblingDir = join(parentDir, "sibling-project-test-ndx");
-      await mkdir(join(siblingDir, ".rex"), { recursive: true });
-      await writeFile(
-        join(siblingDir, "package.json"),
-        JSON.stringify({ name: "sibling-project" }),
-      );
-
-      try {
-        clearConfigCaches();
-        const res = await fetch(`http://127.0.0.1:${port}/api/projects`);
-        const data = await res.json();
-
-        const sibling = data.find((p: { name: string }) => p.name === "sibling-project");
-        expect(sibling).toBeDefined();
-        expect(sibling.active).toBe(false);
-        expect(sibling.tools.rex).toBe(true);
-      } finally {
-        await rm(siblingDir, { recursive: true, force: true });
-      }
-    });
-
-    it("active project is always first", async () => {
-      const res = await fetch(`http://127.0.0.1:${port}/api/projects`);
-      const data = await res.json();
-
-      if (data.length > 0) {
-        expect(data[0].active).toBe(true);
-      }
     });
   });
 

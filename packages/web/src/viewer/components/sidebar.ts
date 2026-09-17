@@ -13,6 +13,7 @@ import {
   HenchActivityIndicator,
 } from "../api.js";
 import { ConfigFooter } from "./config-footer.js";
+import type { ServerIdentity } from "./config-footer.js";
 import { useProjectMetadata, useFeatureToggle, useCliName } from "../api.js";
 import { resolveCliLabel } from "../hooks/index.js";
 import { SOURCEVISION_TABS } from "../api.js";
@@ -29,6 +30,8 @@ interface SidebarProps {
   onToggleSidebar: () => void;
   /** When set, restricts sidebar to a single package section. */
   scope?: string | null;
+  /** Server identity for the footer's identity line; null on an older server. */
+  server?: ServerIdentity | null;
 }
 
 type NavItem = {
@@ -51,6 +54,12 @@ interface SectionGroup {
 }
 
 const NAV_ENTRIES: NavEntry[] = [
+  // First because it is the "which checkout am I looking at" question, which
+  // comes before anything a single checkout can tell you. Sections are an
+  // accordion — exactly one is open — so putting it here also means HENCH is
+  // collapsed while the board is showing, without a special rule for it.
+  { type: "section", label: "WORKSPACES" },
+  { type: "item", id: "workspaces", icon: "◱", label: "Overview", minPass: 0, requiresServer: true },
   { type: "section", label: "SOURCEVISION", product: "sourcevision" },
   ...SOURCEVISION_TABS.map((tab) => ({ type: "item" as const, ...tab })),
   { type: "section", label: "REX", product: "rex" },
@@ -101,6 +110,12 @@ function buildSections(): SectionGroup[] {
 
 const SECTIONS = buildSections();
 
+/**
+ * Section expanded when the active view belongs to none — named rather than
+ * positional so inserting a section at the top does not silently move it.
+ */
+const FALLBACK_SECTION = "SOURCEVISION";
+
 /** Find which section label owns the given view */
 function sectionForView(view: ViewId): string {
   for (const section of SECTIONS) {
@@ -108,7 +123,7 @@ function sectionForView(view: ViewId): string {
       return section.label;
     }
   }
-  return SECTIONS[0].label;
+  return FALLBACK_SECTION;
 }
 
 /** Expand the section that owns the active view so the highlighted item is always visible on load */
@@ -125,7 +140,7 @@ for (const section of SECTIONS) {
 }
 
 
-export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, onToggleSidebar, scope }: SidebarProps) {
+export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, onToggleSidebar, scope, server = null }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const projectStatus = useProjectStatus();
   const projectMeta = useProjectMetadata();
@@ -151,18 +166,22 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
       ? SECTIONS.filter((s) => s.product === scope || !s.product)
       : SECTIONS;
     // Filter out feature-gated items that are disabled, then resolve the
-    // {cli} placeholder in command-reference labels.
-    return scopeFiltered.map((s) => ({
-      ...s,
-      items: s.items
-        .filter((item) => {
-          // Server-rendered views have nothing to show in a static export.
-          if (item.requiresServer && isDeployedMode()) return false;
-          if (!item.featureGate) return true;
-          return enabledGates.get(item.featureGate) ?? false;
-        })
-        .map((item) => ({ ...item, label: resolveCliLabel(item.label, cliName) })),
-    }));
+    // {cli} placeholder in command-reference labels. A section left with no
+    // items — WORKSPACES in a static export, where its one item needs a
+    // server — is dropped rather than rendered as a header over nothing.
+    return scopeFiltered
+      .map((s) => ({
+        ...s,
+        items: s.items
+          .filter((item) => {
+            // Server-rendered views have nothing to show in a static export.
+            if (item.requiresServer && isDeployedMode()) return false;
+            if (!item.featureGate) return true;
+            return enabledGates.get(item.featureGate) ?? false;
+          })
+          .map((item) => ({ ...item, label: resolveCliLabel(item.label, cliName) })),
+      }))
+      .filter((s) => s.items.length > 0);
   }, [scope, enabledGates, cliName]);
 
   const [expandedSection, setExpandedSection] = useState<string>(() =>
@@ -451,7 +470,7 @@ export function Sidebar({ view, onNavigate, manifest, zones, sidebarCollapsed, o
     !sidebarCollapsed
       ? h("div", { class: "sidebar-footer", role: "group", "aria-label": "Sidebar controls" },
           h("div", { class: "sidebar-footer-divider", "aria-hidden": "true" }),
-          h(ConfigFooter, null),
+          h(ConfigFooter, { server }),
           h("div", { class: "sidebar-footer-divider", "aria-hidden": "true" }),
           h("div", { class: "sidebar-footer-controls" },
             h(SidebarDensitySelector, null),

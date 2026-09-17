@@ -4,76 +4,24 @@
  * die immediately instead of being adopted into a set no future sweep drains.
  *
  * These use real processes. The unit tests verify the selected signals with
- * fakes; this suite proves those signals actually remove an OS process.
+ * fakes; this suite proves those signals actually remove an OS process. The
+ * terminators those paths share are proved the same way in
+ * `terminate-tree-liveness.test.js`; the fixtures are common to both.
  */
-import { afterEach, describe, expect, it } from "vitest";
-import { spawn } from "node:child_process";
+import { afterEach, describe, it } from "vitest";
+import { createChildProcessTracker } from "../../packages/core/child-lifecycle.js";
 import {
-  createChildProcessTracker,
-  treeKillSpawnOptions,
-} from "../../packages/core/child-lifecycle.js";
-
-const EXIT_TIMEOUT_MS = 3_000;
+  reapPids,
+  spawnIdleChild,
+  spawnProcessTree,
+  waitForPidExit,
+} from "../helpers/real-process-tree.js";
 
 /** @type {number[]} */
 let pidsToReap = [];
 
-function isPidRunning(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function waitForPidExit(pid, label) {
-  const deadline = Date.now() + EXIT_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    if (!isPidRunning(pid)) return;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-
-  throw new Error(`${label} (pid ${pid}) remained alive after the cleanup gate.`);
-}
-
-function waitForGrandchildPid(child) {
-  return new Promise((resolve, reject) => {
-    let output = "";
-    const timeout = setTimeout(() => {
-      finish(reject, new Error("Timed out waiting for the detached child to spawn its grandchild."));
-    }, EXIT_TIMEOUT_MS);
-
-    const onData = (chunk) => {
-      output += chunk;
-      const match = output.match(/^(\d+)\r?\n/);
-      if (match) finish(resolve, Number.parseInt(match[1], 10));
-    };
-    const onError = (error) => finish(reject, error);
-    const onExit = () => finish(reject, new Error(`Detached child exited before reporting its grandchild PID: ${output}`));
-
-    function finish(settle, value) {
-      clearTimeout(timeout);
-      child.stdout.removeListener("data", onData);
-      child.removeListener("error", onError);
-      child.removeListener("exit", onExit);
-      settle(value);
-    }
-
-    child.stdout.on("data", onData);
-    child.once("error", onError);
-    child.once("exit", onExit);
-  });
-}
-
 afterEach(() => {
-  for (const pid of pidsToReap) {
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      // The assertion already proved this child exited.
-    }
-  }
+  reapPids(pidsToReap);
   pidsToReap = [];
 });
 
@@ -82,9 +30,7 @@ describe("late child registration after the cleanup gate", () => {
     const tracker = createChildProcessTracker();
     await tracker.cleanup();
 
-    const child = tracker.register(
-      spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" }),
-    );
+    const child = tracker.register(spawnIdleChild());
     pidsToReap = [child.pid];
 
     await waitForPidExit(child.pid, "Late child");
@@ -98,21 +44,7 @@ describePosix("late detached child registration after the cleanup gate", () => {
     const tracker = createChildProcessTracker({ treeKill: true });
     await tracker.cleanup();
 
-    const child = spawn(
-      process.execPath,
-      [
-        "-e",
-        [
-          "const { spawn } = require('node:child_process');",
-          "const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
-          "process.stdout.write(String(grandchild.pid).slice(0, 1));",
-          "setTimeout(() => process.stdout.write(String(grandchild.pid).slice(1) + '\\n'), 10);",
-          "setInterval(() => {}, 1000);",
-        ].join(" "),
-      ],
-      { stdio: ["ignore", "pipe", "ignore"], ...treeKillSpawnOptions() },
-    );
-    const grandchildPid = await waitForGrandchildPid(child);
+    const { child, grandchildPid } = await spawnProcessTree();
     pidsToReap = [child.pid, grandchildPid];
 
     tracker.register(child);
@@ -131,21 +63,7 @@ describeWindows("late Windows child registration after the cleanup gate", () => 
     const tracker = createChildProcessTracker({ treeKill: true });
     await tracker.cleanup();
 
-    const child = spawn(
-      process.execPath,
-      [
-        "-e",
-        [
-          "const { spawn } = require('node:child_process');",
-          "const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
-          "process.stdout.write(String(grandchild.pid).slice(0, 1));",
-          "setTimeout(() => process.stdout.write(String(grandchild.pid).slice(1) + '\\n'), 10);",
-          "setInterval(() => {}, 1000);",
-        ].join(" "),
-      ],
-      { stdio: ["ignore", "pipe", "ignore"], ...treeKillSpawnOptions() },
-    );
-    const grandchildPid = await waitForGrandchildPid(child);
+    const { child, grandchildPid } = await spawnProcessTree();
     pidsToReap = [child.pid, grandchildPid];
 
     tracker.register(child);

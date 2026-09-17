@@ -21,6 +21,12 @@ import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { safeDecodeSegment } from "../shared/index.js";
+import {
+  validateConfigKeyValue,
+  getConfigValue as getNestedValue,
+  setConfigValue as setNestedValue,
+} from "./hench-config-fields.js";
 
 const ADAPTIVE_PREFIX = "/api/hench/adaptive/";
 
@@ -478,28 +484,6 @@ function generateAdjustments(
 
 // ── Config mutation helpers ──────────────────────────────────────────
 
-function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const parts = path.split(".");
-  let current = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
-    if (!(parts[i] in current) || typeof current[parts[i]] !== "object" || current[parts[i]] === null) {
-      current[parts[i]] = {};
-    }
-    current = current[parts[i]] as Record<string, unknown>;
-  }
-  current[parts[parts.length - 1]] = value;
-}
-
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const parts = path.split(".");
-  let current: unknown = obj;
-  for (const part of parts) {
-    if (current === null || current === undefined || typeof current !== "object") return undefined;
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
-}
-
 // ── Route handler ────────────────────────────────────────────────────
 
 /** Handle adaptive workflow adjustment API requests. Returns true if handled. */
@@ -587,7 +571,7 @@ export function handleAdaptiveRoute(
   // POST /api/hench/adaptive/lock/:key — lock a config key
   const lockMatch = path.match(/^lock\/(.+)$/);
   if (lockMatch && method === "POST") {
-    const key = decodeURIComponent(lockMatch[1]);
+    const key = safeDecodeSegment(lockMatch[1]);
     const state = loadAdaptiveState(ctx.projectDir);
     if (!state.settings.lockedKeys.includes(key)) {
       state.settings.lockedKeys.push(key);
@@ -600,7 +584,7 @@ export function handleAdaptiveRoute(
   // POST /api/hench/adaptive/unlock/:key — unlock a config key
   const unlockMatch = path.match(/^unlock\/(.+)$/);
   if (unlockMatch && method === "POST") {
-    const key = decodeURIComponent(unlockMatch[1]);
+    const key = safeDecodeSegment(unlockMatch[1]);
     const state = loadAdaptiveState(ctx.projectDir);
     state.settings.lockedKeys = state.settings.lockedKeys.filter((k) => k !== key);
     saveAdaptiveState(ctx.projectDir, state);
@@ -616,7 +600,7 @@ export function handleAdaptiveRoute(
   // DELETE /api/hench/adaptive/override/:key — remove a manual override
   const overrideMatch = path.match(/^override\/(.+)$/);
   if (overrideMatch && method === "DELETE") {
-    const key = decodeURIComponent(overrideMatch[1]);
+    const key = safeDecodeSegment(overrideMatch[1]);
     const state = loadAdaptiveState(ctx.projectDir);
     delete state.overrides[key];
     state.settings.lockedKeys = state.settings.lockedKeys.filter((k) => k !== key);
@@ -661,7 +645,7 @@ async function handleUpdateSettings(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -701,7 +685,7 @@ async function handleApplyAdjustment(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -717,6 +701,14 @@ async function handleApplyAdjustment(
 
   if (!configKey || newValue === undefined) {
     errorResponse(res, 400, "Request must include 'configKey' and 'newValue'");
+    return true;
+  }
+
+  // Only a known config field with a correctly-typed value may be written, and
+  // never a prototype-poisoning path. Refuse before touching the config file.
+  const applyError = validateConfigKeyValue(configKey, newValue);
+  if (applyError) {
+    errorResponse(res, 400, applyError);
     return true;
   }
 
@@ -777,7 +769,7 @@ async function handleDismissAdjustment(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -817,7 +809,7 @@ async function handleSetOverride(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -829,6 +821,14 @@ async function handleSetOverride(
 
   if (!key || value === undefined) {
     errorResponse(res, 400, "Request must include 'key' and 'value'");
+    return true;
+  }
+
+  // Same gate as apply: an override may only set a known config field to a
+  // correctly-typed value, never an invented key or a prototype segment.
+  const overrideError = validateConfigKeyValue(key, value);
+  if (overrideError) {
+    errorResponse(res, 400, overrideError);
     return true;
   }
 

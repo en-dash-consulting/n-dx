@@ -412,6 +412,18 @@
   padding: 0 8px;
 }
 
+/* Identity line: which n-dx, from where, serving what. Always visible. */
+.config-footer-identity {
+  padding: var(--space-1) var(--space-2);
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
 .config-footer-toggle {
   display: flex;
   align-items: center;

@@ -279,13 +279,20 @@ async function tryAcquire(lockPath: string, token: string): Promise<LockBackend 
 
 /**
  * Remove the lock file only if it still carries our ownership token.
- * A lock taken over by another writer (different token) is left untouched.
+ *
+ * This is the one place in this module that deletes a lock, so it deletes only
+ * on positive proof of ownership. Content that does not decode proves nothing:
+ * it is not evidence the lock is ours, and a replacement published by a build
+ * whose lock shape this one cannot parse would be unlinked out from under a
+ * live holder. Anything we cannot read as our own token — a takeover, a
+ * foreign format, an unreadable path — is left exactly where it is, to be
+ * resolved by the same manual cleanup every other unowned lock gets.
  */
 async function releaseIfOwner(lockPath: string, token: string, backend: LockBackend): Promise<void> {
   try {
     const ownerPath = backend === "directory" ? `${lockPath}/${FALLBACK_OWNER_FILE}` : lockPath;
     const info = decodeLock(await readFile(ownerPath, "utf-8"));
-    if (info && info.token !== token) return; // No longer ours
+    if (info?.token !== token) return; // No longer provably ours
     await unlink(ownerPath);
     if (backend === "directory") await rmdir(lockPath);
   } catch {

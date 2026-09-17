@@ -45,6 +45,17 @@ if (redirectScript) {
       const childOptions = isDocsBuild && process.platform === "win32"
         ? { ...options, detached: true }
         : options;
+      if (childOptions?.shell) {
+        // The docs-build spawn is shell-backed on Windows, and a shell spawn
+        // concatenates command + args unquoted — so a node.exe under
+        // "C:\Program Files" splits at the space and the double never runs
+        // (green on GitHub runners only because their node path has no
+        // spaces). Hand cmd.exe one pre-quoted command string instead.
+        const quoted = [childCommand, redirectScript, ...childArgs]
+          .map((part) => `"${part}"`)
+          .join(" ");
+        return originalSpawn.call(this, quoted, [], childOptions);
+      }
       return originalSpawn.call(this, childCommand, [redirectScript, ...childArgs], childOptions);
     }
 

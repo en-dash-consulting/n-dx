@@ -148,7 +148,7 @@ describe("file-lock", () => {
     // A waiter must queue behind a live holder rather than unlinking its lock
     // and entering concurrently (the root cause of folder-tree corruption).
     // In-process this is guaranteed by the mutex; across processes it is the
-    // liveness check in isLockStale.
+    // liveness check in assessLock.
     const p1 = withLock(
       lockPath,
       async () => {
@@ -184,6 +184,27 @@ describe("file-lock", () => {
     await release();
 
     // The usurper's lock must survive the original holder's release.
+    await expect(stat(lockPath)).resolves.toBeTruthy();
+    await rm(lockPath, { force: true });
+  });
+
+  it("release leaves a replacement lock whose format it cannot decode", async () => {
+    // The release path is the only place this module deletes a lock, and it
+    // must delete one only on positive proof of ownership. A replacement
+    // published by a build whose lock shape this one cannot parse decodes to
+    // nothing — that is absence of evidence, not evidence the lock is ours.
+    // Format skew between concurrent builds is real: a mismatched global rex
+    // writing into a checked-out tree is how it shows up in practice.
+    const lockPath = await makeLockPath();
+    const release = await acquireLock(lockPath);
+
+    await writeFile(
+      lockPath,
+      JSON.stringify({ pid: String(process.ppid), owner: "a build we cannot parse" }),
+    );
+
+    await release();
+
     await expect(stat(lockPath)).resolves.toBeTruthy();
     await rm(lockPath, { force: true });
   });

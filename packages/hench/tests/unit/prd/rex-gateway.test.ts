@@ -39,6 +39,9 @@ const EXPECTED_EXPORTS = [
   "findActionableTasks",
   "collectCompletedIds",
   "explainSelection",
+  // Cross-worktree task claims
+  "openClaimsStore",
+  "resolveClaimHolder",
   // Timestamps
   "computeTimestampUpdates",
   // Parent auto-completion

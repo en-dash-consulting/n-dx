@@ -12,6 +12,7 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerContext } from "./types.js";
+import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
 import { computeStats, collectCompletedIds, findNextTask, walkTree } from "./rex-gateway.js";
@@ -135,11 +136,12 @@ interface StatusCache {
 /** Cache TTL — 5 seconds. Short enough for real-time feel, long enough to avoid thrashing. */
 const CACHE_TTL_MS = 5_000;
 
-let cache: StatusCache | null = null;
+/** One cache slot per workspace — a status computed for worktree A is not worktree B's. */
+const statusCaches = new WorkspaceScoped<{ entry: StatusCache | null }>(() => ({ entry: null }));
 
-/** Clear the status cache (exposed for testing). */
+/** Clear the status cache for every workspace (exposed for testing and route invalidation). */
 export function clearStatusCache(): void {
-  cache = null;
+  statusCaches.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -374,17 +376,14 @@ export function handleStatusRoute(
   if (method !== "GET" || url !== STATUS_PREFIX) return false;
 
   const now = Date.now();
-  if (
-    cache &&
-    cache.projectDir === ctx.projectDir &&
-    now - cache.timestamp < CACHE_TTL_MS
-  ) {
-    jsonResponse(res, 200, cache.status);
+  const slot = statusCaches.get(ctx);
+  if (slot.entry && slot.entry.projectDir === ctx.projectDir && now - slot.entry.timestamp < CACHE_TTL_MS) {
+    jsonResponse(res, 200, slot.entry.status);
     return true;
   }
 
   const status = buildProjectStatus(ctx);
-  cache = { status, projectDir: ctx.projectDir, timestamp: now };
+  slot.entry = { status, projectDir: ctx.projectDir, timestamp: now };
   jsonResponse(res, 200, status);
   return true;
 }

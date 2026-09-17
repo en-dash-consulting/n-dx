@@ -16,6 +16,8 @@ import type { PRDDocument } from "../../../src/schema/v1.js";
 const EXPECTED_TOOLS = [
   "get_prd_status",
   "get_next_task",
+  "claim_task",
+  "release_task",
   "update_task_status",
   "add_item",
   "edit_item",

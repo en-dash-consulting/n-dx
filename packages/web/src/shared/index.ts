@@ -11,6 +11,20 @@ export type { ViewId } from "./view-id.js";
 export type { FeatureToggle, FeaturesResponse } from "./features.js";
 export type { ViewerScope, SourcevisionScopeViewId } from "./view-routing.js";
 export {
+  PROJECT_PATH_PREFIX,
+  WORKSPACE_PATH_PREFIX,
+  detectBasePath,
+  detectViewerBasePath,
+  projectIdFromBasePath,
+  safeDecodeSegment,
+  workspaceKeyFromBasePath,
+  stripWorkspaceSlot,
+  withBasePath,
+  stripBasePath,
+  webSocketUrl,
+} from "./base-path.js";
+export { isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
+export {
   SOURCEVISION_SCOPE_VIEWS,
   REX_SCOPE_VIEWS,
   HENCH_SCOPE_VIEWS,

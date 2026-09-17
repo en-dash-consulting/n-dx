@@ -19,9 +19,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { initGitFixtureRepoSync } from "../helpers/index.js";
+import { commitGitFixtureBaseline } from "../helpers/index.js";
 import { initConfig } from "../../src/store/config.js";
 import { defaultRegistry } from "../../src/prd/llm-gateway.js";
 import type {
@@ -68,9 +68,7 @@ describe("Gemini agentic tool-use loop", () => {
 
     // Completion validation discovers changes via git; without a repo (and a
     // baseline commit) every completion claim is rejected as unverifiable.
-    initGitFixtureRepoSync(projectDir);
-    execFileSync("git", ["add", "-A"], { cwd: projectDir, stdio: "ignore" });
-    execFileSync("git", ["commit", "-m", "baseline"], { cwd: projectDir, stdio: "ignore" });
+    commitGitFixtureBaseline(projectDir);
   });
 
   afterEach(async () => {
@@ -224,6 +222,58 @@ describe("Gemini agentic tool-use loop", () => {
     expect(result.run.error).toContain("No changes detected");
 
     // The task went back to pending — not completed — so the next cycle retries it.
+    const doc = await store.loadDocument();
+    const task = doc!.items.find((i: { id: string }) => i.id === "task-1");
+    expect(task!.status).toBe("pending");
+  });
+
+  it("rejects a completion whose only output is hench's own commit-message handoff", async () => {
+    // `.hench-commit-msg.txt` is hench's scratch file, written at the repo
+    // root so neither the `.rex/` nor the `.hench/` bookkeeping prefix covers
+    // it. Writing it is not doing the task, and a run that wrote nothing else
+    // must not satisfy the git-derived completion gate on it.
+    const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../src/store/config.js");
+
+    const provider = mockGeminiProvider([
+      {
+        parts: [{ functionCall: { name: "write_file", args: { path: ".hench-commit-msg.txt", content: "feat: nothing at all\n" } } }],
+        functionCalls: [{ name: "write_file", args: { path: ".hench-commit-msg.txt", content: "feat: nothing at all\n" } }],
+        text: "",
+        finishReason: "STOP",
+        usage: { input: 20, output: 5 },
+      },
+      {
+        parts: [{ text: "Done." }],
+        functionCalls: [],
+        text: "Done.",
+        finishReason: "STOP",
+        usage: { input: 10, output: 3 },
+      },
+    ]);
+    vi.spyOn(defaultRegistry, "getActiveProvider").mockReturnValue(provider);
+
+    const config = await loadConfig(henchDir);
+    config.skipFullTestGate = true;
+    const store = createStore("file", join(projectDir, ".rex"));
+
+    const result = await agentLoop({
+      config, store, projectDir, henchDir,
+      model: "gemini-2.5-pro", yes: true, autonomous: true,
+    });
+
+    // The handoff file really was written — the rejection is the gate's
+    // judgement about it, not the write failing. It is no longer at the repo
+    // root by the time the run ends: a run that does not commit has its
+    // proposed message moved beside the run record, so the next run's watcher
+    // cannot commit under it (see stale-commit-msg-quarantine.test.ts).
+    expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
+    expect(readFileSync(join(henchDir, "runs", `${result.run.id}.commit-msg.txt`), "utf-8"))
+      .toBe("feat: nothing at all\n");
+    expect(result.run.status).toBe("failed");
+    expect(result.run.error).toContain("No changes detected");
+
     const doc = await store.loadDocument();
     const task = doc!.items.find((i: { id: string }) => i.id === "task-1");
     expect(task!.status).toBe("pending");

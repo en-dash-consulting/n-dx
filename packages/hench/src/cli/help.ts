@@ -129,18 +129,21 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "\n" +
       "Token usage is read from the current Claude Code session's transcript,\n" +
       "which is where Claude Code records the API's own usage numbers; the\n" +
-      "session is located via CLAUDE_CODE_SESSION_ID. Only the spend since the\n" +
-      "previous record for that session is claimed, so several tasks completed\n" +
-      "in one session each get their own slice rather than all claiming the\n" +
-      "session total. The watermark lives in .hench/usage-cursors/.\n" +
+      "session is located via CLAUDE_CODE_SESSION_ID. When 'hench usage mark\n" +
+      "--task=<id>' was run at the start of the task, the record claims exactly\n" +
+      "what accumulated after that mark — the difference between two positions\n" +
+      "in the transcript, computed here, per token class. Without a mark it\n" +
+      "falls back to the spend since the previous record for the session (a\n" +
+      "warning names the mark command). Marks and the watermark live in\n" +
+      ".hench/usage-cursors/.\n" +
       "\n" +
-      "Precedence: explicit --*-tokens flags, then the transcript, then zeros.\n" +
-      "A missing transcript never fails the record — an unrecorded run is worse\n" +
-      "than one missing its tokens.\n" +
+      "Precedence: explicit --*-tokens flags, then the mark, then the session\n" +
+      "watermark, then zeros. A missing transcript never fails the record — an\n" +
+      "unrecorded run is worse than one missing its tokens.\n" +
       "\n" +
-      "With no --startedAt/--since, the FIRST record for a session claims every\n" +
-      "usage-bearing message in the transcript (a warning says how many) — pass\n" +
-      "--startedAt so the record claims only spend from when the work began.\n" +
+      "--startedAt is the run's start time and nothing more: it never selects\n" +
+      "usage. Omit it when a mark exists — the mark knows when the task began.\n" +
+      "--since is an explicit time window for the rare case that needs one.\n" +
       "An unparseable --startedAt/--since value is an error, not a silent no-op.",
     options: [
       { flag: "--task=<id>", description: "Rex task ID the work addressed (required)" },
@@ -149,8 +152,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--summary=<text>", description: "Short description of what was done" },
       { flag: "--turns=<n>", description: "Agent turns (default: the transcript's message count)" },
       { flag: "--no-tokens", description: "Record without token usage (the suppressed spend is discarded — it does not roll into the session's next record)" },
-      { flag: "--startedAt=<iso>", description: "When the work began; also the earliest spend this run may claim" },
-      { flag: "--since=<iso>", description: "Claim spend from this time only (overrides --startedAt)" },
+      { flag: "--mark=<id>", description: "Consume this usage mark instead of the one named by --task" },
+      { flag: "--startedAt=<iso>", description: "Run start time (metadata only; defaults to the mark's time)" },
+      { flag: "--since=<iso>", description: "Claim spend from this time only (explicit window; skips the mark)" },
       { flag: "--session=<id>", description: "Session to read (default: $CLAUDE_CODE_SESSION_ID)" },
       { flag: "--transcript=<path>", description: "Read this transcript instead of searching by session" },
       { flag: "--input-tokens=<n>", description: "Set input tokens by hand (overrides the transcript)" },
@@ -161,12 +165,40 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--format=json", description: "Output the new run ID and usage as JSON" },
     ],
     examples: [
-      { command: "hench record --task=abc123 --status=completed --startedAt=2026-08-25T18:30:00Z", description: "Record a completed assisted run, claiming usage from when the work began" },
-      { command: "hench record --task=abc123 --status=completed", description: "Without --startedAt: a first record claims the whole session's usage (warned)" },
+      { command: "hench usage mark --task=abc123 && … && hench record --task=abc123 --status=completed", description: "Mark at the start, record at the end: usage is the difference" },
+      { command: "hench record --task=abc123 --status=completed", description: "Without a mark: claims the spend since the session's previous record (warned)" },
       { command: "hench record --task=abc123 --title=\"Add auth\" --summary=\"Implemented login\"", description: "Record with title and summary" },
       { command: "hench record --task=abc123 --no-tokens", description: "Record without attributing any token usage" },
     ],
-    related: ["run", "status", "show"],
+    related: ["usage", "run", "status", "show"],
+  },
+  usage: {
+    tool: "hench",
+    command: "usage",
+    summary: "mark where a task's token usage starts",
+    usage: "hench usage mark --task=<id> [dir] | hench usage marks [dir]",
+    description:
+      "mark: snapshot the current Claude Code session's cumulative token usage\n" +
+      "and transcript position under the task id, in .hench/usage-cursors/. Run\n" +
+      "it the moment a task begins; 'hench record --task=<id>' then reports the\n" +
+      "difference between that snapshot and the transcript at record time —\n" +
+      "arithmetic on two positions in the same file, no typed timestamp.\n" +
+      "Re-marking the same task overwrites. Without a session or transcript it\n" +
+      "warns and marks nothing; the record then falls back to the watermark.\n" +
+      "\n" +
+      "marks: list the marks the session still holds.",
+    options: [
+      { flag: "--task=<id>", description: "Task (or skill:<name>) the mark is for (required for mark)" },
+      { flag: "--session=<id>", description: "Session to read (default: $CLAUDE_CODE_SESSION_ID)" },
+      { flag: "--transcript=<path>", description: "Read this transcript instead of searching by session" },
+      { flag: "--format=json", description: "Output the mark as JSON" },
+    ],
+    examples: [
+      { command: "hench usage mark --task=abc123 .", description: "Mark the start of task abc123" },
+      { command: "hench usage mark --task=skill:ndx-plan .", description: "Mark under a skill name when the item id is not known yet" },
+      { command: "hench usage marks .", description: "Show pending marks for this session" },
+    ],
+    related: ["record"],
   },
   status: {
     tool: "hench",
@@ -292,6 +324,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
 const RELATED_COMMANDS: Record<string, string[]> = {
   init: ["run", "config"],
   run: ["status", "show"],
+  record: ["usage", "status", "show"],
+  usage: ["record"],
   status: ["show", "run", "validate-tokens"],
   show: ["status"],
   config: ["template"],

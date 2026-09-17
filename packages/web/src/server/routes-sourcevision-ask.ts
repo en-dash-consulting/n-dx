@@ -617,7 +617,7 @@ async function handleAsk(
   // already out — fall into the catch and attempt a second write.
   let raw: string;
   try {
-    raw = await readBody(req);
+    raw = await readBody(req, res);
   } catch {
     sendError(res, { error: "Could not read the request body.", kind: "invalid_request" });
     return;

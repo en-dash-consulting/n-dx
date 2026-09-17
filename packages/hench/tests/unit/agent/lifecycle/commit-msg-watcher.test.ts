@@ -1,10 +1,11 @@
 /**
  * Unit tests for the timeout handler branches inside commit-msg-watcher.
  *
- * Covers the three observable outcomes when the timer fires:
+ * Covers the four observable outcomes when the timer fires:
  *   1. Empty file   → file deleted, no commit, skip logged.
  *   2. Whitespace   → file deleted, no commit, skip logged.
  *   3. Non-empty    → git commit runs, file deleted.
+ *   4. Git refuses  → no commit claimed, file kept for the normal commit path.
  *
  * Each test uses a real temporary directory so file-system side-effects are
  * directly observable without complex mocking. The git repo is only needed
@@ -125,5 +126,50 @@ describe("startCommitMsgWatcher — timeout handler branches", () => {
     // The commit must exist and the file must be gone.
     expect(await getHeadSubject(projectDir)).toBe("feat: update x to 2");
     expect(existsSync(msgPath)).toBe(false);
+  });
+
+  it("rejected commit: claims no auto-commit and keeps the staged work and message file", async () => {
+    await setupGitRepo(projectDir);
+
+    const { startCommitMsgWatcher } = await import(
+      "../../../../src/agent/lifecycle/commit-msg-watcher.js"
+    );
+
+    // Stage a change, then make git refuse the commit for real. A stale index
+    // lock stands in for the production causes named in the ACs — a rejected
+    // signing request, a failing pre-commit hook, a missing Git identity — all
+    // of which reach this helper the same way: a non-zero `git commit`.
+    await writeFile(join(projectDir, "src.ts"), "export const x = 2;\n", "utf-8");
+    await execAsync("git add src.ts", { cwd: projectDir });
+    await writeFile(join(projectDir, ".git", "index.lock"), "", "utf-8");
+
+    const msgPath = join(projectDir, ".hench-commit-msg.txt");
+    await writeFile(msgPath, "feat: update x to 2", "utf-8");
+
+    const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logged = (): string => consoleLog.mock.calls.flat().join("\n");
+    const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 100 });
+
+    await waitFor(() => logged().includes("Auto-commit failed"));
+    watcher.cancel();
+
+    const output = logged();
+    // The success line and the flag it sets are what made a refused commit read
+    // as a landed one: didAutoCommit() short-circuits performCommitPromptIfNeeded,
+    // so the run's work would stay uncommitted with nobody reporting it.
+    expect(output).toContain("Auto-commit failed");
+    expect(output).not.toContain("committed staged changes");
+    expect(watcher.didAutoCommit()).toBe(false);
+
+    // HEAD unmoved, work still staged, and the message file preserved so the
+    // normal commit prompt can still land it.
+    expect(await getHeadSubject(projectDir)).toBe("initial");
+    expect(existsSync(msgPath)).toBe(true);
+
+    await rm(join(projectDir, ".git", "index.lock"), { force: true });
+    const { stdout: staged } = await execAsync("git diff --cached --name-only", {
+      cwd: projectDir,
+    });
+    expect(staged.trim()).toBe("src.ts");
   });
 });

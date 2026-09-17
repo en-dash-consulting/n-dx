@@ -56,7 +56,8 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { execFile } from "node:child_process";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { removeTempDir } from "../helpers/temp-dir.js";
 import { assertFreshServerBuild } from "../helpers/built-server-guard.js";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -150,7 +151,7 @@ async function runDriver(scope: string, routePath: string): Promise<DriverResult
       stderr,
     };
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    await removeTempDir(dir);
   }
 }
 

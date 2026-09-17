@@ -78,6 +78,8 @@ Claude uses double-underscore prefixes (`mcp__{server}__{tool}`) to namespace to
 |------|-------------|
 | `get_prd_status` | PRD tree with completion stats |
 | `get_next_task` | Next actionable task |
+| `claim_task` | Hold a task for this worktree |
+| `release_task` | Give back a claim |
 | `add_item` | Add epic/feature/task/subtask |
 | `update_task_status` | Update item status |
 | `edit_item` | Edit item content (title, description, priority) |

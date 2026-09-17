@@ -475,10 +475,28 @@ let posixShellProbe: boolean | undefined;
  * cmd.exe, the default shells, do not. Probed at most once per process
  * because the answer cannot change under us and `where` costs a subprocess.
  */
-function hasPosixShell(platform: NodeJS.Platform): boolean {
+export function hasPosixShell(platform: NodeJS.Platform): boolean {
   if (platform !== "win32") return true;
   posixShellProbe ??= isExecutableOnPath("sh");
   return posixShellProbe;
+}
+
+/**
+ * Which shell semantics {@link execShellCmd} will interpret a command under.
+ *
+ * The single source of the sh-vs-cmd.exe decision: {@link buildShellInvocation}
+ * derives its `kind` from this, and a caller that validates a command string
+ * *before* handing it to `execShellCmd` (hench's command guard) must ask the
+ * same question the same way, or it models one shell while another runs.
+ *
+ * Defaults resolve for the current process; pass both arguments to make the
+ * decision a pure function for tests.
+ */
+export function resolveShellKind(
+  platform: NodeJS.Platform = process.platform as NodeJS.Platform,
+  posixShellAvailable: boolean = hasPosixShell(platform),
+): ShellInvocation["kind"] {
+  return platform === "win32" && !posixShellAvailable ? "cmd" : "posix";
 }
 
 /**
@@ -528,7 +546,7 @@ export function buildShellInvocation(
   platform: NodeJS.Platform,
   posixShellAvailable: boolean,
 ): ShellInvocation {
-  if (platform === "win32" && !posixShellAvailable) {
+  if (resolveShellKind(platform, posixShellAvailable) === "cmd") {
     return { cmd: "cmd.exe", args: ["/d", "/s", "/c", `"${command}"`], kind: "cmd" };
   }
   return { cmd: "sh", args: ["-c", command], kind: "posix" };
@@ -641,20 +659,28 @@ function gitRevParsePath(cwd: string, flag: string): string | null {
   }
   if (!output) return null;
 
-  const absolute = isAbsolute(output) ? output : resolvePath(cwd, output);
+  return canonicalizeGitPath(isAbsolute(output) ? output : resolvePath(cwd, output));
+}
+
+/**
+ * Realpath a path git reported, falling back to the path itself.
+ *
+ * `.native` rather than the JS implementation: on Windows only the OS call
+ * expands an 8.3 short name (C:\Users\RUNNER~1\…) to its long form and
+ * returns the canonical on-disk casing. Without it, the same directory
+ * reached through a short path compares unequal to itself, which for the
+ * commit gate means a spurious "the run started in worktree X, but git now
+ * reports Y" refusal. Matches canonicalizePath in packages/core/web.js.
+ *
+ * git reported this path, so it existed a moment ago; a race or a permission
+ * boundary on an intermediate segment is the only way realpath can fail. The
+ * unresolved absolute path is still the correct answer, just without symlink
+ * normalisation — better than discarding it.
+ */
+function canonicalizeGitPath(absolute: string): string {
   try {
-    // `.native` rather than the JS implementation: on Windows only the OS call
-    // expands an 8.3 short name (C:\Users\RUNNER~1\…) to its long form and
-    // returns the canonical on-disk casing. Without it, the same directory
-    // reached through a short path compares unequal to itself, which for the
-    // commit gate means a spurious "the run started in worktree X, but git now
-    // reports Y" refusal. Matches canonicalizePath in packages/core/web.js.
     return realpathSync.native(absolute);
   } catch {
-    // git reported this path, so it existed a moment ago; a race or a
-    // permission boundary on an intermediate segment is the only way to get
-    // here. The unresolved absolute path is still the correct answer, just
-    // without symlink normalisation — better than discarding it.
     return absolute;
   }
 }
@@ -690,6 +716,101 @@ export function getWorktreeRoot(cwd: string): string | null {
  */
 export function getGitCommonDir(cwd: string): string | null {
   return gitRevParsePath(cwd, "--git-common-dir");
+}
+
+/** One entry of `git worktree list`. */
+export interface GitWorktree {
+  /** Realpath-resolved absolute path of the worktree's root. */
+  path: string;
+  /**
+   * Checked-out branch name (`main`, not `refs/heads/main`). null when HEAD
+   * is detached or the entry is a bare repository.
+   */
+  branch: string | null;
+  /** HEAD commit hash. null for a bare repository, which has no checkout. */
+  head: string | null;
+  /**
+   * The main worktree — the one holding the shared `.git` directory. git
+   * always lists it first; every other entry was created by `git worktree add`.
+   */
+  isMain: boolean;
+  /** HEAD is not on a branch. */
+  detached: boolean;
+  /** A bare repository: registered, but with no working files to check out. */
+  bare: boolean;
+}
+
+/** `git worktree list` is a metadata read; anything slower is a stuck git. */
+const WORKTREE_LIST_TIMEOUT_MS = 5_000;
+
+/**
+ * Parse `git worktree list --porcelain`.
+ *
+ * Entries are `worktree <path>` followed by attribute lines (`HEAD <sha>`,
+ * `branch refs/heads/<name>`, `detached`, `bare`) and separated by a blank
+ * line. Attribute lines this parser does not know (`locked`, `prunable`) are
+ * skipped rather than rejected, so a newer git adding one does not empty the
+ * list. Paths are returned as printed; the caller canonicalizes.
+ */
+function parseWorktreeList(porcelain: string): Omit<GitWorktree, "isMain">[] {
+  const entries: Omit<GitWorktree, "isMain">[] = [];
+  let current: Omit<GitWorktree, "isMain"> | null = null;
+
+  for (const rawLine of porcelain.split("\n")) {
+    const line = rawLine.trimEnd();
+    if (line.startsWith("worktree ")) {
+      const path = line.slice("worktree ".length).trim();
+      current = path ? { path, branch: null, head: null, detached: false, bare: false } : null;
+      if (current) entries.push(current);
+      continue;
+    }
+    if (!current) continue;
+    if (line.startsWith("HEAD ")) {
+      current.head = line.slice("HEAD ".length).trim() || null;
+    } else if (line.startsWith("branch ")) {
+      const ref = line.slice("branch ".length).trim();
+      current.branch = ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : ref;
+    } else if (line === "detached") {
+      current.detached = true;
+    } else if (line === "bare") {
+      current.bare = true;
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * Async git helper — every worktree of the repository containing `cwd`.
+ *
+ * The main checkout comes first (`isMain`), then the linked worktrees as
+ * git lists them — by path in current versions, but only the main entry's
+ * position is git's documented contract. Paths are realpath-resolved so they
+ * compare equal to {@link getWorktreeRoot} for the same directory.
+ *
+ * Returns `[]` when git is not installed, `cwd` is not inside a repository,
+ * or git does not answer within {@link WORKTREE_LIST_TIMEOUT_MS}. Those are
+ * the same answer for a caller asking "which worktrees are there?", and
+ * git's `fatal: not a git repository` stays captured rather than reaching
+ * the user's terminal.
+ *
+ * Async, unlike its `getWorktreeRoot` sibling, because its callers are
+ * request handlers and agent loops that must not block on a child process.
+ * The sourcevision analyzer keeps its own synchronous copy for the same
+ * reason in reverse — its scan is synchronous throughout.
+ */
+export async function listWorktrees(cwd: string): Promise<GitWorktree[]> {
+  const result = await exec("git", ["worktree", "list", "--porcelain"], {
+    cwd,
+    timeout: WORKTREE_LIST_TIMEOUT_MS,
+  });
+  if (!result.launched || result.error || result.exitCode !== 0) return [];
+
+  return parseWorktreeList(result.stdout).map((entry, index) => ({
+    ...entry,
+    path: canonicalizeGitPath(entry.path),
+    isMain: index === 0,
+  }));
 }
 
 /**

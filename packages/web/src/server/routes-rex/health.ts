@@ -89,7 +89,7 @@ export function routeHealthReorganize(
   // Body: { proposalIds?: number[], llmProposalIds?: string[] }
   if (path === "reorganize/apply" && method === "POST") {
     return (async () => {
-      const body = await readBody(req);
+      const body = await readBody(req, res);
       let proposalIds: number[];
       let llmProposalIds: string[];
       try {

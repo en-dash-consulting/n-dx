@@ -23,7 +23,7 @@ import { BulkActions } from "../components/prd-tree/bulk-actions.js";
 import { MergePreview } from "../components/prd-tree/merge-preview.js";
 import { PruneConfirmation } from "../components/prd-tree/prune-confirmation.js";
 import { DeleteConfirmation } from "../components/prd-tree/delete-confirmation.js";
-import { BrandedHeader } from "../components/index.js";
+import { BrandedHeader, WorkspaceWriteStrip } from "../components/index.js";
 import { CompletionTimeline } from "../components/prd-tree/completion-timeline.js";
 import type { PRDDocumentData, ItemStatus } from "../components/prd-tree/index.js";
 import type { DetailItem, NavigateTo } from "../types.js";
@@ -36,6 +36,7 @@ import {
   usePersistentFilter,
   useFeatureToggle,
   useFacetState,
+  useClaims,
 } from "../hooks/index.js";
 import { searchTree, collectAllTags, collectAllBranches } from "../components/prd-tree/tree-search.js";
 import { FacetFilter } from "../components/prd-tree/facet-filter.js";
@@ -67,6 +68,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
   // ── Feature toggles ────────────────────────────────────────────
   const showTokenBudget = useFeatureToggle("rex.showTokenBudget", false);
+
+  // ── Cross-worktree claims (read-only chips on claimed rows) ─────
+  const { claimsById } = useClaims();
 
   // ── WebSocket real-time updates ────────────────────────────────
   usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage });
@@ -241,6 +245,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       h("h2", { class: "section-header" }, "Tasks"),
     ),
 
+    // Which tree an edit here lands in — shown only off the anchor.
+    h(WorkspaceWriteStrip, null),
+
     // Deep-link error banner
     deepLinkError
       ? h("div", { class: "prd-deep-link-error", role: "alert" },
@@ -344,6 +351,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
     h(PRDTree, {
       key: "prd",
       document: data,
+      claimsById,
       taskUsageById,
       rollupById,
       weeklyBudget,

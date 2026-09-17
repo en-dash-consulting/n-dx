@@ -18,14 +18,36 @@
  *   ndx start --background [dir]     Start detached (daemon mode)
  *   ndx start stop [dir]             Stop a background server
  *   ndx start status [dir]           Check if server is running
+ *   ndx start [dir]                  Register with the per-user hub (0.7.0) and
+ *                                    serve at http://localhost:3117/p/<id>/
+ *   ndx start --here [dir]           Force the single-project server above
+ *
+ * ## Hub mode (0.7.0)
+ *
+ * `ndx start` resolves the repository through git's worktree list, derives a
+ * stable project id, starts the hub daemon if it is not already answering,
+ * registers this repository (and this worktree) with it, and prints the
+ * project's URL and MCP endpoints. The hub runs one `web serve` child per
+ * repository on an ephemeral port, so two repositories never collide on 3117.
+ * The orchestration rule holds: the hub is spawned (`tools.web hub`) and
+ * talked to over node:http, never imported.
+ *
+ * This is the default; `--here` (or `web.mode: "here"` in .n-dx.json) gets the
+ * single-project server that owns the port itself. `stop` unregisters this
+ * worktree rather than killing the shared hub — the project's server stays up
+ * while another worktree is registered, and the hub exits with its last
+ * project unless `hub.keepAlive` is set in `~/.n-dx/config.json`. `ndx hub
+ * status` and `ndx hub stop` address the hub itself.
  */
 
-import { spawn } from "child_process";
-import { get as httpGet } from "http";
+import { spawn, execFileSync } from "child_process";
+import { get as httpGet, request as httpRequest } from "http";
 import { createConnection } from "net";
+import { createHash } from "crypto";
+import { homedir } from "os";
 import { readFile, writeFile, unlink, access } from "fs/promises";
 import { realpathSync } from "fs";
-import { join, resolve } from "path";
+import { basename, join, resolve } from "path";
 import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
 
@@ -187,9 +209,10 @@ export async function findRelocationPort(
  *
  * @param {number} port
  * @param {number} [timeoutMs]
+ * @param {string} [path]  Endpoint to probe. Default `/api/status`.
  * @returns {Promise<unknown>} Parsed body, or null.
  */
-export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS) {
+export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS, path = "/api/status") {
   return new Promise((res) => {
     let settled = false;
     const done = (value) => {
@@ -199,7 +222,7 @@ export function probeStatusEndpoint(port, timeoutMs = PROBE_TIMEOUT_MS) {
     };
 
     const req = httpGet(
-      { host: "127.0.0.1", port, path: "/api/status", timeout: timeoutMs },
+      { host: "127.0.0.1", port, path, timeout: timeoutMs },
       (response) => {
         if (response.statusCode !== 200) {
           response.resume();
@@ -303,6 +326,35 @@ export function classifyPortOccupant(payload, absDir) {
   return resolved === canonicalizePath(absDir)
     ? { kind: "self", projectDir: resolved }
     : { kind: "peer", projectDir: resolved };
+}
+
+/**
+ * Is the n-dx hub listening on `port`?
+ *
+ * The hub must never be killed to free a port. It is a per-user daemon
+ * supervising one server per registered project, so SIGKILLing it to make room
+ * for a single-project `ndx start --here` orphans every child it was running —
+ * other repositories, other worktrees, none of them this invocation's business.
+ *
+ * `/api/status` cannot answer this. With one project registered the hub
+ * *aliases* the root to that project, so the status probe returns that
+ * project's payload and the hub reads as an ordinary dashboard (`self` when it
+ * happens to serve this directory — straight into the kill path); with several
+ * registered, root requests answer 409 and it reads as `unknown`, which is the
+ * kill path too. `/api/hub/health` is the hub's own endpoint and no project
+ * server answers it.
+ *
+ * @param {number} port
+ * @returns {Promise<{pid: number, projects: number} | null>} Hub identity, or null.
+ */
+export async function probeHubEndpoint(port) {
+  const payload = await probeStatusEndpoint(port, PROBE_TIMEOUT_MS, "/api/hub/health");
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  // Shape check against hub/routes.ts `/health`: `registryPath` is the field
+  // no project server has, so an unrelated `ok: true` service is not a hub.
+  if (payload.ok !== true || typeof payload.registryPath !== "string") return null;
+  if (typeof payload.pid !== "number") return null;
+  return { pid: payload.pid, projects: typeof payload.projects === "number" ? payload.projects : 0 };
 }
 
 /**
@@ -491,6 +543,34 @@ async function writePidFile(dir, pid, port) {
 }
 
 /**
+ * Write the marker files a hub-served directory keeps for compatibility.
+ *
+ * `.n-dx-web.port` carries the HUB's port, so `ndx refresh --live-server`
+ * (which reads only that file and POSTs /api/reload to it) keeps working: the
+ * hub forwards the signal to this project's server. `.n-dx-web.pid` records
+ * the hub's pid tagged `via: "hub"` so every reader of that file — `stop`,
+ * `status`, refresh's conflict detection — can tell a hub registration from a
+ * single-project server and must not kill the hub for it.
+ */
+export async function writeHubMarkerFiles(dir, { hubPid, hubPort, projectId }) {
+  await writeFile(
+    join(dir, PID_FILE),
+    JSON.stringify(
+      { pid: hubPid, port: hubPort, startedAt: new Date().toISOString(), via: "hub", projectId },
+      null,
+      2,
+    ) + "\n",
+    "utf-8",
+  );
+  await writeFile(join(dir, PORT_FILE), String(hubPort) + "\n", "utf-8");
+}
+
+/** True when a pid file records a hub registration rather than a server of its own. */
+export function isHubMarker(info) {
+  return Boolean(info) && info.via === "hub";
+}
+
+/**
  * Remove PID file.
  */
 export async function removePidFile(dir) {
@@ -543,6 +623,14 @@ async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(pro
     return true;
   }
 
+  // A hub marker names the hub's pid, not a server of this directory's own.
+  // Killing it would take every other dashboard on the machine down, so stop
+  // means "unregister this worktree" — the hub decides what that implies for
+  // the project's server and for itself.
+  if (isHubMarker(info)) {
+    return unregisterFromHub(dir, info, label);
+  }
+
   if (!isProcessRunning(info.pid)) {
     log("Server process is no longer running (stale PID file).");
     await removePidFile(dir);
@@ -590,6 +678,15 @@ async function showStatus(dir, port, label = "n-dx server") {
     return;
   }
 
+  if (isHubMarker(info)) {
+    const health = await hubRequest(info.port, "GET", "/api/hub/health");
+    const project = health.status === 200
+      ? await hubRequest(info.port, "GET", `/api/hub/projects/${encodeURIComponent(info.projectId)}`)
+      : { status: 0, body: null };
+    for (const line of formatHubStatus({ label, marker: info, health, project })) log(line);
+    return;
+  }
+
   // The port file reflects the actual port the server bound to (may differ
   // from the PID file's port if dynamic allocation kicked in).
   const actualPort = (await readPortFile(dir)) ?? info.port;
@@ -609,6 +706,576 @@ async function showStatus(dir, port, label = "n-dx server") {
     await removePidFile(dir);
     await removePortFile(dir);
   }
+}
+
+// ── Hub mode (0.7.0) ─────────────────────────────────────────────────────────
+
+const HUB_DEFAULT_PORT = 3117;
+const HUB_REGISTRY_FILE = "hub.json";
+const HUB_PID_FILE = "hub.pid";
+const HUB_CONFIG_FILE = "config.json";
+/** How long a freshly spawned hub gets to answer /api/hub/health. */
+const HUB_START_TIMEOUT_MS = 15_000;
+/** Registering spawns the project server; the hub waits for its port before answering. */
+const HUB_REGISTER_TIMEOUT_MS = 60_000;
+/** Unregistering stops a project server (SIGTERM → grace → SIGKILL) before answering. */
+const HUB_UNREGISTER_TIMEOUT_MS = 30_000;
+/** `ndx hub stop`: long enough for the hub to stop every project server in order. */
+const HUB_STOP_GRACE_MS = Number(process.env.N_DX_STOP_GRACE_MS ?? 10_000);
+
+/** `$N_DX_HOME`, else `~/.n-dx` — the same resolution the hub itself uses. */
+export function hubHome() {
+  return process.env.N_DX_HOME ?? join(homedir(), ".n-dx");
+}
+
+/** Hub port: `~/.n-dx/config.json` → `{ "hub": { "port": N } }`, default 3117. */
+export async function loadHubPort(home = hubHome()) {
+  try {
+    const raw = await readFile(join(home, HUB_CONFIG_FILE), "utf-8");
+    const port = JSON.parse(raw)?.hub?.port;
+    if (Number.isInteger(port) && port > 0 && port <= MAX_PORT) return port;
+  } catch {
+    // absent or malformed — default
+  }
+  return HUB_DEFAULT_PORT;
+}
+
+/** The hub's registry, read-only. Empty when absent or unreadable. */
+export async function readHubRegistry(home = hubHome()) {
+  try {
+    const parsed = JSON.parse(await readFile(join(home, HUB_REGISTRY_FILE), "utf-8"));
+    return parsed && typeof parsed.projects === "object" && parsed.projects ? parsed.projects : {};
+  } catch {
+    return {};
+  }
+}
+
+/** `web.mode` from the project's .n-dx.json: "hub" or "here"; undefined when unset. */
+async function loadConfigMode(dir) {
+  const configPath = join(dir, ".n-dx.json");
+  if (!(await fileExists(configPath))) return undefined;
+  try {
+    const mode = JSON.parse(await readFile(configPath, "utf-8"))?.web?.mode;
+    return mode === "hub" || mode === "here" ? mode : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The main worktree's path from `git worktree list --porcelain` output — git
+ * lists it first. Pure, so the parse is testable without a repository.
+ */
+export function parseMainWorktree(porcelain) {
+  for (const line of porcelain.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      const path = line.slice("worktree ".length).trim();
+      if (path) return path;
+    }
+  }
+  return null;
+}
+
+function gitOutput(cwd, args) {
+  try {
+    return execFileSync("git", args, { cwd, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function realpathOrSelf(path) {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return path;
+  }
+}
+
+/**
+ * Where this directory sits in its repository.
+ *
+ * `repoRoot` is the main worktree (first entry of `git worktree list`) —
+ * the thing the hub registers once per repository — falling back to the
+ * checkout root, and to the directory itself outside git. `worktree` is the
+ * root of the checkout containing `dir`, which is what gets listed under the
+ * project. Paths are realpath-resolved so they compare equal to what the hub
+ * and the project server report.
+ */
+export function resolveRepo(dir) {
+  const absDir = resolve(dir);
+  const toplevel = gitOutput(absDir, ["rev-parse", "--show-toplevel"]);
+  if (!toplevel) {
+    return { repoRoot: realpathOrSelf(absDir), worktree: realpathOrSelf(absDir), branch: null, remoteUrl: null, isRepo: false };
+  }
+  const worktree = realpathOrSelf(toplevel);
+  const porcelain = gitOutput(absDir, ["worktree", "list", "--porcelain"]);
+  const main = porcelain ? parseMainWorktree(porcelain) : null;
+  const repoRoot = main ? realpathOrSelf(main) : worktree;
+  const branchOut = gitOutput(absDir, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  const branch = branchOut && branchOut !== "HEAD" ? branchOut : null;
+  const remoteUrl = gitOutput(absDir, ["remote", "get-url", "origin"]) || null;
+  return { repoRoot, worktree, branch, remoteUrl, isRepo: true };
+}
+
+/** URL- and path-safe slug for a project id. */
+export function slugifyProjectId(name) {
+  const slug = String(name ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+  return slug || "project";
+}
+
+/**
+ * The project's display name: `.rex/config.json` "project", else the
+ * repository directory's basename.
+ */
+async function loadProjectName(repoRoot) {
+  try {
+    const raw = await readFile(join(repoRoot, ".rex", "config.json"), "utf-8");
+    const project = JSON.parse(raw)?.project;
+    if (typeof project === "string" && project.trim()) return project.trim();
+  } catch {
+    // no rex config — basename below
+  }
+  return basename(repoRoot);
+}
+
+/**
+ * A stable id for the repository. The slug of its name, with a 6-hex hash of
+ * the origin URL (or the path, without a remote) appended only when the
+ * registry already holds that id for a *different* repository — two clones
+ * named "app" stay distinct without every project carrying a hash.
+ */
+export function deriveProjectId(name, { repoRoot, remoteUrl, registryProjects }) {
+  const slug = slugifyProjectId(name);
+  const existing = registryProjects?.[slug];
+  if (!existing || existing.repoRoot === repoRoot) return slug;
+  const hash = createHash("sha1").update(remoteUrl || repoRoot).digest("hex").slice(0, 6);
+  return `${slug}-${hash}`;
+}
+
+/** One JSON request to the hub. Resolves `{ status, body }`; status 0 when unreachable. */
+export function hubRequest(port, method, path, body, timeoutMs = PROBE_TIMEOUT_MS) {
+  return new Promise((res) => {
+    const payload = body === undefined ? null : JSON.stringify(body);
+    const req = httpRequest(
+      {
+        host: "127.0.0.1",
+        port,
+        method,
+        path,
+        headers: payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {},
+      },
+      (response) => {
+        let text = "";
+        response.setEncoding("utf-8");
+        response.on("data", (chunk) => { text += chunk; });
+        response.on("end", () => {
+          let parsed = null;
+          try { parsed = text ? JSON.parse(text) : null; } catch { parsed = null; }
+          res({ status: response.statusCode ?? 0, body: parsed });
+        });
+      },
+    );
+    req.setTimeout(timeoutMs, () => req.destroy(new Error("timeout")));
+    req.on("error", () => res({ status: 0, body: null }));
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+/** Whether a hub answers on `port`. */
+async function hubIsHealthy(port) {
+  const { status, body } = await hubRequest(port, "GET", "/api/hub/health");
+  return status === 200 && body?.ok === true;
+}
+
+/**
+ * Make sure a hub is answering on `port`, spawning one detached if not.
+ * Same CLAUDECODE-stripping, detached, unref'd pattern as background mode.
+ */
+async function ensureHub(port, { tools, __dir, home }) {
+  if (await hubIsHealthy(port)) return { spawned: false, pid: null };
+
+  const script = resolve(__dir, tools.web);
+  const { CLAUDECODE: _cc, ...env } = process.env;
+  const child = spawn(process.execPath, [script, "hub", `--port=${port}`], {
+    stdio: "ignore",
+    detached: true,
+    windowsHide: true,
+    env: { ...env, N_DX_HOME: home },
+  });
+  child.unref();
+
+  const deadline = Date.now() + HUB_START_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (await hubIsHealthy(port)) return { spawned: true, pid: child.pid };
+    if (!isProcessRunning(child.pid)) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error(`n-dx hub did not start on port ${port} within ${HUB_START_TIMEOUT_MS}ms`);
+}
+
+/**
+ * "2h 13m", "4m 02s", "12s" — coarse on purpose; a hub's uptime is read to
+ * tell "since I started it" from "since last week", not to the second.
+ */
+export function formatUptime(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return "unknown";
+  const seconds = Math.floor(ms / 1000);
+  const days = Math.floor(seconds / 86_400);
+  const hours = Math.floor((seconds % 86_400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+  return `${seconds}s`;
+}
+
+/** Milliseconds between an ISO timestamp and `now`, or null when unparseable. */
+function uptimeMs(startedAt, now) {
+  const started = Date.parse(startedAt ?? "");
+  return Number.isFinite(started) ? Math.max(0, now - started) : null;
+}
+
+/** Hub uptime as a phrase, omitted entirely when the hub did not say when it started. */
+function uptimePhrase(startedAt, now) {
+  const ms = uptimeMs(startedAt, now);
+  return ms === null ? "" : `, up ${formatUptime(ms)}`;
+}
+
+/**
+ * `ndx start status` for a hub-registered directory.
+ *
+ * Pure: takes the marker file and the two hub responses and returns the lines
+ * to print, so the wording is unit-tested without a hub. Three shapes — the
+ * hub answering about a registered project, the hub answering but not knowing
+ * the project (a stale marker), and no hub answering at all.
+ *
+ * @param {object} args
+ * @param {string} args.label                 "n-dx server" / "n-dx dashboard"
+ * @param {{pid:number,port:number,projectId:string}} args.marker  The `.n-dx-web.pid` hub marker
+ * @param {{status:number,body:any}} args.health   GET /api/hub/health
+ * @param {{status:number,body:any}} args.project  GET /api/hub/projects/:id
+ * @param {number} [args.now]                 Clock, for tests
+ * @returns {string[]}
+ */
+export function formatHubStatus({ label, marker, health, project, now = Date.now() }) {
+  const base = `http://localhost:${marker.port}/p/${encodeURIComponent(marker.projectId)}`;
+
+  if (health.status !== 200) {
+    return [
+      `${label}: this directory is registered with the n-dx hub on port ${marker.port}, but the hub is not answering.`,
+      `  Start it again with 'ndx start .' — the registration is remembered.`,
+    ];
+  }
+
+  const record = project.body?.project;
+  if (!record) {
+    return [
+      `${label}: the n-dx hub is running (PID ${health.body?.pid ?? marker.pid}, port ${marker.port}${uptimePhrase(health.body?.startedAt, now)}),`,
+      `  but no project "${marker.projectId}" is registered with it. Run 'ndx start .' to register this directory again.`,
+    ];
+  }
+
+  const status = record.status ?? {};
+  const serverDetail = status.pid && status.port
+    ? ` (server PID ${status.pid}, port ${status.port})`
+    : status.lastError
+      ? ` (${status.lastError})`
+      : "";
+  const worktrees = Array.isArray(record.worktrees) ? record.worktrees : [];
+
+  const lines = [
+    `${label}: served through the n-dx hub.`,
+    `  Hub:        PID ${health.body?.pid ?? marker.pid}, port ${marker.port}${uptimePhrase(health.body?.startedAt, now)}`,
+    `  Project:    "${record.id}" is ${status.state ?? "unknown"}${serverDetail}`,
+    `  Repository: ${record.repoRoot}`,
+  ];
+  if (worktrees.length > 0) {
+    lines.push(`  Worktrees:  ${worktrees.length} registered`);
+    for (const worktree of worktrees) lines.push(`    ${worktree}`);
+  }
+  lines.push(
+    `  URL: ${base}/`,
+    `  MCP (rex):          ${base}/mcp/rex`,
+    `  MCP (sourcevision): ${base}/mcp/sourcevision`,
+  );
+  return lines;
+}
+
+/**
+ * `ndx hub status` — the hub itself and every project on it, not just this
+ * directory's. Pure, for the same reason as {@link formatHubStatus}.
+ *
+ * @param {object} args
+ * @param {number} args.port
+ * @param {{status:number,body:any}} args.health    GET /api/hub/health
+ * @param {{status:number,body:any}} args.projects  GET /api/hub/projects
+ * @param {number} [args.now]
+ * @returns {string[]}
+ */
+export function formatHubOverview({ port, health, projects, now = Date.now() }) {
+  if (health.status !== 200) {
+    return [
+      `n-dx hub: not running (nothing answers on port ${port}).`,
+      `  'ndx start .' starts one and registers the current repository.`,
+    ];
+  }
+  const lines = [
+    `n-dx hub: running (PID ${health.body?.pid ?? "?"}, port ${health.body?.port ?? port}${uptimePhrase(health.body?.startedAt, now)}).`,
+  ];
+  if (health.body?.registryPath) lines.push(`  Registry: ${health.body.registryPath}`);
+
+  const list = Array.isArray(projects.body?.projects) ? projects.body.projects : [];
+  if (list.length === 0) {
+    lines.push("  No projects registered.");
+    return lines;
+  }
+  lines.push(`  Projects (${list.length}):`);
+  const idWidth = Math.max(...list.map((entry) => String(entry.id).length));
+  for (const entry of list) {
+    const state = entry.status?.state ?? "unknown";
+    const where = entry.status?.port ? `port ${entry.status.port}` : "—";
+    lines.push(`    ${String(entry.id).padEnd(idWidth)}  ${state.padEnd(11)} ${String(where).padEnd(11)} ${entry.repoRoot}`);
+  }
+  return lines;
+}
+
+/**
+ * What `ndx start stop` says after unregistering — one line, three outcomes.
+ *
+ * @param {object} args
+ * @param {string} args.label
+ * @param {string} args.projectId
+ * @param {number} args.port
+ * @param {string} args.worktree
+ * @param {{projectRemoved?:boolean,worktreeKnown?:boolean,remaining?:string[],hubExiting?:boolean}} args.result
+ * @returns {string[]}
+ */
+export function formatUnregister({ label, projectId, port, worktree, result }) {
+  const base = `http://localhost:${port}/p/${encodeURIComponent(projectId)}`;
+  if (result.projectRemoved) {
+    const lines = [`${label}: unregistered "${projectId}" from the n-dx hub and stopped its server.`];
+    if (result.hubExiting) lines.push("  That was the hub's last project, so the hub exited too.");
+    return lines;
+  }
+  const remaining = result.remaining ?? [];
+  const lines = result.worktreeKnown === false
+    ? [`${label}: this worktree was not registered with the n-dx hub; project "${projectId}" is untouched.`]
+    : [`${label}: unregistered ${worktree} from project "${projectId}".`];
+  lines.push(`  Still served for ${remaining.length} worktree(s) at ${base}/`);
+  for (const entry of remaining) lines.push(`    ${entry}`);
+  return lines;
+}
+
+/**
+ * `ndx start stop` in a hub-registered directory: unregister this worktree.
+ *
+ * The hub owns what that means — the project's server stays up while another
+ * worktree is registered, and goes (along with the hub, unless
+ * `hub.keepAlive`) when this was the last one. The marker files are removed
+ * either way: whatever the hub decided, this directory is no longer pointing
+ * at a server of its own.
+ */
+async function unregisterFromHub(dir, marker, label) {
+  const worktree = resolveRepo(dir).worktree;
+  const path =
+    `/api/hub/projects/${encodeURIComponent(marker.projectId)}` +
+    `/worktrees/${encodeURIComponent(worktree)}`;
+  const { status, body } = await hubRequest(marker.port, "DELETE", path, undefined, HUB_UNREGISTER_TIMEOUT_MS);
+
+  if (status === 200) {
+    for (const line of formatUnregister({ label, projectId: marker.projectId, port: marker.port, worktree, result: body ?? {} })) {
+      log(line);
+    }
+  } else if (status === 404) {
+    log(`${label}: the n-dx hub no longer knows project "${marker.projectId}" — clearing this directory's registration.`);
+  } else if (status === 0) {
+    log(`${label}: the n-dx hub on port ${marker.port} is not answering — clearing this directory's registration anyway.`);
+  } else {
+    console.error(`Unregistering from the n-dx hub failed (${status})${body?.error ? `: ${body.error}` : ""}`);
+    return false;
+  }
+
+  await removePidFile(dir);
+  await removePortFile(dir);
+  return true;
+}
+
+/**
+ * `ndx hub <status|stop>` — the hub itself, from any directory.
+ *
+ * Stopping goes through the pid file and a signal rather than an HTTP route:
+ * the hub's own SIGTERM handler stops every project server in order, and an
+ * unauthenticated "shut down" endpoint on a loopback port is reachable by any
+ * page the browser happens to load.
+ *
+ * @returns {Promise<number>} exit code
+ */
+export async function runHub(rest, { commandName = "hub" } = {}) {
+  const flags = {};
+  let subcommand = null;
+  for (const arg of rest) {
+    if (arg.startsWith("--")) {
+      const eq = arg.indexOf("=");
+      if (eq !== -1) flags[arg.slice(2, eq)] = arg.slice(eq + 1);
+      else flags[arg.slice(2)] = true;
+    } else if (!subcommand) {
+      subcommand = arg;
+    }
+  }
+  _quiet = !!flags.quiet;
+
+  const home = hubHome();
+  let port = await loadHubPort(home);
+  if (flags.port) {
+    const parsed = parseInt(flags.port, 10);
+    if (isNaN(parsed) || parsed < 1 || parsed > MAX_PORT) {
+      console.error(`Invalid port: ${flags.port}`);
+      return 1;
+    }
+    port = parsed;
+  }
+
+  if (subcommand === "status" || subcommand === undefined || subcommand === null) {
+    const health = await hubRequest(port, "GET", "/api/hub/health");
+    const projects = health.status === 200
+      ? await hubRequest(port, "GET", "/api/hub/projects")
+      : { status: 0, body: null };
+    for (const line of formatHubOverview({ port, health, projects })) log(line);
+    return 0;
+  }
+
+  if (subcommand === "stop") {
+    const health = await hubRequest(port, "GET", "/api/hub/health");
+    const pid = typeof health.body?.pid === "number" ? health.body.pid : (await readHubPid(home));
+    if (health.status !== 200 && !pid) {
+      log(`No n-dx hub is running on port ${port}.`);
+      return 0;
+    }
+    if (!pid) {
+      console.error(`The hub on port ${port} did not report a pid; stop it by hand.`);
+      return 1;
+    }
+    // SIGTERM first and a long grace: the handler stops every project server
+    // before exiting, and killing the hub early would orphan them.
+    await terminateTreeByPid(pid, { forceKillTimeoutMs: HUB_STOP_GRACE_MS });
+    log(`Stopped the n-dx hub (PID ${pid}, port ${port}) and its project servers.`);
+    return 0;
+  }
+
+  console.error(`Unknown ${commandName} subcommand: ${subcommand}`);
+  console.error("Available: status, stop");
+  return 1;
+}
+
+/** The hub's recorded pid from `~/.n-dx/hub.pid`, or null. */
+async function readHubPid(home = hubHome()) {
+  try {
+    const pid = JSON.parse(await readFile(join(home, HUB_PID_FILE), "utf-8"))?.pid;
+    return Number.isInteger(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Open a URL in the default browser, best-effort. */
+function openBrowser(url) {
+  const [cmd, args] = process.platform === "darwin"
+    ? ["open", [url]]
+    : process.platform === "win32"
+      ? ["cmd.exe", ["/d", "/s", "/c", `start "" "${url}"`]]
+      : ["xdg-open", [url]];
+  try {
+    const child = spawn(cmd, args, {
+      stdio: "ignore",
+      detached: true,
+      ...(process.platform === "win32" ? { windowsVerbatimArguments: true } : {}),
+    });
+    child.on("error", () => {});
+    child.unref();
+  } catch {
+    // No opener — the URL was printed anyway.
+  }
+}
+
+/**
+ * `ndx start --hub`: register this repository with the per-user hub and print
+ * where it is served. Returns an exit code.
+ */
+async function runHubMode(absDir, flags, { tools, __dir, label }) {
+  const home = hubHome();
+  let hubPort = await loadHubPort(home);
+  if (flags.port) {
+    const parsed = parseInt(flags.port, 10);
+    if (isNaN(parsed) || parsed < 1 || parsed > MAX_PORT) {
+      console.error(`Invalid port: ${flags.port}`);
+      return 1;
+    }
+    hubPort = parsed;
+  }
+
+  const repo = resolveRepo(absDir);
+  const name = await loadProjectName(repo.repoRoot);
+  const id = deriveProjectId(name, {
+    repoRoot: repo.repoRoot,
+    remoteUrl: repo.remoteUrl,
+    registryProjects: await readHubRegistry(home),
+  });
+
+  let hub;
+  try {
+    hub = await ensureHub(hubPort, { tools, __dir, home });
+  } catch (err) {
+    console.error(err.message);
+    return 1;
+  }
+  if (hub.spawned) log(`n-dx hub started on http://localhost:${hubPort} (PID ${hub.pid}).`);
+
+  const { status, body } = await hubRequest(
+    hubPort,
+    "POST",
+    "/api/hub/projects",
+    { id, name, repoRoot: repo.repoRoot, worktree: repo.worktree, ndxBin: resolve(__dir, tools.web) },
+    HUB_REGISTER_TIMEOUT_MS,
+  );
+  if (status !== 200 && status !== 201) {
+    console.error(`Registering with the n-dx hub failed (${status || "unreachable"})${body?.error ? `: ${body.error}` : ""}`);
+    return 1;
+  }
+  const state = body?.project?.status?.state;
+  if (state !== "healthy") {
+    console.error(`Project "${id}" registered but its server is ${state ?? "in an unknown state"}${body?.project?.status?.lastError ? `: ${body.project.status.lastError}` : ""}`);
+    return 1;
+  }
+
+  // Marker files: the port file points refresh --live-server at the hub, and
+  // the pid file lets stop/status/refresh recognise a hub registration.
+  const health = await hubRequest(hubPort, "GET", "/api/hub/health");
+  const hubPid = typeof health.body?.pid === "number" ? health.body.pid : (hub.pid ?? process.pid);
+  try {
+    await writeHubMarkerFiles(absDir, { hubPid, hubPort, projectId: id });
+  } catch {
+    // Non-fatal: the marker files are a convenience for other commands.
+  }
+
+  const base = `http://localhost:${hubPort}/p/${encodeURIComponent(id)}`;
+  log(`${label}: project "${id}" registered with the hub${status === 200 ? " (already known)" : ""}.`);
+  log(`  Repository: ${repo.repoRoot}${repo.worktree !== repo.repoRoot ? `\n  Worktree:   ${repo.worktree}` : ""}${repo.branch ? ` (${repo.branch})` : ""}`);
+  log(`  URL: ${base}/`);
+  log(`  MCP (rex):          ${base}/mcp/rex`);
+  log(`  MCP (sourcevision): ${base}/mcp/sourcevision`);
+  log("");
+  log("MCP setup:");
+  log(`  Claude:  claude mcp add --transport http rex ${base}/mcp/rex`);
+  log(`           claude mcp add --transport http sourcevision ${base}/mcp/sourcevision`);
+  log("  Codex:   configured automatically via .codex/config.toml (stdio)");
+  if (flags.open) openBrowser(`${base}/`);
+  return 0;
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -689,9 +1356,26 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     return 1;
   }
 
+  // --- Hub mode (0.7.0) ---
+  // The default since the hub learned to unregister projects and report its
+  // own state. `--here` (or web.mode "here") opts back out to the
+  // single-project server, which is everything below this point, unchanged.
+  // Precedence, flags over config: --here wins outright, then --hub (still
+  // accepted, and the way to override web.mode "here" for one run), then the
+  // config, then the hub.
+  if (!flags.here && (flags.hub || (await loadConfigMode(absDir)) !== "here")) {
+    return runHubMode(absDir, flags, { tools, __dir, label });
+  }
+
   // --- Check for stale PID / already running ---
   const existing = await readPidFile(absDir);
-  if (existing && isProcessRunning(existing.pid)) {
+  if (existing && isHubMarker(existing)) {
+    // The marker points at the hub, which keeps serving the other projects.
+    // A single-project server here just takes the marker files over.
+    log(`This directory was registered with the n-dx hub (project "${existing.projectId}"); starting a single-project server here instead.`);
+    await removePidFile(absDir);
+    await removePortFile(absDir);
+  } else if (existing && isProcessRunning(existing.pid)) {
     // Auto-restart: stop the old server so ndx start is idempotent.
     log(`Stopping previous ${label} (PID ${existing.pid}, port ${existing.port})…`);
     await stopServer(absDir, label);
@@ -715,22 +1399,38 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       // knows about servers started for THIS directory, so a second project or
       // worktree used to look like a stranger squatting on 3117 and got
       // SIGKILLed — taking a working dashboard down with it.
-      const occupant = classifyPortOccupant(await probeStatusEndpoint(port), absDir);
+      //
+      // The hub is asked about first and is never killed: it supervises other
+      // projects' servers, and it is the default occupant of 3117 now, so a
+      // `--here` run that cleared the port would take unrelated dashboards with
+      // it. Relocating is the same answer as for a peer.
+      const hub = await probeHubEndpoint(port);
+      const occupant = hub ? null : classifyPortOccupant(await probeStatusEndpoint(port), absDir);
 
-      if (occupant.kind === "peer") {
+      // Two occupants must be left alone, and the answer for both is to move:
+      // the hub, which supervises other projects' servers, and a peer
+      // dashboard serving a different directory.
+      const leaveAlone = hub
+        ? `The n-dx hub (PID ${hub.pid}) is on :${port} serving ${hub.projects} project(s)`
+        : occupant.kind === "peer"
+          ? `n-dx dashboard for ${occupant.projectDir} is already on :${port}`
+          : null;
+
+      if (leaveAlone) {
         const next = await findRelocationPort(port);
         if (next === null) {
           console.error(
-            `n-dx dashboard for ${occupant.projectDir} is already on :${port}, and no port near it or in ` +
+            `${leaveAlone}, and no port near it or in ` +
             `${PORT_RANGE_START}–${PORT_RANGE_END} is free. Choose one with --port=N or set web.port in .n-dx.json`,
           );
           return 1;
         }
-        log(`n-dx dashboard for ${occupant.projectDir} is already on :${port}; starting this one on :${next}`);
+        log(`${leaveAlone}; starting this one on :${next}`);
         port = next;
       } else {
-        // Not identifiable as a peer — either a stranger, or this directory's
-        // own untracked server, which `ndx start` restarts by contract.
+        // Not identifiable as the hub or a peer — either a stranger, or this
+        // directory's own untracked server, which `ndx start` restarts by
+        // contract.
         log(`Port ${port} is in use by another process — clearing it…`);
         const freed = await killPortOccupant(port);
         if (!freed) {

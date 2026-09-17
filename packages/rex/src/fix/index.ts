@@ -104,20 +104,45 @@ export function detectOrphanBlockedBy(items: FixItem[]): FixAction[] {
  * Completed parents that still hold at least one unfinished child, paired with
  * the children responsible. Single source for both the detector and the fixer
  * so the two can never describe different repairs.
+ *
+ * ## Why post-order
+ *
+ * A falsely-completed parent can sit under another one: epic(completed) →
+ * feature(completed) → task(pending). Walking top-down over raw statuses, the
+ * epic is judged while the feature still reads `completed`, so only the
+ * feature is found. The pass reopens it, reports "Fixed 1 issue", and leaves
+ * the epic completed above a pending child — the very inconsistency this
+ * detector exists to find. A second `rex fix` was needed to reach the epic, a
+ * third to confirm clean, and nothing told the operator to run it again.
+ *
+ * Deciding children first, and reading each child's status as this same pass
+ * will leave it, closes that: the feature is already in `reopening` by the
+ * time the epic is judged, so both are found in one pass and the tree
+ * converges in one run however deep the nesting goes.
+ *
+ * The returned order is bottom-up, which is also the order the repair wants —
+ * though {@link applyParentChildFixes} writes each item independently, so it
+ * is the completeness of the list that matters, not its sequence.
  */
 function findMisalignedParents(
   items: FixItem[],
 ): Array<{ item: FixItem; unfinished: FixItem[] }> {
   const found: Array<{ item: FixItem; unfinished: FixItem[] }> = [];
+  /** Ids this pass has already decided to reopen — no longer "successful". */
+  const reopening = new Set<string>();
 
-  for (const { item } of walkFixTree(items)) {
+  for (const item of collectFixTreePostOrder(items)) {
     if (item.status !== "completed") continue;
     if (!item.children || item.children.length === 0) continue;
 
     const unfinished = item.children.filter(
-      (child) => !SUCCESSFUL_CHILD_STATUSES.has(child.status),
+      (child) =>
+        reopening.has(child.id) || !SUCCESSFUL_CHILD_STATUSES.has(child.status),
     );
-    if (unfinished.length > 0) found.push({ item, unfinished });
+    if (unfinished.length > 0) {
+      found.push({ item, unfinished });
+      reopening.add(item.id);
+    }
   }
 
   return found;

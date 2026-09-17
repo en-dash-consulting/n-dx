@@ -1,20 +1,23 @@
 /**
  * Structural tests: run-recording discipline in canonical skill bodies.
  *
- * A skill that ends with `ndx hench record` must also tell the assistant to
- * capture a start time and pass it as `--startedAt`. Without it the FIRST
- * record in a session has no watermark to work back from, so `readUsageDelta`
- * opens its window at the top of the transcript and the record claims every
- * token the session spent before the skill was ever invoked. Measured while
- * building this: a first record in a long session claimed 549 messages and
- * 127M cache-read tokens, four earlier tasks' spend included.
+ * A skill that ends with `ndx hench record` must start by marking where its
+ * token usage begins — `ndx hench usage mark --task=<id>` — and must not ask
+ * the assistant to type a timestamp for `--startedAt`. The mark is a snapshot
+ * of the session transcript written by code; the record computes the run's
+ * spend as the difference between that snapshot and the transcript at record
+ * time. A typed time was the previous mechanism: it filtered messages by a
+ * value the model produced, and one slip in it silently moved the boundary.
+ * Measured before the change: nine consecutive skill runs in one session
+ * recorded 1.7M–18.2M tokens each, most of it the same context re-read.
  *
  * The skill list is derived from the manifest rather than hardcoded, so a
  * NEW skill that records runs is covered the moment it is added — this is the
  * guard, not a snapshot of today's skills.
  *
- * @see packages/hench/src/store/session-usage.ts — readUsageDelta, `since`
- * @see packages/hench/src/cli/commands/record.ts — flags.since || flags.startedAt
+ * @see packages/hench/src/store/session-usage.ts — takeUsageMark, readUsageSinceMark
+ * @see packages/hench/src/cli/commands/record.ts — the mark is consumed here
+ * @see packages/hench/src/cli/commands/usage.ts — `hench usage mark`
  */
 
 import { describe, it, expect } from "vitest";
@@ -25,53 +28,42 @@ const RECORDING_SKILLS = getSkillNames().filter((name) =>
   getSkillBody(name).includes("hench record"),
 );
 
-// ── The --startedAt window ───────────────────────────────────────────────────
-
-describe("skills that record runs pass --startedAt", () => {
+describe("skills that record runs mark their usage start in code", () => {
   it("at least one skill records runs (guards against a vacuous suite)", () => {
     expect(RECORDING_SKILLS.length).toBeGreaterThan(0);
   });
 
   for (const name of RECORDING_SKILLS) {
-    it(`${name}: passes --startedAt to hench record`, () => {
+    const body = getSkillBody(name);
+
+    it(`${name}: runs 'hench usage mark' before it records`, () => {
+      const markAt = body.indexOf("hench usage mark");
+      const recordAt = body.indexOf("hench record");
       expect(
-        getSkillBody(name),
-        `${name} invokes 'ndx hench record' without --startedAt. The first record ` +
-          `in a session would claim every token spent before the skill ran. Add a ` +
-          `step that captures the current time in ISO-8601, and pass it as ` +
-          `--startedAt=<that time>.`,
-      ).toContain("--startedAt");
+        markAt,
+        `${name} invokes 'ndx hench record' without first running 'ndx hench usage mark --task=<id>'. ` +
+          `Without a mark the record falls back to the session's previous watermark and may claim unrelated work.`,
+      ).toBeGreaterThanOrEqual(0);
+      expect(markAt, `${name}: the mark must come before the record`).toBeLessThan(recordAt);
     });
 
-    it(`${name}: tells the assistant to capture a timestamp`, () => {
+    it(`${name}: does not ask the assistant to type a start time`, () => {
       expect(
-        getSkillBody(name),
-        `${name} passes --startedAt but never says where the value comes from. ` +
-          `Instruct capturing the current time in ISO-8601 before the work begins.`,
-      ).toMatch(/ISO-8601/);
+        body,
+        `${name} still passes a typed time as --startedAt. Usage is measured from the mark; ` +
+          `a model-typed timestamp is not a measurement.`,
+      ).not.toMatch(/--startedAt=</);
+      expect(
+        body,
+        `${name} still instructs the assistant to note or record the current time. ` +
+          `Replace that step with 'ndx hench usage mark --task=<id>'.`,
+      ).not.toMatch(/\b(note|record|capture) the current time\b/i);
     });
-  }
-});
 
-// Platform neutrality of the timestamp instruction is asserted in
-// tests/e2e/skill-portability.test.js, alongside the other "does this skill
-// assume one environment?" guards. This file covers recording discipline only.
-
-// ── The timestamp example must work on BSD date too ──────────────────────────
-
-describe("the POSIX timestamp example is not GNU-only", () => {
-  for (const name of RECORDING_SKILLS) {
-    it(`${name}: prescribes 'date -Iseconds', never bare 'date -Is'`, () => {
-      // BSD date (macOS — this project's primary development platform)
-      // rejects the short form: `date -Is` exits 1 with "invalid argument
-      // 's' for -I". `date -Iseconds` is valid on BOTH GNU and BSD date.
-      // The lookahead matters: 'date -Iseconds' contains 'date -Is' as a
-      // substring, so a plain contains-check would reject the fix itself.
-      expect(
-        getSkillBody(name),
-        `${name} prescribes bare 'date -Is', which BSD date rejects — ` +
-          `use 'date -Iseconds' (valid on GNU and BSD).`,
-      ).not.toMatch(/date -Is(?!econds)/);
+    it(`${name}: does not ask the assistant to do token arithmetic`, () => {
+      // The subtraction lives in session-usage.ts. A skill that tells the
+      // model to compute or compare token counts reintroduces the guesswork.
+      expect(body).not.toMatch(/\b(subtract|compute|calculate)\b[^.\n]*\btokens?\b/i);
     });
   }
 });

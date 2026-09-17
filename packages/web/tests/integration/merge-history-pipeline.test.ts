@@ -8,7 +8,8 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
+import { removeTempDir } from "../helpers/temp-dir.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -108,7 +109,7 @@ describe("merge-history pipeline (integration)", () => {
   });
 
   afterAll(async () => {
-    if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+    if (tmpDir) await removeTempDir(tmpDir);
   });
 
   it("produces merge nodes + edges with real git + PRD inputs", () => {

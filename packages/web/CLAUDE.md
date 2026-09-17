@@ -78,3 +78,113 @@ When `ndx start` is running, the web server holds in-process caches (aggregation
 **General rule for HTTP:** most routes treat disk files as read-only. The exception is the PRD: the routes that mutate `.rex/prd_tree/` (item CRUD, merge, prune, reorganize, restore, and the Ask panel's `apply-refinements`) go through `rex-gateway`'s `resolveStore` and hold the PRD file lock for the span of `withTransaction`. That makes the server a first-class PRD writer alongside `ndx work` and the MCP tools, and it is why those routes surface a lock-acquisition failure — which names the holder's PID — rather than retrying or writing anyway.
 
 The folder tree watcher refreshes `.rex/.cache/prd.json` automatically for most PRD mutations; routes that write also call `refreshPRDCache` so their own change is visible to the next read without a restart. Any command that bulk-rewrites `.sourcevision/` (ci, refresh) should be followed by a server restart to flush stale caches.
+
+### Writes are workspace-scoped
+
+Every PRD-writing route resolves its target from `ctx.rexDir` — through
+`resolveStore(ctx.rexDir)` in `routes-rex/items.ts`, `prune.ts`, `health.ts`,
+`refinements.ts` (which is where the Ask panel's accepted proposals land, via
+`POST /api/rex/apply-refinements`), `requirements.ts` and `routes-rex-analysis.ts`;
+and by path in `restore.ts`, which restores from that workspace's `.rex/.backups`.
+Since PR 12 that ctx is whichever workspace the request addressed —
+the `/w/<key>/` slot or `X-Ndx-Workspace` — so a write made while viewing a branch
+worktree rewrites **that worktree's** `.rex/prd_tree/` and leaves the anchor's
+untouched. The PRD lock is per `rexDir` (`prdLockPath`), one per workspace: two
+worktrees write concurrently without contending, and equally, the lock does not
+serialize them against each other. Nothing needs it to — they are different trees.
+
+Two rules follow, and both are load-bearing:
+
+- **No cross-workspace write action.** No route takes a workspace as a parameter,
+  and no UI offers "apply to the anchor instead". Editing the anchor's PRD while
+  viewing a branch requires switching workspace through the breadcrumb switcher,
+  which is a full navigation. A cross-workspace affordance would make the write
+  target a thing the reader has to check rather than a thing the URL states.
+- **The write target is stated, not inferred.** `WorkspaceWriteStrip`
+  (`viewer/components/workspace-write-strip.ts`) renders a one-line strip in the
+  PRD view for a non-anchor workspace only. On the anchor it renders nothing —
+  a permanent banner on the common case is noise.
+
+`tests/integration/workspace-scoped-prd-writes.test.ts` pins this by hashing both
+trees around each write; a route that wrote both would fail it.
+
+### The Workspaces board is the one cross-workspace reader
+
+`viewer/views/workspaces.ts` is the exception to both rules above, deliberately
+and in one direction only. It is *about* the set of worktrees, so it addresses
+each one explicitly with the `X-Ndx-Workspace` header rather than the `/w/<key>/`
+slot — the slot is already spent on whichever workspace the viewer itself is
+mounted under, and the server reads the header ahead of the slot
+(`workspaceFromHeader` in the dispatcher, not the lenient `resolveWorkspace`).
+Three endpoints answer for the whole repository and are fetched plainly
+(`/api/workspaces`, `/api/worktrees`, `/api/hench/memory`); the rest are per
+workspace.
+
+**A header naming no known worktree is a 404, on reads as much as on writes.**
+Falling back to the anchor would answer under a name the caller did not ask
+for: a write to the wrong tree, or — on the board's per-card polling — the
+anchor's running task painted onto another worktree's card. Refusing is safe
+because only a fetch ever sets this header (`workspaceFetch`,
+`StartTaskButton`), never a navigation, so no page load can 404 on it. The
+dispatcher re-reads the worktree list once before refusing, since the registry
+only rescans every 30s and a worktree created since the last tick would
+otherwise be rejected for no reason. `respondUnknownWorkspaceHeader` answers
+JSON naming the key and the keys that do exist; `StartTaskButton` already
+renders that `error` field.
+
+Two constraints keep this from eroding the rules:
+
+- **No route gained a workspace parameter.** The header is the existing
+  addressing mechanism, not a new one. A request made with it *is* that
+  workspace's request — `ctx` resolves the same way it does for a `/w/<key>/`
+  navigation, so the run it starts has that worktree as its cwd and writes that
+  worktree's tree. Nothing writes across a boundary.
+- **The only cross-workspace action is Start working / Stop.** Starting an agent
+  in another worktree names the worktree on the button
+  (`StartTaskButton`'s `workspace` prop, which sets the header). Editing a PRD
+  item still requires navigating there — the board links, it does not edit.
+
+Because it is about every worktree, it is also the one socket consumer that must
+**not** call `acceptsFrame`: a run progressing in worktree B is exactly what
+should move B's card while the viewer sits on A. It reads the `workspace` tag
+itself (`frameWorkspace`) and refreshes only that workspace's slice, falling back
+to a whole-board reload for a `"*"` frame or an unrecognised key.
+
+## hub zone (`src/hub/`)
+
+`src/hub/` is the 0.7.0 hub daemon (`web hub`): one process per user that owns
+`~/.n-dx/hub.json` (project registry) and `~/.n-dx/hub.pid`, serves `/api/hub/*`,
+and runs one `web serve` child per registered repository on an ephemeral loopback
+port. It is its own zone with a deliberately small import surface:
+
+- node built-ins, `src/shared/` through its barrel (the base-path helpers the hub
+  shares with the viewer), and `@n-dx/llm-client` exec helpers **only** through
+  `src/hub/exec-gateway.ts` (re-export only, no logic).
+- Nothing from `src/server/` or `src/viewer/`. The project servers it spawns are
+  today's `web serve` unchanged; the hub talks to them over HTTP (`GET /api/status`),
+  never by import. The two JSON response helpers in `hub/routes.ts` are local for
+  that reason rather than shared with `server/response-utils.ts`.
+- Consumers import from `src/hub/index.ts`, the barrel.
+
+`$N_DX_HOME` overrides the `~/.n-dx` directory; tests pass `homeDir` explicitly.
+Core's `web.js` spawns the hub (PR 10) — the orchestration tier still never imports it.
+
+**Proxy and base path.** `hub/proxy.ts` forwards `/p/<id>/…` to that project's
+server with the prefix stripped (HTTP streamed, WebSocket upgrades piped over
+`node:net`), and aliases the root to the sole registered project; with several
+registered, `/` is a project list and other root paths answer 409 with the ids.
+The viewer derives the same prefix from `location.pathname` at boot
+(`viewer/base-path.ts`): `installBasePathFetch()` prefixes every root-relative
+`fetch`, `getWebSocketUrl()` is the one socket endpoint, and `appUrl()` covers
+hand-built URLs (history entries, share links, the logo). Both sides use
+`src/shared/base-path.ts`, so where the prefix ends is defined once. New viewer
+code must not build `ws://…${location.host}` or `location.origin + "/api/…"` by
+hand — go through those helpers.
+
+**Workspace slot.** The viewer's base path also carries `/w/<key>` when it
+addresses a worktree other than the anchor (`detectViewerBasePath`), so
+`/p/app/w/feature/prd` and `/w/feature/prd` deep-link to that worktree's tree.
+The project server strips the slot in `start.ts` before dispatch
+(`stripWorkspaceSlot`), resolves the workspace in the registry, and answers an
+unknown key with a 404 page linking to the anchor; `X-Ndx-Workspace` does the
+same for non-browser clients. Routes never see the slot.

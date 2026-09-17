@@ -12,6 +12,7 @@
  * and WebSocket events for live updates.
  */
 
+import { getWebSocketUrl, acceptsFrame } from "../base-path.js";
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 
@@ -89,8 +90,7 @@ export function ThrottleControlsPanel() {
     fetchThrottle();
 
     // Connect to WebSocket for real-time updates
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = getWebSocketUrl();
     let ws: WebSocket | null = null;
 
     try {
@@ -101,6 +101,8 @@ export function ThrottleControlsPanel() {
         if (!mounted) return;
         try {
           const msg = JSON.parse(event.data);
+          // Another worktree's frame on the shared socket — not ours to react to.
+          if (!acceptsFrame(msg)) return;
           if (msg.type === "hench:throttle-state") {
             setStatus({
               paused: msg.paused,

@@ -1,0 +1,293 @@
+/* Workspaces Overview — machine strip plus a board of worktree cards.
+   Tiles reuse .stat-grid/.stat-card from cards.css and the live-run block
+   reuses the .active-task-* idioms from hench-runs.css, so a run reads the
+   same here as it does on the Runs view. Everything below is tokens only —
+   both themes come from tokens.css without a per-theme rule. */
+
+.workspaces-container {
+  max-width: 1200px;
+}
+
+.workspaces-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.workspaces-header h2 {
+  font-size: var(--font-3xl);
+  font-weight: var(--weight-bold);
+  margin: 0;
+  line-height: var(--leading-tight);
+}
+
+.workspaces-subtitle {
+  margin: 0;
+  font-size: var(--font-base);
+  color: var(--text-dim);
+}
+
+.workspaces-empty {
+  margin: var(--space-6) 0;
+  font-size: var(--font-base);
+  color: var(--text-dim);
+}
+
+/* ── Board ───────────────────────────────────────────────────────────── */
+
+.workspaces-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+@media (max-width: 900px) {
+  .workspaces-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.workspace-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  min-width: 0;
+}
+
+/* The workspace this viewer is mounted under — the same accent tint the
+   active-tasks panel uses, so "current" reads without a second colour. */
+.workspace-card-current {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg-surface));
+}
+
+.workspace-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.workspace-card-name {
+  margin: 0;
+  font-size: var(--font-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.workspace-card-anchor {
+  color: var(--accent);
+}
+
+.workspace-card-status {
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  font-weight: var(--weight-semibold);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.workspace-card-status-running {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.workspace-card-status-idle {
+  color: var(--text-dim);
+  background: var(--bg-hover);
+}
+
+.workspace-card-branch-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.workspace-card-branch {
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.workspace-card-viewing {
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+}
+
+/* ── Live run ────────────────────────────────────────────────────────── */
+
+.workspace-card-run {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  min-width: 0;
+}
+
+.workspace-card-run-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.workspace-card-run-title {
+  font-size: var(--font-base);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.workspace-card-run-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.workspace-card-run-link:hover {
+  text-decoration: underline;
+}
+
+.workspace-card-run-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.workspace-card-run-meta {
+  margin: 0;
+}
+
+.workspace-card-stop {
+  margin-left: auto;
+  font-size: var(--font-xs);
+  padding: 1px var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--red) 40%, var(--border));
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--red);
+  cursor: pointer;
+  transition: background var(--transition-normal);
+}
+
+.workspace-card-stop:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+}
+
+.workspace-card-stop:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.workspace-card-stop:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.workspace-card-output {
+  min-width: 0;
+}
+
+.workspace-card-output-text {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-card-last-run {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+}
+
+.workspace-card-error {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--red);
+}
+
+/* ── Footer chips and actions ────────────────────────────────────────── */
+
+.workspace-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.workspace-card-chip {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.workspace-card-chip-dirty {
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+
+.workspace-card-chip-clean {
+  color: var(--text-dim);
+  background: var(--bg-hover);
+}
+
+.workspace-card-chip-prd {
+  color: var(--purple);
+  background: color-mix(in srgb, var(--purple) 12%, transparent);
+}
+
+.workspace-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-1);
+}
+
+.workspace-card-open {
+  font-size: var(--font-xs);
+  font-weight: var(--weight-medium);
+  padding: 3px var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--transition-normal), background var(--transition-normal);
+}
+
+.workspace-card-open:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.workspace-card-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

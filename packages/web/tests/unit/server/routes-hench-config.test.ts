@@ -303,4 +303,54 @@ describe("Hench Config API routes", () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it("PUT /api/hench/config rejects values hench's schema would refuse", async () => {
+    // Each of these passed the old gate and wrote a config that
+    // HenchConfigSchema rejects, so the next `ndx work` refused to start.
+    const refused: Array<[string, unknown]> = [
+      ["provider", ["cli"]],                // String(["cli"]) === "cli"
+      ["guard.allowedCommands", [1, null]], // z.array(z.string())
+      ["guard.blockedPaths", ["ok", 2]],
+      ["guard.commandTimeout", 0],          // z.number().positive()
+      ["maxTokens", 0],
+      ["tokenBudget", 1.5],                 // z.number().int()
+    ];
+
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+    for (const [path, value] of refused) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ changes: { [path]: value } }),
+      });
+      expect(res.status, `${path}=${JSON.stringify(value)}`).toBe(400);
+      expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+    }
+  });
+
+  it("PUT /api/hench/config rejects a non-finite number", async () => {
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+    // Infinity has no JSON literal; 1e999 is how it arrives over the wire, and
+    // JSON.stringify would write it back out as null.
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: '{"changes":{"guard.maxFileSize":1e999}}',
+    });
+    expect(res.status).toBe(400);
+    expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+  });
+
+  it("PUT /api/hench/config leaves the file untouched when one change in a batch is invalid", async () => {
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        changes: { model: "opus", "guard.commandTimeout": 0 },
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+  });
 });

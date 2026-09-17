@@ -23,8 +23,11 @@ import { realpathSync } from "node:fs";
 import { tmpdir, platform } from "node:os";
 import { join, resolve } from "node:path";
 
+import { canCreateSymlinks } from "../helpers/symlink-support.js";
+
 import {
   classifyPortOccupant,
+  probeHubEndpoint,
   probeStatusEndpoint,
   findFreePortInRange,
   findRelocationPort,
@@ -77,6 +80,33 @@ function startServer(handler) {
     server.listen(0, "127.0.0.1", () => {
       res({ server, port: server.address().port });
     });
+  });
+}
+
+/**
+ * Start a server that answers like the hub: `/api/hub/health` is its own, and
+ * `/api/status` behaves as the hub's root alias does — one registered project's
+ * payload, or a 409 when several are registered.
+ */
+function startFakeHub({ pid = 4242, projects = 1, aliasTo = null } = {}) {
+  return startServer((req, res) => {
+    if (req.url === "/api/hub/health") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, pid, port: 3117, startedAt: new Date().toISOString(), registryPath: "/home/u/.n-dx/hub.json", projects }));
+      return;
+    }
+    if (req.url === "/api/status") {
+      if (aliasTo) {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(statusPayload(aliasTo)));
+        return;
+      }
+      res.writeHead(409, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "Several projects are registered", projects: ["a", "b"] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end();
   });
 }
 
@@ -273,7 +303,9 @@ describe("classifyPortOccupant", () => {
       link = null;
     });
 
-    it("reports a dashboard as self when the same directory is reached through a symlink", async () => {
+    // Skipped where the environment cannot create symlinks (Windows without
+    // Developer Mode/elevation) — the aliasing under test needs a real link.
+    it.skipIf(!canCreateSymlinks())("reports a dashboard as self when the same directory is reached through a symlink", async () => {
       // Without resolving symlinks, the server's realpath'd projectDir and
       // this invocation's symlink-spelled absDir compare unequal and the
       // caller relocates instead of restarting — starting a second dashboard
@@ -483,6 +515,10 @@ describe("runWeb, on a busy port", () => {
    *
    * The SIGINT/SIGTERM handlers runWeb installs are removed afterwards so
    * repeated calls do not pile up listeners on the shared test process.
+   *
+   * `--here` because port occupancy is the single-project server's problem:
+   * since 0.7.0 the default registers with the hub, whose children bind
+   * ephemeral ports and never contend for 3117.
    */
   async function captureServeArgs(dir, rest) {
     const before = {
@@ -491,7 +527,7 @@ describe("runWeb, on a busy port", () => {
     };
     let serveArgs = null;
     try {
-      const code = await runWeb(dir, ["--quiet", ...rest], {
+      const code = await runWeb(dir, ["--quiet", "--here", ...rest], {
         exit: (c) => { throw new Error(`unexpected exit(${c})`); },
         flushExit: async () => {},
         run: async (_tool, args) => { serveArgs = args; return 0; },
@@ -651,5 +687,68 @@ describe("isPortInUse", () => {
     const { server, port } = await startServer(() => {});
     await expect(isPortInUse(port)).resolves.toBe(true);
     await new Promise((res) => server.close(() => res()));
+  });
+});
+
+/**
+ * The hub must never be the process a port-clearing run kills.
+ *
+ * It supervises one server per registered project, so SIGKILLing it to free
+ * 3117 for a single-project `ndx start --here` orphans every child it was
+ * running — other repositories, other worktrees. And `/api/status` cannot tell
+ * you it is the hub: with one project registered the hub *aliases* the root to
+ * that project, so the status probe answers with that project's payload.
+ */
+describe("probeHubEndpoint", () => {
+  it("identifies a hub by its own health endpoint", async () => {
+    const { port } = await startFakeHub({ pid: 9001, projects: 3 });
+    expect(await probeHubEndpoint(port)).toEqual({ pid: 9001, projects: 3 });
+  });
+
+  it("is null for a project dashboard, which has no such endpoint", async () => {
+    const { port } = await startFakeDashboard(PROJECT_A);
+    expect(await probeHubEndpoint(port)).toBeNull();
+  });
+
+  it("is null when nothing is listening", async () => {
+    const { port, server } = await startFakeDashboard(PROJECT_A);
+    await new Promise((res) => server.close(() => res()));
+    expect(await probeHubEndpoint(port)).toBeNull();
+  });
+
+  it("is null for an unrelated service that happens to answer ok:true", async () => {
+    const { port } = await startServer((req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    });
+    expect(await probeHubEndpoint(port)).toBeNull();
+  });
+
+  it("answers for a hub the status probe alone would send to the kill path", async () => {
+    const aliased = await startFakeHub({ aliasTo: PROJECT_A });
+    expect(await probeHubEndpoint(aliased.port)).not.toBeNull();
+    const conflicted = await startFakeHub();
+    expect(await probeHubEndpoint(conflicted.port)).not.toBeNull();
+  });
+});
+
+/**
+ * Why the extra probe exists at all — a characterization test of what
+ * `/api/status` says about a hub. Both outcomes below are branches that go on
+ * to clear the port, which for a hub means SIGKILLing a daemon that is
+ * supervising other projects' servers.
+ */
+describe("a hub through the status probe alone", () => {
+  it("reads as `self` when its sole registered project is this directory", async () => {
+    // The hub aliases the root to that project, so the status probe is
+    // answered by the project's server and looks like an ordinary dashboard.
+    const aliased = await startFakeHub({ aliasTo: PROJECT_A });
+    expect(classifyPortOccupant(await probeStatusEndpoint(aliased.port), PROJECT_A).kind).toBe("self");
+  });
+
+  it("reads as `unknown` when several projects are registered", async () => {
+    // Root API calls answer 409 with the ids, which is not a status payload.
+    const conflicted = await startFakeHub();
+    expect(classifyPortOccupant(await probeStatusEndpoint(conflicted.port), PROJECT_A).kind).toBe("unknown");
   });
 });

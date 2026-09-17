@@ -22,6 +22,7 @@ import { h, Fragment, Component } from "preact";
 import type { ComponentType } from "preact";
 import { useState, useMemo, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, PRDDocumentData, ItemStatus, ItemLevel, Priority, TaskUsageSummary, WeeklyBudgetResolution, ItemUsageRollup } from "./types.js";
+import type { ClaimEntry } from "../../hooks/index.js";
 import { computeBranchStats, completionRatio, formatTimestamp } from "./compute.js";
 import { isWorkItem } from "./levels.js";
 import { defaultStatusFilter } from "../../views/status-filter.js";
@@ -347,8 +348,31 @@ function renderDurationCell(args: DurationCellArgs) {
 // attributes so the delegated handler can identify the target node and its
 // capabilities from the bubbled event.
 
+/**
+ * "claimed · <worktree>" on a row another checkout is working. Reuses the
+ * tag chip's visual so it reads as metadata, not as a status; the tooltip
+ * carries the rest of the claim.
+ */
+export function claimChipLabel(claim: ClaimEntry): string {
+  return `claimed · ${claim.isServedHere ? "here" : claim.worktree}`;
+}
+
+export function claimChipTitle(claim: ClaimEntry): string {
+  return `Being worked on in ${claim.worktreeRoot} (pid ${claim.pid}${claim.host ? ` on ${claim.host}` : ""}) — claim expires ${claim.expiresAt}`;
+}
+
+function ClaimChip({ claim }: { claim: ClaimEntry }) {
+  return h("span", {
+    class: `tag-chip prd-claim-chip${claim.isServedHere ? " prd-claim-chip-here" : ""}`,
+    title: claimChipTitle(claim),
+    "data-claimed-by": claim.worktreeRoot,
+  }, claimChipLabel(claim));
+}
+
 interface NodeRowProps {
   item: PRDItemData;
+  /** Live cross-worktree claim on this task, if any (see hooks/use-claims.ts). */
+  claim?: ClaimEntry;
   taskUsage?: TaskUsageSummary;
   /**
    * Rolled-up token totals for this item (self + descendants + total).
@@ -424,6 +448,7 @@ class NodeRow extends Component<NodeRowProps> {
     if (p.isHighlighted !== nextProps.isHighlighted) return true;
     if (p.isDeleting !== nextProps.isDeleting) return true;
     if (p.depth !== nextProps.depth) return true;
+    if (p.claim !== nextProps.claim) return true;
     if (p.hasChildren !== nextProps.hasChildren) return true;
     if (p.canInlineAdd !== nextProps.canInlineAdd) return true;
     if (p.canDelete !== nextProps.canDelete) return true;
@@ -444,7 +469,7 @@ class NodeRow extends Component<NodeRowProps> {
   }
 
   render() {
-    const { item, taskUsage, usageRollup, weeklyBudget, showTokenBudget, tickMs, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting, searchQuery, isSearchMatch, showLevelLabel } = this.props;
+    const { item, claim, taskUsage, usageRollup, weeklyBudget, showTokenBudget, tickMs, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting, searchQuery, isSearchMatch, showLevelLabel } = this.props;
     const children = item.children ?? [];
     const stats = hasChildren ? computeBranchStats(children) : null;
     const ratio = stats ? completionRatio(stats) : 0;
@@ -510,6 +535,8 @@ class NodeRow extends Component<NodeRowProps> {
       item.priority
         ? h(PriorityBadge, { priority: item.priority })
         : null,
+      // Cross-worktree claim — another checkout (or this one) is working the task.
+      claim ? h(ClaimChip, { claim }) : null,
       // Progress bar (for nodes with children)
       stats && stats.total > 0
         ? h(Fragment, null,
@@ -681,6 +708,12 @@ function Toolbar({ onExpandAll, onCollapseAll, availableBranches, activeBranch, 
 export interface PRDTreeProps {
   /** PRD document data (items array + title). */
   document: PRDDocumentData;
+  /**
+   * Live cross-worktree task claims keyed by task id (from `useClaims`).
+   * A claimed row shows a "claimed · <worktree>" chip; the chip goes when
+   * the claim is released or its holder dies.
+   */
+  claimsById?: Record<string, ClaimEntry>;
   /** Aggregated task token usage keyed by task ID. */
   taskUsageById?: Record<string, TaskUsageSummary>;
   /**
@@ -775,7 +808,7 @@ function buildItemMap(items: PRDItemData[]): Map<string, PRDItemData> {
   return map;
 }
 
-export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize, availableBranches, activeBranch, onBranchChange }: PRDTreeProps) {
+export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize, availableBranches, activeBranch, onBranchChange }: PRDTreeProps) {
   // ── Flat item map for delegated event handlers ────────────────────
   const itemMap = useMemo(() => buildItemMap(doc.items), [doc.items]);
   const getItem = useCallback((id: string) => itemMap.get(id) ?? null, [itemMap]);
@@ -1087,6 +1120,7 @@ export function PRDTree({ document: doc, taskUsageById, rollupById, weeklyBudget
         return h(Fragment, { key: item.id },
           h(NodeRow as ComponentType<NodeRowProps>, {
             item,
+            claim: claimsById?.[item.id],
             taskUsage: taskUsageById?.[item.id],
             usageRollup: rollupById?.[item.id],
             weeklyBudget,

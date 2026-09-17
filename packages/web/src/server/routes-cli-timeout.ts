@@ -158,7 +158,7 @@ export async function handleCliTimeoutRoute(
   // PUT /api/cli/timeouts
   if (method === "PUT" && url === TIMEOUTS_PREFIX) {
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, res);
       const parsed = JSON.parse(body) as CliTimeoutsPutBody;
 
       // Validate timeoutMs if provided

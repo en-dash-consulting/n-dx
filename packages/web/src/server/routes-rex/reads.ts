@@ -1,12 +1,12 @@
 /**
- * PRD read routes: prd, stats, dashboard, next, log.
+ * PRD read routes: prd, stats, dashboard, next, log, claims.
  *
  * All handlers are read-only — they load the PRD and return computed views.
  */
 
 import type { ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse } from "../response-utils.js";
 import { loadPRDSync } from "../prd-io.js";
@@ -17,13 +17,70 @@ import {
   computeEpicStats,
   computePriorityDistribution,
   computeRequirementsSummary,
+  findItem,
+  openClaimsStore,
+  resolveClaimHolder,
 } from "../rex-gateway.js";
 
-/** PRD read routes: prd, stats, dashboard, next, log. */
+/**
+ * One live cross-worktree claim, as the dashboard shows it. Mirrors
+ * `ClaimEntry` in viewer/hooks/use-claims.ts.
+ */
+export interface ClaimWire {
+  taskId: string;
+  /** Title from this workspace's PRD, or null when the task exists only in the claiming worktree. */
+  taskTitle: string | null;
+  /** Realpath of the claiming worktree root. */
+  worktreeRoot: string;
+  /** Its basename — the label the chip shows. */
+  worktree: string;
+  /** Whether the claim is held from the worktree this server serves. */
+  isServedHere: boolean;
+  pid: number;
+  host: string;
+  claimedAt: string;
+  expiresAt: string;
+}
+
+/**
+ * GET /api/rex/claims — every live claim in the repository's claims store.
+ *
+ * Read-only. The store lives in the git common dir, so this is the same
+ * answer from every worktree; dead-pid and expired claims are already gone
+ * by the time it is read. Outside a repository the store is a no-op and the
+ * list is empty.
+ */
+async function handleClaims(res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+  const holder = resolveClaimHolder(ctx.projectDir);
+  const claims = await openClaimsStore(ctx.projectDir).readClaims();
+  const doc = claims.length > 0 ? loadPRDSync(ctx.rexDir) : null;
+  const wire: ClaimWire[] = claims
+    .map((c) => ({
+      taskId: c.taskId,
+      taskTitle: doc ? findItem(doc.items, c.taskId)?.item.title ?? null : null,
+      worktreeRoot: c.worktreeRoot,
+      worktree: basename(c.worktreeRoot) || c.worktreeRoot,
+      isServedHere: c.worktreeRoot === holder.worktreeRoot,
+      pid: c.pid,
+      host: c.host,
+      claimedAt: c.claimedAt,
+      expiresAt: c.expiresAt,
+    }))
+    .sort((a, b) => a.claimedAt.localeCompare(b.claimedAt) || a.taskId.localeCompare(b.taskId));
+  jsonResponse(res, 200, { servedWorktree: holder.worktreeRoot, claims: wire });
+  return true;
+}
+
+/** PRD read routes: prd, stats, dashboard, next, log, claims. */
 export function routePrdReads(
   url: string, path: string, method: string,
   res: ServerResponse, ctx: ServerContext,
-): boolean {
+): boolean | Promise<boolean> {
+  // GET /api/rex/claims — live cross-worktree task claims
+  if (path === "claims" && method === "GET") {
+    return handleClaims(res, ctx);
+  }
+
   // GET /api/rex/prd — full PRD document
   if (path === "prd" && method === "GET") {
     const doc = loadPRDSync(ctx.rexDir);

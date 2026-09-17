@@ -6,6 +6,7 @@
  * for WebSocket updates.
  */
 
+import { getWebSocketUrl, acceptsFrame } from "../../base-path.js";
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { usePolling } from "../../hooks/index.js";
@@ -118,8 +119,7 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
     fetchStatus();
 
     // Connect to WebSocket for live updates
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = getWebSocketUrl();
     let ws: WebSocket;
 
     try {
@@ -129,6 +129,8 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
+          // Another worktree's frame on the shared socket — not ours to react to.
+          if (!acceptsFrame(msg)) return;
           if (msg.type === "rex:execution-progress" && msg.state) {
             // Optimistic update — instant UI feedback from the WS payload.
             setStatus(msg.state);

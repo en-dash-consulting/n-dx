@@ -95,7 +95,7 @@ One capability **regressed**: the Analyze/Batch-Import panels (`ndx plan` propos
 | `sourcevision pr-markdown` | full | medium | PR Markdown tab with per-section copy + freshness state |
 | `sourcevision validate` | none | low | No UI to validate `.sourcevision/` outputs; freshness indicator partially covers intent |
 | `sourcevision export-pdf` | **full** | medium | "Export PDF report" beside the Export panel; reports the written path (the viewer sandbox blocks page-initiated downloads) |
-| `sourcevision workspace` | none | low | Multi-repo aggregation has no dashboard concept yet (project switcher `/api/projects` is single-repo) |
+| `sourcevision workspace` | none | low | Multi-repo aggregation has no dashboard concept yet; `GET /api/worktrees` covers worktrees of the served repo only, and cross-project switching is the 0.7.0 hub's job |
 | `sourcevision serve` | n/a | — | Legacy standalone viewer; superseded by `ndx start` |
 | `sourcevision reset` | n/a | — | Destructive; intentionally terminal-only |
 | `sourcevision git-credential-helper` | n/a | — | Interactive terminal flow |

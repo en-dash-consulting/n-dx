@@ -36,6 +36,7 @@ test.afterAll(async () => {
 // Every ViewId from src/shared/view-id.ts. If a view is added or renamed
 // there, update this list — that mismatch is itself worth catching.
 const VIEWS = [
+  "workspaces",
   "overview",
   "graph",
   "iso-map",

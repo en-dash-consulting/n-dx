@@ -3,14 +3,15 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, execSync } from "node:child_process";
-import { toolGit } from "../../../src/tools/git.js";
+import { existsSync } from "node:fs";
+import { toolGit, tokenizeArgs } from "../../../src/tools/git.js";
 import type { ToolGuard } from "../../../src/tools/contracts.js";
 import { initGitFixtureRepoSync } from "../../helpers/index.js";
-// toolGit runs exec("sh", ["-c", ...]) on every platform. Cases asserting on
-// git's actual output need a real `sh`; without one they'd fail with
-// "Exit code: 1" and no mention of a shell. Cases asserting only shape
-// (typeof result === "string") or guard behaviour stay unguarded — see the
-// shape-only precedent in tests/shell-spawn-inventory.md.
+// toolGit now spawns `git` with an explicit argv and NO shell. The
+// `itNeedsPosixShell` guard is kept on cases that assert on git's real output
+// only so this suite still skips cleanly on a machine without git-friendly
+// tooling; the injection cases below run everywhere, since their whole point is
+// that no shell is involved.
 import { itNeedsPosixShell } from "../../helpers/posix-shell.js";
 
 function createGitGuard(allowedGitSubcommands: string[]): ToolGuard {
@@ -168,6 +169,39 @@ describe("toolGit", () => {
       await expect(
         toolGit(guard, projectDir, { subcommand: "status$(whoami)" }),
       ).rejects.toThrow("not allowed");
+    });
+
+    it("does not execute a shell command injected through args (no shell)", async () => {
+      // The real hole: args were tokenized, re-joined into a string, and run by
+      // `sh -c`, so `"--short; echo pwned > f"` executed the echo+redirect. With
+      // an argv spawn the whole thing is one literal argument to git — git fails
+      // on the unknown flag and no file is written.
+      const marker = join(projectDir, "pwned.txt");
+      const result = await toolGit(guard, projectDir, {
+        subcommand: "status",
+        args: '"--short; echo pwned > ' + marker + '"',
+      });
+      expect(existsSync(marker)).toBe(false);
+      expect(typeof result).toBe("string");
+    });
+
+    it("does not execute a newline-injected command through args", async () => {
+      const marker = join(projectDir, "nl-pwned.txt");
+      await toolGit(guard, projectDir, {
+        subcommand: "status",
+        args: "--short\ntouch " + marker,
+      });
+      expect(existsSync(marker)).toBe(false);
+    });
+
+    it("passes a quoted argument through as a single token", () => {
+      expect(tokenizeArgs('commit -m "a message with spaces"')).toEqual([
+        "commit", "-m", "a message with spaces",
+      ]);
+      expect(tokenizeArgs('log --format="%H"')).toEqual(["log", "--format=%H"]);
+      // A metacharacter-laden value stays one token — never split into a
+      // second command.
+      expect(tokenizeArgs('"--short; rm -rf /"')).toEqual(["--short; rm -rf /"]);
     });
 
     it("properly handles quoted args without injection", async () => {

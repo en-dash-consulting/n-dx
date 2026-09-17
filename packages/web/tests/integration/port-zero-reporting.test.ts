@@ -33,12 +33,13 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { execFile } from "node:child_process";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { assertFreshServerBuild } from "../helpers/built-server-guard.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
 
 const WEB_PKG = resolve(fileURLToPath(import.meta.url), "../../..");
 const SERVER_ENTRY = join(WEB_PKG, "dist/server/start.js");
@@ -92,7 +93,11 @@ async function boot(projectDir: string, requestedPort: number): Promise<DriverRe
       execFile(
         process.execPath,
         [scriptPath],
-        { cwd: projectDir, timeout: 60_000 },
+        // cwd is WEB_PKG, never projectDir: Windows locks a process's working
+        // directory, so a temp dir used as cwd cannot be removed until the
+        // child is fully reaped. The driver passes absolute paths throughout
+        // and the server never reads process.cwd(), so nothing depends on it.
+        { cwd: WEB_PKG, timeout: 60_000 },
         (err, out) => {
           resolvePromise({
             stdout: out ?? "",
@@ -164,7 +169,7 @@ describe("what the server reports about the port it bound", () => {
         `the port file must still carry the real ephemeral port (got ${result.portFile})`,
       ).toBe(result.port);
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await removeTempDir(dir);
     }
   }, 90_000);
 
@@ -182,7 +187,7 @@ describe("what the server reports about the port it bound", () => {
       expect(result.port).toBeGreaterThan(0);
     } finally {
       await occupied.release();
-      await rm(dir, { recursive: true, force: true });
+      await removeTempDir(dir);
     }
   }, 90_000);
 });

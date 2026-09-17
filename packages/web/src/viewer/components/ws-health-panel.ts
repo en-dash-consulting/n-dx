@@ -12,6 +12,7 @@
  * - Connection duration and health level
  */
 
+import { getWebSocketUrl, acceptsFrame } from "../base-path.js";
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 
@@ -170,8 +171,7 @@ export function WsHealthPanel() {
     fetchWsHealth();
 
     // Connect to WebSocket for real-time updates
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = getWebSocketUrl();
     let ws: WebSocket | null = null;
 
     try {
@@ -182,6 +182,8 @@ export function WsHealthPanel() {
         if (!mounted) return;
         try {
           const msg = JSON.parse(event.data);
+          // Another worktree's frame on the shared socket — not ours to react to.
+          if (!acceptsFrame(msg)) return;
           if (msg.type === "ws:health-status") {
             setStatus({
               activeConnections: msg.activeConnections,

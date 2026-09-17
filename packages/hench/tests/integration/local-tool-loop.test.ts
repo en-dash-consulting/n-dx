@@ -24,7 +24,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { initGitFixtureRepoSync } from "../helpers/index.js";
+import { commitGitFixtureBaseline } from "../helpers/index.js";
 import { initConfig } from "../../src/store/config.js";
 import { defaultRegistry } from "../../src/prd/llm-gateway.js";
 import type { LLMProvider } from "../../src/prd/llm-gateway.js";
@@ -99,9 +99,7 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
 
     // Completion validation discovers changes via git; without a repo (and a
     // baseline commit) every completion claim is rejected as unverifiable.
-    initGitFixtureRepoSync(projectDir);
-    execFileSync("git", ["add", "-A"], { cwd: projectDir, stdio: "ignore" });
-    execFileSync("git", ["commit", "-m", "baseline"], { cwd: projectDir, stdio: "ignore" });
+    commitGitFixtureBaseline(projectDir);
   });
 
   afterEach(async () => {

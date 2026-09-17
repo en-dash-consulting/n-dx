@@ -310,6 +310,60 @@ describe("Git mutation failures in the Hench lifecycle", () => {
     }
   });
 
+  it("lets the commit prompt land work the timer-expiry auto-commit could not", async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), "hench-watcher-commit-failure-"));
+    try {
+      await initGitFixtureRepo(projectDir);
+      await writeFile(join(projectDir, "src.ts"), "export const value = 1;\n", "utf-8");
+      await execAsync("git add src.ts && git commit -m initial", { cwd: projectDir });
+      await writeFile(join(projectDir, "src.ts"), "export const value = 2;\n", "utf-8");
+      await execAsync("git add src.ts", { cwd: projectDir });
+      const msgPath = join(projectDir, ".hench-commit-msg.txt");
+      await writeFile(msgPath, "feat: update value\n", "utf-8");
+
+      // Make the timer-expiry commit fail for real, the way a rejected signing
+      // request or a failing hook does.
+      const lockPath = join(projectDir, ".git", "index.lock");
+      await writeFile(lockPath, "", "utf-8");
+
+      const { startCommitMsgWatcher } = await import(
+        "../../src/agent/lifecycle/commit-msg-watcher.js"
+      );
+      const { performCommitPromptIfNeeded } = await import("../../src/agent/lifecycle/shared.js");
+      const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+      const logged = (): string => consoleLog.mock.calls.flat().join("\n");
+
+      const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 50 });
+      const deadline = Date.now() + 5000;
+      while (!logged().includes("Auto-commit failed") && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      watcher.cancel();
+
+      // The refusal must not be reported as a commit — that flag is what made
+      // performCommitPromptIfNeeded skip, orphaning the run's staged work for
+      // the next task's commit to absorb.
+      expect(watcher.didAutoCommit()).toBe(false);
+      expect(logged()).toContain("Auto-commit failed");
+
+      // With the transient cause cleared, the normal commit path still owns the
+      // work: the message file survived, so nothing had to be reconstructed.
+      await rm(lockPath, { force: true });
+      const run = completedRun();
+      // The watcher is handed over exactly as finalizeRun hands it over, so the
+      // didAutoCommit() short-circuit is the thing under test.
+      await performCommitPromptIfNeeded(run, projectDir, false, true, true, undefined, undefined, watcher);
+
+      expect(run.status).toBe("completed");
+      const { stdout: head } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+      expect(head.trim()).toBe("feat: update value");
+      const { stdout: status } = await execAsync("git status --porcelain", { cwd: projectDir });
+      expect(status).not.toContain("src.ts");
+    } finally {
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  });
+
   it("withdraws auto-commit completion when checking staged reviewer repairs fails", async () => {
     const projectDir = await mkdtemp(join(tmpdir(), "hench-auto-review-diff-failure-"));
     try {

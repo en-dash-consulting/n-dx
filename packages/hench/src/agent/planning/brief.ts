@@ -20,6 +20,8 @@ import type {
 } from "../../schema/index.js";
 import { CLIError } from "../../prd/llm-gateway.js";
 import type { PromptSection } from "../../prd/llm-gateway.js";
+import { TaskClaimedElsewhereError } from "../../process/task-claims.js";
+import type { TaskClaims } from "../../process/task-claims.js";
 import {
   capList,
   dedupeRequirements,
@@ -42,7 +44,16 @@ export interface AssembleBriefOptions {
    * "n-dx" when omitted.
    */
   projectDir?: string;
+  /**
+   * Cross-worktree claims for this run. When set, autoselection passes over
+   * tasks another worktree holds, an explicit task held elsewhere is refused,
+   * and the selected task is claimed here — before anything else happens.
+   */
+  claims?: TaskClaims;
 }
+
+/** Autoselect attempts before giving up on a claim race. */
+const MAX_CLAIM_ATTEMPTS = 3;
 
 // ---------------------------------------------------------------------------
 // Epic task collection
@@ -176,6 +187,7 @@ export async function assembleTaskBrief(
     ? resolveProjectCliName(options.projectDir)
     : DEFAULT_CLI_NAME;
 
+  const claims = options?.claims;
   let entry: TreeEntry | null;
 
   if (taskId) {
@@ -201,37 +213,74 @@ export async function assembleTaskBrief(
         entry.item.title,
       );
     }
+    // An explicit task another worktree is working on is refused, not stolen.
+    // Claiming is the check: the store answers atomically under its lock.
+    if (claims) {
+      const refusedBy = await claims.claim(taskId);
+      if (refusedBy) throw new TaskClaimedElsewhereError(taskId, refusedBy, entry.item.title);
+    }
   } else {
     const completedIds = collectCompletedIds(doc.items);
     // When excluding stuck tasks, treat them as completed so findNextTask skips them
     const skipIds = excludeIds
       ? new Set([...completedIds, ...excludeIds])
       : completedIds;
+    // Tasks other worktrees hold are passed over — not folded into skipIds,
+    // which would make their parents look finished.
+    const claimedElsewhere = new Set<string>(claims ? (await claims.foreignClaims()).keys() : []);
 
     const epicId = options?.epicId;
 
-    if (epicId) {
-      // Epic filter active: get all actionable tasks and filter to epic
-      const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
-      const allActionable = findActionableTasks(doc.items, skipIds, Infinity, tags ? { tags } : undefined);
+    // Select, then claim. Another worktree may claim the same task between
+    // our read and our claim; the store refuses the loser, who excludes that
+    // id and selects again. Bounded so a store that refuses everything ends
+    // in an error rather than a spin.
+    entry = null;
+    for (let attempt = 0; attempt < MAX_CLAIM_ATTEMPTS; attempt++) {
+      const selectOptions = {
+        ...(tags ? { tags } : {}),
+        ...(claimedElsewhere.size > 0 ? { excludeIds: claimedElsewhere } : {}),
+      };
+      let candidate: TreeEntry | null;
+      if (epicId) {
+        // Epic filter active: get all actionable tasks and filter to epic
+        const epicTaskIds = collectEpicTaskIds(doc.items, epicId);
+        const allActionable = findActionableTasks(doc.items, skipIds, Infinity, selectOptions);
 
-      // Filter to tasks within the epic and not in excludeIds
-      const epicActionable = allActionable.filter(
-        (e) => epicTaskIds.has(e.item.id) && !excludeIds?.has(e.item.id),
+        // Filter to tasks within the epic and not in excludeIds
+        const epicActionable = allActionable.filter(
+          (e) => epicTaskIds.has(e.item.id) && !excludeIds?.has(e.item.id),
+        );
+
+        if (epicActionable.length === 0) {
+          throw new Error("No actionable tasks found in epic");
+        }
+
+        // findActionableTasks already sorts by priority, so first is best
+        candidate = epicActionable[0];
+      } else {
+        // No epic filter: use standard findNextTask
+        candidate = findNextTask(doc.items, skipIds, selectOptions);
+        if (!candidate) {
+          throw new Error("No actionable tasks found in PRD");
+        }
+      }
+
+      if (!claims) {
+        entry = candidate;
+        break;
+      }
+      const refusedBy = await claims.claim(candidate.item.id);
+      if (!refusedBy) {
+        entry = candidate;
+        break;
+      }
+      claimedElsewhere.add(candidate.item.id);
+    }
+    if (!entry) {
+      throw new Error(
+        `Could not claim a task after ${MAX_CLAIM_ATTEMPTS} attempts — each candidate was claimed by another worktree first.`,
       );
-
-      if (epicActionable.length === 0) {
-        throw new Error("No actionable tasks found in epic");
-      }
-
-      // findActionableTasks already sorts by priority, so first is best
-      entry = epicActionable[0];
-    } else {
-      // No epic filter: use standard findNextTask
-      entry = findNextTask(doc.items, skipIds, tags ? { tags } : undefined);
-      if (!entry) {
-        throw new Error("No actionable tasks found in PRD");
-      }
     }
   }
 
@@ -294,10 +343,17 @@ export interface ActionableTask {
 export async function getActionableTasks(
   store: PRDStore,
   limit = 20,
+  claims?: TaskClaims,
 ): Promise<ActionableTask[]> {
   const doc = await store.loadDocument();
   const completedIds = collectCompletedIds(doc.items);
-  const entries = findActionableTasks(doc.items, completedIds, limit);
+  const claimedElsewhere = claims ? new Set((await claims.foreignClaims()).keys()) : undefined;
+  const entries = findActionableTasks(
+    doc.items,
+    completedIds,
+    limit,
+    claimedElsewhere?.size ? { excludeIds: claimedElsewhere } : undefined,
+  );
 
   return entries.map((e) => ({
     id: e.item.id,

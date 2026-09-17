@@ -39,7 +39,8 @@ export {
   buildShareableUrl,
   type CopyLinkButtonProps,
 } from "./copy-link-button.js";
-export { ConfigFooter } from "./config-footer.js";
+export { ConfigFooter, installRootLabel, identityLine, identityTooltip } from "./config-footer.js";
+export type { ConfigFooterProps, ServerIdentity } from "./config-footer.js";
 export { ElapsedTime } from "./elapsed-time.js";
 export { updateFavicon, resetFavicon, FAVICON_PNGS, VIEW_TO_PRODUCT } from "./favicon.js";
 export { SidebarThemeToggle, initTheme } from "./theme-toggle.js";
@@ -53,6 +54,8 @@ export { ActiveOperationsTray } from "./active-operations-tray.js";
 export type { ActiveOperationsTrayProps } from "./active-operations-tray.js";
 export { GitStatusBanner } from "./git-status-banner.js";
 export type { GitStatusBannerProps } from "./git-status-banner.js";
+export { SessionsPanel } from "./sessions-panel.js";
+export type { SessionsPanelProps } from "./sessions-panel.js";
 
 // ── Status indicators ───────────────────────────────────────────────
 
@@ -123,3 +126,7 @@ export {
   DecoLargeNumeral,
   type DecoLargeNumeralProps,
 } from "./decorations.js";
+export { WorkspaceSwitcher, buildWorkspaceOptions, workspaceUrl, fmtElapsed } from "./workspace-switcher.js";
+export type { WorkspaceSwitcherProps, WorkspaceOption } from "./workspace-switcher.js";
+export { WorkspaceWriteStrip, workspaceWriteNotice } from "./workspace-write-strip.js";
+export type { WorkspaceWriteStripProps } from "./workspace-write-strip.js";

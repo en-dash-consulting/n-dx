@@ -15,6 +15,7 @@
 import { createHash } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
+import { isTrustedBrowserOrigin } from "./request-security.js";
 
 // ── Health tracking types ──────────────────────────────────────────────────
 
@@ -300,6 +301,40 @@ export class WsHealthTracker {
 /** A broadcast function that sends a message to all connected clients. */
 export type WebSocketBroadcaster = (data: unknown) => void;
 
+/**
+ * Workspace tag meaning "every workspace": for frames about the process as a
+ * whole (socket health, machine memory) rather than one worktree's data.
+ */
+export const BROADCAST_ALL_WORKSPACES = "*";
+
+/**
+ * A broadcaster that stamps every object frame with `{ workspace }` unless
+ * the frame already carries one.
+ *
+ * One socket serves every worktree of a repository, so a viewer showing
+ * worktree A must be able to ignore frames about worktree B — a PRD change
+ * in B must not make A refetch. Watchers and route handlers get a tagged
+ * broadcaster for the workspace they act on; the viewer filters on the tag
+ * (see messaging/ws-pipeline.ts). Untagged frames are read as the anchor's,
+ * which is what an older server would have meant.
+ */
+export function tagBroadcaster(broadcast: WebSocketBroadcaster, workspace: string | null): WebSocketBroadcaster {
+  return (data: unknown) => {
+    // null is the anchor, and the anchor's frames go out untagged: that is what
+    // an anchor viewer (workspace key null) accepts and what the Workspaces
+    // board reads as the anchor card's.
+    if (workspace === null) {
+      broadcast(data);
+      return;
+    }
+    if (data && typeof data === "object" && !Array.isArray(data) && !("workspace" in data)) {
+      broadcast({ ...(data as Record<string, unknown>), workspace });
+      return;
+    }
+    broadcast(data);
+  };
+}
+
 /** Options for the WebSocket manager. */
 export interface WebSocketManagerOptions {
   /** Optional health tracker for connection lifecycle metrics. */
@@ -477,6 +512,23 @@ export function createWebSocketManager(opts?: WebSocketManagerOptions): {
     if (!key) {
       socket.destroy();
       return;
+    }
+
+    // Browser-origin gate. A WebSocket handshake carries no CORS preflight, so
+    // the HTTP `handleRequestSecurity` guard never sees it — a page open in the
+    // user's browser could otherwise open `ws://localhost:<port>` and read every
+    // broadcast (PRD changes, agent stdout, execution state). A present `Origin`
+    // must be this loopback server's own; a missing one is a non-browser client
+    // (CLI/MCP), which stays allowed to match the HTTP guard's contract. A
+    // duplicate/array Origin header is treated as untrusted.
+    const originHeader = req.headers.origin;
+    if (originHeader !== undefined) {
+      const origin = typeof originHeader === "string" ? originHeader : null;
+      if (origin === null || !isTrustedBrowserOrigin(origin, req)) {
+        socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+        socket.destroy();
+        return;
+      }
     }
 
     // Enable TCP-level keepalive for OS-level dead-peer detection.

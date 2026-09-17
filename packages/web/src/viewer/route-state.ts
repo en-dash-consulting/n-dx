@@ -1,4 +1,5 @@
 import type { ViewId } from "./types.js";
+import { stripBasePath } from "./external.js";
 
 export interface ParsedRoute {
   view: ViewId;
@@ -41,8 +42,13 @@ function normalizeHashView(base: string): string {
   return normalized;
 }
 
-export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>): ParsedRoute | null {
-  const raw = pathname.slice(1).replace(/^\/+/, "").replace(/\/+$/, "");
+/**
+ * @param basePath `/p/<id>` when the viewer is served through the hub and/or
+ *   `/w/<key>` when it addresses a worktree; the prefix is removed before the
+ *   view segment is read, so `/p/x/w/y/prd/123` and `/prd/123` parse identically.
+ */
+export function parsePathnameRoute(pathname: string, validViews: Set<ViewId>, basePath = ""): ParsedRoute | null {
+  const raw = stripBasePath(basePath, pathname).slice(1).replace(/^\/+/, "").replace(/\/+$/, "");
   if (!raw) return null;
 
   const slashIdx = raw.indexOf("/");
@@ -82,6 +88,7 @@ export function resolveLocationRoute(
   pathname: string,
   hash: string,
   validViews: Set<ViewId>,
+  basePath = "",
 ): ParsedRoute | null {
-  return parseLegacyHashRoute(hash, validViews) ?? parsePathnameRoute(pathname, validViews);
+  return parseLegacyHashRoute(hash, validViews) ?? parsePathnameRoute(pathname, validViews, basePath);
 }

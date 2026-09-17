@@ -119,6 +119,138 @@ describe("hench record", () => {
   });
 
   /**
+   * The start-of-task mark: `hench usage mark --task=<id>` snapshots the
+   * transcript when the work begins, and the record measures from there. This
+   * is what replaced the typed `--startedAt` window.
+   */
+  describe("token usage from a mark", () => {
+    function message(uuid: string, output: number, cacheRead = 0, timestamp?: string): string {
+      return JSON.stringify({
+        type: "assistant",
+        uuid,
+        ...(timestamp ? { timestamp } : {}),
+        message: {
+          model: "claude-opus-5",
+          usage: { input_tokens: 1, output_tokens: output, cache_creation_input_tokens: 2, cache_read_input_tokens: cacheRead },
+        },
+      });
+    }
+
+    async function writeTranscript(name: string, lines: string[]): Promise<string> {
+      const path = join(projectDir, name);
+      await writeFile(path, lines.join("\n"), "utf-8");
+      return path;
+    }
+
+    async function markNow(task: string, transcript: string, session: string): Promise<void> {
+      const { cmdUsage } = await import("../../../src/cli/commands/usage.js");
+      await cmdUsage(projectDir, ["mark"], { task, transcript, session });
+    }
+
+    it("claims exactly what accumulated after the mark, per token class", async () => {
+      // Two messages of unrelated work, then the mark, then two of this task.
+      const before = await writeTranscript("t.jsonl", [message("a", 100, 9000), message("b", 50, 9000)]);
+      await markNow("T1", before, "s-mark");
+      const after = await writeTranscript("t.jsonl", [
+        message("a", 100, 9000), message("b", 50, 9000),
+        message("c", 7, 500), message("d", 3, 500),
+      ]);
+
+      await cmdRecord(projectDir, { task: "T1", transcript: after, session: "s-mark" });
+
+      const [run] = await listRuns(henchDir);
+      expect(run.tokenUsage).toEqual({ input: 2, output: 10, cacheCreationInput: 4, cacheReadInput: 1000 });
+      expect(run.turns).toBe(2);
+      // No warning: the mark is the boundary.
+      expect(vi.mocked(console.error).mock.calls.flat().join("\n")).not.toMatch(/Warning/);
+      const note = vi.mocked(console.log).mock.calls.flat().join("\n");
+      expect(note).toMatch(/measured from the "T1" mark/);
+      expect(note).toMatch(/fresh 16/);
+      expect(note).toMatch(/cache-read 1,000/);
+    });
+
+    it("a deliberately wrong --startedAt yields the same tokens as none at all", async () => {
+      const before = await writeTranscript("t.jsonl", [message("a", 100, 0, "2026-09-16T10:00:00Z")]);
+      await markNow("T1", before, "s-wrong");
+      const after = await writeTranscript("t.jsonl", [
+        message("a", 100, 0, "2026-09-16T10:00:00Z"),
+        message("b", 7, 0, "2026-09-16T10:05:00Z"),
+      ]);
+
+      await cmdRecord(projectDir, { task: "T1", transcript: after, session: "s-wrong", startedAt: "2026-09-16T10:04:00Z" });
+      await markNow("T2", after, "s-wrong");
+      const grown = await writeTranscript("t.jsonl", [
+        message("a", 100, 0, "2026-09-16T10:00:00Z"),
+        message("b", 7, 0, "2026-09-16T10:05:00Z"),
+        message("c", 11, 0, "2026-09-16T10:09:00Z"),
+      ]);
+      // A time AFTER the only new message: the old window would have claimed nothing.
+      await cmdRecord(projectDir, { task: "T2", transcript: grown, session: "s-wrong", startedAt: "2026-09-16T10:30:00Z" });
+
+      const byTask = Object.fromEntries((await listRuns(henchDir)).map((r) => [r.taskId, r]));
+      expect(byTask.T1.tokenUsage.output).toBe(7);
+      expect(byTask.T2.tokenUsage.output).toBe(11);
+      // …but the typed value is still the record's start time.
+      expect(byTask.T2.startedAt).toBe("2026-09-16T10:30:00Z");
+    });
+
+    it("takes the run's startedAt from the mark when none is passed", async () => {
+      const transcript = await writeTranscript("t.jsonl", [message("a", 1)]);
+      await markNow("T1", transcript, "s-at");
+      await cmdRecord(projectDir, { task: "T1", transcript, session: "s-at" });
+      const [run] = await listRuns(henchDir);
+      expect(Date.parse(run.startedAt)).not.toBeNaN();
+      expect(Date.parse(run.finishedAt!)).toBeGreaterThanOrEqual(Date.parse(run.startedAt));
+    });
+
+    it("consumes the mark: a second record for the same task falls back and warns", async () => {
+      const transcript = await writeTranscript("t.jsonl", [message("a", 100)]);
+      await markNow("T1", transcript, "s-consume");
+      await cmdRecord(projectDir, { task: "T1", transcript, session: "s-consume" });
+      vi.mocked(console.error).mockClear();
+
+      const grown = await writeTranscript("t.jsonl", [message("a", 100), message("b", 5)]);
+      await cmdRecord(projectDir, { task: "T1", transcript: grown, session: "s-consume" });
+
+      const runs = await listRuns(henchDir);
+      expect(runs.map((r) => r.tokenUsage.output).sort()).toEqual([0, 5].sort());
+      expect(vi.mocked(console.error).mock.calls.flat().join("\n")).toMatch(/no usage mark for "T1"/);
+    });
+
+    it("--mark consumes a mark taken under another name, leaving other marks alone", async () => {
+      const transcript = await writeTranscript("t.jsonl", [message("a", 100)]);
+      await markNow("skill:ndx-capture", transcript, "s-alias");
+      await markNow("T-other", transcript, "s-alias");
+      const grown = await writeTranscript("t.jsonl", [message("a", 100), message("b", 9)]);
+
+      await cmdRecord(projectDir, { task: "item-42", mark: "skill:ndx-capture", transcript: grown, session: "s-alias" });
+
+      const [run] = await listRuns(henchDir);
+      expect(run.taskId).toBe("item-42");
+      expect(run.tokenUsage.output).toBe(9);
+      const { loadUsageCursor } = await import("../../../src/store/session-usage.js");
+      const cursor = await loadUsageCursor(henchDir, "s-alias");
+      expect(Object.keys(cursor.marks ?? {})).toEqual(["T-other"]);
+      // The watermark moved to the end regardless of which mark was consumed.
+      expect(cursor.consumed).toBe(2);
+    });
+
+    it("reports an approximate delta when the marked message was compacted away", async () => {
+      const before = await writeTranscript("t.jsonl", [message("a", 100), message("b", 50)]);
+      await markNow("T1", before, "s-compact");
+      // Compaction rewrote the transcript: the marked uuid is gone, totals differ.
+      const rewritten = await writeTranscript("t.jsonl", [message("z", 160), message("c", 7)]);
+
+      await cmdRecord(projectDir, { task: "T1", transcript: rewritten, session: "s-compact" });
+
+      const [run] = await listRuns(henchDir);
+      // now (167) − then (150) = 17, computed from the two snapshots.
+      expect(run.tokenUsage.output).toBe(17);
+      expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toMatch(/approximate/);
+    });
+  });
+
+  /**
    * Usage comes from the session transcript, so assisted runs stop reporting
    * zeros. Driven through `--transcript` rather than the ambient session: a
    * fixture is deterministic, and the live transcript grows between assertions.
@@ -311,7 +443,7 @@ describe("hench record", () => {
       ).rejects.toThrow(/--since/);
     });
 
-    it("warns before a windowless first record claims a whole transcript", async () => {
+    it("warns, naming the mark command, before an unmarked first record claims a whole transcript", async () => {
       const transcript = join(projectDir, "windowless.jsonl");
       await writeFile(transcript, [message("a", 100), message("b", 50), message("c", 7)].join("\n"), "utf-8");
 
@@ -323,10 +455,23 @@ describe("hench record", () => {
 
       const warned = vi.mocked(console.error).mock.calls.flat().join("\n");
       expect(warned).toMatch(/3 usage-bearing messages/);
-      expect(warned).toMatch(/--startedAt/);
+      expect(warned).toMatch(/hench usage mark --task=T1/);
     });
 
-    it("does not warn when a window was given", async () => {
+    it("a typed --startedAt no longer narrows the claim — it is metadata", async () => {
+      const transcript = join(projectDir, "typed.jsonl");
+      await writeFile(transcript, [message("a", 100), message("b", 50)].join("\n"), "utf-8");
+
+      // A wildly wrong start time: under the old window semantics this would
+      // have excluded every message (they carry no timestamp → kept, so use a
+      // future time to make the point) — now the number is the same regardless.
+      await cmdRecord(projectDir, { task: "T1", transcript, session: "s-typed", startedAt: "2099-01-01T00:00:00Z" });
+      const [run] = await listRuns(henchDir);
+      expect(run.tokenUsage.output).toBe(150);
+      expect(run.startedAt).toBe("2099-01-01T00:00:00Z");
+    });
+
+    it("does not warn when an explicit --since window was given", async () => {
       const transcript = join(projectDir, "windowed.jsonl");
       await writeFile(transcript, [message("a", 100), message("b", 50)].join("\n"), "utf-8");
 
@@ -334,7 +479,7 @@ describe("hench record", () => {
         task: "T1",
         transcript,
         session: "s-windowed",
-        startedAt: "2026-08-25T00:00:00Z",
+        since: "2026-08-25T00:00:00Z",
       });
 
       const warned = vi.mocked(console.error).mock.calls.flat().join("\n");

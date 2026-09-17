@@ -107,7 +107,7 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 Follow `.rex/workflow.md` for task execution discipline. Key steps:
 
 1. Run the project's validation command to ensure a clean state.
-2. Call `get_next_task` to pick up an actionable task.
+2. Call `get_next_task` to pick up an actionable task, then `claim_task` so another worktree's agent skips it.
 3. Read the task's full context: parent chain, description, acceptance criteria.
 4. Implement using TDD where possible: failing test → green → refactor.
 5. Run validation and tests.
@@ -150,6 +150,8 @@ Two MCP servers provide structured access to project data. They are configured i
 
 **Write tools** (modify project state, use with care):
 
+- `claim_task`
+- `release_task`
 - `update_task_status`
 - `add_item`
 - `edit_item`

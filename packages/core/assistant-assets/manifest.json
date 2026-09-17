@@ -62,6 +62,8 @@
           "facets"
         ],
         "write": [
+          "claim_task",
+          "release_task",
           "update_task_status",
           "add_item",
           "edit_item",

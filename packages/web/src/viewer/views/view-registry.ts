@@ -53,6 +53,8 @@ import {
   AdaptiveOptimizationView,
 } from "./domain-hench.js";
 
+import { WorkspacesView } from "./domain-workspaces.js";
+
 import {
   NotionConfigView,
   IntegrationConfigView,
@@ -96,6 +98,9 @@ export interface ViewRenderContext {
 type ViewRenderer = (ctx: ViewRenderContext) => ComponentChild;
 
 const REGISTRY: Record<string, ViewRenderer> = {
+  "workspaces": () =>
+    h(WorkspacesView, null),
+
   "overview": ({ data }) =>
     h(Overview, { data }),
 

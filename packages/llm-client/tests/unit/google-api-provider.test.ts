@@ -343,7 +343,7 @@ describe("createGoogleApiProvider — complete()", () => {
     expect(fetchCall[0]).toContain(":generateContent");
   });
 
-  it("includes API key as query parameter", async () => {
+  it("sends the API key in the x-goog-api-key header, not the URL", async () => {
     mockFetchResponse(makeGeminiResponse("OK"));
 
     const provider = createGoogleApiProvider({
@@ -352,7 +352,11 @@ describe("createGoogleApiProvider — complete()", () => {
     await provider.complete({ prompt: "Hi", model: "gemini-2.5-pro" });
 
     const fetchCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(fetchCall[0]).toContain("key=AIza-test-key");
+    // The key must never appear in the URL — proxies and egress logs record it.
+    expect(fetchCall[0]).not.toContain("key=");
+    expect(fetchCall[0]).not.toContain("AIza-test-key");
+    const headers = fetchCall[1].headers as Record<string, string>;
+    expect(headers["x-goog-api-key"]).toBe("AIza-test-key");
   });
 
   it("returns empty text when no candidates", async () => {
@@ -586,6 +590,8 @@ describe("createGoogleApiProvider — stream()", () => {
     const fetchCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(fetchCall[0]).toContain(":streamGenerateContent");
     expect(fetchCall[0]).toContain("alt=sse");
+    expect(fetchCall[0]).not.toContain("key=");
+    expect((fetchCall[1].headers as Record<string, string>)["x-goog-api-key"]).toBeDefined();
   });
 
   it("throws ClaudeClientError with reason 'rate-limit' on 429", async () => {
@@ -700,7 +706,9 @@ describe("createGoogleApiProvider — validateAuth()", () => {
 
     const fetchCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(fetchCall[0]).toContain("/models");
-    expect(fetchCall[0]).toContain("AIza-validate-key");
+    expect(fetchCall[0]).not.toContain("key=");
+    expect(fetchCall[0]).not.toContain("AIza-validate-key");
+    expect((fetchCall[1].headers as Record<string, string>)["x-goog-api-key"]).toBe("AIza-validate-key");
   });
 });
 

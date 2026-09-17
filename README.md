@@ -194,8 +194,10 @@ Iterative improvement loop: re-analyze the codebase, accept new recommendations 
 
 ```sh
 ndx status .                # PRD tree with completion stats
-ndx start .                 # dashboard + MCP server (port 3117)
-ndx start --background .    # daemon mode
+ndx start .                 # register with the hub; dashboard + MCP at /p/<id>/ on 3117
+ndx start status .          # hub, project and URL
+ndx start stop .            # unregister this worktree
+ndx start --here .          # single-project server that owns the port instead
 ndx usage .                 # token usage analytics
 ```
 
@@ -242,7 +244,7 @@ ndx config llm.codex.cli_path codex .
 | `ndx dev [dir]` | Start dev server with live reload |
 | `ndx ci [dir]` | Run analysis pipeline and validate PRD health |
 | `ndx config [key] [value]` | View and edit settings (`--json`, `--help`) |
-| `ndx export [dir]` | Export static deployable dashboard (`--out-dir`, `--deploy=github`) |
+| `ndx export [dir]` | Export static deployable dashboard (`--out-dir`, `--deploy=github` confirms first — `--yes` for unattended; agent transcripts excluded unless `--include-transcripts`) |
 | `ndx prd export\|import` | Carry the PRD between machines as a portable JSON bundle (`--out`, `--in`, `--replace`), scoped to one item with `--item` (its subtree, its `blockedBy` closure, and its ancestors), or write a stakeholder document with `--format=narrative` (`--include-completed`; one-way) — distinct from `ndx export` above |
 | `ndx iso [dir]` | Render a standalone isometric architecture map (`--source=auto\|sourcevision\|scan`, `--max-nodes=N`, `--no-externals`) |
 | `ndx auth [dir]` | Check and configure LLM provider credentials |
@@ -310,20 +312,27 @@ If `ndx` isn't on `PATH`, run the CLI through npx instead: `npx -y @n-dx/core re
 
 Codex reads `.codex/config.toml` automatically — no manual registration required.
 
-### HTTP transport — single project only
+### HTTP transport — through the hub
+
+The hub runs one dashboard server per registered repository and exposes each project's MCP endpoints under its id:
 
 ```sh
-ndx start .
-# Claude example:
-claude mcp add --transport http rex http://localhost:3117/mcp/rex
-claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
+ndx start .                     # starts the hub if needed and registers this repository
+ndx hub status                  # the hub's pid, port and every registered project
+# Claude example, for the project registered as <id>:
+claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex
+claude mcp add --transport http sourcevision http://localhost:3117/p/<id>/mcp/sourcevision
 ```
 
-`http://localhost:3117/mcp/rex` isn't scoped to a project — it points at whichever `ndx start` currently holds port 3117. Registering it is only safe when you have one n-dx project running at a time: a second `ndx start` on the same port redirects both registrations to the newer project. Prefer stdio (above) if you work across multiple n-dx projects; a multi-project hub landing in 0.7.0 will make HTTP registration safe to share.
+Sessions (`Mcp-Session-Id`), SSE responses and `DELETE` for session close are handled by the project's own server; the hub only proxies. Two registered projects have independent sessions, and a tool call on `/p/A/mcp/rex` writes to A's tree only. `GET /api/hub/projects` lists the registered ids.
+
+While exactly one project is registered, the root `http://localhost:3117/mcp/rex` still aliases to it, so a single-project registration keeps working unchanged. With several registered, root MCP calls answer `409` with the list of ids — register the `/p/<id>/` URL instead.
+
+The tracked `.mcp.json` (stdio, above) remains the recommended path: it needs no running server and resolves the project from the directory Claude Code launched in. Use HTTP when you want one long-lived server shared by several assistant sessions.
 
 ### Tools
 
-**Rex:** `get_prd_status`, `get_next_task`, `add_item`, `update_task_status`, `edit_item`, `get_item`, `move_item`, `merge_items`, `get_recommendations`, `verify_criteria`, `reorganize`, `health`, `facets`, `append_log`, `sync_with_remote`, `get_capabilities`
+**Rex:** `get_prd_status`, `get_next_task`, `claim_task`, `release_task`, `add_item`, `update_task_status`, `edit_item`, `get_item`, `move_item`, `merge_items`, `get_recommendations`, `verify_criteria`, `reorganize`, `health`, `facets`, `append_log`, `sync_with_remote`, `get_capabilities`
 
 **SourceVision:** `get_overview`, `get_next_steps`, `get_zone`, `get_findings`, `get_file_info`, `search_files`, `get_imports`, `get_classifications`, `set_file_archetype`, `get_route_tree`
 

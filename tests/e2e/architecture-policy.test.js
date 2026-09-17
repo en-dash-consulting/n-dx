@@ -49,10 +49,20 @@ const ALLOWED = new Set([
   "packages/core/cli-ink.js",
   "packages/core/ci.js",
   "packages/core/web.js",
+  // Spawns the sub-package's own stdio MCP server with `stdio: "inherit"`, so
+  // the editor's stdin and stdout reach it unmediated. Deliberately a direct
+  // spawn rather than win-spawn's spawnCli: that wraps in cmd.exe on Windows
+  // for `.cmd` shims, and an extra process between an editor and its MCP
+  // server is exactly what must not be in the way.
+  "packages/core/mcp-shim.js",
   "packages/core/config.js",
   "packages/core/export.js",
   "packages/core/pair-programming.js",
   "packages/core/win-spawn.js",
+  // `git ls-files` — whether a path is already tracked is what decides
+  // whether adding an ignore line for it is right, so the question lives
+  // beside the writer rather than in a caller.
+  "packages/core/gitignore.js",
   "pr-check.js",
   // Development scripts
   "packages/web/dev.js",
@@ -99,6 +109,11 @@ const ALLOWED = new Set([
   // needed — removed rather than left as a permitted-but-unused entry.
   // Git preflight — invokes `git init` when the user consents during `ndx init`
   "packages/core/git-preflight.js",
+  // Install identity (`ndx which`) — reads the install checkout's branch and
+  // short SHA with `git rev-parse`. Orchestration tier, and it must answer even
+  // when nothing is initialized, so it cannot route through llm-client's exec
+  // helpers (a Foundation-tier dependency the report does not otherwise need).
+  "packages/core/install-identity.js",
   // Codex integration — writes .codex/config.toml, .agents/skills, AGENTS.md
   "packages/core/codex-integration.js",
   // Assistant integration — runs `git check-ignore` to detect gitignored
@@ -1017,13 +1032,13 @@ describe("architecture policy: zone cohesion gate", () => {
 const BOUNDARY_FILES = [
   {
     file: "packages/web/src/viewer/external.ts",
-    maxExports: 26,
-    description: "viewer outbound gateway (schema types, shared utilities, messaging)",
+    maxExports: 33,
+    description: "viewer outbound gateway (schema types, shared utilities, messaging). Raised from 32 to 33 for frameIsForWorkspace: the workspace-tag filter lives in the messaging pipeline and raw socket consumers need the same predicate, which they may reach only through this gateway. Raised from 30 to 32 for detectViewerBasePath and workspaceKeyFromBasePath — the /w/<key>/ workspace slot (0.8.0 PR 12) is part of the viewer's base path and must be read through the same shared helper the server strips it with. Raised from 26 to 30 for the four base-path helpers (detectBasePath, withBasePath, stripBasePath, webSocketUrl) the viewer needs to run under the hub's /p/<id>/ prefix (0.7.0 PR 8): they live in src/shared so the hub strips exactly what the viewer prefixes, and the viewer may reach shared/ only through this gateway.",
   },
   {
     file: "packages/web/src/server/rex-gateway.ts",
-    maxExports: 66,
-    description: "web→rex gateway (domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser, folder-tree parser/slug resolver, legacy PRD migration, PRD tree backup snapshots for the dashboard's Restore panel — isValidSnapshotId added to reject a path-traversal id in POST /api/rex/restore before it reaches restoreFromBackup's fs.rm)",
+    maxExports: 68,
+    description: "web→rex gateway (raised from 66 to 68 for openClaimsStore and resolveClaimHolder, 0.6.0 PR 6: the execute route answers 409 naming the worktree that holds a task, and the claims file lives in the git common dir that only rex's store knows how to find; domain types, MCP server factory, tree utilities, token + duration rollup, constants, Markdown serializer/parser, folder-tree parser/slug resolver, legacy PRD migration, PRD tree backup snapshots for the dashboard's Restore panel — isValidSnapshotId added to reject a path-traversal id in POST /api/rex/restore before it reaches restoreFromBackup's fs.rm)",
   },
   {
     file: "packages/web/src/server/domain-gateway.ts",
@@ -1032,13 +1047,13 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/rex-gateway.ts",
-    maxExports: 32,
-    description: "hench→rex gateway (schema, store, tree, task selection, timestamps). Raised from 30 to carry TREE_META_FILENAME: `.rex/tree-meta.json` is rewritten by every folder-tree save, so hench has to stage and discount it wherever it stages and discounts the tree, and hardcoding the name at those three sites is exactly the drift that left it in nobody's list and refused every task completion. Raised from 31 to carry findParentResets: withdrawing a completion claim has to reopen the ancestors the same run's cascade closed, and rex already owns that computation — reimplementing the ancestor walk in hench would be a second definition of which parents are inconsistent, free to drift from the add path's.",
+    maxExports: 38,
+    description: "hench→rex gateway (schema, store, tree, task selection, timestamps). Raised from 37 to 38 for SelectionReasonCode: hench's task header used to decide what to print by substring-matching explainSelection's rendered sentence, so rewording that sentence silently blanked the finalize label. The discriminator is rex's to define — a hench-local copy of the three codes would be a second definition of why a task was picked, free to drift from the one that sets it. Raised from 32 to 37 for the cross-worktree claims surface (0.6.0 PR 6): openClaimsStore and resolveClaimHolder plus the ClaimsStore, ClaimHolder and TaskClaim types — the run claims the task it selects so other worktrees pass over it, and the store lives in the git common dir that only rex knows how to locate; a hench copy would be a second definition of where claims live. Raised from 30 to carry TREE_META_FILENAME: `.rex/tree-meta.json` is rewritten by every folder-tree save, so hench has to stage and discount it wherever it stages and discounts the tree, and hardcoding the name at those three sites is exactly the drift that left it in nobody's list and refused every task completion. Raised from 31 to carry findParentResets: withdrawing a completion claim has to reopen the ancestors the same run's cascade closed, and rex already owns that computation — reimplementing the ancestor walk in hench would be a second definition of which parents are inconsistent, free to drift from the add path's.",
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 166,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token accumulation, and model catalogs). The combined branch exposes both terminateProcessTree for complete Windows CLI-tree cleanup and resolveLocalTimeoutMs for the local-provider timeout configuration; both are consumed only through this gateway.",
+    maxExports: 170,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token accumulation, and model catalogs). The combined branch exposes both terminateProcessTree for complete Windows CLI-tree cleanup and resolveLocalTimeoutMs for the local-provider timeout configuration; both are consumed only through this gateway. Raised from 166 to 168 for listWorktrees and its GitWorktree type (0.6.0 PR 5, worktree awareness): the async sibling of getWorktreeRoot, so hench's cross-worktree run views read the same realpath-resolved worktree list the dashboard does rather than shelling out to git themselves. Raised from 168 to 170 for hasPosixShell and resolveShellKind: the command guard must know whether run_command will be interpreted by sh or cmd.exe, and that decision has to come from the same function execShellCmd uses (a copy in hench would drift and re-open the cmd.exe bypass).",
   },
 ];
 

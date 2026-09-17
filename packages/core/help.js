@@ -196,6 +196,13 @@ const COMMAND_REGISTRY = [
     related: ["plan", "status"],
   },
   {
+    name: "which",
+    category: "Orchestration",
+    summary: "Show which n-dx is running — version, path, install kind, git",
+    keywords: ["which", "version", "path", "install", "identity", "checkout", "worktree", "link", "global", "debug"],
+    related: ["config", "init"],
+  },
+  {
     name: "config",
     category: "Orchestration",
     summary: "View and edit settings across all packages",
@@ -1028,16 +1035,33 @@ const ORCHESTRATOR_HELP_DEFS = {
     related: ["status"],
   },
   start: {
-    summary: "start the dashboard and MCP server",
-    description: "Starts the unified web server serving both the dashboard UI and\nMCP HTTP endpoints for Rex and SourceVision.",
+    summary: "serve this repository through the n-dx hub",
+    description:
+      "Registers this repository with the per-user hub and serves it at\n" +
+      "http://localhost:3117/p/<id>/ — dashboard UI and MCP HTTP endpoints for\n" +
+      "Rex and SourceVision. The hub starts on first use and runs one server per\n" +
+      "repository, so several projects share the port without colliding.\n\n" +
+      "--here opts out to the single-project server, which owns the port itself.",
     usage: "ndx start [subcommand] [options] [dir]",
     sections: [
       {
         title: "Subcommands",
-        content: "(none)              Start the server (foreground)\nstop                Stop a background server\nstatus              Check if a background server is running",
+        content:
+          "(none)              Register with the hub (or start the server, with --here)\n" +
+          "stop                Unregister this worktree (--here: stop the background server)\n" +
+          "status              Report the hub, this project and its URL",
       },
       {
-        title: "Port handling",
+        title: "Stopping",
+        content:
+          "'ndx start stop' unregisters the worktree it runs in. While another\n" +
+          "worktree of the repository is still registered, the project keeps being\n" +
+          "served; the last one unregisters the project and stops its server. A hub\n" +
+          "with no projects left exits, unless ~/.n-dx/config.json sets\n" +
+          "hub.keepAlive to true. 'ndx hub stop' stops the hub and every project.",
+      },
+      {
+        title: "Port handling (--here)",
         content:
           "Starting again for the same directory restarts that server on the same port.\n" +
           "If the port is held by an n-dx dashboard for a DIFFERENT directory, that\n" +
@@ -1046,16 +1070,45 @@ const ORCHESTRATOR_HELP_DEFS = {
       },
     ],
     options: [
-      { flag: "--port=<N>", description: "Server port (default: 3117)" },
-      { flag: "--background", description: "Run as a background daemon" },
+      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.n-dx/config.json); with --here, this server's port" },
+      { flag: "--here", description: "Single-project server instead of the hub (also: web.mode \"here\" in .n-dx.json)" },
+      { flag: "--hub", description: "Register with the hub — the default since 0.7.0; accepted for compatibility" },
+      { flag: "--background", description: "With --here, run as a background daemon" },
+      { flag: "--open", description: "Open the project URL in the browser" },
     ],
     examples: [
-      { command: "ndx start .", description: "Start server in foreground" },
-      { command: "ndx start --background .", description: "Start as background daemon" },
-      { command: "ndx start status .", description: "Check if server is running" },
-      { command: "ndx start stop .", description: "Stop background server" },
+      { command: "ndx start .", description: "Register with the hub; several repos share port 3117" },
+      { command: "ndx start status .", description: "Report the hub, this project and its URL" },
+      { command: "ndx start stop .", description: "Unregister this worktree" },
+      { command: "ndx start --here .", description: "Single-project server on this port" },
+      { command: "ndx start --here --background .", description: "Single-project server as a background daemon" },
     ],
-    related: ["web", "dev"],
+    related: ["hub", "web", "dev"],
+  },
+  hub: {
+    summary: "inspect or stop the per-user n-dx hub",
+    description:
+      "The hub is one process per user: it owns port 3117, keeps the project\n" +
+      "registry in ~/.n-dx/hub.json, and runs one dashboard server per registered\n" +
+      "repository. 'ndx start' starts and registers with it; these subcommands\n" +
+      "address the hub itself, from any directory.",
+    usage: "ndx hub [status|stop] [options]",
+    sections: [
+      {
+        title: "Subcommands",
+        content:
+          "status              Hub pid, port, uptime and every registered project (default)\n" +
+          "stop                Stop the hub and every project server it runs",
+      },
+    ],
+    options: [
+      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.n-dx/config.json)" },
+    ],
+    examples: [
+      { command: "ndx hub status", description: "What the hub is serving right now" },
+      { command: "ndx hub stop", description: "Stop the hub and every project server" },
+    ],
+    related: ["start"],
   },
   web: {
     summary: "alias for 'ndx start'",
@@ -1127,16 +1180,41 @@ const ORCHESTRATOR_HELP_DEFS = {
     summary: "export static deployable dashboard",
     description: "Generates a self-contained static directory from the current\nSourceVision and Rex data. Deployable to GitHub Pages, Netlify, S3,\nor any static host. All read-only views work; mutation UI is hidden.",
     usage: "ndx export [options] [dir]",
+    sections: [
+      {
+        title: "What is published",
+        content:
+          "Published:     PRD items (titles, descriptions, acceptance criteria,\n" +
+          "               status), SourceVision analysis data (file inventory,\n" +
+          "               import graph, zones), and hench run summaries (status,\n" +
+          "               token usage, activity counts).\n" +
+          "Not published: anything free-text a run recorded — tool-call inputs and\n" +
+          "               outputs, event streams, error bodies, test-runner output,\n" +
+          "               and the command lines the agent ran. These can contain\n" +
+          "               anything the agent read or printed (.env contents, an env\n" +
+          "               dump from a failing test, an inline API token).\n" +
+          "               A run record is published through an allowlist, so a field\n" +
+          "               added to it later is excluded until named there.\n" +
+          "               Pass --include-transcripts to publish them deliberately.\n" +
+          "\n" +
+          "--deploy=github force-pushes the export to origin/n-dx-dashboard. It\n" +
+          "prints what will be published and asks first; unattended runs (no TTY)\n" +
+          "must pass --yes or the command stops before writing or pushing.",
+      },
+    ],
     options: [
-      { flag: "--out-dir=<path>", description: "Output directory (default: ./ndx-export)" },
+      { flag: "--out-dir=<path>", description: "Output directory (default: ./ndx-export, gitignored on first run)" },
       { flag: "--base-path=<path>", description: "Base URL path for deployment (default: /)" },
-      { flag: "--deploy=github", description: "Push to n-dx-dashboard branch for GitHub Pages" },
+      { flag: "--deploy=github", description: "Push to the n-dx-dashboard branch for GitHub Pages (asks first)" },
+      { flag: "--yes", description: "Skip the deploy confirmation (required when stdin is not a TTY)" },
+      { flag: "--include-transcripts", description: "Publish the full hench run records — transcripts, events, test and error output" },
     ],
     examples: [
       { command: "ndx export", description: "Export to ./ndx-export" },
       { command: "ndx export --out-dir=dist .", description: "Export to ./dist" },
       { command: "ndx export --base-path=/my-project/ .", description: "Export with subpath" },
-      { command: "ndx export --deploy=github .", description: "Export and deploy to GitHub Pages" },
+      { command: "ndx export --deploy=github .", description: "Export and deploy to GitHub Pages (confirms first)" },
+      { command: "ndx export --deploy=github --yes .", description: "Deploy unattended, e.g. from CI" },
     ],
     related: ["start", "status"],
   },
@@ -1148,6 +1226,46 @@ const ORCHESTRATOR_HELP_DEFS = {
     examples: [
       { command: "ndx auth", description: "Verify credentials for the active vendor" },
       { command: "ndx auth ~/projects/app", description: "Verify using another project's vendor config" },
+    ],
+    related: ["config", "init"],
+  },
+  which: {
+    summary: "show which n-dx is running",
+    description:
+      "Reports the identity of the CLI executing right now, not just its version.\n" +
+      "\n" +
+      "The package version is the same string in every checkout and every\n" +
+      "install, so it cannot distinguish a globally installed ndx from the\n" +
+      "worktree you are standing in. When a terminal, a dashboard tab and a run\n" +
+      "record disagree, this is the command that says why.\n" +
+      "\n" +
+      "Five fields are printed:\n" +
+      "\n" +
+      "  version   the @n-dx/core version\n" +
+      "  cli       absolute path of the cli.js actually running\n" +
+      "  install   npm registry install, pnpm global link, or workspace checkout\n" +
+      "  git       branch and short SHA, or detached@<sha>, of the install\n" +
+      "  project   the resolved project directory\n" +
+      "\n" +
+      "'install' distinguishes a linked checkout from one invoked directly by\n" +
+      "comparing the invoked path against the resolved one — a global shim is a\n" +
+      "symlink, so the two differ.\n" +
+      "\n" +
+      "Always exits 0. A missing git binary, or an install that is not a git\n" +
+      "working tree, reports no git identity rather than failing — this command\n" +
+      "is for use when something is already confusing, so it never adds a new\n" +
+      "way to fail.\n" +
+      "\n" +
+      "'ndx --version --verbose' prints exactly this report.",
+    usage: "ndx which [dir]",
+    options: [
+      { flag: "--json", description: "Emit the report as a single JSON object" },
+    ],
+    examples: [
+      { command: "ndx which", description: "Identify the ndx on PATH" },
+      { command: "node packages/core/cli.js which", description: "Identify a specific checkout" },
+      { command: "ndx which --json", description: "Machine-readable identity record" },
+      { command: "ndx --version --verbose", description: "Same report via the version flag" },
     ],
     related: ["config", "init"],
   },
@@ -1531,6 +1649,7 @@ export function formatMainHelp() {
 
   section("SETUP", [
     ["init [dir]", "Initialize project"],
+    ["which [dir]", "Show which n-dx is running (version, path, install, git)"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],
     ["install-sample [dir]", "Install a safe, destroyable sample webapp"],
@@ -1572,7 +1691,8 @@ export function formatMainHelp() {
   ], pad);
 
   section("SERVE", [
-    ["start [dir]", "Start dashboard + MCP server (--port=N, --background)"],
+    ["start [dir]", "Dashboard + MCP through the hub (--here: single-project server)"],
+    ["hub [status|stop]", "Inspect or stop the per-user hub"],
     ["dev [dir]", "Start dev server with live reload"],
     ["refresh [dir]", "Refresh dashboard artifacts (--ui-only, --data-only)"],
     ["export [dir]", "Export static deployable dashboard (--deploy=github)"],

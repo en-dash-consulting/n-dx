@@ -8,6 +8,7 @@
 import { useState, useCallback, useEffect } from "preact/hooks";
 import type { ViewId, NavigateTo, AskSeed } from "../types.js";
 import { parseLegacyHashRoute, resolveLocationRoute } from "../route-state.js";
+import { appUrl, getBasePath } from "../base-path.js";
 
 export interface RouteState {
   view: ViewId;
@@ -35,18 +36,18 @@ function defaultView(validViews: Set<ViewId>): ViewId {
 }
 
 function getInitialView(validViews: Set<ViewId>): ViewId {
-  const parsed = resolveLocationRoute(location.pathname, location.hash, validViews);
+  const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath());
   return parsed?.view ?? defaultView(validViews);
 }
 
 function getInitialRunId(validViews: Set<ViewId>): string | null {
-  const parsed = resolveLocationRoute(location.pathname, location.hash, validViews);
+  const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath());
   if (!parsed || parsed.view !== "hench-runs") return null;
   return parsed.subId;
 }
 
 function getInitialTaskId(validViews: Set<ViewId>): string | null {
-  const parsed = resolveLocationRoute(location.pathname, location.hash, validViews);
+  const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath());
   if (!parsed || parsed.view !== "prd") return null;
   return parsed.subId;
 }
@@ -73,7 +74,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     setView(targetView);
     const subId = runId ?? taskId;
     const urlPath = subId ? `/${targetView}/${subId}` : `/${targetView}`;
-    history.pushState({ view: targetView, file, zone, runId, taskId, askSeed: seed }, "", urlPath);
+    history.pushState({ view: targetView, file, zone, runId, taskId, askSeed: seed }, "", appUrl(urlPath));
   }, []);
 
   const handleSidebarNav = useCallback((id: ViewId) => {
@@ -83,7 +84,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
     setSelectedTaskId(null);
     setAskSeed(null);
     setView(id);
-    history.pushState({ view: id, file: null, zone: null, runId: null, taskId: null, askSeed: null }, "", `/${id}`);
+    history.pushState({ view: id, file: null, zone: null, runId: null, taskId: null, askSeed: null }, "", appUrl(`/${id}`));
   }, []);
 
   useEffect(() => {
@@ -101,12 +102,12 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
       setSelectedTaskId(taskId);
       setAskSeed(null);
       const hashUrl = hashRoute.subId ? `/${hashRoute.view}/${hashRoute.subId}` : `/${hashRoute.view}`;
-      history.replaceState({ view: hashRoute.view, file: null, zone: null, runId, taskId, askSeed: null }, "", hashUrl);
+      history.replaceState({ view: hashRoute.view, file: null, zone: null, runId, taskId, askSeed: null }, "", appUrl(hashUrl));
     } else {
       // Seed the initial history entry — preserve deep-link path if present
       const subId = selectedRunId ?? selectedTaskId;
       const initialUrl = subId ? `/${view}/${subId}` : `/${view}`;
-      history.replaceState({ view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed: null }, "", initialUrl);
+      history.replaceState({ view, file: selectedFile, zone: selectedZone, runId: selectedRunId, taskId: selectedTaskId, askSeed: null }, "", appUrl(initialUrl));
     }
 
     const handlePopState = (e: PopStateEvent) => {
@@ -130,7 +131,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
         }
       }
 
-      const parsed = resolveLocationRoute(location.pathname, location.hash, validViews)
+      const parsed = resolveLocationRoute(location.pathname, location.hash, validViews, getBasePath())
         ?? { view: defaultView(validViews), subId: null };
       setView(parsed.view);
       setSelectedFile(null);
@@ -148,7 +149,7 @@ export function useRouteState(validViews: Set<ViewId>): RouteState {
         runId: isRunView ? parsed.subId : null,
         taskId: isTaskView ? parsed.subId : null,
         askSeed: null,
-      }, "", fallbackUrl);
+      }, "", appUrl(fallbackUrl));
     };
 
     window.addEventListener("popstate", handlePopState);

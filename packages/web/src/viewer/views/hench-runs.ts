@@ -68,6 +68,86 @@ interface RunSummary {
   tokenDiagnosticStatus?: "complete" | "partial" | "unavailable";
   /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
+  /** Worktree this run was recorded in — present when the list was fetched with `scope=repo`. */
+  worktree?: RunWorktree;
+  /**
+   * Set by `ndx export` when the record was published without its transcript.
+   * `error` is stripped along with it, so a failed run arrives with no failure
+   * text — see {@link runErrorDisplay}. Never set by the live server.
+   */
+  transcriptOmitted?: boolean;
+}
+
+/** Worktree annotation on a run, as GET /api/hench/runs?scope=repo returns it. */
+export interface RunWorktree {
+  /** Directory basename — what the chip shows. */
+  name: string;
+  /** Absolute path; distinct worktrees are keyed by it. */
+  path: string;
+  /** Checked-out branch, or null when detached. */
+  branch: string | null;
+}
+
+/** Option shown in the worktree filter. */
+export interface WorktreeOption {
+  path: string;
+  name: string;
+  branch: string | null;
+  /** Number of loaded runs recorded in this worktree. */
+  runs: number;
+}
+
+/**
+ * Distinct worktrees among the loaded runs, keyed by path, sorted by name.
+ *
+ * Keyed by path rather than name because two worktrees can share a basename
+ * (`repo` and `.claude/worktrees/repo`); the name is only what gets shown.
+ * Runs without a worktree (default-scope responses, older servers) are
+ * ignored, so the filter simply does not appear for them.
+ */
+export function collectWorktreeOptions(runs: ReadonlyArray<{ worktree?: RunWorktree }>): WorktreeOption[] {
+  const byPath = new Map<string, WorktreeOption>();
+  for (const run of runs) {
+    if (!run.worktree) continue;
+    const existing = byPath.get(run.worktree.path);
+    if (existing) {
+      existing.runs++;
+    } else {
+      byPath.set(run.worktree.path, { ...run.worktree, runs: 1 });
+    }
+  }
+  return Array.from(byPath.values()).sort((a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
+}
+
+/** What the run detail puts under its "Error" heading, if anything. */
+export interface RunErrorDisplay {
+  /** True when the text is this view's own notice, not the run's failure body. */
+  omitted: boolean;
+  text: string;
+}
+
+/**
+ * Decide what a run's Error section shows.
+ *
+ * A record published by `ndx export` without `--include-transcripts` has no
+ * `error`: a failure body echoes whatever the agent read, so the exporter
+ * strips it from both the per-run file and the `runs.json` index and stamps
+ * `transcriptOmitted`. Rendering nothing would leave a failed run looking like
+ * it failed for no reason, so the flag earns a neutral notice naming the flag
+ * that would have published the text.
+ */
+export function runErrorDisplay(
+  run: { status: string; error?: string; transcriptOmitted?: boolean },
+  cliName: string,
+): RunErrorDisplay | null {
+  if (run.error) return { omitted: false, text: run.error };
+  if (!run.transcriptOmitted) return null;
+  if (run.status !== "failed" && run.status !== "error") return null;
+  return {
+    omitted: true,
+    text: `The failure text was not published in this export — an error body can echo whatever the agent read. `
+      + `Re-run \`${cliName} export --include-transcripts\` (or open this run in the live dashboard) to see it.`,
+  };
 }
 
 interface RunDiagnosticsData {
@@ -322,10 +402,12 @@ function RunMetrics({ runs }: { runs: RunSummary[] }) {
 }
 
 /** Individual run card in the list. */
-function RunCard({ run, isSelected, isHighlighted, onClick, navigateTo, cardRef }: {
+function RunCard({ run, isSelected, isHighlighted, showWorktree, onClick, navigateTo, cardRef }: {
   run: RunSummary;
   isSelected: boolean;
   isHighlighted?: boolean;
+  /** Render the worktree chip. Off when every loaded run is from one worktree — the chip would say the same thing on every card. */
+  showWorktree?: boolean;
   onClick: () => void;
   navigateTo?: NavigateTo;
   cardRef?: (el: HTMLDivElement | null) => void;
@@ -407,6 +489,12 @@ function RunCard({ run, isSelected, isHighlighted, onClick, navigateTo, cardRef 
       stale
         ? h("span", { class: "hench-run-chip hench-run-chip-warning" }, "Possibly stuck")
         : null,
+      showWorktree && run.worktree
+        ? h("span", {
+            class: "hench-run-chip hench-run-chip-mono",
+            title: run.worktree.branch ? `${run.worktree.path} · ${run.worktree.branch}` : run.worktree.path,
+          }, run.worktree.name)
+        : null,
     ),
   );
 }
@@ -448,6 +536,8 @@ function FileChangesList({ fileChangesWithStatus }: { fileChangesWithStatus?: st
 /** Detail panel for the selected run. */
 export function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onBack: () => void; navigateTo?: NavigateTo }) {
   const status = getStatusConfig(run.status);
+  const cliName = useCliName();
+  const errorDisplay = runErrorDisplay(run, cliName);
   const totalTokens = (run.tokenUsage.input ?? 0)
     + (run.tokenUsage.output ?? 0)
     + (run.tokenUsage.cacheCreationInput ?? 0)
@@ -694,11 +784,13 @@ export function RunDetailView({ run, onBack, navigateTo }: { run: RunDetail; onB
         )
       : null,
 
-    // Error message
-    run.error
+    // Error message — or, for an export without transcripts, why it is missing.
+    errorDisplay
       ? h("div", { class: "hench-detail-section" },
           h("h3", null, "Error"),
-          h("pre", { class: "hench-error-box" }, run.error),
+          errorDisplay.omitted
+            ? h("p", { class: "hench-error-omitted" }, errorDisplay.text)
+            : h("pre", { class: "hench-error-box" }, errorDisplay.text),
         )
       : null,
 
@@ -810,6 +902,8 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [vendorFilter, setVendorFilter] = useState<string>("all");
   const [modelFilter, setModelFilter] = useState<string>("all");
+  /** Worktree path, or "all". */
+  const [worktreeFilter, setWorktreeFilter] = useState<string>("all");
   const [deepLinkError, setDeepLinkError] = useState<string | null>(null);
   /** Tracks the run ID that was deep-linked to, for highlight animation. */
   const [highlightedRunId, setHighlightedRunId] = useState<string | null>(null);
@@ -832,7 +926,10 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
   // Fetch the runs list
   const fetchRuns = useCallback(async () => {
     try {
-      const res = await fetch("/api/hench/runs");
+      // scope=repo: runs from every worktree of the repository, each tagged
+      // with the worktree it was recorded in. A single-worktree repo returns
+      // exactly what the default scope would.
+      const res = await fetch("/api/hench/runs?scope=repo");
       if (!res.ok) {
         setError(`Failed to load runs (${res.status})`);
         return;
@@ -970,7 +1067,8 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
   const fetchDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/hench/runs/${id}`);
+      // The run may live in another worktree's .hench/runs — same scope as the list.
+      const res = await fetch(`/api/hench/runs/${id}?scope=repo`);
       if (!res.ok) {
         setRunDetail(null);
         if (id === initialRunId) {
@@ -1041,9 +1139,13 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
       if (modelFilter !== "all") {
         if (r.model !== modelFilter) return false;
       }
+      // Worktree filter
+      if (worktreeFilter !== "all") {
+        if (r.worktree?.path !== worktreeFilter) return false;
+      }
       return true;
     });
-  }, [runs, statusFilter, vendorFilter, modelFilter]);
+  }, [runs, statusFilter, vendorFilter, modelFilter, worktreeFilter]);
 
   // Status counts for the filter buttons
   const statusCounts = useMemo(() => {
@@ -1068,6 +1170,9 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
     for (const r of runs) models.add(r.model);
     return Array.from(models).sort();
   }, [runs]);
+
+  const worktreeOptions = useMemo(() => collectWorktreeOptions(runs), [runs]);
+  const multipleWorktrees = worktreeOptions.length > 1;
 
   // Scroll the deep-linked run card into view when it renders
   const scrolledRef = useRef(false);
@@ -1264,6 +1369,22 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
             ),
           )
         : null,
+      // Worktree filter — only when runs came from more than one worktree
+      multipleWorktrees
+        ? h("select", {
+            class: "hench-filter-select hench-filter-select-mono",
+            value: worktreeFilter,
+            onChange: (e: Event) => setWorktreeFilter((e.target as HTMLSelectElement).value),
+            "aria-label": "Filter by worktree",
+          },
+            h("option", { value: "all" }, "All Worktrees"),
+            worktreeOptions.map((wt) =>
+              h("option", { key: wt.path, value: wt.path },
+                wt.branch ? `${wt.name} (${wt.branch})` : wt.name,
+              ),
+            ),
+          )
+        : null,
     ),
 
     // Runs list
@@ -1275,6 +1396,7 @@ export function HenchRunsView({ navigateTo, initialRunId }: HenchRunsViewProps =
           run,
           isSelected: selectedRunId === run.id,
           isHighlighted: isHL,
+          showWorktree: multipleWorktrees,
           onClick: () => handleSelectRun(run.id),
           navigateTo,
           cardRef: isHL ? deepLinkCardRef : undefined,

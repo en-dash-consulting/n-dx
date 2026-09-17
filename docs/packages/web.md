@@ -53,9 +53,16 @@ See [MCP Integration](/guide/mcp) for setup instructions.
 ## Static Export
 
 ```sh
-ndx export .                        # export to .sourcevision/site/
+ndx export .                        # export to ./ndx-export/ (gitignored)
 ndx export --out-dir=./build .      # custom output directory
-ndx export --deploy=github .        # deploy to GitHub Pages
+ndx export --deploy=github .        # deploy to GitHub Pages — confirms first
+ndx export --deploy=github --yes .  # unattended deploy (CI)
 ```
 
 Generates a static, self-contained dashboard that can be hosted anywhere.
+
+**What is published.** PRD items (titles, descriptions, acceptance criteria, status), SourceVision analysis data (inventory, import graph, zones), and hench run *summaries* (status, token usage, files changed).
+
+**What is not published.** Agent transcripts — hench `toolCalls` inputs and outputs, `events`, and `error` bodies — are stripped from every exported run by default, because they contain whatever the agent read or printed (`.env` contents, `process.env`, fixture data). Pass `--include-transcripts` to publish them deliberately; the static Task Audit view then shows them, otherwise it says the transcript was not included.
+
+`--deploy=github` force-pushes to `origin/n-dx-dashboard`. It prints a manifest (remote, branch, run count, PRD item count, transcript inclusion) and asks for confirmation; when stdin is not a TTY it stops before writing or pushing unless `--yes` is passed. The dashboard's Export panel sends `--yes` only from its own confirmation step.

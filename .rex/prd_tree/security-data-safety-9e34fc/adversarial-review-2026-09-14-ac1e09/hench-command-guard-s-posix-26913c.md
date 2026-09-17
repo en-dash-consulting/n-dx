@@ -1,0 +1,30 @@
+---
+id: "26913c7d-d3e9-44b7-87dd-0065a3a6e5a4"
+level: "task"
+title: "hench command guard's POSIX quote model lets `&`, `|`, `<`, `>` through on the cmd.exe fallback"
+status: "completed"
+priority: "critical"
+tags:
+  - "ndx-adversarial-review"
+  - "security"
+  - "severity:high"
+  - "hench"
+  - "windows"
+blockedBy:
+  - "bd556004-a98b-4c5a-8335-cc5421ce7902"
+source: "ndx-adversarial-review"
+startedAt: "2026-09-15T22:02:31.762Z"
+completedAt: "2026-09-16T14:01:17.102Z"
+endedAt: "2026-09-16T14:01:17.102Z"
+resolutionType: "code-change"
+resolutionDetail: "validateCommand takes a shellKind resolved by GuardRails from llm-client's resolveShellKind; cmd.exe model rejects & | < > ( ) ^ outside double quotes and % anywhere; tests inject the kind and run on every platform."
+acceptanceCriteria:
+  - "When the shell that will run the command is cmd.exe, `validateCommand(\"npm test 'x & echo pwned'\", defaults)` throws a GuardError"
+  - "When the shell is cmd.exe, `validateCommand('npm test \"foo\\\" & echo pwned\"', defaults)` throws a GuardError"
+  - "When the shell is POSIX sh, both of the above still pass (single-quoted and escaped-quote operators are literal to sh)"
+  - "The shell kind reaches the guard through `packages/hench/src/prd/llm-gateway.ts` (a re-export of `hasPosixShell` or `buildShellInvocation`), not a direct `@n-dx/llm-client` import"
+  - "Unit tests in `packages/hench/tests/unit/guard/commands.test.ts` exercise the cmd.exe branch on every platform (pure-function, shell kind injected)"
+description: "**Severity:** high · **Verdict:** must-fix · **Regression introduced by commit 67212136 (this branch)**\n\n**Failure scenario.** `findActiveShellOperator` (`packages/hench/src/guard/commands.ts:50-79`) models POSIX `sh` quoting: single quotes are literal, `\\` escapes inside double quotes. `run_command` is executed by `execShellCmd`, which on win32 *without a resolvable `sh`* runs `cmd.exe /d /s /c \"<command>\"` (`packages/llm-client/src/exec.ts:529-531`). In cmd.exe a single quote is an ordinary character and `\\` is not an escape. The agent sends `npm test 'x & del /q something'`: the scanner sees the `&` as single-quoted and returns null; `npm` is allowlisted; cmd.exe treats `&` as a command separator and runs the `del`. Same for `npm test \"foo\\\" & calc\"` — sh sees one quoted string, cmd.exe closes the quote at `\\\"` and runs `calc\"`. The pre-branch regex was blunt but shell-agnostic (rejected `& | ; $` at any position), so on the cmd.exe path this branch is strictly more permissive. The fix's own resolution note says \"run_command still uses the shell for Windows .cmd shims\".\n\n**Refutation attempted.** Looked for a platform or shell-kind parameter on `validateCommand`/`checkCommand` (`guard/index.ts:93`) — none. Looked for hench refusing to run on cmd.exe — no, `buildShellInvocation` deliberately supports it and CI runs Windows smoke tests.\n\n**Evidence.** `packages/hench/src/guard/commands.ts:62-74`, `packages/llm-client/src/exec.ts:505-560` (`buildShellInvocation`, `execShellCmd`, `hasPosixShell`), `packages/hench/src/tools/shell.ts:16`.\n\n**Reachability.** Windows host with no Git Bash `sh` on PATH (plain Node install), hench in API/local/Google provider mode, prompt injection during `--auto`. Narrower than the POSIX sibling but a supported, tested configuration.\n\n**Solution options.**\n1. *(Recommended)* Give `validateCommand` a `shellKind: \"posix\" | \"cmd\"` (or `posixShellAvailable`) argument, resolved by the guard from `hasPosixShell(process.platform)`. For `\"cmd\"`, reject any occurrence of `& | < > ^ % ( )` regardless of quotes (restoring the old blunt behavior there, plus redirection). Requires re-exporting `hasPosixShell` or `buildShellInvocation` through `src/prd/llm-gateway.ts` — it is not currently exported. Cost: small; one gateway edit, one parameter, tests. Risk: quoted `&` in a legitimate cmd.exe command is refused, which the old guard also did.\n2. Refuse `run_command` entirely when the shell would be cmd.exe, with a message pointing at installing Git Bash. Simplest; costs Windows users without sh the tool.\n3. Shell-free argv spawn (see sibling item) — resolves both guard items at once at the cost of shell features."
+lastModified: "2026-09-16T14:01:17.525Z"
+lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+---

@@ -15,6 +15,8 @@ import {
   PollingSuspensionIndicator,
   ActiveOperationsTray,
   GitStatusBanner,
+  SessionsPanel,
+  type ServerIdentity,
   SearchOverlay,
   useSearchOverlay,
   NeolithicOverlay,
@@ -32,18 +34,25 @@ import {
   useRefreshThrottle,
   useActiveOperations,
   useGitStatus,
+  useWorktrees,
+  useClaims,
   useFeatureToggle,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
 import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
 import { bootstrap } from "./bootstrap.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
+import { installBasePathFetch } from "./base-path.js";
 import { renderActiveView, buildValidViews } from "./views/view-registry.js";
 import { initScrollReveal } from "./scroll-reveal.js";
 
 if (isDeployedMode()) {
   installFetchAdapter();
   document.body.classList.add("ndx-deployed");
+} else {
+  // Served through the hub at /p/<id>/: prefix every root-relative fetch.
+  // At the root this is a no-op.
+  installBasePathFetch();
 }
 
 initTheme();
@@ -52,15 +61,29 @@ bootstrap();
 startPollingRestart({ onDegradationChange, isFeatureDisabled });
 initScrollReveal();
 
-/** Fetch viewer scope from the server config endpoint. */
-async function fetchScope(): Promise<string | null> {
+/** What the one boot-time `/api/config` call yields. */
+interface BootConfig {
+  scope: string | null;
+  /** Server identity for the sidebar footer; null on a server too old to send it. */
+  server: ServerIdentity | null;
+}
+
+/**
+ * Read the server config endpoint once, before the first render.
+ *
+ * Both values it carries are needed before anything paints — the scope
+ * decides which views exist, and the identity line says which n-dx this
+ * window is — so the footer takes `server` as a prop from here rather than
+ * fetching the same endpoint again.
+ */
+async function fetchBootConfig(): Promise<BootConfig> {
   try {
     const res = await fetch("/api/config");
-    if (!res.ok) return null;
-    const config: { scope?: string | null } = await res.json();
-    return config.scope ?? null;
+    if (!res.ok) return { scope: null, server: null };
+    const config: { scope?: string | null; server?: ServerIdentity | null } = await res.json();
+    return { scope: config.scope ?? null, server: config.server ?? null };
   } catch {
-    return null;
+    return { scope: null, server: null };
   }
 }
 
@@ -74,7 +97,7 @@ function getInitialSidebarCollapsed(): boolean {
   }
 }
 
-function App({ scope }: { scope: string | null }) {
+function App({ scope, server = null }: { scope: string | null; server?: ServerIdentity | null }) {
   const validViews = useMemo(() => buildValidViews(scope), [scope]);
 
   const {
@@ -101,6 +124,8 @@ function App({ scope }: { scope: string | null }) {
   const { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount } = usePollingSuspension();
   const activeOperations = useActiveOperations();
   const { status: gitStatus, refetch: refetchGitStatus } = useGitStatus();
+  const { worktrees } = useWorktrees();
+  const { claims } = useClaims();
   const [searchOpen, , closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const handleTripleClick = useMemo(
@@ -194,7 +219,7 @@ function App({ scope }: { scope: string | null }) {
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
-    h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar, scope }),
+    h(Sidebar, { view, onNavigate: handleSidebarNav, manifest: data.manifest, zones: data.zones, sidebarCollapsed, onToggleSidebar: handleToggleSidebar, scope, server }),
     h("main", {
       id: "main-content",
       // The Tasks (prd) view manages its own internal scroll region, so the
@@ -225,6 +250,7 @@ function App({ scope }: { scope: string | null }) {
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
     h(ActiveOperationsTray, { operations: activeOperations, navigateTo }),
     h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
+    h(SessionsPanel, { worktrees, claims, navigateTo }),
     (showDrop && !hasData)
       ? h("div", { class: "drop-overlay", role: "dialog", "aria-label": "File drop zone" },
           h("div", { class: "drop-box" },
@@ -240,8 +266,8 @@ function App({ scope }: { scope: string | null }) {
 
 const root = document.getElementById("app");
 if (root) {
-  // Fetch scope before first render to avoid flash of unscoped content
-  fetchScope().then((scope) => {
-    render(h(App, { scope }), root);
+  // Fetch config before first render to avoid a flash of unscoped content
+  fetchBootConfig().then(({ scope, server }) => {
+    render(h(App, { scope, server }), root);
   });
 }

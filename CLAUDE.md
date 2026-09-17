@@ -74,7 +74,7 @@ Packages that import from other packages at runtime concentrate **all** cross-pa
 
 | Package | Gateway file | Imports from | Re-exports |
 |---------|-------------|--------------|------------|
-| hench | `src/prd/rex-gateway.ts` | rex | 21 functions + 4 constants + 7 types (schema, store, tree, task selection, timestamps, auto-completion, parent reset, requirements, level helpers, finding acknowledgment) |
+| hench | `src/prd/rex-gateway.ts` | rex | 21 functions + 4 constants + 8 types (schema, store, tree, task selection, timestamps, auto-completion, parent reset, requirements, level helpers, finding acknowledgment) |
 | hench | `src/prd/llm-gateway.ts` | @n-dx/llm-client | 30 functions + 10 types (config, constants, JSON, output, help, errors, process execution, token parsing, model resolution) |
 | web | `src/server/rex-gateway.ts` | rex | Rex MCP server factory, domain types & constants, tree utilities |
 | web | `src/server/domain-gateway.ts` | sourcevision | Sourcevision MCP server factory, next-step derivation, archetype override, iso-map builder, analysis artifact schema types |
@@ -126,6 +126,8 @@ The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`) s
 
 **What the code enforces:** the MCP write tools, the dashboard's PRD-writing routes (item CRUD, merge, prune, restore, and the SourceVision Ask panel's `apply-refinements`), and the bulk restructurers `reorganize`, `prune`, and `reshape` perform their read-modify-write inside `store.withTransaction`, which holds the PRD file lock across the whole span — a concurrent writer's item is no longer silently dropped by their full-document save. Their LLM analysis runs on an unlocked snapshot; accepted proposals are re-applied against a freshly loaded document under the lock. `saveDocument` itself always takes the lock, so writes cannot interleave, and a writer that cannot acquire the lock within its timeout fails loudly with an error naming the holder PID rather than proceeding.
 
+**The PRD lock is per workspace, one per `rexDir`.** `prdLockPath(rexDir)` means each worktree's `.rex/` has its own lock, so two worktrees of the same repository write their own trees in parallel without contending — which is the point of worktree workspaces, and also why the lock is no help across them. The dashboard follows the same rule: every PRD-writing route resolves its store from the request's `ctx.rexDir`, so a request made under `/w/<key>/` (or with `X-Ndx-Workspace`) writes *that worktree's* `.rex/prd_tree/` and nothing else. There is no cross-workspace write anywhere in the dashboard — editing the anchor's PRD while viewing a branch means switching workspace through the breadcrumb switcher, which is a full navigation. The PRD view shows a one-line strip naming the workspace whenever it is not the anchor, so the write target is never inferred from the URL alone.
+
 **What remains operator discipline:** other CLI write paths (`analyze`/`plan` imports, `update`, `move`, `remove`, `fix`, and similar) still do their own load→mutate→save — the lock serializes their write but does not merge concurrent changes, so for those commands the last full-document writer still wins. Do not run them concurrently with other PRD writers, and prefer waiting for a background PRD-writing command to finish before making MCP writes: a restructure computed on a stale snapshot can turn individual proposals into no-ops (reported, not silent).
 
 **PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/prd_tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
@@ -168,20 +170,22 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 
 ## MCP Servers
 
-Rex and sourcevision expose MCP servers over stdio (default) and HTTP (`ndx start`, port 3117 by default). See `README.md` for full registration commands.
+Rex and sourcevision expose MCP servers over stdio (default) and HTTP (`ndx start`, which registers the repository with the per-user hub on port 3117). See `README.md` for full registration commands.
 
 **stdio (default):** `ndx init` writes a tracked `.mcp.json` at the project root with cwd-relative commands (`ndx rex mcp .`, `ndx sv mcp .`) — committed to the repo, so every worktree and clone gets the same working registration. Claude Code shows a one-time approval prompt for a project's servers the first time it opens the checkout. If `ndx` isn't on `PATH`, use `npx -y @n-dx/core rex mcp .` / `npx -y @n-dx/core sv mcp .`, or re-run init with `--mcp-scope=local` to fall back to the older per-machine `claude mcp add --scope local` registration.
 
-**HTTP — single project only:** `http://localhost:3117/mcp/rex` points at whichever project currently holds port 3117, not a specific one — registering it is only safe with one n-dx project running at a time, until the multi-project hub (0.7.0) lands. HTTP uses [Streamable HTTP](https://modelcontextprotocol.io/) with session management (`Mcp-Session-Id` header, created automatically on first request).
+**HTTP — through the hub:** `ndx start .` registers the repository with the per-user hub and serves it at `http://localhost:3117/p/<id>/`, so each project's endpoints are `…/p/<id>/mcp/rex` and `…/p/<id>/mcp/sourcevision` and several projects share the port without collision. While exactly one project is registered the bare `http://localhost:3117/mcp/rex` still aliases to it; with several, root MCP calls answer `409` listing the ids. HTTP uses [Streamable HTTP](https://modelcontextprotocol.io/) with session management (`Mcp-Session-Id` header, created automatically on first request); the hub proxies, and each project's own server owns its sessions.
 
-**Migrating from stdio to HTTP (Claude):** start the server (`ndx start --background .`), remove the stdio registrations (`claude mcp remove rex && claude mcp remove sourcevision`), then add the HTTP ones (`claude mcp add --transport http rex http://localhost:3117/mcp/rex`, same for sourcevision).
+**Migrating from stdio to HTTP (Claude):** register with the hub (`ndx start .`), read the project id from the URL it prints (or `ndx hub status`), remove the stdio registrations (`claude mcp remove rex && claude mcp remove sourcevision`), then add the HTTP ones (`claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex`, same for sourcevision).
 
 ### Rex MCP tools
 
 Rex mutations write only to the folder tree (`.rex/prd_tree/`). No JSON files are produced by MCP write operations.
 
 - `get_prd_status` — PRD title, overall stats, and per-epic stats
-- `get_next_task` — next actionable task based on priority and dependencies
+- `get_next_task` — next actionable task based on priority and dependencies (skips tasks another worktree has claimed)
+- `claim_task` — hold a task for this worktree so other worktrees skip it
+- `release_task` — give back a claim without changing the task's status
 - `update_task_status` — update item status
 - `add_item` — add epic/feature/task/subtask
 - `edit_item` — edit item content (title, description, priority, tags)

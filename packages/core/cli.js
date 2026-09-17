@@ -52,8 +52,10 @@ import { resolveCommandTimeout, withCommandTimeout } from "./cli-timeout.js";
 import { runCI } from "./ci.js";
 import {
   runWeb,
+  runHub,
   isProcessRunning,
   readPidFile,
+  isHubMarker,
   removePidFile,
   removePortFile,
 } from "./web.js";
@@ -100,6 +102,7 @@ import {
   dim,
 } from "./cli-brand.js";
 import { runExport } from "./export.js";
+import { ensureGitignoreEntry } from "./gitignore.js";
 import {
   resolveInitLLMSelection,
   promptLLMSelection,
@@ -124,6 +127,14 @@ import {
   writeNdxContextFile,
   buildRemediationContext,
 } from "./pair-programming.js";
+import { runMcpShim } from "./mcp-shim.js";
+import {
+  collectInstallIdentity,
+  formatInstallIdentity,
+  formatWorkIdentityLine,
+  readGitIdentity,
+  shouldPrintWorkIdentity,
+} from "./install-identity.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 process.env.NDX_CLI_PATH = fileURLToPath(import.meta.url);
@@ -362,9 +373,16 @@ let staleCheckResult = null;
 
 /**
  * Commands that skip the stale check — either they have no project context
- * (help, version) or they are about to fix staleness (init).
+ * (help, version, which) or they are about to fix staleness (init).
+ *
+ * `which` reports what is installed; appending a staleness notice to it would
+ * mix a diagnosis of the project into an answer about the CLI, which is exactly
+ * the confusion the command exists to remove.
  */
-const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "auth"]);
+// `mcp` joins them for a different reason than the rest: it speaks a protocol
+// on stdout, and a stale-project notice printed there desynchronises the
+// editor's parser for the whole session.
+const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "which", "auth", "hub", "mcp"]);
 
 /**
  * Spawn options that make each child tree-killable by the tracker. Owned by
@@ -772,12 +790,19 @@ function showCommandHelp(command) {
  * race against a live server that is serving the files being rebuilt.
  *
  * @param {string} absDir  Absolute project directory (contains `.n-dx-web.pid`)
- * @returns {Promise<{status:"none"|"stale"|"stopped"|"stop-failed", pid?: number, port?: number}>}
+ * @returns {Promise<{status:"none"|"stale"|"hub"|"stopped"|"stop-failed", pid?: number, port?: number, projectId?: string}>}
  */
 async function detectAndCleanConflictingDashboard(absDir) {
   const info = await readPidFile(absDir);
   if (!info) {
     return { status: "none" };
+  }
+
+  // A hub registration: the pid is the hub's, which serves every registered
+  // project. It is not this directory's server to stop, and it does not
+  // rebuild this directory's assets, so there is no race to avoid.
+  if (isHubMarker(info)) {
+    return { status: "hub", pid: info.pid, port: info.port, projectId: info.projectId };
   }
 
   if (!isProcessRunning(info.pid)) {
@@ -890,7 +915,10 @@ async function signalLiveReload(dir) {
     const res = await fetch(`http://127.0.0.1:${port}/api/reload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: "ndx refresh" }),
+      // `dir` lets the hub, which serves several projects on one port, forward
+      // the signal to the server for this directory. A single-project server
+      // ignores it.
+      body: JSON.stringify({ source: "ndx refresh", dir: resolve(dir) }),
       signal: controller.signal,
     });
 
@@ -942,23 +970,6 @@ async function signalLiveReload(dir) {
 }
 
 /**
- * Append an entry to .gitignore if not already present.
- * Creates .gitignore if it doesn't exist. Uses sync I/O (matches cli.js patterns).
- */
-function ensureGitignoreEntry(dir, entry) {
-  const gitignorePath = join(dir, ".gitignore");
-  let content = "";
-  try {
-    content = readFileSync(gitignorePath, "utf-8");
-  } catch {
-    // No .gitignore yet
-  }
-  if (content.includes(entry)) return;
-  const suffix = (content.length > 0 && !content.endsWith("\n") ? "\n" : "") + entry + "\n";
-  writeFileSync(gitignorePath, content + suffix, "utf-8");
-}
-
-/**
  * Register the rex-prd merge driver in the repository's git config, so the
  * `.rex/prd_tree/** merge=rex-prd` attribute (pinned by
  * `ensureGitattributesRules`) resolves to `rex merge-driver` — the three-way,
@@ -997,11 +1008,46 @@ function ensureMergeDriverRegistered(dir) {
 // ── Command handlers ─────────────────────────────────────────────────────────
 
 function handleVersion(rest) {
+  // `--version --verbose` is the same report as `ndx which`: the bare version is
+  // identical across every checkout and install, so the moment someone asks for
+  // more detail, what they want is which copy is running.
+  if (rest.includes("--verbose") || rest.includes("--debug")) {
+    handleWhich(rest);
+    return;
+  }
   const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
   if (rest.includes("--json")) {
     console.log(JSON.stringify({ version }));
   } else {
     console.log(version);
+  }
+  exitWithCleanup(0);
+}
+
+/**
+ * `ndx which [dir]` — report which copy of n-dx is running.
+ *
+ * Always exits 0. Every field degrades to a known value rather than an error:
+ * a missing git binary or a non-repo install simply has no git identity. The
+ * command exists to answer a question when something is already confusing, so
+ * it must not itself become another thing that can fail.
+ */
+function handleWhich(rest) {
+  const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+  const info = collectInstallIdentity({
+    version,
+    // Derived from import.meta.url rather than read back from NDX_CLI_PATH:
+    // that variable is exported for children and could be inherited from an
+    // unrelated parent, which is exactly the confusion this command resolves.
+    cliPath: fileURLToPath(import.meta.url),
+    projectDir: resolveDir(rest),
+    argvPath: process.argv[1] ?? null,
+  });
+
+  if (rest.includes("--json")) {
+    console.log(JSON.stringify(info, null, 2));
+  } else {
+    console.log(formatInstallIdentity(info));
   }
   exitWithCleanup(0);
 }
@@ -1416,6 +1462,10 @@ async function handleInit(rest) {
   const rexExists = existsSync(join(dir, ".rex"));
   const henchExists = existsSync(join(dir, ".hench"));
   ensureGitignoreEntry(dir, ".n-dx.local.json");
+  // `ndx export` writes ./ndx-export inside the project by default; the site
+  // it produces carries PRD data and run summaries, so it must not be
+  // committable by accident.
+  ensureGitignoreEntry(dir, "ndx-export/");
   ensureGitattributesRules(dir);
   ensureMergeDriverRegistered(dir);
 
@@ -1656,6 +1706,10 @@ async function handleRefresh(rest) {
       console.log(
         `Pre-refresh: detected running dashboard (PID ${conflict.pid}, port ${conflict.port}); stopped.`,
       );
+    } else if (conflict.status === "hub") {
+      console.log(
+        `Pre-refresh: this directory is served through the n-dx hub (project "${conflict.projectId}", port ${conflict.port}); leaving it running.`,
+      );
     } else if (conflict.status === "stop-failed") {
       console.error(
         `Error: Dashboard server (PID ${conflict.pid}) is running and could not be stopped automatically.`,
@@ -1854,6 +1908,16 @@ async function handleWork(rest) {
   requireInit(dir, [".rex", ".hench"]);
   const flags = extractFlags(rest);
 
+  // Which n-dx is about to run, against which checkout. A run is the most
+  // expensive thing this CLI starts and the hardest to attribute afterwards:
+  // the run record says what happened but not which install produced it, and
+  // a dashboard, a terminal and a worktree can each be a different one. One
+  // line, before anything else, so the dashboard's live status hint (which is
+  // the last line of the child's stdout) shows it once at the start.
+  if (shouldPrintWorkIdentity(rest)) {
+    printWorkIdentity(dir);
+  }
+
   // Require explicit vendor selection for n-dx orchestration.
   // This avoids implicit use of whichever local CLI session happens to be active.
   const isDryRun = flags.includes("--dry-run");
@@ -1873,6 +1937,33 @@ async function handleWork(rest) {
     disposeInterrupt();
   }
   exitWithCleanup(0);
+}
+
+/**
+ * Print the `ndx work` identity line. Best-effort throughout — a run must not
+ * fail because its own banner could not be assembled.
+ *
+ * The git identity is read from the PROJECT directory, not the install: the
+ * branch worth naming is the one the work lands on, which is a different
+ * checkout whenever n-dx is run against another repository.
+ *
+ * @param {string} dir  Resolved project directory.
+ */
+function printWorkIdentity(dir) {
+  try {
+    const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+    console.log(formatWorkIdentityLine({
+      version,
+      // From import.meta.url, not NDX_CLI_PATH: that variable is exported for
+      // children and could have been inherited from an unrelated parent —
+      // the same reasoning as `ndx which`.
+      cliPath: fileURLToPath(import.meta.url),
+      projectDir: dir,
+      git: readGitIdentity(dir),
+    }));
+  } catch {
+    // No identity line rather than a failed run.
+  }
 }
 
 async function handleStatus(rest) {
@@ -1926,6 +2017,42 @@ async function handleDev(rest) {
   const flags = extractFlags(rest);
   const code = await run(resolvePackageFile("packages/web", "dev.js"), [...flags, dir]);
   exitWithCleanup(code);
+}
+
+/**
+ * `ndx mcp <server> [dir]` — the MCP entry an editor launches.
+ *
+ * Deliberately not a tool delegation: the shim decides per launch whether to
+ * bridge to a running hub (so the tool call lands in the worktree the editor
+ * is open on) or to serve MCP in this process exactly as `ndx rex mcp .`
+ * always has. See mcp-shim.js.
+ */
+async function handleMcpShim(rest) {
+  const [server] = rest.filter((arg) => !arg.startsWith("-"));
+  if (!server) {
+    console.error("Usage: ndx mcp <server> [dir]");
+    console.error("Servers: rex, sourcevision");
+    exitWithCleanup(1);
+    return;
+  }
+  const dir = resolveDir(rest.filter((arg) => arg !== server));
+  try {
+    exitWithCleanup(await runMcpShim(server, dir, { tools }));
+  } catch (err) {
+    if (err instanceof ExitRequest) throw err;
+    console.error(formatError(err));
+    exitWithCleanup(1);
+  }
+}
+
+async function handleHub(rest) {
+  try {
+    exitWithCleanup(await runHub(rest));
+  } catch (err) {
+    if (err instanceof ExitRequest) throw err;
+    console.error(formatError(err));
+    exitWithCleanup(1);
+  }
 }
 
 async function handleStart(rest, commandName = "start") {
@@ -2749,6 +2876,7 @@ function showMainHelp() {
 const COMMAND_DISPATCH = new Map([
   // ── Core commands ──
   ["version",           handleVersion],
+  ["which",             handleWhich],
   ["help",              handleHelp],
   ["init",              handleInit],
   ["analyze",           handleAnalyze],
@@ -2764,6 +2892,8 @@ const COMMAND_DISPATCH = new Map([
   ["dev",               handleDev],
   ["start",             (rest) => handleStart(rest, "start")],
   ["web",               (rest) => handleStart(rest, "web")],
+  ["hub",               handleHub],
+  ["mcp",               handleMcpShim],
   ["export",            handleExport],
   ["install-sample",    handleInstallSample],
   ["destroy-sample",    handleDestroySample],

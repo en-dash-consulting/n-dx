@@ -1,3 +1,33 @@
+/**
+ * Child-process termination for the orchestration tier.
+ *
+ * HOW THE KILL PATHS ARE PROVED. A test that asserts which strategy ran proves
+ * nothing about whether a process died: every implementation here would survive
+ * being replaced by one that records the right signal and delivers nothing.
+ * `tests/unit/child-lifecycle.test.js` is exactly that kind of test — fakes and
+ * injected signallers — so each path also needs a case that watches a real pid
+ * stop answering `kill(pid, 0)`:
+ *
+ * | Path                                        | Liveness proof                                  |
+ * |---------------------------------------------|-------------------------------------------------|
+ * | {@link terminateTree} (POSIX group)         | `tests/integration/terminate-tree-liveness.test.js` |
+ * | direct-child fallback                       | same file (a child leading no group)             |
+ * | SIGTERM → SIGKILL escalation                | same file (fixtures install an empty handler)    |
+ * | {@link terminateTreeByPid}                  | same file, plus `tests/e2e/stop-orphan-children.test.js` |
+ * | late-arrival kill (post-gate `register`)    | `tests/integration/late-arrival-child-cleanup.test.js` |
+ * | Windows `taskkill /T /F`                    | INJECTED ONLY — see below                        |
+ *
+ * THE WINDOWS EXCEPTION IS DELIBERATE, NOT AN OMISSION. libuv assigns every
+ * non-detached child it spawns on Windows to a global job object, which reaps a
+ * node-spawns-node tree independently of anything here — so a liveness assertion
+ * on that platform passes whether or not taskkill reached anyone (the vacuity
+ * recorded in `tests/shell-spawn-inventory.md`). The unit suite therefore asserts
+ * the argv and the fallback, which is the strongest claim that platform supports
+ * without a non-libuv intermediary; `tests/e2e/stop-orphan-children.test.js` adds
+ * the shell-backed version of that tree, and skips where no shell exists.
+ *
+ * So: a new kill path needs a liveness case, not another strategy assertion.
+ */
 import { spawnCli } from "./win-spawn.js";
 
 const DEFAULT_FORCE_KILL_TIMEOUT_MS = 5000;

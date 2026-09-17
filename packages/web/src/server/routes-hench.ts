@@ -3,8 +3,11 @@
  *
  * All endpoints are under /api/hench/.
  *
- * GET    /api/hench/runs                  — list runs with summary (newest first, ?limit=N)
- * GET    /api/hench/runs/:id              — full run detail with transcript
+ * GET    /api/hench/runs                  — list runs with summary (newest first, ?limit=N;
+ *                                            ?scope=repo merges every worktree's runs, each
+ *                                            annotated with its worktree)
+ * GET    /api/hench/runs/:id              — full run detail with transcript (?scope=repo
+ *                                            searches every worktree)
  * GET    /api/hench/runs/health           — staleness health check for running runs
  * POST   /api/hench/runs/:id/mark-stuck   — mark a stuck run as failed
  * GET    /api/hench/task-usage            — incremental per-task token usage aggregation
@@ -34,20 +37,31 @@
  * POST   /api/hench/throttle/emergency-stop — terminate all running executions immediately
  */
 
-import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
-import {writeFile} from "node:fs/promises";import { join } from "node:path";
+import { readFileSync, readdirSync, writeFileSync, existsSync, watch } from "node:fs";
+import type { FSWatcher } from "node:fs";
+import { writeFile } from "node:fs/promises";
+import { join, basename } from "node:path";
 import { execFileSync } from "node:child_process";
 import { totalmem, freemem, loadavg, cpus } from "node:os";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
+import { spawnManaged, killWithFallback, listWorktrees, getWorktreeRoot, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import {
+  CONFIG_FIELD_META,
+  validateFieldValue,
+  validateConfigKeyValue,
+  getConfigValue as getNestedValue,
+  setConfigValue as setNestedValue,
+} from "./hench-config-fields.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { IncrementalTaskUsageAggregator } from "./task-usage.js";
 import {
   collectAllIds,
   aggregateItemTokenUsage,
   aggregateItemDurations,
+  openClaimsStore,
+  resolveClaimHolder,
 } from "./rex-gateway.js";
 import type {
   PRDDocument,
@@ -78,21 +92,46 @@ export function getAggregator(runsDir: string): IncrementalTaskUsageAggregator {
 }
 
 /**
- * Module-level process memory tracker singleton.
+ * Per-workspace execution state — the memory tracker, execution metrics and
+ * active-execution map that used to be process-wide singletons.
  *
- * Records per-process RSS samples during each memory broadcast cycle
- * and provides historical data + leak detection via the API.
+ * Keyed by the workspace's runs directory (`<projectDir>/.hench/runs`), which
+ * every handler already has in hand as `rc.runsDir` or derives from its
+ * context, so a task started from worktree A neither blocks nor reports in
+ * worktree B. Process-wide sweeps (shutdown, the memory monitor) iterate
+ * every workspace.
  */
-const processMemoryTracker = new ProcessMemoryTracker();
+interface HenchWorkspaceState {
+  /** Active task executions, keyed by task id — prevents concurrent runs on one task. */
+  activeExecutions: Map<string, ActiveExecution>;
+  /** Per-process RSS samples for historical data and leak detection. */
+  processMemoryTracker: ProcessMemoryTracker;
+  /** Time-series snapshots of concurrent process counts and per-task resource metrics. */
+  executionMetrics: ConcurrentExecutionMetrics;
+}
 
-/**
- * Module-level concurrent execution metrics singleton.
- *
- * Records time-series snapshots of concurrent process counts, total memory
- * utilization, and per-task resource metrics during each monitoring cycle.
- * Provides aggregate patterns (peak, average) for dashboard consumption.
- */
-const executionMetrics = new ConcurrentExecutionMetrics();
+const workspaceStates = new Map<string, HenchWorkspaceState>();
+
+function stateFor(runsDir: string): HenchWorkspaceState {
+  let state = workspaceStates.get(runsDir);
+  if (!state) {
+    state = {
+      activeExecutions: new Map(),
+      processMemoryTracker: new ProcessMemoryTracker(),
+      executionMetrics: new ConcurrentExecutionMetrics(),
+    };
+    workspaceStates.set(runsDir, state);
+  }
+  return state;
+}
+
+function runsDirOf(ctx: ServerContext): string {
+  return join(ctx.projectDir, ".hench", "runs");
+}
+
+function stateForCtx(ctx: ServerContext): HenchWorkspaceState {
+  return stateFor(runsDirOf(ctx));
+}
 
 /** Minimal run shape for listing (avoids loading full toolCalls/transcript). */
 interface RunSummary {
@@ -123,37 +162,23 @@ interface RunSummary {
   tokenDiagnosticStatus?: "complete" | "partial" | "unavailable";
   /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
+  /**
+   * The worktree whose `.hench/runs/` this run was read from. Present only
+   * for `?scope=repo` responses; the default (served-directory) listing is
+   * unchanged and carries no worktree field.
+   */
+  worktree?: RunWorktree;
 }
 
-/** Config field metadata for the UI. */
-interface ConfigFieldInfo {
+/** Where a run file lives, for a dashboard serving one worktree of a repository. */
+export interface RunWorktree {
+  /** Directory basename — short enough for a chip. */
+  name: string;
+  /** Realpath-resolved absolute path of the worktree root. */
   path: string;
-  label: string;
-  description: string;
-  type: "string" | "number" | "boolean" | "enum" | "array";
-  enumValues?: string[];
-  category: string;
+  /** Checked-out branch, or null when detached or bare. */
+  branch: string | null;
 }
-
-/** Known config field metadata — mirrors the CLI config module. */
-const CONFIG_FIELD_META: ConfigFieldInfo[] = [
-  { path: "provider", label: "Provider", description: "Claude provider: 'cli' (Claude Code) or 'api' (direct API)", type: "enum", enumValues: ["cli", "api"], category: "execution" },
-  { path: "model", label: "Model", description: "Claude model to use (e.g. sonnet, opus, haiku)", type: "string", category: "execution" },
-  { path: "maxTurns", label: "Max Turns", description: "Maximum conversation turns per run", type: "number", category: "execution" },
-  { path: "maxTokens", label: "Max Tokens per Request", description: "Maximum tokens per API request", type: "number", category: "execution" },
-  { path: "tokenBudget", label: "Token Budget", description: "Total token budget per run (input+output). 0 = unlimited", type: "number", category: "execution" },
-  { path: "loopPauseMs", label: "Loop Pause (ms)", description: "Pause between loop/iteration runs in milliseconds", type: "number", category: "execution" },
-  { path: "maxFailedAttempts", label: "Max Failed Attempts", description: "Consecutive failures before a task is considered stuck", type: "number", category: "task-selection" },
-  { path: "rexDir", label: "Rex Directory", description: "Path to the .rex directory for task data", type: "string", category: "task-selection" },
-  { path: "retry.maxRetries", label: "Max Retries", description: "Number of retry attempts for transient API errors", type: "number", category: "retry" },
-  { path: "retry.baseDelayMs", label: "Base Retry Delay (ms)", description: "Initial delay before first retry (doubles each attempt)", type: "number", category: "retry" },
-  { path: "retry.maxDelayMs", label: "Max Retry Delay (ms)", description: "Maximum delay between retries (caps exponential backoff)", type: "number", category: "retry" },
-  { path: "guard.blockedPaths", label: "Blocked Paths", description: "Glob patterns for paths the agent cannot modify", type: "array", category: "guard" },
-  { path: "guard.allowedCommands", label: "Allowed Commands", description: "Shell commands the agent is permitted to execute", type: "array", category: "guard" },
-  { path: "guard.commandTimeout", label: "Command Timeout (ms)", description: "Maximum time for a single command execution", type: "number", category: "guard" },
-  { path: "guard.maxFileSize", label: "Max File Size (bytes)", description: "Maximum file size the agent can write", type: "number", category: "guard" },
-  { path: "apiKeyEnv", label: "API Key Env Var", description: "Environment variable name for Anthropic API key", type: "string", category: "general" },
-];
 
 /** Default config values for detecting non-default settings. */
 const DEFAULT_CONFIG: Record<string, unknown> = {
@@ -225,57 +250,6 @@ function loadHenchConfig(projectDir: string): Record<string, unknown> | null {
   }
 }
 
-/** Get a nested value from an object using dot-path notation. */
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const parts = path.split(".");
-  let current: unknown = obj;
-  for (const part of parts) {
-    if (current === null || current === undefined || typeof current !== "object") {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
-}
-
-/** Set a nested value in an object using dot-path notation. */
-function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const parts = path.split(".");
-  let current = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
-    if (!(parts[i] in current) || typeof current[parts[i]] !== "object" || current[parts[i]] === null) {
-      current[parts[i]] = {};
-    }
-    current = current[parts[i]] as Record<string, unknown>;
-  }
-  current[parts[parts.length - 1]] = value;
-}
-
-/** Basic type validation for config values. */
-function validateFieldValue(field: ConfigFieldInfo, value: unknown): string | null {
-  switch (field.type) {
-    case "number":
-      if (typeof value !== "number" || isNaN(value)) return `${field.label} must be a number`;
-      if (value < 0) return `${field.label} must be non-negative`;
-      return null;
-    case "boolean":
-      if (typeof value !== "boolean") return `${field.label} must be a boolean`;
-      return null;
-    case "enum":
-      if (field.enumValues && !field.enumValues.includes(String(value)))
-        return `${field.label} must be one of: ${field.enumValues.join(", ")}`;
-      return null;
-    case "array":
-      if (!Array.isArray(value)) return `${field.label} must be an array`;
-      return null;
-    case "string":
-      if (typeof value !== "string" || value.length === 0) return `${field.label} must be a non-empty string`;
-      return null;
-    default:
-      return null;
-  }
-}
-
 /** Read a single run file, returning the full parsed JSON or null on error. */
 function loadRunFile(runsDir: string, id: string): Record<string, unknown> | null {
   try {
@@ -310,6 +284,160 @@ function toRunSummary(run: Record<string, unknown>): RunSummary {
     tokenDiagnosticStatus: diagnostics?.tokenDiagnosticStatus as RunSummary["tokenDiagnosticStatus"],
     invocationContext: run.invocationContext as RunSummary["invocationContext"],
   };
+}
+
+// ── Repo-scope runs (worktree aggregation) ──────────────────────────────────
+// `GET /api/hench/runs?scope=repo` merges every worktree's `.hench/runs/`.
+// The default scope stays the served directory so existing callers see no
+// change; only the viewer's Runs view opts in.
+
+/** One worktree's runs directory, with the annotation its runs will carry. */
+interface WorktreeRunsSource {
+  runsDir: string;
+  worktree: RunWorktree;
+  /** The worktree this server serves — its runs dir is already watched by start.ts. */
+  served: boolean;
+}
+
+/**
+ * Every worktree of the served repository as a runs source. Empty outside a
+ * git repository, in which case callers fall back to the served directory.
+ */
+async function resolveRunSources(ctx: ServerContext): Promise<WorktreeRunsSource[]> {
+  const worktrees = await listWorktrees(ctx.projectDir);
+  if (worktrees.length === 0) return [];
+  const servedRoot = getWorktreeRoot(ctx.projectDir);
+  return worktrees
+    .filter((wt) => !wt.bare)
+    .map((wt) => ({
+      runsDir: join(wt.path, ".hench", "runs"),
+      worktree: { name: basename(wt.path), path: wt.path, branch: wt.branch },
+      served: servedRoot !== null && wt.path === servedRoot,
+    }));
+}
+
+/**
+ * Lazily registered `fs.watch` per non-served worktree runs directory, so a
+ * run written in another worktree fires `hench:run-changed` exactly as one in
+ * the served directory does (start.ts's registerHenchWatcher covers that one).
+ *
+ * Lazy — registered on the first `?scope=repo` request that sees the
+ * directory — rather than at startup, because worktrees and their
+ * `.hench/runs/` come and go while the server is up. Each poll re-checks, so
+ * a worktree added later is picked up without a restart.
+ */
+const worktreeRunWatchers = new Map<string, FSWatcher>();
+const WORKTREE_WATCH_DEBOUNCE_MS = 500;
+
+function ensureWorktreeRunWatcher(
+  runsDir: string,
+  broadcast: WebSocketBroadcaster | undefined,
+  onStatusInvalidate: (() => void) | undefined,
+): void {
+  if (worktreeRunWatchers.has(runsDir) || !existsSync(runsDir)) return;
+
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const fire = (): void => {
+    timer = null;
+    onStatusInvalidate?.();
+    broadcast?.({ type: "hench:run-changed", timestamp: new Date().toISOString() });
+  };
+
+  try {
+    const watcher = watch(runsDir, (_eventType, filename) => {
+      if (!filename || !String(filename).endsWith(".json")) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(fire, WORKTREE_WATCH_DEBOUNCE_MS);
+    });
+    // A watcher on a directory that disappears (worktree removed) errors
+    // rather than closing; drop it so the next poll can re-register.
+    watcher.on("error", () => {
+      watcher.close();
+      worktreeRunWatchers.delete(runsDir);
+    });
+    worktreeRunWatchers.set(runsDir, watcher);
+  } catch {
+    // fs.watch unavailable here — polling still works, just without the push.
+  }
+}
+
+/** Close every lazily registered worktree watcher. Called on server shutdown and by tests. */
+export function closeWorktreeRunWatchers(): void {
+  for (const watcher of worktreeRunWatchers.values()) watcher.close();
+  worktreeRunWatchers.clear();
+}
+
+interface RunsListQuery {
+  limit: number;
+  offset: number;
+  filterTaskId: string | null;
+}
+
+/** Read every run summary in one runs directory (missing directory is empty). */
+function loadRunSummaries(runsDir: string, filterTaskId: string | null): RunSummary[] {
+  let files: string[];
+  try {
+    files = readdirSync(runsDir);
+  } catch {
+    return [];
+  }
+  const summaries: RunSummary[] = [];
+  for (const file of files) {
+    if (!file.endsWith(".json")) continue;
+    const run = loadRunFile(runsDir, file.replace(/\.json$/, ""));
+    if (!run || !run.id || !run.startedAt) continue;
+    if (filterTaskId && run.taskId !== filterTaskId) continue;
+    summaries.push(toRunSummary(run));
+  }
+  return summaries;
+}
+
+/**
+ * GET /api/hench/runs?scope=repo — runs from every worktree, newest first,
+ * each annotated with its worktree. Pagination applies to the merged list.
+ */
+async function handleRunsRepoScope(rc: RouteContext, query: RunsListQuery): Promise<boolean> {
+  const sources = await resolveRunSources(rc.ctx);
+  if (sources.length === 0) {
+    // Not a repository: the served directory is the only source, unannotated.
+    const summaries = loadRunSummaries(rc.runsDir, query.filterTaskId);
+    summaries.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+    jsonResponse(rc.res, 200, { runs: paginate(summaries, query), total: summaries.length });
+    return true;
+  }
+
+  const merged: RunSummary[] = [];
+  for (const source of sources) {
+    if (!source.served) ensureWorktreeRunWatcher(source.runsDir, rc.broadcast, rc.onStatusInvalidate);
+    for (const summary of loadRunSummaries(source.runsDir, query.filterTaskId)) {
+      merged.push({ ...summary, worktree: source.worktree });
+    }
+  }
+  merged.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  jsonResponse(rc.res, 200, { runs: paginate(merged, query), total: merged.length });
+  return true;
+}
+
+function paginate<T>(items: T[], query: RunsListQuery): T[] {
+  if (query.limit <= 0 && query.offset <= 0) return items;
+  return items.slice(query.offset, query.limit > 0 ? query.offset + query.limit : undefined);
+}
+
+/** GET /api/hench/runs/:id?scope=repo — find the run in whichever worktree holds it. */
+async function handleRunDetailRepoScope(rc: RouteContext, runId: string): Promise<boolean> {
+  const sources = await resolveRunSources(rc.ctx);
+  const candidates = sources.length > 0
+    ? sources
+    : [{ runsDir: rc.runsDir, worktree: null as RunWorktree | null }];
+  for (const source of candidates) {
+    const run = loadRunFile(source.runsDir, runId);
+    if (run) {
+      jsonResponse(rc.res, 200, source.worktree ? { ...run, worktree: source.worktree } : run);
+      return true;
+    }
+  }
+  errorResponse(rc.res, 404, `Run "${runId}" not found`);
+  return true;
 }
 
 // ── Sub-routers ─────────────────────────────────────────────────────────────
@@ -382,10 +510,10 @@ function routeUsage(rc: RouteContext): boolean | Promise<boolean> | null {
 /** Routes: metrics, metrics/snapshots */
 function routeMetrics(rc: RouteContext): boolean | null {
   if (rc.path === "metrics/snapshots" && rc.method === "GET") {
-    return handleMetricsSnapshots(rc.res);
+    return handleMetricsSnapshots(rc.res, rc.runsDir);
   }
   if (rc.path === "metrics" && rc.method === "GET") {
-    return handleMetrics(rc.res);
+    return handleMetrics(rc.res, rc.runsDir);
   }
   return null;
 }
@@ -399,13 +527,13 @@ function routeMemory(rc: RouteContext): boolean | null {
   }
   const historyMatch = rc.path.match(/^memory\/history\/([^/?]+)$/);
   if (historyMatch && rc.method === "GET") {
-    return handleMemoryHistoryByTask(historyMatch[1]!, rc.res);
+    return handleMemoryHistoryByTask(historyMatch[1]!, rc.res, rc.runsDir);
   }
   if (rc.path === "memory/history" && rc.method === "GET") {
-    return handleMemoryHistory(rc.res);
+    return handleMemoryHistory(rc.res, rc.runsDir);
   }
   if (rc.path === "memory/leaks" && rc.method === "GET") {
-    return handleMemoryLeaks(rc.res);
+    return handleMemoryLeaks(rc.res, rc.runsDir);
   }
   return null;
 }
@@ -444,17 +572,17 @@ function routeExecute(rc: RouteContext): boolean | Promise<boolean> | null {
     return handleExecute(rc.req, rc.res, rc.ctx, rc.broadcast);
   }
   if (rc.path === "execute/status" && rc.method === "GET") {
-    return handleExecuteStatus(rc.res);
+    return handleExecuteStatus(rc.res, rc.runsDir);
   }
   const statusMatch = rc.path.match(/^execute\/status\/([^/?]+)$/);
   if (statusMatch && rc.method === "GET") {
-    return handleExecuteStatusForTask(statusMatch[1], rc.res);
+    return handleExecuteStatusForTask(statusMatch[1], rc.res, rc.runsDir);
   }
   return null;
 }
 
 /** Routes: runs, runs/:id, runs/health, runs/:id/mark-stuck */
-function routeRuns(rc: RouteContext): boolean | null {
+function routeRuns(rc: RouteContext): boolean | Promise<boolean> | null {
   if (!rc.path.startsWith("runs")) return null;
 
   if (rc.path === "runs/health" && rc.method === "GET") {
@@ -465,8 +593,26 @@ function routeRuns(rc: RouteContext): boolean | null {
     return handleMarkStuck(markStuckMatch[1], rc.res, rc.runsDir, rc.onStatusInvalidate);
   }
 
-  // GET /api/hench/runs — list runs with summary (?limit=N&offset=N)
+  // GET /api/hench/runs — list runs with summary (?limit=N&offset=N&taskId=&scope=repo)
   if (rc.path === "runs" && rc.method === "GET") {
+    let limit = 0;
+    let offset = 0;
+    let filterTaskId: string | null = null;
+    let repoScope = false;
+    if (rc.qIdx !== -1) {
+      const params = new URLSearchParams(rc.fullPath.slice(rc.qIdx));
+      const limitStr = params.get("limit");
+      const offsetStr = params.get("offset");
+      const taskIdStr = params.get("taskId");
+      if (limitStr) limit = Math.max(0, parseInt(limitStr, 10) || 0);
+      if (offsetStr) offset = Math.max(0, parseInt(offsetStr, 10) || 0);
+      if (taskIdStr) filterTaskId = taskIdStr;
+      repoScope = params.get("scope") === "repo";
+    }
+
+    // Opt-in: merge every worktree's runs. The default below is untouched.
+    if (repoScope) return handleRunsRepoScope(rc, { limit, offset, filterTaskId });
+
     let files: string[];
     try {
       files = readdirSync(rc.runsDir);
@@ -477,19 +623,6 @@ function routeRuns(rc: RouteContext): boolean | null {
 
     const jsonFiles = files.filter((f) => f.endsWith(".json"));
     const total = jsonFiles.length;
-
-    let limit = 0;
-    let offset = 0;
-    let filterTaskId: string | null = null;
-    if (rc.qIdx !== -1) {
-      const params = new URLSearchParams(rc.fullPath.slice(rc.qIdx));
-      const limitStr = params.get("limit");
-      const offsetStr = params.get("offset");
-      const taskIdStr = params.get("taskId");
-      if (limitStr) limit = Math.max(0, parseInt(limitStr, 10) || 0);
-      if (offsetStr) offset = Math.max(0, parseInt(offsetStr, 10) || 0);
-      if (taskIdStr) filterTaskId = taskIdStr;
-    }
 
     jsonFiles.sort((a, b) => b.localeCompare(a));
 
@@ -523,6 +656,9 @@ function routeRuns(rc: RouteContext): boolean | null {
   const runsMatch = rc.path.match(/^runs\/([^/?]+)$/);
   if (runsMatch && rc.method === "GET") {
     const runId = runsMatch[1];
+    if (rc.qIdx !== -1 && new URLSearchParams(rc.fullPath.slice(rc.qIdx)).get("scope") === "repo") {
+      return handleRunDetailRepoScope(rc, runId);
+    }
     const run = loadRunFile(rc.runsDir, runId);
     if (!run) {
       errorResponse(rc.res, 404, `Run "${runId}" not found`);
@@ -660,7 +796,7 @@ async function handleConfigUpdate(
   // Parse request body
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -810,6 +946,48 @@ function findTemplate(projectDir: string, id: string): WorkflowTemplateData | nu
   return user.find((t) => t.id === id) ?? null;
 }
 
+/**
+ * Every writable key/value pair a template overlay would set, flattened to the
+ * dotted paths the config gate speaks (`retry.maxRetries`, `guard.blockedPaths`).
+ *
+ * `guard` and `retry` are merged a level down by {@link mergeTemplateConfig},
+ * so their members are validated individually; everything else is a top-level
+ * assignment.
+ */
+function flattenTemplateOverlay(overlay: Record<string, unknown>): Array<[string, unknown]> {
+  const pairs: Array<[string, unknown]> = [];
+  for (const [key, value] of Object.entries(overlay)) {
+    if ((key === "guard" || key === "retry") && value && typeof value === "object" && !Array.isArray(value)) {
+      for (const [inner, innerValue] of Object.entries(value as Record<string, unknown>)) {
+        pairs.push([`${key}.${inner}`, innerValue]);
+      }
+      continue;
+    }
+    pairs.push([key, value]);
+  }
+  return pairs;
+}
+
+/**
+ * Refuse a template overlay that would write a config field the dashboard may
+ * not write. Returns the first problem, or null.
+ *
+ * Templates are the fourth path into `.hench/config.json`, after the config
+ * editor, the adaptive routes and the workflow apply — and the only one that
+ * used to skip the gate those three share. `POST /api/hench/templates` takes
+ * `config` verbatim from the request body and `…/apply` merges it into the
+ * file, so an unvalidated overlay could invent `permissionMode`, reshape
+ * `guard.allowedCommands`, or walk `__proto__` — precisely the three threats
+ * `hench-config-fields.ts` names — and the next autonomous run inherited it.
+ */
+export function validateTemplateOverlay(overlay: Record<string, unknown>): string | null {
+  for (const [key, value] of flattenTemplateOverlay(overlay)) {
+    const problem = validateConfigKeyValue(key, value);
+    if (problem) return problem;
+  }
+  return null;
+}
+
 /** Apply a template config overlay to a config object. */
 function mergeTemplateConfig(
   config: Record<string, unknown>,
@@ -863,7 +1041,7 @@ async function handleTemplateCreate(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -882,13 +1060,24 @@ async function handleTemplateCreate(
     return true;
   }
 
+  const overlay = (body.config as Record<string, unknown>) || {};
+  if (!overlay || typeof overlay !== "object" || Array.isArray(overlay)) {
+    errorResponse(res, 400, "Template config must be an object");
+    return true;
+  }
+  const overlayProblem = validateTemplateOverlay(overlay);
+  if (overlayProblem) {
+    errorResponse(res, 400, overlayProblem);
+    return true;
+  }
+
   const template: WorkflowTemplateData = {
     id,
     name: (body.name as string) || id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
     description: (body.description as string) || "User-defined workflow template",
     useCases: Array.isArray(body.useCases) ? body.useCases as string[] : [],
     tags: Array.isArray(body.tags) ? body.tags as string[] : [],
-    config: (body.config as Record<string, unknown>) || {},
+    config: overlay,
     builtIn: false,
     createdAt: new Date().toISOString(),
   };
@@ -923,6 +1112,15 @@ function handleTemplateApply(
   const template = findTemplate(ctx.projectDir, id);
   if (!template) {
     errorResponse(res, 404, `Template "${id}" not found`);
+    return true;
+  }
+
+  // Re-validated on the way out, not just on the way in: `.hench/templates.json`
+  // is a file, and one written before this gate existed (or by hand) must not
+  // become a config write just because it is already stored.
+  const overlayProblem = validateTemplateOverlay(template.config);
+  if (overlayProblem) {
+    errorResponse(res, 400, `Template "${id}" cannot be applied: ${overlayProblem}`);
     return true;
   }
 
@@ -1006,12 +1204,12 @@ const TOK_PER_SEC_RE = /⚡\s*([\d.]+)\s*tok\/s/g;
 /** Regex (non-global) to test whether a single line is a tok/s metric line. */
 const TOK_PER_SEC_LINE_RE = /⚡\s*[\d.]+\s*tok\/s/;
 
-/** Track active task executions to prevent concurrent runs on the same task. */
-const activeExecutions = new Map<string, {
+/** One dashboard-started task execution. */
+interface ActiveExecution {
   runId: string;
   handle: ManagedChild;
   state: TaskExecutionStatus;
-}>();
+}
 
 /** Load and parse prd.json from disk. */
 function loadPRDForExecute(ctx: ServerContext): Record<string, unknown> | null {
@@ -1123,10 +1321,11 @@ async function handleExecute(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
+  const { activeExecutions, executionMetrics, processMemoryTracker } = stateForCtx(ctx);
   // Parse request body
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -1178,6 +1377,26 @@ async function handleExecute(
       error: "Task is already being executed",
       runId: active.runId,
       taskId,
+    });
+    return true;
+  }
+
+  // Another worktree of this repository may hold the task. The spawned run
+  // would refuse it too; answering here names the worktree instead of
+  // surfacing a failed process. Outside a git repo the store is a no-op.
+  const claimedBy = await openClaimsStore(ctx.projectDir)
+    .isClaimedByOther(taskId, resolveClaimHolder(ctx.projectDir));
+  if (claimedBy) {
+    jsonResponse(res, 409, {
+      error: `Task is being worked on in another worktree: ${claimedBy.worktreeRoot}`,
+      taskId,
+      claimedBy: {
+        worktreeRoot: claimedBy.worktreeRoot,
+        pid: claimedBy.pid,
+        host: claimedBy.host,
+        claimedAt: claimedBy.claimedAt,
+        expiresAt: claimedBy.expiresAt,
+      },
     });
     return true;
   }
@@ -1351,9 +1570,9 @@ async function handleExecute(
 }
 
 /** GET /api/hench/execute/status — return status of all active executions. */
-function handleExecuteStatus(res: ServerResponse): boolean {
+function handleExecuteStatus(res: ServerResponse, runsDir: string): boolean {
   const executions: TaskExecutionStatus[] = [];
-  for (const entry of activeExecutions.values()) {
+  for (const entry of stateFor(runsDir).activeExecutions.values()) {
     executions.push({ ...entry.state });
   }
   jsonResponse(res, 200, { executions });
@@ -1361,8 +1580,8 @@ function handleExecuteStatus(res: ServerResponse): boolean {
 }
 
 /** GET /api/hench/execute/status/:taskId — return status of a specific task execution. */
-function handleExecuteStatusForTask(taskId: string, res: ServerResponse): boolean {
-  const entry = activeExecutions.get(taskId);
+function handleExecuteStatusForTask(taskId: string, res: ServerResponse, runsDir: string): boolean {
+  const entry = stateFor(runsDir).activeExecutions.get(taskId);
   if (!entry) {
     jsonResponse(res, 200, { execution: null });
     return true;
@@ -1611,6 +1830,7 @@ export function startConcurrencyMonitor(
   ctx: ServerContext,
   broadcast: WebSocketBroadcaster,
 ): void {
+  const { activeExecutions } = stateForCtx(ctx);
   const CONCURRENCY_BROADCAST_MS = 10_000; // 10 seconds
 
   const timer = setInterval(() => {
@@ -1776,7 +1996,11 @@ function getProcessRss(pid: number): number | null {
 }
 
 /** Collect full memory status snapshot. */
+/** Which workspace's tracker each sampled dashboard process belongs to (taskId → runsDir). */
+const processOwners = new Map<string, string>();
+
 function collectMemoryStatus(): MemoryStatus {
+  processOwners.clear();
   const totalBytes = totalmem();
   const freeBytes = freemem();
   const usedBytes = totalBytes - freeBytes;
@@ -1786,20 +2010,24 @@ function collectMemoryStatus(): MemoryStatus {
   const load = loadavg() as [number, number, number];
   const cpuCount = cpus().length;
 
-  // Collect per-process memory for active executions
+  // Collect per-process memory for active executions in every workspace —
+  // memory is a property of the machine, not of one worktree.
   const processes: ProcessMemoryEntry[] = [];
-  for (const [taskId, entry] of activeExecutions.entries()) {
-    const pid = entry.handle.pid;
-    if (pid == null) continue;
-    const rssBytes = getProcessRss(pid);
-    if (rssBytes != null) {
-      processes.push({
-        taskId,
-        taskTitle: entry.state.taskTitle,
-        pid,
-        rssBytes,
-        source: "dashboard",
-      });
+  for (const [runsDir, wsState] of workspaceStates) {
+    for (const [taskId, entry] of wsState.activeExecutions.entries()) {
+      const pid = entry.handle.pid;
+      if (pid == null) continue;
+      const rssBytes = getProcessRss(pid);
+      if (rssBytes != null) {
+        processes.push({
+          taskId,
+          taskTitle: entry.state.taskTitle,
+          pid,
+          rssBytes,
+          source: "dashboard",
+        });
+        processOwners.set(taskId, runsDir);
+      }
     }
   }
 
@@ -1821,14 +2049,15 @@ function collectMemoryStatus(): MemoryStatus {
 }
 
 /** GET /api/hench/metrics — concurrent execution metrics and resource utilization. */
-function handleMetrics(res: ServerResponse): boolean {
-  const summary = executionMetrics.getSummary();
+function handleMetrics(res: ServerResponse, runsDir: string): boolean {
+  const summary = stateFor(runsDir).executionMetrics.getSummary();
   jsonResponse(res, 200, summary);
   return true;
 }
 
 /** GET /api/hench/metrics/snapshots — time-series execution metrics snapshots. */
-function handleMetricsSnapshots(res: ServerResponse): boolean {
+function handleMetricsSnapshots(res: ServerResponse, runsDir: string): boolean {
+  const { executionMetrics } = stateFor(runsDir);
   const snapshots = executionMetrics.getSnapshots();
   jsonResponse(res, 200, {
     snapshots,
@@ -1847,7 +2076,8 @@ function handleMemory(res: ServerResponse): boolean {
 }
 
 /** GET /api/hench/memory/history — per-process memory history for all tracked processes. */
-function handleMemoryHistory(res: ServerResponse): boolean {
+function handleMemoryHistory(res: ServerResponse, runsDir: string): boolean {
+  const { processMemoryTracker } = stateFor(runsDir);
   const histories = processMemoryTracker.getAllHistories();
   jsonResponse(res, 200, {
     histories,
@@ -1859,8 +2089,8 @@ function handleMemoryHistory(res: ServerResponse): boolean {
 }
 
 /** GET /api/hench/memory/history/:taskId — memory history for a specific task. */
-function handleMemoryHistoryByTask(taskId: string, res: ServerResponse): boolean {
-  const history = processMemoryTracker.getHistory(taskId);
+function handleMemoryHistoryByTask(taskId: string, res: ServerResponse, runsDir: string): boolean {
+  const history = stateFor(runsDir).processMemoryTracker.getHistory(taskId);
   if (!history) {
     jsonResponse(res, 404, {
       error: "not_found",
@@ -1873,8 +2103,8 @@ function handleMemoryHistoryByTask(taskId: string, res: ServerResponse): boolean
 }
 
 /** GET /api/hench/memory/leaks — leak detection summary for all active processes. */
-function handleMemoryLeaks(res: ServerResponse): boolean {
-  const summary = processMemoryTracker.detectLeaks();
+function handleMemoryLeaks(res: ServerResponse, runsDir: string): boolean {
+  const summary = stateFor(runsDir).processMemoryTracker.detectLeaks();
   jsonResponse(res, 200, summary);
   return true;
 }
@@ -1886,48 +2116,45 @@ function handleMemoryLeaks(res: ServerResponse): boolean {
  * Also records per-process RSS samples into the process memory tracker
  * for historical analysis and leak detection.
  */
-export function startMemoryMonitor(broadcast: WebSocketBroadcaster): void {
+export function startMemoryMonitor(broadcast: WebSocketBroadcaster, anchorRunsDir: string): void {
   const MEMORY_BROADCAST_MS = 10_000;
 
   const timer = setInterval(() => {
     const status = collectMemoryStatus();
 
-    // Record per-process samples for historical tracking + leak detection
+    // Record per-process samples into the tracker of the workspace that owns
+    // the process, and one metrics snapshot per workspace over its own processes.
+    const byWorkspace = new Map<string, ProcessMemoryEntry[]>();
     for (const proc of status.processes) {
-      processMemoryTracker.recordSample(
-        proc.taskId,
-        proc.taskTitle,
-        proc.pid,
-        proc.rssBytes,
-      );
+      const owner = processOwners.get(proc.taskId);
+      if (!owner) continue;
+      stateFor(owner).processMemoryTracker.recordSample(proc.taskId, proc.taskTitle, proc.pid, proc.rssBytes);
+      const list = byWorkspace.get(owner) ?? [];
+      list.push(proc);
+      byWorkspace.set(owner, list);
     }
-
-    // Record execution metrics snapshot (concurrent count, total RSS, per-task)
-    const totalRssBytes = status.processes.reduce((sum, p) => sum + p.rssBytes, 0);
-    executionMetrics.recordSnapshot({
-      concurrentCount: status.processes.length,
-      totalRssBytes,
-      systemMemoryPercent: status.system.usedPercent,
-      loadAvg1m: status.loadAvg[0],
-      perTaskRss: status.processes.map((p) => ({
-        taskId: p.taskId,
-        rssBytes: p.rssBytes,
-      })),
-    });
-
-    // Prune tracker entries for processes that are no longer active
-    // (the activeExecutions map is the source of truth)
-    for (const history of processMemoryTracker.getActiveHistories()) {
-      if (!activeExecutions.has(history.taskId)) {
-        processMemoryTracker.markCompleted(history.taskId);
+    for (const [runsDir, wsState] of workspaceStates) {
+      const own = byWorkspace.get(runsDir) ?? [];
+      wsState.executionMetrics.recordSnapshot({
+        concurrentCount: own.length,
+        totalRssBytes: own.reduce((sum, p) => sum + p.rssBytes, 0),
+        systemMemoryPercent: status.system.usedPercent,
+        loadAvg1m: status.loadAvg[0],
+        perTaskRss: own.map((p) => ({ taskId: p.taskId, rssBytes: p.rssBytes })),
+      });
+      // Prune tracker entries for processes that are no longer active
+      // (the workspace's activeExecutions map is the source of truth)
+      for (const history of wsState.processMemoryTracker.getActiveHistories()) {
+        if (!wsState.activeExecutions.has(history.taskId)) {
+          wsState.processMemoryTracker.markCompleted(history.taskId);
+        }
       }
     }
 
-    // Include leak alerts in the broadcast when detected
-    const leakAlerts = processMemoryTracker.getLeakAlerts();
-
-    // Include execution metrics summary in the broadcast
-    const metricsSummary = executionMetrics.getSummary();
+    // Leak alerts from every workspace; the metrics summary is the anchor's —
+    // the broadcast is one frame for one dashboard (PR 12 tags frames per workspace).
+    const leakAlerts = Array.from(workspaceStates.values()).flatMap((w) => w.processMemoryTracker.getLeakAlerts());
+    const metricsSummary = stateFor(anchorRunsDir).executionMetrics.getSummary();
 
     broadcast({
       type: "hench:memory-status",
@@ -2011,7 +2238,8 @@ const throttleState: ThrottleState = {
  * this in `beforeEach` so every route test starts from a known state.
  */
 export function resetHenchRouteStateForTests(): void {
-  activeExecutions.clear();
+  workspaceStates.clear();
+  processOwners.clear();
   aggregatorCache.clear();
   throttleState.paused = false;
   throttleState.pausedAt = null;
@@ -2047,6 +2275,7 @@ function getEffectiveMaxConcurrent(projectDir: string): number {
  * a utilization level for visual indicators.
  */
 function handleConcurrency(res: ServerResponse, ctx: ServerContext): boolean {
+  const { activeExecutions } = stateForCtx(ctx);
   const henchDir = join(ctx.projectDir, ".hench");
   const locksDir = join(henchDir, "locks");
   const runsDir = join(henchDir, "runs");
@@ -2208,6 +2437,7 @@ interface AuditEntry {
 
 /** GET /api/hench/audit — aggregate audit info for all active tasks. */
 function handleAudit(res: ServerResponse, runsDir: string): boolean {
+  const { activeExecutions } = stateFor(runsDir);
   const now = Date.now();
   const entries: AuditEntry[] = [];
 
@@ -2302,6 +2532,7 @@ async function handleTerminate(
   broadcast?: WebSocketBroadcaster,
   onStatusInvalidate?: () => void,
 ): Promise<boolean> {
+  const { activeExecutions, executionMetrics, processMemoryTracker } = stateFor(runsDir);
   const entry = activeExecutions.get(taskId);
 
   if (!entry) {
@@ -2416,16 +2647,20 @@ export interface ShutdownExecutionsResult {
 export async function shutdownActiveExecutions(
   gracePeriodMs: number = Number(process.env["HENCH_SHUTDOWN_TIMEOUT_MS"] ?? 5_000),
 ): Promise<ShutdownExecutionsResult> {
-  if (activeExecutions.size === 0) return { terminated: 0, failed: 0 };
+  const all: Array<[string, ActiveExecution, HenchWorkspaceState]> = [];
+  for (const wsState of workspaceStates.values()) {
+    for (const [taskId, entry] of wsState.activeExecutions) all.push([taskId, entry, wsState]);
+  }
+  if (all.length === 0) return { terminated: 0, failed: 0 };
 
-  const count = activeExecutions.size;
+  const count = all.length;
   console.log(`[shutdown] terminating ${count} active execution(s)`);
 
   let terminated = 0;
   let failed = 0;
 
-  const terminations = Array.from(activeExecutions.entries()).map(
-    async ([taskId, entry]) => {
+  const terminations = all.map(
+    async ([taskId, entry, wsState]) => {
       const pid = entry.handle.pid;
       const pidInfo = pid != null ? ` (pid ${pid})` : "";
       try {
@@ -2437,9 +2672,9 @@ export async function shutdownActiveExecutions(
         console.error(`[shutdown] execution ${taskId}${pidInfo} failed to terminate: ${error.message}`);
         failed++;
       } finally {
-        processMemoryTracker.markCompleted(taskId);
-        executionMetrics.taskCompleted(taskId);
-        activeExecutions.delete(taskId);
+        wsState.processMemoryTracker.markCompleted(taskId);
+        wsState.executionMetrics.taskCompleted(taskId);
+        wsState.activeExecutions.delete(taskId);
       }
     },
   );
@@ -2464,6 +2699,7 @@ export async function shutdownActiveExecutions(
  * about the config-file default for UI comparison.
  */
 function handleThrottleGet(res: ServerResponse, ctx: ServerContext): boolean {
+  const { activeExecutions } = stateForCtx(ctx);
   const config = loadHenchConfig(ctx.projectDir);
   const guard = config?.guard as Record<string, unknown> | undefined;
   const configMax = typeof guard?.maxConcurrentProcesses === "number"
@@ -2500,7 +2736,7 @@ async function handleThrottleUpdate(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -2600,7 +2836,7 @@ async function handleEmergencyStop(
 ): Promise<boolean> {
   let body: Record<string, unknown>;
   try {
-    const raw = await readBody(req);
+    const raw = await readBody(req, res);
     body = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     errorResponse(res, 400, "Invalid JSON in request body");
@@ -2612,7 +2848,12 @@ async function handleEmergencyStop(
     return true;
   }
 
-  const count = activeExecutions.size;
+  const targets = ctx ? [stateForCtx(ctx)] : Array.from(workspaceStates.values());
+  const all: Array<[string, ActiveExecution, HenchWorkspaceState]> = [];
+  for (const wsState of targets) {
+    for (const [taskId, entry] of wsState.activeExecutions) all.push([taskId, entry, wsState]);
+  }
+  const count = all.length;
 
   if (count === 0) {
     jsonResponse(res, 200, {
@@ -2634,8 +2875,8 @@ async function handleEmergencyStop(
   let terminated = 0;
   let failed = 0;
 
-  const terminations = Array.from(activeExecutions.entries()).map(
-    async ([taskId, entry]) => {
+  const terminations = all.map(
+    async ([taskId, entry, wsState]) => {
       const pid = entry.handle.pid;
       const pidInfo = pid != null ? ` (pid ${pid})` : "";
       try {
@@ -2652,9 +2893,9 @@ async function handleEmergencyStop(
         entry.state.finishedAt = new Date().toISOString();
         entry.state.error = "Terminated via emergency stop";
         broadcastExecState(broadcast, { ...entry.state });
-        processMemoryTracker.markCompleted(taskId);
-        executionMetrics.taskCompleted(taskId);
-        activeExecutions.delete(taskId);
+        wsState.processMemoryTracker.markCompleted(taskId);
+        wsState.executionMetrics.taskCompleted(taskId);
+        wsState.activeExecutions.delete(taskId);
       }
     },
   );
@@ -2684,6 +2925,7 @@ function broadcastThrottleState(
   broadcast: WebSocketBroadcaster,
   ctx: ServerContext,
 ): void {
+  const { activeExecutions } = stateForCtx(ctx);
   const config = loadHenchConfig(ctx.projectDir);
   const guard = config?.guard as Record<string, unknown> | undefined;
   const configMax = typeof guard?.maxConcurrentProcesses === "number"

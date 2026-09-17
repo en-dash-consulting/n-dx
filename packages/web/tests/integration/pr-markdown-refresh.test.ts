@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { removeTempDir } from "../helpers/temp-dir.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, execSync } from "node:child_process";
@@ -61,7 +62,7 @@ describe("PR markdown integration", () => {
     render(null, root);
     root.remove();
     globalThis.fetch = originalFetch;
-    await rm(tmpDir, { recursive: true, force: true });
+    await removeTempDir(tmpDir);
   });
 
   function createRouteFetch(ctx: ServerContext): typeof fetch {

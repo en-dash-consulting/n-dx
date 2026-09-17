@@ -13,6 +13,7 @@ prevent future contributors from replacing injection with direct imports.
 | Injection site | Target module | Injected callbacks | Interface type |
 |----------------|---------------|---------------------|-----------------|
 | `src/server/start.ts` | `src/server/task-usage.ts` (barrel facade — re-exports from `task-usage/register-scheduler.ts`; import through the facade, not the subdirectory file directly) | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
+| `src/server/start.ts` | `src/server/workspaces.ts` (`WorkspaceRegistry`) | `setup(ctx)` → watchers + PRD cache for a worktree, `teardown(handles)` — built by `createWorkspaceHooks` in start.ts, which owns the watcher registration helpers; the registry must not import start.ts | `WorkspaceHooks` |
 
 Rules:
 - **Prefer injection over import** when the target module would otherwise need to import

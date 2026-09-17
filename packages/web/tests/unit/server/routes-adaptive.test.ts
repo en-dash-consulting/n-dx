@@ -369,6 +369,100 @@ describe("Adaptive Workflow Adjustment API routes", () => {
     expect(res.status).toBe(400);
   });
 
+  // ── Config-write allowlist (finding: unguarded adaptive writes) ───
+
+  /** POST helper for the two config-writing routes. */
+  function postJson(path: string, payload: unknown) {
+    return fetch(`http://127.0.0.1:${port}/api/hench/adaptive/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  it("rejects an override whose key is not an allowlisted config field", async () => {
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+    const res = await postJson("override", { key: "permissionMode", value: "bypassPermissions" });
+    expect(res.status).toBe(400);
+    expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+  });
+
+  it("rejects an apply whose configKey is not an allowlisted config field", async () => {
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+    const res = await postJson("apply", { configKey: "totallyMadeUp", newValue: 1 });
+    expect(res.status).toBe(400);
+    expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+  });
+
+  it("rejects a prototype-poisoning key on both routes without polluting Object.prototype", async () => {
+    for (const seg of ["__proto__", "constructor", "prototype"]) {
+      const key = `${seg}.polluted`;
+      const before = await readFile(join(henchDir, "config.json"), "utf-8");
+      const r1 = await postJson("override", { key, value: 1 });
+      expect(r1.status, `override ${key}`).toBe(400);
+      const r2 = await postJson("apply", { configKey: key, newValue: 1 });
+      expect(r2.status, `apply ${key}`).toBe(400);
+      expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+    }
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it("rejects an allowlisted key with a wrong-typed value", async () => {
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+    // maxTurns is a number field; a string must be refused.
+    expect((await postJson("override", { key: "maxTurns", value: "lots" })).status).toBe(400);
+    // guard.allowedCommands is an array field; a string must be refused.
+    expect((await postJson("apply", { configKey: "guard.allowedCommands", newValue: "sh" })).status).toBe(400);
+    expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+  });
+
+  it("rejects a value hench's schema would refuse, leaving the config byte-identical", async () => {
+    // Each of these passed the old gate and produced a .hench/config.json that
+    // HenchConfigSchema rejects, so the next `ndx work` refused to start.
+    const refused: Array<[string, unknown]> = [
+      ["provider", ["cli"]],                    // String(["cli"]) === "cli"
+      ["guard.allowedCommands", [1, null]],     // z.array(z.string())
+      ["guard.blockedPaths", ["ok", 2]],
+      ["guard.commandTimeout", 0],              // z.number().positive()
+      ["maxTurns", 0],
+      ["maxFailedAttempts", 2.5],               // z.number().int()
+    ];
+
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+    for (const [key, value] of refused) {
+      const ovr = await postJson("override", { key, value });
+      expect(ovr.status, `override ${key}=${JSON.stringify(value)}`).toBe(400);
+      const app = await postJson("apply", { configKey: key, newValue: value });
+      expect(app.status, `apply ${key}=${JSON.stringify(value)}`).toBe(400);
+      expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+    }
+  });
+
+  it("rejects a non-finite number, which JSON.stringify would write as null", async () => {
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+    // Infinity has no JSON literal; 1e999 is how it arrives over the wire.
+    const body = '{"key":"guard.commandTimeout","value":1e999}';
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/adaptive/override`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    expect(res.status).toBe(400);
+    expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+  });
+
+  it("still accepts a valid override and a valid apply", async () => {
+    const ovr = await postJson("override", { key: "retry.maxRetries", value: 7 });
+    expect(ovr.status).toBe(200);
+    let config = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
+    expect(config.retry.maxRetries).toBe(7);
+
+    const app = await postJson("apply", { configKey: "guard.commandTimeout", newValue: 45000 });
+    expect(app.status).toBe(200);
+    config = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
+    expect(config.guard.commandTimeout).toBe(45000);
+  });
+
   // ── DELETE /api/hench/adaptive/override/:key ──────────────────────
 
   it("removes a manual override and unlocks the key", async () => {

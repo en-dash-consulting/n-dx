@@ -24,6 +24,24 @@ function bestAncestorPriority(parents: PRDItem[]): number {
  * feature completion before starting new work.
  *
  * Returns 0 for root-level items (no parent) or only-children.
+ *
+ * ## Why this is NOT `SUCCESSFUL_CHILD_STATUSES`
+ *
+ * This is the one status set in this module that deliberately still counts
+ * `deferred` alongside `completed`, and it must stay that way. It answers
+ * "how much of this feature has stopped needing attention?" — a *tiebreak
+ * ordering* signal — not "is this parent done?". A deferred sibling will not
+ * be worked again this pass, so it genuinely does make the feature closer to
+ * quiet, which is what the heuristic rewards.
+ *
+ * The completion question is answered by {@link allChildrenSuccessful}, where
+ * `deferred` must not count (#364). The two must not be unified in either
+ * direction: feeding this ratio into an actionability check would resurrect
+ * #364, and narrowing it to `{completed}` would silently reorder selection
+ * away from features whose remaining work is parked.
+ *
+ * Nothing here can make a parent *selectable* — this value only breaks ties
+ * between candidates `collectActionable` has already approved.
  */
 export function siblingCompletionRatio(entry: TreeEntry): number {
   const parent = entry.parents[entry.parents.length - 1];
@@ -152,6 +170,12 @@ export interface PrioritizationOptions {
    * When empty or undefined, no tag filtering is applied.
    */
   tags?: string[];
+  /**
+   * Task ids to pass over without treating them as completed — e.g. tasks a
+   * different worktree currently holds a live claim on. Unlike folding ids
+   * into `completedIds`, this never makes a parent look finished.
+   */
+  excludeIds?: ReadonlySet<string>;
 }
 
 /**
@@ -222,8 +246,20 @@ function makeComparator(
   };
 }
 
+/**
+ * Machine-readable reason a task was selected.
+ *
+ * Consumers must branch on this, never on the wording of `summary`. Hench's
+ * task header did substring-match the summary, so rewording the sentence here
+ * silently degraded its display — the sentence is for humans, this is the
+ * contract.
+ */
+export type SelectionReasonCode = "in_progress" | "ready_to_finalize" | "priority";
+
 export interface SelectionExplanation {
-  /** Human-readable summary of why this task was selected. */
+  /** Why this task was selected, as a discriminator. See {@link SelectionReasonCode}. */
+  reason: SelectionReasonCode;
+  /** Human-readable summary of why this task was selected. Display only — never parse it. */
   summary: string;
   /** Priority reasoning. */
   priority: {
@@ -335,6 +371,12 @@ function resolveFeatureSubtree(
   return entry.item.children ?? [];
 }
 
+/** Drop entries whose id is in `excludeIds`. */
+function filterExcluded(entries: TreeEntry[], excludeIds?: ReadonlySet<string>): TreeEntry[] {
+  if (!excludeIds || excludeIds.size === 0) return entries;
+  return entries.filter((e) => !excludeIds.has(e.item.id));
+}
+
 /** Filter entries to those with at least one tag in the allowed list. */
 function filterByTags(entries: TreeEntry[], tags: string[]): TreeEntry[] {
   if (tags.length === 0) return entries;
@@ -359,6 +401,7 @@ export function findActionableTasks(
   if (options?.tags?.length) {
     results = filterByTags(results, options.tags);
   }
+  results = filterExcluded(results, options?.excludeIds);
   results.sort(makeComparator(items, options));
   return results.slice(0, limit);
 }
@@ -378,6 +421,7 @@ export function findNextTask(
   if (options?.tags?.length) {
     results = filterByTags(results, options.tags);
   }
+  results = filterExcluded(results, options?.excludeIds);
   if (results.length === 0) return null;
   results.sort(makeComparator(items, options));
   return results[0];
@@ -470,11 +514,13 @@ export function explainSelection(
   const traversalPath = selected.parents.map((p) => p.title);
   const itemPriority: Priority = selected.item.priority ?? "medium";
 
-  // Build human-readable summary
+  // Status context — the reason code and its sentence are decided together so a
+  // reworded sentence cannot leave the code behind.
+  let reason: SelectionReasonCode;
   const summaryParts: string[] = [];
 
-  // Status context
   if (selected.item.status === "in_progress") {
+    reason = "in_progress";
     summaryParts.push(`"${selected.item.title}" is already in_progress`);
   } else {
     // Check if this is a parent with all children done. The shared predicate,
@@ -482,10 +528,12 @@ export function explainSelection(
     // done after #364 narrowed the real rule to `completed`, so a parent with a
     // deferred child was announced as "all children completed".
     if (allChildrenSuccessful(selected.item, NO_VIRTUAL_COMPLETIONS)) {
+      reason = "ready_to_finalize";
       summaryParts.push(
         `"${selected.item.title}" — all children completed, ready to finalize`,
       );
     } else {
+      reason = "priority";
       summaryParts.push(
         `"${selected.item.title}" selected at ${itemPriority} priority`,
       );
@@ -512,6 +560,7 @@ export function explainSelection(
   }
 
   return {
+    reason,
     summary: summaryParts.join(" "),
     priority: {
       itemPriority,

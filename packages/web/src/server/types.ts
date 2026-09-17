@@ -29,6 +29,12 @@ export interface ServerContext {
    * {@link startServer}. Optional for the same reason as {@link port}.
    */
   startedAt?: string;
+  /**
+   * Key of the workspace (worktree) this context serves — see
+   * `workspaces.ts`. Optional because tests construct contexts directly and
+   * a single-workspace server has only the anchor.
+   */
+  workspace?: string;
 }
 
 /** A route handler receives the request, response, and server context. */

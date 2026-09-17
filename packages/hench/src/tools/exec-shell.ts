@@ -1,9 +1,25 @@
-import { execShellCmd } from "../process/exec.js";
+import { exec, execShellCmd } from "../process/exec.js";
 import { isVerbose, verbose } from "../types/output.js";
 
 export interface ExecShellOptions {
   /** Shell command string to execute. */
   command: string;
+  /** Working directory. */
+  cwd: string;
+  /** Timeout in milliseconds. */
+  timeout: number;
+  /** Maximum output buffer in bytes. Defaults to 1 MiB. */
+  maxBuffer?: number;
+  /** Spread into the child process env. Defaults to process.env. */
+  env?: NodeJS.ProcessEnv;
+}
+
+/** Options for {@link execArgv} — a shell-free spawn of one binary with argv. */
+export interface ExecArgvOptions {
+  /** Executable to run (e.g. "git"). Resolved on PATH by the OS, no shell. */
+  file: string;
+  /** Arguments, passed to the process verbatim — never re-parsed by a shell. */
+  args: string[];
   /** Working directory. */
   cwd: string;
   /** Timeout in milliseconds. */
@@ -67,16 +83,54 @@ export async function execShell(opts: ExecShellOptions): Promise<string> {
   // exitCode 1 with no output looked exactly like a failing command.
   const result = await execShellCmd(command, { cwd, timeout, maxBuffer, env, onData: liveTail.onData });
   liveTail.flush();
+  return formatExecOutcome(result, timeout);
+}
 
+/**
+ * Execute one binary with an explicit argv and **no shell**, returning the same
+ * formatted result string as {@link execShell}.
+ *
+ * This is the injection-safe counterpart to `execShell`: because there is no
+ * `sh -c`, shell metacharacters in `args` (`;`, `>`, newlines, quotes, `$(…)`)
+ * are passed to the process as literal argument bytes and can never start a
+ * second command or a redirection. Use it whenever the target is a real binary
+ * (e.g. `git`) rather than a shell command line. Not for `.cmd`/`.bat` shims on
+ * Windows — those still need the shell path.
+ */
+export async function execArgv(opts: ExecArgvOptions): Promise<string> {
+  const {
+    file,
+    args,
+    cwd,
+    timeout,
+    maxBuffer = 1024 * 1024,
+    env = { ...process.env },
+  } = opts;
+
+  const liveTail = createLiveTail();
+  const result = await exec(file, args, { cwd, timeout, maxBuffer, env, onData: liveTail.onData });
+  liveTail.flush();
+  return formatExecOutcome(result, timeout);
+}
+
+/**
+ * Format a foundation {@link ExecResult} into hench's tool-result string.
+ * Shared by {@link execShell} and {@link execArgv} so shell and shell-free
+ * execution report timeouts, launch failures, stderr and empty output alike.
+ */
+function formatExecOutcome(
+  result: { exitCode: number | null; launched: boolean; stdout: string; stderr: string; error: Error | null },
+  timeout: number,
+): string {
   // Timeout — exitCode is null when the process was killed
   if (result.exitCode === null) {
     return `Command timed out after ${timeout}ms`;
   }
 
-  // Never started: the shell itself could not be spawned. Say so, rather than
-  // reporting the exitCode 1 that a command which ran and failed would give.
+  // Never started: the binary or shell could not be spawned. Say so, rather
+  // than reporting the exitCode 1 that a command which ran and failed would give.
   if (!result.launched) {
-    return `Command could not be launched: ${result.error?.message ?? "shell not available"}`;
+    return `Command could not be launched: ${result.error?.message ?? "not available"}`;
   }
 
   const output: string[] = [];

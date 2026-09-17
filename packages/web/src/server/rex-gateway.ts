@@ -66,6 +66,10 @@ export type { TreeEntry, TreeStats } from "@n-dx/rex";
 // ---- Rex task selection -----------------------------------------------------
 export { findNextTask, collectCompletedIds } from "@n-dx/rex";
 
+// ---- Rex cross-worktree task claims -----------------------------------------
+// The dashboard's execute route refuses (409) a task another worktree holds.
+export { openClaimsStore, resolveClaimHolder } from "@n-dx/rex";
+
 // ---- Rex timestamps ---------------------------------------------------------
 export { computeTimestampUpdates } from "@n-dx/rex";
 

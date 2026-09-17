@@ -303,6 +303,146 @@ describe("detectParentChildMisalignment", () => {
 // detectStuckParents
 // ---------------------------------------------------------------------------
 
+describe("nested misalignment — one run must be enough", () => {
+  /**
+   * epic(completed) → feature(completed) → task(pending).
+   *
+   * Judged top-down over raw statuses, only the feature is misaligned: the
+   * epic's one child still reads `completed`. `rex fix` reopened the feature,
+   * reported "Fixed 1 issue", and left the epic completed above a pending
+   * child — needing a second run to reach the epic and a third to confirm
+   * clean, with nothing saying so. Common after an interrupted run.
+   */
+  function nestedTree(): PRDItem[] {
+    return [
+      makeItem({
+        id: "e1",
+        title: "Epic",
+        level: "epic",
+        status: "completed",
+        startedAt: NOW,
+        completedAt: NOW,
+        children: [
+          makeItem({
+            id: "f1",
+            title: "Feature",
+            level: "feature",
+            status: "completed",
+            startedAt: NOW,
+            completedAt: NOW,
+            children: [
+              makeItem({ id: "t1", title: "Task", status: "pending" }),
+            ],
+          }),
+        ],
+      }),
+    ];
+  }
+
+  it("reports both the epic and the feature, so the dry-run plan matches the run", () => {
+    const actions = detectParentChildMisalignment(nestedTree());
+    expect(actions.map((a) => a.itemId).sort()).toEqual(["e1", "f1"]);
+    // Bottom-up: the child is decided before the parent that contains it.
+    expect(actions[0].itemId).toBe("f1");
+  });
+
+  it("leaves both pending after a single applyFixes", () => {
+    const items = nestedTree();
+    const result = applyFixes(items, NOW);
+
+    const epic = items[0];
+    const feature = epic.children![0];
+    expect(feature.status).toBe("pending");
+    expect(epic.status).toBe("pending");
+    expect(feature.completedAt).toBeUndefined();
+    expect(epic.completedAt).toBeUndefined();
+    // Reopening does not erase when the work began.
+    expect(epic.startedAt).toBe(NOW);
+    expect(result.mutatedCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it("converges: a second detectIssues on the repaired tree finds nothing", () => {
+    const items = nestedTree();
+    applyFixes(items, NOW);
+    expect(detectIssues(items)).toEqual([]);
+    // And a second fix run has nothing to do.
+    expect(applyFixes(items, NOW).mutatedCount).toBe(0);
+  });
+
+  it("converges through three levels of falsely-completed parents", () => {
+    const items: PRDItem[] = [
+      makeItem({
+        id: "e1", title: "Epic", level: "epic", status: "completed", startedAt: NOW, completedAt: NOW,
+        children: [
+          makeItem({
+            id: "f1", title: "Feature", level: "feature", status: "completed", startedAt: NOW, completedAt: NOW,
+            children: [
+              makeItem({
+                id: "s1", title: "Subfeature", level: "feature", status: "completed", startedAt: NOW, completedAt: NOW,
+                children: [makeItem({ id: "t1", title: "Task", status: "pending" })],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ];
+
+    expect(detectParentChildMisalignment(items).map((a) => a.itemId)).toEqual(["s1", "f1", "e1"]);
+    applyFixes(items, NOW);
+    expect(detectIssues(items)).toEqual([]);
+  });
+
+  it("does not reopen a parent whose subtree is genuinely finished", () => {
+    // The sibling case: reopening must follow an actually-unfinished child,
+    // not merely the presence of a nested parent.
+    const items: PRDItem[] = [
+      makeItem({
+        id: "e1", title: "Epic", level: "epic", status: "completed", startedAt: NOW, completedAt: NOW,
+        children: [
+          makeItem({
+            id: "f1", title: "Done feature", level: "feature", status: "completed", startedAt: NOW, completedAt: NOW,
+            children: [makeItem({ id: "t1", title: "Done task", status: "completed", startedAt: NOW, completedAt: NOW })],
+          }),
+        ],
+      }),
+    ];
+    expect(detectParentChildMisalignment(items)).toEqual([]);
+  });
+
+  it("stops at a completed ancestor whose other child is still finished", () => {
+    // epic(completed) with two features: one falsely completed, one really
+    // completed. The epic must still be reopened — it has an unfinished child
+    // once the first feature is — but only because of that one.
+    const items: PRDItem[] = [
+      makeItem({
+        id: "e1", title: "Epic", level: "epic", status: "completed", startedAt: NOW, completedAt: NOW,
+        children: [
+          makeItem({
+            id: "f1", title: "False", level: "feature", status: "completed", startedAt: NOW, completedAt: NOW,
+            children: [makeItem({ id: "t1", title: "Pending", status: "pending" })],
+          }),
+          makeItem({
+            id: "f2", title: "Real", level: "feature", status: "completed", startedAt: NOW, completedAt: NOW,
+            children: [makeItem({ id: "t2", title: "Done", status: "completed", startedAt: NOW, completedAt: NOW })],
+          }),
+        ],
+      }),
+    ];
+
+    const actions = detectParentChildMisalignment(items);
+    expect(actions.map((a) => a.itemId).sort()).toEqual(["e1", "f1"]);
+    // The epic's description counts one unfinished child, not two.
+    const epicAction = actions.find((a) => a.itemId === "e1")!;
+    expect(epicAction.description).toContain("1 unfinished child");
+
+    const items2 = items;
+    applyFixes(items2, NOW);
+    expect(items2[0].status).toBe("pending");
+    expect(items2[0].children![1].status).toBe("completed");
+    expect(detectIssues(items2)).toEqual([]);
+  });
+});
+
 describe("detectStuckParents", () => {
   it("detects a pending parent whose children are all completed", () => {
     const items: PRDItem[] = [

@@ -357,12 +357,20 @@ export function cliSpawnsOnly(
  * normalizing line endings in the comparison instead would let a rollback that
  * subtly corrupted a file still pass. This mirrors what .gitattributes already
  * does for n-dx's own written files.
+ *
+ * `commit.gpgsign=false` is the same kind of insulation. A developer or runner
+ * with `commit.gpgsign=true` in global or system config cannot sign as
+ * `test@test.com`, so every fixture commit fails and the repo keeps an unborn
+ * HEAD — and the baseline commit is load-bearing for every test of the
+ * git-derived completion gate. It must not depend on the machine's signing
+ * setup.
  */
 const GIT_FIXTURE_CONFIG: readonly string[][] = [
   ["user.email", "test@test.com"],
   ["user.name", "Test"],
   ["core.autocrlf", "false"],
   ["core.eol", "lf"],
+  ["commit.gpgsign", "false"],
 ];
 
 /**
@@ -391,6 +399,37 @@ export function initGitFixtureRepoSync(dir: string): void {
   for (const args of GIT_FIXTURE_CONFIG) {
     execFileSync("git", ["config", ...args], { cwd: dir, stdio: "ignore" });
   }
+}
+
+/**
+ * Initialize `dir` as a fixture repo and commit everything already in it, so a
+ * run starting there has a real baseline commit to be diffed against.
+ *
+ * Every test that drives a loop to completion needs this: completion is
+ * git-derived, and a repository with no commits gives the gate a far weaker
+ * question to answer than the one production normally faces. Three integration
+ * fixtures were each open-coding the same init/add/commit trio.
+ *
+ * HEAD is verified afterwards rather than assumed. `git commit` failing is not
+ * hypothetical — an inherited hook or signing requirement does it — and the
+ * symptom, a completion gate that finds nothing, reads as a defect in the code
+ * under test rather than a fixture that never committed.
+ *
+ * @returns the baseline commit's sha, for tests that diff against it directly.
+ */
+export function commitGitFixtureBaseline(dir: string, message = "baseline"): string {
+  initGitFixtureRepoSync(dir);
+  execFileSync("git", ["add", "-A"], { cwd: dir, stdio: "ignore" });
+  execFileSync("git", ["commit", "-m", message], { cwd: dir, stdio: "ignore" });
+
+  const head = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: dir,
+    encoding: "utf-8",
+  }).trim();
+  if (!head) {
+    throw new Error(`commitGitFixtureBaseline: no commit was created in ${dir}`);
+  }
+  return head;
 }
 
 /**

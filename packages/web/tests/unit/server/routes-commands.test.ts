@@ -890,19 +890,51 @@ describe("commands route — export", () => {
     expect(args.some((a) => a.startsWith("--cname="))).toBe(false);
   });
 
-  it("forwards deploy=github, basePath, and cname as CLI flags", async () => {
+  it("forwards a confirmed deploy=github, basePath, and cname as CLI flags", async () => {
     execMock.mockResolvedValue({ stdout: "[export] pushed to n-dx-dashboard", stderr: "", error: null });
 
     const res = await fetch(`http://127.0.0.1:${port}/api/commands/export`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deploy: "github", basePath: "/my-repo/", cname: "dash.example.com" }),
+      body: JSON.stringify({ deploy: "github", confirmDeploy: true, basePath: "/my-repo/", cname: "dash.example.com" }),
     });
     expect(res.status).toBe(200);
     const args = execMock.mock.calls[0][1] as string[];
     expect(args).toContain("--deploy=github");
+    // The child has no TTY; the browser's confirmation is carried as --yes.
+    expect(args).toContain("--yes");
     expect(args).toContain("--base-path=/my-repo/");
     expect(args).toContain("--cname=dash.example.com");
+  });
+
+  it("refuses a deploy that did not pass the confirmation step", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/commands/export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deploy: "github" }),
+    });
+    expect(res.status).toBe(400);
+    expect(String((await res.json()).error)).toContain("confirmDeploy");
+    expect(execMock).not.toHaveBeenCalled();
+  });
+
+  it("forwards --include-transcripts only when asked, and not otherwise", async () => {
+    execMock.mockResolvedValue({ stdout: "[export] done", stderr: "", error: null });
+
+    await fetch(`http://127.0.0.1:${port}/api/commands/export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ includeTranscripts: true }),
+    });
+    expect(execMock.mock.calls[0][1] as string[]).toContain("--include-transcripts");
+
+    execMock.mockClear();
+    await fetch(`http://127.0.0.1:${port}/api/commands/export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(execMock.mock.calls[0][1] as string[]).not.toContain("--include-transcripts");
   });
 
   it("ignores deploy values other than github", async () => {
@@ -924,7 +956,7 @@ describe("commands route — export", () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/commands/export`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deploy: "github" }),
+      body: JSON.stringify({ deploy: "github", confirmDeploy: true }),
     });
     expect(res.status).toBe(500);
     const body = await res.json();
@@ -1015,9 +1047,29 @@ describe("commands route — manifest (command reference)", () => {
       }
     }
     const allNames = body.groups.flatMap((g: { commands: Array<{ name: string }> }) => g.commands.map((c) => c.name));
-    for (const expected of ["init", "analyze", "plan", "work", "config"]) {
+    for (const expected of ["init", "which", "analyze", "plan", "work", "config"]) {
       expect(allNames).toContain(expected);
     }
+  });
+
+  it("lists which as always available and not dashboard-triggerable", async () => {
+    // tmpDir is an empty directory, so anything gated on init reports
+    // needs-init here. `ndx which` must not be gated: identifying the CLI is
+    // most useful on a project that is not set up yet. And it carries no
+    // trigger — run from the dashboard it would describe the server's own
+    // install, which the footer already reports.
+    const body = await getManifest();
+    const all = body.groups.flatMap((g: { commands: Array<Record<string, any>> }) => g.commands);
+
+    const which = all.find((c: Record<string, any>) => c.name === "which");
+    expect(which.status).toBe("available");
+    expect(which.trigger).toBeUndefined();
+    expect(which.invocation).toBe(`${body.cliName} which`);
+
+    // Sanity check that the fixture really is uninitialized, so the assertion
+    // above is testing the absence of a gate rather than an initialized dir.
+    const analyze = all.find((c: Record<string, any>) => c.name === "analyze");
+    expect(analyze.status).toBe("needs-init");
   });
 
   it("resolves invocations with cli.name from .n-dx.json", async () => {
@@ -1481,3 +1533,4 @@ describe("commands route — tier 3 triggers (auth, validate-tokens, export-pdf)
     expect(String((await res.json()).error)).toContain("no analysis data");
   });
 });
+

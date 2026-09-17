@@ -280,7 +280,7 @@ export async function handleIntegrationRoute(
 
   if (method === "PUT" && action === "config") {
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, res);
       const data = JSON.parse(body) as Record<string, unknown>;
 
       const { ensureSchemas, getIntegrationSchema, validateConfig } = await loadIntegrationSchemas();

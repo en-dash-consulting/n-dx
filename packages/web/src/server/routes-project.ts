@@ -12,6 +12,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { exec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
+import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse } from "./response-utils.js";
 import { readCliName, DEFAULT_CLI_NAME } from "./cli-name.js";
 
@@ -58,11 +59,12 @@ interface CacheEntry {
 /** Cache TTL in milliseconds (30 seconds). */
 const CACHE_TTL_MS = 30_000;
 
-let cache: CacheEntry | null = null;
+/** One cache slot per workspace. */
+const metadataCaches = new WorkspaceScoped<{ entry: CacheEntry | null }>(() => ({ entry: null }));
 
-/** Clear the metadata cache (exposed for testing). */
+/** Clear the metadata cache for every workspace (exposed for testing). */
 export function clearProjectMetadataCache(): void {
-  cache = null;
+  metadataCaches.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -148,17 +150,13 @@ export async function extractProjectMetadata(projectDir: string): Promise<Projec
 /** Get project metadata, using cache when available and project dir hasn't changed. */
 async function getProjectMetadata(ctx: ServerContext): Promise<ProjectMetadata> {
   const now = Date.now();
-
-  if (
-    cache &&
-    cache.projectDir === ctx.projectDir &&
-    now - cache.timestamp < CACHE_TTL_MS
-  ) {
-    return cache.metadata;
+  const slot = metadataCaches.get(ctx);
+  if (slot.entry && slot.entry.projectDir === ctx.projectDir && now - slot.entry.timestamp < CACHE_TTL_MS) {
+    return slot.entry.metadata;
   }
 
   const metadata = await extractProjectMetadata(ctx.projectDir);
-  cache = { metadata, projectDir: ctx.projectDir, timestamp: now };
+  slot.entry = { metadata, projectDir: ctx.projectDir, timestamp: now };
   return metadata;
 }
 

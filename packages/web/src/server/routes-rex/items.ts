@@ -117,7 +117,7 @@ async function handleItemPatch(
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const updates = JSON.parse(body) as Record<string, unknown>;
 
     // Use the PRDStore so writes go to the correct backend (prd_tree/ or prd.md)
@@ -239,7 +239,7 @@ async function handleItemAdd(
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       title?: string;
       level?: string;
@@ -365,7 +365,7 @@ async function handleBulkUpdate(
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       ids: string[];
       updates: Record<string, unknown>;
@@ -435,7 +435,7 @@ async function handleItemMerge(
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as {
       sourceIds: string[];
       targetId: string;

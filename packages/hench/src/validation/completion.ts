@@ -32,8 +32,18 @@ export interface CompletionValidationOptions {
 
 const DEFAULT_TIMEOUT = 30_000;
 
-/** Git pathspec excludes matching BOOKKEEPING_PREFIXES in validation/changed-files.ts. */
-const BOOKKEEPING_EXCLUDES = [":(exclude).rex", ":(exclude).hench"];
+/**
+ * Git pathspec excludes for the human-readable diff summary, mirroring the
+ * bookkeeping filter in validation/changed-files.ts. Decoration only — the
+ * verdict comes from {@link discoverChangedFiles}, which applies the shared
+ * rule (including `.hench-commit-msg.txt` and the repo-relative prefix a
+ * pathspec gets for free by being resolved against `projectDir`).
+ */
+const BOOKKEEPING_EXCLUDES = [
+  ":(exclude).rex",
+  ":(exclude).hench",
+  ":(exclude).hench-commit-msg.txt",
+];
 
 /**
  * Validate that a task produced meaningful changes before completion.

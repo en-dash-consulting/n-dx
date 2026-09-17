@@ -13,7 +13,10 @@ import {
 } from "../../core/token-usage.js";
 import { formatAggregateTokenUsage, formatBudgetWarnings } from "./token-format.js";
 import { walkTree } from "../../core/tree.js";
-import { SUCCESSFUL_CHILD_STATUSES } from "../../core/parent-completion.js";
+import {
+  AUTO_COMPLETABLE_STATUSES,
+  SUCCESSFUL_CHILD_STATUSES,
+} from "../../core/parent-completion.js";
 import { info, warn, result } from "../output.js";
 import { bold, cyan } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/index.js";
@@ -136,16 +139,22 @@ export function findStaleItems(items: PRDItem[], now: Date = new Date()): PRDIte
  * parent, a parent that really has finished would otherwise go unmentioned
  * forever. Surfacing it here is the escape hatch — the human decides. Do not
  * "align" this with the mutation predicate; the divergence is the point.
+ *
+ * Because of that divergence, callers must not assume `rex fix` will act on
+ * every entry: the returned `status` is what says so, and
+ * `renderAutoCompletableHints` partitions on `AUTO_COMPLETABLE_STATUSES`.
  */
-export function findAutoCompletable(items: PRDItem[]): Array<{ id: string; title: string }> {
-  const results: Array<{ id: string; title: string }> = [];
+export function findAutoCompletable(
+  items: PRDItem[],
+): Array<{ id: string; title: string; status: PRDItem["status"] }> {
+  const results: Array<{ id: string; title: string; status: PRDItem["status"] }> = [];
   for (const { item } of walkTree(items)) {
     if (
       item.children && item.children.length > 0 &&
       (item.status === "pending" || item.status === "in_progress") &&
       item.children.every((c) => SUCCESSFUL_CHILD_STATUSES.has(c.status))
     ) {
-      results.push({ id: item.id, title: item.title });
+      results.push({ id: item.id, title: item.title, status: item.status });
     }
   }
   return results;
@@ -260,18 +269,43 @@ export async function renderTokenUsageSection(
   }
 }
 
-/** Render auto-completable item hints. */
+/**
+ * Render auto-completable item hints, split by who can close them.
+ *
+ * `findAutoCompletable` lists both pending and in_progress parents, but
+ * `rex fix`'s `stuck_parent` kind only touches the ones in
+ * `AUTO_COMPLETABLE_STATUSES` — an explicit in_progress claim stays a human
+ * judgement (#368). Partitioning on that same set is what keeps the hint from
+ * advertising a repair `rex fix` will answer with "No issues found."; it also
+ * follows automatically if the set is ever widened.
+ */
 export function renderAutoCompletableHints(items: PRDItem[]): void {
   const autoCompletable = findAutoCompletable(items);
   if (autoCompletable.length === 0) return;
+
+  const repairable = autoCompletable.filter((ac) => AUTO_COMPLETABLE_STATUSES.has(ac.status));
+  const humanOnly = autoCompletable.filter((ac) => !AUTO_COMPLETABLE_STATUSES.has(ac.status));
+
   info("");
   info(bold(cyan("💡 ACTION:")) + " Auto-completable items found.");
-  for (const ac of autoCompletable) {
+
+  for (const ac of repairable) {
     info(`  ● ${ac.title} — all children done, can be marked completed`);
   }
-  // The pending ones are repairable without a human deciding each id; the
-  // in_progress ones are an explicit claim and stay a human judgement (#368).
-  info(`  Run ${bold("rex fix")} to close the pending ones.`);
+  if (repairable.length > 0) {
+    info(`  Run ${bold("rex fix")} to close ${repairable.length === 1 ? "it" : "them"}.`);
+  }
+
+  for (const ac of humanOnly) {
+    info(`  ● ${ac.title} — all children done, but still ${ac.status}`);
+  }
+  if (humanOnly.length > 0) {
+    info(
+      `  ${bold("rex fix")} will not close ${humanOnly.length === 1 ? "that one" : "those"} — ` +
+        `an explicit ${bold("in_progress")} claim is yours to close ` +
+        `(${bold("rex update <id> --status=completed")}).`,
+    );
+  }
 }
 
 /** Render what to do next hint based on tree stats. */

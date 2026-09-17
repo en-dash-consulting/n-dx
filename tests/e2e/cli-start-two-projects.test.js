@@ -47,9 +47,13 @@ const NEAR_WINDOW_SIZE = PORT_RANGE_END - PORT_RANGE_START;
 /** Servers started by this file, reaped in afterAll whether or not the test passed. */
 const startedPids = new Set();
 
+// `--here` on every invocation: since 0.7.0 `ndx start` registers with the
+// per-user hub by default, and this suite is about the single-project server
+// that owns the port — the hub's own behaviour is covered by
+// tests/e2e/cli-start-hub.test.js, which redirects $N_DX_HOME.
 function runStart(args) {
   try {
-    const stdout = execFileSync("node", [CLI_PATH, "start", ...args], {
+    const stdout = execFileSync("node", [CLI_PATH, "start", "--here", ...args], {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",

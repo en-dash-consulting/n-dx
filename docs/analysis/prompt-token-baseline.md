@@ -10,9 +10,9 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-09-11T12:15:04.131Z
-- **Commit** — `1ce09a26728b`
-- **Content hash** — `e10365e5d95f379b` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-09-17T17:04:11.456Z
+- **Commit** — `bde2835c906d`
+- **Content hash** — `6f1202b784078109` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 36
 - **Per-call total** — 21,688 tokens (what every surface costs, summed)
@@ -219,7 +219,7 @@ per section rather than as one literal. These are the same sections
 | `system` | 1,663 | 416 | 71.4% |
 | `brief` | 668 | 167 | 28.6% |
 
-## Workflow skills — 17,217 tokens, 13 skills
+## Workflow skills — 17,483 tokens, 13 skills
 
 A skill body enters the agent's context whole the moment the skill is invoked,
 so its size is a per-invocation bill in the same way a builder's fixed text is a
@@ -232,15 +232,15 @@ portability guards until this table gave them a number.
 
 | Skill | Shipped | Chars | Tokens |
 |---|:-:|---:|---:|
-| `ndx-adversarial-review` | yes | 20,512 | 5,128 |
+| `ndx-adversarial-review` | yes | 20,552 | 5,138 |
 | `iso-map` | — | 8,285 | 2,072 |
 | `triage` | — | 7,421 | 1,856 |
-| `ndx-reshape` | yes | 5,816 | 1,454 |
+| `ndx-reshape` | yes | 5,941 | 1,486 |
 | `dev-link` | — | 5,054 | 1,264 |
-| `ndx-plan` | yes | 4,437 | 1,110 |
-| `ndx-capture` | yes | 4,407 | 1,102 |
-| `ndx-config` | yes | 3,322 | 831 |
-| `ndx-work` | yes | 2,954 | 739 |
+| `ndx-capture` | yes | 4,639 | 1,160 |
+| `ndx-plan` | yes | 4,553 | 1,139 |
+| `ndx-config` | yes | 3,444 | 861 |
+| `ndx-work` | yes | 3,382 | 846 |
 | `ndx-feedback` | yes | 2,565 | 642 |
 | `no-plan-mode` | yes | 2,476 | 619 |
 | `ndx-zone` | yes | 817 | 205 |

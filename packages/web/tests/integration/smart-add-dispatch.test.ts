@@ -8,7 +8,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
+import { removeTempDir } from "../helpers/temp-dir.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
@@ -128,7 +129,7 @@ describe("smart-add endpoint → rex CLI dispatch", () => {
 
   afterEach(async () => {
     await closeRouteTestServer(server);
-    await rm(tmpDir, { recursive: true, force: true });
+    await removeTempDir(tmpDir);
   });
 
   // ── Happy path ────────────────────────────────────────────────────────

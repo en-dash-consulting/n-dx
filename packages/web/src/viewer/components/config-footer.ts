@@ -1,8 +1,18 @@
 /**
  * Configuration display footer for the sidebar.
  *
- * Shows active n-dx configuration (model, auth method, token budget) in a
- * collapsible panel above the sidebar footer controls.
+ * Two things, stacked. An identity line — which n-dx is running, from where,
+ * and which directory it is serving — and below it the collapsible panel of
+ * active configuration (model, auth method, token budget).
+ *
+ * The identity line answers the question a second dashboard makes urgent:
+ * with several checkouts open, or a globally installed n-dx next to a
+ * development one, "which of them am I looking at?" is not guessable from
+ * the page. It comes from `GET /api/config`'s `server` object, which
+ * main.ts already fetches before the first render — passed down as a prop
+ * rather than fetched again here. A server too old to send it renders no
+ * identity line at all, which is the honest answer: an unknown version is
+ * worse than none.
  */
 
 import { h } from "preact";
@@ -11,6 +21,19 @@ import { useState, useEffect, useRef } from "preact/hooks";
 // ---------------------------------------------------------------------------
 // Types (mirror server-side shapes)
 // ---------------------------------------------------------------------------
+
+/**
+ * The subset of the server's `ServerInfo` (see server/routes-status.ts) that
+ * the footer shows. Structural, not imported: the viewer never imports from
+ * the server half of the package.
+ */
+export interface ServerIdentity {
+  version: string;
+  /** Absolute path of the CLI that launched this server; may be empty. */
+  cliPath: string;
+  /** Absolute path of the directory this server serves. */
+  projectDir: string;
+}
 
 interface NdxConfigSummary {
   vendor: string | null;
@@ -57,6 +80,82 @@ function useNdxConfig(): NdxConfigSummary | null {
   }, []);
 
   return config;
+}
+
+// ---------------------------------------------------------------------------
+// Identity line
+// ---------------------------------------------------------------------------
+
+/** Last path segment, for either separator. Empty string for an empty path. */
+function basename(path: string): string {
+  const trimmed = path.replace(/[/\\]+$/, "");
+  if (!trimmed) return "";
+  const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  return cut === -1 ? trimmed : trimmed.slice(cut + 1);
+}
+
+function dirname(path: string): string {
+  const trimmed = path.replace(/[/\\]+$/, "");
+  const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  return cut <= 0 ? "" : trimmed.slice(0, cut);
+}
+
+/**
+ * The install `cliPath` came from, as one short label.
+ *
+ * `cliPath` points at the entry file, which sits at a known depth inside the
+ * install: `<checkout>/packages/core/cli.js` in a monorepo, `<pkg>/dist/cli/
+ * index.js` in a build, `<pkg>/bin/ndx.js` when published. Climbing past
+ * those leaves the root, and the root's own name is what identifies it —
+ * "n-dx", "n-dx-internal", "core". A scoped package keeps its scope
+ * ("@n-dx/core"), which is the whole difference between two installs that
+ * would otherwise both read "core".
+ *
+ * Returns null when there is nothing useful to show; the caller omits the
+ * segment rather than printing a placeholder.
+ */
+export function installRootLabel(cliPath: string): string | null {
+  if (!cliPath) return null;
+  let dir = dirname(cliPath);
+  if (!dir) return null;
+
+  // Climb the wrapper directories the entry file lives in. Empty segments are
+  // dropped first: a doubled or trailing separator would otherwise shift the
+  // tail by one and leave the label reading "core" instead of the install.
+  const segments = dir.split(/[/\\]+/).filter(Boolean);
+  const wrappers = [["packages", "core"], ["dist", "cli"], ["src", "cli"], ["bin"], ["dist"]];
+  for (const wrapper of wrappers) {
+    const tail = segments.slice(-wrapper.length).map((seg) => seg.toLowerCase());
+    if (tail.length === wrapper.length && tail.every((seg, i) => seg === wrapper[i])) {
+      dir = segments.slice(0, -wrapper.length).join("/");
+      break;
+    }
+  }
+  const name = basename(dir);
+  if (!name) return null;
+  const parent = basename(dirname(dir));
+  return parent.startsWith("@") ? `${parent}/${name}` : name;
+}
+
+/**
+ * The identity line's text: "n-dx 0.6.0 · n-dx · my-project". Segments that
+ * are unknown drop out rather than showing an empty separator.
+ */
+export function identityLine(server: ServerIdentity): string {
+  const parts = [`n-dx ${server.version || "unknown"}`];
+  const install = installRootLabel(server.cliPath);
+  if (install) parts.push(install);
+  const project = basename(server.projectDir);
+  if (project) parts.push(project);
+  return parts.join(" \u00B7 ");
+}
+
+/** The tooltip: the full paths the line shortened, one per line. */
+export function identityTooltip(server: ServerIdentity): string {
+  const lines = [`n-dx ${server.version || "unknown"}`];
+  if (server.cliPath) lines.push(`CLI: ${server.cliPath}`);
+  if (server.projectDir) lines.push(`Project: ${server.projectDir}`);
+  return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -115,17 +214,45 @@ const AUTH_ICONS: Record<string, string> = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ConfigFooter() {
+export interface ConfigFooterProps {
+  /**
+   * Server identity from `GET /api/config`, threaded down from main.ts.
+   * Absent on a server too old to send it (and in a static export, which has
+   * no server at all) — the identity line is then omitted.
+   */
+  server?: ServerIdentity | null;
+}
+
+export function ConfigFooter({ server = null }: ConfigFooterProps = {}) {
   const config = useNdxConfig();
   const [expanded, setExpanded] = useState(false);
 
-  if (!config) return null;
+  // The identity line does not wait for /api/ndx-config: it has everything it
+  // needs from the prop, and a footer that appears a second late is a footer
+  // that is missing exactly when someone is checking which window is which.
+  if (!config && !server) return null;
+
+  const identity = server
+    ? h("div", {
+        class: "config-footer-identity",
+        title: identityTooltip(server),
+      }, identityLine(server))
+    : null;
+
+  if (!config) {
+    return h("div", {
+      class: "config-footer",
+      role: "region",
+      "aria-label": "Server identity",
+    }, identity);
+  }
 
   return h("div", {
     class: `config-footer${expanded ? " config-footer-expanded" : ""}`,
     role: "region",
     "aria-label": "Project configuration",
   },
+    identity,
     // Toggle bar — always visible
     h("button", {
       class: "config-footer-toggle",

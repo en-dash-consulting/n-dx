@@ -821,3 +821,85 @@ describe.skipIf(!axeRun)("[a11y] ProjectSettings — axe audit", () => {
     expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
   });
 });
+
+// ── [a11y] WorkspacesView (loaded board) ─────────────────────────────────────
+
+describe.skipIf(!axeRun)("[a11y] WorkspacesView — axe audit", () => {
+  let root: HTMLElement;
+  let cleanup: () => void;
+
+  /** Two worktrees, one of them running — the state carrying the most controls. */
+  function boardFetcher(): typeof fetch {
+    const anchor = { key: "repo", path: "/repo", branch: "main", isAnchor: true, active: true };
+    const branch = { key: "feature", path: "/repo-feature", branch: "feat/x", isAnchor: false, active: true };
+    const running = {
+      taskId: "t1", taskTitle: "Something running", runId: "exec-1",
+      status: "running", startedAt: new Date().toISOString(),
+      lastOutput: "building…", tokensPerSecond: 12,
+    };
+    const bodies: Record<string, unknown> = {
+      "/api/workspaces": { anchor: "repo", workspaces: [anchor, branch] },
+      "/api/worktrees": [
+        {
+          path: "/repo", branch: "main", dirty: false, dirtyFiles: 0,
+          runs: { total: 1, running: 0, lastFinishedAt: new Date().toISOString() },
+          server: { pidFile: true, pid: 1, port: 3117 },
+        },
+        {
+          path: "/repo-feature", branch: "feat/x", dirty: true, dirtyFiles: 3,
+          runs: { total: 1, running: 1, lastFinishedAt: null },
+          server: { pidFile: false, pid: null, port: null },
+        },
+      ],
+      "/api/hench/memory": { system: { totalBytes: 8e9, usedBytes: 4e9, usedPercent: 50 } },
+      "/api/hench/concurrency": { totalRunning: 1 },
+      "/api/rex/next": { task: { id: "next-1", title: "Next up" } },
+      "/api/workspaces/feature/prd-delta": {
+        counts: { onlyHere: 2, onlyAnchor: 0, changed: 1, completedHere: 0 },
+      },
+    };
+    return (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const workspace = new Headers(init?.headers).get("X-Ndx-Workspace");
+      const body = url === "/api/hench/execute/status"
+        ? { executions: workspace === "feature" ? [running] : [] }
+        : bodies[url] ?? {};
+      return { ok: true, status: 200, json: async () => body } as unknown as Response;
+    }) as typeof fetch;
+  }
+
+  async function renderBoard(): Promise<HTMLElement> {
+    const { WorkspacesView } = await import("../../../src/viewer/views/workspaces.js");
+    const socket = { onmessage: null, close: () => { /* no-op */ } } as unknown as WebSocket;
+    const div = renderToDiv(h(WorkspacesView, { fetcher: boardFetcher(), socketFactory: () => socket }));
+    for (let i = 0; i < 6; i++) {
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    }
+    return div;
+  }
+
+  afterEach(() => {
+    act(() => {
+      render(null, root);
+    });
+    root.remove();
+    cleanup?.();
+  });
+
+  it("has zero critical/serious violations (light theme)", async () => {
+    cleanup = setTheme("light");
+    root = await renderBoard();
+    // Guard: a board still on "Loading…" would audit clean and prove nothing.
+    expect(root.querySelectorAll(".workspace-card").length).toBe(2);
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+
+  it("has zero critical/serious violations (dark theme)", async () => {
+    cleanup = setTheme("dark");
+    root = await renderBoard();
+    expect(root.querySelectorAll(".workspace-card").length).toBe(2);
+    const violations = await runAxe(root);
+    expect(violations, `Violations:\n${formatViolations(violations)}`).toHaveLength(0);
+  });
+});

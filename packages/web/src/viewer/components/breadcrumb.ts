@@ -13,6 +13,7 @@ import { h } from "preact";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ViewId, NavigateTo } from "../types.js";
 import { useProjectMetadata, useCliName, resolveCliLabel } from "../hooks/index.js";
+import { WorkspaceSwitcher } from "./workspace-switcher.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,6 +45,7 @@ const PRODUCT_DEFAULT_VIEW: Record<string, ViewId> = {
 };
 
 const VIEW_META: Record<ViewId, ViewMeta> = {
+  workspaces:            { product: "global",       label: "Overview",        productLabel: "Workspaces" },
   overview:              { product: "sourcevision", label: "Overview",        productLabel: "SourceVision" },
   graph:                 { product: "sourcevision", label: "Map",             productLabel: "SourceVision" },
   "iso-map":             { product: "sourcevision", label: "Isometric Map",   productLabel: "SourceVision" },
@@ -138,22 +140,9 @@ export function Breadcrumb({ view, navigateTo, scope }: BreadcrumbProps) {
             },
               projectName,
             ),
-            gitBranch
-              ? h("span", { class: "breadcrumb-branch", title: `Branch: ${gitBranch}` },
-                  h("svg", {
-                    class: "breadcrumb-branch-icon",
-                    width: 11,
-                    height: 11,
-                    viewBox: "0 0 16 16",
-                    fill: "currentColor",
-                    "aria-hidden": "true",
-                  },
-                    // Git branch icon (simplified)
-                    h("path", { d: "M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5z" }),
-                  ),
-                  gitBranch.length > 20 ? gitBranch.slice(0, 18) + "\u2026" : gitBranch,
-                )
-              : null,
+            // The branch chip is the workspace switcher: "<worktree> · <branch>",
+            // a menu of every worktree when there is more than one.
+            h(WorkspaceSwitcher, { view, branch: gitBranch }),
             Separator(),
           )
         : null,

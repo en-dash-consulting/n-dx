@@ -168,10 +168,40 @@ export async function createTmpDir(prefix = "ndx-e2e-") {
 /**
  * Remove a temporary directory recursively.
  *
+ * Retries on failure: the CLI children these tests spawn run with `cwd` inside
+ * the temp dir, so on Windows the directory can still be handle-locked for a
+ * moment after the process has been told to exit and `rmdir` fails with EBUSY.
+ * The retry budget (10 × 100 ms) is the same one the child-cleanup suites use.
+ *
  * @param {string} dir - Directory to remove
  */
 export async function removeTmpDir(dir) {
-  await rm(dir, { recursive: true, force: true });
+  await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}
+
+/**
+ * Poll until `pid` no longer answers signal 0, or `timeoutMs` elapses.
+ *
+ * Signalling a process does not wait for it: on Windows `process.kill` is
+ * TerminateProcess, which returns before the handle table — including the
+ * process's cwd — is released. A teardown that signals and then removes the
+ * temp directory in the same tick races that release.
+ *
+ * @param {number} pid
+ * @param {number} [timeoutMs=10000]
+ * @returns {Promise<boolean>} True when the pid is gone.
+ */
+export async function waitForPidExit(pid, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return true;
+    }
+    if (Date.now() >= deadline) return false;
+    await new Promise((r) => setTimeout(r, 50));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -342,4 +372,47 @@ export async function setupFullProject(dir) {
     setupHenchDir(dir),
     setupSourcevisionDir(dir),
   ]);
+}
+
+/**
+ * Send a JSON-RPC 2.0 request to an MCP Streamable HTTP endpoint.
+ *
+ * The transport requires `Content-Type: application/json` and
+ * `Accept: application/json, text/event-stream`; the response may be plain
+ * JSON or an SSE stream, and the body is parsed accordingly. Shared by the
+ * direct (`ndx start`) and through-the-hub MCP transport tests so the two
+ * exercise the protocol identically.
+ *
+ * @param {string} url
+ * @param {string} method
+ * @param {object} [params]
+ * @param {string|null} [sessionId]
+ * @returns {Promise<{ status: number, sessionId: string|null, body: any }>}
+ */
+export async function mcpJsonRpc(url, method, params = {}, sessionId = null) {
+  const headers = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream",
+  };
+  if (sessionId) headers["Mcp-Session-Id"] = sessionId;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+
+  const contentType = res.headers.get("content-type") || "";
+  let body;
+  if (contentType.includes("text/event-stream")) {
+    const text = await res.text();
+    const dataLines = text.split("\n").filter((l) => l.startsWith("data: "));
+    const lastData = dataLines[dataLines.length - 1];
+    body = lastData ? JSON.parse(lastData.slice(6)) : {};
+  } else {
+    const text = await res.text();
+    body = text ? JSON.parse(text) : {};
+  }
+
+  return { status: res.status, sessionId: res.headers.get("mcp-session-id"), body };
 }

@@ -13,6 +13,7 @@
  * health status (stale detection).
  */
 
+import { getWebSocketUrl, acceptsFrame } from "../base-path.js";
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { RexTaskLink } from "./rex-task-link.js";
@@ -260,8 +261,7 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
     let mounted = true;
     fetchExecutions();
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = getWebSocketUrl();
 
     let reconnectDelay = 1000; // ms; doubles on each failure, capped at 30 s
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -270,6 +270,8 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
       if (!mounted) return;
       try {
         const msg = JSON.parse(event.data as string);
+        // Another worktree's frame on the shared socket — not ours to react to.
+        if (!acceptsFrame(msg)) return;
         if (msg.type === "hench:task-execution-progress" && msg.state) {
           const state = msg.state as ExecutionState;
           // Track any active task so that fast-completing tasks are still

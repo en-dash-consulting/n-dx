@@ -10,6 +10,7 @@
  * - RexTaskLink context menus
  */
 
+import { appUrl } from "../base-path.js";
 import { h } from "preact";
 import { useState, useCallback, useRef } from "preact/hooks";
 
@@ -28,12 +29,12 @@ export interface CopyLinkButtonProps {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-/** Build a full shareable URL from a path. Uses the current origin. */
+/** Build a full shareable URL from a path. Uses the current origin and, behind the hub, the project base path. */
 export function buildShareableUrl(path: string): string {
   const base = typeof window !== "undefined" ? window.location.origin : "";
   // Ensure path starts with /
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${normalizedPath}`;
+  return `${base}${appUrl(normalizedPath)}`;
 }
 
 // ── Component ────────────────────────────────────────────────────────

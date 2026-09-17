@@ -13,7 +13,11 @@
  *
  * 2. **Shell operator blocking** (`commands.ts`)
  *    Metacharacters (`;`, `&`, `|`, `` ` ``, `$`) are rejected to prevent
- *    command chaining or subshell injection.
+ *    command chaining or subshell injection. Shell-aware: the set of active
+ *    characters and the quotes that protect them follow the shell that will
+ *    actually run the command — POSIX `sh`, or cmd.exe on a Windows host
+ *    without one — resolved once per run from the same function the executor
+ *    uses.
  *
  * 3. **Dangerous pattern detection** (`commands.ts`)
  *    Known-hazardous patterns (sudo, eval, rm -rf /, chmod 777) are blocked
@@ -46,12 +50,14 @@
 
 import type { GuardConfig } from "./contracts.js";
 import { validatePath, simpleGlobMatch, GuardError } from "./paths.js";
-import { validateCommand } from "./commands.js";
+import { validateCommand, resolveShellKind } from "./commands.js";
+import type { ShellKind } from "./commands.js";
 import { PolicyEngine } from "./policy.js";
 import type { AuditEntry, SessionCounters } from "./policy.js";
 
 export { GuardError, validatePath, simpleGlobMatch } from "./paths.js";
-export { validateCommand } from "./commands.js";
+export { validateCommand, resolveShellKind } from "./commands.js";
+export type { ShellKind } from "./commands.js";
 export { PolicyEngine } from "./policy.js";
 export type { GuardConfig, PolicyLimitsConfig } from "./contracts.js";
 export type {
@@ -61,6 +67,16 @@ export type {
   AuditEntry,
   SessionCounters,
 } from "./policy.js";
+
+/** Construction-time overrides for {@link GuardRails}. */
+export interface GuardRailsOptions {
+  /**
+   * Which shell `run_command` strings will be interpreted under. Defaults to
+   * the shell `execShellCmd` will actually pick on this host. Inject to make
+   * the cmd.exe branch testable on every platform.
+   */
+  shellKind?: ShellKind;
+}
 
 /**
  * Facade that applies all guard policies against a project directory.
@@ -78,11 +94,14 @@ export type {
 export class GuardRails {
   private projectDir: string;
   private config: GuardConfig;
+  /** Resolved once: the probe behind it costs a subprocess on win32. */
+  readonly shellKind: ShellKind;
   readonly policy: PolicyEngine;
 
-  constructor(projectDir: string, config: GuardConfig) {
+  constructor(projectDir: string, config: GuardConfig, options: GuardRailsOptions = {}) {
     this.projectDir = projectDir;
     this.config = config;
+    this.shellKind = options.shellKind ?? resolveShellKind();
     this.policy = new PolicyEngine(config.policy);
   }
 
@@ -91,7 +110,7 @@ export class GuardRails {
   }
 
   checkCommand(command: string): void {
-    validateCommand(command, this.config.allowedCommands);
+    validateCommand(command, this.config.allowedCommands, this.shellKind);
     this.policy.checkPolicy("command", command);
   }
 

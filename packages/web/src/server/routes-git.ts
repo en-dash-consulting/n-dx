@@ -191,7 +191,7 @@ async function handleGitCommit(
 ): Promise<boolean> {
   let message: string;
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as { message?: string };
     message = (input.message ?? "").trim();
   } catch {
@@ -231,7 +231,7 @@ async function handleGitDiscard(
 ): Promise<boolean> {
   let confirmCount: number;
   try {
-    const body = await readBody(req);
+    const body = await readBody(req, res);
     const input = JSON.parse(body) as { confirmCount?: number };
     if (typeof input.confirmCount !== "number") {
       errorResponse(res, 400, "confirmCount is required");

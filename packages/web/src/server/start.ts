@@ -5,7 +5,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, watch, mkdirSync, rmSync, readFileSync, writeFileSync, type FSWatcher } from "node:fs";
 import { writeFile, unlink } from "node:fs/promises";
-import { resolve, join, dirname } from "node:path";
+import { resolve, join, dirname, basename } from "node:path";
 import { isVerbose, verbose } from "@n-dx/llm-client";
 import type { ServerContext, ViewerScope } from "./types.js";
 import { ensureLegacyPrdMigrated } from "./rex-gateway.js";
@@ -17,7 +17,7 @@ import { handleSourcevisionAskRoute } from "./routes-sourcevision-ask.js";
 import { handleIsoMapRoute } from "./routes-iso-map.js";
 import { handleTokenUsageRoute } from "./routes-token-usage.js";
 import { handleValidationRoute } from "./routes-validation.js";
-import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, getAggregator } from "./routes-hench.js";
+import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, closeWorktreeRunWatchers, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
 import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
 import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_TREE_DIRNAME, SCHEMA_VERSION } from "./rex-gateway.js";
@@ -28,6 +28,11 @@ import { startMcpSchemaWatcher } from "./mcp-schema-watcher.js";
 import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
+import { handleWorktreesRoute } from "./routes-worktrees.js";
+import { handleWorkspacesRoute } from "./routes-workspaces.js";
+import { invalidatePrdDelta } from "./prd-delta.js";
+import { WorkspaceRegistry } from "./workspaces.js";
+import type { WatcherHandles, WorkspaceHooks, WorkspaceResources } from "./workspaces.js";
 import { handleStatusRoute, clearStatusCache, buildServerInfo } from "./routes-status.js";
 import { handleConfigRoute } from "./routes-config.js";
 import { handleSearchRoute } from "./routes-search.js";
@@ -39,8 +44,9 @@ import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
-import { createWebSocketManager, WsHealthTracker } from "./websocket.js";
-import { ALL_DATA_FILES } from "../shared/index.js";
+import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
+import type { WebSocketBroadcaster } from "./websocket.js";
+import { ALL_DATA_FILES, stripWorkspaceSlot } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
 import { handleRequestSecurity } from "./request-security.js";
 
@@ -95,6 +101,8 @@ export function registerShutdownHandlers(
   timeoutMs: number = Number(process.env["N_DX_SHUTDOWN_TIMEOUT_MS"] ?? DEFAULT_SHUTDOWN_TIMEOUT_MS),
   deps: ShutdownDeps = {},
   watcherHandles?: WatcherHandles,
+  /** Workspace registry whose non-anchor resources are released with the anchor's. */
+  registry?: { closeAll(): void },
 ): void {
   const doExit = deps.exit ?? ((code: number) => process.exit(code));
 
@@ -126,6 +134,10 @@ export function registerShutdownHandlers(
     if (watcherHandles) {
       closeWatchers(watcherHandles);
     }
+    // Every lazily created worktree workspace: its watchers and PRD cache.
+    registry?.closeAll();
+    // Lazily registered per-worktree runs watchers (GET /api/hench/runs?scope=repo).
+    closeWorktreeRunWatchers();
 
     // Step 1 — terminate hench child processes (highest priority: avoids orphaned agents)
     // Covers both hench-route executions and the rex epic-by-epic execution engine.
@@ -246,6 +258,33 @@ function isInScope(scope: ViewerScope | undefined, pkg: ViewerScope): boolean {
   return !scope || scope === pkg;
 }
 
+/** The subset of the WebSocket manager the watchers need — lets a tagged broadcaster stand in. */
+interface Broadcasting {
+  broadcast: WebSocketBroadcaster;
+}
+
+/**
+ * The workspace tag for frames about `ctx`, or null to leave them untagged.
+ *
+ * Untagged means the anchor, on both sides of the wire: `frameIsForWorkspace`
+ * accepts an untagged frame only for a viewer whose own key is null, and the
+ * Workspaces board attributes one to the anchor card. The anchor viewer is
+ * served at `/` with no `/w/<key>/` slot, so its key *is* null — tagging the
+ * anchor's frames with its directory basename made every one of them fail
+ * that test, and the plain single-worktree dashboard stopped updating live.
+ *
+ * `ctx.workspace` is set by the registry when it copies the anchor context
+ * for a worktree; the anchor's own context never has it.
+ */
+function workspaceTagOf(ctx: ServerContext): string | null {
+  return ctx.workspace ?? null;
+}
+
+/** The same rule for a resolved workspace: the anchor's frames carry no tag. */
+function frameTagOf(workspace: { key: string; isAnchor: boolean }): string | null {
+  return workspace.isAnchor ? null : workspace.key;
+}
+
 /**
  * Regenerate `.rex/.cache/prd.json` from the folder-tree backend (preferred)
  * or legacy `prd.md`. Called at server boot and whenever the rex watcher fires.
@@ -312,7 +351,7 @@ function registerSourcevisionWatcher(
   scope: ViewerScope | undefined,
   svDir: string,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
+  ws: Broadcasting,
 ): FSWatcher | null {
   if (!isInScope(scope, "sourcevision") || !existsSync(svDir)) return null;
   const debouncedRefresh = debounce(() => {
@@ -338,10 +377,13 @@ function registerRexWatcher(
   scope: ViewerScope | undefined,
   rexDir: string,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
+  ws: Broadcasting,
 ): FSWatcher[] {
   if (!isInScope(scope, "rex") || !existsSync(rexDir)) return [];
   const debouncedRefresh = debounce(() => {
+    // A changed tree stales every PRD delta it takes part in, as anchor or
+    // as the compared worktree.
+    invalidatePrdDelta(rexDir);
     void refreshPRDCache(rexDir).then(() => {
       watcher.refresh();
       ws.broadcast({
@@ -386,7 +428,7 @@ function registerRexWatcher(
 function registerHenchWatcher(
   scope: ViewerScope | undefined,
   henchRunsDir: string,
-  ws: ReturnType<typeof createWebSocketManager>,
+  ws: Broadcasting,
 ): FSWatcher | null {
   if (!isInScope(scope, "hench") || !existsSync(henchRunsDir)) return null;
   const debouncedBroadcast = debounce(() => {
@@ -412,7 +454,7 @@ function registerDevViewerWatcher(
   dev: boolean,
   viewerPath: string,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
+  ws: Broadcasting,
 ): FSWatcher | null {
   if (!dev || !viewerPath) return null;
   const debouncedRefresh = debounce(() => {
@@ -434,22 +476,14 @@ function registerDevViewerWatcher(
   }
 }
 
-/** Collected file system watchers and monitor intervals for cleanup during shutdown. */
-interface WatcherHandles {
-  watchers: FSWatcher[];
-  henchRunsDir: string;
-  /** Monitor intervals to clear on shutdown. */
-  monitorIntervals: ReturnType<typeof setInterval>[];
-  /** Ephemeral PRD JSON cache directory to delete on shutdown (if set). */
-  prdCacheDir?: string;
-}
-
 function registerWatchers(
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
+  wsManager: Broadcasting,
   viewerPath: string,
 ): WatcherHandles {
+  // Every frame these watchers emit is about this workspace.
+  const ws: Broadcasting = { broadcast: tagBroadcaster(wsManager.broadcast, workspaceTagOf(ctx)) };
   const henchRunsDir = join(ctx.projectDir, ".hench", "runs");
   const watchers: FSWatcher[] = [];
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
@@ -490,9 +524,14 @@ function registerWatchers(
 function reregisterProjectWatchers(
   ctx: ServerContext,
   watcher: ReturnType<typeof createDataWatcher>,
-  ws: ReturnType<typeof createWebSocketManager>,
+  ws: Broadcasting,
   handles: WatcherHandles,
 ): void {
+  // `ws` arrives already tagged for the request's workspace — the dispatcher
+  // decided that from the resolved workspace, which is the only place that
+  // knows whether it is the anchor. Re-deriving the tag from `ctx` here would
+  // stamp the anchor's frames with its key, and an anchor viewer (whose own
+  // key is null) drops those.
   const sv = registerSourcevisionWatcher(ctx.scope, ctx.svDir, watcher, ws);
   if (sv) handles.watchers.push(sv);
   for (const w of registerRexWatcher(ctx.scope, ctx.rexDir, watcher, ws)) {
@@ -500,6 +539,32 @@ function reregisterProjectWatchers(
   }
   const hench = registerHenchWatcher(ctx.scope, handles.henchRunsDir, ws);
   if (hench) handles.watchers.push(hench);
+}
+
+/**
+ * How a non-anchor workspace gets its watchers and PRD cache — the setup and
+ * teardown half of the seam declared as `WorkspaceHooks` in workspaces.ts.
+ *
+ * Same helpers as the anchor, minus the dev-viewer watcher (one per process is
+ * enough — the built HTML is shared) and minus the hench/heartbeat monitors,
+ * which stay per process until PR 11's job-singleton task.
+ *
+ * @internal exported for integration testing only
+ */
+export function createWorkspaceHooks(
+  ws: ReturnType<typeof createWebSocketManager>,
+): WorkspaceHooks {
+  return {
+    setup(ctx: ServerContext): WorkspaceResources {
+      const watcher = createDataWatcher(ctx);
+      const handles = registerWatchers(ctx, watcher, ws, "");
+      if (isInScope(ctx.scope, "rex") && existsSync(ctx.rexDir)) {
+        void refreshPRDCache(ctx.rexDir);
+      }
+      return { watcher, handles };
+    },
+    teardown: closeWatchers,
+  };
 }
 
 /** Close all file system watchers, monitor intervals, and ephemeral cache on shutdown. */
@@ -561,6 +626,8 @@ function handleReloadSignalEndpoint(
   req: IncomingMessage,
   res: ServerResponse,
   ws: ReturnType<typeof createWebSocketManager>,
+  /** Tagged for the workspace the request addressed. */
+  broadcast: WebSocketBroadcaster = ws.broadcast,
 ): boolean {
   const path = (req.url || "/").split("?")[0];
   if (path !== "/api/reload") return false;
@@ -572,17 +639,17 @@ function handleReloadSignalEndpoint(
   }
 
   const timestamp = new Date().toISOString();
-  ws.broadcast({
+  broadcast({
     type: "viewer:reload",
     source: "ndx-refresh",
     timestamp,
   });
-  ws.broadcast({
+  broadcast({
     type: "sv:data-changed",
     source: "ndx-refresh",
     timestamp,
   });
-  ws.broadcast({
+  broadcast({
     type: "rex:prd-changed",
     source: "ndx-refresh",
     timestamp,
@@ -633,11 +700,16 @@ async function handleApiRoutes(
   assets: ReturnType<typeof resolveStaticAssets>,
   wsHealthTracker: WsHealthTracker,
   watcherHandles: WatcherHandles,
+  registry: WorkspaceRegistry,
+  /** Tagged for the workspace the request addressed. */
+  broadcast: WebSocketBroadcaster,
 ): Promise<boolean> {
   if (handleWsHealthEndpoint(req, res, wsHealthTracker)) return true;
+  if (await handleWorkspacesRoute(req, res, registry)) return true;
   if (await handleMcpRoute(req, res, ctx)) return true;
   if (await handleProjectRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(true, () => handleGitRoute(req, res, ctx))) return true;
+  if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx))) return true;
   if (handleStatusRoute(req, res, ctx)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleNotionRoute(req, res, ctx))) return true;
@@ -646,10 +718,10 @@ async function handleApiRoutes(
   if (await handleCliTimeoutRoute(req, res, ctx)) return true;
   if (await handleLlmRoute(req, res, ctx)) return true;
   if (await handleProjectSettingsRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(true, () => handleCommandsRoute(req, res, ctx, ws.broadcast, {
+  if (await handleScopedRoute(true, () => handleCommandsRoute(req, res, ctx, broadcast, {
     onProjectInitialized: () => {
       clearStatusCache();
-      reregisterProjectWatchers(ctx, watcher, ws, watcherHandles);
+      reregisterProjectWatchers(ctx, watcher, { broadcast }, watcherHandles);
     },
   }))) return true;
   // Ask must be dispatched before the general sourcevision route so
@@ -658,8 +730,8 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "sourcevision") && handleSourcevisionRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && handleIsoMapRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "rex") && handleSearchRoute(req, res, ctx)) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, ws.broadcast))) return true;
-  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, ws.broadcast, { onStatusInvalidate: clearStatusCache }))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleRexRoute(req, res, ctx, broadcast))) return true;
+  if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleHenchRoute(req, res, ctx, broadcast, { onStatusInvalidate: clearStatusCache }))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleWorkflowRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "hench"), () => handleAdaptiveRoute(req, res, ctx))) return true;
   if (isInScope(ctx.scope, "rex") && handleValidationRoute(req, res, ctx)) return true;
@@ -670,21 +742,125 @@ async function handleApiRoutes(
   return false;
 }
 
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] ?? ch);
+}
+
+/**
+ * 404 for an `X-Ndx-Workspace` naming no known worktree.
+ *
+ * JSON, not the HTML page below: the header is only ever set on a fetch —
+ * `workspaceFetch` in the Workspaces board and `StartTaskButton` — never on a
+ * navigation, so the caller is code and wants a body it can read. Which is
+ * also why refusing is safe: no page load carries this header, so this cannot
+ * 404 anybody's dashboard.
+ *
+ * Refusing beats the anchor fallback on reads as much as on writes. The board
+ * polls `/api/hench/execute/status` per card with this header; answering about
+ * the anchor puts the anchor's running task on a card labelled with someone
+ * else's worktree. A 404 leaves the card's previous value alone (`loadSlice`
+ * keeps it) until the next `/api/workspaces` load drops the card entirely.
+ */
+function respondUnknownWorkspaceHeader(res: ServerResponse, key: string, registry: WorkspaceRegistry): void {
+  res.writeHead(404, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+  res.end(JSON.stringify({
+    error: `No workspace named "${key}" — it may have been removed since this page loaded.`,
+    workspace: key,
+    known: registry.keys(),
+  }));
+}
+
+/** 404 for a `/w/<key>/` that names no known worktree, linking back to the anchor. */
+function respondUnknownWorkspace(res: ServerResponse, key: string, registry: WorkspaceRegistry): void {
+  // The anchor is listed as `/`, not `/w/<its key>/`: that is the address the
+  // viewer builds for it (workspaceViewUrl) and the one whose workspace key is
+  // null, which is what makes its untagged frames arrive.
+  const known = registry.list().map((w) => {
+    const href = w.isAnchor ? "/" : `/w/${encodeURIComponent(w.key)}/`;
+    return `<li><a href="${href}">${escapeHtml(w.key)}</a>${w.isAnchor ? " (anchor)" : ""}</li>`;
+  }).join("");
+  const html =
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Unknown workspace</title></head><body>` +
+    `<h1>No workspace named &ldquo;${escapeHtml(key)}&rdquo;</h1>` +
+    `<p>This server knows these worktrees:</p><ul>${known}</ul>` +
+    `<p><a href="/">Open the anchor workspace</a></p></body></html>`;
+  res.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+  res.end(html);
+}
+
 function createHttpServer(
-  ctx: ServerContext,
-  watcher: ReturnType<typeof createDataWatcher>,
+  registry: WorkspaceRegistry,
   ws: ReturnType<typeof createWebSocketManager>,
   assets: ReturnType<typeof resolveStaticAssets>,
   wsHealthTracker: WsHealthTracker,
-  watcherHandles: WatcherHandles,
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    if (handleRequestSecurity(req, res)) return;
-    if (handleConfigEndpoint(req, res, ctx)) return;
-    if (handleReloadSignalEndpoint(req, res, ws)) return;
-    if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles)) return;
-    res.writeHead(404);
-    res.end("Not found");
+    try {
+      if (handleRequestSecurity(req, res)) return;
+      // Request-scoped context. Two things can name a worktree and they do not
+      // rank equally: `X-Ndx-Workspace` wins over a leading `/w/<key>/`.
+      //
+      // The slot says where the *page* is mounted, and the viewer prefixes
+      // every root-relative fetch with it. The header says which worktree this
+      // one request is about, which is how the Workspaces board — itself
+      // served under some slot — starts and stops runs in the others. Reading
+      // the slot first made every such action land on the board's own
+      // worktree; `resolveWorkspace` has documented header-first since it was
+      // written, and the dispatcher was the half that disagreed.
+      //
+      // The slot is stripped from the URL whichever one wins, so routes below
+      // always see root-relative paths. An unknown key is refused either way,
+      // in the form its caller can use: an HTML page for the slot (a
+      // navigation), JSON for the header (a fetch). Falling back to the anchor
+      // for an unrecognised header would answer about the wrong worktree under
+      // the name the caller asked for — wrong for a write, and on a read it
+      // paints the anchor's state onto another worktree's card.
+      const slot = stripWorkspaceSlot(req.url || "/");
+      let fromHeader = registry.workspaceFromHeader(req);
+      if (fromHeader.kind === "unknown") {
+        // One re-read of the worktree list before refusing: the registry only
+        // rescans every 30s, so a worktree created since the last tick is
+        // unknown here and would be refused for no good reason. `refresh()`
+        // coalesces, so a burst of bad keys costs one `git worktree list`.
+        await registry.refresh();
+        fromHeader = registry.workspaceFromHeader(req);
+      }
+      let workspace;
+      if (fromHeader.kind === "unknown") {
+        respondUnknownWorkspaceHeader(res, fromHeader.key, registry);
+        return;
+      }
+      if (fromHeader.kind === "known") {
+        workspace = fromHeader.workspace;
+      } else if (slot.key !== null) {
+        const named = registry.get(slot.key);
+        if (!named) {
+          respondUnknownWorkspace(res, slot.key, registry);
+          return;
+        }
+        workspace = named;
+      } else {
+        workspace = registry.resolveWorkspace(req);
+      }
+      if (slot.key !== null) req.url = slot.url;
+      const { ctx, watcher, handles: watcherHandles } = workspace;
+      // Frames this request causes are about its workspace.
+      const broadcast = tagBroadcaster(ws.broadcast, frameTagOf(workspace));
+      if (handleConfigEndpoint(req, res, ctx)) return;
+      if (handleReloadSignalEndpoint(req, res, ws, broadcast)) return;
+      if (await handleApiRoutes(req, res, ctx, watcher, ws, assets, wsHealthTracker, watcherHandles, registry, broadcast)) return;
+      res.writeHead(404);
+      res.end("Not found");
+    } catch (err) {
+      // An async request handler that throws is an unhandled rejection, and
+      // node's default is to take the process down — one malformed request
+      // would stop the dashboard for every worktree. Answer 500 instead.
+      console.error("[server] request failed:", err);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      }
+      if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
+    }
   });
 
   server.on("upgrade", (req, socket, head) => {
@@ -838,17 +1014,22 @@ export async function startServer(
 
   // Start heartbeat monitor — periodically checks for unresponsive tasks and
   // broadcasts alerts via WebSocket.
+  // Monitors run once per process. Heartbeat and concurrency read the anchor's
+  // runs, so their frames are the anchor's; memory is the machine's, so every
+  // workspace's viewer should see it.
+  const anchorBroadcast = tagBroadcaster(ws.broadcast, workspaceTagOf(ctx));
+  const everyWorkspaceBroadcast = tagBroadcaster(ws.broadcast, BROADCAST_ALL_WORKSPACES);
   if (isInScope(scope, "hench")) {
-    startHeartbeatMonitor(watcherHandles.henchRunsDir, ws.broadcast);
-    startConcurrencyMonitor(ctx, ws.broadcast);
-    startMemoryMonitor(ws.broadcast);
+    startHeartbeatMonitor(watcherHandles.henchRunsDir, anchorBroadcast);
+    startConcurrencyMonitor(ctx, anchorBroadcast);
+    startMemoryMonitor(everyWorkspaceBroadcast, watcherHandles.henchRunsDir);
 
     // Start periodic usage cleanup — prunes orphaned aggregation entries
     // for tasks that no longer exist in the PRD (configurable, default weekly).
     const cleanupInterval = registerUsageScheduler({
       ctx,
       getAggregator: () => getAggregator(watcherHandles.henchRunsDir),
-      broadcast: ws.broadcast,
+      broadcast: anchorBroadcast,
       collectAllIds: collectAllIds as CollectAllIdsFn,
       loadPRD: loadPRDSync,
     } satisfies RegisterSchedulerOptions);
@@ -857,7 +1038,7 @@ export async function startServer(
 
   // Start WS health broadcast — periodically sends connection health
   // metrics to all connected dashboard clients.
-  const wsHealthInterval = startWsHealthBroadcast(ws.broadcast, wsHealthTracker, ws.clientCount);
+  const wsHealthInterval = startWsHealthBroadcast(everyWorkspaceBroadcast, wsHealthTracker, ws.clientCount);
   watcherHandles.monitorIntervals.push(wsHealthInterval);
 
   // Under --verbose, periodically confirm the server is still alive — it's
@@ -878,7 +1059,16 @@ export async function startServer(
   const mcpSchemaWatchers = startMcpSchemaWatcher();
   for (const w of mcpSchemaWatchers) watcherHandles.watchers.push(w);
 
-  const server = createHttpServer(ctx, watcher, ws, assets, wsHealthTracker, watcherHandles);
+  // Workspaces: the anchor is what was set up above, eagerly, exactly as
+  // before; any other worktree of this repository is created on first use.
+  const registry = new WorkspaceRegistry({
+    anchor: { ctx, watcher, handles: watcherHandles },
+    hooks: createWorkspaceHooks(ws),
+    log: isVerbose() ? verbose : () => {},
+  });
+  registry.start();
+
+  const server = createHttpServer(registry, ws, assets, wsHealthTracker);
 
   return new Promise<StartResult>((resolvePromise, rejectPromise) => {
     server.once("error", (err: NodeJS.ErrnoException) => {
@@ -927,7 +1117,7 @@ export async function startServer(
       //   3. HTTP server                (drain in-flight requests)
       //   4. Port file                  (orchestrator discovery)
       // A second signal forces immediate exit; overall timeout prevents hangs.
-      registerShutdownHandlers(server, ws, portFilePath, actualPort, undefined, {}, watcherHandles);
+      registerShutdownHandlers(server, ws, portFilePath, actualPort, undefined, {}, watcherHandles, registry);
       // Last-resort safety net: remove PRD cache even if graceful shutdown never runs.
       if (watcherHandles.prdCacheDir) {
         const cacheToRemove = watcherHandles.prdCacheDir;

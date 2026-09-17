@@ -12,6 +12,7 @@
  * - Visual indicators (color-coded) for approaching resource limits
  */
 
+import { getWebSocketUrl, acceptsFrame } from "../base-path.js";
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 
@@ -109,8 +110,7 @@ export function ConcurrencyPanel() {
     fetchConcurrency();
 
     // Connect to WebSocket for real-time updates
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = getWebSocketUrl();
     let ws: WebSocket | null = null;
 
     try {
@@ -121,6 +121,8 @@ export function ConcurrencyPanel() {
         if (!mounted) return;
         try {
           const msg = JSON.parse(event.data);
+          // Another worktree's frame on the shared socket — not ours to react to.
+          if (!acceptsFrame(msg)) return;
           if (msg.type === "hench:concurrency-status") {
             setStatus((prev) => ({
               processCount: msg.processCount,

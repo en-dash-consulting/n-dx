@@ -14,12 +14,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../../../src/process/exec.js", () => ({
   exec: vi.fn(),
   execShellCmd: vi.fn(),
+  // The changed-file discovery resolves the project's position inside its
+  // repository (repoRelativePrefix) before it filters bookkeeping paths.
+  execStdout: vi.fn(),
 }));
 
-import { exec, execShellCmd } from "../../../src/process/exec.js";
+import { exec, execShellCmd, execStdout } from "../../../src/process/exec.js";
 
 const mockExec = vi.mocked(exec);
 const mockExecShellCmd = vi.mocked(execShellCmd);
+const mockExecStdout = vi.mocked(execStdout);
 
 /** A diff stat with real changes, so validation proceeds to the test command. */
 const DIFF_WITH_CHANGES = " src/foo.ts | 5 +++--\n";
@@ -38,6 +42,8 @@ beforeEach(() => {
     exitCode: 0,
     error: null,
   });
+  // No repo root reported — the project is treated as the repository root.
+  mockExecStdout.mockResolvedValue("");
 });
 
 describe("validateCompletion timeout propagation", () => {
