@@ -387,7 +387,29 @@ describe("explainSelection", () => {
     const completedIds = new Set(["t1", "t2"]);
     const explanation = explainSelection(items, { item: items[0]!, parents: [] }, completedIds);
 
+    expect(explanation.reason).toBe("ready_to_finalize");
     expect(explanation.summary).toContain("all children completed, ready to finalize");
+  });
+
+  it("reports the in_progress reason for a resumed task", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Task 1", status: "in_progress" }),
+    ];
+    const completedIds = new Set<string>();
+    const explanation = explainSelection(items, { item: items[0]!, parents: [] }, completedIds);
+
+    expect(explanation.reason).toBe("in_progress");
+    expect(explanation.summary).toContain("already in_progress");
+  });
+
+  it("reports the priority reason for an ordinary leaf task", () => {
+    const items: PRDItem[] = [
+      makeItem({ id: "t1", title: "Task 1", priority: "high" }),
+    ];
+    const completedIds = new Set<string>();
+    const explanation = explainSelection(items, { item: items[0]!, parents: [] }, completedIds);
+
+    expect(explanation.reason).toBe("priority");
   });
 
   it.each(["deferred", "cancelled"] as const)(
@@ -415,6 +437,7 @@ describe("explainSelection", () => {
       const completedIds = new Set(["t1"]);
       const explanation = explainSelection(items, { item: items[0]!, parents: [] }, completedIds);
 
+      expect(explanation.reason).toBe("priority");
       expect(explanation.summary).not.toContain("all children completed");
       expect(explanation.summary).toContain("high");
     },

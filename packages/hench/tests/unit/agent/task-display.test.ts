@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { displayTaskInfo } from "../../../src/agent/lifecycle/task-display.js";
+import { explainSelection, collectCompletedIds } from "../../../src/prd/rex-gateway.js";
+import type { PRDItem, SelectionExplanation } from "../../../src/prd/rex-gateway.js";
 import type { TaskBrief } from "../../../src/schema/index.js";
 
 describe("displayTaskInfo", () => {
@@ -121,5 +123,85 @@ describe("displayTaskInfo", () => {
     const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
     expect(allOutput).not.toContain("auto");
     expect(allOutput).not.toContain("Selected:");
+  });
+
+  describe("selection reason is read from the reason code, not the prose", () => {
+    /** A feature whose only child is completed — the finalize-ready shape. */
+    function finalizeReadyTree(): { items: PRDItem[]; selected: PRDItem } {
+      const child: PRDItem = {
+        id: "task-1",
+        title: "Child task",
+        level: "task",
+        status: "completed",
+        priority: "medium",
+      };
+      const parent: PRDItem = {
+        id: "feat-1",
+        title: "Feature One",
+        level: "feature",
+        status: "pending",
+        priority: "medium",
+        children: [child],
+      };
+      return { items: [parent], selected: parent };
+    }
+
+    function explainFor(items: PRDItem[], selected: PRDItem): SelectionExplanation {
+      return explainSelection(items, { item: selected, parents: [] }, collectCompletedIds(items));
+    }
+
+    it("renders the finalize label for a parent whose children are all completed", () => {
+      const { items, selected } = finalizeReadyTree();
+      displayTaskInfo(makeBrief({ id: selected.id, title: selected.title }), "auto", explainFor(items, selected));
+
+      const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+      expect(allOutput).toContain("all children completed, ready to finalize");
+    });
+
+    it("renders the finalize label even when rex rewords its summary", () => {
+      const { items, selected } = finalizeReadyTree();
+      const reworded: SelectionExplanation = {
+        ...explainFor(items, selected),
+        summary: '"Feature One" — all children done, ready to wrap up',
+      };
+      displayTaskInfo(makeBrief({ id: selected.id, title: selected.title }), "auto", reworded);
+
+      const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+      expect(allOutput).toContain("all children completed, ready to finalize");
+      expect(allOutput).not.toContain("medium priority");
+    });
+
+    it("renders the resuming label even when rex rewords its summary", () => {
+      const task: PRDItem = {
+        id: "task-1",
+        title: "Child task",
+        level: "task",
+        status: "in_progress",
+        priority: "medium",
+      };
+      const reworded: SelectionExplanation = {
+        ...explainFor([task], task),
+        summary: '"Child task" is still being worked on',
+      };
+      displayTaskInfo(makeBrief({ id: task.id, title: task.title }), "auto", reworded);
+
+      const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+      expect(allOutput).toContain("resuming in-progress task");
+      expect(allOutput).not.toContain("medium priority");
+    });
+
+    it("falls back to the priority label for an ordinary task", () => {
+      const task: PRDItem = {
+        id: "task-1",
+        title: "Child task",
+        level: "task",
+        status: "pending",
+        priority: "high",
+      };
+      displayTaskInfo(makeBrief({ id: task.id, title: task.title }), "auto", explainFor([task], task));
+
+      const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
+      expect(allOutput).toContain("high priority");
+    });
   });
 });

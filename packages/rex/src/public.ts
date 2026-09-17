@@ -256,7 +256,7 @@ export {
   matchTasksByKeywords,
   requirementsScore,
 } from "./core/next-task.js";
-export type { SelectionExplanation, TaskMatch, PrioritizationOptions, RiskTolerance } from "./core/next-task.js";
+export type { SelectionExplanation, SelectionReasonCode, TaskMatch, PrioritizationOptions, RiskTolerance } from "./core/next-task.js";
 
 // ---- Core: keywords ---------------------------------------------------------
 

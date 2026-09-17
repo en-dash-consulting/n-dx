@@ -1,5 +1,5 @@
 import type { TaskBrief } from "../../schema/index.js";
-import type { SelectionExplanation } from "../../prd/rex-gateway.js";
+import type { SelectionExplanation, SelectionReasonCode } from "../../prd/rex-gateway.js";
 import { subsection, stream, detail } from "../../types/output.js";
 
 export type SelectionReason = "auto" | "explicit" | "interactive";
@@ -75,14 +75,9 @@ export function displayTaskInfo(
 function formatSelectionSummary(explanation: SelectionExplanation): string {
   const parts: string[] = [];
 
-  // Priority / status context
-  if (explanation.summary.includes("already in_progress")) {
-    parts.push("resuming in-progress task");
-  } else if (explanation.summary.includes("all children completed")) {
-    parts.push("all children completed, ready to finalize");
-  } else {
-    parts.push(`${explanation.priority.itemPriority} priority`);
-  }
+  // Priority / status context. Branch on rex's reason code, never on the
+  // wording of `explanation.summary` — that sentence is rex's to reword.
+  parts.push(selectionReasonLabel(explanation.reason, explanation.priority.itemPriority));
 
   // Blocked higher-priority items
   if (explanation.priority.higherPriorityBlocked > 0) {
@@ -106,4 +101,16 @@ function formatSelectionSummary(explanation: SelectionExplanation): string {
   }
 
   return parts.join(", ");
+}
+
+/** Hench's own wording for each of rex's selection reason codes. */
+function selectionReasonLabel(reason: SelectionReasonCode, itemPriority: string): string {
+  switch (reason) {
+    case "in_progress":
+      return "resuming in-progress task";
+    case "ready_to_finalize":
+      return "all children completed, ready to finalize";
+    case "priority":
+      return `${itemPriority} priority`;
+  }
 }

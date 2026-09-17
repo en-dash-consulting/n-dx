@@ -2,11 +2,12 @@
 id: "4fc05c48-48b0-4da3-8126-4fa237b924d9"
 level: "epic"
 title: "Hench"
-status: "pending"
+status: "completed"
 startedAt: "2026-03-26T15:22:13.999Z"
-endedAt: "2026-09-10T17:19:14.641Z"
+completedAt: "2026-09-17T03:40:02.275Z"
+endedAt: "2026-09-17T03:40:02.275Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
-lastModified: "2026-09-12T09:42:35.682Z"
+lastModified: "2026-09-17T03:40:02.647Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -44,7 +45,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Web UI: Reorganize around SourceVision / Rex / Hench sections](./web-ui-reorganize-around-sourcevision/index.md) | completed |
 | [Fix hench parent auto-completion cascade silently skipped + add reconciliation sweep (#293)](./fix-hench-parent-auto-completion.md) | completed |
 | [Fix hench task-completion commit gap + fullTestCommand schema drop (#302)](./fix-hench-task-completion-commit-gap.md) | completed |
-| [Hench task display branches on rex prose, so a reworded selection summary silently blanks the finalize label](./hench-task-display-branches-on-rex.md) | pending |
+| [Hench task display branches on rex prose, so a reworded selection summary silently blanks the finalize label](./hench-task-display-branches-on-rex.md) | completed |
 | [Pre-run commit gate: verify uncommitted changes before starting a work loop](./pre-run-commit-gate-verify-uncommitted.md) | completed |
 | [RunRecord fields testGate, dependencyAudit and cleanupTransformations are stripped by the run-record schema on load](./runrecord-fields-testgate.md) | completed |
 | [Skill runs attribute tokens from a code-written usage mark taken when the task starts, not from a model-typed --startedAt window](./skill-runs-attribute-tokens-from-a.md) | completed |

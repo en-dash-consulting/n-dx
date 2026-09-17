@@ -246,8 +246,20 @@ function makeComparator(
   };
 }
 
+/**
+ * Machine-readable reason a task was selected.
+ *
+ * Consumers must branch on this, never on the wording of `summary`. Hench's
+ * task header did substring-match the summary, so rewording the sentence here
+ * silently degraded its display — the sentence is for humans, this is the
+ * contract.
+ */
+export type SelectionReasonCode = "in_progress" | "ready_to_finalize" | "priority";
+
 export interface SelectionExplanation {
-  /** Human-readable summary of why this task was selected. */
+  /** Why this task was selected, as a discriminator. See {@link SelectionReasonCode}. */
+  reason: SelectionReasonCode;
+  /** Human-readable summary of why this task was selected. Display only — never parse it. */
   summary: string;
   /** Priority reasoning. */
   priority: {
@@ -502,11 +514,13 @@ export function explainSelection(
   const traversalPath = selected.parents.map((p) => p.title);
   const itemPriority: Priority = selected.item.priority ?? "medium";
 
-  // Build human-readable summary
+  // Status context — the reason code and its sentence are decided together so a
+  // reworded sentence cannot leave the code behind.
+  let reason: SelectionReasonCode;
   const summaryParts: string[] = [];
 
-  // Status context
   if (selected.item.status === "in_progress") {
+    reason = "in_progress";
     summaryParts.push(`"${selected.item.title}" is already in_progress`);
   } else {
     // Check if this is a parent with all children done. The shared predicate,
@@ -514,10 +528,12 @@ export function explainSelection(
     // done after #364 narrowed the real rule to `completed`, so a parent with a
     // deferred child was announced as "all children completed".
     if (allChildrenSuccessful(selected.item, NO_VIRTUAL_COMPLETIONS)) {
+      reason = "ready_to_finalize";
       summaryParts.push(
         `"${selected.item.title}" — all children completed, ready to finalize`,
       );
     } else {
+      reason = "priority";
       summaryParts.push(
         `"${selected.item.title}" selected at ${itemPriority} priority`,
       );
@@ -544,6 +560,7 @@ export function explainSelection(
   }
 
   return {
+    reason,
     summary: summaryParts.join(" "),
     priority: {
       itemPriority,
