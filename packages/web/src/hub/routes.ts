@@ -5,6 +5,10 @@
  *   GET    /api/hub/projects        — registered projects with live child status
  *   POST   /api/hub/projects        — register { id, repoRoot, ndxBin, worktree?, name? } and start its server
  *   DELETE /api/hub/projects/:id    — stop the server and forget the project
+ *   DELETE /api/hub/projects/:id/worktrees/:path
+ *                                   — unregister one worktree; the last one
+ *                                     takes the project (and, with keepAlive
+ *                                     off, the hub) with it
  *
  * Deliberately framework-free and self-contained: the hub must not import
  * from `src/server/`, so the two JSON helpers are local rather than shared
@@ -22,6 +26,19 @@ const HUB_PREFIX = "/api/hub";
 const MAX_BODY_BYTES = 64 * 1024;
 /** Ids appear in paths (`/p/:id/`) and file names; keep them to a safe alphabet. */
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+/**
+ * Run `fn` once the response is off to the client.
+ *
+ * The hub closes itself when its last project unregisters, and that close
+ * destroys open sockets — including the one still carrying the answer that
+ * said so. Waiting for `finish` means the caller reads its response and only
+ * then finds the port gone.
+ */
+function afterResponse(res: ServerResponse, fn: () => void): void {
+  if (res.writableFinished) setImmediate(fn);
+  else res.once("finish", fn);
+}
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
@@ -170,9 +187,41 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
         error(res, 404, `No project registered as "${id}"`);
         return true;
       }
-      json(res, 200, { removed: id });
+      json(res, 200, { removed: id, hubExiting: hub.projectCount === 0 && !hub.keepAlive });
+      afterResponse(res, () => hub.exitIfEmpty());
       return true;
     }
+  }
+
+  // DELETE /projects/:id/worktrees/:encodedPath — `ndx start stop` in one
+  // worktree. The project stays up while other worktrees are registered.
+  const worktreeMatch = path.match(/^\/projects\/([^/]+)\/worktrees\/([^/]+)$/);
+  if (worktreeMatch && method === "DELETE") {
+    let id: string;
+    let worktree: string;
+    try {
+      id = decodeURIComponent(worktreeMatch[1]);
+      worktree = decodeURIComponent(worktreeMatch[2]);
+    } catch {
+      error(res, 400, "Malformed project id or worktree path");
+      return true;
+    }
+    const result = await hub.removeWorktree(id, worktree);
+    if (!result.projectKnown) {
+      error(res, 404, `No project registered as "${id}"`);
+      return true;
+    }
+    json(res, 200, {
+      project: result.project,
+      projectId: id,
+      worktree,
+      worktreeKnown: result.worktreeKnown,
+      projectRemoved: result.projectRemoved,
+      remaining: result.remaining,
+      hubExiting: result.hubExiting,
+    });
+    if (result.hubExiting) afterResponse(res, () => hub.exitIfEmpty());
+    return true;
   }
 
   error(res, 405, `${method} ${url} is not supported`);

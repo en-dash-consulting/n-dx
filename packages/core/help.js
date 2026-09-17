@@ -1035,16 +1035,33 @@ const ORCHESTRATOR_HELP_DEFS = {
     related: ["status"],
   },
   start: {
-    summary: "start the dashboard and MCP server",
-    description: "Starts the unified web server serving both the dashboard UI and\nMCP HTTP endpoints for Rex and SourceVision.",
+    summary: "serve this repository through the n-dx hub",
+    description:
+      "Registers this repository with the per-user hub and serves it at\n" +
+      "http://localhost:3117/p/<id>/ — dashboard UI and MCP HTTP endpoints for\n" +
+      "Rex and SourceVision. The hub starts on first use and runs one server per\n" +
+      "repository, so several projects share the port without colliding.\n\n" +
+      "--here opts out to the single-project server, which owns the port itself.",
     usage: "ndx start [subcommand] [options] [dir]",
     sections: [
       {
         title: "Subcommands",
-        content: "(none)              Start the server (foreground)\nstop                Stop a background server\nstatus              Check if a background server is running",
+        content:
+          "(none)              Register with the hub (or start the server, with --here)\n" +
+          "stop                Unregister this worktree (--here: stop the background server)\n" +
+          "status              Report the hub, this project and its URL",
       },
       {
-        title: "Port handling",
+        title: "Stopping",
+        content:
+          "'ndx start stop' unregisters the worktree it runs in. While another\n" +
+          "worktree of the repository is still registered, the project keeps being\n" +
+          "served; the last one unregisters the project and stops its server. A hub\n" +
+          "with no projects left exits, unless ~/.n-dx/config.json sets\n" +
+          "hub.keepAlive to true. 'ndx hub stop' stops the hub and every project.",
+      },
+      {
+        title: "Port handling (--here)",
         content:
           "Starting again for the same directory restarts that server on the same port.\n" +
           "If the port is held by an n-dx dashboard for a DIFFERENT directory, that\n" +
@@ -1053,20 +1070,45 @@ const ORCHESTRATOR_HELP_DEFS = {
       },
     ],
     options: [
-      { flag: "--port=<N>", description: "Server port (default: 3117); with --hub, the hub's port" },
-      { flag: "--background", description: "Run as a background daemon" },
-      { flag: "--hub", description: "Register this repository with the per-user hub and serve it at /p/<id>/ (also: web.mode \"hub\" in .n-dx.json)" },
-      { flag: "--here", description: "Force the single-project server, ignoring web.mode" },
-      { flag: "--open", description: "With --hub, open the project URL in the browser" },
+      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.n-dx/config.json); with --here, this server's port" },
+      { flag: "--here", description: "Single-project server instead of the hub (also: web.mode \"here\" in .n-dx.json)" },
+      { flag: "--hub", description: "Register with the hub — the default since 0.7.0; accepted for compatibility" },
+      { flag: "--background", description: "With --here, run as a background daemon" },
+      { flag: "--open", description: "Open the project URL in the browser" },
     ],
     examples: [
-      { command: "ndx start .", description: "Start server in foreground" },
-      { command: "ndx start --background .", description: "Start as background daemon" },
-      { command: "ndx start --hub .", description: "Register with the hub; several repos share port 3117" },
-      { command: "ndx start status .", description: "Check if server is running" },
-      { command: "ndx start stop .", description: "Stop background server" },
+      { command: "ndx start .", description: "Register with the hub; several repos share port 3117" },
+      { command: "ndx start status .", description: "Report the hub, this project and its URL" },
+      { command: "ndx start stop .", description: "Unregister this worktree" },
+      { command: "ndx start --here .", description: "Single-project server on this port" },
+      { command: "ndx start --here --background .", description: "Single-project server as a background daemon" },
     ],
-    related: ["web", "dev"],
+    related: ["hub", "web", "dev"],
+  },
+  hub: {
+    summary: "inspect or stop the per-user n-dx hub",
+    description:
+      "The hub is one process per user: it owns port 3117, keeps the project\n" +
+      "registry in ~/.n-dx/hub.json, and runs one dashboard server per registered\n" +
+      "repository. 'ndx start' starts and registers with it; these subcommands\n" +
+      "address the hub itself, from any directory.",
+    usage: "ndx hub [status|stop] [options]",
+    sections: [
+      {
+        title: "Subcommands",
+        content:
+          "status              Hub pid, port, uptime and every registered project (default)\n" +
+          "stop                Stop the hub and every project server it runs",
+      },
+    ],
+    options: [
+      { flag: "--port=<N>", description: "Hub port (default: 3117, or hub.port in ~/.n-dx/config.json)" },
+    ],
+    examples: [
+      { command: "ndx hub status", description: "What the hub is serving right now" },
+      { command: "ndx hub stop", description: "Stop the hub and every project server" },
+    ],
+    related: ["start"],
   },
   web: {
     summary: "alias for 'ndx start'",
@@ -1649,7 +1691,8 @@ export function formatMainHelp() {
   ], pad);
 
   section("SERVE", [
-    ["start [dir]", "Start dashboard + MCP server (--port=N, --background, --hub)"],
+    ["start [dir]", "Dashboard + MCP through the hub (--here: single-project server)"],
+    ["hub [status|stop]", "Inspect or stop the per-user hub"],
     ["dev [dir]", "Start dev server with live reload"],
     ["refresh [dir]", "Refresh dashboard artifacts (--ui-only, --data-only)"],
     ["export [dir]", "Export static deployable dashboard (--deploy=github)"],

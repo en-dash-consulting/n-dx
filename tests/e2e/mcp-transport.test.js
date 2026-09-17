@@ -78,7 +78,9 @@ describe("MCP HTTP transport (e2e)", { timeout: 120_000 }, () => {
     }
 
     // Start the server in the foreground (as a child process)
-    serverProcess = spawn("node", [CLI_PATH, "start", "--port=" + port, tmpDir], {
+    // `--here`: this suite drives the single-project server's own MCP
+    // endpoints. The hub-proxied ones are covered by mcp-transport-hub.test.js.
+    serverProcess = spawn("node", [CLI_PATH, "start", "--here", "--port=" + port, tmpDir], {
       stdio: "pipe",
       env: { ...process.env },
     });

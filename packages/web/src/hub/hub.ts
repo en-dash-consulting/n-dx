@@ -26,7 +26,9 @@ import { basename } from "node:path";
 import { ProjectSupervisor } from "./children.js";
 import type { ChildStatus, SupervisorOptions } from "./children.js";
 import {
+  hubConfigPath,
   hubPidPath,
+  loadHubConfig,
   loadRegistry,
   registryPath,
   removeHubPidFile,
@@ -50,6 +52,18 @@ export interface HubOptions {
   healthIntervalMs?: number;
   /** Passed to every {@link ProjectSupervisor}. */
   supervisor?: SupervisorOptions;
+  /**
+   * Stay up when the last project unregisters. Defaults to `hub.keepAlive`
+   * in `~/.n-dx/config.json`, which itself defaults to false.
+   */
+  keepAlive?: boolean;
+  /**
+   * Called once the registry has just become empty and `keepAlive` is off —
+   * {@link startHub} closes the hub. Fired by {@link Hub.exitIfEmpty} rather
+   * than from the removal itself, so the caller can wait until its HTTP
+   * response has flushed before pulling the server out from under it.
+   */
+  onEmpty?: () => void;
   log?: (message: string) => void;
 }
 
@@ -85,6 +99,32 @@ export interface ProjectView extends ProjectRecord {
   status: ChildStatus;
 }
 
+/** Outcome of unregistering one worktree from a project. */
+export interface WorktreeRemoval {
+  /** False when no project carries that id — the caller's marker files are stale. */
+  projectKnown: boolean;
+  /** False when the project is known but never had that worktree registered. */
+  worktreeKnown: boolean;
+  /** The project was unregistered and its server stopped: that was the last worktree. */
+  projectRemoved: boolean;
+  /** Worktrees still registered under the project, after the removal. */
+  remaining: string[];
+  /** The project as it now stands, or null once removed. */
+  project: ProjectView | null;
+  /** The hub has nothing left to serve and will exit (keepAlive is off). */
+  hubExiting: boolean;
+}
+
+/**
+ * Trailing separators are the only difference worth absorbing: both sides
+ * realpath their paths before they get here, so anything else that differs is
+ * a different directory.
+ */
+export function normalizeWorktree(path: string): string {
+  const trimmed = path.replace(/[/\\]+$/, "");
+  return trimmed || path;
+}
+
 /**
  * Hub state and operations, independent of HTTP so the routes stay thin and
  * the lifecycle is testable without a socket.
@@ -93,16 +133,21 @@ export class Hub {
   readonly hubHome: string;
   readonly registryPath: string;
   readonly startedAt = new Date().toISOString();
+  /** Stay up with an empty registry. Resolved once, at construction. */
+  readonly keepAlive: boolean;
   private readonly registry: HubRegistry;
   private readonly supervisors = new Map<string, ProjectSupervisor>();
   private readonly supervisorOptions: SupervisorOptions;
   private readonly log: (message: string) => void;
+  private readonly onEmpty: (() => void) | undefined;
   private port = 0;
 
   constructor(options: HubOptions = {}) {
     this.hubHome = resolveHubHome(options.homeDir);
     this.registryPath = registryPath(this.hubHome);
     this.log = options.log ?? (() => {});
+    this.onEmpty = options.onEmpty;
+    this.keepAlive = options.keepAlive ?? loadHubConfig(hubConfigPath(this.hubHome)).keepAlive === true;
     this.supervisorOptions = { log: this.log, ...options.supervisor };
     mkdirSync(this.hubHome, { recursive: true });
     this.registry = loadRegistry(this.registryPath);
@@ -183,6 +228,57 @@ export class Hub {
     return { created, project: { ...sup.record, status: sup.status() } };
   }
 
+  /** How many projects are registered. */
+  get projectCount(): number {
+    return this.supervisors.size;
+  }
+
+  /**
+   * Unregister one worktree from a project.
+   *
+   * Each worktree that ran `ndx start` is listed under the project, and the
+   * repository root is listed from the first registration onwards because it
+   * is what the project's server actually serves. Removing the last of them
+   * unregisters the project and stops that server; while any remain, the
+   * server keeps running for them.
+   */
+  async removeWorktree(id: string, worktree: string): Promise<WorktreeRemoval> {
+    const sup = this.supervisors.get(id);
+    if (!sup) {
+      return { projectKnown: false, worktreeKnown: false, projectRemoved: false, remaining: [], project: null, hubExiting: false };
+    }
+    const target = normalizeWorktree(worktree);
+    const before = sup.record.worktrees;
+    const remaining = before.filter((wt) => normalizeWorktree(wt) !== target);
+    const worktreeKnown = remaining.length !== before.length;
+    sup.record.worktrees = remaining;
+
+    if (remaining.length === 0) {
+      await this.removeProject(id);
+      const hubExiting = this.supervisors.size === 0 && !this.keepAlive;
+      return { projectKnown: true, worktreeKnown, projectRemoved: true, remaining, project: null, hubExiting };
+    }
+    this.persist();
+    return {
+      projectKnown: true,
+      worktreeKnown,
+      projectRemoved: false,
+      remaining,
+      project: { ...sup.record, status: sup.status() },
+      hubExiting: false,
+    };
+  }
+
+  /**
+   * Invoke the {@link HubOptions.onEmpty} hook when nothing is registered any
+   * more. Called by the route layer once its response has flushed — closing
+   * the server mid-response would strand the client that asked for it.
+   */
+  exitIfEmpty(): void {
+    if (this.supervisors.size > 0 || this.keepAlive) return;
+    this.onEmpty?.();
+  }
+
   /** Stop a project's server and forget it. False when the id is unknown. */
   async removeProject(id: string): Promise<boolean> {
     const sup = this.supervisors.get(id);
@@ -213,10 +309,22 @@ export class Hub {
 
 /** Start the hub: adopt registered servers, listen, health-check. */
 export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
-  const hub = new Hub(options);
   const requestedPort = options.port ?? DEFAULT_HUB_PORT;
   const healthIntervalMs = options.healthIntervalMs ?? 15_000;
   const log = options.log ?? (() => {});
+
+  // Closing on the last unregistration: `close` is only defined once the
+  // handle below exists, and nothing can call this before the server is
+  // listening, so the late binding is safe.
+  let closeSelf: (() => Promise<void>) | null = null;
+  const hub = new Hub({
+    ...options,
+    onEmpty: () => {
+      log("[hub] last project unregistered — exiting (set hub.keepAlive in ~/.n-dx/config.json to stay up)");
+      void closeSelf?.();
+      options.onEmpty?.();
+    },
+  });
 
   const server: Server = createServer((req: IncomingMessage, res: ServerResponse) => {
     void handleHubRoute(req, res, hub).then((handled) => {
@@ -246,7 +354,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
   healthTimer.unref();
 
   let closed = false;
-  return {
+  const handle: HubHandle = {
     port,
     hubHome: hub.hubHome,
     registryPath: hub.registryPath,
@@ -267,4 +375,6 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       });
     },
   };
+  closeSelf = () => handle.close({ stopChildren: true });
+  return handle;
 }

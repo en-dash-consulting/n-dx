@@ -21,6 +21,8 @@ export const HUB_REGISTRY_VERSION = 1;
 
 export const HUB_REGISTRY_FILE = "hub.json";
 export const HUB_PID_FILE = "hub.pid";
+/** User settings for the hub itself, distinct from any project's `.n-dx.json`. */
+export const HUB_CONFIG_FILE = "config.json";
 
 /** One registered repository and the server process serving it. */
 export interface ProjectRecord {
@@ -58,6 +60,18 @@ export interface HubPidFile {
   startedAt: string;
 }
 
+/** The `hub` section of `~/.n-dx/config.json`. Everything is optional. */
+export interface HubConfig {
+  /** Port the hub listens on. Core reads the same key to find it. */
+  port?: number;
+  /**
+   * Keep the hub running once its last project unregisters. Off by default:
+   * a hub with nothing to serve is a process holding 3117 for no reason, and
+   * the next `ndx start` spawns one in well under a second.
+   */
+  keepAlive?: boolean;
+}
+
 export function emptyRegistry(): HubRegistry {
   return { version: HUB_REGISTRY_VERSION, projects: {} };
 }
@@ -73,6 +87,32 @@ export function registryPath(hubHome: string): string {
 
 export function hubPidPath(hubHome: string): string {
   return join(hubHome, HUB_PID_FILE);
+}
+
+export function hubConfigPath(hubHome: string): string {
+  return join(hubHome, HUB_CONFIG_FILE);
+}
+
+/**
+ * Read `~/.n-dx/config.json`. Absent, unreadable or malformed yields `{}` —
+ * settings are a convenience, and refusing to start over a stray comma would
+ * take every dashboard on the machine with it. Values of the wrong type are
+ * dropped individually for the same reason.
+ */
+export function loadHubConfig(path: string): HubConfig {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf-8"));
+  } catch {
+    return {};
+  }
+  const hub = (parsed as { hub?: unknown })?.hub;
+  if (!hub || typeof hub !== "object") return {};
+  const { port, keepAlive } = hub as { port?: unknown; keepAlive?: unknown };
+  const config: HubConfig = {};
+  if (typeof port === "number" && Number.isInteger(port) && port > 0 && port <= 65535) config.port = port;
+  if (typeof keepAlive === "boolean") config.keepAlive = keepAlive;
+  return config;
 }
 
 /**

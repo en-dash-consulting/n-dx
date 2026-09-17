@@ -10,9 +10,13 @@ import { DEFAULT_TIMEOUT, removeTmpDir, waitForPidExit } from "./e2e-helpers.js"
 const CLI_PATH = join(import.meta.dirname, "../../packages/core/cli.js");
 const LOOPBACK_HOST = "127.0.0.1";
 
+// `--here` on every invocation: since 0.7.0 `ndx start` registers with the
+// per-user hub by default, and this suite is about the single-project server
+// that owns the port — the hub's own behaviour is covered by
+// tests/e2e/cli-start-hub.test.js, which redirects $N_DX_HOME.
 function runResult(args) {
   try {
-    const stdout = execFileSync("node", [CLI_PATH, "start", ...args], {
+    const stdout = execFileSync("node", [CLI_PATH, "start", "--here", ...args], {
       encoding: "utf-8",
       timeout: DEFAULT_TIMEOUT,
       stdio: "pipe",
@@ -353,14 +357,17 @@ describe("n-dx start", { timeout: 120_000 }, () => {
   // ── Help text ────────────────────────────────────────────────────────
 
   describe("help text", () => {
-    it("shows start in the main help output", () => {
+    it("shows start and hub in the main help output", () => {
       const output = execFileSync("node", [CLI_PATH], {
         encoding: "utf-8",
         timeout: DEFAULT_TIMEOUT,
         stdio: "pipe",
       });
-      expect(output).toContain("start");
-      expect(output).toContain("dashboard + MCP");
+      // `start` serves through the hub since 0.7.0, so the summary says so and
+      // names the way back to the single-project server.
+      expect(output).toMatch(/start \[dir\]\s+Dashboard \+ MCP through the hub/);
+      expect(output).toContain("--here");
+      expect(output).toMatch(/hub \[status\|stop\]/);
     });
   });
 });

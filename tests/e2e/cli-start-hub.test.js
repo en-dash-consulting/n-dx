@@ -231,14 +231,14 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
     expect(plain.stdout).toContain("served through the n-dx hub");
     expect((await getJson(`http://127.0.0.1:${hubPort}/api/hub/health`)).status).toBe(200);
 
-    // stop and status recognise the marker and leave the hub alone.
-    const stop = runStart(["stop", worktreeA]);
-    expect(stop.code).toBe(0);
-    expect(stop.stdout).toContain("served through the n-dx hub");
-    expect((await getJson(`http://127.0.0.1:${hubPort}/api/hub/health`)).status).toBe(200);
+    // status reads the marker and reports the hub, the project and the URL.
+    // (What `stop` does with it is the next two tests.)
     const status = runStart(["status", worktreeA]);
-    expect(status.stdout).toContain("registered with the n-dx hub");
-    expect(status.stdout).toContain(`/p/alpha-app/`);
+    expect(status.stdout).toContain("served through the n-dx hub");
+    expect(status.stdout).toContain(`Hub:        PID ${hubHealth.body.pid}, port ${hubPort}`);
+    expect(status.stdout).toContain('Project:    "alpha-app" is healthy');
+    expect(status.stdout).toContain("Worktrees:  2 registered");
+    expect(status.stdout).toContain(`http://localhost:${hubPort}/p/alpha-app/`);
   });
 
   it("--here still starts the single-project server on the requested port", async () => {
@@ -255,5 +255,59 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
     } finally {
       runStart(["stop", repoB]);
     }
+  });
+
+  it("ndx hub status names the hub and every project registered on it", async () => {
+    if (!canBindPorts) return;
+    const result = runCli(["hub", "status", `--port=${hubPort}`]);
+    expect(result.code, result.stderr + result.stdout).toBe(0);
+    expect(result.stdout).toContain(`n-dx hub: running (PID`);
+    expect(result.stdout).toContain(`port ${hubPort}`);
+    expect(result.stdout).toContain(join(home, "hub.json"));
+    expect(result.stdout).toContain("alpha-app");
+    expect(result.stdout).toContain(repoA);
+    expect(result.stdout).toContain("beta-app");
+  });
+
+  it("stop in one of two worktrees unregisters only that worktree; the project stays served", async () => {
+    if (!canBindPorts) return;
+    const before = (await getJson(`http://127.0.0.1:${hubPort}/api/hub/projects`))
+      .body.projects.find((p) => p.id === "alpha-app");
+    expect(before.worktrees).toEqual([repoA, worktreeA]);
+
+    const stop = runStart(["stop", worktreeA]);
+    expect(stop.code, stop.stderr + stop.stdout).toBe(0);
+    expect(stop.stdout).toContain(`unregistered ${worktreeA} from project "alpha-app"`);
+    expect(stop.stdout).toContain("Still served for 1 worktree(s)");
+
+    // Same server, one fewer worktree — nothing was restarted.
+    const after = (await getJson(`http://127.0.0.1:${hubPort}/api/hub/projects`))
+      .body.projects.find((p) => p.id === "alpha-app");
+    expect(after.worktrees).toEqual([repoA]);
+    expect(after.pid).toBe(before.pid);
+    expect((await getJson(`http://127.0.0.1:${hubPort}/p/alpha-app/api/status`)).status).toBe(200);
+
+    // The worktree's marker files are gone: it points at no server now.
+    await expect(readFile(join(worktreeA, ".n-dx-web.pid"), "utf-8")).rejects.toThrow();
+    await expect(readFile(join(worktreeA, ".n-dx-web.port"), "utf-8")).rejects.toThrow();
+    expect(runStart(["status", worktreeA]).stdout).toContain("No background server recorded");
+  });
+
+  it("stop in the last worktree unregisters the project, and the hub exits with its last project", async () => {
+    if (!canBindPorts) return;
+    const hubPid = (await getJson(`http://127.0.0.1:${hubPort}/api/hub/health`)).body.pid;
+    // Beta is still registered from an earlier test; drop it so alpha is last.
+    const dropBeta = await fetch(`http://127.0.0.1:${hubPort}/api/hub/projects/beta-app`, { method: "DELETE" });
+    expect(dropBeta.status).toBe(200);
+
+    const stop = runStart(["stop", repoA]);
+    expect(stop.code, stop.stderr + stop.stdout).toBe(0);
+    expect(stop.stdout).toContain('unregistered "alpha-app" from the n-dx hub and stopped its server');
+    expect(stop.stdout).toContain("the hub exited too");
+
+    // keepAlive is unset, so the hub really goes — pid gone, pid file gone.
+    expect(await waitForPidExit(hubPid, 20_000)).toBe(true);
+    await expect(readFile(join(home, "hub.pid"), "utf-8")).rejects.toThrow();
+    expect(runCli(["hub", "status", `--port=${hubPort}`]).stdout).toContain("not running");
   });
 });

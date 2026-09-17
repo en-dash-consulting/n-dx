@@ -52,6 +52,7 @@ import { resolveCommandTimeout, withCommandTimeout } from "./cli-timeout.js";
 import { runCI } from "./ci.js";
 import {
   runWeb,
+  runHub,
   isProcessRunning,
   readPidFile,
   isHubMarker,
@@ -374,7 +375,7 @@ let staleCheckResult = null;
  * mix a diagnosis of the project into an answer about the CLI, which is exactly
  * the confusion the command exists to remove.
  */
-const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "which", "auth"]);
+const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "which", "auth", "hub"]);
 
 /**
  * Spawn options that make each child tree-killable by the tracker. Owned by
@@ -1974,6 +1975,16 @@ async function handleDev(rest) {
   exitWithCleanup(code);
 }
 
+async function handleHub(rest) {
+  try {
+    exitWithCleanup(await runHub(rest));
+  } catch (err) {
+    if (err instanceof ExitRequest) throw err;
+    console.error(formatError(err));
+    exitWithCleanup(1);
+  }
+}
+
 async function handleStart(rest, commandName = "start") {
   const dir = resolveDir(rest);
   try {
@@ -2811,6 +2822,7 @@ const COMMAND_DISPATCH = new Map([
   ["dev",               handleDev],
   ["start",             (rest) => handleStart(rest, "start")],
   ["web",               (rest) => handleStart(rest, "web")],
+  ["hub",               handleHub],
   ["export",            handleExport],
   ["install-sample",    handleInstallSample],
   ["destroy-sample",    handleDestroySample],

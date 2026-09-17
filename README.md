@@ -194,8 +194,10 @@ Iterative improvement loop: re-analyze the codebase, accept new recommendations 
 
 ```sh
 ndx status .                # PRD tree with completion stats
-ndx start .                 # dashboard + MCP server (port 3117)
-ndx start --background .    # daemon mode
+ndx start .                 # register with the hub; dashboard + MCP at /p/<id>/ on 3117
+ndx start status .          # hub, project and URL
+ndx start stop .            # unregister this worktree
+ndx start --here .          # single-project server that owns the port instead
 ndx usage .                 # token usage analytics
 ```
 
@@ -315,7 +317,8 @@ Codex reads `.codex/config.toml` automatically — no manual registration requir
 The hub runs one dashboard server per registered repository and exposes each project's MCP endpoints under its id:
 
 ```sh
-n-dx-web hub                    # one per user, port 3117 (ndx start will register projects here in 0.7.0)
+ndx start .                     # starts the hub if needed and registers this repository
+ndx hub status                  # the hub's pid, port and every registered project
 # Claude example, for the project registered as <id>:
 claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex
 claude mcp add --transport http sourcevision http://localhost:3117/p/<id>/mcp/sourcevision

@@ -1963,9 +1963,11 @@ Self-heal settings (.n-dx.json):
 
 Web dashboard settings (.n-dx.json):
   web.port                 number    Dashboard server port (default: 3117)
-  web.mode                 string    "hub" makes 'ndx start' register with the per-user
-                                    hub (served at /p/<id>/); "here" runs the
-                                    single-project server (default)
+  web.mode                 string    "here" makes 'ndx start' run the single-project
+                                    server that owns the port; "hub" registers with
+                                    the per-user hub (served at /p/<id>/) — the
+                                    default, so this key only has to be set to
+                                    opt out
 
 Experimental settings (.n-dx.json) — BETA, off by default:
   experimental.posixFreezeTreeKill

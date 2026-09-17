@@ -483,6 +483,10 @@ describe("runWeb, on a busy port", () => {
    *
    * The SIGINT/SIGTERM handlers runWeb installs are removed afterwards so
    * repeated calls do not pile up listeners on the shared test process.
+   *
+   * `--here` because port occupancy is the single-project server's problem:
+   * since 0.7.0 the default registers with the hub, whose children bind
+   * ephemeral ports and never contend for 3117.
    */
   async function captureServeArgs(dir, rest) {
     const before = {
@@ -491,7 +495,7 @@ describe("runWeb, on a busy port", () => {
     };
     let serveArgs = null;
     try {
-      const code = await runWeb(dir, ["--quiet", ...rest], {
+      const code = await runWeb(dir, ["--quiet", "--here", ...rest], {
         exit: (c) => { throw new Error(`unexpected exit(${c})`); },
         flushExit: async () => {},
         run: async (_tool, args) => { serveArgs = args; return 0; },

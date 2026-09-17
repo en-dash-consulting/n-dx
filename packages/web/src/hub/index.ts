@@ -5,17 +5,20 @@
  * @module web/hub
  */
 
-export { startHub, Hub, DEFAULT_HUB_PORT } from "./hub.js";
-export type { HubOptions, HubHandle, CloseOptions, RegisterProjectInput, ProjectView } from "./hub.js";
+export { startHub, Hub, DEFAULT_HUB_PORT, normalizeWorktree } from "./hub.js";
+export type { HubOptions, HubHandle, CloseOptions, RegisterProjectInput, ProjectView, WorktreeRemoval } from "./hub.js";
 export { buildServeCommand, checkProjectHealth, ProjectSupervisor, MAX_RESPAWNS } from "./children.js";
 export type { ChildState, ChildStatus, SupervisorOptions } from "./children.js";
 export {
   HUB_REGISTRY_VERSION,
   HUB_REGISTRY_FILE,
   HUB_PID_FILE,
+  HUB_CONFIG_FILE,
   resolveHubHome,
   registryPath,
   hubPidPath,
+  hubConfigPath,
+  loadHubConfig,
   loadRegistry,
   saveRegistry,
   emptyRegistry,
@@ -24,7 +27,7 @@ export {
   removeHubPidFile,
   isPidAlive,
 } from "./registry.js";
-export type { HubRegistry, ProjectRecord, HubPidFile } from "./registry.js";
+export type { HubRegistry, ProjectRecord, HubPidFile, HubConfig } from "./registry.js";
 export { parseRegisterInput, handleHubRoute } from "./routes.js";
 export { decideProxy, matchProjectByDir, renderProjectList, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 export type { ProxyDecision } from "./proxy.js";
