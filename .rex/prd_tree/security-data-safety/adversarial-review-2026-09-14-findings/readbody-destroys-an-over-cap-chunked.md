@@ -2,7 +2,7 @@
 id: "88f193a3-110d-4d83-93f2-9fb73d34d12d"
 level: "task"
 title: "`readBody` destroys an over-cap chunked request before any response, so the client sees EPIPE instead of the documented 400"
-status: "pending"
+status: "completed"
 priority: "low"
 tags:
   - "ndx-adversarial-review"
@@ -10,11 +10,16 @@ tags:
   - "severity:low"
   - "web"
 source: "ndx-adversarial-review"
+startedAt: "2026-09-17T03:23:44.626Z"
+completedAt: "2026-09-17T03:27:57.520Z"
+endedAt: "2026-09-17T03:27:57.520Z"
+resolutionType: "code-change"
+resolutionDetail: "readBody(req, res) answers 413 with the same body as the Content-Length guard and lets the connection close cleanly instead of destroying the request; all 52 call sites pass the response, and a real-socket test pins the status line."
 acceptanceCriteria:
   - "A chunked POST with no Content-Length whose body exceeds `MAX_REQUEST_BODY_BYTES` receives an HTTP 413 status line before the connection closes"
   - "The `readBody` doc comment in `packages/web/src/server/response-utils.ts` describes the actual wire behaviour"
   - "A real-socket test (next to the Content-Length integration test in `packages/web/tests/unit/request-security.test.ts`) sends a chunked over-cap body and asserts on the status line received"
 description: "**Severity:** low · **Verdict:** should-fix · **Introduced in commit bd7fe245 (this branch)** · Found by `/ndx-adversarial-review` 2026-09-15.\n\n**Failure scenario.** `readBody` (`packages/web/src/server/response-utils.ts:57-70`) calls `req.destroy()` at `:65` when the streamed total passes the cap, then rejects. The doc comment (`:54`) says the caller's try/catch turns the rejection into a 400. Verified on the wire with a 12 MB chunked POST against a server that does exactly that: `errorResponse` runs with `res.headersSent === true` but the socket is already destroyed, the client receives zero bytes and EPIPE. No 400 or 413 is ever sent. The memory bound itself holds.\n\n**Refutation attempted.** Checked whether `handleRequestSecurity` catches this first — it only inspects Content-Length, so a chunked body reaches `readBody`. Checked whether Node buffers the response for a destroyed socket — it does not.\n\n**Reachability.** Only clients that send chunked bodies without Content-Length. The dashboard's `fetch` with a string body always sends Content-Length, so real users do not hit it; a hand-written client or a proxy that re-chunks would.\n\n**Not covered.** `response-utils.test.ts` tests the cap with a fake EventEmitter, so it never observes the wire; the integration test in `request-security.test.ts` covers only the Content-Length path.\n\n**Solution options.**\n1. *(Recommended)* In `readBody`, on overflow: stop listening, write `413` with the same JSON body the Content-Length guard uses, then `req.destroy()` after `res.end` — requires passing `res` into `readBody` or returning a typed error the route maps to 413. Fix the comment. Add the chunked wire test. Trivial cost.\n2. Leave behaviour, fix only the comment and add the wire test asserting the reset. Honest, but a client still cannot tell a cap rejection from a crash."
-lastModified: "2026-09-15T20:55:29.013Z"
+lastModified: "2026-09-17T03:27:57.898Z"
 lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
 ---
